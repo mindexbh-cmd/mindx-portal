@@ -7,7 +7,8 @@ import sqlite3, hashlib, os, json
 from datetime import datetime, date
 from functools import wraps
 
-app = Flask(__name__)
+import os
+app = Flask(__name__, template_folder=os.path.dirname(os.path.abspath(__file__)))
 app.secret_key = os.environ.get("SECRET_KEY", "mindx_secret_2026")
 DB_PATH = os.environ.get("DB_PATH", "mindx.db")
 
