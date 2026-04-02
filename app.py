@@ -1,0 +1,849 @@
+"""
+MINDX PORTAL - مركز مايندكس للتعليم والتدريب
+Flask + SQLite | Python 3.12
+"""
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, g
+import sqlite3, hashlib, os, json
+from datetime import datetime, date
+from functools import wraps
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "mindx_secret_2026")
+DB_PATH = os.environ.get("DB_PATH", "mindx.db")
+
+# ═══════════════════════════════════════
+#  DATABASE
+# ═══════════════════════════════════════
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
+    return g.db
+
+@app.teardown_appcontext
+def close_db(e=None):
+    db = g.pop("db", None)
+    if db: db.close()
+
+def init_db():
+    db = sqlite3.connect(DB_PATH)
+    db.row_factory = sqlite3.Row
+    db.executescript("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        personal_id TEXT,
+        whatsapp TEXT,
+        parent_name TEXT,
+        parent_whatsapp TEXT,
+        group_name TEXT,
+        level TEXT,
+        schedule_days TEXT,
+        schedule_time TEXT,
+        teacher TEXT,
+        course TEXT,
+        enrollment_date TEXT,
+        status TEXT DEFAULT 'active',
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        teacher TEXT,
+        course TEXT,
+        level TEXT,
+        days TEXT,
+        time TEXT,
+        zoom_link TEXT,
+        max_students INTEGER DEFAULT 8
+    );
+    CREATE TABLE IF NOT EXISTS attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        group_name TEXT,
+        date TEXT,
+        status TEXT,
+        note TEXT,
+        recorded_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        amount REAL,
+        installment INTEGER DEFAULT 1,
+        paid_date TEXT,
+        due_date TEXT,
+        status TEXT DEFAULT 'pending',
+        note TEXT,
+        recorded_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to TEXT,
+        department TEXT,
+        priority TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'pending',
+        due_date TEXT,
+        created_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS evaluations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        group_name TEXT,
+        teacher TEXT,
+        eval_month TEXT,
+        reading REAL, writing REAL, listening REAL,
+        speaking REAL, vocabulary REAL, grammar REAL,
+        behavior REAL, participation REAL,
+        notes TEXT,
+        sent_to_parent INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS violations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        group_name TEXT,
+        violation_type TEXT,
+        title TEXT,
+        description TEXT,
+        action_taken TEXT,
+        points INTEGER DEFAULT 0,
+        date TEXT,
+        status TEXT DEFAULT 'open',
+        recorded_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS curriculum_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT,
+        teacher TEXT,
+        unit TEXT,
+        lesson TEXT,
+        skills TEXT,
+        session_date TEXT,
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        group_name TEXT,
+        reason TEXT,
+        points INTEGER DEFAULT 0,
+        given_by TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS faq (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        department TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        event_date TEXT,
+        event_type TEXT,
+        groups_involved TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    def hp(p): return hashlib.sha256(p.encode()).hexdigest()
+
+    # Users
+    users = [
+        ("admin","admin123","محمد إبراهيم","admin"),
+        ("reception","rec123","أحمد يونس","reception"),
+        ("students","stu123","أحمد إبراهيم","students"),
+        ("media","med123","زينب إبراهيم","media"),
+        ("curriculum","cur123","فاطمة إبراهيم","curriculum"),
+        ("hq","hq123","رائد الحايكي","hq"),
+        ("ideas","id123","إبراهيم عبد الرسول","ideas"),
+        ("teacher1","tea123","كوثر شعبان","teacher"),
+        ("teacher2","tea456","زهراء نوح","teacher"),
+        ("parent1","par123","ولي أمر","parent"),
+    ]
+    for u,p,n,r in users:
+        try: db.execute("INSERT INTO users(username,password,name,role) VALUES(?,?,?,?)",(u,hp(p),n,r))
+        except: pass
+
+    # Groups
+    groups = [
+        ("مجموعة 01","زهراء نوح","MAC 1","قراءة 2.1","الجمعة، السبت","11:40-12:40","https://zoom.us/j/demo1",8),
+        ("مجموعة 10","كوثر شعبان","MAC 1.2","MAC 1.2","الاثنين، الأربعاء","4:10-5:10","https://zoom.us/j/demo2",7),
+        ("مجموعة 15","كوثر شعبان","قراءة 2.1","قراءة 2.1","الجمعة، السبت","11:00-12:00","https://zoom.us/j/demo3",8),
+        ("مجموعة 5.2","زهراء نوح","MAC 1.1","MAC 1.1","الأحد، الثلاثاء","7:30-8:30","https://zoom.us/j/demo4",6),
+        ("مجموعة 11","كوثر شعبان","MAC 1.1","MAC 1.1","الأحد، الثلاثاء","3:00-4:00","https://zoom.us/j/demo5",8),
+    ]
+    for g2 in groups:
+        try: db.execute("INSERT INTO groups(name,teacher,course,level,days,time,zoom_link,max_students) VALUES(?,?,?,?,?,?,?,?)",g2)
+        except: pass
+
+    # Students
+    students = [
+        ("تسنيم السيد محمود","200603680","33117717","السيد محمود","33322829","مجموعة 01","قراءة 2.1","الجمعة، السبت","11:40-12:40","زهراء نوح","MAC 1","active"),
+        ("خولة أحمد عادل","211010979","37744575","أحمد عادل","38889109","مجموعة 15","قراءة 2.1","الجمعة، السبت","11:00-12:00","كوثر شعبان","قراءة 2.1","active"),
+        ("دانيال محمد منعم","201112795","66305005","محمد منعم","39883303","مجموعة 15","قراءة 2.1","الجمعة، السبت","11:00-12:00","كوثر شعبان","قراءة 2.1","active"),
+        ("رجاني عبدالحميد حسن","200605054","39222293","عبدالحميد حسن","39891188","مجموعة 01","قراءة 2.1","الجمعة، السبت","11:40-12:40","زهراء نوح","MAC 1","active"),
+        ("فاطمة حسين مشاخيل","191206245","66976742","حسين مشاخيل","33577794","مجموعة 01","قراءة 2.1","الجمعة، السبت","11:40-12:40","زهراء نوح","MAC 1","active"),
+        ("فاطمة حسين مهدي","200110268","34348389","حسين مهدي","36462640","مجموعة 15","قراءة 2.1","الجمعة، السبت","11:00-12:00","كوثر شعبان","قراءة 2.1","active"),
+        ("كوثر صادق الشعلة","201116570","33494411","صادق الشعلة","33974889","مجموعة 01","قراءة 2.1","الجمعة، السبت","11:40-12:40","زهراء نوح","MAC 1","active"),
+        ("أية زكريا علي حسن","36338283","36338283","زكريا علي","33337526","مجموعة 10","MAC 1.2","الاثنين، الأربعاء","4:10-5:10","كوثر شعبان","MAC 1.2","active"),
+        ("أحمد يوسف الولد","33661723","33661723","يوسف الولد","39804033","مجموعة 11","MAC 1.1","الأحد، الثلاثاء","3:00-4:00","كوثر شعبان","MAC 1.1","active"),
+        ("محمد مصطفى مكي","38201219","38201219","مصطفى مكي","36121561","مجموعة 01","قراءة 2.1","الجمعة، السبت","11:40-12:40","زهراء نوح","MAC 1","active"),
+    ]
+    for s in students:
+        try:
+            db.execute("""INSERT INTO students(name,personal_id,whatsapp,parent_name,parent_whatsapp,
+                group_name,level,schedule_days,schedule_time,teacher,course,status,enrollment_date)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'2026-01-31')""", s)
+        except: pass
+
+    # Tasks
+    tasks = [
+        ("ملف الأسئلة الشائعة لأولياء الأمور","مطلوب من 3 أقسام — استقبال وطلاب ومقر","أحمد يونس","الاستقبال","high","pending","2026-04-05","admin"),
+        ("نظام إشعارات الحضور والغياب","متى ترسل الرسائل ومتى يكون الاتصال","أحمد يونس","الاستقبال","high","pending","2026-04-03","admin"),
+        ("متابعة تقدم الدروس","زهراء نوح لم تسجل منذ أسبوعين","فاطمة إبراهيم","المناهج","high","in_progress","2026-04-03","admin"),
+        ("تفاصيل الرحلة المدرسية","أي مجموعة، الوقت، المكان، الكادر","أحمد إبراهيم","شؤون الطلاب","medium","pending","2026-04-10","admin"),
+        ("تدريب رائد على شراء الجوائز","إبراهيم عبد الرسول يدرب رائد","إبراهيم عبد الرسول","الأفكار","medium","pending","2026-04-08","admin"),
+        ("إضافة إيميلات الموظفين في Jira","رسالة تعريفية لجميع الموظفين","وفاء شاكر","أمانة السر","medium","pending","2026-04-06","admin"),
+        ("تجهيز مواد التصوير لرمضان","15 ريلز + 4 فيديوهات احترافية","زينب إبراهيم","الإعلام","high","pending","2026-04-07","admin"),
+    ]
+    for t in tasks:
+        try: db.execute("INSERT INTO tasks(title,description,assigned_to,department,priority,status,due_date,created_by) VALUES(?,?,?,?,?,?,?,?)",t)
+        except: pass
+
+    # Violations
+    violations = [
+        (None,"محمد مصطفى مكي","مجموعة 01","سلوك","يقاطع الحصة باستمرار","يقاطع الحصة ويصدر أصواتاً مزعجة","تم التواصل مع ولي الأمر",2,"2026-03-28","open","كوثر شعبان"),
+        (None,"أحمد يوسف الولد","مجموعة 11","غياب","غياب أسبوعين متواصلين","لم يحضر أي حصة منذ أسبوعين","جاري التحقيق",3,"2026-03-10","open","أحمد يونس"),
+        (None,"منتظر صادق","مجموعة 11","غياب","3 حصص بدون إشعار","غياب متكرر بدون عذر","إرسال إنذار",2,"2026-03-25","open","أحمد يونس"),
+        (None,"فاطمة حسين مهدي","مجموعة 15","دفع","تأخر في سداد القسط","متأخر +45 يوم","إشعار مالي أُرسل",0,"2026-03-15","open","أحمد يونس"),
+    ]
+    for v in violations:
+        try: db.execute("INSERT INTO violations(student_id,student_name,group_name,violation_type,title,description,action_taken,points,date,status,recorded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)",v)
+        except: pass
+
+    # Payments
+    payments = [
+        (1,"تسنيم السيد محمود",35,1,"2026-02-01","2026-02-01","paid","","admin"),
+        (2,"خولة أحمد عادل",35,2,None,"2026-03-01","pending","","admin"),
+        (6,"فاطمة حسين مهدي",35,2,None,"2026-02-15","pending","","admin"),
+        (8,"أية زكريا علي",35,1,None,"2026-04-01","pending","","admin"),
+        (3,"دانيال محمد منعم",70,1,"2026-02-01","2026-02-01","paid","دفع قسطين","admin"),
+    ]
+    for p2 in payments:
+        try: db.execute("INSERT INTO payments(student_id,student_name,amount,installment,paid_date,due_date,status,note,recorded_by) VALUES(?,?,?,?,?,?,?,?,?)",p2)
+        except: pass
+
+    # FAQ
+    faqs = [
+        ("ما هو مستوى ابني/ابنتي في المركز؟","يمكنك الاطلاع على المستوى الحالي من خلال التقييم الشهري المرسل عبر الواتساب. للاستفسار تواصل معنا على الرقم الرسمي فقط.","الاستقبال"),
+        ("لماذا لم يتوقف المركز في هذه المناسبة؟","نسعى لإتمام الخطة الدراسية والساعات المتفق عليها. في حال التوقف سيتم إشعاركم مسبقاً عبر الواتساب.","الاستقبال"),
+        ("ما المحتوى الذي تعلمه الطالب هذا الشهر؟","يُرسل ملخص المحتوى الشهري لأولياء الأمور في نهاية كل شهر.","شؤون الطلاب"),
+        ("كيف أعرف أن ابني حضر الحصة؟","يُرسل إشعار الغياب تلقائياً عبر الواتساب فور تسجيله. إذا لم تصلك رسالة فابنك حاضر.","الاستقبال"),
+        ("ما الفرق بين منهج Macmillan وOxford؟","اعتمدنا منهج Oxford CLIL الذي يدمج اللغة مع المحتوى العلمي، وهو أقرب لنظام البكالوريا الدولية IB.","المناهج"),
+        ("كيف يمكنني التواصل مع المعلمة؟","يتم التواصل حصراً عبر الرقم الرسمي للمركز خلال ساعات الدوام.","الاستقبال"),
+        ("متى يُرسل التقييم الشهري؟","في نهاية كل شهر. تقييم الطلاب ذوي المستوى المنخفض يُرسل أولاً مع توضيح.","شؤون الطلاب"),
+    ]
+    for f in faqs:
+        try: db.execute("INSERT INTO faq(question,answer,department) VALUES(?,?,?)",f)
+        except: pass
+
+    # Events
+    events = [
+        ("اليوم المفتوح — أونلاين","اتصال 15 دقيقة للطلاب المحتاجين فقط. حجز عبر Google Form","2026-04-07","open_day","الكل"),
+        ("رحلة الطلاب الصغار","الصف الرضة حتى الرابع — شهر أبريل","2026-04-15","trip","الصغار"),
+        ("تسليم التقييم الشهري","نهاية كل شهر — من المعلمات","2026-04-28","deadline","الكل"),
+    ]
+    for e in events:
+        try: db.execute("INSERT INTO events(title,description,event_date,event_type,groups_involved) VALUES(?,?,?,?,?)",e)
+        except: pass
+
+    db.commit()
+    db.close()
+    print("✅ قاعدة البيانات جاهزة")
+
+# ═══════════════════════════════════════
+#  AUTH
+# ═══════════════════════════════════════
+ROLE_PAGES = {
+    "admin":      ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai"],
+    "reception":  ["dashboard","students","attendance","payments","tasks","faq","whatsapp","ai"],
+    "students":   ["dashboard","students","attendance","tasks","evaluations","violations","points","events","faq","ai"],
+    "media":      ["dashboard","tasks","events","ai"],
+    "curriculum": ["dashboard","students","curriculum","evaluations","tasks","ai"],
+    "hq":         ["dashboard","tasks","events","ai"],
+    "ideas":      ["dashboard","tasks","points","events","ai"],
+    "teacher":    ["dashboard","students","attendance","curriculum","evaluations","points","ai"],
+    "parent":     ["dashboard","ai"],
+}
+ROLE_LABELS = {
+    "admin":"الإدارة العامة","reception":"الاستقبال","students":"شؤون الطلاب",
+    "media":"الإعلام والتدريب","curriculum":"المناهج والامتحانات","hq":"شؤون المقر",
+    "ideas":"الأفكار والتحفيز","teacher":"معلمة","parent":"ولي أمر"
+}
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user" not in session:
+            return redirect("/")
+        return f(*args, **kwargs)
+    return decorated
+
+def hp(p): return hashlib.sha256(p.encode()).hexdigest()
+
+# ═══════════════════════════════════════
+#  ROUTES — AUTH
+# ═══════════════════════════════════════
+@app.route("/")
+def index():
+    if "user" in session:
+        return redirect("/dashboard")
+    return render_template("login.html")
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    d = request.json
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
+                      (d["username"], hp(d["password"]))).fetchone()
+    if not user:
+        return jsonify({"ok": False, "error": "بيانات خاطئة"})
+    session["user"] = dict(user)
+    return jsonify({"ok": True, "user": dict(user)})
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("app.html",
+        user=session["user"],
+        role_label=ROLE_LABELS.get(session["user"]["role"],""),
+        pages=ROLE_PAGES.get(session["user"]["role"],[])
+    )
+
+# ═══════════════════════════════════════
+#  API — DASHBOARD
+# ═══════════════════════════════════════
+@app.route("/api/dashboard")
+@login_required
+def api_dashboard():
+    db = get_db()
+    today = date.today().isoformat()
+    return jsonify({
+        "total_students": db.execute("SELECT COUNT(*) FROM students WHERE status='active'").fetchone()[0],
+        "total_groups":   db.execute("SELECT COUNT(*) FROM groups").fetchone()[0],
+        "absent_today":   db.execute("SELECT COUNT(*) FROM attendance WHERE date=? AND status='absent'",(today,)).fetchone()[0],
+        "pending_tasks":  db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending'").fetchone()[0],
+        "pending_pay":    db.execute("SELECT COUNT(*) FROM payments WHERE status='pending'").fetchone()[0],
+        "open_violations":db.execute("SELECT COUNT(*) FROM violations WHERE status='open'").fetchone()[0],
+        "recent_tasks":   [dict(r) for r in db.execute("SELECT * FROM tasks WHERE status!='done' ORDER BY created_at DESC LIMIT 6").fetchall()],
+        "recent_absent":  [dict(r) for r in db.execute("SELECT * FROM attendance WHERE date=? AND status='absent' LIMIT 5",(today,)).fetchall()],
+        "groups":         [dict(r) for r in db.execute("SELECT g.*, (SELECT COUNT(*) FROM students s WHERE s.group_name=g.name AND s.status='active') as count FROM groups g").fetchall()],
+    })
+
+# ═══════════════════════════════════════
+#  API — STUDENTS
+# ═══════════════════════════════════════
+@app.route("/api/students")
+@login_required
+def api_students():
+    db = get_db()
+    q = request.args.get("q","")
+    group = request.args.get("group","")
+    status = request.args.get("status","")
+    sql = "SELECT * FROM students WHERE 1=1"
+    params = []
+    if q:
+        sql += " AND (name LIKE ? OR personal_id LIKE ? OR whatsapp LIKE ?)"
+        params += [f"%{q}%",f"%{q}%",f"%{q}%"]
+    if group:
+        sql += " AND group_name=?"
+        params.append(group)
+    if status:
+        sql += " AND status=?"
+        params.append(status)
+    sql += " ORDER BY name"
+    students = [dict(r) for r in db.execute(sql,params).fetchall()]
+    # حساب نسبة الغياب
+    for s in students:
+        total = db.execute("SELECT COUNT(*) FROM attendance WHERE student_id=?OR student_name=?",(s["id"],s["name"])).fetchone()[0]
+        absent = db.execute("SELECT COUNT(*) FROM attendance WHERE (student_id=? OR student_name=?) AND status='absent'",(s["id"],s["name"])).fetchone()[0]
+        s["absence_rate"] = round((absent/total*100) if total>0 else 0,1)
+        s["total_sessions"] = total
+    return jsonify({"students": students, "total": len(students)})
+
+@app.route("/api/students/<int:sid>")
+@login_required
+def api_student_detail(sid):
+    db = get_db()
+    s = db.execute("SELECT * FROM students WHERE id=?", (sid,)).fetchone()
+    if not s: return jsonify({"error":"not found"}), 404
+    attendance = [dict(r) for r in db.execute("SELECT * FROM attendance WHERE student_id=? OR student_name=? ORDER BY date DESC LIMIT 20",(sid,s["name"])).fetchall()]
+    payments   = [dict(r) for r in db.execute("SELECT * FROM payments WHERE student_id=? ORDER BY created_at DESC",(sid,)).fetchall()]
+    evals      = [dict(r) for r in db.execute("SELECT * FROM evaluations WHERE student_id=? ORDER BY created_at DESC",(sid,)).fetchall()]
+    violations = [dict(r) for r in db.execute("SELECT * FROM violations WHERE student_id=? OR student_name=? ORDER BY date DESC",(sid,s["name"])).fetchall()]
+    points     = db.execute("SELECT SUM(points) FROM points WHERE student_id=?",(sid,)).fetchone()[0] or 0
+    return jsonify({"student":dict(s),"attendance":attendance,"payments":payments,"evaluations":evals,"violations":violations,"points":points})
+
+@app.route("/api/students", methods=["POST"])
+@login_required
+def api_add_student():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO students(name,personal_id,whatsapp,parent_name,parent_whatsapp,
+        group_name,level,schedule_days,schedule_time,teacher,course,status,enrollment_date,notes)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (d.get("name"),d.get("personal_id"),d.get("whatsapp"),d.get("parent_name"),
+         d.get("parent_whatsapp"),d.get("group_name"),d.get("level"),d.get("schedule_days"),
+         d.get("schedule_time"),d.get("teacher"),d.get("course"),d.get("status","active"),
+         d.get("enrollment_date",date.today().isoformat()),d.get("notes")))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/students/<int:sid>", methods=["PUT"])
+@login_required
+def api_update_student(sid):
+    d = request.json
+    db = get_db()
+    fields = ["name","personal_id","whatsapp","parent_name","parent_whatsapp","group_name","level","schedule_days","schedule_time","teacher","course","status","notes"]
+    sets = ", ".join(f"{f}=?" for f in fields if f in d)
+    vals = [d[f] for f in fields if f in d] + [sid]
+    db.execute(f"UPDATE students SET {sets} WHERE id=?", vals)
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — ATTENDANCE
+# ═══════════════════════════════════════
+@app.route("/api/attendance")
+@login_required
+def api_attendance():
+    db = get_db()
+    group = request.args.get("group","")
+    date_ = request.args.get("date", date.today().isoformat())
+    records = [dict(r) for r in db.execute(
+        "SELECT * FROM attendance WHERE group_name=? AND date=? ORDER BY student_name",
+        (group, date_)).fetchall()]
+    # إحصائيات
+    present = sum(1 for r in records if r["status"]=="present")
+    absent  = sum(1 for r in records if r["status"]=="absent")
+    late    = sum(1 for r in records if r["status"]=="late")
+    return jsonify({"records":records,"present":present,"absent":absent,"late":late,"date":date_})
+
+@app.route("/api/attendance", methods=["POST"])
+@login_required
+def api_add_attendance():
+    d = request.json
+    db = get_db()
+    # حذف السجل القديم إن وجد
+    db.execute("DELETE FROM attendance WHERE student_name=? AND group_name=? AND date=?",
+               (d["student_name"],d["group_name"],d["date"]))
+    db.execute("""INSERT INTO attendance(student_id,student_name,group_name,date,status,note,recorded_by)
+        VALUES(?,?,?,?,?,?,?)""",
+        (d.get("student_id"),d["student_name"],d["group_name"],d["date"],
+         d["status"],d.get("note",""),session["user"]["name"]))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — PAYMENTS
+# ═══════════════════════════════════════
+@app.route("/api/payments")
+@login_required
+def api_payments():
+    db = get_db()
+    status = request.args.get("status","")
+    sql = "SELECT * FROM payments"
+    params = []
+    if status:
+        sql += " WHERE status=?"
+        params.append(status)
+    sql += " ORDER BY created_at DESC"
+    payments = [dict(r) for r in db.execute(sql,params).fetchall()]
+    total_paid    = db.execute("SELECT SUM(amount) FROM payments WHERE status='paid'").fetchone()[0] or 0
+    total_pending = db.execute("SELECT SUM(amount) FROM payments WHERE status='pending'").fetchone()[0] or 0
+    return jsonify({"payments":payments,"total_paid":total_paid,"total_pending":total_pending})
+
+@app.route("/api/payments/<int:pid>/confirm", methods=["POST"])
+@login_required
+def api_confirm_payment(pid):
+    db = get_db()
+    db.execute("UPDATE payments SET status='paid', paid_date=? WHERE id=?",
+               (date.today().isoformat(), pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/payments", methods=["POST"])
+@login_required
+def api_add_payment():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO payments(student_id,student_name,amount,installment,due_date,status,note,recorded_by)
+        VALUES(?,?,?,?,?,?,?,?)""",
+        (d.get("student_id"),d["student_name"],d["amount"],d.get("installment",1),
+         d["due_date"],d.get("status","pending"),d.get("note",""),session["user"]["name"]))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — TASKS
+# ═══════════════════════════════════════
+@app.route("/api/tasks")
+@login_required
+def api_tasks():
+    db = get_db()
+    dept = request.args.get("department","")
+    status = request.args.get("status","")
+    sql = "SELECT * FROM tasks WHERE 1=1"
+    params = []
+    if dept: sql += " AND department=?"; params.append(dept)
+    if status: sql += " AND status=?"; params.append(status)
+    sql += " ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC"
+    tasks = [dict(r) for r in db.execute(sql,params).fetchall()]
+    return jsonify({"tasks":tasks})
+
+@app.route("/api/tasks", methods=["POST"])
+@login_required
+def api_add_task():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO tasks(title,description,assigned_to,department,priority,status,due_date,created_by)
+        VALUES(?,?,?,?,?,?,?,?)""",
+        (d["title"],d.get("description"),d.get("assigned_to"),d.get("department"),
+         d.get("priority","medium"),"pending",d.get("due_date"),session["user"]["name"]))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/tasks/<int:tid>", methods=["PUT"])
+@login_required
+def api_update_task(tid):
+    d = request.json
+    db = get_db()
+    if "status" in d:
+        db.execute("UPDATE tasks SET status=? WHERE id=?", (d["status"],tid))
+        db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — EVALUATIONS
+# ═══════════════════════════════════════
+@app.route("/api/evaluations")
+@login_required
+def api_evaluations():
+    db = get_db()
+    group = request.args.get("group","")
+    month = request.args.get("month","")
+    sql = "SELECT * FROM evaluations WHERE 1=1"
+    params = []
+    if group: sql += " AND group_name=?"; params.append(group)
+    if month: sql += " AND eval_month=?"; params.append(month)
+    sql += " ORDER BY created_at DESC"
+    evals = [dict(r) for r in db.execute(sql,params).fetchall()]
+    return jsonify({"evaluations":evals})
+
+@app.route("/api/evaluations", methods=["POST"])
+@login_required
+def api_add_evaluation():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO evaluations(student_id,student_name,group_name,teacher,eval_month,
+        reading,writing,listening,speaking,vocabulary,grammar,behavior,participation,notes)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (d.get("student_id"),d["student_name"],d.get("group_name"),d.get("teacher"),
+         d.get("eval_month",date.today().strftime("%Y-%m")),
+         d.get("reading"),d.get("writing"),d.get("listening"),d.get("speaking"),
+         d.get("vocabulary"),d.get("grammar"),d.get("behavior"),d.get("participation"),
+         d.get("notes")))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — VIOLATIONS
+# ═══════════════════════════════════════
+@app.route("/api/violations")
+@login_required
+def api_violations():
+    db = get_db()
+    vtype  = request.args.get("type","")
+    status = request.args.get("status","")
+    q      = request.args.get("q","")
+    sql = "SELECT * FROM violations WHERE 1=1"
+    params = []
+    if vtype:  sql += " AND violation_type=?"; params.append(vtype)
+    if status: sql += " AND status=?"; params.append(status)
+    if q:      sql += " AND (student_name LIKE ? OR title LIKE ?)"; params += [f"%{q}%",f"%{q}%"]
+    sql += " ORDER BY date DESC"
+    violations = [dict(r) for r in db.execute(sql,params).fetchall()]
+    stats = {
+        "open":     db.execute("SELECT COUNT(*) FROM violations WHERE status='open'").fetchone()[0],
+        "resolved": db.execute("SELECT COUNT(*) FROM violations WHERE status='resolved'").fetchone()[0],
+        "high":     db.execute("SELECT COUNT(*) FROM violations WHERE points>=3").fetchone()[0],
+        "total_pts":db.execute("SELECT SUM(points) FROM violations").fetchone()[0] or 0,
+    }
+    return jsonify({"violations":violations,"stats":stats})
+
+@app.route("/api/violations", methods=["POST"])
+@login_required
+def api_add_violation():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO violations(student_id,student_name,group_name,violation_type,title,
+        description,action_taken,points,date,status,recorded_by)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+        (d.get("student_id"),d["student_name"],d.get("group_name"),d.get("violation_type"),
+         d["title"],d.get("description"),d.get("action_taken"),d.get("points",0),
+         d.get("date",date.today().isoformat()),"open",session["user"]["name"]))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/violations/<int:vid>/resolve", methods=["POST"])
+@login_required
+def api_resolve_violation(vid):
+    db = get_db()
+    db.execute("UPDATE violations SET status='resolved' WHERE id=?", (vid,))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — CURRICULUM
+# ═══════════════════════════════════════
+@app.route("/api/curriculum")
+@login_required
+def api_curriculum():
+    db = get_db()
+    group = request.args.get("group","")
+    sql = "SELECT * FROM curriculum_progress WHERE 1=1"
+    params = []
+    if group: sql += " AND group_name=?"; params.append(group)
+    sql += " ORDER BY session_date DESC LIMIT 20"
+    records = [dict(r) for r in db.execute(sql,params).fetchall()]
+    return jsonify({"records":records})
+
+@app.route("/api/curriculum", methods=["POST"])
+@login_required
+def api_add_curriculum():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO curriculum_progress(group_name,teacher,unit,lesson,skills,session_date,notes)
+        VALUES(?,?,?,?,?,?,?)""",
+        (d.get("group_name"),d.get("teacher"),d.get("unit"),d.get("lesson"),
+         d.get("skills"),d.get("session_date",date.today().isoformat()),d.get("notes")))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — POINTS
+# ═══════════════════════════════════════
+@app.route("/api/points")
+@login_required
+def api_points():
+    db = get_db()
+    top = db.execute("""SELECT student_name, group_name, SUM(points) as total
+        FROM points GROUP BY student_name ORDER BY total DESC LIMIT 10""").fetchall()
+    return jsonify({"top":[dict(r) for r in top]})
+
+@app.route("/api/points", methods=["POST"])
+@login_required
+def api_add_points():
+    d = request.json
+    db = get_db()
+    db.execute("""INSERT INTO points(student_id,student_name,group_name,reason,points,given_by)
+        VALUES(?,?,?,?,?,?)""",
+        (d.get("student_id"),d["student_name"],d.get("group_name"),
+         d.get("reason"),d.get("points",5),session["user"]["name"]))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — FAQ
+# ═══════════════════════════════════════
+@app.route("/api/faq")
+@login_required
+def api_faq():
+    db = get_db()
+    faqs = [dict(r) for r in db.execute("SELECT * FROM faq ORDER BY department, id").fetchall()]
+    return jsonify({"faqs":faqs})
+
+@app.route("/api/faq", methods=["POST"])
+@login_required
+def api_add_faq():
+    d = request.json
+    db = get_db()
+    db.execute("INSERT INTO faq(question,answer,department) VALUES(?,?,?)",
+               (d["question"],d["answer"],d.get("department","")))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — EVENTS
+# ═══════════════════════════════════════
+@app.route("/api/events")
+@login_required
+def api_events():
+    db = get_db()
+    events = [dict(r) for r in db.execute("SELECT * FROM events ORDER BY event_date").fetchall()]
+    return jsonify({"events":events})
+
+@app.route("/api/events", methods=["POST"])
+@login_required
+def api_add_event():
+    d = request.json
+    db = get_db()
+    db.execute("INSERT INTO events(title,description,event_date,event_type,groups_involved) VALUES(?,?,?,?,?)",
+               (d["title"],d.get("description"),d.get("event_date"),d.get("event_type"),d.get("groups_involved")))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ═══════════════════════════════════════
+#  API — GROUPS
+# ═══════════════════════════════════════
+@app.route("/api/groups")
+@login_required
+def api_groups():
+    db = get_db()
+    groups = [dict(r) for r in db.execute("""
+        SELECT g.*, (SELECT COUNT(*) FROM students s WHERE s.group_name=g.name AND s.status='active') as student_count
+        FROM groups g ORDER BY g.name""").fetchall()]
+    return jsonify({"groups":groups})
+
+# ═══════════════════════════════════════
+#  API — AI ASSISTANT
+# ═══════════════════════════════════════
+@app.route("/api/ai", methods=["POST"])
+@login_required
+def api_ai():
+    d = request.json
+    question = d.get("question","")
+    db = get_db()
+    today = date.today().isoformat()
+
+    # جمع البيانات
+    total_students = db.execute("SELECT COUNT(*) FROM students WHERE status='active'").fetchone()[0]
+    absent_today   = db.execute("SELECT COUNT(*) FROM attendance WHERE date=? AND status='absent'",(today,)).fetchone()[0]
+    pending_pay    = db.execute("SELECT COUNT(*) FROM payments WHERE status='pending'").fetchone()[0]
+    pending_tasks  = db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending'").fetchone()[0]
+    open_viol      = db.execute("SELECT COUNT(*) FROM violations WHERE status='open'").fetchone()[0]
+
+    absent_names = [r[0] for r in db.execute(
+        "SELECT student_name FROM attendance WHERE date=? AND status='absent'",(today,)).fetchall()]
+    overdue_pay  = [dict(r) for r in db.execute(
+        "SELECT student_name, amount, due_date FROM payments WHERE status='pending' ORDER BY due_date LIMIT 5").fetchall()]
+    high_absence = [dict(r) for r in db.execute("""
+        SELECT student_name, COUNT(*) as total,
+        SUM(CASE WHEN status='absent' THEN 1 ELSE 0 END) as absences
+        FROM attendance GROUP BY student_name
+        HAVING absences*1.0/total > 0.2 ORDER BY absences DESC LIMIT 5""").fetchall()]
+    pending_task_list = [dict(r) for r in db.execute(
+        "SELECT title, department, due_date FROM tasks WHERE status='pending' ORDER BY due_date LIMIT 5").fetchall()]
+
+    context = f"""
+أنت مساعد ذكي لمركز مايندكس للتعليم والتدريب في البحرين.
+بيانات المركز اليوم ({today}):
+- إجمالي الطلاب النشطين: {total_students}
+- الغائبون اليوم ({absent_today}): {', '.join(absent_names) if absent_names else 'لا أحد'}
+- الدفعات المعلقة: {pending_pay}
+- المهام المعلقة: {pending_tasks}
+- المخالفات المفتوحة: {open_viol}
+- أبرز الدفعات المتأخرة: {json.dumps(overdue_pay, ensure_ascii=False)}
+- طلاب نسبة غيابهم عالية: {json.dumps(high_absence, ensure_ascii=False)}
+- أبرز المهام المعلقة: {json.dumps(pending_task_list, ensure_ascii=False)}
+أقسام المركز: الإدارة (محمد إبراهيم)، الاستقبال (أحمد يونس)، شؤون الطلاب (أحمد إبراهيم)، الإعلام (زينب إبراهيم)، المناهج (فاطمة إبراهيم)، شؤون المقر (رائد الحايكي)، الأفكار (إبراهيم عبد الرسول)، المعلمات: كوثر شعبان + زهراء نوح.
+المنهج الجديد: Oxford CLIL (بديل Macmillan) — توافق مع البكالوريا الدولية IB.
+أجب بالعربي بشكل مختصر ومفيد.
+"""
+    # استخدام Anthropic API
+    try:
+        import urllib.request, urllib.error
+        api_key = os.environ.get("ANTHROPIC_API_KEY","")
+        if not api_key:
+            # رد ذكي بدون API
+            answer = generate_local_answer(question, absent_names, overdue_pay, pending_task_list, high_absence, total_students, absent_today, pending_pay, pending_tasks, open_viol)
+        else:
+            payload = json.dumps({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 500,
+                "system": context,
+                "messages": [{"role":"user","content":question}]
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=payload,
+                headers={"Content-Type":"application/json","x-api-key":api_key,"anthropic-version":"2023-06-01"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                answer = result["content"][0]["text"]
+    except Exception as e:
+        answer = generate_local_answer(question, absent_names, overdue_pay, pending_task_list, high_absence, total_students, absent_today, pending_pay, pending_tasks, open_viol)
+
+    return jsonify({"answer": answer})
+
+def generate_local_answer(q, absent_names, overdue_pay, pending_task_list, high_absence, total_students, absent_today, pending_pay, pending_tasks, open_viol):
+    q = q.lower()
+    if "غائب" in q or "حضور" in q or "غياب" in q:
+        if absent_names:
+            return f"الغائبون اليوم ({absent_today} طالب):\n" + "\n".join(f"• {n}" for n in absent_names)
+        return "لا يوجد غياب مسجل اليوم حتى الآن."
+    if "دفع" in q or "قسط" in q or "مال" in q:
+        r = f"الدفعات المعلقة: {pending_pay} دفعة\nأبرزها:\n"
+        for p in overdue_pay:
+            r += f"• {p['student_name']} — {p['amount']} BD (مستحق {p['due_date']})\n"
+        return r
+    if "مهام" in q or "متأخر" in q:
+        r = f"المهام المعلقة: {pending_tasks}\n"
+        for t in pending_task_list:
+            r += f"• {t['title']} ({t['department']}) — {t['due_date']}\n"
+        return r
+    if "نسبة" in q or "كثير" in q or "غياب عالي" in q:
+        if high_absence:
+            r = "الطلاب ذوو نسبة غياب عالية:\n"
+            for s in high_absence:
+                pct = round(s['absences']/s['total']*100)
+                r += f"• {s['student_name']} — {pct}% ({s['absences']}/{s['total']} حصص)\n"
+            return r
+        return "لا يوجد طلاب بنسبة غياب عالية حالياً."
+    if "مخالف" in q:
+        return f"المخالفات المفتوحة: {open_viol} مخالفة."
+    if "طالب" in q or "عدد" in q:
+        return f"إجمالي الطلاب النشطين: {total_students} طالب."
+    return f"ملخص المركز اليوم:\n• الطلاب النشطون: {total_students}\n• الغائبون اليوم: {absent_today}\n• الدفعات المعلقة: {pending_pay}\n• المهام المعلقة: {pending_tasks}\n• المخالفات المفتوحة: {open_viol}"
+
+# ═══════════════════════════════════════
+#  MAIN
+# ═══════════════════════════════════════
+if __name__ == "__main__":
+    if not os.path.exists(DB_PATH):
+        init_db()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
