@@ -1,9 +1,4 @@
-"""
-MINDX PORTAL - مركز مايندكس للتعليم والتدريب
-Flask + SQLite | Python 3.12"""
-MINDX PORTAL - مركز مايندكس للتعليم والتدريب
-Flask + SQLite | Python 3.12
-"""
+# Mindex Portal - Flask App
 from flask import Flask, request, jsonify, session, redirect, url_for, make_response
 import sqlite3, hashlib, os, json
 from datetime import datetime, date
