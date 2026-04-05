@@ -1031,7 +1031,7 @@ async function doImportFromSheets(){
   btn.disabled=true;
   resultEl.style.display='none';
   try{
-    const res = await api('/students/import',{method:'POST',body:JSON.stringify({sheet_url:url,gid:gid})});
+    const res = await api('/students/import','POST',{sheet_url:url,gid:gid});
     resultEl.style.display='block';
     if(res.ok){
       resultEl.style.background='#d1fae5';resultEl.style.color='#065f46';
