@@ -53,6 +53,49 @@ def init_db():
     db.commit(); db.close()
 
 if not os.path.exists(DB): init_db()
+def auto_import_students():
+    """Auto-import students from Google Sheets on startup if DB is empty."""
+    SHEET_ID = '1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4'
+    GID = '942035800'
+    try:
+        db = sqlite3.connect(DB)
+        count = db.execute('SELECT COUNT(*) FROM students').fetchone()[0]
+        if count > 0:
+            db.close()
+            return
+        csv_url = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}'
+        req = urllib.request.Request(csv_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode('utf-8-sig')
+        reader = csv.reader(io.StringIO(raw))
+        rows = list(reader)
+        header_idx = next((i for i, r in enumerate(rows) if any('اسم' in str(c) for c in r)), 1)
+        headers = rows[header_idx]
+        name_col = next((i for i, h in enumerate(headers) if 'اسم' in str(h)), 2)
+        wa_col = next((i for i, h in enumerate(headers) if 'واتس' in str(h) or 'هاتف' in str(h)), 3)
+        level_col = next((i for i, h in enumerate(headers) if 'صف' in str(h)), 4)
+        group_col = next((i for i, h in enumerate(headers) if 'مجموعة' in str(h)), 7)
+        added = 0
+        for row in rows[header_idx + 1:]:
+            if len(row) <= name_col: continue
+            name = row[name_col].strip()
+            if not name: continue
+            wa = row[wa_col].strip() if len(row) > wa_col else ''
+            level = row[level_col].strip() if len(row) > level_col else ''
+            group = row[group_col].strip() if len(row) > group_col else ''
+            exists = db.execute('SELECT id FROM students WHERE name=?', (name,)).fetchone()
+            if exists: continue
+            db.execute('INSERT INTO students (name, group_name, whatsapp, level, monthly_fee, status) VALUES (?,?,?,?,?,?)',
+                       (name, group, wa, level, 35, 'active'))
+            added += 1
+        db.commit()
+        db.close()
+        print(f'[auto-import] Added {added} students from Google Sheets')
+    except Exception as e:
+        print(f'[auto-import] Error: {e}')
+
+auto_import_students()
+
 
 def login_required(f):
     @wraps(f)
