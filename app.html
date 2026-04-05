@@ -331,6 +331,7 @@ async function renderStudents(c,q='',group='',status=''){
       </select>
     </div>
     <button class="btn btn-p" onclick="showAddStudentModal()">+ إضافة طالب</button>
+    <button class="btn" style="background:#10b981;color:#fff;margin-right:8px" onclick="showImportSheetsModal()">📊 استيراد من Google Sheets</button>
   </div>
   <div class="alert alert-warn">📌 إذا سجّل الطالب أثناء الدورة — عدّل تاريخ البداية وعدد الساعات في العقد</div>
   <div class="card"><div class="tw"><table>
@@ -1011,8 +1012,66 @@ function showBulkAttendance(){
   openModal('تسجيل الحضور الجماعي',`<p style="font-size:12px;color:var(--text2)">استخدم القوائم المنسدلة في الجدول لتسجيل حضور كل طالب مباشرة.</p>`,`<button class="btn btn-s" onclick="closeModal()">إغلاق</button>`);
 }
 
+
+function showImportSheetsModal(){
+  document.getElementById('import-sheets-overlay').style.display='flex';
+  document.getElementById('import-result').style.display='none';
+  document.getElementById('sheets-url-input').value='';
+}
+function closeImportSheetsModal(){
+  document.getElementById('import-sheets-overlay').style.display='none';
+}
+async function doImportFromSheets(){
+  const url = document.getElementById('sheets-url-input').value.trim();
+  const gid = document.getElementById('sheets-gid-input').value.trim() || '942035800';
+  const resultEl = document.getElementById('import-result');
+  const btn = document.getElementById('import-btn');
+  if(!url){alert('يرجى إدخال رابط الصفحة');return;}
+  btn.textContent='جاري الاستيراد...';
+  btn.disabled=true;
+  resultEl.style.display='none';
+  try{
+    const res = await api('/students/import',{method:'POST',body:JSON.stringify({sheet_url:url,gid:gid})});
+    resultEl.style.display='block';
+    if(res.ok){
+      resultEl.style.background='#d1fae5';resultEl.style.color='#065f46';
+      resultEl.innerHTML=`✅ تم الاستيراد بنجاح!<br>تمت إضافة <b>${res.added}</b> طالب جديد.<br>تم تخطي التكرار: <b>${res.skipped}</b> طالب (موجودين مسبقاً).`;
+      if(res.added>0){setTimeout(()=>{closeImportSheetsModal();go('students');},2000);}
+    } else {
+      resultEl.style.background='#fee2e2';resultEl.style.color='#991b1b';
+      resultEl.textContent='❌ '+res.msg;
+    }
+  } catch(e){
+    resultEl.style.display='block';resultEl.style.background='#fee2e2';resultEl.style.color='#991b1b';
+    resultEl.textContent='❌ خطأ: '+e.message;
+  }
+  btn.textContent='استيراد →';
+  btn.disabled=false;
+}
+
 // START
 go('dashboard');
 </script>
+
+<div id="import-sheets-overlay" style="display:none;position:fixed;inset:0;background:rgba(74,40,117,.55);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:32px;width:480px;max-width:95vw;direction:rtl">
+    <h3 style="color:#6B3FA0;margin-bottom:16px">📊 استيراد طلاب من Google Sheets</h3>
+    <p style="color:#666;font-size:13px;margin-bottom:16px">ألصق رابط صفحة Google Sheets. يجب أن تكون الصفحة عامة.<br>سيتم استيراد: اسم الطالب ، الواتساب ، الصف ، المجموعة.</p>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:#6B3FA0;font-weight:600;display:block;margin-bottom:6px">رابط Google Sheets:</label>
+      <input id="sheets-url-input" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:8px;font-size:13px;direction:ltr">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;color:#6B3FA0;font-weight:600;display:block;margin-bottom:6px">رقم الورقة (GID) - اختياري:</label>
+      <input id="sheets-gid-input" type="text" placeholder="942035800" value="942035800" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:8px;font-size:13px;direction:ltr">
+    </div>
+    <div id="import-result" style="display:none;margin-bottom:12px;padding:10px;border-radius:8px;font-size:13px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeImportSheetsModal()" style="padding:10px 20px;background:#f3eeff;color:#6B3FA0;border:none;border-radius:8px;cursor:pointer;font-size:14px">إلغاء</button>
+      <button onclick="doImportFromSheets()" id="import-btn" style="padding:10px 24px;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">استيراد →</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
