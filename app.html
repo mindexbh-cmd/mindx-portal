@@ -355,64 +355,41 @@ async function renderStudents(c,q='',group='',status=''){
   </table></div></div>`;
 }
 
-async function showStudentDetail(id){
-  const d=await api('/students/'+id);
-  const s=d.student;
+async async function showStudentDetail(id){
+  const d = await api('/students/'+id);
+  const s = d.student;
+  if(!s){return;}
+  const payRows = (s.payments||[]).map(p=>`
+    <tr><td>${p.date||'—'}</td><td>${p.amount||0} BHD</td><td><span class="badge ${p.status==='paid'?'badge-g':'badge-r'}">${p.status==='paid'?'مدفوع':'معلق'}</span></td></tr>
+  `).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text2)">لا يوجد</td></tr>';
+
   openModal(s.name,`
-  <div class="fgrid" style="margin-bottom:12px">
-    <div><div style="font-size:10px;color:var(--text2)">المجموعة</div><b>${s.group_name||'—'}</b></div>
-    <div><div style="font-size:10px;color:var(--text2)">المستوى</div><b>${s.level||'—'}</b></div>
-    <div><div style="font-size:10px;color:var(--text2)">المعلمة</div><b>${s.teacher||'—'}</b></div>
-    <div><div style="font-size:10px;color:var(--text2)">إجمالي النقاط</div><b style="color:var(--am)">🏆 ${d.points}</b></div>
+  <div class="fgrid" style="margin-bottom:16px">
+    <div class="stat-card" style="background:var(--pur-ll)">
+      <div class="stat-n" style="color:var(--pur)">${s.absence_rate??0}%</div>
+      <div class="stat-l">نسبة الغياب</div>
+    </div>
+    <div class="stat-card" style="background:#e8f5e9">
+      <div class="stat-n" style="color:#388e3c">${s.total_points??0}</div>
+      <div class="stat-l">النقاط</div>
+    </div>
+    <div class="stat-card" style="background:#fff3e0">
+      <div class="stat-n" style="color:#f57c00">${s.total_sessions??0}</div>
+      <div class="stat-l">الجلسات</div>
+    </div>
   </div>
-  <div class="tabs">
-    <button class="tab act" onclick="switchTab(this,'st-att')">الغياب (${d.attendance.length})</button>
-    <button class="tab" onclick="switchTab(this,'st-pay')">الدفع (${d.payments.length})</button>
-    <button class="tab" onclick="switchTab(this,'st-viol')">المخالفات (${d.violations.length})</button>
+  <div class="fgrid" style="margin-bottom:16px">
+    <div><span style="color:var(--text2);font-size:12px">المجموعة</span><div style="font-weight:600">${s.group_name||'—'}</div></div>
+    <div><span style="color:var(--text2);font-size:12px">المستوى</span><div style="font-weight:600">${s.level||'—'}</div></div>
+    <div><span style="color:var(--text2);font-size:12px">المعلمة</span><div style="font-weight:600">${s.teacher||'—'}</div></div>
+    <div><span style="color:var(--text2);font-size:12px">الواتساب</span><div dir="ltr" style="font-weight:600">${s.whatsapp||'—'}</div></div>
+    <div><span style="color:var(--text2);font-size:12px">الرسوم الشهرية</span><div style="font-weight:600">${s.monthly_fee||35} BHD</div></div>
+    <div><span style="color:var(--text2);font-size:12px">الحالة</span><div>${badge(s.status)}</div></div>
   </div>
-  <div id="st-att">
-    ${d.attendance.length?`<table style="font-size:11px;width:100%"><thead><tr><th>التاريخ</th><th>الحالة</th><th>ملاحظة</th></tr></thead><tbody>
-    ${d.attendance.slice(0,8).map(a=>`<tr><td>${a.date}</td><td>${badge(a.status)}</td><td>${a.note||'—'}</td></tr>`).join('')}
-    </tbody></table>`:'<p style="text-align:center;color:var(--text3);padding:12px;font-size:12px">لا سجلات</p>'}
-  </div>
-  <div id="st-pay" style="display:none">
-    ${d.payments.length?`<table style="font-size:11px;width:100%"><thead><tr><th>المبلغ</th><th>القسط</th><th>الاستحقاق</th><th>الحالة</th></tr></thead><tbody>
-    ${d.payments.map(p=>`<tr><td>${p.amount} BD</td><td>${p.installment}</td><td>${p.due_date||'—'}</td><td>${badge(p.status)}</td></tr>`).join('')}
-    </tbody></table>`:'<p style="text-align:center;color:var(--text3);padding:12px;font-size:12px">لا دفعات</p>'}
-  </div>
-  <div id="st-viol" style="display:none">
-    ${d.violations.length?`<table style="font-size:11px;width:100%"><thead><tr><th>المخالفة</th><th>النقاط</th><th>الحالة</th></tr></thead><tbody>
-    ${d.violations.map(v=>`<tr><td>${v.title}</td><td>${v.points}</td><td>${badge(v.status)}</td></tr>`).join('')}
-    </tbody></table>`:'<p style="text-align:center;color:var(--gr);padding:12px;font-size:12px">✓ لا مخالفات</p>'}
-  </div>
-  `,`
-  <button class="btn btn-wa" onclick="showWAModal('single','${s.name}','${s.group_name||''}');closeModal()">📱 واتساب</button>
-  <button class="btn btn-s" onclick="closeModal()">إغلاق</button>`);
+  <h4 style="margin-bottom:8px;color:var(--pur)">📋 آخر الدفعات</h4>
+  <div class="tw"><table style="width:100%"><thead><tr><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${payRows}</tbody></table></div>
+  `);
 }
-
-function switchTab(btn,id){
-  btn.closest('.modal-b').querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
-  btn.classList.add('act');
-  ['st-att','st-pay','st-viol'].forEach(i=>{const el=document.getElementById(i);if(el)el.style.display=i===id?'block':'none';});
-}
-
-function showAddStudentModal(){
-  openModal('+ إضافة طالب جديد',`
-  <div class="fgrid">
-    <div class="fg"><label>الاسم الكامل *</label><input class="inp" id="sn" placeholder="الاسم الرباعي"></div>
-    <div class="fg"><label>الرقم الشخصي</label><input class="inp" id="spid"></div>
-    <div class="fg"><label>واتساب الطالب</label><input class="inp" id="swa" dir="ltr"></div>
-    <div class="fg"><label>واتساب ولي الأمر</label><input class="inp" id="spwa" dir="ltr"></div>
-    <div class="fg"><label>اسم ولي الأمر</label><input class="inp" id="spar"></div>
-    <div class="fg"><label>المجموعة</label><input class="inp" id="sgrp"></div>
-    <div class="fg"><label>المستوى</label><input class="inp" id="slvl"></div>
-    <div class="fg"><label>تاريخ البداية</label><input class="inp" type="date" id="sdate" value="${new Date().toISOString().split('T')[0]}"></div>
-  </div>
-  <div class="fg"><label>ملاحظات</label><textarea class="inp" id="snotes"></textarea></div>
-  `,`<button class="btn btn-s" onclick="closeModal()">إلغاء</button>
-  <button class="btn btn-p" onclick="addStudent()">💾 حفظ</button>`);
-}
-
 async function addStudent(){
   const n=document.getElementById('sn').value.trim();
   if(!n){alert('الاسم مطلوب');return;}
@@ -482,7 +459,7 @@ async function loadAttendance(){
   document.getElementById('att-absent').textContent=d.absent;
   const stD=await api(`/students?group=${encodeURIComponent(group)}&status=active`);
   const table=document.getElementById('att-table');
-  const recorded=new Set(d.records.map(r=>r.student_name));
+  const recorded=new Set((d.records||d.attendance||[]).map(r=>r.student_name));
   table.innerHTML=`<div class="tw"><table>
     <thead><tr><th>الاسم</th><th>الحالة</th><th>ملاحظة</th><th>واتساب</th></tr></thead>
     <tbody>${stD.students.map(s=>{
@@ -654,8 +631,8 @@ async function renderViolations(c){
     <button class="btn btn-p" onclick="showAddViolModal()">+ تسجيل مخالفة</button>
   </div>
   <div class="stat-grid">
-    <div class="stat" style="border-top-color:var(--re)"><div>⚠️</div><div class="stat-v" style="color:var(--re)">${d.stats.open}</div><div class="stat-l">مفتوحة</div></div>
-    <div class="stat" style="border-top-color:var(--gr)"><div>✓</div><div class="stat-v" style="color:var(--gr)">${d.stats.resolved}</div><div class="stat-l">محلولة</div></div>
+    <div class="stat" style="border-top-color:var(--re)"><div>⚠️</div><div class="stat-v" style="color:var(--re)">${(d.stats||{}).open||0}</div><div class="stat-l">مفتوحة</div></div>
+    <div class="stat" style="border-top-color:var(--gr)"><div>✓</div><div class="stat-v" style="color:var(--gr)">${(d.stats||{}).resolved||0}</div><div class="stat-l">محلولة</div></div>
     <div class="stat" style="border-top-color:var(--am)"><div>🔴</div><div class="stat-v" style="color:var(--re)">${d.stats.high}</div><div class="stat-l">3 نقاط (خطيرة)</div></div>
     <div class="stat" style="border-top-color:var(--pur)"><div>📊</div><div class="stat-v" style="color:var(--pur)">${d.stats.total_pts}</div><div class="stat-l">مجموع النقاط</div></div>
   </div>
@@ -738,7 +715,7 @@ async function renderPoints(c){
   <div class="grid2">
     <div class="card">
       <div class="card-h"><h3>🏆 أعلى الطلاب نقاطاً</h3></div>
-      <div>${d.top.map((s,i)=>`
+      <div>${(d.top||[]).map((s,i)=>`
       <div class="row-item">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:18px">${['🥇','🥈','🥉'][i]||'🏅'}</span>
