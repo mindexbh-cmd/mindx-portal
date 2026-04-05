@@ -1,6 +1,6 @@
 # Mindex Portal - v3 Fixed
 from flask import Flask, render_template_string, request, jsonify, session, redirect, g
-import sqlite3, hashlib, os
+import sqlite3, hashlib, os, urllib.request, csv, io
 from datetime import date
 from functools import wraps
 
@@ -521,6 +521,79 @@ def api_users():
     db = get_db()
     rows = db.execute("SELECT id,username,name,role,department FROM users").fetchall()
     return jsonify({"users":[dict(r) for r in rows]})
+
+@app.route("/api/students/import", methods=["POST"])
+@login_required
+def api_import_students():
+    user = session.get("user", {})
+    if user.get("role") not in ["admin", "reception", "students"]:
+        return jsonify({"ok": False, "msg": "غير مصرح"}), 403
+    d = request.json or {}
+    sheet_url = d.get("sheet_url", "")
+    import re
+    m = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
+    if not m:
+        return jsonify({"ok": False, "msg": "رابط غير صحيح"})
+    sheet_id = m.group(1)
+    gid = d.get("gid", "942035800")
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    try:
+        req = urllib.request.Request(csv_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8-sig", errors="replace")
+    except Exception as e:
+        return jsonify({"ok": False, "msg": f"فشل جلب البيانات: {str(e)}"})
+    reader = csv.reader(io.StringIO(raw))
+    rows = list(reader)
+    header_row_idx = 1
+    for i, row in enumerate(rows[:5]):
+        for cell in row:
+            if 'اسم' in cell and 'طالب' in cell:
+                header_row_idx = i
+                break
+    if header_row_idx >= len(rows):
+        return jsonify({"ok": False, "msg": "لم يتم العثور على صف العناوين"})
+    headers = [h.strip() for h in rows[header_row_idx]]
+    col_name = 2
+    col_whatsapp = 3
+    col_level = 4
+    col_group = 7
+    for i, h in enumerate(headers):
+        h_clean = h.strip()
+        if 'اسم الطالب' in h_clean or ('اسم' in h_clean and 'طالب' in h_clean):
+            col_name = i
+        elif 'واتساب' in h_clean or 'هاتف' in h_clean:
+            col_whatsapp = i
+        elif 'صف' in h_clean or 'مستوى' in h_clean:
+            col_level = i
+        elif 'مجموع' in h_clean and i > 5:
+            col_group = i
+    db = get_db()
+    added = 0
+    skipped = 0
+    errors = []
+    data_rows = rows[header_row_idx + 1:]
+    for row in data_rows:
+        if len(row) <= col_name:
+            continue
+        name = row[col_name].strip() if len(row) > col_name else ""
+        if not name or name in ['', 'اسم الطالب']:
+            continue
+        whatsapp = row[col_whatsapp].strip() if len(row) > col_whatsapp else ""
+        level = row[col_level].strip() if len(row) > col_level else ""
+        group_name = row[col_group].strip() if len(row) > col_group else ""
+        existing = db.execute("SELECT id FROM students WHERE name=? AND status='active'", (name,)).fetchone()
+        if existing:
+            skipped += 1
+            continue
+        try:
+            db.execute("INSERT INTO students(name,group_name,teacher,whatsapp,level,zoom_link,monthly_fee) VALUES(?,?,?,?,?,?,?)",
+                (name, group_name, "", whatsapp, level, "", 35))
+            added += 1
+        except Exception as e:
+            errors.append(str(e))
+    db.commit()
+    return jsonify({"ok": True, "added": added, "skipped": skipped, "errors": errors[:5]})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
