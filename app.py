@@ -189,7 +189,31 @@ def dashboard():
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"app.html")) as f:
             html = f.read()
-        return render_template_string(html, user=session["user"])
+        u = session["user"]
+        role = u.get("role","")
+        role_labels = {
+            "admin":"الإدارة العامة","reception":"الاستقبال",
+            "students":"شؤون الطلاب","teacher":"المعلمات",
+            "media":"الإعلام","curriculum":"المناهج",
+            "ideas":"الأفكار","secretary":"أمانة السر",
+            "premises":"شؤون المقر","parent":"ولي أمر"
+        }
+        role_label = role_labels.get(role, role)
+        all_pages = ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai"]
+        role_pages = {
+            "admin": all_pages,
+            "reception": ["dashboard","students","groups","attendance","payments","faq","whatsapp","ai"],
+            "students": ["dashboard","students","attendance","violations","points","faq","ai"],
+            "teacher": ["dashboard","students","groups","attendance","curriculum","evaluations","faq","ai"],
+            "media": ["dashboard","events","faq","whatsapp","ai"],
+            "curriculum": ["dashboard","curriculum","evaluations","faq","ai"],
+            "ideas": ["dashboard","events","faq","ai"],
+            "secretary": ["dashboard","tasks","faq","ai"],
+            "premises": ["dashboard","tasks","faq","ai"],
+            "parent": ["dashboard","students","attendance","payments","faq","ai"]
+        }
+        pages = role_pages.get(role, ["dashboard","faq","ai"])
+        return render_template_string(html, user=u, role_label=role_label, pages=pages)
     except Exception as e:
         u = session.get("user",{})
         return f"<h2>مرحباً {u.get('name','')}</h2><p>دورك: {u.get('role','')}</p><p>خطأ: {str(e)}</p><a href='/api/logout'>خروج</a>"
