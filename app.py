@@ -242,7 +242,17 @@ def api_dashboard():
         pending_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending' AND department=?",(dept,)).fetchone()[0]
         recent_tasks = [dict(r) for r in db.execute("SELECT * FROM tasks WHERE status!='done' AND department=? ORDER BY rowid DESC LIMIT 6",(dept,)).fetchall()]
     pending_pay = db.execute("SELECT COUNT(*) FROM payments WHERE status='pending'").fetchone()[0]
-    return jsonify({"total_students":total_students,"absent_today":absent_today,"pending_tasks":pending_tasks,"pending_pay":pending_pay,"recent_tasks":recent_tasks,"open_violations":open_violations,"recent_absent":recent_absent,"user_name":user.get("name",""),"user_role":role,"user_dept":dept})
+    raw_groups = db.execute("SELECT g.*, (SELECT COUNT(*) FROM students s WHERE s.group_name=g.name AND s.status='active') as count FROM groups_tbl g ORDER BY g.name").fetchall()
+    groups = []
+    for g in raw_groups:
+        gd = dict(g)
+        sched = gd.get("schedule","")
+        parts = sched.split(" ") if sched else []
+        gd["course"] = gd.get("subject","")
+        gd["days"] = parts[0] if len(parts)>0 else ""
+        gd["time"] = " ".join(parts[1:]) if len(parts)>1 else ""
+        groups.append(gd)
+    return jsonify({"total_students":total_students,"absent_today":absent_today,"pending_tasks":pending_tasks,"pending_pay":pending_pay,"recent_tasks":recent_tasks,"open_violations":open_violations,"recent_absent":recent_absent,"groups":groups,"user_name":user.get("name",""),"user_role":role,"user_dept":dept})
 
 @app.route("/api/students")
 @login_required
