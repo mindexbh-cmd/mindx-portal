@@ -33,6 +33,9 @@ def init_db():
     CREATE TABLE IF NOT EXISTS points(id INTEGER PRIMARY KEY,student_name TEXT,reason TEXT,points INTEGER DEFAULT 5,date TEXT);
     CREATE TABLE IF NOT EXISTS faq(id INTEGER PRIMARY KEY,question TEXT,answer TEXT,department TEXT);
     CREATE TABLE IF NOT EXISTS groups_tbl(id INTEGER PRIMARY KEY,name TEXT,teacher TEXT,subject TEXT,level TEXT,zoom_link TEXT,schedule TEXT);
+CREATE TABLE IF NOT EXISTS evaluations(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,teacher TEXT,subject TEXT,score INTEGER DEFAULT 0,max_score INTEGER DEFAULT 100,notes TEXT,date TEXT);
+CREATE TABLE IF NOT EXISTS curriculum(id INTEGER PRIMARY KEY,group_name TEXT,teacher TEXT,subject TEXT,week TEXT,topic TEXT,status TEXT DEFAULT 'pending',date TEXT,notes TEXT);
+CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,title TEXT,description TEXT,date TEXT,time TEXT,location TEXT,target TEXT DEFAULT 'all',created_by TEXT);
     """)
     users = [
         ("admin","admin123","محمد إبراهيم","admin","الإدارة العامة"),
@@ -330,6 +333,28 @@ def api_add_student():
     db.commit()
     return jsonify({"ok":True})
 
+@app.route("/api/students/<int:sid>")
+@login_required
+def api_student_detail(sid):
+    db = get_db()
+    row = db.execute("SELECT * FROM students WHERE id=?", (sid,)).fetchone()
+    if not row: return jsonify({"error": "not found"}), 404
+    s = dict(row)
+    # Get attendance stats
+    att = db.execute("SELECT status, COUNT(*) as n FROM attendance WHERE student_name=? GROUP BY status", (s['name'],)).fetchall()
+    att_map = {r['status']: r['n'] for r in att}
+    s['total_sessions'] = sum(att_map.values())
+    s['absent_count'] = att_map.get('absent', 0)
+    s['absence_rate'] = round(s['absent_count'] / s['total_sessions'] * 100) if s['total_sessions'] > 0 else 0
+    # Get payments
+    pays = db.execute("SELECT * FROM payments WHERE student_name=? ORDER BY rowid DESC LIMIT 6", (s['name'],)).fetchall()
+    s['payments'] = [dict(p) for p in pays]
+    # Get points
+    pts = db.execute("SELECT SUM(points) as total FROM points WHERE student_name=?", (s['name'],)).fetchone()
+    s['total_points'] = pts['total'] or 0
+    db.close()
+    return jsonify({"student": s})
+
 @app.route("/api/students/<int:sid>", methods=["PUT"])
 @login_required
 def api_update_student(sid):
@@ -358,7 +383,10 @@ def api_get_attendance():
         rows = db.execute("SELECT * FROM attendance WHERE date=? AND group_name=?",(d,g_name)).fetchall()
     else:
         rows = db.execute("SELECT * FROM attendance WHERE date=?",(d,)).fetchall()
-    return jsonify({"attendance":[dict(r) for r in rows]})
+    records = [dict(r) for r in rows]
+    present = sum(1 for r in records if r.get("status") == "present")
+    absent = sum(1 for r in records if r.get("status") == "absent")
+    return jsonify({"attendance": records, "records": records, "present": present, "absent": absent})
 
 @app.route("/api/attendance", methods=["POST"])
 @login_required
@@ -431,7 +459,8 @@ def api_violations():
         rows = db.execute("SELECT * FROM violations WHERE student_name LIKE ? ORDER BY rowid DESC",(f"%{student}%",)).fetchall()
     else:
         rows = db.execute("SELECT * FROM violations ORDER BY rowid DESC").fetchall()
-    return jsonify({"violations":[dict(r) for r in rows]})
+    stats = {"open": sum(1 for r in rows if r["status"]=="open"), "resolved": sum(1 for r in rows if r["status"]!="open")}
+    return jsonify({"violations":[dict(r) for r in rows], "stats": stats})
 
 @app.route("/api/violations", methods=["POST"])
 @login_required
@@ -461,7 +490,8 @@ def api_points():
         rows = db.execute("SELECT * FROM points WHERE student_name LIKE ? ORDER BY rowid DESC",(f"%{student}%",)).fetchall()
     else:
         rows = db.execute("SELECT * FROM points ORDER BY rowid DESC").fetchall()
-    return jsonify({"points":[dict(r) for r in rows]})
+    top = db.execute("SELECT student_name, SUM(points) as total FROM points GROUP BY student_name ORDER BY total DESC LIMIT 10").fetchall()
+    return jsonify({"points":[dict(r) for r in rows], "top":[dict(r) for r in top]})
 
 @app.route("/api/points", methods=["POST"])
 @login_required
@@ -564,6 +594,99 @@ def api_users():
     db = get_db()
     rows = db.execute("SELECT id,username,name,role,department FROM users").fetchall()
     return jsonify({"users":[dict(r) for r in rows]})
+
+@app.route("/api/evaluations")
+@login_required
+def api_evaluations():
+    db = get_db()
+    group = request.args.get("group","")
+    student = request.args.get("student","")
+    q = "SELECT * FROM evaluations WHERE 1=1"
+    params = []
+    if group: q += " AND group_name=?"; params.append(group)
+    if student: q += " AND student_name LIKE ?"; params.append(f"%{student}%")
+    rows = db.execute(q + " ORDER BY rowid DESC", params).fetchall()
+    db.close()
+    return jsonify({"evaluations":[dict(r) for r in rows]})
+
+@app.route("/api/evaluations", methods=["POST"])
+@login_required
+def api_evaluations_post():
+    data = request.json or {}
+    db = get_db()
+    db.execute("INSERT INTO evaluations (student_name,group_name,teacher,subject,score,max_score,notes,date) VALUES (?,?,?,?,?,?,?,?)",
+        (data.get("student_name",""), data.get("group_name",""), data.get("teacher",""), data.get("subject",""),
+         data.get("score",0), data.get("max_score",100), data.get("notes",""), data.get("date","")))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/evaluations/<int:eid>", methods=["DELETE"])
+@login_required
+def api_evaluations_delete(eid):
+    db = get_db()
+    db.execute("DELETE FROM evaluations WHERE id=?", (eid,))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/curriculum")
+@login_required
+def api_curriculum():
+    db = get_db()
+    group = request.args.get("group","")
+    rows = db.execute("SELECT * FROM curriculum" + (" WHERE group_name=?" if group else "") + " ORDER BY rowid DESC", ([group] if group else [])).fetchall()
+    db.close()
+    return jsonify({"curriculum":[dict(r) for r in rows]})
+
+@app.route("/api/curriculum", methods=["POST"])
+@login_required
+def api_curriculum_post():
+    data = request.json or {}
+    db = get_db()
+    db.execute("INSERT INTO curriculum (group_name,teacher,subject,week,topic,status,date,notes) VALUES (?,?,?,?,?,?,?,?)",
+        (data.get("group_name",""), data.get("teacher",""), data.get("subject",""), data.get("week",""),
+         data.get("topic",""), data.get("status","pending"), data.get("date",""), data.get("notes","")))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/curriculum/<int:cid>", methods=["PUT","DELETE"])
+@login_required
+def api_curriculum_update(cid):
+    db = get_db()
+    if request.method == "DELETE":
+        db.execute("DELETE FROM curriculum WHERE id=?", (cid,))
+    else:
+        data = request.json or {}
+        db.execute("UPDATE curriculum SET status=?,notes=? WHERE id=?", (data.get("status","pending"), data.get("notes",""), cid))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/events")
+@login_required
+def api_events():
+    db = get_db()
+    rows = db.execute("SELECT * FROM events ORDER BY date DESC, rowid DESC").fetchall()
+    db.close()
+    return jsonify({"events":[dict(r) for r in rows]})
+
+@app.route("/api/events", methods=["POST"])
+@login_required
+def api_events_post():
+    data = request.json or {}
+    db = get_db()
+    user = session.get("user", {})
+    db.execute("INSERT INTO events (title,description,date,time,location,target,created_by) VALUES (?,?,?,?,?,?,?)",
+        (data.get("title",""), data.get("description",""), data.get("date",""), data.get("time",""),
+         data.get("location",""), data.get("target","all"), user.get("name","")))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/events/<int:eid>", methods=["DELETE"])
+@login_required
+def api_events_delete(eid):
+    db = get_db()
+    db.execute("DELETE FROM events WHERE id=?", (eid,))
+    db.commit(); db.close()
+    return jsonify({"ok":True})
 
 @app.route("/api/students/import", methods=["POST"])
 @login_required
