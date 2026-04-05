@@ -233,6 +233,8 @@ def api_dashboard():
     dept = user.get("department","")
     total_students = db.execute("SELECT COUNT(*) FROM students WHERE status='active'").fetchone()[0]
     absent_today = db.execute("SELECT COUNT(*) FROM attendance WHERE date=? AND status='absent'",(today,)).fetchone()[0]
+    recent_absent = [dict(r) for r in db.execute("SELECT * FROM attendance WHERE date=? AND status='absent' ORDER BY rowid DESC LIMIT 10",(today,)).fetchall()]
+    open_violations = db.execute("SELECT COUNT(*) FROM violations WHERE status='open'").fetchone()[0]
     if role == "admin":
         pending_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending'").fetchone()[0]
         recent_tasks = [dict(r) for r in db.execute("SELECT * FROM tasks WHERE status!='done' ORDER BY rowid DESC LIMIT 6").fetchall()]
@@ -240,7 +242,7 @@ def api_dashboard():
         pending_tasks = db.execute("SELECT COUNT(*) FROM tasks WHERE status='pending' AND department=?",(dept,)).fetchone()[0]
         recent_tasks = [dict(r) for r in db.execute("SELECT * FROM tasks WHERE status!='done' AND department=? ORDER BY rowid DESC LIMIT 6",(dept,)).fetchall()]
     pending_pay = db.execute("SELECT COUNT(*) FROM payments WHERE status='pending'").fetchone()[0]
-    return jsonify({"total_students":total_students,"absent_today":absent_today,"pending_tasks":pending_tasks,"pending_pay":pending_pay,"recent_tasks":recent_tasks,"user_name":user.get("name",""),"user_role":role,"user_dept":dept})
+    return jsonify({"total_students":total_students,"absent_today":absent_today,"pending_tasks":pending_tasks,"pending_pay":pending_pay,"recent_tasks":recent_tasks,"open_violations":open_violations,"recent_absent":recent_absent,"user_name":user.get("name",""),"user_role":role,"user_dept":dept})
 
 @app.route("/api/students")
 @login_required
