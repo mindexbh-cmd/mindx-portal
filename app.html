@@ -355,7 +355,7 @@ async function renderStudents(c,q='',group='',status=''){
   </table></div></div>`;
 }
 
-async async function showStudentDetail(id){
+async function showStudentDetail(id){
   const d = await api('/students/'+id);
   const s = d.student;
   if(!s){return;}
