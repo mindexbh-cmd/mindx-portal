@@ -1,5 +1,5 @@
 # Mindex Portal - v3 Fixed
-from flask import Flask, request, jsonify, session, redirect, g
+from flask import Flask, render_template_string, request, jsonify, session, redirect, g
 import sqlite3, hashlib, os
 from datetime import date
 from functools import wraps
@@ -189,10 +189,10 @@ def dashboard():
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"app.html")) as f:
             html = f.read()
-        return html
-    except:
+        return render_template_string(html, user=session["user"])
+    except Exception as e:
         u = session.get("user",{})
-        return f"<h2>مرحباً {u.get('name','')}</h2><p>دورك: {u.get('role','')}</p><a href='/api/logout'>خروج</a>"
+        return f"<h2>مرحباً {u.get('name','')}</h2><p>دورك: {u.get('role','')}</p><p>خطأ: {str(e)}</p><a href='/api/logout'>خروج</a>"
 
 @app.route("/api/me")
 @login_required
