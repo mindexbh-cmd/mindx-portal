@@ -343,7 +343,7 @@ async function renderStudents(c,q='',group='',status=''){
         <td><span class="badge bpu">${s.group_name||'—'}</span></td>
         <td>${s.level||'—'}</td><td>${s.teacher||'—'}</td>
         <td dir="ltr">${s.whatsapp||'—'}</td>
-        <td><span style="color:${color};font-weight:600">${s.absence_rate}%</span></td>
+        <td><span style="color:${color};font-weight:600">${s.absence_rate??0}%</span></td>
         <td>${badge(s.status)}</td>
         <td><div style="display:flex;gap:3px">
           <button class="btn btn-xs btn-s" onclick="showStudentDetail(${s.id})">👁</button>
