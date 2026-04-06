@@ -340,6 +340,14 @@ def api_students():
     rows = db.execute(query, params).fetchall()
     return jsonify({"students":[dict(r) for r in rows]})
 
+@app.route("/api/students/groups")
+@login_required
+def api_student_groups():
+    db = get_db()
+    rows = db.execute("SELECT DISTINCT group_name FROM students WHERE status='active' AND group_name IS NOT NULL AND group_name != '' AND group_name != 'لا يوجد في مجموعة' ORDER BY group_name").fetchall()
+    groups = [r["group_name"] for r in rows]
+    return jsonify({"groups": groups})
+
 @app.route("/api/students", methods=["POST"])
 @login_required
 def api_add_student():
