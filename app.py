@@ -1,4 +1,4 @@
-# Mindex Portal - v3 Fixed
+# Mindex Portal - v4 Extended Fields
 from flask import Flask, render_template_string, request, jsonify, session, redirect, g
 import sqlite3, hashlib, os, urllib.request, csv, io
 from datetime import date
@@ -25,7 +25,7 @@ def init_db():
     db = sqlite3.connect(DB)
     db.executescript("""
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE,password TEXT,name TEXT,role TEXT,department TEXT);
-    CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT,group_name TEXT,teacher TEXT,whatsapp TEXT,level TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active');
+    CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT,group_name TEXT,teacher TEXT,whatsapp TEXT,level TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active',group_name2 TEXT,schedule_time TEXT,schedule_time_ramadan TEXT,schedule_days TEXT,group_online TEXT,schedule_time_online TEXT,schedule_days_online TEXT,zoom_link_online TEXT,attendance_summary TEXT,absence_rate TEXT,delay_rate TEXT,teacher_name TEXT,next_level TEXT,final_result TEXT,student_progress TEXT,level_suitable TEXT,book_received TEXT,notes_2026 TEXT);
     CREATE TABLE IF NOT EXISTS attendance(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,date TEXT,status TEXT);
     CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,student_name TEXT,amount REAL,status TEXT DEFAULT 'pending',date TEXT,notes TEXT);
     CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT,department TEXT,assigned_to TEXT,status TEXT DEFAULT 'pending',priority TEXT DEFAULT 'medium',due_date TEXT,created_date TEXT,notes TEXT);
@@ -98,7 +98,24 @@ def auto_import_students():
         print(f'[auto-import] Error: {e}')
 
 auto_import_students()
+def migrate_db():
+    """Add new columns to existing students table."""
+    db = sqlite3.connect(DB)
+    new_cols = [
+        ("group_name2","TEXT"),("schedule_time","TEXT"),("schedule_time_ramadan","TEXT"),
+        ("schedule_days","TEXT"),("group_online","TEXT"),("schedule_time_online","TEXT"),
+        ("schedule_days_online","TEXT"),("zoom_link_online","TEXT"),("attendance_summary","TEXT"),
+        ("absence_rate","TEXT"),("delay_rate","TEXT"),("teacher_name","TEXT"),
+        ("next_level","TEXT"),("final_result","TEXT"),("student_progress","TEXT"),
+        ("level_suitable","TEXT"),("book_received","TEXT"),("notes_2026","TEXT")
+    ]
+    for col, typ in new_cols:
+        try:
+            db.execute(f"ALTER TABLE students ADD COLUMN {col} {typ}")
+        except: pass
+    db.commit(); db.close()
 
+migrate_db()
 
 def login_required(f):
     @wraps(f)
@@ -328,8 +345,8 @@ def api_students():
 def api_add_student():
     d = request.json or {}
     db = get_db()
-    db.execute("INSERT INTO students(name,group_name,teacher,whatsapp,level,zoom_link,monthly_fee)VALUES(?,?,?,?,?,?,?)",
-               (d["name"],d.get("group_name",""),d.get("teacher",""),d.get("whatsapp",""),d.get("level",""),d.get("zoom_link",""),d.get("monthly_fee",35)))
+    db.execute("INSERT INTO students(name,group_name,teacher,whatsapp,level,zoom_link,monthly_fee,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+               (d["name"],d.get("group_name",""),d.get("teacher",""),d.get("whatsapp",""),d.get("level",""),d.get("zoom_link",""),d.get("monthly_fee",35),d.get("group_name2",""),d.get("schedule_time",""),d.get("schedule_time_ramadan",""),d.get("schedule_days",""),d.get("group_online",""),d.get("schedule_time_online",""),d.get("schedule_days_online",""),d.get("zoom_link_online",""),d.get("attendance_summary",""),d.get("absence_rate",""),d.get("delay_rate",""),d.get("teacher_name",""),d.get("next_level",""),d.get("final_result",""),d.get("student_progress",""),d.get("level_suitable",""),d.get("book_received",""),d.get("notes_2026","")))
     db.commit()
     return jsonify({"ok":True})
 
@@ -360,8 +377,8 @@ def api_student_detail(sid):
 def api_update_student(sid):
     d = request.json or {}
     db = get_db()
-    db.execute("UPDATE students SET name=?,group_name=?,teacher=?,whatsapp=?,level=?,zoom_link=?,monthly_fee=? WHERE id=?",
-               (d["name"],d.get("group_name",""),d.get("teacher",""),d.get("whatsapp",""),d.get("level",""),d.get("zoom_link",""),d.get("monthly_fee",35),sid))
+    db.execute("UPDATE students SET name=?,group_name=?,teacher=?,whatsapp=?,level=?,zoom_link=?,monthly_fee=?,group_name2=?,schedule_time=?,schedule_time_ramadan=?,schedule_days=?,group_online=?,schedule_time_online=?,schedule_days_online=?,zoom_link_online=?,attendance_summary=?,absence_rate=?,delay_rate=?,teacher_name=?,next_level=?,final_result=?,student_progress=?,level_suitable=?,book_received=?,notes_2026=? WHERE id=?",
+               (d["name"],d.get("group_name",""),d.get("teacher",""),d.get("whatsapp",""),d.get("level",""),d.get("zoom_link",""),d.get("monthly_fee",35),d.get("group_name2",""),d.get("schedule_time",""),d.get("schedule_time_ramadan",""),d.get("schedule_days",""),d.get("group_online",""),d.get("schedule_time_online",""),d.get("schedule_days_online",""),d.get("zoom_link_online",""),d.get("attendance_summary",""),d.get("absence_rate",""),d.get("delay_rate",""),d.get("teacher_name",""),d.get("next_level",""),d.get("final_result",""),d.get("student_progress",""),d.get("level_suitable",""),d.get("book_received",""),d.get("notes_2026",""),sid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -745,21 +762,30 @@ def api_import_students():
         name = row[col_name].strip() if len(row) > col_name else ""
         if not name or name in ['', 'اسم الطالب']:
             continue
-        whatsapp = row[col_whatsapp].strip() if len(row) > col_whatsapp else ""
-        level = row[col_level].strip() if len(row) > col_level else ""
-        group_name = row[col_group].strip() if len(row) > col_group else ""
+        def gc(i): return row[i].strip() if len(row) > i else ""
+        whatsapp = gc(3); level = gc(4); group_name = gc(7); group_name2 = gc(8)
+        schedule_time = gc(9); schedule_time_ramadan = gc(10); schedule_days = gc(11)
+        group_online = gc(12); schedule_time_online = gc(13); schedule_days_online = gc(14)
+        zoom_link_online = gc(15); attendance_summary = gc(16); absence_rate = gc(17)
+        delay_rate = gc(18); teacher_name = gc(19); next_level = gc(20)
+        final_result = gc(21); student_progress = gc(22); level_suitable = gc(23)
+        book_received = gc(24); notes_2026 = gc(25)
         existing = db.execute("SELECT id FROM students WHERE name=? AND status='active'", (name,)).fetchone()
         if existing:
-            skipped += 1
+            try:
+                db.execute("""UPDATE students SET group_name=?,whatsapp=?,level=?,group_name2=?,schedule_time=?,schedule_time_ramadan=?,schedule_days=?,group_online=?,schedule_time_online=?,schedule_days_online=?,zoom_link_online=?,attendance_summary=?,absence_rate=?,delay_rate=?,teacher_name=?,next_level=?,final_result=?,student_progress=?,level_suitable=?,book_received=?,notes_2026=? WHERE id=?""",
+                    (group_name,whatsapp,level,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026,existing['id']))
+                skipped += 1
+            except Exception as e: errors.append(str(e))
             continue
         try:
-            db.execute("INSERT INTO students(name,group_name,teacher,whatsapp,level,zoom_link,monthly_fee) VALUES(?,?,?,?,?,?,?)",
-                (name, group_name, "", whatsapp, level, "", 35))
+            db.execute("INSERT INTO students(name,group_name,teacher,whatsapp,level,zoom_link,monthly_fee,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (name, group_name, "", whatsapp, level, "", 35,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026))
             added += 1
         except Exception as e:
             errors.append(str(e))
     db.commit()
-    return jsonify({"ok": True, "added": added, "skipped": skipped, "errors": errors[:5]})
+    return jsonify({"ok": True, "added": added, "updated": skipped, "errors": errors[:5]})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
