@@ -262,7 +262,7 @@ def dashboard():
             "premises":"شؤون المقر","parent":"ولي أمر"
         }
         role_label = role_labels.get(role, role)
-        all_pages = ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai"]
+        all_pages = ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai","database"]
         role_pages = {
             "admin": all_pages,
             "reception": ["dashboard","students","groups","attendance","payments","faq","whatsapp","ai"],
@@ -786,6 +786,54 @@ def api_import_students():
             errors.append(str(e))
     db.commit()
     return jsonify({"ok": True, "added": added, "updated": skipped, "errors": errors[:5]})
+
+@app.route("/api/db/tables")
+@login_required
+def api_db_tables():
+    user = session.get("user", {})
+    if user.get("role") != "admin":
+        return jsonify({"error": "unauthorized"}), 403
+    db = get_db()
+    tables = db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+    result = []
+    for t in tables:
+        tname = t["name"]
+        count = db.execute(f"SELECT COUNT(*) as n FROM {tname}").fetchone()["n"]
+        cols = db.execute(f"PRAGMA table_info({tname})").fetchall()
+        result.append({"name": tname, "count": count, "columns": [c["name"] for c in cols]})
+    return jsonify({"tables": result})
+
+@app.route("/api/db/query")
+@login_required
+def api_db_query():
+    user = session.get("user", {})
+    if user.get("role") != "admin":
+        return jsonify({"error": "unauthorized"}), 403
+    table = request.args.get("table", "students")
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 50))
+    search = request.args.get("search", "")
+    col = request.args.get("col", "")
+    db = get_db()
+    valid = [r["name"] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+    if table not in valid:
+        return jsonify({"error": "invalid table"}), 400
+    cols = [c["name"] for c in db.execute(f"PRAGMA table_info({table})").fetchall()]
+    offset = (page - 1) * per_page
+    where = ""
+    params = []
+    if search and col and col in cols:
+        where = f" WHERE CAST({col} AS TEXT) LIKE ?"
+        params.append(f"%{search}%")
+    elif search:
+        conds = [f"CAST({c} AS TEXT) LIKE ?" for c in cols[:6]]
+        where = " WHERE " + " OR ".join(conds)
+        params = [f"%{search}%"] * len(conds)
+    total = db.execute(f"SELECT COUNT(*) as n FROM {table}" + where, params).fetchone()["n"]
+    rows = db.execute(f"SELECT * FROM {table}" + where + f" LIMIT {per_page} OFFSET {offset}", params).fetchall()
+    return jsonify({"table": table, "columns": cols, "rows": [dict(r) for r in rows],
+        "total": total, "page": page, "per_page": per_page, "pages": (total + per_page - 1) // per_page})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
