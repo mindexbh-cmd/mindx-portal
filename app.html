@@ -426,6 +426,50 @@ async function showStudentDetail(id){
 
     <h4 style="margin-bottom:8px;color:var(--pur);font-size:12px">💳 آخر الدفعات</h4>
     <div class="tw"><table style="width:100%"><thead><tr><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${payRows}</tbody></table></div>
+
+  ${(s.mother_phone||s.father_phone||s.other_phone) ? `
+  <div style="background:#f0fdf4;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:700;color:#166534;margin-bottom:10px;font-size:14px">&#128222; بيانات الاتصال</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      ${s.mother_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف الأم</div><div style="font-weight:600;color:#166534">${s.mother_phone}</div></div>` : ''}
+      ${s.father_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف الأب</div><div style="font-weight:600;color:#166534">${s.father_phone}</div></div>` : ''}
+      ${s.other_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف آخر</div><div style="font-weight:600;color:#166534">${s.other_phone}</div></div>` : ''}
+    </div>
+  </div>` : ''}
+
+  ${(s.residence||s.home_address||s.road||s.complex_name) ? `
+  <div style="background:#eff6ff;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:700;color:#1e40af;margin-bottom:10px;font-size:14px">&#127968; بيانات السكن</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${s.residence ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">مكان السكن</div><div style="font-weight:600;color:#1e40af">${s.residence}</div></div>` : ''}
+      ${s.home_address ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">عنوان المنزل</div><div style="font-weight:600;color:#1e40af">${s.home_address}</div></div>` : ''}
+      ${s.road ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">الطريق</div><div style="font-weight:600;color:#1e40af">${s.road}</div></div>` : ''}
+      ${s.complex_name ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">المجمع</div><div style="font-weight:600;color:#1e40af">${s.complex_name}</div></div>` : ''}
+    </div>
+  </div>` : ''}
+
+  ${(s.installment1||s.total_paid||s.remaining_amount) ? `
+  <div style="background:#fdf4ff;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:700;color:#6b21a8;margin-bottom:10px;font-size:14px">&#128179; الأقساط والمدفوعات</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px">
+      ${[1,2,3,4,5].map(n => s['installment'+n] ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:6px"><div style="font-size:10px;color:#888">القسط ${n}</div><div style="font-weight:700;color:#6b21a8;font-size:13px">${s['installment'+n]}</div></div>` : '').join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${s.total_paid ? `<div style="text-align:center;background:#dcfce7;border-radius:8px;padding:8px"><div style="font-size:11px;color:#166534">اجمالي المدفوع (BD)</div><div style="font-weight:700;color:#166534;font-size:16px">${s.total_paid}</div></div>` : ''}
+      ${s.remaining_amount ? `<div style="text-align:center;background:#fee2e2;border-radius:8px;padding:8px"><div style="font-size:11px;color:#991b1b">المبالغ المتبقية</div><div style="font-weight:700;color:#991b1b;font-size:16px">${s.remaining_amount}</div></div>` : ''}
+    </div>
+  </div>` : ''}
+
+  ${(s.old_new_2026||s.registration_status||s.final_result_2026) ? `
+  <div style="background:#fff7ed;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:700;color:#9a3412;margin-bottom:10px;font-size:14px">&#128203; حالة التسجيل</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      ${s.old_new_2026 ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">قديم/جديد</div><div style="font-weight:600;color:#9a3412">${s.old_new_2026}</div></div>` : ''}
+      ${s.registration_status ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">حالة التسجيل</div><div style="font-weight:600;color:#9a3412">${s.registration_status}</div></div>` : ''}
+      ${s.final_result_2026 ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">النتيجة النهائية</div><div style="font-weight:600;color:#9a3412">${s.final_result_2026}</div></div>` : ''}
+    </div>
+  </div>` : ''}
+
   `);
 }
 async function addStudent(){
