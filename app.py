@@ -459,7 +459,7 @@ def api_violations():
         rows = db.execute("SELECT * FROM violations WHERE student_name LIKE ? ORDER BY rowid DESC",(f"%{student}%",)).fetchall()
     else:
         rows = db.execute("SELECT * FROM violations ORDER BY rowid DESC").fetchall()
-    stats = {"open": sum(1 for r in rows if r["status"]=="open"), "resolved": sum(1 for r in rows if r["status"]!="open")}
+    stats = {"open": sum(1 for r in rows if r["status"]=="open"), "resolved": sum(1 for r in rows if r["status"]!="open"), "high": sum(1 for r in rows if r["points"]>=3), "total_pts": sum(r["points"] for r in rows)}
     return jsonify({"violations":[dict(r) for r in rows], "stats": stats})
 
 @app.route("/api/violations", methods=["POST"])
