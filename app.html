@@ -164,7 +164,8 @@ textarea.inp{resize:vertical;min-height:60px;}
     ('الرئيسية',['dashboard','students','groups','attendance','payments']),
     ('الإدارة',['tasks','curriculum','evaluations','violations','points']),
     ('الخدمات',['events','faq','whatsapp']),
-    ('الذكاء الاصطناعي',['ai'])
+    ('الذكاء الاصطناعي',['ai']),
+        ('الإدارة المتقدمة',['database'])
   ] %}
   {% for sec_name, sec_pages in sections %}
     {% set visible = sec_pages | select('in', pages) | list %}
@@ -260,6 +261,7 @@ async function loadPage(page){
   else if(page==='faq') await renderFAQ(c);
   else if(page==='whatsapp') renderWhatsapp(c);
   else if(page==='ai') renderAI(c);
+  else if(page==='database') renderDatabase(c);
 }
 
 // ── DASHBOARD ──
@@ -1060,6 +1062,78 @@ async function doImportFromSheets(){
   }
   btn.textContent='استيراد →';
   btn.disabled=false;
+}
+
+
+// ── DATABASE VIEWER ──
+async function renderDatabase(c){
+  const resp = await fetch('/api/db/tables');
+  const d = await resp.json();
+  if(d.error){c.innerHTML='<div class="alert alert-red">غير مصرح — فقط الإدارة</div>';return;}
+  c.innerHTML = `
+    <div style="background:linear-gradient(135deg,#1a237e,#283593);border-radius:10px;padding:14px 18px;margin-bottom:14px;color:#fff">
+      <h2 style="font-size:14px;font-weight:700;margin-bottom:3px">🗄️ قاعدة البيانات</h2>
+      <p style="font-size:11px;opacity:.8">تصفح كل جداول قاعدة البيانات</p>
+    </div>
+    <div class="stat-grid" id="db-tables-grid">
+      ${d.tables.map(t=>`
+        <div class="stat" style="border-top-color:#3949ab;cursor:pointer" onclick="loadDbTable('${t.name}')">
+          <div style="font-size:16px">📋</div>
+          <div class="stat-v" style="color:#3949ab;font-size:22px">${t.count}</div>
+          <div class="stat-l" style="font-weight:700;font-size:11px">${t.name}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:2px">${t.columns.slice(0,3).join(', ')}${t.columns.length>3?'...':''}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div id="db-table-view"><div style="text-align:center;padding:30px;color:var(--text3)">👆 اختر جدولاً من الأعلى</div></div>
+  `;
+}
+
+async function loadDbTable(tableName, page=1, search='', col=''){
+  const container = document.getElementById('db-table-view');
+  if(!container) return;
+  container.innerHTML = '<div class="loading">⏳ جاري التحميل...</div>';
+  const params = new URLSearchParams({table: tableName, page, per_page: 50});
+  if(search) params.append('search', search);
+  if(col) params.append('col', col);
+  const resp = await fetch('/api/db/query?' + params);
+  const data = await resp.json();
+  if(data.error){container.innerHTML='<div class="alert alert-red">❌ '+data.error+'</div>';return;}
+  const cols = data.columns;
+  const rows = data.rows;
+  container.innerHTML = `
+    <div class="card" style="margin-top:12px">
+      <div class="card-h" style="background:linear-gradient(135deg,#e8eaf6,#c5cae9)">
+        <h3 style="color:#1a237e;font-size:12px">📋 ${data.table} <span style="font-size:10px;color:#5c6bc0;font-weight:400">(${data.total} سجل)</span></h3>
+        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+          <select class="inp" style="width:120px;padding:3px 6px;font-size:10px" id="dbc-${data.table}">
+            <option value="">كل الأعمدة</option>
+            ${cols.map(c=>`<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <input class="inp" style="width:140px;padding:3px 8px;font-size:10px" placeholder="🔍 بحث..." id="dbs-${data.table}"
+            onkeydown="if(event.key==='Enter')loadDbTable('${data.table}',1,this.value,document.getElementById('dbc-${data.table}').value)">
+          <button class="btn btn-xs" style="background:#3949ab;color:#fff" 
+            onclick="loadDbTable('${data.table}',1,document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">بحث</button>
+          <button class="btn btn-xs btn-s"
+            onclick="loadDbTable('${data.table}',1,'','')">إعادة</button>
+        </div>
+      </div>
+      <div class="tw" style="max-height:480px;overflow:auto">
+        <table style="font-size:11px">
+          <thead><tr>${cols.map(c=>`<th style="white-space:nowrap;background:#e8eaf6;color:#1a237e;position:sticky;top:0">${c}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(r=>`<tr>${cols.map(c=>`<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${String(r[c]??'')}">${r[c]??'—'}</td>`).join('')}</tr>`).join('')
+            : `<tr><td colspan="${cols.length}" style="text-align:center;padding:20px;color:var(--text3)">لا توجد سجلات</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${data.pages > 1 ? `<div style="padding:8px;display:flex;align-items:center;justify-content:center;gap:8px;border-top:1px solid var(--border)">
+        ${data.page>1?`<button class="btn btn-xs btn-s" onclick="loadDbTable('${data.table}',${data.page-1},document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">◀</button>`:''}
+        <span style="font-size:10px;color:var(--text2)">صفحة ${data.page} / ${data.pages}</span>
+        ${data.page<data.pages?`<button class="btn btn-xs btn-s" onclick="loadDbTable('${data.table}',${data.page+1},document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">▶</button>`:''}
+      </div>`:''}
+    </div>
+  `;
 }
 
 // START
