@@ -25,7 +25,7 @@ def init_db():
     db = sqlite3.connect(DB)
     db.executescript("""
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE,password TEXT,name TEXT,role TEXT,department TEXT);
-    CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT,group_name TEXT,teacher TEXT,whatsapp TEXT,level TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active',group_name2 TEXT,schedule_time TEXT,schedule_time_ramadan TEXT,schedule_days TEXT,group_online TEXT,schedule_time_online TEXT,schedule_days_online TEXT,zoom_link_online TEXT,attendance_summary TEXT,absence_rate TEXT,delay_rate TEXT,teacher_name TEXT,next_level TEXT,final_result TEXT,student_progress TEXT,level_suitable TEXT,book_received TEXT,notes_2026 TEXT);
+    CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,name TEXT,group_name TEXT,teacher TEXT,whatsapp TEXT,level TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active',group_name2 TEXT,schedule_time TEXT,schedule_time_ramadan TEXT,schedule_days TEXT,group_online TEXT,schedule_time_online TEXT,schedule_days_online TEXT,zoom_link_online TEXT,attendance_summary TEXT,absence_rate TEXT,delay_rate TEXT,teacher_name TEXT,next_level TEXT,final_result TEXT,student_progress TEXT,level_suitable TEXT,book_received TEXT,notes_2026 TEXT,registration_status TEXT,old_new_2026 TEXT,final_result_2026 TEXT,installment1 TEXT,installment2 TEXT,installment3 TEXT,installment4 TEXT,installment5 TEXT,total_paid TEXT,remaining_amount TEXT,mother_phone TEXT,father_phone TEXT,other_phone TEXT,residence TEXT,home_address TEXT,road TEXT,complex_name TEXT);
     CREATE TABLE IF NOT EXISTS attendance(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,date TEXT,status TEXT);
     CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,student_name TEXT,amount REAL,status TEXT DEFAULT 'pending',date TEXT,notes TEXT);
     CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT,department TEXT,assigned_to TEXT,status TEXT DEFAULT 'pending',priority TEXT DEFAULT 'medium',due_date TEXT,created_date TEXT,notes TEXT);
@@ -107,7 +107,7 @@ def migrate_db():
         ("schedule_days_online","TEXT"),("zoom_link_online","TEXT"),("attendance_summary","TEXT"),
         ("absence_rate","TEXT"),("delay_rate","TEXT"),("teacher_name","TEXT"),
         ("next_level","TEXT"),("final_result","TEXT"),("student_progress","TEXT"),
-        ("level_suitable","TEXT"),("book_received","TEXT"),("notes_2026","TEXT")
+        ("level_suitable","TEXT"),("book_received","TEXT"),("notes_2026","TEXT"),("registration_status","TEXT"),("old_new_2026","TEXT"),("final_result_2026","TEXT"),("installment1","TEXT"),("installment2","TEXT"),("installment3","TEXT"),("installment4","TEXT"),("installment5","TEXT"),("total_paid","TEXT"),("remaining_amount","TEXT"),("mother_phone","TEXT"),("father_phone","TEXT"),("other_phone","TEXT"),("residence","TEXT"),("home_address","TEXT"),("road","TEXT"),("complex_name","TEXT")
     ]
     for col, typ in new_cols:
         try:
@@ -770,11 +770,18 @@ def api_import_students():
         delay_rate = gc(18); teacher_name = gc(19); next_level = gc(20)
         final_result = gc(21); student_progress = gc(22); level_suitable = gc(23)
         book_received = gc(24); notes_2026 = gc(25)
+        old_new_2026 = gc(5); registration_status = gc(6)
+        final_result_2026 = gc(21)
+        installment1 = gc(27); installment2 = gc(28); installment3 = gc(29)
+        installment4 = gc(30); installment5 = gc(31)
+        total_paid = gc(32); remaining_amount = gc(33)
+        mother_phone = gc(34); father_phone = gc(35); other_phone = gc(36)
+        residence = gc(37); home_address = gc(38); road = gc(39); complex_name = gc(40)
         existing = db.execute("SELECT id FROM students WHERE name=? AND status='active'", (name,)).fetchone()
         if existing:
             try:
-                db.execute("""UPDATE students SET group_name=?,whatsapp=?,level=?,group_name2=?,schedule_time=?,schedule_time_ramadan=?,schedule_days=?,group_online=?,schedule_time_online=?,schedule_days_online=?,zoom_link_online=?,attendance_summary=?,absence_rate=?,delay_rate=?,teacher_name=?,next_level=?,final_result=?,student_progress=?,level_suitable=?,book_received=?,notes_2026=? WHERE id=?""",
-                    (group_name,whatsapp,level,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026,existing['id']))
+                db.execute("""UPDATE students SET group_name=?,whatsapp=?,level=?,group_name2=?,schedule_time=?,schedule_time_ramadan=?,schedule_days=?,group_online=?,schedule_time_online=?,schedule_days_online=?,zoom_link_online=?,attendance_summary=?,absence_rate=?,delay_rate=?,teacher_name=?,next_level=?,final_result=?,student_progress=?,level_suitable=?,book_received=?,notes_2026=?,registration_status=?,old_new_2026=?,final_result_2026=?,installment1=?,installment2=?,installment3=?,installment4=?,installment5=?,total_paid=?,remaining_amount=?,mother_phone=?,father_phone=?,other_phone=?,residence=?,home_address=?,road=?,complex_name=? WHERE id=?""",
+                    (group_name,whatsapp,level,group_name2,schedule_time,schedule_time_ramadan,schedule_days,group_online,schedule_time_online,schedule_days_online,zoom_link_online,attendance_summary,absence_rate,delay_rate,teacher_name,next_level,final_result,student_progress,level_suitable,book_received,notes_2026,registration_status,old_new_2026,final_result_2026,installment1,installment2,installment3,installment4,installment5,total_paid,remaining_amount,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name,existing['id']))
                 skipped += 1
             except Exception as e: errors.append(str(e))
             continue
