@@ -317,14 +317,14 @@ async function renderDashboard(c){
 // ── STUDENTS ──
 async function renderStudents(c,q='',group='',status=''){
   const d=await api(`/students?q=${encodeURIComponent(q)}&group=${encodeURIComponent(group)}&status=${encodeURIComponent(status)}`);
-  const groupsD=await api('/groups');
+  const groupsD=await api('/students/groups');
   c.innerHTML=`
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
       <input class="inp" style="width:180px" placeholder="🔍 بحث..." value="${q}" oninput="renderStudents(document.getElementById('main-content'),this.value,document.getElementById('sg').value,document.getElementById('ss').value)">
       <select class="inp" style="width:140px" id="sg" onchange="renderStudents(document.getElementById('main-content'),document.querySelector('[placeholder]').value,this.value,document.getElementById('ss').value)">
         <option value="">كل المجموعات</option>
-        ${groupsD.groups.map(g=>`<option value="${g.name}" ${group===g.name?'selected':''}>${g.name}</option>`).join('')}
+        ${groupsD.groups.map(g=>`<option value="${g}" ${group===g?'selected':''}>${g}</option>`).join('')}
       </select>
       <select class="inp" style="width:110px" id="ss" onchange="renderStudents(document.getElementById('main-content'),document.querySelector('[placeholder]').value,document.getElementById('sg').value,this.value)">
         <option value="">كل الحالات</option>
