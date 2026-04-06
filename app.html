@@ -463,7 +463,7 @@ async function loadAttendance(){
   table.innerHTML=`<div class="tw"><table>
     <thead><tr><th>الاسم</th><th>الحالة</th><th>ملاحظة</th><th>واتساب</th></tr></thead>
     <tbody>${stD.students.map(s=>{
-      const rec=d.records.find(r=>r.student_name===s.name);
+      const rec=(d.records||[]).find(r=>r.student_name===s.name);
       return `<tr>
         <td style="font-weight:500">${s.name}</td>
         <td>
@@ -633,8 +633,8 @@ async function renderViolations(c){
   <div class="stat-grid">
     <div class="stat" style="border-top-color:var(--re)"><div>⚠️</div><div class="stat-v" style="color:var(--re)">${(d.stats||{}).open||0}</div><div class="stat-l">مفتوحة</div></div>
     <div class="stat" style="border-top-color:var(--gr)"><div>✓</div><div class="stat-v" style="color:var(--gr)">${(d.stats||{}).resolved||0}</div><div class="stat-l">محلولة</div></div>
-    <div class="stat" style="border-top-color:var(--am)"><div>🔴</div><div class="stat-v" style="color:var(--re)">${d.stats.high}</div><div class="stat-l">3 نقاط (خطيرة)</div></div>
-    <div class="stat" style="border-top-color:var(--pur)"><div>📊</div><div class="stat-v" style="color:var(--pur)">${d.stats.total_pts}</div><div class="stat-l">مجموع النقاط</div></div>
+    <div class="stat" style="border-top-color:var(--am)"><div>🔴</div><div class="stat-v" style="color:var(--re)">${(d.stats||{}).high||0}</div><div class="stat-l">3 نقاط (خطيرة)</div></div>
+    <div class="stat" style="border-top-color:var(--pur)"><div>📊</div><div class="stat-v" style="color:var(--pur)">${(d.stats||{}).total_pts||0}</div><div class="stat-l">مجموع النقاط</div></div>
   </div>
   <div class="card"><div class="tw"><table>
     <thead><tr><th>الطالب</th><th>المجموعة</th><th>النوع</th><th>المخالفة</th><th>النقاط</th><th>التاريخ</th><th>الحالة</th><th>إجراء</th></tr></thead>
@@ -699,7 +699,7 @@ async function renderCurriculum(c){
   <div class="alert alert-red">⚠️ تذكير: التسليم يكون شهرياً — لا أسبوعياً</div>
   <div class="card"><div class="tw"><table>
     <thead><tr><th>المجموعة</th><th>الوحدة</th><th>الدرس</th><th>المهارات</th><th>التاريخ</th><th>ملاحظات</th></tr></thead>
-    <tbody id="curr-body">${d.records.map(r=>`<tr>
+    <tbody id="curr-body">${(d.records||[]).map(r=>`<tr>
       <td><span class="badge bpu">${r.group_name}</span></td>
       <td>${r.unit||'—'}</td><td>${r.lesson||'—'}</td><td>${r.skills||'—'}</td>
       <td style="font-size:11px">${r.session_date||'—'}</td><td style="font-size:11px">${r.notes||'—'}</td>
@@ -979,7 +979,7 @@ async function loadCurriculum(){
   const g=document.getElementById('curr-grp')?.value||'';
   const d=await api('/curriculum?group='+encodeURIComponent(g));
   const tbody=document.getElementById('curr-body');
-  if(tbody) tbody.innerHTML=d.records.map(r=>`<tr>
+  if(tbody) tbody.innerHTML=(d.records||[]).map(r=>`<tr>
     <td><span class="badge bpu">${r.group_name}</span></td>
     <td>${r.unit||'—'}</td><td>${r.lesson||'—'}</td><td>${r.skills||'—'}</td>
     <td style="font-size:11px">${r.session_date||'—'}</td><td style="font-size:11px">${r.notes||'—'}</td>
