@@ -597,7 +597,7 @@ async function doImportGroups(){
 
 // ── ATTENDANCE ──
 async function renderAttendance() {
-  const app = document.getElementById('app');
+  const app = document.getElementById('main-content');
   const now = new Date();
   const dd = String(now.getDate()).padStart(2,'0');
   const mm = String(now.getMonth()+1).padStart(2,'0');
