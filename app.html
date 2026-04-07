@@ -1270,8 +1270,32 @@ go('dashboard');
   </div>
 </div>
 
+
+<script>
+// Fix scroll: redirect wheel events to .main container
+document.addEventListener('wheel', function(e) {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  // Check if the user is scrolling over a modal (don't intercept those)
+  const modal = document.querySelector('.modal-bg.open');
+  if (modal && modal.contains(e.target)) return;
+  // Check if the target is already a scrollable element inside main (like a table wrapper)
+  let el = e.target;
+  while (el && el !== main) {
+    const s = window.getComputedStyle(el);
+    const isScrollableY = (s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+    if (isScrollableY) return; // let it scroll naturally
+    el = el.parentElement;
+  }
+  // Redirect to main
+  e.preventDefault();
+  main.scrollTop += e.deltaY;
+}, { passive: false });
+</script>
 </body>
 </html>
+
+Stop Claude
 
 Stop Claude
 
