@@ -32,7 +32,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS violations(id INTEGER PRIMARY KEY,student_name TEXT,title TEXT,description TEXT,points INTEGER DEFAULT 1,status TEXT DEFAULT 'open',date TEXT);
     CREATE TABLE IF NOT EXISTS points(id INTEGER PRIMARY KEY,student_name TEXT,reason TEXT,points INTEGER DEFAULT 5,date TEXT);
     CREATE TABLE IF NOT EXISTS faq(id INTEGER PRIMARY KEY,question TEXT,answer TEXT,department TEXT);
-    CREATE TABLE IF NOT EXISTS groups_tbl(id INTEGER PRIMARY KEY,name TEXT,teacher TEXT,subject TEXT,level TEXT,zoom_link TEXT,schedule TEXT);
+    CREATE TABLE IF NOT EXISTS groups_tbl(id INTEGER PRIMARY KEY,name TEXT,teacher TEXT,subject TEXT,level TEXT,zoom_link TEXT,schedule TEXT,prev_book TEXT,days TEXT,time TEXT,time_ramadan TEXT,online_days TEXT,online_time TEXT,online_time_ramadan TEXT,sessions_count TEXT,session_duration TEXT,total_hours TEXT,max_students INTEGER DEFAULT 20);
 CREATE TABLE IF NOT EXISTS evaluations(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,teacher TEXT,subject TEXT,score INTEGER DEFAULT 0,max_score INTEGER DEFAULT 100,notes TEXT,date TEXT);
 CREATE TABLE IF NOT EXISTS curriculum(id INTEGER PRIMARY KEY,group_name TEXT,teacher TEXT,subject TEXT,week TEXT,topic TEXT,status TEXT DEFAULT 'pending',date TEXT,notes TEXT);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,title TEXT,description TEXT,date TEXT,time TEXT,location TEXT,target TEXT DEFAULT 'all',created_by TEXT);
@@ -116,6 +116,22 @@ def migrate_db():
     db.commit(); db.close()
 
 migrate_db()
+
+def migrate_groups_db():
+    """Add new columns to groups_tbl."""
+    db = sqlite3.connect(DB)
+    grp_cols = [
+        ("prev_book","TEXT"),("days","TEXT"),("time","TEXT"),("time_ramadan","TEXT"),
+        ("online_days","TEXT"),("online_time","TEXT"),("online_time_ramadan","TEXT"),
+        ("sessions_count","TEXT"),("session_duration","TEXT"),("total_hours","TEXT"),
+        ("max_students","INTEGER")
+    ]
+    for col, typ in grp_cols:
+        try:
+            db.execute(f"ALTER TABLE groups_tbl ADD COLUMN {col} {typ}")
+        except: pass
+    db.commit(); db.close()
+migrate_groups_db()
 
 def login_required(f):
     @wraps(f)
@@ -339,6 +355,61 @@ def api_students():
     query += " ORDER BY name"
     rows = db.execute(query, params).fetchall()
     return jsonify({"students":[dict(r) for r in rows]})
+
+@app.route("/api/groups/import", methods=["POST"])
+@login_required
+def api_import_groups():
+    user = session.get("user", {})
+    if user.get("role") not in ["admin", "reception"]:
+        return jsonify({"ok": False, "msg": "غير مصرح"}), 403
+    d = request.json or {}
+    sheet_url = d.get("sheet_url", "")
+    import re
+    m = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
+    if not m:
+        return jsonify({"ok": False, "msg": "رابط غير صحيح"})
+    sheet_id = m.group(1)
+    gid = d.get("gid", "648031063")
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    try:
+        req = urllib.request.Request(csv_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8-sig", errors="replace")
+    except Exception as e:
+        return jsonify({"ok": False, "msg": f"فشل جلب البيانات: {str(e)}"})
+    reader = csv.reader(io.StringIO(raw))
+    rows = list(reader)
+    if len(rows) < 2:
+        return jsonify({"ok": False, "msg": "لا توجد بيانات"})
+    db = get_db()
+    added = 0; updated = 0
+    def gc(row, i):
+        return row[i].strip() if len(row) > i else ""
+    for row in rows[1:]:
+        name = gc(row, 1)
+        if not name:
+            continue
+        teacher = gc(row, 2); level = gc(row, 3); prev_book = gc(row, 4)
+        days = gc(row, 6); time = gc(row, 7); time_ramadan = gc(row, 8)
+        online_days = gc(row, 9); online_time_ramadan = gc(row, 10); online_time = gc(row, 11)
+        zoom_link = gc(row, 12); sessions_count = gc(row, 13)
+        session_duration = gc(row, 14); total_hours = gc(row, 15)
+        existing = db.execute("SELECT id FROM groups_tbl WHERE name=?", (name,)).fetchone()
+        if existing:
+            db.execute("""UPDATE groups_tbl SET teacher=?,subject=?,level=?,zoom_link=?,days=?,time=?,time_ramadan=?,
+                online_days=?,online_time=?,online_time_ramadan=?,prev_book=?,sessions_count=?,session_duration=?,total_hours=? WHERE id=?""",
+                (teacher,level,level,zoom_link,days,time,time_ramadan,online_days,online_time,
+                 online_time_ramadan,prev_book,sessions_count,session_duration,total_hours,existing["id"]))
+            updated += 1
+        else:
+            db.execute("""INSERT INTO groups_tbl(name,teacher,subject,level,zoom_link,days,time,time_ramadan,
+                online_days,online_time,online_time_ramadan,prev_book,sessions_count,session_duration,total_hours)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (name,teacher,level,level,zoom_link,days,time,time_ramadan,online_days,
+                 online_time,online_time_ramadan,prev_book,sessions_count,session_duration,total_hours))
+            added += 1
+    db.commit()
+    return jsonify({"ok": True, "added": added, "updated": updated})
 
 @app.route("/api/students/groups")
 @login_required
@@ -575,9 +646,9 @@ def api_groups():
     user = session["user"]
     role = user.get("role","")
     if role == "teacher":
-        rows = db.execute("SELECT * FROM groups_tbl WHERE teacher=?",(user.get("name",""),)).fetchall()
+        rows = db.execute("SELECT *, (SELECT COUNT(*) FROM students s WHERE s.group_name=g.name AND s.status='active') as student_count FROM groups_tbl g WHERE g.teacher=?",(user.get("name",""),)).fetchall()
     else:
-        rows = db.execute("SELECT * FROM groups_tbl ORDER BY name").fetchall()
+        rows = db.execute("SELECT *, (SELECT COUNT(*) FROM students s WHERE s.group_name=g.name AND s.status='active') as student_count FROM groups_tbl g ORDER BY g.name").fetchall()
     return jsonify({"groups":[dict(r) for r in rows]})
 
 @app.route("/api/groups", methods=["POST"])
