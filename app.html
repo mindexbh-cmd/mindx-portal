@@ -484,7 +484,7 @@ function showStudentDetail(sid) {
   });
 }
 
-function renderGroups(c, fTeacher, fLevel, fDay, fTime){
+async function renderGroups(c, fTeacher, fLevel, fDay, fTime){
   fTeacher=fTeacher||''; fLevel=fLevel||''; fDay=fDay||''; fTime=fTime||'';
   const d=await api('/groups');
   const allGroups = d.groups || [];
