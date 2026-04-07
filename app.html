@@ -6,7 +6,7 @@
 <style>
 :root{--pur:#6B3FA0;--pur-d:#4A2875;--pur-l:#8B5CC8;--pur-ll:#EDE5F7;--teal:#00BCD4;--teal-d:#0097A7;--gold:#FFD700;--bg:#F8F5FD;--bg2:#fff;--bg3:#F3EEF9;--border:#E0D5F0;--border2:#C9B8E8;--text:#2D1B5E;--text2:#7B6A9E;--text3:#B0A0CC;--gr:#2ECC8A;--am:#F5A623;--re:#E84545;--sb:230px;--hh:58px;}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-body{background:var(--bg);color:var(--text);font-size:13px;direction:rtl;overflow-x:hidden;}
+html,body{overflow:hidden;height:100%;} body{background:var(--bg);color:var(--text);font-size:13px;direction:rtl;}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
 /* TOPBAR */
@@ -29,7 +29,7 @@ body{background:var(--bg);color:var(--text);font-size:13px;direction:rtl;overflo
 .nav-badge{margin-right:auto;background:var(--re);color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;}
 
 /* MAIN */
-.main{margin-right:var(--sb);margin-top:var(--hh);min-height:calc(100vh - var(--hh));padding:18px;}
+.main{margin-right:var(--sb);margin-top:var(--hh);height:calc(100vh - var(--hh));overflow-y:auto;overflow-x:hidden;padding:18px;}
 
 /* CARDS */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
@@ -359,7 +359,7 @@ async function renderStudents(c) {
     parts.push('</select>');
     parts.push('</div>');
     // Table
-    parts.push('<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    parts.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
     parts.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
     parts.push('<thead><tr style="background:#6B3FA0;color:#fff;position:sticky;top:0;z-index:2;">');
     var headers = ['#','الاسم','الرقم الشخصي','واتساب','المجموعة','المستوى','قديم/جديد','حالة التسجيل','وقت الدراسة','ايام الدراسة','المدرس','انتقال 2026','مناسب للمستوى','استلام الكتاب','الأقساط المدفوعة','المتبقي','هاتف الأم','هاتف الأب','السكن',''];
@@ -1272,5 +1272,7 @@ go('dashboard');
 
 </body>
 </html>
+
+Stop Claude
 
 Stop Claude
