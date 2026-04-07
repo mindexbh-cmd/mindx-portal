@@ -490,19 +490,48 @@ async function addStudent(){
 }
 
 // ── GROUPS ──
-async function renderGroups(c){
+async function renderGroups(c, fTeacher, fLevel, fDay, fTime){
+  fTeacher=fTeacher||''; fLevel=fLevel||''; fDay=fDay||''; fTime=fTime||'';
   const d=await api('/groups');
-  const groups = d.groups || [];
+  const allGroups = d.groups || [];
+  let groups = allGroups.filter(g => {
+    if(fTeacher && g.teacher !== fTeacher) return false;
+    if(fLevel && (g.level||g.subject||'').toLowerCase().indexOf(fLevel.toLowerCase())===-1) return false;
+    if(fDay && !(g.days||g.schedule||'').includes(fDay)) return false;
+    if(fTime && (g.time||'').toLowerCase().indexOf(fTime.toLowerCase())===-1) return false;
+    return true;
+  });
+  const teachers=[...new Set(allGroups.map(g=>g.teacher).filter(Boolean))].sort();
+  const levels=[...new Set(allGroups.map(g=>g.level||g.subject).filter(Boolean))].sort();
+  const days=[...new Set(allGroups.flatMap(g=>(g.days||g.schedule||'').split(',').map(x=>x.trim())).filter(Boolean))].sort();
+  const times=[...new Set(allGroups.map(g=>g.time).filter(Boolean))].sort();
   c.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:700;color:var(--pur-d)">🏫 المجموعات (${groups.length})</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:13px;font-weight:700;color:var(--pur-d)">🏫 المجموعات (${groups.length}/${allGroups.length})</div>
     <button class="btn" style="background:#10b981;color:#fff;" onclick="showImportGroupsModal()">📊 استيراد من Google Sheets</button>
   </div>
+  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px;background:var(--bg2);padding:10px;border-radius:8px;border:1px solid var(--border)">
+    <span style="font-size:11px;color:var(--text2);font-weight:600">🔍 فلتر:</span>
+    <select class="inp" style="width:150px" id="gf-teacher" onchange="renderGroups(document.getElementById('main-content'),this.value,document.getElementById('gf-level').value,document.getElementById('gf-day').value,document.getElementById('gf-time').value)">
+      <option value="">كل المعلمات</option>
+      ${teachers.map(t=>`<option value="${t}" ${fTeacher===t?"selected":""}>${t}</option>`).join("")}
+    </select>
+    <select class="inp" style="width:130px" id="gf-level" onchange="renderGroups(document.getElementById('main-content'),document.getElementById('gf-teacher').value,this.value,document.getElementById('gf-day').value,document.getElementById('gf-time').value)">
+      <option value="">كل المستويات</option>
+      ${levels.map(l=>`<option value="${l}" ${fLevel===l?"selected":""}>${l}</option>`).join("")}
+    </select>
+    <select class="inp" style="width:110px" id="gf-day" onchange="renderGroups(document.getElementById('main-content'),document.getElementById('gf-teacher').value,document.getElementById('gf-level').value,this.value,document.getElementById('gf-time').value)">
+      <option value="">كل الأيام</option>
+      ${days.map(day=>`<option value="${day}" ${fDay===day?"selected":""}>${day}</option>`).join("")}
+    </select>
+    <select class="inp" style="width:130px" id="gf-time" onchange="renderGroups(document.getElementById('main-content'),document.getElementById('gf-teacher').value,document.getElementById('gf-level').value,document.getElementById('gf-day').value,this.value)">
+      <option value="">كل الأوقات</option>
+      ${times.map(t=>`<option value="${t}" ${fTime===t?"selected":""}>${t}</option>`).join("")}
+    </select>
+    ${(fTeacher||fLevel||fDay||fTime)?'<button class="btn btn-s btn-sm" onclick="renderGroups(document.getElementById(\'main-content\'))">✕ مسح الفلتر</button>':''}
+  </div>
   <div class="card"><div class="tw"><table>
-    <thead><tr>
-      <th>المجموعة</th><th>المعلمة</th><th>المستوى</th><th>الأيام</th><th>الوقت</th>
-      <th>رمضان</th><th>الطلاب</th><th>الأونلاين</th><th>وقت أونلاين</th><th>الحصص</th><th>الساعات</th><th>Zoom</th>
-    </tr></thead>
+    <thead><tr><th>المجموعة</th><th>المعلمة</th><th>المستوى</th><th>الأيام</th><th>الوقت</th><th>رمضان</th><th>الطلاب</th><th>الأونلاين</th><th>وقت أونلاين</th><th>الحصص</th><th>الساعات</th><th>Zoom</th></tr></thead>
     <tbody>${groups.length ? groups.map(g=>`<tr>
       <td style="font-weight:700;color:var(--pur-d)">${g.name||'—'}</td>
       <td>${g.teacher||'—'}</td>
@@ -516,7 +545,7 @@ async function renderGroups(c){
       <td style="text-align:center;font-weight:600">${g.sessions_count||'—'}</td>
       <td style="text-align:center;font-weight:600;color:var(--pur)">${g.total_hours||'—'} س</td>
       <td>${g.zoom_link?'<a href="'+g.zoom_link+'" target="_blank" class="btn btn-xs btn-t">🔗 فتح</a> <button class="btn btn-xs btn-wa" onclick="showWAModal(\'zoom\',\''+g.name+'\',\''+g.zoom_link+'\')">📱</button>':'—'}</td>
-    </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text3)">لا توجد مجموعات — استورد من Google Sheets</td></tr>'}
+    </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text3)">لا توجد نتائج</td></tr>'}
     </tbody>
   </table></div></div>`;
 }
