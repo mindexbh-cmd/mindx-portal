@@ -332,76 +332,89 @@ async function renderStudents(c) {
   }
   function renderTable() {
     var filtered = doFilter();
-    var total = allStudents.length;
-    var shown = filtered.length;
-    var parts = [];
-    parts.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
-    parts.push('<h2 style="color:#6B3FA0;margin:0;">الطلبة (<span id="stu-count">'+shown+'/'+total+'</span>)</h2>');
-    parts.push('<button onclick="showImportStudentsModal()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
-    parts.push('<button onclick="showAddStudentModal()" style="background:#00BCD4;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">+ إضافة طالب</button>');
+    var total = allStudents.length; var shown = filtered.length;
+    var p = [];
+    p.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    p.push('<h2 style="color:#6B3FA0;margin:0;">الطلبة (<span id="stu-count">'+shown+'/'+total+'</span>)</h2>');
+    p.push('<button onclick="showImportStudentsModal()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
     var anyFilter = fGroup||fStatus||fSearch;
-    if(anyFilter) parts.push('<button onclick="fGroup=\'\';fStatus=\'\';fSearch=\'\';renderTable();" style="background:#f44336;color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;">&#10005; مسح الفلتر</button>');
-    parts.push('</div>');
-    // Filters row
-    parts.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
-    parts.push('<input id="stu-search" type="text" placeholder="🔍 بحث بالاسم أو الرقم..." value="'+fSearch+'" oninput="fSearch=this.value;renderTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:200px;">');
-    // Group filter
+    if(anyFilter) p.push('<button onclick="fGroup=\'\';fStatus=\'\';fSearch=\'\';renderTable();" style="background:#f44336;color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;">&#10005; مسح الفلتر</button>');
+    p.push('</div>');
+    p.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    p.push('<input id="stu-search" type="text" placeholder="&#128269; بحث بالاسم أو الرقم..." value="'+fSearch+'" oninput="fSearch=this.value;renderTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:200px;">');
     var groups = [...new Set(allStudents.map(function(s){return s.group_name;}).filter(Boolean))].sort();
-    parts.push('<select onchange="fGroup=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
-    parts.push('<option value="">كل المجموعات</option>');
-    groups.forEach(function(g){parts.push('<option value="'+g+'"'+(fGroup===g?' selected':'')+'>'+g+'</option>');});
-    parts.push('</select>');
-    // Status filter
+    p.push('<select onchange="fGroup=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">كل المجموعات</option>');
+    groups.forEach(function(g){p.push('<option value="'+g+'"'+(fGroup===g?' selected':'')+'>'+g+'</option>');});
+    p.push('</select>');
     var statuses = [...new Set(allStudents.map(function(s){return s.old_new_2026;}).filter(Boolean))].sort();
-    parts.push('<select onchange="fStatus=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
-    parts.push('<option value="">قديم/جديد - الكل</option>');
-    statuses.forEach(function(s){parts.push('<option value="'+s+'"'+(fStatus===s?' selected':'')+'>'+s+'</option>');});
-    parts.push('</select>');
-    parts.push('</div>');
-    // Table
-    parts.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
-    parts.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
-    parts.push('<thead><tr style="background:#6B3FA0;color:#fff;position:sticky;top:0;z-index:2;">');
-    var headers = ['#','الاسم','الرقم الشخصي','واتساب','المجموعة','المستوى','قديم/جديد','حالة التسجيل','وقت الدراسة','ايام الدراسة','المدرس','انتقال 2026','مناسب للمستوى','استلام الكتاب','الأقساط المدفوعة','المتبقي','هاتف الأم','هاتف الأب','السكن',''];
-    headers.forEach(function(h){parts.push('<th style="padding:10px 8px;text-align:right;white-space:nowrap;position:sticky;top:0;background:#6B3FA0;color:#fff;">'+h+'</th>');});
-    parts.push('</tr></thead><tbody>');
+    p.push('<select onchange="fStatus=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">قديم/جديد - الكل</option>');
+    statuses.forEach(function(s){p.push('<option value="'+s+'"'+(fStatus===s?' selected':'')+'>'+s+'</option>');});
+    p.push('</select>');
+    p.push('</div>');
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var ths=['#','الرقم التسلسلي','الرقم الشخصي','اسم الطالب','واتساب','الصف','قديم/جديد','التسجيل ف2','المجموعة','المجموعة 2','الوقت 2026','وقت رمضان','أيام الدراسة','أونلاين','وقت أونلاين','أيام أونلاين','رابط زووم','أيام الحضور','نسبة الغياب','نسبة التأخير','المدرس 2026','ينتقل إلى','النتيجة','وصل إلى','مناسب للمستوى','استلام الكتب','المدرس 2','رابط واتساب','ق1','ق2','ق3','ق4','ق5','إجمالي BD','المتبقي','هاتف الأم','هاتف الأب','هاتف آخر','مكان السكن','عنوان المنزل','الطريق','المجمع',''];
+    ths.forEach(function(h){p.push('<th style="padding:8px 6px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0;background:#6B3FA0;z-index:1;">'+h+'</th>');});
+    p.push('</tr></thead><tbody>');
     filtered.forEach(function(s,i){
       var bg = i%2===0?'#fff':'#f8f5ff';
-      var reg_color = s.registration_status==='تم التسجيل'?'#4CAF50':s.registration_status==='مستجد'?'#FF9800':'#9E9E9E';
-      parts.push('<tr style="background:'+bg+';border-bottom:1px solid #eee;" onclick="showStudentDetail('+s.id+')" style="cursor:pointer;">');
-      parts.push('<td style="padding:8px;font-weight:bold;color:#6B3FA0;">'+(i+1)+'</td>');
-      parts.push('<td style="padding:8px;font-weight:600;min-width:150px;">'+((s.name)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.personal_id)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.whatsapp)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.group_name)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.level)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.old_new_2026)||'-')+'</td>');
-      parts.push('<td style="padding:8px;"><span style="background:'+reg_color+';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">'+((s.registration_status)||'-')+'</span></td>');
-      parts.push('<td style="padding:8px;white-space:nowrap;">'+((s.schedule_time)||'-')+'</td>');
-      parts.push('<td style="padding:8px;white-space:nowrap;">'+((s.schedule_days)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.teacher_name)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.next_level)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.level_suitable)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.book_received)||'-')+'</td>');
-      parts.push('<td style="padding:8px;font-weight:600;color:#4CAF50;">'+((s.total_paid)||'0')+'</td>');
-      parts.push('<td style="padding:8px;font-weight:600;color:#f44336;">'+((s.remaining_amount)||'0')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.mother_phone)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.father_phone)||'-')+'</td>');
-      parts.push('<td style="padding:8px;">'+((s.residence)||'-')+'</td>');
-      parts.push('<td style="padding:8px;"><button onclick="event.stopPropagation();showStudentDetail('+s.id+')" style="background:#6B3FA0;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;">تفاصيل</button></td>');
-      parts.push('</tr>');
+      var rc = s.registration_status==='تم التسجيل'?'#22c55e':s.registration_status==='مستجد'?'#f59e0b':'#9ca3af';
+      p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;cursor:pointer;" onclick="showStudentDetail('+s.id+')">');
+      p.push('<td style="padding:6px 4px;font-weight:700;color:#6B3FA0;text-align:center;white-space:nowrap;">'+(i+1)+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;color:#888;white-space:nowrap;">'+((s.serial_no)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((s.personal_id)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:130px;white-space:nowrap;">'+((s.name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;direction:ltr;white-space:nowrap;">'+((s.whatsapp)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;"><span style="background:#EDE5F7;color:#4A2875;padding:2px 6px;border-radius:10px;font-size:10px;">'+((s.level)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;"><span style="background:'+(s.old_new_2026==='قديم'?'#dcfce7':'#ede9fe')+';color:'+(s.old_new_2026==='قديم'?'#16a34a':'#7c3aed')+';padding:2px 6px;border-radius:10px;font-size:10px;">'+((s.old_new_2026)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;"><span style="background:'+rc+';color:#fff;padding:2px 7px;border-radius:10px;font-size:10px;">'+((s.registration_status)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;color:#6B3FA0;white-space:nowrap;">'+((s.group_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;color:#888;">'+((s.group_name2)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;font-size:11px;">'+((s.schedule_time)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;font-size:11px;color:#0097A7;">'+((s.schedule_time_ramadan)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;">'+((s.schedule_days)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;">'+((s.group_online)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;font-size:11px;">'+((s.schedule_time_online)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;">'+((s.schedule_days_online)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+(s.zoom_link_online?'<a href="'+s.zoom_link_online+'" target="_blank" style="color:#00BCD4;font-size:10px;">🔗</a>':'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;color:#666;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(s.attendance_days||'')+'">'+((s.attendance_days)||'-')+'</td>');
+      var absPct = parseFloat((s.absence_rate||'0').replace('%',''))||0;
+      var absColor = absPct>20?'#ef4444':absPct>10?'#f59e0b':'#22c55e';
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:'+absColor+';white-space:nowrap;">'+((s.absence_rate)||'0%')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:#f59e0b;white-space:nowrap;">'+((s.delay_rate)||'0%')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;">'+((s.teacher_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;font-size:11px;font-weight:600;color:#7c3aed;">'+((s.next_level)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(s.final_result||'')+'">'+((s.final_result)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(s.student_progress||'')+'">'+((s.student_progress)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;"><span style="background:'+(s.level_suitable==='نعم'?'#dcfce7':'#fef3c7')+';color:'+(s.level_suitable==='نعم'?'#16a34a':'#92400e')+';padding:2px 6px;border-radius:10px;font-size:10px;">'+((s.level_suitable)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;text-align:center;"><span style="background:'+(s.book_received==='استلم'?'#dcfce7':'#fef9c3')+';color:'+(s.book_received==='استلم'?'#16a34a':'#854d0e')+';padding:2px 6px;border-radius:10px;font-size:10px;">'+((s.book_received)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;color:#aaa;white-space:nowrap;">'+((s.teacher2)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+(s.whatsapp_group&&s.whatsapp_group.startsWith('http')?'<a href="'+s.whatsapp_group+'" target="_blank" style="color:#25D366;font-size:11px;">📩</a>':'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:600;color:#16a34a;">'+((s.installment1)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:600;color:#16a34a;">'+((s.installment2)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:600;color:#16a34a;">'+((s.installment3)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:600;color:#16a34a;">'+((s.installment4)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:600;color:#16a34a;">'+((s.installment5)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:#15803d;background:#f0fdf4;">'+((s.total_paid)||'0')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:#dc2626;background:#fff1f2;">'+((s.remaining_amount)||'0')+'</td>');
+      p.push('<td style="padding:6px 4px;direction:ltr;white-space:nowrap;">'+((s.mother_phone)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;direction:ltr;white-space:nowrap;">'+((s.father_phone)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;direction:ltr;white-space:nowrap;">'+((s.other_phone)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((s.residence)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;white-space:nowrap;">'+((s.home_address)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;white-space:nowrap;">'+((s.road)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;white-space:nowrap;">'+((s.complex_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;"><button onclick="event.stopPropagation();showStudentDetail('+s.id+')" style="background:#6B3FA0;color:#fff;border:none;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:10px;">&#128065;</button></td>');
+      p.push('</tr>');
     });
-    if(filtered.length===0) parts.push('<tr><td colspan="20" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
-    parts.push('</tbody></table></div>');
-    c.innerHTML = parts.join('');
-    // Update counter if already rendered
-    var counter = document.getElementById('stu-count');
-    if(counter) counter.textContent = shown+'/'+total;
+    if(!filtered.length) p.push('<tr><td colspan="43" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
   }
-  api('/students').then(function(data){
-    allStudents = data.students||[];
-    renderTable();
-  });
+  api('/students').then(function(data){ allStudents = data.students||[]; renderTable(); });
 }
 
 function showImportStudentsModal() {
@@ -1294,6 +1307,8 @@ document.addEventListener('wheel', function(e) {
 </script>
 </body>
 </html>
+
+Stop Claude
 
 Stop Claude
 
