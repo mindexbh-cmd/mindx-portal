@@ -309,7 +309,7 @@ def dashboard():
             "teacher":"المعلمات","media":"الإعلام","curriculum":"المناهج",
             "ideas":"الأفكار","secretary":"أمانة السر","premises":"شؤون المقر","parent":"ولي أمر"}
         role_label = role_labels.get(role, role)
-        all_pages = ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai","database"]
+        all_pages = ["dashboard","students","groups","attendance","payments","tasks","curriculum","evaluations","violations","points","events","faq","whatsapp","ai","database","payments_detail","attendance_log","evaluations_log","violations_log"]
         role_pages = {
             "admin": all_pages,
             "reception": ["dashboard","students","groups","attendance","payments","faq","whatsapp","ai"],
