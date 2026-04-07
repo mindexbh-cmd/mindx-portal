@@ -596,123 +596,275 @@ async function doImportGroups(){
 }
 
 // ── ATTENDANCE ──
-async function renderAttendance(c){
-  const grps=await api('/groups');
-  const firstGroup=grps.groups[0]?.name||'';
-  const today=new Date().toISOString().split('T')[0];
-  c.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;gap:7px;align-items:center">
-      <select class="inp" style="width:180px" id="att-group" onchange="loadAttendance()">
-        ${grps.groups.map(g=>`<option value="${g.name}">${g.name}</option>`).join('')}
-      </select>
-      <input class="inp" style="width:140px" type="date" id="att-date" value="${today}" onchange="loadAttendance()">
+async function renderAttendance() {
+  const app = document.getElementById('app');
+  // Get current date in Arabic format DD/MM/YYYYم
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  const todayAr = dd + '/' + mm + '/' + yyyy + 'م';
+  const todayISO = yyyy + '-' + mm + '-' + dd;
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const todayDay = days[now.getDay()];
+
+  app.innerHTML = `
+  <div style="padding:16px;direction:rtl">
+    <!-- Header controls -->
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <button onclick="loadPage('attendance')" style="background:#6d4c9e;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px">↩ تحديث</button>
+      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
+        <label style="font-weight:bold;color:#2e7d32;font-size:13px">📅 التاريخ (د/ش/سنةم):</label>
+        <input type="text" id="att-date-ar" placeholder="08/04/2026م" value="${todayAr}" 
+          style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;width:130px;text-align:center"
+          oninput="loadAttendanceData()">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
+        <label style="font-weight:bold;color:#2e7d32;font-size:13px">📆 اليوم:</label>
+        <select id="att-day" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px">
+          <option value="الأحد" ${todayDay==='الأحد'?'selected':''}>الأحد</option>
+          <option value="الاثنين" ${todayDay==='الاثنين'?'selected':''}>الاثنين</option>
+          <option value="الثلاثاء" ${todayDay==='الثلاثاء'?'selected':''}>الثلاثاء</option>
+          <option value="الأربعاء" ${todayDay==='الأربعاء'?'selected':''}>الأربعاء</option>
+          <option value="الخميس" ${todayDay==='الخميس'?'selected':''}>الخميس</option>
+          <option value="الجمعة" ${todayDay==='الجمعة'?'selected':''}>الجمعة</option>
+          <option value="السبت" ${todayDay==='السبت'?'selected':''}>السبت</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
+        <label style="font-weight:bold;color:#2e7d32;font-size:13px">👥 المجموعة:</label>
+        <select id="att-group" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;min-width:150px"
+          onchange="loadGroupStudents()">
+          <option value="">-- اختر المجموعة --</option>
+        </select>
+      </div>
     </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn btn-wa" onclick="showWAModal('absent','','')">📱 إرسال غياب</button>
-      <button class="btn btn-p" onclick="showBulkAttendance()">+ تسجيل الحضور</button>
+    
+    <!-- Note banner -->
+    <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin-bottom:16px;color:#795548;font-size:13px">
+      🚩 <strong>الخصص التي صار فيها تصوير إعلامي تُحتسب كتوقف — لا تُحسب غياباً</strong>
     </div>
-  </div>
-  <div class="alert alert-warn">📌 الحصص التي صار فيها تصوير إعلامي تُحتسب كتوقف — لا تُحسب غياباً</div>
-  <div class="grid2" style="margin-bottom:12px">
-    <div class="card" style="border-top:3px solid var(--gr)"><div style="padding:12px;text-align:center"><div id="att-present" style="font-size:24px;font-weight:700;color:var(--gr)">—</div><div style="font-size:10px;color:var(--text2)">حاضرون</div></div></div>
-    <div class="card" style="border-top:3px solid var(--re)"><div style="padding:12px;text-align:center"><div id="att-absent" style="font-size:24px;font-weight:700;color:var(--re)">—</div><div style="font-size:10px;color:var(--text2)">غائبون</div></div></div>
-  </div>
-  <div class="card" id="att-table"><div class="loading">اختر مجموعة</div></div>`;
-  loadAttendance();
+
+    <!-- Counters -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:white;border:2px solid #ef5350;border-radius:10px;padding:16px;text-align:center">
+        <div id="att-absent-count" style="font-size:36px;font-weight:bold;color:#ef5350">0</div>
+        <div style="color:#888;font-size:14px">غائبون</div>
+      </div>
+      <div style="background:white;border:2px solid #4caf50;border-radius:10px;padding:16px;text-align:center">
+        <div id="att-present-count" style="font-size:36px;font-weight:bold;color:#4caf50">0</div>
+        <div style="color:#888;font-size:14px">حاضرون</div>
+      </div>
+    </div>
+
+    <!-- Student recording table -->
+    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead>
+          <tr style="background:#6d4c9e;color:white">
+            <th style="padding:10px 12px;text-align:right">#</th>
+            <th style="padding:10px 12px;text-align:right">المجموعة</th>
+            <th style="padding:10px 12px;text-align:right">اسم الطالب</th>
+            <th style="padding:10px 12px;text-align:right">رقم التواصل</th>
+            <th style="padding:10px 12px;text-align:center;min-width:120px">حالة الغياب</th>
+          </tr>
+        </thead>
+        <tbody id="att-students-body">
+          <tr><td colspan="5" style="text-align:center;padding:30px;color:#999">اختر المجموعة لعرض الطلاب</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- History / Log section -->
+    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+      <div style="background:#37474f;color:white;padding:12px 16px;font-size:15px;font-weight:bold">
+        📋 سجل الحضور لهذا التاريخ
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#eceff1">
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">التاريخ</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اليوم</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">المجموعة</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اسم الطالب</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">رقم التواصل</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">الحالة</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">الرسالة</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">وصلة الواتساب</th>
+              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">حالة الارسال</th>
+            </tr>
+          </thead>
+          <tbody id="att-log-body">
+            <tr><td colspan="9" style="text-align:center;padding:20px;color:#999">لا توجد بيانات مسجلة لهذا التاريخ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+
+  // Load groups for dropdown
+  const xg = new XMLHttpRequest();
+  xg.open('GET','/api/groups',false);
+  xg.send();
+  const gData = JSON.parse(xg.responseText);
+  const groups = gData.groups || gData || [];
+  const sel = document.getElementById('att-group');
+  groups.sort((a,b)=>a.name.localeCompare(b.name,'ar')).forEach(g=>{
+    const o = document.createElement('option');
+    o.value = g.name;
+    o.textContent = g.name;
+    sel.appendChild(o);
+  });
+
+  // Load existing attendance for today
+  loadAttendanceData();
 }
 
-async function loadAttendance(){
-  const group=document.getElementById('att-group')?.value||'';
-  const date=document.getElementById('att-date')?.value||'';
-  const d=await api(`/attendance?group=${encodeURIComponent(group)}&date=${date}`);
-  document.getElementById('att-present').textContent=d.present;
-  document.getElementById('att-absent').textContent=d.absent;
-  const stD=await api(`/students?group=${encodeURIComponent(group)}&status=active`);
-  const table=document.getElementById('att-table');
-  const recorded=new Set((d.records||d.attendance||[]).map(r=>r.student_name));
-  table.innerHTML=`<div class="tw"><table>
-    <thead><tr><th>الاسم</th><th>الحالة</th><th>ملاحظة</th><th>واتساب</th></tr></thead>
-    <tbody>${stD.students.map(s=>{
-      const rec=(d.records||[]).find(r=>r.student_name===s.name);
-      return `<tr>
-        <td style="font-weight:500">${s.name}</td>
-        <td>
-          <select class="inp" style="width:100px;padding:3px 6px;font-size:11px" onchange="recordAtt('${s.name}',${s.id},'${group}','${date}',this.value,this.closest('tr').querySelector('.att-note').value)">
-            <option value="">—</option>
-            <option value="present" ${rec?.status==='present'?'selected':''}>✓ حاضر</option>
-            <option value="absent" ${rec?.status==='absent'?'selected':''}>✗ غائب</option>
-            <option value="late" ${rec?.status==='late'?'selected':''}>⏱ متأخر</option>
-          </select>
-        </td>
-        <td><input class="inp att-note" style="width:120px;padding:3px 6px;font-size:11px" value="${rec?.note||''}"></td>
-        <td>${rec?.status==='absent'?`<button class="btn btn-xs btn-wa" onclick="showWAModal('absent','${s.name}','${group}')">📱</button>`:''}</td>
-      </tr>`;
-    }).join('')}
-    </tbody>
-  </table></div>`;
+function loadAttendanceData() {
+  const dateArEl = document.getElementById('att-date-ar');
+  if (!dateArEl) return;
+  const dateAr = dateArEl.value.trim();
+  // Convert Arabic date to ISO for API (DD/MM/YYYYم → YYYY-MM-DD)
+  const m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  let dateISO = '';
+  if (m) dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  
+  if (!dateISO) return;
+
+  // Load attendance records for this date
+  const x = new XMLHttpRequest();
+  x.open('GET','/api/attendance?date='+dateISO,false);
+  x.send();
+  const data = JSON.parse(x.responseText);
+  const records = data.records || data.attendance || [];
+
+  // Update counters
+  const present = records.filter(r=>r.status&&r.status.includes('حاضر')).length;
+  const absent = records.filter(r=>r.status&&(r.status.includes('غائب')||r.status.includes('متأخر')||r.status.includes('عذر'))).length;
+  const pc = document.getElementById('att-present-count');
+  const ac = document.getElementById('att-absent-count');
+  if(pc) pc.textContent = present;
+  if(ac) ac.textContent = absent;
+
+  // Update log table
+  const logBody = document.getElementById('att-log-body');
+  if (logBody) {
+    if (records.length === 0) {
+      logBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999">لا توجد بيانات مسجلة لهذا التاريخ</td></tr>';
+    } else {
+      logBody.innerHTML = records.map((r,i)=>{
+        const statusColor = r.status==='حاضر'?'#4caf50':r.status==='غائب'?'#ef5350':r.status==='متأخر'?'#ff9800':'#9e9e9e';
+        const wa = r.contact ? 'https://wa.me/973'+r.contact.replace(/^0/,'') : '';
+        return `<tr style="border-bottom:1px solid #f5f5f5;${i%2?'background:#fafafa':''}">
+          <td style="padding:7px 10px">${r.date||r.attendance_date||''}</td>
+          <td style="padding:7px 10px">${r.day_name||''}</td>
+          <td style="padding:7px 10px">${r.group_name||''}</td>
+          <td style="padding:7px 10px;font-weight:500">${r.student_name||''}</td>
+          <td style="padding:7px 10px;direction:ltr;text-align:left">${r.contact||''}</td>
+          <td style="padding:7px 10px;text-align:center"><span style="background:${statusColor};color:white;border-radius:12px;padding:2px 10px;font-size:12px">${r.status||'—'}</span></td>
+          <td style="padding:7px 10px">${r.notes||''}</td>
+          <td style="padding:7px 10px;text-align:center">${wa?'<a href="'+wa+'" target="_blank" style="color:#25d366;font-size:18px">💬</a>':''}</td>
+          <td style="padding:7px 10px;text-align:center">${r.send_status||''}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Update student rows if group is selected
+  const grp = document.getElementById('att-group');
+  if (grp && grp.value) loadGroupStudents(records);
 }
 
-async function recordAtt(name,id,group,date,status,note){
-  if(!status)return;
-  await api('/attendance','POST',{student_id:id,student_name:name,group_name:group,date,status,note:note||''});
-  loadAttendance();
+function loadGroupStudents(existingRecords) {
+  const grp = document.getElementById('att-group');
+  const dateArEl = document.getElementById('att-date-ar');
+  const dayEl = document.getElementById('att-day');
+  if (!grp || !dateArEl) return;
+  const groupName = grp.value;
+  if (!groupName) return;
+
+  const dateAr = dateArEl.value.trim();
+  const m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  let dateISO = '';
+  if (m) dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+
+  // Get students in this group
+  const xs = new XMLHttpRequest();
+  xs.open('GET','/api/students?group='+encodeURIComponent(groupName)+'&limit=200',false);
+  xs.send();
+  const sData = JSON.parse(xs.responseText);
+  const students = sData.students || sData || [];
+
+  // Get existing records for this date+group
+  if (!existingRecords) {
+    const xr = new XMLHttpRequest();
+    xr.open('GET','/api/attendance?date='+dateISO+'&group='+encodeURIComponent(groupName),false);
+    xr.send();
+    const rData = JSON.parse(xr.responseText);
+    existingRecords = rData.records || rData.attendance || [];
+  }
+  const recordMap = {};
+  existingRecords.forEach(r=>{ if(r.group_name===groupName) recordMap[r.student_name]=r; });
+
+  const body = document.getElementById('att-students-body');
+  if (!body) return;
+
+  if (students.length === 0) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#999">لا يوجد طلاب في هذه المجموعة</td></tr>';
+    return;
+  }
+
+  body.innerHTML = students.map((s,i)=>{
+    const rec = recordMap[s.name] || {};
+    const status = rec.status || '';
+    const contact = s.whatsapp || rec.contact || '';
+    const statusColor = status==='حاضر'?'#e8f5e9':status==='غائب'?'#ffebee':status==='متأخر'?'#fff8e1':status==='عذر'?'#f3e5f5':'white';
+    return `<tr style="border-bottom:1px solid #f5f5f5;background:${statusColor}">
+      <td style="padding:8px 12px;color:#888">${i+1}</td>
+      <td style="padding:8px 12px;color:#666">${groupName}</td>
+      <td style="padding:8px 12px;font-weight:500">${s.name}</td>
+      <td style="padding:8px 12px;direction:ltr;text-align:left;color:#444">${contact}</td>
+      <td style="padding:8px 12px;text-align:center">
+        <select onchange="saveAttendance('${s.name.replace(/'/g,'\\'')}','${groupName.replace(/'/g,'\\'')}','${dateISO}','${dateAr}',this.value,'${contact}')"
+          style="border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:13px;background:white;cursor:pointer">
+          <option value="" ${!status?'selected':''}>—</option>
+          <option value="حاضر" ${status==='حاضر'?'selected':''}>✅ حاضر</option>
+          <option value="غائب" ${status==='غائب'?'selected':''}>❌ غائب</option>
+          <option value="متأخر" ${status==='متأخر'?'selected':''}>⏰ متأخر</option>
+          <option value="عذر" ${status==='عذر'?'selected':''}>📝 عذر</option>
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
-// ── PAYMENTS ──
-async function renderPayments(c){
-  const d=await api('/payments');
-  c.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <select class="inp" style="width:140px" onchange="filterPayments(this.value)"><option value="">الكل</option><option value="pending">معلقة</option><option value="paid">مدفوعة</option></select>
-    <button class="btn btn-p" onclick="showAddPaymentModal()">+ تسجيل دفعة</button>
-  </div>
-  <div class="stat-grid">
-    <div class="stat" style="border-top-color:var(--gr)"><div style="font-size:16px">✅</div><div class="stat-v" style="color:var(--gr);font-size:20px">${d.total_paid} BD</div><div class="stat-l">مدفوع</div></div>
-    <div class="stat" style="border-top-color:var(--am)"><div style="font-size:16px">⏳</div><div class="stat-v" style="color:var(--am);font-size:20px">${d.total_pending} BD</div><div class="stat-l">معلق</div></div>
-  </div>
-  <div class="card" id="pay-table"><div class="tw"><table>
-    <thead><tr><th>الطالب</th><th>المبلغ</th><th>القسط</th><th>الاستحقاق</th><th>الحالة</th><th>إجراء</th></tr></thead>
-    <tbody>${d.payments.map(p=>`<tr>
-      <td style="font-weight:500">${p.student_name}</td>
-      <td style="font-weight:600">${p.amount} BD</td>
-      <td>القسط ${p.installment}</td>
-      <td>${p.due_date||'—'}</td>
-      <td>${badge(p.status)}</td>
-      <td><div style="display:flex;gap:3px">
-        ${p.status==='pending'?`<button class="btn btn-xs btn-p" onclick="confirmPay(${p.id})">تأكيد الدفع</button>
-        <button class="btn btn-xs btn-wa" onclick="showWAModal('payment','${p.student_name}','${p.amount}')">📱</button>`:'—'}
-      </div></td>
-    </tr>`).join('')}
-    </tbody>
-  </table></div></div>`;
+function saveAttendance(studentName, groupName, dateISO, dateAr, status, contact) {
+  const dayEl = document.getElementById('att-day');
+  const dayName = dayEl ? dayEl.value : '';
+  if (!status) {
+    // Delete record if status cleared
+    return;
+  }
+  const x = new XMLHttpRequest();
+  x.open('POST','/api/attendance',false);
+  x.setRequestHeader('Content-Type','application/json');
+  x.send(JSON.stringify({
+    student_name: studentName,
+    group_name: groupName,
+    date: dateISO,
+    day_name: dayName,
+    status: status,
+    contact: contact,
+    notes: '',
+    whatsapp_link: contact ? 'https://wa.me/973'+contact.replace(/^0/,'') : '',
+    send_status: ''
+  }));
+  const res = JSON.parse(x.responseText);
+  // Update counters
+  loadAttendanceData();
 }
 
-async function confirmPay(id){
-  if(!confirm('تأكيد استلام الدفعة؟'))return;
-  await api('/payments/'+id+'/confirm','POST');
-  go('payments');
-}
-
-// ── TASKS ──
-async function renderTasks(c){
-  const d=await api('/tasks');
-  document.getElementById('task-badge').textContent=d.tasks.filter(t=>t.status==='pending').length;
-  c.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <select class="inp" style="width:140px" onchange="this.value?api('/tasks?department='+this.value).then(d=>renderTaskTable(d.tasks)):api('/tasks').then(d=>renderTaskTable(d.tasks))">
-      <option value="">كل الأقسام</option>
-      <option>الاستقبال</option><option>المناهج</option><option>الإعلام</option>
-      <option>شؤون الطلاب</option><option>الأفكار</option><option>أمانة السر</option>
-    </select>
-    <button class="btn btn-p" onclick="showAddTaskModal()">+ مهمة جديدة</button>
-  </div>
-  <div class="alert alert-red">⚠️ مهام متأخرة: ملف الأسئلة الشائعة · نظام إشعارات الغياب · تدريب رائد على الجوائز</div>
-  <div class="card"><div class="tw" id="tasks-wrap"><table>
-    <thead><tr><th>المهمة</th><th>المسند إليه</th><th>القسم</th><th>الأولوية</th><th>التسليم</th><th>الحالة</th><th>إجراء</th></tr></thead>
-    <tbody id="tasks-body">${renderTaskRows(d.tasks)}</tbody>
-  </table></div></div>`;
-}
 function renderTaskRows(tasks){
   return tasks.map(t=>`<tr>
     <td style="font-weight:500">${t.title}${t.description?`<div style="font-size:10px;color:var(--text2)">${t.description}</div>`:''}</td>
