@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS evaluations_log(id INTEGER PRIMARY KEY,
 CREATE TABLE IF NOT EXISTS violations_log(id INTEGER PRIMARY KEY,
     student_name TEXT,group_name TEXT,violation_date TEXT,record_time TEXT,location TEXT,
     violation_title TEXT,description TEXT,action_taken TEXT,notes TEXT,points TEXT,recorder TEXT);
-CREATE TABLE IF NOT EXISTS attendance(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,date TEXT,status TEXT);
+CREATE TABLE IF NOT EXISTS attendance(id INTEGER PRIMARY KEY,student_name TEXT,group_name TEXT,date TEXT,status TEXT,contact TEXT,day_name TEXT,notes TEXT,whatsapp_link TEXT,send_status TEXT);
 CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY,student_name TEXT,amount REAL,status TEXT DEFAULT 'pending',date TEXT,notes TEXT);
 CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT,department TEXT,assigned_to TEXT,status TEXT DEFAULT 'pending',priority TEXT DEFAULT 'medium',due_date TEXT,created_date TEXT,notes TEXT);
 CREATE TABLE IF NOT EXISTS violations(id INTEGER PRIMARY KEY,student_name TEXT,title TEXT,description TEXT,points INTEGER DEFAULT 1,status TEXT DEFAULT 'open',date TEXT);
@@ -628,8 +628,8 @@ def api_get_attendance():
     else:
         rows = db.execute("SELECT * FROM attendance WHERE date=?",(d,)).fetchall()
     records = [dict(r) for r in rows]
-    present = sum(1 for r in records if r.get("status") == "present")
-    absent = sum(1 for r in records if r.get("status") == "absent")
+    present = sum(1 for r in records if r.get("status") in ("present","حاضر"))
+    absent = sum(1 for r in records if r.get("status") in ("absent","غائب","متأخر","عذر"))
     return jsonify({"attendance": records, "records": records, "present": present, "absent": absent})
 
 @app.route("/api/attendance", methods=["POST"])
@@ -637,11 +637,17 @@ def api_get_attendance():
 def api_attendance():
     d = request.json or {}
     db = get_db()
+    contact = d.get("contact","")
+    if not contact:
+        st = db.execute("SELECT whatsapp FROM students WHERE name=?",(d["student_name"],)).fetchone()
+        if st: contact = st["whatsapp"] or ""
     db.execute("DELETE FROM attendance WHERE student_name=? AND date=?",(d["student_name"],d["date"]))
-    db.execute("INSERT INTO attendance(student_name,group_name,date,status)VALUES(?,?,?,?)",
-        (d["student_name"],d.get("group_name",""),d["date"],d["status"]))
+    db.execute("""INSERT INTO attendance(student_name,group_name,date,status,contact,day_name,notes,whatsapp_link,send_status)
+        VALUES(?,?,?,?,?,?,?,?,?)""",
+        (d["student_name"],d.get("group_name",""),d["date"],d.get("status","حاضر"),
+         contact,d.get("day_name",""),d.get("notes",""),d.get("whatsapp_link",""),d.get("send_status","")))
     db.commit()
-    return jsonify({"ok":True})
+    return jsonify({"ok":True,"contact":contact})
 
 @app.route("/api/attendance_log")
 @login_required
