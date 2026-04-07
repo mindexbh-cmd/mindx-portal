@@ -315,182 +315,176 @@ async function renderDashboard(c){
 }
 
 // ── STUDENTS ──
-async function renderStudents(c,q='',group='',status=''){
-  const d=await api(`/students?q=${encodeURIComponent(q)}&group=${encodeURIComponent(group)}&status=${encodeURIComponent(status)}`);
-  const groupsD=await api('/students/groups');
-  c.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-      <input class="inp" style="width:180px" placeholder="🔍 بحث..." value="${q}" oninput="renderStudents(document.getElementById('main-content'),this.value,document.getElementById('sg').value,document.getElementById('ss').value)">
-      <select class="inp" style="width:140px" id="sg" onchange="renderStudents(document.getElementById('main-content'),document.querySelector('[placeholder]').value,this.value,document.getElementById('ss').value)">
-        <option value="">كل المجموعات</option>
-        ${groupsD.groups.map(g=>`<option value="${g}" ${group===g?'selected':''}>${g}</option>`).join('')}
-      </select>
-      <select class="inp" style="width:110px" id="ss" onchange="renderStudents(document.getElementById('main-content'),document.querySelector('[placeholder]').value,document.getElementById('sg').value,this.value)">
-        <option value="">كل الحالات</option>
-        <option value="active" ${status==='active'?'selected':''}>نشط</option>
-        <option value="inactive" ${status==='inactive'?'selected':''}>معلق</option>
-      </select>
-    </div>
-    <button class="btn btn-p" onclick="showAddStudentModal()">+ إضافة طالب</button>
-    <button class="btn" style="background:#10b981;color:#fff;margin-right:8px" onclick="showImportSheetsModal()">📊 استيراد من Google Sheets</button>
-  </div>
-  <div class="alert alert-warn">📌 إذا سجّل الطالب أثناء الدورة — عدّل تاريخ البداية وعدد الساعات في العقد</div>
-  <div class="card"><div class="tw"><table>
-    <thead><tr><th>الاسم</th><th>المجموعة</th><th>المستوى</th><th>المعلمة</th><th>واتساب</th><th>نسبة الغياب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-    <tbody>${d.students.map(s=>{
-      const color=s.absence_rate>=20?'var(--re)':s.absence_rate>=10?'var(--am)':'var(--gr)';
-      return `<tr>
-        <td style="font-weight:600">${s.name}</td>
-        <td><span class="badge bpu">${s.group_name||'—'}</span></td>
-        <td>${s.level||'—'}</td><td>${s.teacher||'—'}</td>
-        <td dir="ltr">${s.whatsapp||'—'}</td>
-        <td><span style="color:${color};font-weight:600">${s.absence_rate??0}%</span></td>
-        <td>${badge(s.status)}</td>
-        <td><div style="display:flex;gap:3px">
-          <button class="btn btn-xs btn-s" onclick="showStudentDetail(${s.id})">👁</button>
-          <button class="btn btn-xs btn-wa" onclick="showWAModal('single','${s.name}','${s.group_name||''}')">📱</button>
-        </div></td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">لا توجد نتائج</td></tr>'}
-    </tbody>
-  </table></div></div>`;
-}
-
-async function showStudentDetail(id){
-  const d = await api('/students/'+id);
-  const s = d.student;
-  if(!s){return;}
-  const payRows = (s.payments||[]).map(p=>`
-    <tr><td>${p.date||'—'}</td><td>${p.amount||0} BHD</td><td><span class="badge ${p.status==='paid'?'bgr':'bam'}">${p.status==='paid'?'مدفوع':'معلق'}</span></td></tr>
-  `).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text2)">لا يوجد</td></tr>';
-  
-  const ir = (label, value, icon) => value ? `<div style="margin-bottom:8px"><span style="color:var(--text2);font-size:11px">${icon||''} ${label}</span><div style="font-weight:600;font-size:12px">${value}</div></div>` : '';
-
-  openModal(s.name,`
-    <div class="fgrid" style="margin-bottom:12px">
-      <div style="background:var(--pur-ll);padding:10px;border-radius:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:var(--pur)">${s.absence_rate||'0%'}</div>
-        <div style="font-size:10px;color:var(--text2)">نسبة الغياب</div>
-      </div>
-      <div style="background:#e8f5e9;padding:10px;border-radius:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#388e3c">${s.total_points||0}</div>
-        <div style="font-size:10px;color:var(--text2)">النقاط</div>
-      </div>
-      <div style="background:#fff3e0;padding:10px;border-radius:8px;text-align:center">
-        <div style="font-size:20px;font-weight:700;color:#f57c00">${s.total_sessions||0}</div>
-        <div style="font-size:10px;color:var(--text2)">الجلسات</div>
-      </div>
-    </div>
-
-    <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:700;color:var(--pur-d);margin-bottom:8px;font-size:12px">📚 معلومات الدراسة الحضوري</div>
-      <div class="fgrid">
-        ${ir('المجموعة', s.group_name||s.group_name2, '🏫')}
-        ${ir('الوقت', s.schedule_time, '⏰')}
-        ${ir('أيام الدراسة', s.schedule_days, '📅')}
-        ${ir('وقت رمضان', s.schedule_time_ramadan, '🌙')}
-        ${ir('اسم المعلمة', s.teacher_name, '👩‍🏫')}
-      </div>
-    </div>
-
-    ${s.group_online ? `<div style="background:#e3f2fd;border-radius:8px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:700;color:#0277bd;margin-bottom:8px;font-size:12px">💻 الأونلاين</div>
-      <div class="fgrid">
-        ${ir('المجموعة الأونلاين', s.group_online, '🌐')}
-        ${ir('الوقت', s.schedule_time_online, '⏰')}
-        ${ir('الأيام', s.schedule_days_online, '📅')}
-      </div>
-      ${s.zoom_link_online ? `<a href="${s.zoom_link_online}" target="_blank" class="btn btn-t btn-sm" style="margin-top:4px">🔗 Zoom الأونلاين</a>` : ''}
-    </div>` : ''}
-
-    <div style="background:#f3fdf3;border-radius:8px;padding:12px;margin-bottom:10px">
-      <div style="font-weight:700;color:#2e7d32;margin-bottom:8px;font-size:12px">📊 التقدم والنتائج</div>
-      ${s.attendance_summary ? `<div style="font-size:11px;color:var(--text);margin-bottom:8px;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #c8e6c9">${s.attendance_summary}</div>` : ''}
-      <div class="fgrid">
-        ${ir('الى أين وصل', s.student_progress, '📖')}
-        ${ir('الانتقال التالي', s.next_level, '⬆️')}
-        ${ir('هل المستوى مناسب', s.level_suitable, '✅')}
-        ${ir('استلام الكتب', s.book_received, '📚')}
-      </div>
-    </div>
-
-    <div class="fgrid" style="margin-bottom:10px">
-      ${ir('الواتساب', s.whatsapp, '📱')}
-      ${ir('الرسوم الشهرية', (s.monthly_fee||35)+' BHD', '💰')}
-      <div style="margin-bottom:8px"><span style="color:var(--text2);font-size:11px">الحالة</span><div>${badge(s.status)}</div></div>
-      ${ir('المستوى', s.level, '📊')}
-    </div>
-
-    ${s.notes_2026 ? `<div style="background:#fffde7;border-radius:8px;padding:10px;margin-bottom:10px;font-size:11px;color:#795548"><b>📝 ملاحظات 2026:</b> ${s.notes_2026}</div>` : ''}
-
-    <h4 style="margin-bottom:8px;color:var(--pur);font-size:12px">💳 آخر الدفعات</h4>
-    <div class="tw"><table style="width:100%"><thead><tr><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${payRows}</tbody></table></div>
-
-  ${(s.mother_phone||s.father_phone||s.other_phone) ? `
-  <div style="background:#f0fdf4;border-radius:12px;padding:14px 16px;margin:10px 0">
-    <div style="font-weight:700;color:#166534;margin-bottom:10px;font-size:14px">&#128222; بيانات الاتصال</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      ${s.mother_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف الأم</div><div style="font-weight:600;color:#166534">${s.mother_phone}</div></div>` : ''}
-      ${s.father_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف الأب</div><div style="font-weight:600;color:#166534">${s.father_phone}</div></div>` : ''}
-      ${s.other_phone ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">هاتف آخر</div><div style="font-weight:600;color:#166534">${s.other_phone}</div></div>` : ''}
-    </div>
-  </div>` : ''}
-
-  ${(s.residence||s.home_address||s.road||s.complex_name) ? `
-  <div style="background:#eff6ff;border-radius:12px;padding:14px 16px;margin:10px 0">
-    <div style="font-weight:700;color:#1e40af;margin-bottom:10px;font-size:14px">&#127968; بيانات السكن</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${s.residence ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">مكان السكن</div><div style="font-weight:600;color:#1e40af">${s.residence}</div></div>` : ''}
-      ${s.home_address ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">عنوان المنزل</div><div style="font-weight:600;color:#1e40af">${s.home_address}</div></div>` : ''}
-      ${s.road ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">الطريق</div><div style="font-weight:600;color:#1e40af">${s.road}</div></div>` : ''}
-      ${s.complex_name ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">المجمع</div><div style="font-weight:600;color:#1e40af">${s.complex_name}</div></div>` : ''}
-    </div>
-  </div>` : ''}
-
-  ${(s.installment1||s.total_paid||s.remaining_amount) ? `
-  <div style="background:#fdf4ff;border-radius:12px;padding:14px 16px;margin:10px 0">
-    <div style="font-weight:700;color:#6b21a8;margin-bottom:10px;font-size:14px">&#128179; الأقساط والمدفوعات</div>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px">
-      ${[1,2,3,4,5].map(n => s['installment'+n] ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:6px"><div style="font-size:10px;color:#888">القسط ${n}</div><div style="font-weight:700;color:#6b21a8;font-size:13px">${s['installment'+n]}</div></div>` : '').join('')}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${s.total_paid ? `<div style="text-align:center;background:#dcfce7;border-radius:8px;padding:8px"><div style="font-size:11px;color:#166534">اجمالي المدفوع (BD)</div><div style="font-weight:700;color:#166534;font-size:16px">${s.total_paid}</div></div>` : ''}
-      ${s.remaining_amount ? `<div style="text-align:center;background:#fee2e2;border-radius:8px;padding:8px"><div style="font-size:11px;color:#991b1b">المبالغ المتبقية</div><div style="font-weight:700;color:#991b1b;font-size:16px">${s.remaining_amount}</div></div>` : ''}
-    </div>
-  </div>` : ''}
-
-  ${(s.old_new_2026||s.registration_status||s.final_result_2026) ? `
-  <div style="background:#fff7ed;border-radius:12px;padding:14px 16px;margin:10px 0">
-    <div style="font-weight:700;color:#9a3412;margin-bottom:10px;font-size:14px">&#128203; حالة التسجيل</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      ${s.old_new_2026 ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">قديم/جديد</div><div style="font-weight:600;color:#9a3412">${s.old_new_2026}</div></div>` : ''}
-      ${s.registration_status ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">حالة التسجيل</div><div style="font-weight:600;color:#9a3412">${s.registration_status}</div></div>` : ''}
-      ${s.final_result_2026 ? `<div style="text-align:center;background:#fff;border-radius:8px;padding:8px"><div style="font-size:11px;color:#666">النتيجة النهائية</div><div style="font-weight:600;color:#9a3412">${s.final_result_2026}</div></div>` : ''}
-    </div>
-  </div>` : ''}
-
-  `);
-}
-async function addStudent(){
-  const n=document.getElementById('sn').value.trim();
-  if(!n){alert('الاسم مطلوب');return;}
-  await api('/students','POST',{
-    name:n,personal_id:document.getElementById('spid').value,
-    whatsapp:document.getElementById('swa').value,
-    parent_name:document.getElementById('spar').value,
-    parent_whatsapp:document.getElementById('spwa').value,
-    group_name:document.getElementById('sgrp').value,
-    level:document.getElementById('slvl').value,
-    enrollment_date:document.getElementById('sdate').value,
-    notes:document.getElementById('snotes').value,
+async function renderStudents(c) {
+  var allStudents = [];
+  var fGroup = '', fStatus = '', fSearch = '';
+  function doFilter() {
+    var filtered = allStudents;
+    if (fGroup) filtered = filtered.filter(function(s){return s.group_name===fGroup;});
+    if (fStatus) filtered = filtered.filter(function(s){return s.old_new_2026===fStatus;});
+    if (fSearch) {
+      var q = fSearch.toLowerCase();
+      filtered = filtered.filter(function(s){
+        return (s.name||'').toLowerCase().includes(q)||(s.personal_id||'').includes(q)||(s.whatsapp||'').includes(q);
+      });
+    }
+    return filtered;
+  }
+  function renderTable() {
+    var filtered = doFilter();
+    var total = allStudents.length;
+    var shown = filtered.length;
+    var parts = [];
+    parts.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    parts.push('<h2 style="color:#6B3FA0;margin:0;">الطلبة (<span id="stu-count">'+shown+'/'+total+'</span>)</h2>');
+    parts.push('<button onclick="showImportStudentsModal()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
+    parts.push('<button onclick="showAddStudentModal()" style="background:#00BCD4;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">+ إضافة طالب</button>');
+    var anyFilter = fGroup||fStatus||fSearch;
+    if(anyFilter) parts.push('<button onclick="fGroup=\'\';fStatus=\'\';fSearch=\'\';renderTable();" style="background:#f44336;color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;">&#10005; مسح الفلتر</button>');
+    parts.push('</div>');
+    // Filters row
+    parts.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    parts.push('<input id="stu-search" type="text" placeholder="🔍 بحث بالاسم أو الرقم..." value="'+fSearch+'" oninput="fSearch=this.value;renderTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:200px;">');
+    // Group filter
+    var groups = [...new Set(allStudents.map(function(s){return s.group_name;}).filter(Boolean))].sort();
+    parts.push('<select onchange="fGroup=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    parts.push('<option value="">كل المجموعات</option>');
+    groups.forEach(function(g){parts.push('<option value="'+g+'"'+(fGroup===g?' selected':'')+'>'+g+'</option>');});
+    parts.push('</select>');
+    // Status filter
+    var statuses = [...new Set(allStudents.map(function(s){return s.old_new_2026;}).filter(Boolean))].sort();
+    parts.push('<select onchange="fStatus=this.value;renderTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    parts.push('<option value="">قديم/جديد - الكل</option>');
+    statuses.forEach(function(s){parts.push('<option value="'+s+'"'+(fStatus===s?' selected':'')+'>'+s+'</option>');});
+    parts.push('</select>');
+    parts.push('</div>');
+    // Table
+    parts.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    parts.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    parts.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var headers = ['#','الاسم','الرقم الشخصي','واتساب','المجموعة','المستوى','قديم/جديد','حالة التسجيل','وقت الدراسة','ايام الدراسة','المدرس','انتقال 2026','مناسب للمستوى','استلام الكتاب','الأقساط المدفوعة','المتبقي','هاتف الأم','هاتف الأب','السكن',''];
+    headers.forEach(function(h){parts.push('<th style="padding:10px 8px;text-align:right;white-space:nowrap;">'+h+'</th>');});
+    parts.push('</tr></thead><tbody>');
+    filtered.forEach(function(s,i){
+      var bg = i%2===0?'#fff':'#f8f5ff';
+      var reg_color = s.registration_status==='تم التسجيل'?'#4CAF50':s.registration_status==='مستجد'?'#FF9800':'#9E9E9E';
+      parts.push('<tr style="background:'+bg+';border-bottom:1px solid #eee;" onclick="showStudentDetail('+s.id+')" style="cursor:pointer;">');
+      parts.push('<td style="padding:8px;font-weight:bold;color:#6B3FA0;">'+(i+1)+'</td>');
+      parts.push('<td style="padding:8px;font-weight:600;min-width:150px;">'+((s.name)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.personal_id)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.whatsapp)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.group_name)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.level)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.old_new_2026)||'-')+'</td>');
+      parts.push('<td style="padding:8px;"><span style="background:'+reg_color+';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">'+((s.registration_status)||'-')+'</span></td>');
+      parts.push('<td style="padding:8px;white-space:nowrap;">'+((s.schedule_time)||'-')+'</td>');
+      parts.push('<td style="padding:8px;white-space:nowrap;">'+((s.schedule_days)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.teacher_name)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.next_level)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.level_suitable)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.book_received)||'-')+'</td>');
+      parts.push('<td style="padding:8px;font-weight:600;color:#4CAF50;">'+((s.total_paid)||'0')+'</td>');
+      parts.push('<td style="padding:8px;font-weight:600;color:#f44336;">'+((s.remaining_amount)||'0')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.mother_phone)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.father_phone)||'-')+'</td>');
+      parts.push('<td style="padding:8px;">'+((s.residence)||'-')+'</td>');
+      parts.push('<td style="padding:8px;"><button onclick="event.stopPropagation();showStudentDetail('+s.id+')" style="background:#6B3FA0;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;">تفاصيل</button></td>');
+      parts.push('</tr>');
+    });
+    if(filtered.length===0) parts.push('<tr><td colspan="20" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
+    parts.push('</tbody></table></div>');
+    c.innerHTML = parts.join('');
+    // Update counter if already rendered
+    var counter = document.getElementById('stu-count');
+    if(counter) counter.textContent = shown+'/'+total;
+  }
+  api('/students').then(function(data){
+    allStudents = data.students||[];
+    renderTable();
   });
-  closeModal();
-  go('students');
 }
 
-// ── GROUPS ──
-async function renderGroups(c, fTeacher, fLevel, fDay, fTime){
+function showImportStudentsModal() {
+  var overlay = document.createElement('div');
+  overlay.id = 'import-stu-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:30px;width:500px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,0.2);">' +
+    '<h3 style="color:#6B3FA0;margin-bottom:16px;">📊 استيراد بيانات الطلبة من Google Sheets</h3>' +
+    '<p style="font-size:13px;color:#666;margin-bottom:12px;">سيتم استيراد كل البيانات من تبويب الطلبة (الصفحة الرئيسية)</p>' +
+    '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">رابط الشيت</label>' +
+    '<input id="stu-sheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:12px;">' +
+    '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">GID التبويب</label>' +
+    '<input id="stu-sheet-gid" type="text" value="942035800" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;margin-bottom:16px;">' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+    '<button onclick="document.getElementById(\'import-stu-overlay\').remove()" style="padding:10px 20px;border:1.5px solid #ddd;background:#fff;border-radius:8px;cursor:pointer;">إلغاء</button>' +
+    '<button onclick="doImportStudents()" style="padding:10px 20px;background:#6B3FA0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">📥 استيراد</button>' +
+    '</div>' +
+    '<div id="stu-import-result" style="margin-top:12px;"></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
+function doImportStudents() {
+  var url = document.getElementById('stu-sheet-url').value;
+  var gid = document.getElementById('stu-sheet-gid').value;
+  var resultDiv = document.getElementById('stu-import-result');
+  resultDiv.innerHTML = '<p style="color:#6B3FA0;">⏳ جاري الاستيراد...</p>';
+  api('/students/import', 'POST', {sheet_url: url, gid: gid})
+    .then(function(d) {
+      if(d.ok) {
+        resultDiv.innerHTML = '<p style="color:green;font-weight:600;">✅ تم الاستيراد: '+d.added+' جديد، '+d.updated+' محدّث</p>';
+        setTimeout(function(){
+          var overlay = document.getElementById('import-stu-overlay');
+          if(overlay) overlay.remove();
+          go('students');
+        }, 2000);
+      } else {
+        resultDiv.innerHTML = '<p style="color:red;">❌ خطأ: '+(d.msg||'unknown')+'</p>';
+      }
+    })
+    .catch(function(e){ resultDiv.innerHTML = '<p style="color:red;">❌ '+e+'</p>'; });
+}
+
+function showStudentDetail(sid) {
+  api('/students/'+sid).then(function(data){
+    var s = data.student;
+    if(!s){alert('لم يتم العثور على الطالب');return;}
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px;';
+    function row(label,val){return '<tr><td style="padding:6px 10px;color:#888;font-size:12px;white-space:nowrap;">'+label+'</td><td style="padding:6px 10px;font-weight:600;font-size:13px;">'+(val||'-')+'</td></tr>';}
+    var html = '<div style="background:#fff;border-radius:16px;padding:28px;width:700px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.2);">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">';
+    html += '<h3 style="color:#6B3FA0;margin:0;">📋 '+s.name+'</h3>';
+    html += '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:#eee;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;">✕</button>';
+    html += '</div>';
+    html += '<table style="width:100%;border-collapse:collapse;">';
+    html += row('الرقم الشخصي',s.personal_id); html += row('الرقم التسلسلي',s.serial_no);
+    html += row('واتساب',s.whatsapp); html += row('المستوى',s.level);
+    html += row('قديم/جديد',s.old_new_2026); html += row('حالة التسجيل',s.registration_status);
+    html += row('المجموعة',s.group_name); html += row('المجموعة 2',s.group_name2);
+    html += row('وقت الدراسة',s.schedule_time); html += row('وقت رمضان',s.schedule_time_ramadan);
+    html += row('أيام الدراسة',s.schedule_days); html += row('المجموعة أونلاين',s.group_online);
+    html += row('وقت أونلاين',s.schedule_time_online); html += row('أيام أونلاين',s.schedule_days_online);
+    html += row('رابط زووم',s.zoom_link_online?'<a href="'+s.zoom_link_online+'" target="_blank">'+s.zoom_link_online+'</a>':null);
+    html += row('نسبة الغياب',s.absence_rate); html += row('نسبة التأخير',s.delay_rate);
+    html += row('المدرس',s.teacher_name); html += row('الانتقال لـ',s.next_level);
+    html += row('النتيجة النهائية',s.final_result); html += row('التقدم',s.student_progress);
+    html += row('مناسب للمستوى؟',s.level_suitable); html += row('استلام الكتاب',s.book_received);
+    html += row('القسط 1',s.installment1); html += row('القسط 2',s.installment2);
+    html += row('القسط 3',s.installment3); html += row('القسط 4',s.installment4);
+    html += row('القسط 5',s.installment5);
+    html += row('إجمالي المدفوع',s.total_paid); html += row('المتبقي',s.remaining_amount);
+    html += row('هاتف الأم',s.mother_phone); html += row('هاتف الأب',s.father_phone);
+    html += row('هاتف آخر',s.other_phone); html += row('مكان السكن',s.residence);
+    html += row('العنوان',s.home_address); html += row('الطريق',s.road); html += row('المجمع',s.complex_name);
+    html += '</table></div>';
+    overlay.innerHTML = html;
+    overlay.onclick = function(e){if(e.target===overlay)overlay.remove();};
+    document.body.appendChild(overlay);
+  });
+}
+
+function renderGroups(c, fTeacher, fLevel, fDay, fTime){
   fTeacher=fTeacher||''; fLevel=fLevel||''; fDay=fDay||''; fTime=fTime||'';
   const d=await api('/groups');
   const allGroups = d.groups || [];
