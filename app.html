@@ -359,11 +359,11 @@ async function renderStudents(c) {
     parts.push('</select>');
     parts.push('</div>');
     // Table
-    parts.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    parts.push('<div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
     parts.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
-    parts.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    parts.push('<thead><tr style="background:#6B3FA0;color:#fff;position:sticky;top:0;z-index:2;">');
     var headers = ['#','الاسم','الرقم الشخصي','واتساب','المجموعة','المستوى','قديم/جديد','حالة التسجيل','وقت الدراسة','ايام الدراسة','المدرس','انتقال 2026','مناسب للمستوى','استلام الكتاب','الأقساط المدفوعة','المتبقي','هاتف الأم','هاتف الأب','السكن',''];
-    headers.forEach(function(h){parts.push('<th style="padding:10px 8px;text-align:right;white-space:nowrap;">'+h+'</th>');});
+    headers.forEach(function(h){parts.push('<th style="padding:10px 8px;text-align:right;white-space:nowrap;position:sticky;top:0;background:#6B3FA0;color:#fff;">'+h+'</th>');});
     parts.push('</tr></thead><tbody>');
     filtered.forEach(function(s,i){
       var bg = i%2===0?'#fff':'#f8f5ff';
@@ -1272,3 +1272,5 @@ go('dashboard');
 
 </body>
 </html>
+
+Stop Claude
