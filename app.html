@@ -598,216 +598,172 @@ async function doImportGroups(){
 // ── ATTENDANCE ──
 async function renderAttendance() {
   const app = document.getElementById('app');
-  // Get current date in Arabic format DD/MM/YYYYم
   const now = new Date();
   const dd = String(now.getDate()).padStart(2,'0');
   const mm = String(now.getMonth()+1).padStart(2,'0');
   const yyyy = now.getFullYear();
   const todayAr = dd + '/' + mm + '/' + yyyy + 'م';
-  const todayISO = yyyy + '-' + mm + '-' + dd;
   const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const todayDay = days[now.getDay()];
 
-  app.innerHTML = `
-  <div style="padding:16px;direction:rtl">
-    <!-- Header controls -->
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-      <button onclick="loadPage('attendance')" style="background:#6d4c9e;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px">↩ تحديث</button>
-      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
-        <label style="font-weight:bold;color:#2e7d32;font-size:13px">📅 التاريخ (د/ش/سنةم):</label>
-        <input type="text" id="att-date-ar" placeholder="08/04/2026م" value="${todayAr}" 
-          style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;width:130px;text-align:center"
-          oninput="loadAttendanceData()">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
-        <label style="font-weight:bold;color:#2e7d32;font-size:13px">📆 اليوم:</label>
-        <select id="att-day" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px">
-          <option value="الأحد" ${todayDay==='الأحد'?'selected':''}>الأحد</option>
-          <option value="الاثنين" ${todayDay==='الاثنين'?'selected':''}>الاثنين</option>
-          <option value="الثلاثاء" ${todayDay==='الثلاثاء'?'selected':''}>الثلاثاء</option>
-          <option value="الأربعاء" ${todayDay==='الأربعاء'?'selected':''}>الأربعاء</option>
-          <option value="الخميس" ${todayDay==='الخميس'?'selected':''}>الخميس</option>
-          <option value="الجمعة" ${todayDay==='الجمعة'?'selected':''}>الجمعة</option>
-          <option value="السبت" ${todayDay==='السبت'?'selected':''}>السبت</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">
-        <label style="font-weight:bold;color:#2e7d32;font-size:13px">👥 المجموعة:</label>
-        <select id="att-group" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;min-width:150px"
-          onchange="loadGroupStudents()">
-          <option value="">-- اختر المجموعة --</option>
-        </select>
-      </div>
-    </div>
-    
-    <!-- Note banner -->
-    <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin-bottom:16px;color:#795548;font-size:13px">
-      🚩 <strong>الخصص التي صار فيها تصوير إعلامي تُحتسب كتوقف — لا تُحسب غياباً</strong>
-    </div>
+  let dayOptions = '';
+  ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'].forEach(function(d){
+    dayOptions += '<option value="'+d+'"'+(d===todayDay?' selected':'')+'>'+d+'</option>';
+  });
 
-    <!-- Counters -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div style="background:white;border:2px solid #ef5350;border-radius:10px;padding:16px;text-align:center">
-        <div id="att-absent-count" style="font-size:36px;font-weight:bold;color:#ef5350">0</div>
-        <div style="color:#888;font-size:14px">غائبون</div>
-      </div>
-      <div style="background:white;border:2px solid #4caf50;border-radius:10px;padding:16px;text-align:center">
-        <div id="att-present-count" style="font-size:36px;font-weight:bold;color:#4caf50">0</div>
-        <div style="color:#888;font-size:14px">حاضرون</div>
-      </div>
-    </div>
+  app.innerHTML = '<div style="padding:16px;direction:rtl">' +
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">' +
+    '<label style="font-weight:bold;color:#2e7d32;font-size:13px">📅 التاريخ:</label>' +
+    '<input type="text" id="att-date-ar" placeholder="08/04/2026م" value="'+todayAr+'" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;width:130px;text-align:center">' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">' +
+    '<label style="font-weight:bold;color:#2e7d32;font-size:13px">📆 اليوم:</label>' +
+    '<select id="att-day" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px">'+dayOptions+'</select>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">' +
+    '<label style="font-weight:bold;color:#2e7d32;font-size:13px">👥 المجموعة:</label>' +
+    '<select id="att-group" onchange="loadGroupStudents()" style="border:1px solid #4caf50;border-radius:6px;padding:4px 8px;font-size:14px;min-width:150px">' +
+    '<option value="">-- اختر المجموعة --</option>' +
+    '</select>' +
+    '</div>' +
+    '<button onclick="loadAttendanceData()" style="background:#6d4c9e;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px">🔄 تحديث</button>' +
+    '</div>' +
+    '<div style="background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin-bottom:16px;color:#795548;font-size:13px">🚩 الحصص التي صار فيها تصوير إعلامي لا تُحسب غياباً</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+    '<div style="background:white;border:2px solid #ef5350;border-radius:10px;padding:16px;text-align:center">' +
+    '<div id="att-absent-count" style="font-size:36px;font-weight:bold;color:#ef5350">0</div>' +
+    '<div style="color:#888;font-size:14px">غائبون</div></div>' +
+    '<div style="background:white;border:2px solid #4caf50;border-radius:10px;padding:16px;text-align:center">' +
+    '<div id="att-present-count" style="font-size:36px;font-weight:bold;color:#4caf50">0</div>' +
+    '<div style="color:#888;font-size:14px">حاضرون</div></div>' +
+    '</div>' +
+    '<div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:24px">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
+    '<thead><tr style="background:#6d4c9e;color:white">' +
+    '<th style="padding:10px 12px;text-align:right">#</th>' +
+    '<th style="padding:10px 12px;text-align:right">المجموعة</th>' +
+    '<th style="padding:10px 12px;text-align:right">اسم الطالب</th>' +
+    '<th style="padding:10px 12px;text-align:right">رقم التواصل</th>' +
+    '<th style="padding:10px 12px;text-align:center;min-width:120px">حالة الغياب</th>' +
+    '</tr></thead>' +
+    '<tbody id="att-students-body">' +
+    '<tr><td colspan="5" style="text-align:center;padding:30px;color:#999">اختر المجموعة لعرض الطلاب</td></tr>' +
+    '</tbody></table></div>' +
+    '<div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">' +
+    '<div style="background:#37474f;color:white;padding:12px 16px;font-size:15px;font-weight:bold">📋 سجل الحضور لهذا التاريخ</div>' +
+    '<div style="overflow-x:auto">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<thead><tr style="background:#eceff1">' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">التاريخ</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اليوم</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">المجموعة</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اسم الطالب</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">رقم التواصل</th>' +
+    '<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">الحالة</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">الرسالة</th>' +
+    '<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">واتساب</th>' +
+    '<th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">حالة الارسال</th>' +
+    '</tr></thead>' +
+    '<tbody id="att-log-body">' +
+    '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999">ادخل التاريخ وانقر تحديث</td></tr>' +
+    '</tbody></table></div></div></div>';
 
-    <!-- Student recording table -->
-    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:24px">
-      <table style="width:100%;border-collapse:collapse;font-size:14px">
-        <thead>
-          <tr style="background:#6d4c9e;color:white">
-            <th style="padding:10px 12px;text-align:right">#</th>
-            <th style="padding:10px 12px;text-align:right">المجموعة</th>
-            <th style="padding:10px 12px;text-align:right">اسم الطالب</th>
-            <th style="padding:10px 12px;text-align:right">رقم التواصل</th>
-            <th style="padding:10px 12px;text-align:center;min-width:120px">حالة الغياب</th>
-          </tr>
-        </thead>
-        <tbody id="att-students-body">
-          <tr><td colspan="5" style="text-align:center;padding:30px;color:#999">اختر المجموعة لعرض الطلاب</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- History / Log section -->
-    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-      <div style="background:#37474f;color:white;padding:12px 16px;font-size:15px;font-weight:bold">
-        📋 سجل الحضور لهذا التاريخ
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:#eceff1">
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">التاريخ</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اليوم</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">المجموعة</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">اسم الطالب</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">رقم التواصل</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">الحالة</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:2px solid #ddd">الرسالة</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">وصلة الواتساب</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #ddd">حالة الارسال</th>
-            </tr>
-          </thead>
-          <tbody id="att-log-body">
-            <tr><td colspan="9" style="text-align:center;padding:20px;color:#999">لا توجد بيانات مسجلة لهذا التاريخ</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-
-  // Load groups for dropdown
-  const xg = new XMLHttpRequest();
+  // Load groups
+  var xg = new XMLHttpRequest();
   xg.open('GET','/api/groups',false);
   xg.send();
-  const gData = JSON.parse(xg.responseText);
-  const groups = gData.groups || gData || [];
-  const sel = document.getElementById('att-group');
-  groups.sort((a,b)=>a.name.localeCompare(b.name,'ar')).forEach(g=>{
-    const o = document.createElement('option');
+  var gData = JSON.parse(xg.responseText);
+  var groups = gData.groups || gData || [];
+  var sel = document.getElementById('att-group');
+  groups.sort(function(a,b){return a.name.localeCompare(b.name,'ar');}).forEach(function(g){
+    var o = document.createElement('option');
     o.value = g.name;
     o.textContent = g.name;
     sel.appendChild(o);
   });
 
-  // Load existing attendance for today
   loadAttendanceData();
 }
 
 function loadAttendanceData() {
-  const dateArEl = document.getElementById('att-date-ar');
+  var dateArEl = document.getElementById('att-date-ar');
   if (!dateArEl) return;
-  const dateAr = dateArEl.value.trim();
-  // Convert Arabic date to ISO for API (DD/MM/YYYYم → YYYY-MM-DD)
-  const m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  let dateISO = '';
-  if (m) dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  
-  if (!dateISO) return;
+  var dateAr = dateArEl.value.trim();
+  var m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return;
+  var dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
 
-  // Load attendance records for this date
-  const x = new XMLHttpRequest();
+  var x = new XMLHttpRequest();
   x.open('GET','/api/attendance?date='+dateISO,false);
   x.send();
-  const data = JSON.parse(x.responseText);
-  const records = data.records || data.attendance || [];
+  var data = JSON.parse(x.responseText);
+  var records = data.records || data.attendance || [];
 
-  // Update counters
-  const present = records.filter(r=>r.status&&r.status.includes('حاضر')).length;
-  const absent = records.filter(r=>r.status&&(r.status.includes('غائب')||r.status.includes('متأخر')||r.status.includes('عذر'))).length;
-  const pc = document.getElementById('att-present-count');
-  const ac = document.getElementById('att-absent-count');
+  var present = records.filter(function(r){return r.status&&r.status==='حاضر';}).length;
+  var absent = records.filter(function(r){return r.status&&(r.status==='غائب'||r.status==='متأخر'||r.status==='عذر');}).length;
+  var pc = document.getElementById('att-present-count');
+  var ac = document.getElementById('att-absent-count');
   if(pc) pc.textContent = present;
   if(ac) ac.textContent = absent;
 
-  // Update log table
-  const logBody = document.getElementById('att-log-body');
+  var logBody = document.getElementById('att-log-body');
   if (logBody) {
     if (records.length === 0) {
       logBody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999">لا توجد بيانات مسجلة لهذا التاريخ</td></tr>';
     } else {
-      logBody.innerHTML = records.map((r,i)=>{
-        const statusColor = r.status==='حاضر'?'#4caf50':r.status==='غائب'?'#ef5350':r.status==='متأخر'?'#ff9800':'#9e9e9e';
-        const wa = r.contact ? 'https://wa.me/973'+r.contact.replace(/^0/,'') : '';
-        return `<tr style="border-bottom:1px solid #f5f5f5;${i%2?'background:#fafafa':''}">
-          <td style="padding:7px 10px">${r.date||r.attendance_date||''}</td>
-          <td style="padding:7px 10px">${r.day_name||''}</td>
-          <td style="padding:7px 10px">${r.group_name||''}</td>
-          <td style="padding:7px 10px;font-weight:500">${r.student_name||''}</td>
-          <td style="padding:7px 10px;direction:ltr;text-align:left">${r.contact||''}</td>
-          <td style="padding:7px 10px;text-align:center"><span style="background:${statusColor};color:white;border-radius:12px;padding:2px 10px;font-size:12px">${r.status||'—'}</span></td>
-          <td style="padding:7px 10px">${r.notes||''}</td>
-          <td style="padding:7px 10px;text-align:center">${wa?'<a href="'+wa+'" target="_blank" style="color:#25d366;font-size:18px">💬</a>':''}</td>
-          <td style="padding:7px 10px;text-align:center">${r.send_status||''}</td>
-        </tr>`;
-      }).join('');
+      var rows = '';
+      records.forEach(function(r,i){
+        var sc = r.status==='حاضر'?'#4caf50':r.status==='غائب'?'#ef5350':r.status==='متأخر'?'#ff9800':'#9e9e9e';
+        var wa = r.contact ? 'https://wa.me/973'+r.contact.replace(/^0/,'') : '';
+        var waBadge = wa ? '<a href="'+wa+'" target="_blank" style="color:#25d366;font-size:18px">💬</a>' : '';
+        rows += '<tr style="border-bottom:1px solid #f5f5f5;'+(i%2?'background:#fafafa':'')+'">';
+        rows += '<td style="padding:7px 10px">'+(r.date||r.attendance_date||'')+'</td>';
+        rows += '<td style="padding:7px 10px">'+(r.day_name||'')+'</td>';
+        rows += '<td style="padding:7px 10px">'+(r.group_name||'')+'</td>';
+        rows += '<td style="padding:7px 10px;font-weight:500">'+(r.student_name||'')+'</td>';
+        rows += '<td style="padding:7px 10px;direction:ltr;text-align:left">'+(r.contact||'')+'</td>';
+        rows += '<td style="padding:7px 10px;text-align:center"><span style="background:'+sc+';color:white;border-radius:12px;padding:2px 10px;font-size:12px">'+(r.status||'—')+'</span></td>';
+        rows += '<td style="padding:7px 10px">'+(r.notes||'')+'</td>';
+        rows += '<td style="padding:7px 10px;text-align:center">'+waBadge+'</td>';
+        rows += '<td style="padding:7px 10px;text-align:center">'+(r.send_status||'')+'</td>';
+        rows += '</tr>';
+      });
+      logBody.innerHTML = rows;
     }
   }
 
-  // Update student rows if group is selected
-  const grp = document.getElementById('att-group');
-  if (grp && grp.value) loadGroupStudents(records);
+  var grp = document.getElementById('att-group');
+  if (grp && grp.value) loadGroupStudents();
 }
 
-function loadGroupStudents(existingRecords) {
-  const grp = document.getElementById('att-group');
-  const dateArEl = document.getElementById('att-date-ar');
-  const dayEl = document.getElementById('att-day');
+function loadGroupStudents() {
+  var grp = document.getElementById('att-group');
+  var dateArEl = document.getElementById('att-date-ar');
   if (!grp || !dateArEl) return;
-  const groupName = grp.value;
+  var groupName = grp.value;
   if (!groupName) return;
 
-  const dateAr = dateArEl.value.trim();
-  const m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  let dateISO = '';
-  if (m) dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  var dateAr = dateArEl.value.trim();
+  var m = dateAr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return;
+  var dateISO = m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
 
-  // Get students in this group
-  const xs = new XMLHttpRequest();
+  var xs = new XMLHttpRequest();
   xs.open('GET','/api/students?group='+encodeURIComponent(groupName)+'&limit=200',false);
   xs.send();
-  const sData = JSON.parse(xs.responseText);
-  const students = sData.students || sData || [];
+  var sData = JSON.parse(xs.responseText);
+  var students = sData.students || sData || [];
 
-  // Get existing records for this date+group
-  if (!existingRecords) {
-    const xr = new XMLHttpRequest();
-    xr.open('GET','/api/attendance?date='+dateISO+'&group='+encodeURIComponent(groupName),false);
-    xr.send();
-    const rData = JSON.parse(xr.responseText);
-    existingRecords = rData.records || rData.attendance || [];
-  }
-  const recordMap = {};
-  existingRecords.forEach(r=>{ if(r.group_name===groupName) recordMap[r.student_name]=r; });
+  var xr = new XMLHttpRequest();
+  xr.open('GET','/api/attendance?date='+dateISO+'&group='+encodeURIComponent(groupName),false);
+  xr.send();
+  var rData = JSON.parse(xr.responseText);
+  var existing = rData.records || rData.attendance || [];
+  var recordMap = {};
+  existing.forEach(function(r){ recordMap[r.student_name]=r; });
 
-  const body = document.getElementById('att-students-body');
+  var body = document.getElementById('att-students-body');
   if (!body) return;
 
   if (students.length === 0) {
@@ -815,38 +771,42 @@ function loadGroupStudents(existingRecords) {
     return;
   }
 
-  body.innerHTML = students.map((s,i)=>{
-    const rec = recordMap[s.name] || {};
-    const status = rec.status || '';
-    const contact = s.whatsapp || rec.contact || '';
-    const statusColor = status==='حاضر'?'#e8f5e9':status==='غائب'?'#ffebee':status==='متأخر'?'#fff8e1':status==='عذر'?'#f3e5f5':'white';
-    return `<tr style="border-bottom:1px solid #f5f5f5;background:${statusColor}">
-      <td style="padding:8px 12px;color:#888">${i+1}</td>
-      <td style="padding:8px 12px;color:#666">${groupName}</td>
-      <td style="padding:8px 12px;font-weight:500">${s.name}</td>
-      <td style="padding:8px 12px;direction:ltr;text-align:left;color:#444">${contact}</td>
-      <td style="padding:8px 12px;text-align:center">
-        <select onchange="saveAttendance('${s.name.replace(/'/g,'\\'')}','${groupName.replace(/'/g,'\\'')}','${dateISO}','${dateAr}',this.value,'${contact}')"
-          style="border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:13px;background:white;cursor:pointer">
-          <option value="" ${!status?'selected':''}>—</option>
-          <option value="حاضر" ${status==='حاضر'?'selected':''}>✅ حاضر</option>
-          <option value="غائب" ${status==='غائب'?'selected':''}>❌ غائب</option>
-          <option value="متأخر" ${status==='متأخر'?'selected':''}>⏰ متأخر</option>
-          <option value="عذر" ${status==='عذر'?'selected':''}>📝 عذر</option>
-        </select>
-      </td>
-    </tr>`;
-  }).join('');
+  var rows = '';
+  students.forEach(function(s,i){
+    var rec = recordMap[s.name] || {};
+    var status = rec.status || '';
+    var contact = s.whatsapp || rec.contact || '';
+    var bgColor = status==='حاضر'?'#e8f5e9':status==='غائب'?'#ffebee':status==='متأخر'?'#fff8e1':status==='عذر'?'#f3e5f5':'white';
+    rows += '<tr style="border-bottom:1px solid #f5f5f5;background:'+bgColor+'">';
+    rows += '<td style="padding:8px 12px;color:#888">'+(i+1)+'</td>';
+    rows += '<td style="padding:8px 12px;color:#666">'+groupName+'</td>';
+    rows += '<td style="padding:8px 12px;font-weight:500">'+s.name+'</td>';
+    rows += '<td style="padding:8px 12px;direction:ltr;text-align:left;color:#444">'+contact+'</td>';
+    rows += '<td style="padding:8px 12px;text-align:center">';
+    rows += '<select data-name="'+s.name.replace(/"/g,'&quot;')+'" data-group="'+groupName.replace(/"/g,'&quot;')+'" data-date="'+dateISO+'" data-datear="'+dateAr+'" data-contact="'+contact+'" onchange="saveAttendanceFromSelect(this)" style="border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:13px;background:white;cursor:pointer">';
+    rows += '<option value=""'+(status===''?' selected':'')+'> — </option>';
+    rows += '<option value="حاضر"'+(status==='حاضر'?' selected':'')+'>✅ حاضر</option>';
+    rows += '<option value="غائب"'+(status==='غائب'?' selected':'')+'>❌ غائب</option>';
+    rows += '<option value="متأخر"'+(status==='متأخر'?' selected':'')+'>⏰ متأخر</option>';
+    rows += '<option value="عذر"'+(status==='عذر'?' selected':'')+'>📝 عذر</option>';
+    rows += '</select></td></tr>';
+  });
+  body.innerHTML = rows;
 }
 
-function saveAttendance(studentName, groupName, dateISO, dateAr, status, contact) {
-  const dayEl = document.getElementById('att-day');
-  const dayName = dayEl ? dayEl.value : '';
-  if (!status) {
-    // Delete record if status cleared
-    return;
-  }
-  const x = new XMLHttpRequest();
+function saveAttendanceFromSelect(sel) {
+  var status = sel.value;
+  if (!status) return;
+  var studentName = sel.getAttribute('data-name');
+  var groupName = sel.getAttribute('data-group');
+  var dateISO = sel.getAttribute('data-date');
+  var dateAr = sel.getAttribute('data-datear');
+  var contact = sel.getAttribute('data-contact');
+  var dayEl = document.getElementById('att-day');
+  var dayName = dayEl ? dayEl.value : '';
+  var wa = contact ? 'https://wa.me/973'+contact.replace(/^0/,'') : '';
+
+  var x = new XMLHttpRequest();
   x.open('POST','/api/attendance',false);
   x.setRequestHeader('Content-Type','application/json');
   x.send(JSON.stringify({
@@ -857,10 +817,16 @@ function saveAttendance(studentName, groupName, dateISO, dateAr, status, contact
     status: status,
     contact: contact,
     notes: '',
-    whatsapp_link: contact ? 'https://wa.me/973'+contact.replace(/^0/,'') : '',
+    whatsapp_link: wa,
     send_status: ''
   }));
-  const res = JSON.parse(x.responseText);
+
+  // Update row background color
+  var row = sel.closest('tr');
+  if (row) {
+    row.style.background = status==='حاضر'?'#e8f5e9':status==='غائب'?'#ffebee':status==='متأخر'?'#fff8e1':status==='عذر'?'#f3e5f5':'white';
+  }
+
   // Update counters
   loadAttendanceData();
 }
