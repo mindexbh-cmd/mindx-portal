@@ -152,20 +152,20 @@ textarea.inp{resize:vertical;min-height:60px;}
     'dashboard':'📊','students':'👥','groups':'🏫','attendance':'📋',
     'payments':'💰','tasks':'✅','curriculum':'📚','evaluations':'⭐',
     'violations':'⚠️','points':'🏆','events':'🎉','faq':'💬',
-    'whatsapp':'📱','ai':'🤖'
+    'whatsapp':'📱','ai':'🤖','database':'🗄️','payments_detail':'💳','attendance_log':'📋','evaluations_log':'⭐','violations_log':'⚠️'
   } %}
   {% set page_labels = {
     'dashboard':'لوحة التحكم','students':'الطلاب','groups':'المجموعات','attendance':'الحضور والغياب',
     'payments':'المالية والدفع','tasks':'المهام','curriculum':'المناهج',
     'evaluations':'التقييمات','violations':'المخالفات','points':'النقاط والمتجر',
-    'events':'الفعاليات','faq':'الأسئلة الشائعة','whatsapp':'قوالب الواتساب','ai':'مساعد الذكاء'
+    'events':'الفعاليات','faq':'الأسئلة الشائعة','whatsapp':'قوالب الواتساب','ai':'مساعد الذكاء','database':'قاعدة البيانات','payments_detail':'تفاصيل المدفوعات','attendance_log':'سجل الحضور','evaluations_log':'سجل التقييمات','violations_log':'سجل المخالفات'
   } %}
   {% set sections = [
     ('الرئيسية',['dashboard','students','groups','attendance','payments']),
     ('الإدارة',['tasks','curriculum','evaluations','violations','points']),
     ('الخدمات',['events','faq','whatsapp']),
     ('الذكاء الاصطناعي',['ai']),
-        ('الإدارة المتقدمة',['database'])
+        ('الإدارة المتقدمة',['database','payments_detail','attendance_log','evaluations_log','violations_log'])
   ] %}
   {% for sec_name, sec_pages in sections %}
     {% set visible = sec_pages | select('in', pages) | list %}
@@ -262,6 +262,10 @@ async function loadPage(page){
   else if(page==='whatsapp') renderWhatsapp(c);
   else if(page==='ai') renderAI(c);
   else if(page==='database') renderDatabase(c);
+  else if(page==='payments_detail') renderPaymentsDetail(c);
+  else if(page==='attendance_log') renderAttendanceLog(c);
+  else if(page==='evaluations_log') renderEvaluationsLog(c);
+  else if(page==='violations_log') renderViolationsLog(c);
 }
 
 // ── DASHBOARD ──
@@ -1264,6 +1268,332 @@ async function loadDbTable(tableName, page=1, search='', col=''){
     </div>
   `;
 }
+
+
+// ── PAYMENTS DETAIL (Google Sheets mirror) ──
+async function renderPaymentsDetail(c) {
+  var allPayments = [];
+  var fStatus = '', fSearch = '';
+
+  function doFilter() {
+    var f = allPayments;
+    if(fStatus) f = f.filter(function(p){return p.payment_status===fStatus;});
+    if(fSearch) {
+      var q = fSearch.toLowerCase();
+      f = f.filter(function(p){return (p.student_name||'').toLowerCase().includes(q)||(p.personal_id||'').includes(q);});
+    }
+    return f;
+  }
+
+  function renderTable() {
+    var filtered = doFilter();
+    var p = [];
+    p.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    p.push('<h2 style="color:#6B3FA0;margin:0;">تفاصيل المدفوعات (<span id="pay-count">'+filtered.length+'/'+allPayments.length+'</span>)</h2>');
+    p.push('<button onclick="doImportPaymentsDetail()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
+    p.push('</div>');
+    p.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    p.push('<input type="text" placeholder="&#128269; بحث..." value="'+fSearch+'" oninput="fSearch=this.value;renderPayTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:200px;">');
+    var statuses = [...new Set(allPayments.map(function(p){return p.payment_status;}).filter(Boolean))];
+    p.push('<select onchange="fStatus=this.value;renderPayTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">كل الحالات</option>');
+    statuses.forEach(function(s){p.push('<option value="'+s+'"'+(fStatus===s?' selected':'')+'>'+s+'</option>');});
+    p.push('</select>');
+    p.push('</div>');
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var ths = ['#','الاسم','الرقم','حالة التسجيل','المبلغ الإجمالي','القسط 1','ق1 للرسالة','القسط 2','ق2 للرسالة','القسط 3','ق3 للرسالة','القسط 4','ق4 للرسالة','القسط 5','ق5 للرسالة','المبلغ المدفوع','المبلغ المتبقي','حالة المدفوعات','رسالة الدفع','رابط الارسال','حالة الارسال'];
+    ths.forEach(function(h){p.push('<th style="padding:8px 6px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0;background:#6B3FA0;">'+h+'</th>');});
+    p.push('</tr></thead><tbody>');
+    filtered.forEach(function(pay,i){
+      var bg = i%2===0?'#fff':'#f8f5ff';
+      var paidColor = parseFloat(pay.remaining||'0')>0?'#dc2626':'#16a34a';
+      p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;">');
+      p.push('<td style="padding:6px 4px;font-weight:700;color:#6B3FA0;text-align:center;">'+(i+1)+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:140px;white-space:nowrap;">'+((pay.student_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((pay.personal_id)||'-')+'</td>');
+      var regColor = pay.registration_status==='قديم'?'#16a34a':pay.registration_status==='مستجد'?'#d97706':'#6b7280';
+      p.push('<td style="padding:6px 4px;"><span style="background:'+regColor+';color:#fff;padding:2px 7px;border-radius:10px;font-size:10px;">'+((pay.registration_status)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:#1d4ed8;">'+((pay.total_amount)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;color:#16a34a;font-weight:600;">'+((pay.installment1)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.installment1_msg||'')+'">'+((pay.installment1_msg)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;color:#16a34a;font-weight:600;">'+((pay.installment2)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.installment2_msg||'')+'">'+((pay.installment2_msg)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;color:#16a34a;font-weight:600;">'+((pay.installment3)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.installment3_msg||'')+'">'+((pay.installment3_msg)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;color:#16a34a;font-weight:600;">'+((pay.installment4)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.installment4_msg||'')+'">'+((pay.installment4_msg)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;color:#16a34a;font-weight:600;">'+((pay.installment5)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.installment5_msg||'')+'">'+((pay.installment5_msg)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:#15803d;background:#f0fdf4;">'+((pay.total_paid)||'0')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;font-weight:700;color:'+paidColor+';background:'+(paidColor==='#dc2626'?'#fff1f2':'#f0fdf4')+';">'+((pay.remaining)||'0')+'</td>');
+      var statusBg = pay.payment_status==='مكتمل'?'#dcfce7':pay.payment_status==='متأخر'?'#fef9c3':'#f3f4f6';
+      var statusColor = pay.payment_status==='مكتمل'?'#16a34a':pay.payment_status==='متأخر'?'#92400e':'#374151';
+      p.push('<td style="padding:6px 4px;"><span style="background:'+statusBg+';color:'+statusColor+';padding:2px 7px;border-radius:10px;font-size:10px;">'+((pay.payment_status)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(pay.payment_message||'')+'">'+((pay.payment_message)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+(pay.send_link?'<a href="'+pay.send_link+'" target="_blank" style="color:#25D366;font-size:11px;">&#128241;</a>':'-')+'</td>');
+      var sendBg = pay.send_status==='تم الارسال'?'#dcfce7':'#f9fafb';
+      var sendColor = pay.send_status==='تم الارسال'?'#16a34a':'#374151';
+      p.push('<td style="padding:6px 4px;"><span style="background:'+sendBg+';color:'+sendColor+';padding:2px 6px;border-radius:10px;font-size:10px;">'+((pay.send_status)||'-')+'</span></td>');
+      p.push('</tr>');
+    });
+    if(!filtered.length) p.push('<tr><td colspan="21" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
+    window.renderPayTable = renderTable;
+  }
+
+  window.renderPayTable = renderTable;
+  window.fPayStatus = '';
+  window.fPaySearch = '';
+
+  api('/payments_detail').then(function(d){
+    allPayments = d.payments||[];
+    renderTable();
+  });
+}
+
+async function doImportPaymentsDetail() {
+  var url = prompt('رابط Google Sheets:', 'https://docs.google.com/spreadsheets/d/1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4/');
+  if(!url) return;
+  var res = await api('/payments_detail/import','POST',{sheet_url:url,gid:'537129565'});
+  alert(res.ok ? '✅ تم: '+res.added+' جديد، '+res.updated+' محدث' : '❌ '+res.msg);
+  if(res.ok) go('payments_detail');
+}
+
+// ── ATTENDANCE LOG (Google Sheets mirror) ──
+async function renderAttendanceLog(c) {
+  var allRecords = [];
+  var fGroup = '', fStatus = '', fSearch = '';
+
+  function doFilter() {
+    var f = allRecords;
+    if(fGroup) f = f.filter(function(r){return r.group_name===fGroup;});
+    if(fStatus) f = f.filter(function(r){return r.status===fStatus;});
+    if(fSearch) {
+      var q = fSearch.toLowerCase();
+      f = f.filter(function(r){return (r.student_name||'').toLowerCase().includes(q)||(r.group_name||'').toLowerCase().includes(q);});
+    }
+    return f;
+  }
+
+  function renderTable() {
+    var filtered = doFilter();
+    var groups = [...new Set(allRecords.map(function(r){return r.group_name;}).filter(Boolean))].sort();
+    var statuses = [...new Set(allRecords.map(function(r){return r.status;}).filter(Boolean))];
+    var p = [];
+    p.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    p.push('<h2 style="color:#6B3FA0;margin:0;">سجل الحضور والغياب (<span id="att-log-count">'+filtered.length+'/'+allRecords.length+'</span>)</h2>');
+    p.push('<button onclick="doImportAttendanceLog()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
+    p.push('</div>');
+    p.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    p.push('<input type="text" placeholder="&#128269; بحث..." value="'+fSearch+'" oninput="fSearch=this.value;renderAttLogTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:180px;">');
+    p.push('<select onchange="fGroup=this.value;renderAttLogTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">كل المجموعات</option>');
+    groups.forEach(function(g){p.push('<option value="'+g+'"'+(fGroup===g?' selected':'')+'>'+g+'</option>');});
+    p.push('</select>');
+    p.push('<select onchange="fStatus=this.value;renderAttLogTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">كل الحالات</option>');
+    statuses.forEach(function(s){p.push('<option value="'+s+'"'+(fStatus===s?' selected':'')+'>'+s+'</option>');});
+    p.push('</select>');
+    p.push('</div>');
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var ths = ['#','تاريخ الحضور','اليوم','المجموعة','اسم الطالب','رقم التواصل','الحالة','الرسالة','وصلة واتساب','حالة الارسال'];
+    ths.forEach(function(h){p.push('<th style="padding:8px 6px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0;background:#6B3FA0;">'+h+'</th>');});
+    p.push('</tr></thead><tbody>');
+    filtered.slice(0,500).forEach(function(r,i){
+      var bg = i%2===0?'#fff':'#f8f5ff';
+      var statusBg = r.status==='حاضر'||r.status==='Present'?'#dcfce7':r.status==='غائب'||r.status==='Absent'?'#fef2f2':r.status==='تأخير'?'#fef9c3':'#f3f4f6';
+      var statusColor = r.status==='حاضر'||r.status==='Present'?'#16a34a':r.status==='غائب'||r.status==='Absent'?'#dc2626':r.status==='تأخير'?'#92400e':'#374151';
+      p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;">');
+      p.push('<td style="padding:6px 4px;font-weight:700;color:#6B3FA0;text-align:center;">'+(i+1)+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;">'+((r.attendance_date)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((r.day_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;color:#6B3FA0;white-space:nowrap;">'+((r.group_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:130px;white-space:nowrap;">'+((r.student_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;direction:ltr;white-space:nowrap;">'+((r.contact)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;"><span style="background:'+statusBg+';color:'+statusColor+';padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;">'+((r.status)||'-')+'</span></td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(r.message||'')+'">'+((r.message)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+(r.whatsapp_link?'<a href="'+r.whatsapp_link+'" target="_blank" style="color:#25D366;font-size:11px;">&#128241;</a>':'-')+'</td>');
+      var sendBg = r.send_status==='تم'?'#dcfce7':'#f9fafb';
+      p.push('<td style="padding:6px 4px;"><span style="background:'+sendBg+';color:'+(r.send_status==='تم'?'#16a34a':'#374151')+';padding:2px 6px;border-radius:10px;font-size:10px;">'+((r.send_status)||'-')+'</span></td>');
+      p.push('</tr>');
+    });
+    if(!filtered.length) p.push('<tr><td colspan="10" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
+    else if(filtered.length>500) p.push('<tr><td colspan="10" style="padding:10px;text-align:center;color:#6B3FA0;font-size:11px;">يُعرض 500 من '+filtered.length+' سجل - استخدم الفلتر لتضييق النتائج</td></tr>');
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
+    window.renderAttLogTable = renderTable;
+  }
+
+  window.renderAttLogTable = renderTable;
+  api('/attendance_log').then(function(d){
+    allRecords = d.records||[];
+    renderTable();
+  });
+}
+
+async function doImportAttendanceLog() {
+  var url = prompt('رابط Google Sheets:', 'https://docs.google.com/spreadsheets/d/1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4/');
+  if(!url) return;
+  var res = await api('/attendance_log/import','POST',{sheet_url:url,gid:'608231213'});
+  alert(res.ok ? '✅ تم: '+res.added+' جديد، '+res.updated+' محدث' : '❌ '+res.msg);
+  if(res.ok) go('attendance_log');
+}
+
+// ── EVALUATIONS LOG (Google Sheets mirror) ──
+async function renderEvaluationsLog(c) {
+  var allEvals = [];
+  var fGroup = '', fSearch = '';
+
+  function doFilter() {
+    var f = allEvals;
+    if(fGroup) f = f.filter(function(e){return e.group_name===fGroup;});
+    if(fSearch) {
+      var q = fSearch.toLowerCase();
+      f = f.filter(function(e){return (e.student_name||'').toLowerCase().includes(q);});
+    }
+    return f;
+  }
+
+  function renderTable() {
+    var filtered = doFilter();
+    var groups = [...new Set(allEvals.map(function(e){return e.group_name;}).filter(Boolean))].sort();
+    var p = [];
+    p.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    p.push('<h2 style="color:#6B3FA0;margin:0;">سجل التقييمات (<span>'+filtered.length+'/'+allEvals.length+'</span>)</h2>');
+    p.push('<button onclick="doImportEvaluationsLog()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
+    p.push('</div>');
+    p.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    p.push('<input type="text" placeholder="&#128269; بحث..." value="'+fSearch+'" oninput="fSearch=this.value;renderEvalLogTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:180px;">');
+    p.push('<select onchange="fGroup=this.value;renderEvalLogTable();" style="padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;">');
+    p.push('<option value="">كل المجموعات</option>');
+    groups.forEach(function(g){p.push('<option value="'+g+'"'+(fGroup===g?' selected':'')+'>'+g+'</option>');});
+    p.push('</select>');
+    p.push('</div>');
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var ths = ['#','تاريخ التقييم','المجموعة','اسم الطالب','المشاركة','السلوك','ملاحظات السلوك','القراءة','الإملاء','المفردات','المحادثة','التعبير','القواعد','ملاحظات'];
+    ths.forEach(function(h){p.push('<th style="padding:8px 6px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0;background:#6B3FA0;">'+h+'</th>');});
+    p.push('</tr></thead><tbody>');
+    filtered.forEach(function(e,i){
+      var bg = i%2===0?'#fff':'#f8f5ff';
+      p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;">');
+      p.push('<td style="padding:6px 4px;font-weight:700;color:#6B3FA0;text-align:center;">'+(i+1)+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;">'+((e.eval_date)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;color:#6B3FA0;white-space:nowrap;">'+((e.group_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:130px;white-space:nowrap;">'+((e.student_name)||'-')+'</td>');
+      function scoreBadge(val){
+        if(!val||val==='-') return '<span style="color:#aaa;font-size:11px;">-</span>';
+        var n=parseFloat(val)||0;
+        var color=n>=4?'#16a34a':n>=3?'#d97706':'#dc2626';
+        return '<span style="font-weight:700;color:'+color+';">'+val+'</span>';
+      }
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.participation)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.behavior)+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(e.behavior_notes||'')+'">'+((e.behavior_notes)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.reading)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.dictation)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.vocab)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.conversation)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.expression)+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;">'+scoreBadge(e.grammar)+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(e.notes||'')+'">'+((e.notes)||'-')+'</td>');
+      p.push('</tr>');
+    });
+    if(!filtered.length) p.push('<tr><td colspan="14" style="padding:30px;text-align:center;color:#999;">لا توجد نتائج</td></tr>');
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
+    window.renderEvalLogTable = renderTable;
+  }
+
+  window.renderEvalLogTable = renderTable;
+  api('/evaluations_log').then(function(d){
+    allEvals = d.evaluations||[];
+    renderTable();
+  });
+}
+
+async function doImportEvaluationsLog() {
+  var url = prompt('رابط Google Sheets:', 'https://docs.google.com/spreadsheets/d/1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4/');
+  if(!url) return;
+  var res = await api('/evaluations_log/import','POST',{sheet_url:url,gid:'1121376693'});
+  alert(res.ok ? '✅ تم: '+res.added+' جديد، '+res.updated+' محدث' : '❌ '+res.msg);
+  if(res.ok) go('evaluations_log');
+}
+
+// ── VIOLATIONS LOG (Google Sheets mirror) ──
+async function renderViolationsLog(c) {
+  var allViolations = [];
+  var fSearch = '';
+
+  function doFilter() {
+    if(!fSearch) return allViolations;
+    var q = fSearch.toLowerCase();
+    return allViolations.filter(function(v){return (v.student_name||'').toLowerCase().includes(q)||(v.group_name||'').toLowerCase().includes(q);});
+  }
+
+  function renderTable() {
+    var filtered = doFilter();
+    var p = [];
+    p.push('<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">');
+    p.push('<h2 style="color:#6B3FA0;margin:0;">سجل المخالفات (<span>'+filtered.length+'/'+allViolations.length+'</span>)</h2>');
+    p.push('<button onclick="doImportViolationsLog()" style="background:#6B3FA0;color:#fff;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;">&#128202; استيراد من Google Sheets</button>');
+    p.push('</div>');
+    p.push('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center;">');
+    p.push('<input type="text" placeholder="&#128269; بحث..." value="'+fSearch+'" oninput="fSearch=this.value;renderViolLogTable();" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:200px;">');
+    p.push('</div>');
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    var ths = ['#','اسم الطالب','المجموعة','تاريخ المخالفة','وقت الرصد','المكان','عنوان المخالفة','وصف مختصر','الإجراء المتخذ','ملاحظات','النقاط','المسجل'];
+    ths.forEach(function(h){p.push('<th style="padding:8px 6px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0;background:#6B3FA0;">'+h+'</th>');});
+    p.push('</tr></thead><tbody>');
+    filtered.forEach(function(v,i){
+      var bg = i%2===0?'#fff':'#f8f5ff';
+      var pts = parseInt(v.points||0);
+      var ptsBg = pts>=3?'#fef2f2':pts>=2?'#fef9c3':'#f9fafb';
+      var ptsColor = pts>=3?'#dc2626':pts>=2?'#92400e':'#374151';
+      p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;">');
+      p.push('<td style="padding:6px 4px;font-weight:700;color:#6B3FA0;text-align:center;">'+(i+1)+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:130px;white-space:nowrap;">'+((v.student_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((v.group_name)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;">'+((v.violation_date)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;direction:ltr;font-size:11px;">'+((v.record_time)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;white-space:nowrap;">'+((v.location)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-weight:600;min-width:120px;white-space:nowrap;">'+((v.violation_title)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(v.description||'')+'">'+((v.description)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(v.action_taken||'')+'">'+((v.action_taken)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(v.notes||'')+'">'+((v.notes)||'-')+'</td>');
+      p.push('<td style="padding:6px 4px;text-align:center;"><span style="background:'+ptsBg+';color:'+ptsColor+';padding:2px 8px;border-radius:50%;font-weight:700;">'+((v.points)||'0')+'</span></td>');
+      p.push('<td style="padding:6px 4px;font-size:11px;white-space:nowrap;">'+((v.recorder)||'-')+'</td>');
+      p.push('</tr>');
+    });
+    if(!filtered.length) p.push('<tr><td colspan="12" style="padding:30px;text-align:center;color:#999;">لا توجد مخالفات مسجلة</td></tr>');
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
+    window.renderViolLogTable = renderTable;
+  }
+
+  window.renderViolLogTable = renderTable;
+  api('/violations_log').then(function(d){
+    allViolations = d.violations||[];
+    renderTable();
+  });
+}
+
+async function doImportViolationsLog() {
+  var url = prompt('رابط Google Sheets:', 'https://docs.google.com/spreadsheets/d/1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4/');
+  if(!url) return;
+  var res = await api('/violations_log/import','POST',{sheet_url:url,gid:'350578639'});
+  alert(res.ok ? '✅ تم: '+res.added+' جديد، '+res.updated+' محدث' : '❌ '+res.msg);
+  if(res.ok) go('violations_log');
+}
+
 
 // START
 go('dashboard');
