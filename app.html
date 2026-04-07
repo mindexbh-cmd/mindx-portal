@@ -514,11 +514,11 @@ async function renderGroups(c, fTeacher, fLevel, fDay, fTime){
   const times=[...new Set(allGroups.map(g=>g.time).filter(Boolean))].sort();
   c.innerHTML=`
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-    <div style="font-size:13px;font-weight:700;color:var(--pur-d)">🏫 المجموعات (${groups.length}/${allGroups.length})</div>
-    <button class="btn" style="background:#10b981;color:#fff;" onclick="showImportGroupsModal()">📊 استيراد من Google Sheets</button>
+    <div style="font-size:13px;font-weight:700;color:var(--pur-d)">&#127«« المجموعات (${groups.length}/${allGroups.length})</div>
+    <button class="btn" style="background:#10b981;color:#fff;" onclick="showImportGroupsModal()">&#128202; استيراد من Google Sheets</button>
   </div>
   <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px;background:var(--bg2);padding:10px;border-radius:8px;border:1px solid var(--border)">
-    <span style="font-size:11px;color:var(--text2);font-weight:600">🔍 فلتر:</span>
+    <span style="font-size:11px;color:var(--text2);font-weight:600">&#128269; فلتر:</span>
     <select class="inp" style="width:150px" id="gf-teacher" onchange="renderGroups(document.getElementById('main-content'),this.value,document.getElementById('gf-level').value,document.getElementById('gf-day').value,document.getElementById('gf-time').value)">
       <option value="">كل المعلمات</option>
       ${teachers.map(t=>`<option value="${t}" ${fTeacher===t?"selected":""}>${t}</option>`).join("")}
@@ -535,26 +535,32 @@ async function renderGroups(c, fTeacher, fLevel, fDay, fTime){
       <option value="">كل الأوقات</option>
       ${times.map(t=>`<option value="${t}" ${fTime===t?"selected":""}>${t}</option>`).join("")}
     </select>
-    ${(fTeacher||fLevel||fDay||fTime)?'<button class="btn btn-s btn-sm" onclick="renderGroups(document.getElementById(\'main-content\'))">✕ مسح الفلتر</button>':''}
+    ${(fTeacher||fLevel||fDay||fTime)?'<button class="btn btn-s btn-sm" onclick="renderGroups(document.getElementById(\'main-content\'))">&#10005; مسح</button>':''}
   </div>
-  <div class="card"><div class="tw"><table>
-    <thead><tr><th>المجموعة</th><th>المعلمة</th><th>المستوى</th><th>الأيام</th><th>الوقت</th><th>رمضان</th><th>الطلاب</th><th>الأونلاين</th><th>وقت أونلاين</th><th>الحصص</th><th>الساعات</th><th>Zoom</th></tr></thead>
-    <tbody>${groups.length ? groups.map(g=>`<tr>
-      <td style="font-weight:700;color:var(--pur-d)">${g.name||'—'}</td>
-      <td>${g.teacher||'—'}</td>
-      <td><span class="badge bpu" style="font-size:10px">${g.level||g.subject||'—'}</span></td>
-      <td>${g.days||g.schedule||'—'}</td>
-      <td dir="ltr" style="font-weight:600">${g.time||'—'}</td>
-      <td dir="ltr" style="color:var(--teal-d)">${g.time_ramadan||'—'}</td>
-      <td><span class="badge ${(g.student_count||0)>=15?'bre':(g.student_count||0)>=10?'bam':'bgr'}">${g.student_count||0} طالب</span></td>
-      <td>${g.online_days&&g.online_days!=='-'?g.online_days:'—'}</td>
-      <td dir="ltr" style="font-size:11px">${g.online_time&&g.online_time!=='-'?g.online_time:'—'}</td>
-      <td style="text-align:center;font-weight:600">${g.sessions_count||'—'}</td>
-      <td style="text-align:center;font-weight:600;color:var(--pur)">${g.total_hours||'—'} س</td>
-      <td>${g.zoom_link?'<a href="'+g.zoom_link+'" target="_blank" class="btn btn-xs btn-t">🔗 فتح</a> <button class="btn btn-xs btn-wa" onclick="showWAModal(\'zoom\',\''+g.name+'\',\''+g.zoom_link+'\')">📱</button>':'—'}</td>
-    </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text3)">لا توجد نتائج</td></tr>'}
+  <div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <table style="width:max-content;min-width:100%;border-collapse:collapse;background:#fff;font-size:12px;">
+    <thead><tr style="background:#6B3FA0;color:#fff;">
+      ${['اسم المجموعة','اسم المدرس','المستوى/المقرر','المقرر الفصل الفائت','عدد الطلاب','أيام الدراسة','وقت الدراسة','توقيت رمضان','أيام الأونلاين','وقت أونلاين (رمضان)','وقت أونلاين (عادي)','رابط البث','عدد الحصص','مدة الحصة (دقيقة)','عدد الساعات'].map(h=>`<th style="padding:9px 8px;text-align:right;white-space:nowrap;font-size:11px;position:sticky;top:0;background:#6B3FA0;z-index:1;">${h}</th>`).join('')}
+    </tr></thead>
+    <tbody>${groups.length ? groups.map((g,i)=>`<tr style="background:${i%2===0?'#fff':'#f8f5ff'};border-bottom:1px solid #f0f0f0;">
+      <td style="padding:8px;font-weight:700;color:#6B3FA0;white-space:nowrap;">${g.name||'—'}</td>
+      <td style="padding:8px;white-space:nowrap;">${g.teacher||'—'}</td>
+      <td style="padding:8px;"><span style="background:#EDE5F7;color:#4A2875;padding:2px 8px;border-radius:10px;font-size:11px;">${g.level||g.subject||'—'}</span></td>
+      <td style="padding:8px;font-size:11px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${g.prev_book||''}">${g.prev_book||'—'}</td>
+      <td style="padding:8px;text-align:center;"><span style="background:${(g.student_count||0)>=15?'#fee2e2':(g.student_count||0)>=10?'#fef3c7':'#dcfce7'};color:${(g.student_count||0)>=15?'#dc2626':(g.student_count||0)>=10?'#92400e':'#16a34a'};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;">${g.student_count||0} طالب</span></td>
+      <td style="padding:8px;white-space:nowrap;">${g.days||g.schedule||'—'}</td>
+      <td style="padding:8px;white-space:nowrap;direction:ltr;font-weight:600;">${g.time||'—'}</td>
+      <td style="padding:8px;white-space:nowrap;direction:ltr;color:#0097A7;">${g.time_ramadan||'—'}</td>
+      <td style="padding:8px;white-space:nowrap;">${g.online_days&&g.online_days!=='-'?g.online_days:'—'}</td>
+      <td style="padding:8px;white-space:nowrap;direction:ltr;font-size:11px;color:#7c3aed;">${g.online_time_ramadan&&g.online_time_ramadan!=='-'?g.online_time_ramadan:'—'}</td>
+      <td style="padding:8px;white-space:nowrap;direction:ltr;font-size:11px;">${g.online_time&&g.online_time!=='-'?g.online_time:'—'}</td>
+      <td style="padding:8px;text-align:center;">${g.zoom_link?'<a href="'+g.zoom_link+'" target="_blank" class="btn btn-xs btn-t" style="font-size:10px;">&#128279; فتح</a> <button class="btn btn-xs btn-wa" onclick="showWAModal(\'zoom\',\''+g.name+'\',\''+g.zoom_link+'\')">&#128241;</button>':'—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:700;color:#6B3FA0;">${g.sessions_count||'—'}</td>
+      <td style="padding:8px;text-align:center;font-size:11px;">${g.session_duration?g.session_duration+' د':'—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:700;color:#6B3FA0;">${g.total_hours?g.total_hours+' س':'—'}</td>
+    </tr>`).join('') : '<tr><td colspan="15" style="text-align:center;padding:20px;color:var(--text3)">لا توجد نتائج</td></tr>'}
     </tbody>
-  </table></div></div>`;
+  </table></div>`;
 }
 
 function showImportGroupsModal(){
@@ -1307,6 +1313,8 @@ document.addEventListener('wheel', function(e) {
 </script>
 </body>
 </html>
+
+Stop Claude
 
 Stop Claude
 
