@@ -94,14 +94,16 @@ if not os.path.exists(DB): init_db()
 def auto_import_on_startup():
     import threading, time, json
     def do_import():
-        time.sleep(5)
+        time.sleep(8)
         try:
             db = sqlite3.connect(DB)
             db.row_factory = sqlite3.Row
             count = db.execute("SELECT COUNT(*) as n FROM groups_tbl").fetchone()["n"]
             db.close()
             if count > 0: return
-            base = 'http://localhost:' + str(int(os.environ.get("PORT", 10000)))
+            # Use the public URL or localhost with correct port
+            port = int(os.environ.get("PORT", 10000))
+            base = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:"+str(port))
             SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/'
             for ep, gid in [('groups','648031063'),('students','942035800'),
                             ('attendance_log','608231213'),('payments_detail','537129565'),
@@ -110,8 +112,9 @@ def auto_import_on_startup():
                     data = json.dumps({'sheet_url': SHEET_URL, 'gid': gid}).encode()
                     req = urllib.request.Request(base+'/api/'+ep+'/import',
                         data=data, headers={'Content-Type':'application/json'}, method='POST')
-                    with urllib.request.urlopen(req, timeout=60) as r:
+                    with urllib.request.urlopen(req, timeout=120) as r:
                         print('Auto-import '+ep+': '+r.read().decode()[:80])
+                    time.sleep(2)
                 except Exception as e:
                     print('Auto-import '+ep+' error: '+str(e))
         except Exception as e:
