@@ -468,6 +468,12 @@ async function savePersonalId(id, val) {
   if (res && res.ok) alert('تم حفظ الرقم الشخصي');
   else alert('خطأ في الحفظ');
 }
+async function saveStudySystem(id, val) {
+  const res = await api('/students/'+id, 'PUT', {study_system: val});
+  if (res && res.ok) alert('تم حفظ نظام الدراسة');
+  else alert('خطأ في الحفظ');
+}
+
 
 function showStudentDetail(sid) {
   api('/students/'+sid).then(function(data){
@@ -483,6 +489,7 @@ function showStudentDetail(sid) {
     html += '</div>';
     html += '<table style="width:100%;border-collapse:collapse;">';
         html += '<tr><td style="padding:6px 10px;color:#888;font-size:12px;white-space:nowrap">الرقم الشخصي</td><td style="padding:6px 4px"><div style="display:flex;gap:4px;align-items:center"><input id="pid-inp" type="text" value="'+(s.personal_id||'')+'" style="flex:1;padding:4px 8px;border:1.5px solid #ccc;border-radius:6px;font-size:13px;text-align:right" placeholder="أدخل الرقم الشخصي"><button onclick="savePersonalId('+s.id+',document.getElementById(\'pid-inp\').value)" style="background:var(--pur);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">حفظ</button></div></td></tr>';
+        html += '<tr><td style="padding:6px 10px;color:#888;font-size:12px;white-space:nowrap">نظام الدراسة</td><td style="padding:6px 4px"><div style="display:flex;gap:4px;align-items:center"><input id="ssi-inp" type="text" value="'+(s.study_system||'')+'" style="flex:1;padding:4px 8px;border:1.5px solid #ccc;border-radius:6px;font-size:13px;text-align:right" placeholder="حضوري / اونلاين"><button onclick="saveStudySystem('+s.id+',document.getElementById(\'ssi-inp\').value)" style="background:var(--pur);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">حفظ</button></div></td></tr>';
         html += row('الرقم التسلسلي',s.serial_no);
 
     html += row('واتساب',s.whatsapp); html += row('المستوى',s.level);
