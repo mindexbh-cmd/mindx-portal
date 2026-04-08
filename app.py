@@ -92,35 +92,79 @@ CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,title TEXT,description 
 if not os.path.exists(DB): init_db()
 
 def auto_import_on_startup():
-    import threading, time, json
     def do_import():
-        time.sleep(8)
+        time.sleep(5)
         try:
-            db = sqlite3.connect(DB)
-            db.row_factory = sqlite3.Row
-            count = db.execute("SELECT COUNT(*) as n FROM groups_tbl").fetchone()["n"]
-            db.close()
-            if count > 0: return
-            # Use the public URL or localhost with correct port
-            port = int(os.environ.get("PORT", 10000))
-            base = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:"+str(port))
-            SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/'
-            for ep, gid in [('groups','648031063'),('students','942035800'),
-                            ('attendance_log','608231213'),('payments_detail','537129565'),
-                            ('evaluations_log','1121376693')]:
+            db2 = sqlite3.connect(DB)
+            cnt = db2.execute("SELECT COUNT(*) FROM groups_tbl").fetchone()[0]
+            if cnt > 0:
+                db2.close()
+                return
+            print("Startup: Auto-importing data from Google Sheets...")
+            SHEET_ID_V = SHEET_ID
+            gid_map = [
+                ('648031063', 'groups'),
+                ('942035800', 'students'),
+                ('608231213', 'attendance_log'),
+                ('537129565', 'payments_detail'),
+                ('1121376693', 'evaluations_log'),
+            ]
+            for gid, kind in gid_map:
                 try:
-                    data = json.dumps({'sheet_url': SHEET_URL, 'gid': gid}).encode()
-                    req = urllib.request.Request(base+'/api/'+ep+'/import',
-                        data=data, headers={'Content-Type':'application/json'}, method='POST')
-                    with urllib.request.urlopen(req, timeout=120) as r:
-                        print('Auto-import '+ep+': '+r.read().decode()[:80])
-                    time.sleep(2)
-                except Exception as e:
-                    print('Auto-import '+ep+' error: '+str(e))
+                    url = f'https://docs.google.com/spreadsheets/d/{SHEET_ID_V}/export?format=csv&gid={gid}'
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    resp = urllib.request.urlopen(req, timeout=60)
+                    raw = resp.read().decode('utf-8')
+                    reader = list(csv.reader(io.StringIO(raw)))
+                    if len(reader) < 2:
+                        continue
+                    added = 0
+                    if kind == 'groups':
+                        for row in reader[1:]:
+                            if not row or not row[1].strip(): continue
+                            n,t,l = row[1].strip(), (row[2].strip() if len(row)>2 else ''), (row[3].strip() if len(row)>3 else '')
+                            try:
+                                db2.execute("INSERT OR IGNORE INTO groups_tbl(name,teacher,level) VALUES(?,?,?)", (n,t,l)); added+=1
+                            except: pass
+                    elif kind == 'students':
+                        for row in reader[2:]:
+                            if not row or not row[2].strip(): continue
+                            n=row[2].strip(); w=row[3].strip() if len(row)>3 else ''; g=row[7].strip() if len(row)>7 else ''
+                            try:
+                                db2.execute("INSERT OR IGNORE INTO students(name,whatsapp,group_name) VALUES(?,?,?)", (n,w,g)); added+=1
+                            except: pass
+                    elif kind == 'attendance_log':
+                        for row in reader[1:]:
+                            if not row or not row[0].strip() or len(row)<5: continue
+                            try:
+                                vals = tuple((row[i].strip() if len(row)>i else '') for i in range(9))
+                                db2.execute("""INSERT OR IGNORE INTO attendance_log
+                                    (attendance_date,day_name,group_name,student_name,contact,status,message,whatsapp_link,send_status)
+                                    VALUES(?,?,?,?,?,?,?,?,?)""", vals); added+=1
+                            except: pass
+                    elif kind == 'payments_detail':
+                        for row in reader[1:]:
+                            if not row or not row[0].strip(): continue
+                            try:
+                                db2.execute("INSERT OR IGNORE INTO payments_detail(student_name,personal_id,registration_status) VALUES(?,?,?)",
+                                    (row[0].strip(), row[1].strip() if len(row)>1 else '', row[2].strip() if len(row)>2 else '')); added+=1
+                            except: pass
+                    elif kind == 'evaluations_log':
+                        for row in reader[1:]:
+                            if not row or not row[0].strip(): continue
+                            try:
+                                db2.execute("INSERT OR IGNORE INTO evaluations_log(evaluation_date,group_name,student_name) VALUES(?,?,?)",
+                                    (row[0].strip(), row[1].strip() if len(row)>1 else '', row[2].strip() if len(row)>2 else '')); added+=1
+                            except: pass
+                    db2.commit()
+                    print(f"  {kind}: {added} records")
+                except Exception as ex:
+                    print(f"  {kind} error: {ex}")
+            db2.close()
+            print("Startup auto-import completed")
         except Exception as e:
-            print('Auto-import startup error: '+str(e))
+            print(f"Auto-import error: {e}")
     threading.Thread(target=do_import, daemon=True).start()
-auto_import_on_startup()
 
 def migrate_students_db():
     db = sqlite3.connect(DB)
