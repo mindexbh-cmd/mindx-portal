@@ -1396,12 +1396,12 @@ async function loadDbTable(tableName, page, search, col){
       cols.forEach(function(c) {
         const val = r[c] !== null && r[c] !== undefined ? r[c] : '';
         if(isStudents && (c === 'personal_id' || c === 'study_system' || c === 'name')) {
-          tbody += '<td style="padding:4px 6px;max-width:160px;">'+
+          tbody += '<td style="padding:4px 6px;min-width:260px;">'+
             '<div style="display:flex;gap:3px;align-items:center;">'+
             '<input type="text" value="'+String(val).replace(/"/g,'&quot;')+'" '+
             'onblur="dbSaveField('+r['id']+',\''+c+'\',this.value,this)" '+
             'onkeydown="if(event.key===\'Enter\'){this.blur();}if(event.key===\'Escape\'){loadDbTable(\''+tableName+'\','+page+',\''+search+'\',\''+col+'\')}" '+
-            'style="width:100%;padding:3px 6px;border:1.5px solid #ddd;border-radius:5px;font-size:11px;font-family:inherit;background:#fffef0;" '+
+            'style="width:100%;padding:3px 6px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:13px;font-family:inherit;background:#fffef0;padding:5px 8px;" '+
             'title="&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;">'+
             '</div></td>';
         } else {
