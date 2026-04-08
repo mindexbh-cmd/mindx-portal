@@ -91,6 +91,34 @@ CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,title TEXT,description 
 
 if not os.path.exists(DB): init_db()
 
+def auto_import_on_startup():
+    import threading, time, json
+    def do_import():
+        time.sleep(5)
+        try:
+            db = sqlite3.connect(DB)
+            db.row_factory = sqlite3.Row
+            count = db.execute("SELECT COUNT(*) as n FROM groups_tbl").fetchone()["n"]
+            db.close()
+            if count > 0: return
+            base = 'http://localhost:' + str(int(os.environ.get("PORT", 10000)))
+            SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/'
+            for ep, gid in [('groups','648031063'),('students','942035800'),
+                            ('attendance_log','608231213'),('payments_detail','537129565'),
+                            ('evaluations_log','1121376693')]:
+                try:
+                    data = json.dumps({'sheet_url': SHEET_URL, 'gid': gid}).encode()
+                    req = urllib.request.Request(base+'/api/'+ep+'/import',
+                        data=data, headers={'Content-Type':'application/json'}, method='POST')
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        print('Auto-import '+ep+': '+r.read().decode()[:80])
+                except Exception as e:
+                    print('Auto-import '+ep+' error: '+str(e))
+        except Exception as e:
+            print('Auto-import startup error: '+str(e))
+    threading.Thread(target=do_import, daemon=True).start()
+auto_import_on_startup()
+
 def migrate_students_db():
     db = sqlite3.connect(DB)
     cols = [
