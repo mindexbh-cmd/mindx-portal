@@ -669,34 +669,12 @@ async function renderAttendance() {
     '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999">ادخل التاريخ وانقر تحديث</td></tr>' +
     '</tbody></table></div></div></div>';
 
-  // Load groups - auto-import if empty
+  // Load groups
   var xg = new XMLHttpRequest();
   xg.open('GET','/api/groups',false);
   xg.send();
   var gData = JSON.parse(xg.responseText);
   var groups = gData.groups || gData || [];
-  // If DB is empty, auto-import from Google Sheets
-  if (groups.length === 0) {
-    var SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lZIi00wDbPSGT-Sl0prYg6-tmKAPNymbDfRITbTyPe4/';
-    var imports = [
-      {url:'/api/groups/import',gid:'648031063'},
-      {url:'/api/students/import',gid:'942035800'},
-      {url:'/api/attendance_log/import',gid:'608231213'},
-      {url:'/api/payments_detail/import',gid:'537129565'},
-      {url:'/api/evaluations_log/import',gid:'1121376693'}
-    ];
-    imports.forEach(function(imp){
-      var xi = new XMLHttpRequest();
-      xi.open('POST',imp.url,false);
-      xi.setRequestHeader('Content-Type','application/json');
-      xi.send(JSON.stringify({sheet_url:SHEET_URL,gid:imp.gid}));
-    });
-    // Reload groups
-    xg.open('GET','/api/groups',false);
-    xg.send();
-    gData = JSON.parse(xg.responseText);
-    groups = gData.groups || gData || [];
-  }
   var sel = document.getElementById('att-group');
   groups.sort(function(a,b){return a.name.localeCompare(b.name,'ar');}).forEach(function(g){
     var o = document.createElement('option');
