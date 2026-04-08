@@ -624,7 +624,7 @@ async function renderAttendance() {
     '<div style="display:flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 12px">' +
     '<label style="font-weight:bold;color:#2e7d32;font-size:13px">👥 المجموعة:</label>' +
     '<select id="att-group" onchange="loadGroupStudents()" style="border:1px solid #4caf50;border-radius:6px;padding:6px 10px;font-size:15px;min-width:200px;background:white;cursor:pointer">' +
-    '<option value="">⏳ جاري التحميل...</option>' +
+    '<option value="">-- اختر المجموعة --</option>' +
     '</select>' +
     '</div>' +
     '<button onclick="loadAttendanceData()" style="background:#6d4c9e;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px">🔄 تحديث</button>' +
@@ -676,6 +676,8 @@ async function renderAttendance() {
   var gData = JSON.parse(xg.responseText);
   var groups = gData.groups || gData || [];
   var sel = document.getElementById('att-group');
+  // Update first option text after loading
+  if (sel.options.length > 0) sel.options[0].textContent = groups.length > 0 ? '-- اختر المجموعة --' : '⚠️ لا توجد مجموعات';
   groups.sort(function(a,b){return a.name.localeCompare(b.name,'ar');}).forEach(function(g){
     var o = document.createElement('option');
     o.value = g.name;
