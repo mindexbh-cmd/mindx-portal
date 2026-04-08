@@ -1728,84 +1728,104 @@ async function doImportViolationsLog() {
 
 
 async function renderStudyData(c) {
-  window._sdRecords = [];
-  async function loadData(q) {
-    const url = '/study_data' + (q ? '?q=' + encodeURIComponent(q) : '');
-    const d = await api(url);
-    window._sdRecords = d.records || [];
-    renderTable(q || '');
+  window._sdr = [];
+  async function load(q) {
+    var d = await api("/study_data" + (q ? "?q=" + q : ""));
+    window._sdr = d.records || [];
+    draw(q || "");
   }
-
-  function renderTable(searchVal) {
-    const recs = window._sdRecords;
-    var p = [];
-    p.push('<div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);border-radius:12px;padding:16px 20px;margin-bottom:16px;color:#fff;"><h2 style="margin:0;font-size:15px;">📚 نظام الدراسة</h2><p style="font-size:11px;opacity:.8;margin-top:4px;">إدخال وتعديل بيانات الطلاب يدوياً</p></div>');
-    p.push('<div style="background:#fff;border:1.5px solid #E0D5F0;border-radius:12px;padding:16px;margin-bottom:16px;">');
-    p.push('<h3 style="color:#6B3FA0;font-size:13px;margin-bottom:12px;">&#xFF0B; إضافة سجل جديد</h3>');
-    p.push('<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">');
-    p.push('<div style="flex:2;min-width:180px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">اسم الطالب *</label><input id="sd-name" type="text" placeholder="اسم الطالب" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
-    p.push('<div style="flex:1;min-width:130px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">الرقم الشخصي</label><input id="sd-pid" type="text" placeholder="الرقم الشخصي" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
-    p.push('<div style="flex:1;min-width:130px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">نظام الدراسة</label><input id="sd-sys" type="text" placeholder="حضوري / أونلاين" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
-    p.push('<button onclick="sdAdd()" style="background:#6B3FA0;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;">💾 حفظ</button>');
-    p.push('</div></div>');
-    p.push('<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">');
-    p.push('<input id="sd-search" type="text" placeholder="🔍 بحث..." value="'+searchVal+'" oninput="sdLoad(this.value)" style="padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:220px;font-family:inherit;">');
-    p.push('<span style="font-size:12px;color:#888;">'+recs.length+' سجل</span></div>');
-    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
-    p.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">');
-    p.push('<thead><tr style="background:#6B3FA0;color:#fff;"><th style="padding:10px 12px;text-align:right;">#</th><th style="padding:10px 12px;text-align:right;">اسم الطالب</th><th style="padding:10px 12px;text-align:right;">الرقم الشخصي</th><th style="padding:10px 12px;text-align:right;">نظام الدراسة</th><th style="padding:10px 12px;text-align:center;">إجراء</th></tr></thead><tbody id="sd-tbody">');
+  function draw(sv) {
+    var recs = window._sdr;
+    var h = "";
+    h += "<div style=\"background:#6B3FA0;border-radius:12px;padding:14px 18px;margin-bottom:14px;color:#fff;\">";
+    h += "<h2 style=\"margin:0;font-size:14px;font-weight:700;\">نظام الدراسة</h2>";
+    h += "<p style=\"font-size:11px;opacity:.8;margin-top:4px;\">اضافة وتعديل يدوي</p></div>";
+    h += "<div style=\"background:#fff;border:1.5px solid #E0D5F0;border-radius:10px;padding:14px;margin-bottom:14px;\">";
+    h += "<div style=\"display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;\">";
+    h += "<div style=\"flex:2;min-width:160px;\"><label style=\"font-size:11px;color:#888;display:block;margin-bottom:3px;\">اسم الطالب</label>";
+    h += "<input id=\"sd-n\" type=\"text\" placeholder=\"اسم الطالب\" style=\"width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;\"></div>";
+    h += "<div style=\"flex:1;min-width:120px;\"><label style=\"font-size:11px;color:#888;display:block;margin-bottom:3px;\">الرقم الشخصي</label>";
+    h += "<input id=\"sd-p\" type=\"text\" placeholder=\"الرقم\" style=\"width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;\"></div>";
+    h += "<div style=\"flex:1;min-width:120px;\"><label style=\"font-size:11px;color:#888;display:block;margin-bottom:3px;\">نظام الدراسة</label>";
+    h += "<input id=\"sd-s\" type=\"text\" placeholder=\"حضوري / اونلاين\" style=\"width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;\"></div>";
+    h += "<button onclick=\"sdAdd()\" style=\"background:#6B3FA0;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;\">حفظ</button></div></div>";
+    h += "<div style=\"display:flex;gap:8px;margin-bottom:10px;\">";
+    h += "<input id=\"sd-q\" type=\"text\" placeholder=\"بحث...\" value=\"" + sv + "\" oninput=\"sdLoad(this.value)\" style=\"padding:7px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;min-width:200px;font-family:inherit;\">";
+    h += "<span style=\"font-size:12px;color:#888;margin-top:8px;\">" + recs.length + " سجل</span></div>";
+    h += "<div style=\"overflow-x:auto;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);\"><table style=\"width:100%;border-collapse:collapse;background:#fff;font-size:13px;\">";
+    h += "<thead><tr style=\"background:#6B3FA0;color:#fff;\">";
+    h += "<th style=\"padding:10px;text-align:right;\">#</th>";
+    h += "<th style=\"padding:10px;text-align:right;\">اسم الطالب</th>";
+    h += "<th style=\"padding:10px;text-align:right;\">الرقم الشخصي</th>";
+    h += "<th style=\"padding:10px;text-align:right;\">نظام الدراسة</th>";
+    h += "<th style=\"padding:10px;text-align:center;\">ادوات</th></tr></thead><tbody>";
     if (!recs.length) {
-      p.push('<tr><td colspan="5" style="text-align:center;padding:30px;color:#aaa;">لا توجد سجلات — أضف من الأعلى</td></tr>');
+      h += "<tr><td colspan=\"5\" style=\"text-align:center;padding:30px;color:#aaa;\">لا توجد سجلات - اضف من الاعلى</td></tr>";
     } else {
       recs.forEach(function(r, i) {
-        var bg = i%2===0?'#fff':'#f8f5ff';
-        p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;" id="sdr-'+r.id+'">');
-        p.push('<td style="padding:8px 12px;color:#888;font-weight:700;">'+(i+1)+'</td>');
-        p.push('<td style="padding:8px 12px;font-weight:600;">'+(r.student_name||'-')+'</td>');
-        p.push('<td style="padding:8px 12px;direction:ltr;">'+(r.personal_id||'-')+'</td>');
-        p.push('<td style="padding:8px 12px;">'+(r.study_system?'<span style="background:#EDE5F7;color:#4A2875;padding:3px 10px;border-radius:20px;font-size:12px;">'+r.study_system+'</span>':'<span style="color:#ccc;font-size:12px;">— غير محدد</span>')+'</td>');
-        p.push('<td style="padding:8px 12px;text-align:center;"><button onclick="sdEdit('+r.id+')" style="background:#f3eeff;color:#6B3FA0;border:1px solid #E0D5F0;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">✏️ تعديل</button><button onclick="sdDel('+r.id+')" style="background:#fff0f0;color:#e84545;border:1px solid #fdd;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;">🗑️ حذف</button></td>');
-        p.push('</tr>');
+        var bg = i%2===0 ? "#fff" : "#f8f5ff";
+        h += "<tr style=\"background:" + bg + ";border-bottom:1px solid #f0f0f0;\" id=\"sdr-" + r.id + "\">";
+        h += "<td style=\"padding:8px 10px;color:#888;\">" + (i+1) + "</td>";
+        h += "<td style=\"padding:8px 10px;font-weight:600;\">" + (r.student_name || "-") + "</td>";
+        h += "<td style=\"padding:8px 10px;direction:ltr;\">" + (r.personal_id || "-") + "</td>";
+        h += "<td style=\"padding:8px 10px;\">";
+        if (r.study_system) {
+          h += "<span style=\"background:#EDE5F7;color:#4A2875;padding:3px 10px;border-radius:20px;font-size:12px;\">" + r.study_system + "</span>";
+        } else {
+          h += "<span style=\"color:#ccc;font-size:12px;\">غير محدد</span>";
+        }
+        h += "</td>";
+        h += "<td style=\"padding:8px 10px;text-align:center;\">";
+        h += "<button onclick=\"sdEdit(" + r.id + ")\" style=\"background:#f3eeff;color:#6B3FA0;border:1px solid #E0D5F0;padding:4px 9px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;\">تعديل</button>";
+        h += "<button onclick=\"sdDel(" + r.id + ")\" style=\"background:#fff0f0;color:#e84545;border:1px solid #fdd;padding:4px 9px;border-radius:6px;cursor:pointer;font-size:11px;\">حذف</button>";
+        h += "</td></tr>";
       });
     }
-    p.push('</tbody></table></div>');
-    c.innerHTML = p.join('');
-    window.sdLoad = function(v){ loadData(v); };
+    h += "</tbody></table></div>";
+    c.innerHTML = h;
+    window.sdLoad = function(v) { load(v); };
     window.sdAdd = async function() {
-      var name = document.getElementById('sd-name').value.trim();
-      var pid = document.getElementById('sd-pid').value.trim();
-      var sys = document.getElementById('sd-sys').value.trim();
-      if(!name){alert('اسم الطاب مطلوب');return;}
-      var res = await api('/study_data','POST',{student_name:name,personal_id:pid,study_system:sys});
-      if(res&&res.ok){document.getElementById('sd-name').value='';document.getElementById('sd-pid').value='';document.getElementById('sd-sys').value='';loadData('');}
-      else alert('خطأ: '+(res&&res.msg?res.msg:''));
+      var n = document.getElementById("sd-n").value.trim();
+      var p = document.getElementById("sd-p").value.trim();
+      var s = document.getElementById("sd-s").value.trim();
+      if (!n) { alert("اسم الطالب مطلوب"); return; }
+      var res = await api("/study_data", "POST", {student_name: n, personal_id: p, study_system: s});
+      if (res && res.ok) {
+        document.getElementById("sd-n").value = "";
+        document.getElementById("sd-p").value = "";
+        document.getElementById("sd-s").value = "";
+        load("");
+      } else { alert("خطأ: " + (res && res.msg ? res.msg : "")); }
     };
     window.sdEdit = function(id) {
-      var r = window._sdRecords.find(function(x){return x.id===id;});
-      if(!r) return;
-      var row = document.getElementById('sdr-'+id);
-      if(!row) return;
-      row.innerHTML = '<td style="padding:4px;">&nbsp;</td>'+
-        '<td style="padding:4px;"><input id="en-'+id+'" value="'+(r.student_name||'').replace(/"/g,'&quot;')+'" style="width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;"></td>'+
-        '<td style="padding:4px;"><input id="ep-'+id+'" value="'+(r.personal_id||'').replace(/"/g,'&quot;')+'" style="width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;direction:ltr;font-family:inherit;"></td>'+
-        '<td style="padding:4px;"><input id="es-'+id+'" value="'+(r.study_system||'').replace(/"/g,'&quot;')+'" style="width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;" placeholder="حضوري / أونلاين"></td>'+
-        '<td style="padding:4px;text-align:center;"><button onclick="sdSave('+id+')" style="background:#6B3FA0;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">حفظ</button><button onclick="sdLoad('')" style="background:#eee;color:#666;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;">إلغاء</button></td>';
+      var r = window._sdr.find(function(x) { return x.id === id; });
+      if (!r) return;
+      var row = document.getElementById("sdr-" + id);
+      if (!row) return;
+      row.innerHTML =
+        "<td style=\"padding:4px;\">-</td>" +
+        "<td style=\"padding:4px;\"><input id=\"en-" + id + "\" value=\"" + (r.student_name||"").replace(/"/g,"&quot;") + "\" style=\"width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;\"></td>" +
+        "<td style=\"padding:4px;\"><input id=\"ep-" + id + "\" value=\"" + (r.personal_id||"").replace(/"/g,"&quot;") + "\" style=\"width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;direction:ltr;font-family:inherit;\"></td>" +
+        "<td style=\"padding:4px;\"><input id=\"es-" + id + "\" value=\"" + (r.study_system||"").replace(/"/g,"&quot;") + "\" style=\"width:100%;padding:5px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;\" placeholder=\"حضوري / اونلاين\"></td>" +
+        "<td style=\"padding:4px;text-align:center;\">" +
+        "<button onclick=\"sdSave(" + id + ")\" style=\"background:#6B3FA0;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;\">حفظ</button>" +
+        "<button onclick=\"sdLoad('')\" style=\"background:#eee;color:#666;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;\">الغاء</button></td>";
     };
     window.sdSave = async function(id) {
-      var name = document.getElementById('en-'+id).value.trim();
-      var pid = document.getElementById('ep-'+id).value.trim();
-      var sys = document.getElementById('es-'+id).value.trim();
-      if(!name){alert('اسم الطالب مطلوب');return;}
-      var res = await api('/study_data/'+id,'PUT',{student_name:name,personal_id:pid,study_system:sys});
-      if(res&&res.ok) loadData(''); else alert('خطأ في الحفظ');
+      var n = document.getElementById("en-" + id).value.trim();
+      var p = document.getElementById("ep-" + id).value.trim();
+      var s = document.getElementById("es-" + id).value.trim();
+      if (!n) { alert("اسم الطالب مطلوب"); return; }
+      var res = await api("/study_data/" + id, "PUT", {student_name: n, personal_id: p, study_system: s});
+      if (res && res.ok) { load(""); } else { alert("خطأ في الحفظ"); }
     };
     window.sdDel = async function(id) {
-      if(!confirm('حذف هذا السجل؟')) return;
-      var res = await api('/study_data/'+id,'DELETE');
-      if(res&&res.ok) loadData('');
+      if (!confirm("حذف هذا السجل؟")) return;
+      var res = await api("/study_data/" + id, "DELETE");
+      if (res && res.ok) { load(""); }
     };
   }
-  await loadData('');
+  await load("");
 }
 // START
 go('dashboard');
