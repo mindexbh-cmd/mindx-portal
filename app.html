@@ -462,6 +462,12 @@ function doImportStudents() {
     .catch(function(e){ resultDiv.innerHTML = '<p style="color:red;">❌ '+e+'</p>'; });
 }
 
+async function savePersonalId(id, val) {
+  const res = await api('/students/'+id, 'PUT', {personal_id: val});
+  if (res && res.ok) alert('تم حفظ الرقم الشخصي');
+  else alert('خطأ في الحفظ');
+}
+
 function showStudentDetail(sid) {
   api('/students/'+sid).then(function(data){
     var s = data.student;
@@ -475,9 +481,9 @@ function showStudentDetail(sid) {
     html += '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:#eee;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;">✕</button>';
     html += '</div>';
     html += '<table style="width:100%;border-collapse:collapse;">';
-    html += row('الرقم الشخصي',s.personal_id); html += row('الرقم التسلسلي',s.serial_no);
+    html += '<tr><td style="padding:6px 10px;color:#888;font-size:12px;white-space:nowrap">الرقم الشخصي</td><td style="padding:6px 4px"><div style="display:flex;gap:4px;align-items:center"><input id=\'pid-inp\' type=\'text\' value=\''+(s.personal_id||'')+'\' style=\'flex:1;padding:4px 8px;border:1.5px solid #ccc;border-radius:6px;font-size:13px;text-align:right\' placeholder=\'أدخل الرقم الشخصي\'><button onclick=\'savePersonalId('+s.id+',document.getElementById(\\'pid-inp\\').value)\' style=\'background:var(--pur);color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px\'>حفظ</button></div></td></tr>'; html += row('الرقم التسلسلي',s.serial_no);
     html += row('واتساب',s.whatsapp); html += row('المستوى',s.level);
-    html += row('قديم/جديد',s.old_new_2026); html += row('حالة التسجيل',s.registration_status);
+    html += row('قديم/جديد',s.old_new_2026); htration_status);
     html += row('المجموعة',s.group_name); html += row('المجموعة 2',s.group_name2);
     html += row('وقت الدراسة',s.schedule_time); html += row('وقت رمضان',s.schedule_time_ramadan);
     html += row('أيام الدراسة',s.schedule_days); html += row('المجموعة أونلاين',s.group_online);
