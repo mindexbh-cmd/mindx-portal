@@ -637,11 +637,11 @@ def api_student(sid):
         d = request.json or {}
         db.execute("""UPDATE students SET name=?,group_name=?,teacher_name=?,whatsapp=?,level=?,
             old_new_2026=?,registration_status=?,group_name2=?,schedule_time=?,
-            schedule_time_ramadan=?,schedule_days=?,notes_2026=? WHERE id=?""",
+            schedule_time_ramadan=?,schedule_days=?,notes_2026=?,personal_id=? WHERE id=?""",
             (d.get("name",""),d.get("group_name",""),d.get("teacher_name",""),d.get("whatsapp",""),
              d.get("level",""),d.get("old_new_2026",""),d.get("registration_status",""),
              d.get("group_name2",""),d.get("schedule_time",""),d.get("schedule_time_ramadan",""),
-             d.get("schedule_days",""),d.get("notes_2026",""),sid))
+             d.get("schedule_days",""),d.get("notes_2026",""),d.get("personal_id",""),sid))
         db.commit()
         return jsonify({"ok":True})
     else:
