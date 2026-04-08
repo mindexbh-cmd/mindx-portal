@@ -1360,52 +1360,89 @@ async function renderDatabase(c){
   `;
 }
 
-async function loadDbTable(tableName, page=1, search='', col=''){
+async function dbSaveField(studentId, field, value, inputEl) {
+  if(inputEl) { inputEl.style.background='#fff8dc'; inputEl.disabled=true; }
+  const body = {};
+  body[field] = value;
+  const res = await api('/students/'+studentId, 'PUT', body);
+  if(inputEl) {
+    if(res && res.ok) {
+      inputEl.style.background='#d4f8d4';
+      setTimeout(function(){ if(inputEl) inputEl.style.background='#fffef0'; }, 1200);
+    } else {
+      inputEl.style.background='#ffd4d4';
+    }
+    inputEl.disabled=false;
+  }
+}
+async function loadDbTable(tableName, page, search, col){
+  page = page || 1; search = search || ''; col = col || '';
   const container = document.getElementById('db-table-view');
   if(!container) return;
-  container.innerHTML = '<div class="loading">⏳ جاري التحميل...</div>';
-  const params = new URLSearchParams({table: tableName, page, per_page: 50});
+  container.innerHTML = '<div class="loading">&#9203; &#1580;&#1575;&#1585;&#1610; &#1575;&#1604;&#1578;&#1581;&#1605;&#1610;&#1604;...</div>';
+  const params = new URLSearchParams({table: tableName, page: page, per_page: 50});
   if(search) params.append('search', search);
   if(col) params.append('col', col);
   const resp = await fetch('/api/db/query?' + params);
   const data = await resp.json();
-  if(data.error){container.innerHTML='<div class="alert alert-red">❌ '+data.error+'</div>';return;}
+  if(data.error){container.innerHTML='<div class="alert alert-red">&#10060; '+data.error+'</div>';return;}
   const cols = data.columns;
   const rows = data.rows;
-  container.innerHTML = `
-    <div class="card" style="margin-top:12px">
-      <div class="card-h" style="background:linear-gradient(135deg,#e8eaf6,#c5cae9)">
-        <h3 style="color:#1a237e;font-size:12px">📋 ${data.table} <span style="font-size:10px;color:#5c6bc0;font-weight:400">(${data.total} سجل)</span></h3>
-        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <select class="inp" style="width:120px;padding:3px 6px;font-size:10px" id="dbc-${data.table}">
-            <option value="">كل الأعمدة</option>
-            ${cols.map(c=>`<option value="${c}">${c}</option>`).join('')}
-          </select>
-          <input class="inp" style="width:140px;padding:3px 8px;font-size:10px" placeholder="🔍 بحث..." id="dbs-${data.table}"
-            onkeydown="if(event.key==='Enter')loadDbTable('${data.table}',1,this.value,document.getElementById('dbc-${data.table}').value)">
-          <button class="btn btn-xs" style="background:#3949ab;color:#fff" 
-            onclick="loadDbTable('${data.table}',1,document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">بحث</button>
-          <button class="btn btn-xs btn-s"
-            onclick="loadDbTable('${data.table}',1,'','')">إعادة</button>
-        </div>
-      </div>
-      <div class="tw" style="max-height:480px;overflow:auto">
-        <table style="font-size:11px">
-          <thead><tr>${cols.map(c=>`<th style="white-space:nowrap;background:#e8eaf6;color:#1a237e;position:sticky;top:0">${c}</th>`).join('')}</tr></thead>
-          <tbody>
-            ${rows.length ? rows.map(r=>`<tr>${cols.map(c=>`<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${String(r[c]??'')}">${r[c]??'—'}</td>`).join('')}</tr>`).join('')
-            : `<tr><td colspan="${cols.length}" style="text-align:center;padding:20px;color:var(--text3)">لا توجد سجلات</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-      ${data.pages > 1 ? `<div style="padding:8px;display:flex;align-items:center;justify-content:center;gap:8px;border-top:1px solid var(--border)">
-        ${data.page>1?`<button class="btn btn-xs btn-s" onclick="loadDbTable('${data.table}',${data.page-1},document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">◀</button>`:''}
-        <span style="font-size:10px;color:var(--text2)">صفحة ${data.page} / ${data.pages}</span>
-        ${data.page<data.pages?`<button class="btn btn-xs btn-s" onclick="loadDbTable('${data.table}',${data.page+1},document.getElementById('dbs-${data.table}').value,document.getElementById('dbc-${data.table}').value)">▶</button>`:''}
-      </div>`:''}
-    </div>
-  `;
+  const isStudents = tableName === 'students';
+  let tbody = '';
+  if(rows.length) {
+    rows.forEach(function(r) {
+      tbody += '<tr>';
+      cols.forEach(function(c) {
+        const val = r[c] !== null && r[c] !== undefined ? r[c] : '';
+        if(isStudents && (c === 'personal_id' || c === 'study_system')) {
+          tbody += '<td style="padding:4px 6px;max-width:160px;">'+
+            '<div style="display:flex;gap:3px;align-items:center;">'+
+            '<input type="text" value="'+String(val).replace(/"/g,'&quot;')+'" '+
+            'onblur="dbSaveField('+r['id']+',\''+c+'\',this.value,this)" '+
+            'onkeydown="if(event.key===\'Enter\'){this.blur();}if(event.key===\'Escape\'){loadDbTable(\''+tableName+'\','+page+',\''+search+'\',\''+col+'\')}" '+
+            'style="width:100%;padding:3px 6px;border:1.5px solid #ddd;border-radius:5px;font-size:11px;font-family:inherit;background:#fffef0;" '+
+            'title="&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;">'+
+            '</div></td>';
+        } else {
+          tbody += '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px;" title="'+String(val)+'">'+( val !== '' ? val : '&#8212;')+'</td>';
+        }
+      });
+      tbody += '</tr>';
+    });
+  } else {
+    tbody = '<tr><td colspan="'+cols.length+'" style="text-align:center;padding:20px;color:var(--text3)">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1587;&#1580;&#1604;&#1575;&#1578;</td></tr>';
+  }
+  let editNote = isStudents ? '<div style="font-size:11px;color:#6B3FA0;margin-bottom:6px;padding:6px 10px;background:#f3eeff;border-radius:6px;">&#9997;&#65039; &#1575;&#1604;&#1607;&#1608;&#1610;&#1577; &#1575;&#1604;&#1588;&#1582;&#1589;&#1610;&#1577; &#1608;&#1606;&#1592;&#1575;&#1605; &#1575;&#1604;&#1583;&#1585;&#1575;&#1587;&#1577; &#1602;&#1575;&#1576;&#1604;&#1578;&#1575;&#1606; &#1604;&#1604;&#1578;&#1593;&#1583;&#1610;&#1604; &#1575;&#1604;&#1605;&#1576;&#1575;&#1588;&#1585; (&#1575;&#1590;&#1594;&#1591; Enter &#1571;&#1608; &#1575;&#1606;&#1602;&#1604; &#1604;&#1604;&#1581;&#1601;&#1592;)</div>' : '';
+  container.innerHTML = 
+    '<div class="card" style="margin-top:12px">'+
+    '<div class="card-h" style="background:linear-gradient(135deg,#e8eaf6,#c5cae9)">'+
+    '<h3 style="color:#1a237e;font-size:12px">&#128203; '+data.table+' <span style="font-size:10px;color:#5c6bc0;font-weight:400">('+data.total+' &#1587;&#1580;&#1604;)</span></h3>'+
+    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
+    '<select class="inp" style="width:120px;padding:3px 6px;font-size:10px" id="dbc-'+data.table+'">'+
+    '<option value="">&#1603;&#1604; &#1575;&#1604;&#1571;&#1593;&#1605;&#1583;&#1577;</option>'+
+    cols.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('')+
+    '</select>'+
+    '<input class="inp" style="width:140px;padding:3px 8px;font-size:10px" placeholder="&#128269; &#1576;&#1581;&#1579;..." id="dbs-'+data.table+'" '+
+    'onkeydown="if(event.key===\'Enter\')loadDbTable(\''+tableName+'\',1,this.value,document.getElementById(\'dbc-'+data.table+'\').value)">'+
+    '<button class="btn btn-xs" style="background:#3949ab;color:#fff" onclick="loadDbTable(\''+tableName+'\',1,document.getElementById(\'dbs-'+data.table+'\').value,document.getElementById(\'dbc-'+data.table+'\').value)">&#1576;&#1581;&#1579;</button>'+
+    '<button class="btn btn-xs btn-s" onclick="loadDbTable(\''+tableName+'\',1,\'\',\'\')" >&#1573;&#1593;&#1575;&#1583;&#1577;</button>'+
+    '</div></div>'+
+    editNote+
+    '<div class="tw" style="max-height:480px;overflow:auto">'+
+    '<table style="font-size:11px">'+
+    '<thead><tr>'+cols.map(function(c){return '<th style="white-space:nowrap;background:#e8eaf6;color:#1a237e;position:sticky;top:0">'+c+'</th>';}).join('')+'</tr></thead>'+
+    '<tbody>'+tbody+'</tbody>'+
+    '</table></div>'+
+    (data.pages > 1 ?
+      '<div style="padding:8px;display:flex;align-items:center;justify-content:center;gap:8px;border-top:1px solid var(--border)">'+
+      (data.page>1?'<button class="btn btn-xs btn-s" onclick="loadDbTable(\''+tableName+'\','+( data.page-1)+',\''+search+'\',\''+col+'\')">&larr;</button>':'')+
+      '<span style="font-size:10px;color:var(--text2)">&#1589;&#1601;&#1581;&#1577; '+data.page+' / '+data.pages+'</span>'+
+      (data.page<data.pages?'<button class="btn btn-xs btn-s" onclick="loadDbTable(\''+tableName+'\','+( data.page+1)+',\''+search+'\',\''+col+'\')">&rarr;</button>':'')+
+      '</div>' : '')+
+    '</div>';
 }
+
 
 
 // ── PAYMENTS DETAIL (Google Sheets mirror) ──
