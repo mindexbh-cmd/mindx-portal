@@ -637,13 +637,20 @@ def api_student(sid):
         return jsonify({"student": s})
     elif request.method == "PUT":
         d = request.json or {}
-        db.execute("""UPDATE students SET name=?,group_name=?,teacher_name=?,whatsapp=?,level=?,
-            old_new_2026=?,registration_status=?,group_name2=?,schedule_time=?,
-            schedule_time_ramadan=?,schedule_days=?,notes_2026=?,personal_id=?,study_system=? WHERE id=?""",
-            (d.get("name",""),d.get("group_name",""),d.get("teacher_name",""),d.get("whatsapp",""),
-             d.get("level",""),d.get("old_new_2026",""),d.get("registration_status",""),
-             d.get("group_name2",""),d.get("schedule_time",""),d.get("schedule_time_ramadan",""),
-             d.get("schedule_days",""),d.get("notes_2026",""),d.get("personal_id",""),d.get("study_system",""),sid))
+        # Allowed fields for partial update
+        allowed = ["name","group_name","teacher_name","whatsapp","level",
+                   "old_new_2026","registration_status","group_name2","schedule_time",
+                   "schedule_time_ramadan","schedule_days","notes_2026","personal_id","study_system"]
+        sets = []
+        vals = []
+        for field in allowed:
+            if field in d:
+                sets.append(f"{field}=?")
+                vals.append(d[field])
+        if not sets:
+            return jsonify({"ok":False,"msg":"no fields"})
+        vals.append(sid)
+        db.execute(f"UPDATE students SET {', '.join(sets)} WHERE id=?", vals)
         db.commit()
         return jsonify({"ok":True})
     else:
