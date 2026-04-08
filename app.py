@@ -232,6 +232,33 @@ def fetch_sheet_csv(gid):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=15) as resp:
         return resp.read().decode('utf-8-sig', errors='replace')
+def auto_import_groups():
+    try:
+        db  = sqlite3.connect(DB)
+        count = db.execute('SELECT COUNT(*) FROM groups_tbl').fetchone()[0]
+        if count > 0:
+            db.close(); return
+        raw = fetch_sheet_csv('648031063')
+        reader = csv.reader(io.StringIO(raw))
+        rows = list(reader)
+        added = 0
+        for row in rows[1:]:
+            name = gc(row, 1)
+            if not name: continue
+            try:
+                teacher = gc(row,2); level = gc(row,3); prev_book = gc(row,4)
+                days = gc(row,6); time_val = gc(row,7); time_ramadan = gc(row,8)
+                online_days = gc(row,9); online_time_ramadan = gc(row,10); online_time = gc(row,11)
+                zoom_link = gc(row,12)
+                db.execute('INSERT OR IGNORE INTO groups_tbl(name,teacher,level,zoom_link,days,time,time_ramadan,online_days,online_time_ramadan,online_time) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                    (name,teacher,level,zoom_link,days,time_val,time_ramadan,online_days,online_time_ramadan,online_time))
+                added += 1
+            except: pass
+        db.commit(); db.close()
+        print(f'[auto-import] Added {added} groups')
+    except Exception as e:
+        print(f'[auto-import] Groups error: {e}')
+
 
 def auto_import_students():
     try:
@@ -256,6 +283,7 @@ def auto_import_students():
     except Exception as e:
         print(f'[auto-import] Error: {e}')
 
+auto_import_groups()
 auto_import_students()
 
 def login_required(f):
