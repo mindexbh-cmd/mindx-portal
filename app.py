@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,
     mother_phone TEXT,father_phone TEXT,other_phone TEXT,
     residence TEXT,home_address TEXT,road TEXT,complex_name TEXT,
     teacher TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active',
-    notes_2026 TEXT,final_result_2026 TEXT),study_system TEXT;
+    notes_2026 TEXT,final_result_2026 TEXT,study_system TEXT);
 CREATE TABLE IF NOT EXISTS groups_tbl(id INTEGER PRIMARY KEY,name TEXT,teacher TEXT,subject TEXT,level TEXT,zoom_link TEXT,schedule TEXT,prev_book TEXT,days TEXT,time TEXT,time_ramadan TEXT,online_days TEXT,online_time TEXT,online_time_ramadan TEXT,sessions_count TEXT,session_duration TEXT,total_hours TEXT,max_students INTEGER DEFAULT 20);
 CREATE TABLE IF NOT EXISTS attendance_log(id INTEGER PRIMARY KEY,
     attendance_date TEXT,day_name TEXT,group_name TEXT,student_name TEXT,
