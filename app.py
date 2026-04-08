@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY,
     mother_phone TEXT,father_phone TEXT,other_phone TEXT,
     residence TEXT,home_address TEXT,road TEXT,complex_name TEXT,
     teacher TEXT,zoom_link TEXT,monthly_fee REAL DEFAULT 35,status TEXT DEFAULT 'active',
-    notes_2026 TEXT,final_result_2026 TEXT);
+    notes_2026 TEXT,final_result_2026 TEXT),study_system TEXT;
 CREATE TABLE IF NOT EXISTS groups_tbl(id INTEGER PRIMARY KEY,name TEXT,teacher TEXT,subject TEXT,level TEXT,zoom_link TEXT,schedule TEXT,prev_book TEXT,days TEXT,time TEXT,time_ramadan TEXT,online_days TEXT,online_time TEXT,online_time_ramadan TEXT,sessions_count TEXT,session_duration TEXT,total_hours TEXT,max_students INTEGER DEFAULT 20);
 CREATE TABLE IF NOT EXISTS attendance_log(id INTEGER PRIMARY KEY,
     attendance_date TEXT,day_name TEXT,group_name TEXT,student_name TEXT,
@@ -182,6 +182,7 @@ def migrate_students_db():
         ("remaining_amount","TEXT"),("mother_phone","TEXT"),("father_phone","TEXT"),
         ("other_phone","TEXT"),("residence","TEXT"),("home_address","TEXT"),
         ("road","TEXT"),("complex_name","TEXT"),("notes_2026","TEXT"),("final_result_2026","TEXT"),
+        ("study_system","TEXT"),
     ]
     for col, typ in cols:
         try: db.execute(f"ALTER TABLE students ADD COLUMN {col} {typ}")
@@ -218,7 +219,8 @@ CREATE TABLE IF NOT EXISTS evaluations_log(id INTEGER PRIMARY KEY,
 CREATE TABLE IF NOT EXISTS violations_log(id INTEGER PRIMARY KEY,
     student_name TEXT,group_name TEXT,violation_date TEXT,record_time TEXT,location TEXT,
     violation_title TEXT,description TEXT,action_taken TEXT,notes TEXT,points TEXT,recorder TEXT);
-""")
+
+CREATE TABLE IF NOT EXISTS study_data(id INTEGER PRIMARY KEY, student_name TEXT, personal_id TEXT, study_system TEXT);""")
     db.commit(); db.close()
 
 migrate_students_db()
@@ -637,11 +639,11 @@ def api_student(sid):
         d = request.json or {}
         db.execute("""UPDATE students SET name=?,group_name=?,teacher_name=?,whatsapp=?,level=?,
             old_new_2026=?,registration_status=?,group_name2=?,schedule_time=?,
-            schedule_time_ramadan=?,schedule_days=?,notes_2026=?,personal_id=? WHERE id=?""",
+            schedule_time_ramadan=?,schedule_days=?,notes_2026=?,personal_id=?,study_system=? WHERE id=?""",
             (d.get("name",""),d.get("group_name",""),d.get("teacher_name",""),d.get("whatsapp",""),
              d.get("level",""),d.get("old_new_2026",""),d.get("registration_status",""),
              d.get("group_name2",""),d.get("schedule_time",""),d.get("schedule_time_ramadan",""),
-             d.get("schedule_days",""),d.get("notes_2026",""),d.get("personal_id",""),sid))
+             d.get("schedule_days",""),d.get("notes_2026",""),d.get("personal_id",""),d.get("study_system",""),sid))
         db.commit()
         return jsonify({"ok":True})
     else:
@@ -1306,6 +1308,44 @@ def api_db_query():
     rows = db.execute(f"SELECT * FROM {table}" + where + f" LIMIT {per_page} OFFSET {offset}", params).fetchall()
     return jsonify({"table": table, "columns": cols, "rows": [dict(r) for r in rows],
         "total": total, "page": page, "per_page": per_page, "pages": (total + per_page - 1) // per_page})
+
+
+@app.route("/api/study_data")
+@login_required
+def api_study_data():
+    db = get_db()
+    search = request.args.get("q","")
+    if search:
+        rows = db.execute("SELECT * FROM study_data WHERE student_name LIKE ? OR personal_id LIKE ? ORDER BY student_name", (f"%{search}%", f"%{search}%")).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM study_data ORDER BY student_name").fetchall()
+    return jsonify({"records":[dict(r) for r in rows]})
+
+@app.route("/api/study_data", methods=["POST"])
+@login_required
+def api_study_data_add():
+    d = request.json or {}
+    db = get_db()
+    name = d.get("student_name","").strip()
+    if not name:
+        return jsonify({"ok":False,"msg":"الاسم مطلوب"})
+    db.execute("INSERT INTO study_data(student_name,personal_id,study_system) VALUES(?,?,?)",
+        (name, d.get("personal_id",""), d.get("study_system","")))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/study_data/<int:rid>", methods=["PUT","DELETE"])
+@login_required
+def api_study_data_update(rid):
+    db = get_db()
+    if request.method == "DELETE":
+        db.execute("DELETE FROM study_data WHERE id=?", (rid,))
+    else:
+        d = request.json or {}
+        db.execute("UPDATE study_data SET student_name=?,personal_id=?,study_system=? WHERE id=?",
+            (d.get("student_name",""), d.get("personal_id",""), d.get("study_system",""), rid))
+    db.commit()
+    return jsonify({"ok":True})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
