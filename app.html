@@ -152,20 +152,20 @@ textarea.inp{resize:vertical;min-height:60px;}
     'dashboard':'📊','students':'👥','groups':'🏫','attendance':'📋',
     'payments':'💰','tasks':'✅','curriculum':'📚','evaluations':'⭐',
     'violations':'⚠️','points':'🏆','events':'🎉','faq':'💬',
-    'whatsapp':'📱','ai':'🤖','database':'🗄️','payments_detail':'💳','attendance_log':'📋','evaluations_log':'⭐','violations_log':'⚠️'
+    'whatsapp':'📱','ai':'🤖','database':'🗄️','payments_detail':'💳','attendance_log':'📋','evaluations_log':'⭐','violations_log':'⚠️','study_data':'📊'
   } %}
   {% set page_labels = {
     'dashboard':'لوحة التحكم','students':'الطلاب','groups':'المجموعات','attendance':'الحضور والغياب',
     'payments':'المالية والدفع','tasks':'المهام','curriculum':'المناهج',
     'evaluations':'التقييمات','violations':'المخالفات','points':'النقاط والمتجر',
-    'events':'الفعاليات','faq':'الأسئلة الشائعة','whatsapp':'قوالب الواتساب','ai':'مساعد الذكاء','database':'قاعدة البيانات','payments_detail':'تفاصيل المدفوعات','attendance_log':'سجل الحضور','evaluations_log':'سجل التقييمات','violations_log':'سجل المخالفات'
+    'events':'الفعاليات','faq':'الأسئلة الشائعة','whatsapp':'قوالب الواتساب','ai':'مساعد الذكاء','database':'قاعدة البيانات','payments_detail':'تفاصيل المدفوعات','attendance_log':'سجل الحضور','evaluations_log':'سجل التقييمات','violations_log':'سجل المخالفات','study_data':'نظام الدراسة'
   } %}
   {% set sections = [
     ('الرئيسية',['dashboard','students','groups','attendance','payments']),
     ('الإدارة',['tasks','curriculum','evaluations','violations','points']),
     ('الخدمات',['events','faq','whatsapp']),
     ('الذكاء الاصطناعي',['ai']),
-        ('الإدارة المتقدمة',['database','payments_detail','attendance_log','evaluations_log','violations_log'])
+        ('الإدارة المتقدمة',['database','payments_detail','attendance_log','evaluations_log',,'study_data''violations_log'])
   ] %}
   {% for sec_name, sec_pages in sections %}
     {% set visible = sec_pages | select('in', pages) | list %}
@@ -266,6 +266,7 @@ async function loadPage(page){
   else if(page==='attendance_log') renderAttendanceLog(c);
   else if(page==='evaluations_log') renderEvaluationsLog(c);
   else if(page==='violations_log') renderViolationsLog(c);
+  else if(page==='study_data') await renderStudyData(c);
 }
 
 // ── DASHBOARD ──
@@ -1725,6 +1726,129 @@ async function doImportViolationsLog() {
 }
 
 
+
+async function renderStudyData(c) {
+  var allRecords = [];
+  var fSearch = '';
+  var editingId = null;
+
+  async function loadData() {
+    const d = await api('/study_data' + (fSearch ? '?q='+encodeURIComponent(fSearch) : ''));
+    allRecords = d.records || [];
+    renderTable();
+  }
+
+  function renderTable() {
+    var p = [];
+    p.push('<div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);border-radius:12px;padding:16px 20px;margin-bottom:16px;color:#fff;">');
+    p.push('<h2 style="margin:0;font-size:15px;">📚 نظام الدراسة</h2>');
+    p.push('<p style="font-size:11px;opacity:.8;margin-top:4px;">إدخال وتعديل بيانات الطلاب يدوياً</p></div>');
+
+    // Add form
+    p.push('<div style="background:#fff;border:1.5px solid #E0D5F0;border-radius:12px;padding:16px;margin-bottom:16px;">');
+    p.push('<h3 style="color:#6B3FA0;font-size:13px;margin-bottom:12px;">➕ إضافة سجل جديد</h3>');
+    p.push('<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">');
+    p.push('<div style="flex:2;min-width:180px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">اسم الطالب *</label>');
+    p.push('<input id="sd-name" type="text" placeholder="اسم الطالب" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
+    p.push('<div style="flex:1;min-width:130px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">الرقم الشخصي</label>');
+    p.push('<input id="sd-pid" type="text" placeholder="الرقم الشخصي" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
+    p.push('<div style="flex:1;min-width:130px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px;">نظام الدراسة</label>');
+    p.push('<input id="sd-sys" type="text" placeholder="مثال: حضوري / أونلاين" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;"></div>');
+    p.push('<button onclick="addStudyRecord()" style="background:#6B3FA0;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;">💾 حفظ</button>');
+    p.push('</div></div>');
+
+    // Search
+    p.push('<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">');
+    p.push('<input id="sd-search" type="text" placeholder="🔍 بحث بالاسم أو الرقم..." value="'+fSearch+'" oninput="sdSearch(this.value)" style="padding:8px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;min-width:220px;font-family:inherit;">');
+    p.push('<span style="font-size:12px;color:#888;">'+allRecords.length+' سجل</span>');
+    p.push('</div>');
+
+    // Table
+    p.push('<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">');
+    p.push('<table style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">');
+    p.push('<thead><tr style="background:#6B3FA0;color:#fff;">');
+    p.push('<th style="padding:10px 12px;text-align:right;white-space:nowrap;">#</th>');
+    p.push('<th style="padding:10px 12px;text-align:right;white-space:nowrap;">اسم الطالب</th>');
+    p.push('<th style="padding:10px 12px;text-align:right;white-space:nowrap;">الرقم الشخصي</th>');
+    p.push('<th style="padding:10px 12px;text-align:right;white-space:nowrap;">نظام الدراسة</th>');
+    p.push('<th style="padding:10px 12px;text-align:center;white-space:nowrap;">إجراء</th>');
+    p.push('</tr></thead><tbody>');
+
+    if (!allRecords.length) {
+      p.push('<tr><td colspan="5" style="text-align:center;padding:30px;color:#aaa;">لا توجد سجلات — أضف من الأعلى</td></tr>');
+    } else {
+      allRecords.forEach(function(r, i) {
+        var bg = i%2===0?'#fff':'#f8f5ff';
+        p.push('<tr style="background:'+bg+';border-bottom:1px solid #f0f0f0;" id="sd-row-'+r.id+'">');
+        p.push('<td style="padding:8px 12px;color:#888;font-weight:700;">'+(i+1)+'</td>');
+        p.push('<td style="padding:8px 12px;font-weight:600;" id="sd-name-'+r.id+'">'+(r.student_name||'-')+'</td>');
+        p.push('<td style="padding:8px 12px;direction:ltr;" id="sd-pid-'+r.id+'">'+(r.personal_id||'-')+'</td>');
+        p.push('<td style="padding:8px 12px;" id="sd-sys-'+r.id+'">');
+        if(r.study_system) {
+          p.push('<span style="background:#EDE5F7;color:#4A2875;padding:3px 10px;border-radius:20px;font-size:12px;">'+r.study_system+'</span>');
+        } else {
+          p.push('<span style="color:#ccc;font-size:12px;">— غير محدد</span>');
+        }
+        p.push('</td>');
+        p.push('<td style="padding:8px 12px;text-align:center;">');
+        p.push('<button onclick="editStudyRecord('+r.id+',''+encodeURIComponent(r.student_name||'')+'',''+encodeURIComponent(r.personal_id||'')+'',''+encodeURIComponent(r.study_system||'')+'')" style="background:#f3eeff;color:#6B3FA0;border:1px solid #E0D5F0;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">✏️ تعديل</button>');
+        p.push('<button onclick="deleteStudyRecord('+r.id+')" style="background:#fff0f0;color:#e84545;border:1px solid #fdd;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;">🗑️ حذف</button>');
+        p.push('</td></tr>');
+      });
+    }
+    p.push('</tbody></table></div>');
+    c.innerHTML = p.join('');
+    window._sdLoadData = loadData;
+    window._sdFSearch = function(v){ fSearch=v; loadData(); };
+  }
+
+  window.sdSearch = function(v){ fSearch=v; loadData(); };
+  window.addStudyRecord = async function() {
+    var name = document.getElementById('sd-name').value.trim();
+    var pid = document.getElementById('sd-pid').value.trim();
+    var sys = document.getElementById('sd-sys').value.trim();
+    if(!name){alert('اسم الطالب مطلوب');return;}
+    var res = await api('/study_data','POST',{student_name:name,personal_id:pid,study_system:sys});
+    if(res && res.ok){
+      document.getElementById('sd-name').value='';
+      document.getElementById('sd-pid').value='';
+      document.getElementById('sd-sys').value='';
+      loadData();
+    } else { alert('خطأ: '+(res&&res.msg?res.msg:'unknown')); }
+  };
+  window.editStudyRecord = function(id, nameEnc, pidEnc, sysEnc) {
+    var name = decodeURIComponent(nameEnc);
+    var pid = decodeURIComponent(pidEnc);
+    var sys = decodeURIComponent(sysEnc);
+    var row = document.getElementById('sd-row-'+id);
+    if(!row) return;
+    row.innerHTML =
+      '<td style="padding:6px 8px;color:#888;font-weight:700;">&nbsp;</td>' +
+      '<td style="padding:4px 6px;"><input id="edit-name-'+id+'" value="'+name.replace(/"/g,'&quot;')+'" style="width:100%;padding:5px 8px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;"></td>' +
+      '<td style="padding:4px 6px;"><input id="edit-pid-'+id+'" value="'+pid.replace(/"/g,'&quot;')+'" style="width:100%;padding:5px 8px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;direction:ltr;"></td>' +
+      '<td style="padding:4px 6px;"><input id="edit-sys-'+id+'" value="'+sys.replace(/"/g,'&quot;')+'" style="width:100%;padding:5px 8px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:12px;font-family:inherit;" placeholder="حضوري / أونلاين"></td>' +
+      '<td style="padding:4px 8px;text-align:center;">' +
+      '<button onclick="saveStudyRecord('+id+')" style="background:#6B3FA0;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">حفظ</button>' +
+      '<button onclick="window._sdLoadData()" style="background:#eee;color:#666;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;">إلغاء</button>' +
+      '</td>';
+  };
+  window.saveStudyRecord = async function(id) {
+    var name = document.getElementById('edit-name-'+id).value.trim();
+    var pid = document.getElementById('edit-pid-'+id).value.trim();
+    var sys = document.getElementById('edit-sys-'+id).value.trim();
+    if(!name){alert('اسم الطالب مطلوب');return;}
+    var res = await api('/study_data/'+id,'PUT',{student_name:name,personal_id:pid,study_system:sys});
+    if(res && res.ok){ loadData(); }
+    else { alert('خطأ في الحفظ'); }
+  };
+  window.deleteStudyRecord = async function(id) {
+    if(!confirm('حذف هذا السجل؟')) return;
+    var res = await api('/study_data/'+id,'DELETE');
+    if(res && res.ok){ loadData(); }
+  };
+
+  await loadData();
+}
 // START
 go('dashboard');
 </script>
