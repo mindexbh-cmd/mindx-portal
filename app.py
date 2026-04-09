@@ -1,5 +1,6 @@
 from flask import Flask, request, session, redirect, g
 import sqlite3, hashlib, os
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
@@ -23,22 +24,17 @@ def hp(p):
 def init_db():
     db = sqlite3.connect(DB)
     db.execute("""CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY,
-        username TEXT UNIQUE,
-        password TEXT,
-        name TEXT,
-        role TEXT,
-        department TEXT
-    )""")
+        id INTEGER PRIMARY KEY, username TEXT UNIQUE,
+        password TEXT, name TEXT, role TEXT, department TEXT)""")
     users = [
-        ("admin","admin123","admin","الادارة العامة"),
-        ("reception","rec123","الاستقبال","الاستقبال"),
-        ("teacher1","tea123","teacher","المعلمات"),
-        ("teacher2","tea456","teacher","المعلمات"),
+        ("admin","admin123","admin"),
+        ("reception","rec123","reception"),
+        ("teacher1","tea123","teacher"),
+        ("teacher2","tea456","teacher"),
     ]
-    for u, p, r, d in users:
+    for u, p, r in users:
         try:
-            db.execute("INSERT INTO users(username,password,role,department) VALUES(?,?,?,?)", (u, hp(p), r, d))
+            db.execute("INSERT INTO users(username,password,role) VALUES(?,?,?)", (u, hp(p), r))
         except:
             pass
     db.commit()
@@ -46,6 +42,14 @@ def init_db():
 
 if not os.path.exists(DB):
     init_db()
+
+def login_required(f):
+    @wraps(f)
+    def dec(*a, **k):
+        if "user" not in session:
+            return redirect("/")
+        return f(*a, **k)
+    return dec
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -97,6 +101,36 @@ LOGIN_HTML = """<!DOCTYPE html>
 </body>
 </html>"""
 
+HOME_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mindex</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+    body{background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+    .btn{
+      display:inline-block;
+      padding:18px 48px;
+      background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+      color:#fff;
+      border:none;
+      border-radius:14px;
+      font-size:18px;
+      font-weight:700;
+      cursor:pointer;
+      text-decoration:none;
+      letter-spacing:0.5px;
+    }
+    .btn:hover{opacity:0.9;}
+  </style>
+</head>
+<body>
+  <a href="/database" class="btn">قاعدة البيانات</a>
+</body>
+</html>"""
+
 def render_login(error=""):
     err_html = f'<div class="err">{error}</div>' if error else ""
     return LOGIN_HTML.replace("ERROR_PLACEHOLDER", err_html)
@@ -117,7 +151,17 @@ def login():
     if not user:
         return render_login("اسم المستخدم أو كلمة المرور غلط"), 401
     session["user"] = dict(user)
-    return render_login()
+    return redirect("/dashboard")
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return HOME_HTML
+
+@app.route("/database")
+@login_required
+def database():
+    return "<h2>قاعدة البيانات</h2>"
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
