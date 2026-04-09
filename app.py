@@ -681,6 +681,36 @@ def api_add_group():
     db.commit()
     return jsonify({"ok":True})
 
+@app.route("/api/groups/<int:gid>", methods=["GET","PUT","DELETE"])
+@login_required
+def api_group_detail(gid):
+    db = get_db()
+    if request.method == "GET":
+        row = db.execute("SELECT * FROM groups_tbl WHERE id=?", (gid,)).fetchone()
+        if not row: return jsonify({"error": "not found"}), 404
+        return jsonify({"group": dict(row)})
+    elif request.method == "PUT":
+        d = request.json or {}
+        allowed = ["name","teacher","online_time","zoom_link","session_duration",
+                   "time","time_ramadan","days","level","max_students",
+                   "online_days","online_time_ramadan"]
+        sets = []
+        vals = []
+        for field in allowed:
+            if field in d:
+                sets.append(f"{field}=?")
+                vals.append(d[field])
+        if not sets:
+            return jsonify({"ok":False,"msg":"no fields"})
+        vals.append(gid)
+        db.execute(f"UPDATE groups_tbl SET {', '.join(sets)} WHERE id=?", vals)
+        db.commit()
+        return jsonify({"ok":True})
+    else:
+        db.execute("DELETE FROM groups_tbl WHERE id=?", (gid,))
+        db.commit()
+        return jsonify({"ok":True})
+
 @app.route("/api/groups/import", methods=["POST"])
 @login_required
 def api_import_groups():
