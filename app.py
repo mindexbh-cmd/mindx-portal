@@ -640,7 +640,8 @@ def api_student(sid):
         # Allowed fields for partial update
         allowed = ["name","group_name","teacher_name","whatsapp","level",
                    "old_new_2026","registration_status","group_name2","schedule_time",
-                   "schedule_time_ramadan","schedule_days","notes_2026","personal_id","study_system"]
+                   "schedule_time_ramadan","schedule_days","notes_2026","personal_id","study_system",
+                   "mother_phone","father_phone","other_phone","residence","home_address","road","complex_name"]
         sets = []
         vals = []
         for field in allowed:
