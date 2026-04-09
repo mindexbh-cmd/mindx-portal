@@ -7,6 +7,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
 DB = os.environ.get("DB_PATH", "mindx.db")
 
 def get_db():
+        # v2 - login only
         if "db" not in g:
                     g.db = sqlite3.connect(DB)
                     g.db.row_factory = sqlite3.Row
