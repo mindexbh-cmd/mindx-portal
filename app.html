@@ -1375,6 +1375,21 @@ async function dbSaveField(studentId, field, value, inputEl) {
     inputEl.disabled=false;
   }
 }
+async function dbSaveGroupField(groupId, field, value, inputEl) {
+  if(inputEl) { inputEl.style.background='#fff8dc'; inputEl.disabled=true; }
+  const body = {};
+  body[field] = value;
+  const res = await api('/groups/'+groupId, 'PUT', body);
+  if(inputEl) {
+    if(res && res.ok) {
+      inputEl.style.background='#d4f8d4';
+      setTimeout(function(){ if(inputEl) inputEl.style.background='#fffef0'; }, 1200);
+    } else {
+      inputEl.style.background='#ffd4d4';
+    }
+    inputEl.disabled=false;
+  }
+}
 async function loadDbTable(tableName, page, search, col){
   page = page || 1; search = search || ''; col = col || '';
   const container = document.getElementById('db-table-view');
@@ -1389,6 +1404,7 @@ async function loadDbTable(tableName, page, search, col){
   const cols = data.columns;
   const rows = data.rows;
   const isStudents = tableName === 'students';
+  const isGroups = tableName === 'groups_tbl';
   let tbody = '';
   if(rows.length) {
     rows.forEach(function(r) {
@@ -1404,6 +1420,14 @@ async function loadDbTable(tableName, page, search, col){
             'style="width:100%;padding:3px 6px;border:1.5px solid #6B3FA0;border-radius:6px;font-size:13px;font-family:inherit;background:#fffef0;padding:5px 8px;" '+
             'title="&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;">'+
             '</div></td>';
+        } else if(isGroups && (c === 'name' || c === 'teacher' || c === 'online_time' || c === 'zoom_link' || c === 'session_duration')) {
+          tbody += '<td style="padding:4px 6px;min-width:220px;">'+
+            '<input type="text" value="'+String(val).replace(/"/g,'&quot;')+'" '+
+            'onblur="dbSaveGroupField('+r['id']+',''+c+'',this.value,this)" '+
+            'onkeydown="if(event.key==='Enter'){this.blur();}if(event.key==='Escape'){loadDbTable(''+tableName+'','+page+',''+search+'',''+col+'')}" '+
+            'style="width:100%;padding:5px 8px;border:1.5px solid #00838f;border-radius:6px;font-size:13px;font-family:inherit;background:#f0feff;" '+
+            'title="&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;">'+
+            '</td>';
         } else {
           tbody += '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px;" title="'+String(val)+'">'+( val !== '' ? val : '&#8212;')+'</td>';
         }
@@ -1413,7 +1437,7 @@ async function loadDbTable(tableName, page, search, col){
   } else {
     tbody = '<tr><td colspan="'+cols.length+'" style="text-align:center;padding:20px;color:var(--text3)">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1587;&#1580;&#1604;&#1575;&#1578;</td></tr>';
   }
-  let editNote = isStudents ? '<div style="font-size:11px;color:#6B3FA0;margin-bottom:6px;padding:6px 10px;background:#f3eeff;border-radius:6px;">&#9997;&#65039; &#1575;&#1604;&#1571;&#1593;&#1605;&#1583;&#1577; &#1575;&#1604;&#1578;&#1575;&#1604;&#1610;&#1577; &#1602;&#1575;&#1576;&#1604;&#1577; &#1604;&#1604;&#1578;&#1593;&#1583;&#1610;&#1604;: &#1575;&#1604;&#1575;&#1587;&#1605;&#1548; &#1575;&#1604;&#1607;&#1608;&#1610;&#1577;&#1548; &#1575;&#1604;&#1606;&#1592;&#1575;&#1605;&#1548; &#1575;&#1604;&#1608;&#1575;&#1578;&#1587;&#1575;&#1576;&#1548; &#1575;&#1604;&#1605;&#1604;&#1575;&#1581;&#1592;&#1548; &#1607;&#1575;&#1578;&#1601; &#1575;&#1604;&#1571;&#1605;&#1548; &#1607;&#1575;&#1578;&#1601; &#1575;&#1604;&#1571;&#1576;&#1548; &#1607;&#1575;&#1578;&#1601; &#1570;&#1582;&#1585;&#1548; &#1605;&#1603;&#1575;&#1606; &#1575;&#1604;&#1587;&#1603;&#1606;&#1548; &#1575;&#1604;&#1593;&#1606;&#1608;&#1575;&#1606;&#1548; &#1575;&#1604;&#1591;&#1585;&#1610;&#1602;&#1548; &#1575;&#1604;&#1605;&#1580;&#1605;&#1593; - (&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;)</div>' : '';
+  let editNote = isStudents ? '<div style="font-size:11px;color:#6B3FA0;margin-bottom:6px;padding:6px 10px;background:#f3eeff;border-radius:6px;">&#9997;&#65039; &#1575;&#1604;&#1571;&#1593;&#1605;&#1583;&#1577; &#1575;&#1604;&#1578;&#1575;&#1604;&#1610;&#1577; &#1602;&#1575;&#1576;&#1604;&#1577; &#1604;&#1604;&#1578;&#1593;&#1583;&#1610;&#1604;: &#1575;&#1604;&#1575;&#1587;&#1605;&#1548; &#1575;&#1604;&#1607;&#1608;&#1610;&#1577;&#1548; &#1575;&#1604;&#1606;&#1592;&#1575;&#1605;&#1548; &#1575;&#1604;&#1608;&#1575;&#1578;&#1587;&#1575;&#1576;&#1548; &#1575;&#1604;&#1605;&#1604;&#1575;&#1581;&#1592;&#1548; &#1607;&#1575;&#1578;&#1601; &#1575;&#1604;&#1571;&#1605;&#1548; &#1607;&#1575;&#1578;&#1601; &#1575;&#1604;&#1571;&#1576;&#1548; &#1607;&#1575;&#1578;&#1601; &#1570;&#1582;&#1585;&#1548; &#1605;&#1603;&#1575;&#1606; &#1575;&#1604;&#1587;&#1603;&#1606;&#1548; &#1575;&#1604;&#1593;&#1606;&#1608;&#1575;&#1606;&#1548; &#1575;&#1604;&#1591;&#1585;&#1610;&#1602;&#1548; &#1575;&#1604;&#1605;&#1580;&#1605;&#1593; - (&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;)</div>' : isGroups ? '<div style="font-size:11px;color:#00838f;margin-bottom:6px;padding:6px 10px;background:#e0f7fa;border-radius:6px;">&#9997;&#65039; &#1575;&#1604;&#1571;&#1593;&#1605;&#1583;&#1577; &#1575;&#1604;&#1578;&#1575;&#1604;&#1610;&#1577; &#1602;&#1575;&#1576;&#1604;&#1577; &#1604;&#1604;&#1578;&#1593;&#1583;&#1610;&#1604;: &#1575;&#1587;&#1605; &#1575;&#1604;&#1605;&#1580;&#1605;&#1608;&#1593;&#1577;&#1548; &#1575;&#1587;&#1605; &#1575;&#1604;&#1605;&#1583;&#1585;&#1587;&#1548; &#1578;&#1608;&#1602;&#1610;&#1578; &#1575;&#1604;&#1575;&#1608;&#1606;&#1604;&#1575;&#1610;&#1606;&#1548; &#1585;&#1575;&#1576;&#1591; &#1575;&#1604;&#1576;&#1579;&#1548; &#1605;&#1583;&#1577; &#1575;&#1604;&#1581;&#1589;&#1577; - (&#1575;&#1590;&#1594;&#1591; Enter &#1604;&#1604;&#1581;&#1601;&#1592;)</div>' : ''
   container.innerHTML = 
     '<div class="card" style="margin-top:12px">'+
     '<div class="card-h" style="background:linear-gradient(135deg,#e8eaf6,#c5cae9)">'+
