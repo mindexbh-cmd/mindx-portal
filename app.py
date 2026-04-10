@@ -46,6 +46,18 @@ def init_db():
         road TEXT,
         complex_name TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT,
+        teacher_name TEXT,
+        level_course TEXT,
+        last_reached TEXT,
+        study_time TEXT,
+        ramadan_time TEXT,
+        online_time TEXT,
+        group_link TEXT,
+        session_duration TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     users = [
         ("admin","admin123","admin"),
         ("reception","rec123","reception"),
@@ -79,6 +91,18 @@ else:
         home_address TEXT,
         road TEXT,
         complex_name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT,
+        teacher_name TEXT,
+        level_course TEXT,
+        last_reached TEXT,
+        study_time TEXT,
+        ramadan_time TEXT,
+        online_time TEXT,
+        group_link TEXT,
+        session_duration TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db2.commit()
     db2.close()
@@ -233,7 +257,10 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   <a href="/dashboard" class="btn-home">&larr; الرئيسية</a>
 </div>
 <div class="main">
-  <div class="page-title">قاعدة بيانات الطلبة</div>
+  <div class="page-title-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div class="page-title" style="margin-bottom:0;">قاعدة بيانات الطلبة</div>
+    <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; معلومات المجموعات</a>
+  </div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
@@ -492,6 +519,286 @@ def api_students_delete(sid):
     try:
         db = get_db()
         db.execute("DELETE FROM students WHERE id=?", (sid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+GROUPS_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>معلومات المجموعات - Mindex</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:#f5f3ff;min-height:100vh;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:20px;font-weight:800;}
+.btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+.btn-back:hover{background:rgba(255,255,255,.3);}
+.main{padding:24px 28px;}
+.page-title{font-size:22px;font-weight:800;color:#0097A7;margin-bottom:20px;}
+.stats{display:flex;gap:14px;margin-bottom:22px;}
+.stat-card{background:#fff;border-radius:12px;padding:14px 22px;box-shadow:0 2px 10px rgba(0,150,180,.1);display:flex;flex-direction:column;align-items:center;min-width:120px;}
+.stat-num{font-size:28px;font-weight:800;color:#00BCD4;}
+.stat-label{font-size:12px;color:#888;margin-top:2px;}
+.btn-add{background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;border:none;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:20px;display:inline-flex;align-items:center;gap:8px;}
+.btn-add:hover{opacity:.9;}
+.search-bar{display:flex;gap:10px;margin-bottom:18px;}
+.search-bar input{flex:1;padding:10px 16px;border:1.5px solid #b2ebf2;border-radius:10px;font-size:14px;outline:none;background:#fff;}
+.search-bar input:focus{border-color:#00BCD4;}
+.btn-search{background:#00BCD4;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,150,180,.1);overflow-x:auto;}
+table{width:100%;border-collapse:collapse;min-width:1200px;}
+thead tr{background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;}
+th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
+tbody tr{border-bottom:1px solid #e0f7fa;transition:background .15s;}
+tbody tr:hover{background:#e0f7fa;}
+td{padding:11px 12px;font-size:13px;text-align:center;color:#444;}
+td.name-cell{font-weight:600;color:#0097A7;text-align:right;}
+td.link-cell a{color:#00BCD4;text-decoration:none;font-weight:600;}
+td.link-cell a:hover{text-decoration:underline;}
+.no-data{text-align:center;padding:48px;color:#bbb;font-size:16px;}
+.action-btn{background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:15px;}
+.btn-edit{color:#0097A7;}
+.btn-edit:hover{background:#e0f7fa;}
+.btn-del{color:#e53935;}
+.btn-del:hover{background:#fce4ec;}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:18px;padding:30px 28px;width:720px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,150,180,.2);}
+.modal h2{font-size:20px;font-weight:800;color:#0097A7;margin-bottom:22px;text-align:center;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-grid .full{grid-column:1/-1;}
+.field label{display:block;font-size:13px;color:#0097A7;font-weight:600;margin-bottom:5px;}
+.field input{width:100%;padding:10px 13px;border:1.5px solid #b2ebf2;border-radius:9px;font-size:14px;outline:none;background:#f0fdff;direction:rtl;}
+.field input:focus{border-color:#00BCD4;background:#fff;}
+.field input.ltr{direction:ltr;text-align:left;}
+.modal-actions{display:flex;gap:12px;justify-content:center;margin-top:22px;}
+.btn-save{background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;border:none;padding:11px 34px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-cancel{background:#e0f7fa;color:#0097A7;border:none;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer;}
+.btn-cancel:hover{background:#b2ebf2;}
+.toast{position:fixed;bottom:28px;right:28px;background:#00BCD4;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,188,212,.3);}
+.toast.show{display:block;}
+.confirm-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2000;align-items:center;justify-content:center;}
+.confirm-bg.open{display:flex;}
+.confirm-box{background:#fff;border-radius:16px;padding:28px 32px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.2);max-width:380px;width:94%;}
+.confirm-box h3{font-size:18px;font-weight:800;color:#c62828;margin-bottom:12px;}
+.confirm-box p{color:#555;margin-bottom:22px;font-size:14px;}
+.confirm-actions{display:flex;gap:12px;justify-content:center;}
+.btn-confirm-del{background:#e53935;color:#fff;border:none;padding:10px 26px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-confirm-cancel{background:#f5f5f5;color:#444;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>&#128101; معلومات المجموعات</h1>
+  <a href="/database" class="btn-back">&larr; قاعدة البيانات</a>
+</div>
+<div class="main">
+  <div class="page-title">جدول المجموعات</div>
+  <div class="stats">
+    <div class="stat-card">
+      <span class="stat-num" id="totalCount">0</span>
+      <span class="stat-label">إجمالي المجموعات</span>
+    </div>
+  </div>
+  <button class="btn-add" onclick="openAddModal()">+ إضافة مجموعة</button>
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterTable()">
+    <button class="btn-search" onclick="filterTable()">بحث</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>اسم المجموعة</th>
+          <th>اسم المدرس</th>
+          <th>المستوى / المقرر</th>
+          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th>
+          <th>وقت الدراسة</th>
+          <th>توقيت شهر رمضان</th>
+          <th>توقيت الاونلاين (العادي)</th>
+          <th>رابط المجموعة</th>
+          <th>الحصة بالدقيقة (يدوي)</th>
+          <th>اجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="groupsBody">
+        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">اضافة مجموعة جديدة</h2>
+    <input type="hidden" id="editId">
+    <div class="form-grid">
+      <div class="field"><label>اسم المجموعة *</label><input id="f_group_name" placeholder="اسم المجموعة"></div>
+      <div class="field"><label>اسم المدرس *</label><input id="f_teacher_name" placeholder="اسم المدرس"></div>
+      <div class="field"><label>المستوى / المقرر</label><input id="f_level_course" placeholder="مثال: المستوى 3 - كتاب A"></div>
+      <div class="field"><label>المقرر الذي تم الوصول اليه الفصل الفائت</label><input id="f_last_reached" placeholder="مثال: الوحدة 5 - الدرس 3"></div>
+      <div class="field"><label>وقت الدراسة</label><input id="f_study_time" placeholder="مثال: السبت والاثنين 4-5 مساءً"></div>
+      <div class="field"><label>توقيت شهر رمضان</label><input id="f_ramadan_time" placeholder="مثال: 8-9 مساءً"></div>
+      <div class="field"><label>توقيت الاونلاين (العادي)</label><input id="f_online_time" placeholder="مثال: 5-6 مساءً"></div>
+      <div class="field"><label>رابط المجموعة</label><input id="f_group_link" placeholder="https://..." class="ltr"></div>
+      <div class="field full"><label>الحصة بالدقيقة (يدوي)</label><input id="f_session_duration" placeholder="مثال: 60 دقيقة"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" onclick="saveGroup()">حفظ</button>
+      <button class="btn-cancel" onclick="closeModal()">الغاء</button>
+    </div>
+  </div>
+</div>
+<div class="confirm-bg" id="confirmModal">
+  <div class="confirm-box">
+    <h3>تاكيد الحذف</h3>
+    <p>هل انت متاكد انك تريد حذف هذه المجموعة؟</p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-del" id="confirmDelBtn">حذف</button>
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">الغاء</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let allGroups=[];
+let deleteTargetId=null;
+async function loadGroups(){
+  const res=await fetch('/api/groups');
+  const data=await res.json();
+  allGroups=data.groups||[];
+  renderTable(allGroups);
+  document.getElementById('totalCount').textContent=allGroups.length;
+}
+function renderTable(list){
+  const body=document.getElementById('groupsBody');
+  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>';return;}
+  body.innerHTML=list.map((g,i)=>{
+    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank">فتح الرابط</a>':'-';
+    return '<tr><td>'+(i+1)+'</td><td class="name-cell">'+(g.group_name||'-')+'</td><td>'+(g.teacher_name||'-')+'</td><td>'+(g.level_course||'-')+'</td><td>'+(g.last_reached||'-')+'</td><td>'+(g.study_time||'-')+'</td><td>'+(g.ramadan_time||'-')+'</td><td>'+(g.online_time||'-')+'</td><td class="link-cell">'+link+'</td><td>'+(g.session_duration||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+g.id+')">&#128465;</button></td></tr>';
+  }).join('');
+}
+function filterTable(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  renderTable(allGroups.filter(g=>(g.group_name||'').toLowerCase().includes(q)||(g.teacher_name||'').toLowerCase().includes(q)));
+}
+function clearForm(){
+  ['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';});
+  document.getElementById('editId').value='';
+}
+function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة مجموعة جديدة';document.getElementById('modal').classList.add('open');}
+function openEdit(id){
+  const g=allGroups.find(x=>x.id===id);if(!g)return;
+  document.getElementById('editId').value=id;
+  document.getElementById('modalTitle').textContent='تعديل بيانات المجموعة';
+  document.getElementById('f_group_name').value=g.group_name||'';
+  document.getElementById('f_teacher_name').value=g.teacher_name||'';
+  document.getElementById('f_level_course').value=g.level_course||'';
+  document.getElementById('f_last_reached').value=g.last_reached||'';
+  document.getElementById('f_study_time').value=g.study_time||'';
+  document.getElementById('f_ramadan_time').value=g.ramadan_time||'';
+  document.getElementById('f_online_time').value=g.online_time||'';
+  document.getElementById('f_group_link').value=g.group_link||'';
+  document.getElementById('f_session_duration').value=g.session_duration||'';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+async function saveGroup(){
+  const editId=document.getElementById('editId').value;
+  const body={
+    group_name:document.getElementById('f_group_name').value.trim(),
+    teacher_name:document.getElementById('f_teacher_name').value.trim(),
+    level_course:document.getElementById('f_level_course').value.trim(),
+    last_reached:document.getElementById('f_last_reached').value.trim(),
+    study_time:document.getElementById('f_study_time').value.trim(),
+    ramadan_time:document.getElementById('f_ramadan_time').value.trim(),
+    online_time:document.getElementById('f_online_time').value.trim(),
+    group_link:document.getElementById('f_group_link').value.trim(),
+    session_duration:document.getElementById('f_session_duration').value.trim(),
+  };
+  if(!body.group_name){showToast('اسم المجموعة مطلوب','#e53935');return;}
+  const url=editId?'/api/groups/'+editId:'/api/groups';
+  const method=editId?'PUT':'POST';
+  const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+  const data=await res.json();
+  if(data.ok){closeModal();showToast(editId?'تم تعديل المجموعة بنجاح':'تم اضافة المجموعة بنجاح');loadGroups();}
+  else{showToast(data.error||'حدث خطا','#e53935');}
+}
+function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
+async function confirmDelete(){
+  if(!deleteTargetId)return;
+  const res=await fetch('/api/groups/'+deleteTargetId,{method:'DELETE',credentials:'include'});
+  const data=await res.json();
+  closeConfirm();
+  if(data.ok){showToast('تم حذف المجموعة بنجاح');loadGroups();}
+  else{showToast(data.error||'حدث خطا','#e53935');}
+  deleteTargetId=null;
+}
+function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
+function showToast(msg,bg='#00BCD4'){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+loadGroups();
+</script>
+</body>
+</html>"""
+
+@app.route("/groups")
+@login_required
+def groups():
+    return GROUPS_HTML
+
+@app.route("/api/groups", methods=["GET"])
+@login_required
+def api_groups_get():
+    db = get_db()
+    rows = db.execute("SELECT * FROM groups ORDER BY id DESC").fetchall()
+    return jsonify({"groups": [dict(r) for r in rows]})
+
+@app.route("/api/groups", methods=["POST"])
+@login_required
+def api_groups_add():
+    d = request.get_json()
+    try:
+        db = get_db()
+        db.execute("""INSERT INTO groups
+            (group_name,teacher_name,level_course,last_reached,study_time,
+             ramadan_time,online_time,group_link,session_duration)
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
+             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
+             d.get("online_time"), d.get("group_link"), d.get("session_duration")))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/groups/<int:gid>", methods=["PUT"])
+@login_required
+def api_groups_update(gid):
+    d = request.get_json()
+    try:
+        db = get_db()
+        db.execute("""UPDATE groups SET
+            group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
+            ramadan_time=?,online_time=?,group_link=?,session_duration=?
+            WHERE id=?""",
+            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
+             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
+             d.get("online_time"), d.get("group_link"), d.get("session_duration"), gid))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/groups/<int:gid>", methods=["DELETE"])
+@login_required
+def api_groups_delete(gid):
+    try:
+        db = get_db()
+        db.execute("DELETE FROM groups WHERE id=?", (gid,))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
