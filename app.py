@@ -46,7 +46,7 @@ def init_db():
         road TEXT,
         complex_name TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
-    db.execute("""CREATE TABLE IF NOT EXISTS groups(
+    db.execute("""CREATE TABLE IF NOT EXISTS student_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_name TEXT,
         teacher_name TEXT,
@@ -92,7 +92,7 @@ else:
         road TEXT,
         complex_name TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS groups(
+    db2.execute("""CREATE TABLE IF NOT EXISTS student_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_name TEXT,
         teacher_name TEXT,
@@ -754,7 +754,7 @@ def groups():
 @login_required
 def api_groups_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM groups ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM student_groups ORDER BY id DESC").fetchall()
     return jsonify({"groups": [dict(r) for r in rows]})
 
 @app.route("/api/groups", methods=["POST"])
@@ -763,7 +763,7 @@ def api_groups_add():
     d = request.get_json()
     try:
         db = get_db()
-        db.execute("""INSERT INTO groups
+        db.execute("""INSERT INTO student_groups
             (group_name,teacher_name,level_course,last_reached,study_time,
              ramadan_time,online_time,group_link,session_duration)
             VALUES(?,?,?,?,?,?,?,?,?)""",
@@ -781,7 +781,7 @@ def api_groups_update(gid):
     d = request.get_json()
     try:
         db = get_db()
-        db.execute("""UPDATE groups SET
+        db.execute("""UPDATE student_groups SET
             group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
             ramadan_time=?,online_time=?,group_link=?,session_duration=?
             WHERE id=?""",
@@ -798,7 +798,7 @@ def api_groups_update(gid):
 def api_groups_delete(gid):
     try:
         db = get_db()
-        db.execute("DELETE FROM groups WHERE id=?", (gid,))
+        db.execute("DELETE FROM student_groups WHERE id=?", (gid,))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
