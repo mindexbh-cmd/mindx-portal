@@ -298,6 +298,37 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       </tbody>
     </table>
   </div>
+
+<!-- ===== GROUPS TABLE SECTION ===== -->
+<div style="margin-top:40px;">
+  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; معلومات المجموعات (يدوي)</div>
+  <div class="stats">
+    <div class="stat-card" style="border-top:3px solid #00BCD4;">
+      <span class="stat-num" id="groupsTotalCount" style="color:#00BCD4;">0</span>
+      <span class="stat-label">إجمالي المجموعات</span>
+    </div>
+  </div>
+  <button class="btn-add" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ إضافة مجموعة</button>
+  <div class="search-bar">
+    <input type="text" id="groupSearchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterGroupTable2()">
+    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">بحث</button>
+  </div>
+  <div class="table-wrap">
+    <table style="min-width:1300px;">
+      <thead>
+        <tr style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
+          <th>#</th><th>اسم المجموعة</th><th>اسم المدرس</th><th>المستوى / المقرر</th>
+          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th><th>وقت الدراسة</th>
+          <th>توقيت شهر رمضان</th><th>توقيت الاونلاين (العادي)</th>
+          <th>رابط المجموعة</th><th>الحصة بالدقيقة (يدوي)</th><th>اجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="groupsBody2">
+        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -343,36 +374,6 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<!-- ===== GROUPS TABLE SECTION ===== -->
-<div style="margin-top:40px;">
-  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; معلومات المجموعات (يدوي)</div>
-  <div class="stats">
-    <div class="stat-card" style="border-top:3px solid #00BCD4;">
-      <span class="stat-num" id="groupsTotalCount" style="color:#00BCD4;">0</span>
-      <span class="stat-label">إجمالي المجموعات</span>
-    </div>
-  </div>
-  <button class="btn-add" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ إضافة مجموعة</button>
-  <div class="search-bar">
-    <input type="text" id="groupSearchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterGroupTable2()">
-    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">بحث</button>
-  </div>
-  <div class="table-wrap">
-    <table style="min-width:1300px;">
-      <thead>
-        <tr style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
-          <th>#</th><th>اسم المجموعة</th><th>اسم المدرس</th><th>المستوى / المقرر</th>
-          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th><th>وقت الدراسة</th>
-          <th>توقيت شهر رمضان</th><th>توقيت الاونلاين (العادي)</th>
-          <th>رابط المجموعة</th><th>الحصة بالدقيقة (يدوي)</th><th>اجراءات</th>
-        </tr>
-      </thead>
-      <tbody id="groupsBody2">
-        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
     <h2 id="groupModalTitle2" style="color:#0097A7;">اضافة مجموعة جديدة</h2>
