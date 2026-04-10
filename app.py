@@ -894,6 +894,30 @@ def api_groups_bulk():
 @login_required
 def api_columns_get():
     db = get_db()
+    db.execute("""CREATE TABLE IF NOT EXISTS column_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    if db.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
+        default_cols = [
+            ("personal_id","الرقم الشخصي",1),("student_name","اسم الطالب",2),("whatsapp","هاتف الواتساب المعتمد",3),
+            ("class_name","الصف",4),("old_new_2026","قديم جديد 2026",5),("registration_term2_2026","تسجيل الفصل الثاني 2026",6),
+            ("group_name_student","المجموعة",7),("group_online","المجموعة (الاونلاين)",8),
+            ("final_result","النتيجة النهائية (تحديد المستوى 2026)",9),
+            ("level_reached_2026","الى اين وصل الطالب 2026",10),("suitable_level_2026","هل الطالب مناسب لهذا المستوى 2026؟",11),
+            ("books_received","استلام الكتب",12),("teacher_2026","المدرس 2026",13),
+            ("installment1","القسط الاول 2026",14),("installment2","القسط الثاني",15),("installment3","القسط الثالث",16),
+            ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
+            ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
+            ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
+        ]
+        for key,label,order in default_cols:
+            try:
+                db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
+            except: pass
+        db.commit()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM column_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
