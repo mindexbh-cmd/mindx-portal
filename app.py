@@ -1,18 +1,6 @@
 from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
-
-    db2.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        col_key TEXT UNIQUE,
-        col_label TEXT,
-        col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
-    db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        col_key TEXT UNIQUE,
-        col_label TEXT,
-        col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")from functools import wraps
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
@@ -88,6 +76,12 @@ def init_db():
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
 
     users = [
         ("admin","admin123","admin"),
@@ -149,6 +143,12 @@ else:
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     
     db2.execute("""CREATE TABLE IF NOT EXISTS column_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
         col_label TEXT,
