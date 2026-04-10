@@ -190,7 +190,7 @@ thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
 tbody tr{border-bottom:1px solid #f0ebff;transition:background .15s;}
 tbody tr:hover{background:#faf7ff;}
-td{padding:11px 12px;font-size:13px;text-align:center;color:#444;}
+td{padding:11px 12px;font-size:13px;text-align:center;color:#444;} td.phone-cell{direction:ltr;unicode-bidi:embed;}
 td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
 .badge-pass{background:#e8f5e9;color:#2e7d32;}
@@ -209,7 +209,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .form-grid .full{grid-column:1/-1;}
 .field label{display:block;font-size:13px;color:#6B3FA0;font-weight:600;margin-bottom:5px;}
-.field input,.field select{width:100%;padding:10px 13px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;outline:none;background:#faf7ff;direction:rtl;}
+.field input,.field select{width:100%;padding:10px 13px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;outline:none;background:#faf7ff;direction:rtl;} .field input.ltr{direction:ltr;text-align:left;}
 .field input:focus,.field select:focus{border-color:#6B3FA0;background:#fff;}
 .modal-actions{display:flex;gap:12px;justify-content:center;margin-top:22px;}
 .btn-save{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:11px 34px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;}
@@ -279,7 +279,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <div class="form-grid">
       <div class="field"><label>الرقم الشخصي *</label><input id="f_personal_id" placeholder="الرقم الشخصي"></div>
       <div class="field"><label>اسم الطالب *</label><input id="f_student_name" placeholder="الاسم الكامل"></div>
-      <div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX"></div>
+      <div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
       <div class="field"><label>النتيجة النهائية (تحديد المستوى 2026)</label>
         <select id="f_final_result">
           <option value="">-- اختر --</option>
@@ -291,9 +291,9 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       </div>
       <div class="field"><label>الى اين وصل الطالب 2026</label><input id="f_level_reached" placeholder="مثال: الوحدة 5 / المستوى 3"></div>
       <div class="field"><label>المدرس 2026</label><input id="f_teacher" placeholder="اسم المدرس"></div>
-      <div class="field"><label>هاتف الام</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX"></div>
-      <div class="field"><label>هاتف الاب</label><input id="f_father_phone" placeholder="+973 XXXX XXXX"></div>
-      <div class="field"><label>هاتف اخر</label><input id="f_other_phone" placeholder="+973 XXXX XXXX"></div>
+      <div class="field"><label>هاتف الام</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+      <div class="field"><label>هاتف الاب</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+      <div class="field"><label>هاتف اخر</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
       <div class="field"><label>مكان السكن</label><input id="f_residence" placeholder="المنطقة / المدينة"></div>
       <div class="field full"><label>عنوان المنزل</label><input id="f_home_address" placeholder="عنوان المنزل التفصيلي"></div>
       <div class="field"><label>الطريق</label><input id="f_road" placeholder="رقم الطريق او اسمه"></div>
