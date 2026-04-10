@@ -70,6 +70,13 @@ def init_db():
         group_link TEXT,
         session_duration TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS column_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+
     users = [
         ("admin","admin123","admin"),
         ("reception","rec123","reception"),
@@ -129,6 +136,30 @@ else:
         session_duration TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     
+    db2.execute("""CREATE TABLE IF NOT EXISTS column_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    # Seed default column labels if empty
+    if db2.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
+        default_cols = [
+            ("personal_id","الرقم الشخصي",1),("student_name","اسم الطالب",2),("whatsapp","هاتف الواتساب المعتمد",3),
+            ("class_name","الصف",4),("old_new_2026","قديم جديد 2026",5),("registration_term2_2026","تسجيل الفصل الثاني 2026",6),
+            ("group_name_student","المجموعة",7),("group_online","المجموعة (الاونلاين)",8),("final_result","النتيجة النهائية (تحديد المستوى 2026)",9),
+            ("level_reached_2026","الى اين وصل الطالب 2026",10),("suitable_level_2026","هل الطالب مناسب لهذا المستوى 2026؟",11),
+            ("books_received","استلام الكتب",12),("teacher_2026","المدرس 2026",13),
+            ("installment1","القسط الاول 2026",14),("installment2","القسط الثاني",15),("installment3","القسط الثالث",16),
+            ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
+            ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
+            ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
+        ]
+        for key,label,order in default_cols:
+            try:
+                db2.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
+            except: pass
+
     # Add new columns if they don't exist yet
     new_cols = [
         ("class_name", "TEXT"),
@@ -311,7 +342,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">إجمالي الطلبة</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ إضافة طالب</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; اضافة جدول</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ إضافة طالب</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; تعديل الجدول</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الرقم الشخصي..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">بحث</button>
@@ -435,6 +466,45 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
 </div>
+<!-- TABLE EDIT MODAL -->
+<div class="modal-bg" id="tableEditModal">
+<div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
+<h2 style="color:#E55A2B;">&#9881; تعديل الجدول</h2>
+<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #f0ebff;padding-bottom:10px;">
+<button id="tab-add-col" onclick="switchTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">➕ إضافة عمود</button>
+<button id="tab-del-col" onclick="switchTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">❌ حذف عمود</button>
+<button id="tab-edit-col" onclick="switchTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; تعديل عنوان</button>
+</div>
+<!-- Tab: Add Column -->
+<div id="panel-add-col">
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">عنوان العمود الجديد *</label><input id="new_col_label" placeholder="مثال: ملاحظات" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">إضافة عمود</button>
+</div>
+</div>
+<!-- Tab: Delete Column -->
+<div id="panel-del-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">اختر العمود للحذف *</label>
+<select id="del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">— اختر عمود —</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">⚠️ تحذير: حذف العمود يحذف جميع بياناته من كل الطلبة. لا يمكن التراجع.</div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:#e53935;" onclick="deleteColumn()">حذف العمود</button>
+</div>
+</div>
+<!-- Tab: Edit Column Label -->
+<div id="panel-edit-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">اختر العمود *</label>
+<select id="edit_col_key" onchange="fillEditLabel()" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"><option value="">— اختر عمود —</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">الاسم الجديد *</label><input id="edit_col_label" placeholder="اسم العمود" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" onclick="updateColumnLabel()">حفظ العنوان</button>
+</div>
+</div>
+<div class="modal-actions" style="margin-top:18px;justify-content:center;">
+<button class="btn-cancel" onclick="closeTableEditModal()">إغلاق</button>
+</div>
+</div>
+</div>
 <!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد طلبة من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>الرقم الشخصي، اسم الطالب، الواتساب، النتيجة، المستوى 2026، المدرس 2026، هاتف الام، هاتف الاب، هاتف اخر، السكن، العنوان، الطريق، المجمع</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeStudentExcelModal()">الغاء</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد مجموعات من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>اسم المجموعة، اسم المدرس، المستوى، المقرر الفائت، وقت الدراسة، توقيت رمضان، توقيت الاونلاين، رابط المجموعة، الحصة بالدقيقة</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeGroupExcelModal()">الغاء</button></div></div></div><div class="toast" id="toast"></div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
@@ -470,17 +540,45 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <script>
 let allStudents=[];
 let deleteTargetId=null;
+var allColumns=[];
 async function loadStudents(){
-  const res=await fetch('/api/students');
-  const data=await res.json();
-  allStudents=data.students||[];
-  renderTable(allStudents);
-  document.getElementById('totalCount').textContent=allStudents.length;
+const [sRes,cRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns')]);
+const sData=await sRes.json(); const cData=await cRes.json();
+allStudents=sData.students||[]; allColumns=cData.columns||[];
+renderTable(allStudents);
+document.getElementById('totalCount').textContent=allStudents.length;
+buildTableHeader();
+}
+function buildTableHeader(){
+var thead=document.querySelector('#studentsBody').closest('table').querySelector('thead tr');
+if(!thead)return;
+var html='<th>#</th>';
+for(var i=0;i<allColumns.length;i++){html+='<th>'+allColumns[i].col_label+'</th>';}
+html+='<th>اجراءات</th>';
+thead.innerHTML=html;
 }
 function renderTable(list){
-  const body=document.getElementById('studentsBody');
-  if(!list.length){body.innerHTML='<tr><td colspan="15" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>';return;}
-  body.innerHTML=list.map((s,i)=>{ const badge=s.final_result=='ناجح'?'badge-pass':s.final_result=='راسب'?'badge-fail':'badge-pend'; const res=s.final_result?'<span class="badge '+badge+'">'+(s.final_result)+'</span>':'-'; return '<tr><td>'+(i+1)+'</td><td><b>'+(s.personal_id||'-')+'</b></td><td class="name-cell">'+(s.student_name||'-')+'</td><td dir="ltr">'+(s.whatsapp||'-')+'</td><td>'+(s.class_name||'-')+'</td><td>'+(s.old_new_2026||'-')+'</td><td>'+(s.registration_term2_2026||'-')+'</td><td>'+(s.group_name_student||'-')+'</td><td>'+(s.group_online||'-')+'</td><td>'+res+'</td><td>'+(s.level_reached_2026||'-')+'</td><td>'+(s.suitable_level_2026||'-')+'</td><td>'+(s.books_received||'-')+'</td><td>'+(s.teacher_2026||'-')+'</td><td>'+(s.installment1||'-')+'</td><td>'+(s.installment2||'-')+'</td><td>'+(s.installment3||'-')+'</td><td>'+(s.installment4||'-')+'</td><td>'+(s.installment5||'-')+'</td><td dir="ltr">'+(s.mother_phone||'-')+'</td><td dir="ltr">'+(s.father_phone||'-')+'</td><td dir="ltr">'+(s.other_phone||'-')+'</td><td>'+(s.residence||'-')+'</td><td>'+(s.home_address||'-')+'</td><td>'+(s.road||'-')+'</td><td>'+(s.complex_name||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+s.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s.id+')">&#128465;</button></td></tr>'; }).join('');
+var body=document.getElementById('studentsBody');
+var colCount=allColumns.length+2;
+if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>';return;}
+var html='';
+for(var i=0;i<list.length;i++){
+var s2=list[i];
+var row='<tr><td>'+(i+1)+'</td>';
+for(var j=0;j<allColumns.length;j++){
+var key=allColumns[j].col_key;
+var val=s2[key]||'';
+if(key==='personal_id'){row+='<td><b>'+val+'</b></td>';}
+else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
+else if(key==='final_result'){
+var badge=val==='ناجح'?'badge-pass':val==='راسب'?'badge-fail':'badge-pend';
+row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
+}else{row+='<td>'+(val||'-')+'</td>';}
+}
+row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
+html+=row;
+}
+body.innerHTML=html;
 }
 function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
@@ -583,6 +681,70 @@ function confirmGroupDelete2(){
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
 var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="لم يتم اختيار ملف";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("الملف فارغ","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="تم قراءة "+parsed.length+" طالب. اضغط استيراد.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("الملف فارغ","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="تم قراءة "+parsed.length+" مجموعة. اضغط استيراد.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("لا توجد بيانات","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="جاري الاستيراد...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("انتهت الجلسة، سجل الدخول مجددا","#e53935");btn.disabled=false;btn.textContent="استيراد";return;}if(data.ok){closeStudentExcelModal();showToast("تم استيراد "+data.imported+" طالب بنجاح");loadStudents();}else{showToast("حدث خطا","#e53935");}btn.disabled=false;btn.textContent="استيراد";}).catch(function(){showToast("حدث خطا في الاستيراد","#e53935");btn.disabled=false;btn.textContent="استيراد";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="لم يتم اختيار ملف";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("لا توجد بيانات","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="جاري الاستيراد...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("انتهت الجلسة، سجل الدخول مجددا","#e53935");btn.disabled=false;btn.textContent="استيراد";return;}if(data.ok){closeGroupExcelModal();showToast("تم استيراد "+data.imported+" مجموعة بنجاح","#00BCD4");loadGroups2();}else{showToast("حدث خطا","#e53935");}btn.disabled=false;btn.textContent="استيراد";}).catch(function(){showToast("حدث خطا في الاستيراد","#e53935");btn.disabled=false;btn.textContent="استيراد";});}
 loadGroups2();
+function openTableEditModal(){
+  loadColumnsForEdit();
+  document.getElementById('tableEditModal').classList.add('open');
+  switchTab('add-col');
+}
+function closeTableEditModal(){document.getElementById('tableEditModal').classList.remove('open');}
+function switchTab(tab){
+  var tabs=['add-col','del-col','edit-col'];
+  for(var i=0;i<tabs.length;i++){
+    var panel=document.getElementById('panel-'+tabs[i]);
+    var btn=document.getElementById('tab-'+tabs[i]);
+    if(panel)panel.style.display=(tabs[i]===tab)?'block':'none';
+    if(btn){btn.style.background=tabs[i]===tab?'#FF6B35':'#f0ebff';btn.style.color=tabs[i]===tab?'#fff':'#6B3FA0';}
+  }
+}
+function loadColumnsForEdit(){
+  fetch('/api/columns').then(function(r){return r.json();}).then(function(data){
+    var cols=data.columns||[];
+    var delSel=document.getElementById('del_col_key');
+    var editSel=document.getElementById('edit_col_key');
+    delSel.innerHTML='<option value="">— اختر عمود —</option>';
+    editSel.innerHTML='<option value="">— اختر عمود —</option>';
+    for(var i=0;i<cols.length;i++){
+      delSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
+      editSel.innerHTML+='<option value="'+cols[i].col_key+'" data-label="'+cols[i].col_label+'">'+cols[i].col_label+'</option>';
+    }
+  });
+}
+function fillEditLabel(){
+  var sel=document.getElementById('edit_col_key');
+  var opt=sel.options[sel.selectedIndex];
+  document.getElementById('edit_col_label').value=opt?opt.getAttribute('data-label'):'';
+}
+function addColumn(){
+  var label=document.getElementById('new_col_label').value.trim();
+  if(!label){showToast('ادخل عنوان العمود','#e53935');return;}
+  var key='col_'+Date.now();
+  fetch('/api/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_key:key,col_label:label})}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
+    if(d.ok){document.getElementById('new_col_label').value='';closeTableEditModal();showToast('تم إضافة العمود بنجاح');loadStudents();}
+    else{showToast(d.error||'حدث خطا','#e53935');}
+  });
+}
+function deleteColumn(){
+  var key=document.getElementById('del_col_key').value;
+  if(!key){showToast('اختر عمودا','#e53935');return;}
+  if(!confirm('هل أنت متأكد من حذف هذا العمود؟ سيتم حذف جميع بياناته.'))return;
+  fetch('/api/columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('تم حذف العمود');loadStudents();}
+    else{showToast(d.error||'حدث خطا','#e53935');}
+  });
+}
+function updateColumnLabel(){
+  var key=document.getElementById('edit_col_key').value;
+  var label=document.getElementById('edit_col_label').value.trim();
+  if(!key||!label){showToast('اختر عمودا وادخل الاسم','#e53935');return;}
+  fetch('/api/columns/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('تم تعديل العنوان');loadStudents();}
+    else{showToast(d.error||'حدث خطا','#e53935');}
+  });
+}
+
 </script>
 </body>
 </html>"""
@@ -727,6 +889,68 @@ def api_groups_bulk():
             errors.append(str(ex))
     db.commit()
     return jsonify({"ok": True, "imported": ok_count, "errors": len(errors)})
+
+@app.route("/api/columns", methods=["GET"])
+@login_required
+def api_columns_get():
+    db = get_db()
+    rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM column_labels ORDER BY col_order").fetchall()
+    return jsonify({"columns": [dict(r) for r in rows]})
+
+@app.route("/api/columns", methods=["POST"])
+@login_required
+def api_columns_add():
+    d = request.get_json()
+    col_key = d.get("col_key","").strip().replace(" ","_").lower()
+    col_label = d.get("col_label","").strip()
+    if not col_key or not col_label:
+        return jsonify({"ok":False,"error":"missing data"}),400
+    db = get_db()
+    try:
+        max_order = db.execute("SELECT MAX(col_order) FROM column_labels").fetchone()[0] or 0
+        db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,max_order+1))
+        db.execute("ALTER TABLE students ADD COLUMN "+col_key+" TEXT")
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/columns/<col_key>", methods=["DELETE"])
+@login_required
+def api_columns_delete(col_key):
+    db = get_db()
+    try:
+        # SQLite doesn't support DROP COLUMN directly (before 3.35), rebuild table
+        rows = db.execute("SELECT col_key FROM column_labels ORDER BY col_order").fetchall()
+        remaining = [r[0] for r in rows if r[0] != col_key]
+        # Get all columns in students table
+        pragma = db.execute("PRAGMA table_info(students)").fetchall()
+        all_cols = [r[1] for r in pragma]
+        keep_cols = [c2 for c2 in all_cols if c2 != col_key]
+        cols_str = ",".join(keep_cols)
+        db.execute("CREATE TABLE students_backup AS SELECT "+cols_str+" FROM students")
+        db.execute("DROP TABLE students")
+        db.execute("ALTER TABLE students_backup RENAME TO students")
+        db.execute("DELETE FROM column_labels WHERE col_key=?",(col_key,))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/columns/<col_key>", methods=["PUT"])
+@login_required
+def api_columns_update(col_key):
+    d = request.get_json()
+    new_label = d.get("col_label","").strip()
+    if not new_label:
+        return jsonify({"ok":False,"error":"missing label"}),400
+    db = get_db()
+    try:
+        db.execute("UPDATE column_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
 
 GROUPS_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
