@@ -343,6 +343,78 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- ========== GROUPS TABLE SECTION ========== -->
+<div style="margin-top:40px;">
+  <div class="page-title" style="color:#0097A7;font-size:20px;font-weight:800;margin-bottom:16px;">&#128101; معلومات المجموعات (يدوي)</div>
+  <div class="stats" id="groupsStats">
+    <div class="stat-card">
+      <span class="stat-num" id="groupsTotalCount">0</span>
+      <span class="stat-label">إجمالي المجموعات</span>
+    </div>
+  </div>
+  <button class="btn-add" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal()">+ إضافة مجموعة</button>
+  <div class="search-bar">
+    <input type="text" id="groupSearchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterGroupTable()">
+    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable()">بحث</button>
+  </div>
+  <div class="table-wrap" style="border-radius:14px;overflow-x:auto;">
+    <table style="min-width:1300px;">
+      <thead>
+        <tr style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
+          <th>#</th>
+          <th>اسم المجموعة</th>
+          <th>اسم المدرس</th>
+          <th>المستوى / المقرر</th>
+          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th>
+          <th>وقت الدراسة</th>
+          <th>توقيت شهر رمضان</th>
+          <th>توقيت الاونلاين (العادي)</th>
+          <th>رابط المجموعة</th>
+          <th>الحصة بالدقيقة (يدوي)</th>
+          <th>اجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="groupsBody">
+        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Groups Add/Edit Modal -->
+<div class="modal-bg" id="groupModal">
+  <div class="modal" style="border-top:4px solid #00BCD4;">
+    <h2 id="groupModalTitle" style="color:#0097A7;">اضافة مجموعة جديدة</h2>
+    <input type="hidden" id="groupEditId">
+    <div class="form-grid">
+      <div class="field"><label style="color:#0097A7;">اسم المجموعة *</label><input id="gf_group_name" placeholder="اسم المجموعة" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">اسم المدرس *</label><input id="gf_teacher_name" placeholder="اسم المدرس" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">المستوى / المقرر</label><input id="gf_level_course" placeholder="مثال: المستوى 3 - كتاب A" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">المقرر الذي تم الوصول اليه الفصل الفائت</label><input id="gf_last_reached" placeholder="مثال: الوحدة 5 - الدرس 3" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">وقت الدراسة</label><input id="gf_study_time" placeholder="مثال: السبت والاثنين 4-5 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">توقيت شهر رمضان</label><input id="gf_ramadan_time" placeholder="مثال: 8-9 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">توقيت الاونلاين (العادي)</label><input id="gf_online_time" placeholder="مثال: 5-6 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">رابط المجموعة</label><input id="gf_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field full"><label style="color:#0097A7;">الحصة بالدقيقة (يدوي)</label><input id="gf_session_duration" placeholder="مثال: 60 دقيقة" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="saveGroup()">حفظ</button>
+      <button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupModal()">الغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Groups Confirm Delete Modal -->
+<div class="confirm-bg" id="groupConfirmModal">
+  <div class="confirm-box">
+    <h3>تاكيد الحذف</h3>
+    <p>هل انت متاكد انك تريد حذف هذه المجموعة؟ لا يمكن التراجع عن هذا الاجراء.</p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-del" id="groupConfirmDelBtn">حذف</button>
+      <button class="btn-confirm-cancel" onclick="closeGroupConfirm()">الغاء</button>
+    </div>
+  </div>
+</div>
 <script>
 let allStudents=[];
 let deleteTargetId=null;
@@ -540,7 +612,84 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .main{padding:24px 28px;}
 .page-title{font-size:22px;font-weight:800;color:#0097A7;margin-bottom:20px;}
 .stats{display:flex;gap:14px;margin-bottom:22px;}
-.stat-card{background:#fff;border-radius:12px;padding:14px 22px;box-shadow:0 2px 10px rgba(0,150,180,.1);display:flex;flex-direction:column;align-items:center;min-width:120px;}
+.stat-card{background:#fff;border-radius:12px;padding:14px 22px;box
+
+// ===== Groups Table Logic =====
+let allGroups=[];
+let groupDeleteTargetId=null;
+async function loadGroups(){
+  const res=await fetch('/api/groups');
+  const data=await res.json();
+  allGroups=data.groups||[];
+  renderGroupTable(allGroups);
+  document.getElementById('groupsTotalCount').textContent=allGroups.length;
+}
+function renderGroupTable(list){
+  const body=document.getElementById('groupsBody');
+  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>';return;}
+  body.innerHTML=list.map((g,i)=>{
+    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank" style="color:#00BCD4;font-weight:600;">فتح الرابط</a>':'-';
+    return '<tr><td>'+(i+1)+'</td><td style="font-weight:600;color:#0097A7;text-align:right;">'+(g.group_name||'-')+'</td><td>'+(g.teacher_name||'-')+'</td><td>'+(g.level_course||'-')+'</td><td>'+(g.last_reached||'-')+'</td><td>'+(g.study_time||'-')+'</td><td>'+(g.ramadan_time||'-')+'</td><td>'+(g.online_time||'-')+'</td><td>'+link+'</td><td>'+(g.session_duration||'-')+'</td><td><button class="action-btn btn-edit" style="color:#0097A7;" onclick="openGroupEdit('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askGroupDelete('+g.id+')">&#128465;</button></td></tr>';
+  }).join('');
+}
+function filterGroupTable(){
+  const q=document.getElementById('groupSearchInput').value.toLowerCase();
+  renderGroupTable(allGroups.filter(g=>(g.group_name||'').toLowerCase().includes(q)||(g.teacher_name||'').toLowerCase().includes(q)));
+}
+function clearGroupForm(){
+  ['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration'].forEach(k=>{const el=document.getElementById('gf_'+k);if(el)el.value='';});
+  document.getElementById('groupEditId').value='';
+}
+function openAddGroupModal(){clearGroupForm();document.getElementById('groupModalTitle').textContent='اضافة مجموعة جديدة';document.getElementById('groupModal').classList.add('open');}
+function openGroupEdit(id){
+  const g=allGroups.find(x=>x.id===id);if(!g)return;
+  document.getElementById('groupEditId').value=id;
+  document.getElementById('groupModalTitle').textContent='تعديل بيانات المجموعة';
+  document.getElementById('gf_group_name').value=g.group_name||'';
+  document.getElementById('gf_teacher_name').value=g.teacher_name||'';
+  document.getElementById('gf_level_course').value=g.level_course||'';
+  document.getElementById('gf_last_reached').value=g.last_reached||'';
+  document.getElementById('gf_study_time').value=g.study_time||'';
+  document.getElementById('gf_ramadan_time').value=g.ramadan_time||'';
+  document.getElementById('gf_online_time').value=g.online_time||'';
+  document.getElementById('gf_group_link').value=g.group_link||'';
+  document.getElementById('gf_session_duration').value=g.session_duration||'';
+  document.getElementById('groupModal').classList.add('open');
+}
+function closeGroupModal(){document.getElementById('groupModal').classList.remove('open');}
+async function saveGroup(){
+  const editId=document.getElementById('groupEditId').value;
+  const body={
+    group_name:document.getElementById('gf_group_name').value.trim(),
+    teacher_name:document.getElementById('gf_teacher_name').value.trim(),
+    level_course:document.getElementById('gf_level_course').value.trim(),
+    last_reached:document.getElementById('gf_last_reached').value.trim(),
+    study_time:document.getElementById('gf_study_time').value.trim(),
+    ramadan_time:document.getElementById('gf_ramadan_time').value.trim(),
+    online_time:document.getElementById('gf_online_time').value.trim(),
+    group_link:document.getElementById('gf_group_link').value.trim(),
+    session_duration:document.getElementById('gf_session_duration').value.trim(),
+  };
+  if(!body.group_name){showToast('اسم المجموعة مطلوب','#e53935');return;}
+  const url=editId?'/api/groups/'+editId:'/api/groups';
+  const method=editId?'PUT':'POST';
+  const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+  const data=await res.json();
+  if(data.ok){closeGroupModal();showToast(editId?'تم تعديل المجموعة بنجاح':'تم اضافة المجموعة بنجاح','#00BCD4');loadGroups();}
+  else{showToast(data.error||'حدث خطا','#e53935');}
+}
+function askGroupDelete(id){groupDeleteTargetId=id;document.getElementById('groupConfirmModal').classList.add('open');document.getElementById('groupConfirmDelBtn').onclick=confirmGroupDelete;}
+async function confirmGroupDelete(){
+  if(!groupDeleteTargetId)return;
+  const res=await fetch('/api/groups/'+groupDeleteTargetId,{method:'DELETE',credentials:'include'});
+  const data=await res.json();
+  closeGroupConfirm();
+  if(data.ok){showToast('تم حذف المجموعة بنجاح','#00BCD4');loadGroups();}
+  else{showToast(data.error||'حدث خطا في الحذف','#e53935');}
+  groupDeleteTargetId=null;
+}
+function closeGroupConfirm(){document.getElementById('groupConfirmModal').classList.remove('open');}
+loadGroups();-shadow:0 2px 10px rgba(0,150,180,.1);display:flex;flex-direction:column;align-items:center;min-width:120px;}
 .stat-num{font-size:28px;font-weight:800;color:#00BCD4;}
 .stat-label{font-size:12px;color:#888;margin-top:2px;}
 .btn-add{background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;border:none;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:20px;display:inline-flex;align-items:center;gap:8px;}
