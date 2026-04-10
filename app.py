@@ -324,7 +324,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
           <th>الرقم الشخصي</th>
           <th>اسم الطالب</th>
           <th>هاتف الواتساب المعتمد</th>
-          <th>اسم الصف</th>
+          <th>الصف</th>
           <th>قديم جديد 2026</th>
           <th>تسجيل الفصل الثاني 2026</th>
           <th>المجموعة</th>
@@ -394,7 +394,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <div class="field"><label>الرقم الشخصي *</label><input id="f_personal_id" placeholder="الرقم الشخصي"></div>
 <div class="field"><label>اسم الطالب *</label><input id="f_student_name" placeholder="الاسم الكامل"></div>
 <div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>اسم الصف</label><input id="f_class_name" placeholder="مثال: صف A"></div>
+<div class="field"><label>الصف</label><input id="f_class_name" placeholder="مثال: صف A"></div>
 <div class="field"><label>قديم جديد 2026</label><input id="f_old_new_2026" placeholder="قديم أو جديد"></div>
 <div class="field"><label>تسجيل الفصل الثاني 2026</label><input id="f_registration_term2_2026" placeholder="نعم / لا"></div>
 <div class="field"><label>المجموعة</label><input id="f_group_name_student" placeholder="اسم المجموعة"></div>
