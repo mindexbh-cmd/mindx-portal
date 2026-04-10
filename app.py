@@ -478,6 +478,19 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- Tab: Add Column -->
 <div id="panel-add-col">
 <div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">عنوان العمود الجديد *</label><input id="new_col_label" placeholder="مثال: ملاحظات" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;">
+  <label style="color:#E55A2B;">موقع العمود الجديد</label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <select id="new_col_position" onchange="togglePositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
+      <option value="end">في النهاية</option>
+      <option value="start">في البداية</option>
+      <option value="after">بعد عمود:</option>
+    </select>
+    <select id="new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;">
+      <option value="">— اختر العمود —</option>
+    </select>
+  </div>
+</div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
 <button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">إضافة عمود</button>
 </div>
@@ -701,11 +714,14 @@ function loadColumnsForEdit(){
     var cols=data.columns||[];
     var delSel=document.getElementById('del_col_key');
     var editSel=document.getElementById('edit_col_key');
+    var afterSel=document.getElementById('new_col_after');
     delSel.innerHTML='<option value="">— اختر عمود —</option>';
     editSel.innerHTML='<option value="">— اختر عمود —</option>';
+    afterSel.innerHTML='<option value="">— اختر العمود —</option>';
     for(var i=0;i<cols.length;i++){
       delSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
       editSel.innerHTML+='<option value="'+cols[i].col_key+'" data-label="'+cols[i].col_label+'">'+cols[i].col_label+'</option>';
+      afterSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
     }
   });
 }
@@ -714,13 +730,22 @@ function fillEditLabel(){
   var opt=sel.options[sel.selectedIndex];
   document.getElementById('edit_col_label').value=opt?opt.getAttribute('data-label'):'';
 }
+function togglePositionCol(){
+  var posVal=document.getElementById('new_col_position').value;
+  var afterSel=document.getElementById('new_col_after');
+  if(afterSel) afterSel.style.display=(posVal==='after')?'block':'none';
+}
 function addColumn(){
   var label=document.getElementById('new_col_label').value.trim();
   if(!label){showToast('ادخل عنوان العمود','#e53935');return;}
+  var posVal=document.getElementById('new_col_position').value;
+  var afterCol=document.getElementById('new_col_after').value;
   var key='col_'+Date.now();
-  fetch('/api/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_key:key,col_label:label})}).then(function(r){return r.text();}).then(function(txt){
+  var payload={col_key:key,col_label:label,position:posVal};
+  if(posVal==='after'&&afterCol){payload.after_col=afterCol;}
+  fetch('/api/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)}).then(function(r){return r.text();}).then(function(txt){
     var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
-    if(d.ok){document.getElementById('new_col_label').value='';closeTableEditModal();showToast('تم إضافة العمود بنجاح');loadStudents();}
+    if(d.ok){document.getElementById('new_col_label').value='';document.getElementById('new_col_position').value='end';togglePositionCol();closeTableEditModal();showToast('تم إضافة العمود بنجاح');loadStudents();}
     else{showToast(d.error||'حدث خطا','#e53935');}
   });
 }
@@ -927,18 +952,36 @@ def api_columns_add():
     d = request.get_json()
     col_key = d.get("col_key","").strip().replace(" ","_").lower()
     col_label = d.get("col_label","").strip()
+    position = d.get("position","end")
+    after_col = d.get("after_col","")
     if not col_key or not col_label:
         return jsonify({"ok":False,"error":"missing data"}),400
     db = get_db()
     try:
-        max_order = db.execute("SELECT MAX(col_order) FROM column_labels").fetchone()[0] or 0
-        db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,max_order+1))
+        all_cols = db.execute("SELECT col_key,col_order FROM column_labels ORDER BY col_order").fetchall()
+        if position == "start":
+            new_order = 0
+            for row in all_cols:
+                db.execute("UPDATE column_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+        elif position == "after" and after_col:
+            after_row = db.execute("SELECT col_order FROM column_labels WHERE col_key=?", (after_col,)).fetchone()
+            if after_row:
+                new_order = after_row[0] + 1
+                for row in all_cols:
+                    if row[1] >= new_order:
+                        db.execute("UPDATE column_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+            else:
+                max_order = db.execute("SELECT MAX(col_order) FROM column_labels").fetchone()[0] or 0
+                new_order = max_order + 1
+        else:
+            max_order = db.execute("SELECT MAX(col_order) FROM column_labels").fetchone()[0] or 0
+            new_order = max_order + 1
+        db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,new_order))
         db.execute("ALTER TABLE students ADD COLUMN "+col_key+" TEXT")
         db.commit()
         return jsonify({"ok":True})
     except Exception as ex:
         return jsonify({"ok":False,"error":str(ex)}),400
-
 @app.route("/api/columns/<col_key>", methods=["DELETE"])
 @login_required
 def api_columns_delete(col_key):
