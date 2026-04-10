@@ -1,6 +1,18 @@
 from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
-from functools import wraps
+
+    db2.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
@@ -395,7 +407,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">إجمالي المجموعات</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ إضافة مجموعة</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; اضافة جدول</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ إضافة مجموعة</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; تعديل الجدول</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">بحث</button>
@@ -403,7 +415,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   <div class="table-wrap">
     <table style="min-width:1300px;">
       <thead>
-        <tr style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
+        <tr id="groupsTheadRow" style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
           <th>#</th><th>اسم المجموعة</th><th>اسم المدرس</th><th>المستوى / المقرر</th>
           <th>المقرر الذي تم الوصول اليه الفصل الفائت</th><th>وقت الدراسة</th>
           <th>توقيت شهر رمضان</th><th>توقيت الاونلاين (العادي)</th>
@@ -550,6 +562,48 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
 </div>
+<!-- GROUP TABLE EDIT MODAL -->
+<div class="modal-bg" id="groupTableEditModal">
+<div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
+<h2 style="color:#E55A2B;">&#9881; تعديل جدول المجموعات</h2>
+<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e0f7fa;padding-bottom:10px;">
+<button id="gtab-add-col" onclick="switchGroupTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#1573;&#1590;&#1575;&#1601;&#1577; &#1593;&#1605;&#1608;&#1583;</button>
+<button id="gtab-del-col" onclick="switchGroupTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f7fa;color:#0097A7;font-weight:700;cursor:pointer;font-size:13px;">&#10060; &#1581;&#1584;&#1601; &#1593;&#1605;&#1608;&#1583;</button>
+<button id="gtab-edit-col" onclick="switchGroupTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f7fa;color:#0097A7;font-weight:700;cursor:pointer;font-size:13px;">&#9998; &#1578;&#1593;&#1583;&#1610;&#1604; &#1593;&#1606;&#1608;&#1575;&#1606;</button>
+</div>
+<div id="gpanel-add-col">
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#1593;&#1606;&#1608;&#1575;&#1606; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1575;&#1604;&#1580;&#1583;&#1610;&#1583; *</label><input id="g_new_col_label" placeholder="&#1605;&#1579;&#1575;&#1604;: &#1605;&#1604;&#1575;&#1581;&#1592;&#1575;&#1578;" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#1605;&#1608;&#1602;&#1593; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1575;&#1604;&#1580;&#1583;&#1610;&#1583;</label>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+<select id="g_new_col_position" onchange="toggleGroupPositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
+<option value="end">&#1601;&#1610; &#1575;&#1604;&#1606;&#1607;&#1575;&#1610;&#1577;</option>
+<option value="start">&#1601;&#1610; &#1575;&#1604;&#1576;&#1583;&#1575;&#1610;&#1577;</option>
+<option value="after">&#1576;&#1593;&#1583; &#1593;&#1605;&#1608;&#1583;:</option>
+</select>
+<select id="g_new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;"><option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#8212;</option></select>
+</div></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addGroupColumn()">&#1573;&#1590;&#1575;&#1601;&#1577; &#1593;&#1605;&#1608;&#1583;</button>
+</div></div>
+<div id="gpanel-del-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">&#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1604;&#1604;&#1581;&#1584;&#1601; *</label>
+<select id="g_del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583; &#8212;</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">&#9888; &#1578;&#1581;&#1584;&#1610;&#1585;: &#1581;&#1584;&#1601; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1610;&#1581;&#1584;&#1601; &#1580;&#1605;&#1610;&#1593; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1607; &#1605;&#1606; &#1603;&#1604; &#1575;&#1604;&#1605;&#1580;&#1605;&#1608;&#1593;&#1575;&#1578;. &#1604;&#1575; &#1610;&#1605;&#1603;&#1606; &#1575;&#1604;&#1578;&#1585;&#1575;&#1580;&#1593;.</div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:#e53935;" onclick="deleteGroupColumn()">&#1581;&#1584;&#1601; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;</button>
+</div></div>
+<div id="gpanel-edit-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#0097A7;">&#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; *</label>
+<select id="g_edit_col_key" onchange="fillGroupEditLabel()" style="width:100%;padding:10px;border:1.5px solid #b2ebf2;border-radius:9px;font-size:14px;background:#f0fdff;"><option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583; &#8212;</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#0097A7;">&#1575;&#1604;&#1575;&#1587;&#1605; &#1575;&#1604;&#1580;&#1583;&#1610;&#1583; *</label><input id="g_edit_col_label" placeholder="&#1575;&#1587;&#1605; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;" style="width:100%;padding:10px;border:1.5px solid #b2ebf2;border-radius:9px;font-size:14px;background:#f0fdff;"></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="updateGroupColumnLabel()">&#1581;&#1601;&#1592; &#1575;&#1604;&#1593;&#1606;&#1608;&#1575;&#1606;</button>
+</div></div>
+<div class="modal-actions" style="margin-top:18px;justify-content:center;">
+<button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupTableEditModal()">&#1573;&#1594;&#1604;&#1575;&#1602;</button>
+</div>
+</div>
+</div>
 <script>
 let allStudents=[];
 let deleteTargetId=null;
@@ -615,20 +669,41 @@ loadStudents();
 var allGroups2=[];
 var groupDeleteTargetId2=null;
 function loadGroups2(){
-  fetch('/api/groups',{credentials:'include'}).then(function(r){return r.json();}).then(function(data){
-    allGroups2=data.groups||[];
+  Promise.all([fetch('/api/groups',{credentials:'include'}),fetch('/api/group-columns',{credentials:'include'})]).then(function(rs){
+    return Promise.all([rs[0].json(),rs[1].json()]);
+  }).then(function(results){
+    allGroups2=results[0].groups||[];
+    allGroupColumns=results[1].columns||[];
+    buildGroupTableHeader();
     renderGroupTable2(allGroups2);
     document.getElementById('groupsTotalCount').textContent=allGroups2.length;
   }).catch(function(){});
 }
+function buildGroupTableHeader(){
+  var thead=document.getElementById('groupsTheadRow');
+  if(!thead)return;
+  var html='<th>#</th>';
+  for(var i=0;i<allGroupColumns.length;i++){html+='<th>'+allGroupColumns[i].col_label+'</th>';}
+  html+='<th>&#1575;&#1580;&#1585;&#1575;&#1569;&#1575;&#1578;</th>';
+  thead.innerHTML=html;
+}
 function renderGroupTable2(list){
   var body=document.getElementById('groupsBody2');
-  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>';return;}
+  var colCount=allGroupColumns.length+2;
+  if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';return;}
   var html='';
   for(var i=0;i<list.length;i++){
     var g=list[i];
-    var link=g.group_link?'<a href="'+g.group_link+'" target="_blank" style="color:#00BCD4;">فتح</a>':'-';
-    html+='<tr><td>'+(i+1)+'</td><td style="font-weight:600;color:#0097A7;text-align:right;">'+(g.group_name||'-')+'</td><td>'+(g.teacher_name||'-')+'</td><td>'+(g.level_course||'-')+'</td><td>'+(g.last_reached||'-')+'</td><td>'+(g.study_time||'-')+'</td><td>'+(g.ramadan_time||'-')+'</td><td>'+(g.online_time||'-')+'</td><td>'+link+'</td><td>'+(g.session_duration||'-')+'</td><td><button class="action-btn btn-edit" style="color:#0097A7;" onclick="openGroupEdit2('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askGroupDelete2('+g.id+')">&#128465;</button></td></tr>';
+    var row='<tr><td>'+(i+1)+'</td>';
+    for(var j=0;j<allGroupColumns.length;j++){
+      var key=allGroupColumns[j].col_key;
+      var val=g[key]||'';
+      if(key==='group_name'){row+='<td style="font-weight:600;color:#0097A7;text-align:right;">'+val+'</td>';}
+      else if(key==='group_link'){row+='<td>'+(val?'<a href="'+val+'" target="_blank" style="color:#00BCD4;">&#1601;&#1578;&#1581;</a>':'-')+'</td>';}
+      else{row+='<td>'+(val||'-')+'</td>';}
+    }
+    row+='<td><button class="action-btn btn-edit" style="color:#0097A7;" onclick="openGroupEdit2('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askGroupDelete2('+g.id+')">&#128465;</button></td></tr>';
+    html+=row;
   }
   body.innerHTML=html;
 }
@@ -770,6 +845,84 @@ function updateColumnLabel(){
   });
 }
 
+
+var allGroupColumns=[];
+function openGroupTableEditModal(){
+  loadGroupColumnsForEdit();
+  document.getElementById('groupTableEditModal').classList.add('open');
+  switchGroupTab('add-col');
+}
+function closeGroupTableEditModal(){document.getElementById('groupTableEditModal').classList.remove('open');}
+function switchGroupTab(tab){
+  var tabs=['add-col','del-col','edit-col'];
+  for(var i=0;i<tabs.length;i++){
+    var panel=document.getElementById('gpanel-'+tabs[i]);
+    var btn=document.getElementById('gtab-'+tabs[i]);
+    if(panel)panel.style.display=(tabs[i]===tab)?'block':'none';
+    if(btn){btn.style.background=tabs[i]===tab?'#FF6B35':'#e0f7fa';btn.style.color=tabs[i]===tab?'#fff':'#0097A7';}
+  }
+}
+function loadGroupColumnsForEdit(){
+  fetch('/api/group-columns',{credentials:'include'}).then(function(r){return r.json();}).then(function(data){
+    var cols=data.columns||[];
+    var delSel=document.getElementById('g_del_col_key');
+    var editSel=document.getElementById('g_edit_col_key');
+    var afterSel=document.getElementById('g_new_col_after');
+    if(delSel)delSel.innerHTML='<option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583; &#8212;</option>';
+    if(editSel)editSel.innerHTML='<option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583; &#8212;</option>';
+    if(afterSel)afterSel.innerHTML='<option value="">&#8212; &#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#8212;</option>';
+    for(var i=0;i<cols.length;i++){
+      if(delSel)delSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
+      if(editSel)editSel.innerHTML+='<option value="'+cols[i].col_key+'" data-label="'+cols[i].col_label+'">'+cols[i].col_label+'</option>';
+      if(afterSel)afterSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
+    }
+  });
+}
+function fillGroupEditLabel(){
+  var sel=document.getElementById('g_edit_col_key');
+  var opt=sel.options[sel.selectedIndex];
+  var lbl=document.getElementById('g_edit_col_label');
+  if(lbl)lbl.value=opt?opt.getAttribute('data-label'):'';
+}
+function toggleGroupPositionCol(){
+  var posVal=document.getElementById('g_new_col_position').value;
+  var afterSel=document.getElementById('g_new_col_after');
+  if(afterSel)afterSel.style.display=(posVal==='after')?'block':'none';
+}
+function addGroupColumn(){
+  var label=document.getElementById('g_new_col_label').value.trim();
+  if(!label){showToast('&#1575;&#1583;&#1582;&#1604; &#1593;&#1606;&#1608;&#1575;&#1606; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;','#e53935');return;}
+  var posVal=document.getElementById('g_new_col_position').value;
+  var afterCol=document.getElementById('g_new_col_after').value;
+  var key='gcol_'+Date.now();
+  var payload={col_key:key,col_label:label,position:posVal};
+  if(posVal==='after'&&afterCol){payload.after_col=afterCol;}
+  fetch('/api/group-columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
+    if(d.ok){document.getElementById('g_new_col_label').value='';document.getElementById('g_new_col_position').value='end';toggleGroupPositionCol();closeGroupTableEditModal();showToast('&#1578;&#1605; &#1573;&#1590;&#1575;&#1601;&#1577; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1576;&#1606;&#1580;&#1575;&#1581;','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+  });
+}
+function deleteGroupColumn(){
+  var key=document.getElementById('g_del_col_key').value;
+  if(!key){showToast('&#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583;&#1575;','#e53935');return;}
+  if(!confirm('&#1607;&#1604; &#1571;&#1606;&#1578; &#1605;&#1578;&#1571;&#1603;&#1583; &#1605;&#1606; &#1581;&#1584;&#1601; &#1607;&#1584;&#1575; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;&#1567;'))return;
+  fetch('/api/group-columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
+    if(d.ok){closeGroupTableEditModal();showToast('&#1578;&#1605; &#1581;&#1584;&#1601; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+  });
+}
+function updateGroupColumnLabel(){
+  var key=document.getElementById('g_edit_col_key').value;
+  var label=document.getElementById('g_edit_col_label').value.trim();
+  if(!key||!label){showToast('&#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583;&#1575; &#1608;&#1575;&#1583;&#1582;&#1604; &#1575;&#1604;&#1575;&#1587;&#1605;','#e53935');return;}
+  fetch('/api/group-columns/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})}).then(function(r){return r.text();}).then(function(txt){
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
+    if(d.ok){closeGroupTableEditModal();showToast('&#1578;&#1605; &#1578;&#1593;&#1583;&#1610;&#1604; &#1575;&#1604;&#1593;&#1606;&#1608;&#1575;&#1606;','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+  });
+}
 </script>
 </body>
 </html>"""
@@ -1014,6 +1167,103 @@ def api_columns_update(col_key):
     db = get_db()
     try:
         db.execute("UPDATE column_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/group-columns", methods=["GET"])
+@login_required
+def api_group_columns_get():
+    db = get_db()
+    db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    if db.execute("SELECT COUNT(*) FROM group_col_labels").fetchone()[0] == 0:
+        default_cols = [
+            ("group_name","اسم المجموعة",1),("teacher_name","اسم المدرس",2),
+            ("level_course","المستوى / المقرر",3),("last_reached","المقرر الذي تم الوصول اليه الفصل الفائت",4),
+            ("study_time","وقت الدراسة",5),("ramadan_time","توقيت شهر رمضان",6),
+            ("online_time","توقيت الاونلاين (العادي)",7),("group_link","رابط المجموعة",8),
+            ("session_duration","الحصة بالدقيقة (يدوي)",9),
+        ]
+        for key,label,order in default_cols:
+            try:
+                db.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
+            except:
+                pass
+        db.commit()
+    rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM group_col_labels ORDER BY col_order").fetchall()
+    return jsonify({"columns": [dict(r) for r in rows]})
+
+@app.route("/api/group-columns", methods=["POST"])
+@login_required
+def api_group_columns_add():
+    d = request.get_json()
+    col_key = d.get("col_key","").strip().replace(" ","_").lower()
+    col_label = d.get("col_label","").strip()
+    position = d.get("position","end")
+    after_col = d.get("after_col","")
+    if not col_key or not col_label:
+        return jsonify({"ok":False,"error":"missing data"}),400
+    db = get_db()
+    try:
+        all_cols = db.execute("SELECT col_key,col_order FROM group_col_labels ORDER BY col_order").fetchall()
+        if position == "start":
+            new_order = 0
+            for row in all_cols:
+                db.execute("UPDATE group_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+        elif position == "after" and after_col:
+            after_row = db.execute("SELECT col_order FROM group_col_labels WHERE col_key=?", (after_col,)).fetchone()
+            if after_row:
+                new_order = after_row[0] + 1
+                for row in all_cols:
+                    if row[1] >= new_order:
+                        db.execute("UPDATE group_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+            else:
+                max_order = db.execute("SELECT MAX(col_order) FROM group_col_labels").fetchone()[0] or 0
+                new_order = max_order + 1
+        else:
+            max_order = db.execute("SELECT MAX(col_order) FROM group_col_labels").fetchone()[0] or 0
+            new_order = max_order + 1
+        db.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,new_order))
+        db.execute("ALTER TABLE student_groups ADD COLUMN "+col_key+" TEXT")
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/group-columns/<col_key>", methods=["DELETE"])
+@login_required
+def api_group_columns_delete(col_key):
+    db = get_db()
+    try:
+        pragma = db.execute("PRAGMA table_info(student_groups)").fetchall()
+        all_cols = [r[1] for r in pragma]
+        keep_cols = [c for c in all_cols if c != col_key]
+        cols_str = ",".join(keep_cols)
+        db.execute("CREATE TABLE student_groups_backup AS SELECT "+cols_str+" FROM student_groups")
+        db.execute("DROP TABLE student_groups")
+        db.execute("ALTER TABLE student_groups_backup RENAME TO student_groups")
+        db.execute("DELETE FROM group_col_labels WHERE col_key=?",(col_key,))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/group-columns/<col_key>", methods=["PUT"])
+@login_required
+def api_group_columns_update(col_key):
+    d = request.get_json()
+    new_label = d.get("col_label","").strip()
+    if not new_label:
+        return jsonify({"ok":False,"error":"missing label"}),400
+    db = get_db()
+    try:
+        db.execute("UPDATE group_col_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
         db.commit()
         return jsonify({"ok":True})
     except Exception as ex:
