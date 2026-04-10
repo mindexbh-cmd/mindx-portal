@@ -35,9 +35,21 @@ def init_db():
         personal_id TEXT UNIQUE,
         student_name TEXT,
         whatsapp TEXT,
+        class_name TEXT,
+        old_new_2026 TEXT,
+        registration_term2_2026 TEXT,
+        group_name_student TEXT,
+        group_online TEXT,
         final_result TEXT,
         level_reached_2026 TEXT,
+        suitable_level_2026 TEXT,
+        books_received TEXT,
         teacher_2026 TEXT,
+        installment1 TEXT,
+        installment2 TEXT,
+        installment3 TEXT,
+        installment4 TEXT,
+        installment5 TEXT,
         mother_phone TEXT,
         father_phone TEXT,
         other_phone TEXT,
@@ -81,9 +93,21 @@ else:
         personal_id TEXT UNIQUE,
         student_name TEXT,
         whatsapp TEXT,
+        class_name TEXT,
+        old_new_2026 TEXT,
+        registration_term2_2026 TEXT,
+        group_name_student TEXT,
+        group_online TEXT,
         final_result TEXT,
         level_reached_2026 TEXT,
+        suitable_level_2026 TEXT,
+        books_received TEXT,
         teacher_2026 TEXT,
+        installment1 TEXT,
+        installment2 TEXT,
+        installment3 TEXT,
+        installment4 TEXT,
+        installment5 TEXT,
         mother_phone TEXT,
         father_phone TEXT,
         other_phone TEXT,
@@ -104,6 +128,26 @@ else:
         group_link TEXT,
         session_duration TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    
+    # Add new columns if they don't exist yet
+    new_cols = [
+        ("class_name", "TEXT"),
+        ("old_new_2026", "TEXT"),
+        ("registration_term2_2026", "TEXT"),
+        ("group_name_student", "TEXT"),
+        ("group_online", "TEXT"),
+        ("suitable_level_2026", "TEXT"),
+        ("books_received", "TEXT"),
+        ("installment1", "TEXT"),
+        ("installment2", "TEXT"),
+        ("installment3", "TEXT"),
+        ("installment4", "TEXT"),
+        ("installment5", "TEXT"),
+    ]
+    existing = [row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()]
+    for col, coltype in new_cols:
+        if col not in existing:
+            db2.execute("ALTER TABLE students ADD COLUMN " + col + " " + coltype)
     db2.commit()
     db2.close()
 
@@ -209,7 +253,7 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
 .table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;}
-table{width:100%;border-collapse:collapse;min-width:1400px;}
+table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
 tbody tr{border-bottom:1px solid #f0ebff;transition:background .15s;}
@@ -280,9 +324,21 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
           <th>الرقم الشخصي</th>
           <th>اسم الطالب</th>
           <th>هاتف الواتساب المعتمد</th>
+          <th>اسم الصف</th>
+          <th>قديم جديد 2026</th>
+          <th>تسجيل الفصل الثاني 2026</th>
+          <th>المجموعة</th>
+          <th>المجموعة (الاونلاين)</th>
           <th>النتيجة النهائية (تحديد المستوى 2026)</th>
           <th>الى اين وصل الطالب 2026</th>
+          <th>هل الطالب مناسب لهذا المستوى 2026؟</th>
+          <th>استلام الكتب</th>
           <th>المدرس 2026</th>
+          <th>القسط الاول 2026</th>
+          <th>القسط الثاني</th>
+          <th>القسط الثالث</th>
+          <th>القسط الرابع</th>
+          <th>القسط الخامس</th>
           <th>هاتف الام</th>
           <th>هاتف الاب</th>
           <th>هاتف اخر</th>
@@ -294,7 +350,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
         </tr>
       </thead>
       <tbody id="studentsBody">
-        <tr><td colspan="15" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>
+        <tr><td colspan="27" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>
       </tbody>
     </table>
   </div>
@@ -335,27 +391,33 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <h2 id="modalTitle">اضافة طالب جديد</h2>
     <input type="hidden" id="editId">
     <div class="form-grid">
-      <div class="field"><label>الرقم الشخصي *</label><input id="f_personal_id" placeholder="الرقم الشخصي"></div>
-      <div class="field"><label>اسم الطالب *</label><input id="f_student_name" placeholder="الاسم الكامل"></div>
-      <div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
-      <div class="field"><label>النتيجة النهائية (تحديد المستوى 2026)</label>
-        <select id="f_final_result">
-          <option value="">-- اختر --</option>
-          <option>ناجح</option>
-          <option>راسب</option>
-          <option>قيد التقييم</option>
-          <option>غائب</option>
-        </select>
-      </div>
-      <div class="field"><label>الى اين وصل الطالب 2026</label><input id="f_level_reached" placeholder="مثال: الوحدة 5 / المستوى 3"></div>
-      <div class="field"><label>المدرس 2026</label><input id="f_teacher" placeholder="اسم المدرس"></div>
-      <div class="field"><label>هاتف الام</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-      <div class="field"><label>هاتف الاب</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-      <div class="field"><label>هاتف اخر</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-      <div class="field"><label>مكان السكن</label><input id="f_residence" placeholder="المنطقة / المدينة"></div>
-      <div class="field full"><label>عنوان المنزل</label><input id="f_home_address" placeholder="عنوان المنزل التفصيلي"></div>
-      <div class="field"><label>الطريق</label><input id="f_road" placeholder="رقم الطريق او اسمه"></div>
-      <div class="field"><label>المجمع</label><input id="f_complex" placeholder="اسم المجمع"></div>
+<div class="field"><label>الرقم الشخصي *</label><input id="f_personal_id" placeholder="الرقم الشخصي"></div>
+<div class="field"><label>اسم الطالب *</label><input id="f_student_name" placeholder="الاسم الكامل"></div>
+<div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>اسم الصف</label><input id="f_class_name" placeholder="مثال: صف A"></div>
+<div class="field"><label>قديم جديد 2026</label><input id="f_old_new_2026" placeholder="قديم أو جديد"></div>
+<div class="field"><label>تسجيل الفصل الثاني 2026</label><input id="f_registration_term2_2026" placeholder="نعم / لا"></div>
+<div class="field"><label>المجموعة</label><input id="f_group_name_student" placeholder="اسم المجموعة"></div>
+<div class="field"><label>المجموعة (الاونلاين)</label><input id="f_group_online" placeholder="مجموعة الاونلاين"></div>
+<div class="field"><label>النتيجة النهائية (تحديد المستوى 2026)</label><select id="f_final_result"><option value="">-- اختر --</option><option>ناجح</option><option>راسب</option><option>قيد التقييم</option><option>غائب</option></select></div>
+<div class="field"><label>الى اين وصل الطالب 2026</label><input id="f_level_reached" placeholder="مثال: الوحدة 5"></div>
+<div class="field"><label>هل الطالب مناسب لهذا المستوى 2026؟</label><input id="f_suitable_level" placeholder="نعم / لا"></div>
+<div class="field"><label>استلام الكتب</label><input id="f_books_received" placeholder="نعم / لا"></div>
+<div class="field"><label>المدرس 2026</label><input id="f_teacher" placeholder="اسم المدرس"></div>
+<div class="field"><label>القسط الاول 2026</label><input id="f_installment1" placeholder="مدفوع / غير مدفوع"></div>
+<div class="field"><label>القسط الثاني</label><input id="f_installment2" placeholder="مدفوع / غير مدفوع"></div>
+<div class="field"><label>القسط الثالث</label><input id="f_installment3" placeholder="مدفوع / غير مدفوع"></div>
+<div class="field"><label>القسط الرابع</label><input id="f_installment4" placeholder="مدفوع / غير مدفوع"></div>
+<div class="field"><label>القسط الخامس</label><input id="f_installment5" placeholder="مدفوع / غير مدفوع"></div>
+<div class="field"><label>هاتف الام</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>هاتف الاب</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>هاتف اخر</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>مكان السكن</label><input id="f_residence" placeholder="المنطقة"></div>
+<div class="field full"><label>عنوان المنزل</label><input id="f_home_address" placeholder="عنوان المنزل"></div>
+<div class="field"><label>الطريق</label><input id="f_road" placeholder="رقم الطريق"></div>
+<div class="field"><label>المجمع</label><input id="f_complex" placeholder="اسم المجمع"></div>
+</div>
+    v>
     </div>
     <div class="modal-actions">
       <button class="btn-save" onclick="saveStudent()">حفظ</button>
@@ -418,67 +480,15 @@ async function loadStudents(){
 function renderTable(list){
   const body=document.getElementById('studentsBody');
   if(!list.length){body.innerHTML='<tr><td colspan="15" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>';return;}
-  body.innerHTML=list.map((s,i)=>{
-    const badge=s.final_result=='ناجح'?'badge-pass':s.final_result=='راسب'?'badge-fail':'badge-pend';
-    const res=s.final_result?'<span class="badge '+badge+'">'+s.final_result+'</span>':'-';
-    return '<tr><td>'+(i+1)+'</td><td><b>'+(s.personal_id||'-')+'</b></td><td class="name-cell">'+(s.student_name||'-')+'</td><td dir="ltr">'+(s.whatsapp||'-')+'</td><td>'+res+'</td><td>'+(s.level_reached_2026||'-')+'</td><td>'+(s.teacher_2026||'-')+'</td><td dir="ltr">'+(s.mother_phone||'-')+'</td><td dir="ltr">'+(s.father_phone||'-')+'</td><td dir="ltr">'+(s.other_phone||'-')+'</td><td>'+(s.residence||'-')+'</td><td>'+(s.home_address||'-')+'</td><td>'+(s.road||'-')+'</td><td>'+(s.complex_name||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+s.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s.id+')">&#128465;</button></td></tr>';
-  }).join('');
+  body.innerHTML=list.map((s,i)=>{ const badge=s.final_result=='ناجح'?'badge-pass':s.final_result=='راسب'?'badge-fail':'badge-pend'; const res=s.final_result?'<span class="badge '+badge+'">'+(s.final_result)+'</span>':'-'; return '<tr><td>'+(i+1)+'</td><td><b>'+(s.personal_id||'-')+'</b></td><td class="name-cell">'+(s.student_name||'-')+'</td><td dir="ltr">'+(s.whatsapp||'-')+'</td><td>'+(s.class_name||'-')+'</td><td>'+(s.old_new_2026||'-')+'</td><td>'+(s.registration_term2_2026||'-')+'</td><td>'+(s.group_name_student||'-')+'</td><td>'+(s.group_online||'-')+'</td><td>'+res+'</td><td>'+(s.level_reached_2026||'-')+'</td><td>'+(s.suitable_level_2026||'-')+'</td><td>'+(s.books_received||'-')+'</td><td>'+(s.teacher_2026||'-')+'</td><td>'+(s.installment1||'-')+'</td><td>'+(s.installment2||'-')+'</td><td>'+(s.installment3||'-')+'</td><td>'+(s.installment4||'-')+'</td><td>'+(s.installment5||'-')+'</td><td dir="ltr">'+(s.mother_phone||'-')+'</td><td dir="ltr">'+(s.father_phone||'-')+'</td><td dir="ltr">'+(s.other_phone||'-')+'</td><td>'+(s.residence||'-')+'</td><td>'+(s.home_address||'-')+'</td><td>'+(s.road||'-')+'</td><td>'+(s.complex_name||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+s.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s.id+')">&#128465;</button></td></tr>'; }).join('');
 }
 function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   renderTable(allStudents.filter(s=>(s.student_name||'').toLowerCase().includes(q)||(s.personal_id||'').toLowerCase().includes(q)));
 }
-function clearForm(){
-  ['personal_id','student_name','whatsapp','final_result','level_reached','teacher','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';});
-  document.getElementById('editId').value='';
-}
-function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة طالب جديد';document.getElementById('modal').classList.add('open');}
-function openEdit(id){
-  const s=allStudents.find(x=>x.id===id);if(!s)return;
-  document.getElementById('editId').value=id;
-  document.getElementById('modalTitle').textContent='تعديل بيانات الطالب';
-  document.getElementById('f_personal_id').value=s.personal_id||'';
-  document.getElementById('f_student_name').value=s.student_name||'';
-  document.getElementById('f_whatsapp').value=s.whatsapp||'';
-  document.getElementById('f_final_result').value=s.final_result||'';
-  document.getElementById('f_level_reached').value=s.level_reached_2026||'';
-  document.getElementById('f_teacher').value=s.teacher_2026||'';
-  document.getElementById('f_mother_phone').value=s.mother_phone||'';
-  document.getElementById('f_father_phone').value=s.father_phone||'';
-  document.getElementById('f_other_phone').value=s.other_phone||'';
-  document.getElementById('f_residence').value=s.residence||'';
-  document.getElementById('f_home_address').value=s.home_address||'';
-  document.getElementById('f_road').value=s.road||'';
-  document.getElementById('f_complex').value=s.complex_name||'';
-  document.getElementById('modal').classList.add('open');
-}
-function closeModal(){document.getElementById('modal').classList.remove('open');}
-async function saveStudent(){
-  const editId=document.getElementById('editId').value;
-  const body={
-    personal_id:document.getElementById('f_personal_id').value.trim(),
-    student_name:document.getElementById('f_student_name').value.trim(),
-    whatsapp:document.getElementById('f_whatsapp').value.trim(),
-    final_result:document.getElementById('f_final_result').value,
-    level_reached_2026:document.getElementById('f_level_reached').value.trim(),
-    teacher_2026:document.getElementById('f_teacher').value.trim(),
-    mother_phone:document.getElementById('f_mother_phone').value.trim(),
-    father_phone:document.getElementById('f_father_phone').value.trim(),
-    other_phone:document.getElementById('f_other_phone').value.trim(),
-    residence:document.getElementById('f_residence').value.trim(),
-    home_address:document.getElementById('f_home_address').value.trim(),
-    road:document.getElementById('f_road').value.trim(),
-    complex_name:document.getElementById('f_complex').value.trim(),
-  };
-  if(!body.personal_id||!body.student_name){showToast('الرقم الشخصي واسم الطالب مطلوبان','#e53935');return;}
-  const url=editId?'/api/students/'+editId:'/api/students';
-  const method=editId?'PUT':'POST';
-  const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await res.json();
-  if(data.ok){closeModal();showToast(editId?'تم تعديل بيانات الطالب بنجاح':'تم اضافة الطالب بنجاح');loadStudents();}
-  else{showToast(data.error||'حدث خطا','#e53935');}
-}
-function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
+function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة طالب جديد';document.getElementById('modal').classList.add('open');}
+function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='تعديل بيانات الطالب'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
+async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('الرقم الشخصي واسم الطالب مطلوبان','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'تم تعديل بيانات الطالب بنجاح':'تم اضافة الطالب بنجاح');loadStudents();} else{showToast(data.error||'حدث خطا','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
   if(!deleteTargetId)return;
   const res=await fetch('/api/students/'+deleteTargetId,{method:'DELETE'});
@@ -624,12 +634,18 @@ def api_students_add():
     try:
         db = get_db()
         db.execute("""INSERT INTO students
-            (personal_id,student_name,whatsapp,final_result,level_reached_2026,
-             teacher_2026,mother_phone,father_phone,other_phone,residence,
-             home_address,road,complex_name)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (personal_id,student_name,whatsapp,class_name,old_new_2026,registration_term2_2026,
+             group_name_student,group_online,final_result,level_reached_2026,suitable_level_2026,
+             books_received,teacher_2026,installment1,installment2,installment3,installment4,
+             installment5,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
-             d.get("final_result"), d.get("level_reached_2026"), d.get("teacher_2026"),
+             d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
+             d.get("group_name_student"), d.get("group_online"),
+             d.get("final_result"), d.get("level_reached_2026"), d.get("suitable_level_2026"),
+             d.get("books_received"), d.get("teacher_2026"),
+             d.get("installment1"), d.get("installment2"), d.get("installment3"),
+             d.get("installment4"), d.get("installment5"),
              d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
              d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name")))
         db.commit()
@@ -644,12 +660,20 @@ def api_students_update(sid):
     try:
         db = get_db()
         db.execute("""UPDATE students SET
-            personal_id=?,student_name=?,whatsapp=?,final_result=?,level_reached_2026=?,
-            teacher_2026=?,mother_phone=?,father_phone=?,other_phone=?,residence=?,
+            personal_id=?,student_name=?,whatsapp=?,class_name=?,old_new_2026=?,
+            registration_term2_2026=?,group_name_student=?,group_online=?,
+            final_result=?,level_reached_2026=?,suitable_level_2026=?,books_received=?,
+            teacher_2026=?,installment1=?,installment2=?,installment3=?,installment4=?,
+            installment5=?,mother_phone=?,father_phone=?,other_phone=?,residence=?,
             home_address=?,road=?,complex_name=?
             WHERE id=?""",
             (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
-             d.get("final_result"), d.get("level_reached_2026"), d.get("teacher_2026"),
+             d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
+             d.get("group_name_student"), d.get("group_online"),
+             d.get("final_result"), d.get("level_reached_2026"), d.get("suitable_level_2026"),
+             d.get("books_received"), d.get("teacher_2026"),
+             d.get("installment1"), d.get("installment2"), d.get("installment3"),
+             d.get("installment4"), d.get("installment5"),
              d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
              d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), sid))
         db.commit()
@@ -678,8 +702,8 @@ def api_students_bulk():
     db = get_db()
     for s in rows:
         try:
-            db.execute("""INSERT OR IGNORE INTO students (personal_id,student_name,whatsapp,final_result,level_reached_2026,teacher_2026,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (s.get("personal_id"), s.get("student_name"), s.get("whatsapp"), s.get("final_result"), s.get("level_reached_2026"), s.get("teacher_2026"), s.get("mother_phone"), s.get("father_phone"), s.get("other_phone"), s.get("residence"), s.get("home_address"), s.get("road"), s.get("complex_name")))
+            db.execute("""INSERT OR IGNORE INTO students (personal_id,student_name,whatsapp,class_name,old_new_2026,registration_term2_2026,group_name_student,group_online,final_result,level_reached_2026,suitable_level_2026,books_received,teacher_2026,installment1,installment2,installment3,installment4,installment5,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (s.get("personal_id"), s.get("student_name"), s.get("whatsapp"), s.get("class_name"), s.get("old_new_2026"), s.get("registration_term2_2026"), s.get("group_name_student"), s.get("group_online"), s.get("final_result"), s.get("level_reached_2026"), s.get("suitable_level_2026"), s.get("books_received"), s.get("teacher_2026"), s.get("installment1"), s.get("installment2"), s.get("installment3"), s.get("installment4"), s.get("installment5"), s.get("mother_phone"), s.get("father_phone"), s.get("other_phone"), s.get("residence"), s.get("home_address"), s.get("road"), s.get("complex_name")))
             ok_count += 1
         except Exception as ex:
             errors.append(str(ex))
