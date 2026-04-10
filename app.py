@@ -332,7 +332,7 @@ function renderTable(list){
   body.innerHTML=list.map((s,i)=>{
     const badge=s.final_result=='ناجح'?'badge-pass':s.final_result=='راسب'?'badge-fail':'badge-pend';
     const res=s.final_result?'<span class="badge '+badge+'">'+s.final_result+'</span>':'-';
-    return '<tr><td>'+(i+1)+'</td><td><b>'+(s.personal_id||'-')+'</b></td><td class="name-cell">'+(s.student_name||'-')+'</td><td>'+(s.whatsapp||'-')+'</td><td>'+res+'</td><td>'+(s.level_reached_2026||'-')+'</td><td>'+(s.teacher_2026||'-')+'</td><td>'+(s.mother_phone||'-')+'</td><td>'+(s.father_phone||'-')+'</td><td>'+(s.other_phone||'-')+'</td><td>'+(s.residence||'-')+'</td><td>'+(s.home_address||'-')+'</td><td>'+(s.road||'-')+'</td><td>'+(s.complex_name||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+s.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s.id+')">&#128465;</button></td></tr>';
+    return '<tr><td>'+(i+1)+'</td><td><b>'+(s.personal_id||'-')+'</b></td><td class="name-cell">'+(s.student_name||'-')+'</td><td dir="ltr">'+(s.whatsapp||'-')+'</td><td>'+res+'</td><td>'+(s.level_reached_2026||'-')+'</td><td>'+(s.teacher_2026||'-')+'</td><td dir="ltr">'+(s.mother_phone||'-')+'</td><td dir="ltr">'+(s.father_phone||'-')+'</td><td dir="ltr">'+(s.other_phone||'-')+'</td><td>'+(s.residence||'-')+'</td><td>'+(s.home_address||'-')+'</td><td>'+(s.road||'-')+'</td><td>'+(s.complex_name||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+s.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s.id+')">&#128465;</button></td></tr>';
   }).join('');
 }
 function filterTable(){
