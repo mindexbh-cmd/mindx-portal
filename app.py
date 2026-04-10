@@ -252,7 +252,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
           <th>#</th>
           <th>الرقم الشخصي</th>
           <th>اسم الطالب</th>
-          <th>هاتف الواتساب</th>
+          <th>هاتف الواتساب المعتمد</th>
           <th>النتيجة النهائية</th>
           <th>الى اين وصل 2026</th>
           <th>المدرس 2026</th>
