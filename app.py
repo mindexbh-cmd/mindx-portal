@@ -94,6 +94,20 @@ def init_db():
         message TEXT,
         message_status TEXT,
         study_status TEXT)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tbl_name TEXT UNIQUE,
+        created_at TEXT DEFAULT (datetime('now')))""")
+    db.execute("""CREATE TABLE IF NOT EXISTS custom_table_cols(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_id INTEGER,
+        col_key TEXT,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS custom_table_rows(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_id INTEGER,
+        row_data TEXT DEFAULT '{}')""")
     users = [
         ("admin","admin123","admin"),
         ("reception","rec123","reception"),
@@ -213,6 +227,20 @@ else:
         message TEXT,
         message_status TEXT,
         study_status TEXT)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tbl_name TEXT UNIQUE,
+        created_at TEXT DEFAULT (datetime('now')))""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS custom_table_cols(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_id INTEGER,
+        col_key TEXT,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS custom_table_rows(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_id INTEGER,
+        row_data TEXT DEFAULT '{}')""")
     db2.commit()
     db2.close()
 
@@ -244,6 +272,20 @@ input{width:100%;padding:12px 14px;border:1.5px solid #E0D5F0;border-radius:10px
 input:focus{border-color:#6B3FA0;background:#fff;}
 button{width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;}
 .err{background:#fee;color:#c00;padding:10px;border-radius:8px;margin-bottom:12px;text-align:center;font-size:13px;}
+.btn-new-table{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.btn-new-table:hover{opacity:0.9;}
+.custom-table-section{margin:30px 0 0 0;}
+.custom-table-title{font-size:1.2em;font-weight:700;color:#1565C0;margin-bottom:8px;}
+.wizard-step{display:none;}
+.wizard-step.active{display:block;}
+.col-name-input{width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;margin-bottom:6px;}
+.wizard-nav{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+.step-indicator{display:flex;gap:6px;margin-bottom:16px;}
+.step-dot{width:10px;height:10px;border-radius:50%;background:#ddd;}
+.step-dot.active{background:#1976D2;}
+.btn-tab{background:#f0ebff;color:#6c3fa0;border:none;padding:8px 14px;border-radius:8px;font-size:.9em;font-weight:600;cursor:pointer;}
+.btn-tab.active{background:#6c3fa0;color:#fff;}
+.btn-tab:hover{opacity:0.85;}
 </style>
 </head>
 <body>
@@ -380,7 +422,8 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">إجمالي الطلبة</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ إضافة طالب</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; تعديل الجدول</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ إضافة طالب</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; تعديل الجدول</button>
+  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; إضافة جدول جديد</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الرقم الشخصي..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">بحث</button>
@@ -675,7 +718,108 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-delete" onclick="confirmAttendanceDelete()">حذف</button>
     </div>
   </div>
-</div><div class="toast" id="toast"></div>
+</div><!-- DYNAMIC CUSTOM TABLES CONTAINER -->
+<div id="customTablesContainer"></div>
+
+<!-- NEW TABLE WIZARD MODAL -->
+<div class="modal-bg" id="newTableWizardModal" style="display:none">
+  <div class="modal" style="max-width:540px;width:96%">
+    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; إنشاء جدول جديد</h2>
+    <div class="step-indicator">
+      <div class="step-dot active" id="wizDot1"></div>
+      <div class="step-dot" id="wizDot2"></div>
+    </div>
+    <!-- Step 1: Name + cols/rows count -->
+    <div class="wizard-step active" id="wizStep1">
+      <div style="margin-bottom:12px;">
+        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">اسم الجدول</label>
+        <input type="text" id="wiz_tbl_name" placeholder="مثال: سجل التقدم" class="col-name-input">
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">عدد الأعمدة</label>
+          <input type="number" id="wiz_col_count" min="1" max="20" value="3" class="col-name-input" style="width:100%;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">عدد الصفوف الابتدائية</label>
+          <input type="number" id="wiz_row_count" min="0" max="100" value="0" class="col-name-input" style="width:100%;">
+        </div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn-cancel" onclick="closeNewTableWizard()">إلغاء</button>
+        <button class="btn-save" onclick="wizardStep1Next()">التالي &#8594;</button>
+      </div>
+    </div>
+    <!-- Step 2: Column names -->
+    <div class="wizard-step" id="wizStep2">
+      <p style="font-size:.9em;color:#555;margin-bottom:10px;">أدخل أسماء الأعمدة:</p>
+      <div id="wizColNamesContainer"></div>
+      <div class="wizard-nav">
+        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; رجوع</button>
+        <button class="btn-save" onclick="wizardCreateTable()">&#10003; إنشاء الجدول</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM TABLE EDIT MODAL (add/delete/rename cols) -->
+<div class="modal-bg" id="customTableEditModal" style="display:none">
+  <div class="modal" style="max-width:480px;width:96%">
+    <h2 id="customTableEditTitle" style="margin-bottom:12px;color:#1565C0;font-size:1.1em;">⚙ تعديل الجدول</h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;" id="customTblTabBtns">
+      <button class="btn-tab active" id="ctab1" onclick="switchCustomTab('add')">إضافة عمود</button>
+      <button class="btn-tab" id="ctab2" onclick="switchCustomTab('del')">حذف عمود</button>
+      <button class="btn-tab" id="ctab3" onclick="switchCustomTab('rename')">تعديل عنوان</button>
+    </div>
+    <div id="ctabPanelAdd">
+      <input type="text" id="ctbl_new_col_name" placeholder="اسم العمود الجديد" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">مكان الإضافة:</div>
+      <select id="ctbl_position" class="col-name-input" onchange="toggleCustomPosition()">
+        <option value="end">في النهاية</option>
+        <option value="start">في البداية</option>
+        <option value="after">بعد عمود:</option>
+      </select>
+      <select id="ctbl_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addCustomColumn()">إضافة</button>
+    </div>
+    <div id="ctabPanelDel" style="display:none">
+      <select id="ctbl_del_col" class="col-name-input"></select>
+      <button class="btn-delete" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteCustomColumn()">حذف العمود</button>
+    </div>
+    <div id="ctabPanelRename" style="display:none">
+      <select id="ctbl_rename_col" class="col-name-input" onchange="fillCustomRenameLabel()"></select>
+      <input type="text" id="ctbl_rename_label" placeholder="الاسم الجديد" class="col-name-input" style="margin-top:8px;">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateCustomColumnLabel()">حفظ التعديل</button>
+    </div>
+    <div style="margin-top:14px;text-align:left;">
+      <button class="btn-cancel" onclick="closeCustomTableEditModal()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ROW MODAL FOR CUSTOM TABLE -->
+<div class="modal-bg" id="customRowModal" style="display:none">
+  <div class="modal" style="max-width:500px;width:96%">
+    <h2 id="customRowModalTitle" style="margin-bottom:14px;color:#1565C0;font-size:1.1em;">إضافة صف</h2>
+    <div id="customRowFormFields" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeCustomRowModal()">إلغاء</button>
+      <button class="btn-save" onclick="saveCustomRow()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE CUSTOM TABLE -->
+<div class="confirm-bg" id="customTableDeleteConfirm" style="display:none">
+  <div class="confirm-box">
+    <p id="customTableDeleteMsg">هل تريد حذف هذا الجدول؟</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn-cancel" onclick="closeCustomTableDeleteConfirm()">إلغاء</button>
+      <button style="background:#e53935;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;" onclick="confirmCustomTableDelete()">حذف</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
     <h2 id="groupModalTitle2" style="color:#0097A7;">اضافة مجموعة جديدة</h2>
@@ -1240,6 +1384,365 @@ function confirmAttendanceDelete() {
 }
 
 loadAttendance();
+
+// ─── Custom Tables JS ────────────────────────────────────────────────────────
+var allCustomTables = [];
+var currentCustomTableId = null;
+var editingCustomRowId = null;
+var deletingCustomTableId = null;
+
+function loadCustomTables() {
+  fetch('/api/custom-tables').then(function(r){ return r.json(); }).then(function(data){
+    allCustomTables = data;
+    renderAllCustomTables();
+  });
+}
+
+function renderAllCustomTables() {
+  var container = document.getElementById('customTablesContainer');
+  if(!container) return;
+  var html = '';
+  for(var i=0; i<allCustomTables.length; i++) {
+    var t = allCustomTables[i];
+    html += buildCustomTableHTML(t);
+  }
+  container.innerHTML = html;
+}
+
+function buildCustomTableHTML(t) {
+  var cols = t.cols || [];
+  var rows = t.rows || [];
+  var headerCells = '<th>#</th>';
+  for(var i=0; i<cols.length; i++) {
+    headerCells += '<th>' + (cols[i].col_label||'') + '</th>';
+  }
+  headerCells += '<th>&#128465;</th>';
+
+  var bodyRows = '';
+  if(rows.length === 0) {
+    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">لا توجد بيانات، أضف أول صف</td></tr>';
+  } else {
+    for(var j=0; j<rows.length; j++) {
+      var r = rows[j];
+      var rd = r.row_data || {};
+      bodyRows += '<tr>';
+      bodyRows += '<td>' + (j+1) + '</td>';
+      for(var k=0; k<cols.length; k++) {
+        var ck = cols[k].col_key;
+        var val = rd[ck] || '';
+        bodyRows += '<td class="editable" data-tid="' + t.id + '" data-rid="' + r.id + '" data-ckey="' + ck + '" onclick="editCustomCell(this)">' + val + '</td>';
+      }
+      bodyRows += '<td><button class="btn-del-row" onclick="deleteCustomRow(' + t.id + ',' + r.id + ')">&#128465;</button></td>';
+      bodyRows += '</tr>';
+    }
+  }
+
+  return '<div class="custom-table-section" id="ctsec_' + t.id + '">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
+    '<span class="custom-table-title">&#128203; ' + t.tbl_name + '</span>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ إضافة صف</button>' +
+    '<button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openCustomImportModal(' + t.id + ')">&#128196; استيراد جدول</button>' +
+    '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; تعديل الجدول</button>' +
+    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" onclick="openCustomTableDeleteConfirm(' + t.id + ','' + t.tbl_name + '')">&#128465; حذف الجدول</button>' +
+    '</div></div>' +
+    '<div class="table-wrap"><table>' +
+    '<thead><tr id="cthead_' + t.id + '">' + headerCells + '</tr></thead>' +
+    '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
+    '</table></div></div>';
+}
+
+// ── Wizard ────────────────────────────────────────────────────────────────────
+function openNewTableWizard() {
+  document.getElementById('wiz_tbl_name').value = '';
+  document.getElementById('wiz_col_count').value = '3';
+  document.getElementById('wiz_row_count').value = '0';
+  document.getElementById('wizStep1').classList.add('active');
+  document.getElementById('wizStep2').classList.remove('active');
+  document.getElementById('wizDot1').classList.add('active');
+  document.getElementById('wizDot2').classList.remove('active');
+  document.getElementById('newTableWizardModal').style.display = 'flex';
+}
+
+function closeNewTableWizard() {
+  document.getElementById('newTableWizardModal').style.display = 'none';
+}
+
+function wizardStep1Next() {
+  var name = document.getElementById('wiz_tbl_name').value.trim();
+  var cols = parseInt(document.getElementById('wiz_col_count').value) || 1;
+  if(!name) { showToast('أدخل اسم الجدول','#e53935'); return; }
+  if(cols < 1 || cols > 20) { showToast('عدد الأعمدة يجب أن يكون 1-20','#e53935'); return; }
+  var container = document.getElementById('wizColNamesContainer');
+  container.innerHTML = '';
+  for(var i=0; i<cols; i++) {
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'col-name-input';
+    inp.placeholder = 'اسم العمود ' + (i+1);
+    inp.id = 'wizCol_' + i;
+    container.appendChild(inp);
+  }
+  document.getElementById('wizStep1').classList.remove('active');
+  document.getElementById('wizStep2').classList.add('active');
+  document.getElementById('wizDot1').classList.remove('active');
+  document.getElementById('wizDot2').classList.add('active');
+}
+
+function wizardGoBack() {
+  document.getElementById('wizStep2').classList.remove('active');
+  document.getElementById('wizStep1').classList.add('active');
+  document.getElementById('wizDot2').classList.remove('active');
+  document.getElementById('wizDot1').classList.add('active');
+}
+
+function wizardCreateTable() {
+  var name = document.getElementById('wiz_tbl_name').value.trim();
+  var rowCount = parseInt(document.getElementById('wiz_row_count').value) || 0;
+  var colInputs = document.querySelectorAll('[id^="wizCol_"]');
+  var cols = [];
+  for(var i=0; i<colInputs.length; i++) {
+    var v = colInputs[i].value.trim();
+    cols.push(v || ('عمود ' + (i+1)));
+  }
+  var payload = { tbl_name: name, cols: cols, row_count: rowCount };
+  fetch('/api/custom-tables', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok) {
+        closeNewTableWizard();
+        showToast('تم إنشاء الجدول','#4CAF50');
+        loadCustomTables();
+      } else {
+        showToast(d.error||'حدث خطأ','#e53935');
+      }
+    });
+}
+
+// ── Row add/edit ───────────────────────────────────────────────────────────────
+function openCustomRowModal(tid) {
+  currentCustomTableId = tid;
+  editingCustomRowId = null;
+  var t = null;
+  for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
+  if(!t) return;
+  document.getElementById('customRowModalTitle').textContent = 'إضافة صف - ' + t.tbl_name;
+  var fields = document.getElementById('customRowFormFields');
+  fields.innerHTML = '';
+  var cols = t.cols || [];
+  for(var j=0; j<cols.length; j++) {
+    var wrapper = document.createElement('div');
+    wrapper.innerHTML = '<label style="font-size:.85em;color:#555;">' + cols[j].col_label + '</label>' +
+      '<input type="text" id="crow_' + cols[j].col_key + '" class="col-name-input" placeholder="' + cols[j].col_label + '" style="margin-top:3px;">';
+    fields.appendChild(wrapper);
+  }
+  document.getElementById('customRowModal').style.display = 'flex';
+}
+
+function closeCustomRowModal() {
+  document.getElementById('customRowModal').style.display = 'none';
+  currentCustomTableId = null;
+  editingCustomRowId = null;
+}
+
+function saveCustomRow() {
+  var tid = currentCustomTableId;
+  var t = null;
+  for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
+  if(!t) return;
+  var row_data = {};
+  var cols = t.cols || [];
+  for(var j=0; j<cols.length; j++) {
+    var inp = document.getElementById('crow_' + cols[j].col_key);
+    if(inp) row_data[cols[j].col_key] = inp.value;
+  }
+  var url = '/api/custom-tables/' + tid + '/rows';
+  var method = 'POST';
+  if(editingCustomRowId) {
+    url = '/api/custom-tables/' + tid + '/rows/' + editingCustomRowId;
+    method = 'PUT';
+  }
+  fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: row_data})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok) { closeCustomRowModal(); showToast('تم الحفظ','#4CAF50'); loadCustomTables(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function deleteCustomRow(tid, rid) {
+  fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok) { showToast('تم الحذف','#e53935'); loadCustomTables(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+// ── Inline cell edit ──────────────────────────────────────────────────────────
+function editCustomCell(tdEl) {
+  if(tdEl.querySelector('input')) return;
+  var tid = parseInt(tdEl.getAttribute('data-tid'));
+  var rid = parseInt(tdEl.getAttribute('data-rid'));
+  var ckey = tdEl.getAttribute('data-ckey');
+  var oldVal = tdEl.textContent.trim();
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldVal;
+  input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
+  tdEl.innerHTML = '';
+  tdEl.appendChild(input);
+  input.focus();
+  var saved = false;
+  function saveCell() {
+    if(saved) return; saved = true;
+    var newVal = input.value;
+    var t = null;
+    for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
+    if(!t) return;
+    var row = null;
+    for(var j=0; j<t.rows.length; j++) { if(t.rows[j].id===rid) { row=t.rows[j]; break; } }
+    if(!row) return;
+    var updated = Object.assign({}, row.row_data);
+    updated[ckey] = newVal;
+    fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
+      .then(function(r){ return r.json(); }).then(function(d){
+        if(d.ok){ showToast('تم التحديث','#4CAF50'); loadCustomTables(); }
+        else{ showToast(d.error||'حدث خطأ','#e53935'); loadCustomTables(); }
+      });
+  }
+  input.addEventListener('blur', saveCell);
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter') input.blur(); });
+}
+
+// ── Table edit modal (add/delete/rename cols) ─────────────────────────────────
+function openCustomTableEditModal(tid) {
+  currentCustomTableId = tid;
+  var t = null;
+  for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
+  if(!t) return;
+  document.getElementById('customTableEditTitle').textContent = 'تعديل جدول: ' + t.tbl_name;
+  switchCustomTab('add');
+  loadCustomColsForEdit(t);
+  document.getElementById('customTableEditModal').style.display = 'flex';
+}
+
+function closeCustomTableEditModal() {
+  document.getElementById('customTableEditModal').style.display = 'none';
+  currentCustomTableId = null;
+}
+
+function switchCustomTab(tab) {
+  var panels = ['ctabPanelAdd','ctabPanelDel','ctabPanelRename'];
+  var btns = ['ctab1','ctab2','ctab3'];
+  var tabMap = {add:0, del:1, rename:2};
+  for(var i=0; i<panels.length; i++) {
+    document.getElementById(panels[i]).style.display = i===tabMap[tab] ? 'block' : 'none';
+    document.getElementById(btns[i]).classList.toggle('active', i===tabMap[tab]);
+  }
+}
+
+function loadCustomColsForEdit(t) {
+  var cols = t.cols || [];
+  var delSel = document.getElementById('ctbl_del_col');
+  var renameSel = document.getElementById('ctbl_rename_col');
+  var afterSel = document.getElementById('ctbl_after_col');
+  delSel.innerHTML = '';
+  renameSel.innerHTML = '';
+  afterSel.innerHTML = '';
+  for(var i=0; i<cols.length; i++) {
+    var o1 = document.createElement('option');
+    o1.value = cols[i].col_key; o1.textContent = cols[i].col_label;
+    delSel.appendChild(o1);
+    var o2 = document.createElement('option');
+    o2.value = cols[i].col_key; o2.textContent = cols[i].col_label;
+    renameSel.appendChild(o2);
+    var o3 = document.createElement('option');
+    o3.value = cols[i].col_key; o3.textContent = cols[i].col_label;
+    afterSel.appendChild(o3);
+  }
+  document.getElementById('ctbl_new_col_name').value = '';
+  document.getElementById('ctbl_position').value = 'end';
+  document.getElementById('ctbl_after_col').style.display = 'none';
+  fillCustomRenameLabel();
+}
+
+function toggleCustomPosition() {
+  var pos = document.getElementById('ctbl_position').value;
+  document.getElementById('ctbl_after_col').style.display = pos === 'after' ? 'block' : 'none';
+}
+
+function fillCustomRenameLabel() {
+  var sel = document.getElementById('ctbl_rename_col');
+  var lbl = document.getElementById('ctbl_rename_label');
+  if(sel && sel.options[sel.selectedIndex]) {
+    lbl.value = sel.options[sel.selectedIndex].text;
+  }
+}
+
+function addCustomColumn() {
+  var tid = currentCustomTableId;
+  var col_label = document.getElementById('ctbl_new_col_name').value.trim();
+  if(!col_label) { showToast('أدخل اسم العمود','#e53935'); return; }
+  var position = document.getElementById('ctbl_position').value;
+  var after_key = document.getElementById('ctbl_after_col').value;
+  var payload = { col_label: col_label, position: position, after_key: after_key };
+  fetch('/api/custom-tables/' + tid + '/cols', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم إضافة العمود','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function deleteCustomColumn() {
+  var tid = currentCustomTableId;
+  var col_key = document.getElementById('ctbl_del_col').value;
+  if(!col_key) return;
+  fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم الحذف','#e53935'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function updateCustomColumnLabel() {
+  var tid = currentCustomTableId;
+  var col_key = document.getElementById('ctbl_rename_col').value;
+  var new_label = document.getElementById('ctbl_rename_label').value.trim();
+  if(!new_label || !col_key) { showToast('أدخل الاسم الجديد','#e53935'); return; }
+  fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label: new_label})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم تعديل العنوان','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+// ── Delete table ──────────────────────────────────────────────────────────────
+function openCustomTableDeleteConfirm(tid, name) {
+  deletingCustomTableId = tid;
+  document.getElementById('customTableDeleteMsg').textContent = 'هل تريد حذف جدول "' + name + '"؟ سيتم حذف جميع البيانات.';
+  document.getElementById('customTableDeleteConfirm').style.display = 'flex';
+}
+
+function closeCustomTableDeleteConfirm() {
+  document.getElementById('customTableDeleteConfirm').style.display = 'none';
+  deletingCustomTableId = null;
+}
+
+function confirmCustomTableDelete() {
+  if(!deletingCustomTableId) return;
+  fetch('/api/custom-tables/' + deletingCustomTableId, {method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      closeCustomTableDeleteConfirm();
+      if(d.ok){ showToast('تم حذف الجدول','#e53935'); loadCustomTables(); }
+      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+// ── Import stub (placeholder) ─────────────────────────────────────────────────
+function openCustomImportModal(tid) {
+  showToast('ميزة الاستيراد قريباً','#FF9800');
+}
+
+// Load custom tables on page load
+loadCustomTables();
 </script>
 </body>
 </html>"""
@@ -1636,6 +2139,159 @@ def api_attendance_delete(rid):
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+
+# ─── Custom Tables API ────────────────────────────────────────────────────────
+
+@app.route('/api/custom-tables', methods=['GET'])
+@login_required
+def api_custom_tables_get():
+    db = get_db()
+    tables = db.execute("SELECT * FROM custom_tables ORDER BY id").fetchall()
+    result = []
+    for t in tables:
+        cols = db.execute("SELECT * FROM custom_table_cols WHERE table_id=? ORDER BY col_order", (t['id'],)).fetchall()
+        rows = db.execute("SELECT * FROM custom_table_rows WHERE table_id=? ORDER BY id", (t['id'],)).fetchall()
+        result.append({
+            'id': t['id'],
+            'tbl_name': t['tbl_name'],
+            'created_at': t['created_at'],
+            'cols': [dict(c) for c in cols],
+            'rows': [{'id': r['id'], 'row_data': json.loads(r['row_data'] or '{}')} for r in rows]
+        })
+    return jsonify(result)
+
+@app.route('/api/custom-tables', methods=['POST'])
+@login_required
+def api_custom_tables_create():
+    d = request.get_json()
+    tbl_name = d.get('tbl_name','').strip()
+    cols = d.get('cols', [])
+    row_count = int(d.get('row_count', 0))
+    if not tbl_name:
+        return jsonify({'ok': False, 'error': 'missing name'}), 400
+    db = get_db()
+    try:
+        db.execute("INSERT INTO custom_tables(tbl_name) VALUES(?)", (tbl_name,))
+        db.commit()
+        tid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        for i, col_label in enumerate(cols):
+            col_key = 'col_' + str(i+1)
+            db.execute("INSERT INTO custom_table_cols(table_id,col_key,col_label,col_order) VALUES(?,?,?,?)", (tid, col_key, col_label, i+1))
+        for _ in range(row_count):
+            db.execute("INSERT INTO custom_table_rows(table_id,row_data) VALUES(?,?)", (tid, '{}'))
+        db.commit()
+        return jsonify({'ok': True, 'id': tid})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>', methods=['DELETE'])
+@login_required
+def api_custom_tables_delete(tid):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM custom_table_rows WHERE table_id=?", (tid,))
+        db.execute("DELETE FROM custom_table_cols WHERE table_id=?", (tid,))
+        db.execute("DELETE FROM custom_tables WHERE id=?", (tid,))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/rows', methods=['POST'])
+@login_required
+def api_custom_table_row_add(tid):
+    d = request.get_json()
+    row_data = d.get('row_data', {})
+    db = get_db()
+    try:
+        db.execute("INSERT INTO custom_table_rows(table_id,row_data) VALUES(?,?)", (tid, json.dumps(row_data, ensure_ascii=False)))
+        db.commit()
+        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return jsonify({'ok': True, 'id': rid})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/rows/<int:rid>', methods=['PUT'])
+@login_required
+def api_custom_table_row_update(tid, rid):
+    d = request.get_json()
+    row_data = d.get('row_data', {})
+    db = get_db()
+    try:
+        db.execute("UPDATE custom_table_rows SET row_data=? WHERE id=? AND table_id=?", (json.dumps(row_data, ensure_ascii=False), rid, tid))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/rows/<int:rid>', methods=['DELETE'])
+@login_required
+def api_custom_table_row_delete(tid, rid):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM custom_table_rows WHERE id=? AND table_id=?", (rid, tid))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/cols', methods=['POST'])
+@login_required
+def api_custom_table_col_add(tid):
+    d = request.get_json()
+    col_label = d.get('col_label','').strip()
+    position = d.get('position','end')
+    after_key = d.get('after_key','')
+    if not col_label:
+        return jsonify({'ok': False, 'error': 'missing label'}), 400
+    db = get_db()
+    try:
+        max_order = db.execute("SELECT MAX(col_order) FROM custom_table_cols WHERE table_id=?", (tid,)).fetchone()[0] or 0
+        count = db.execute("SELECT COUNT(*) FROM custom_table_cols WHERE table_id=?", (tid,)).fetchone()[0]
+        col_key = 'col_' + str(int(max_order) + 1)
+        if position == 'start':
+            db.execute("UPDATE custom_table_cols SET col_order=col_order+1 WHERE table_id=?", (tid,))
+            new_order = 1
+        elif position == 'after' and after_key:
+            after_order = db.execute("SELECT col_order FROM custom_table_cols WHERE table_id=? AND col_key=?", (tid, after_key)).fetchone()
+            after_order = after_order[0] if after_order else max_order
+            db.execute("UPDATE custom_table_cols SET col_order=col_order+1 WHERE table_id=? AND col_order>?", (tid, after_order))
+            new_order = after_order + 1
+        else:
+            new_order = max_order + 1
+        db.execute("INSERT INTO custom_table_cols(table_id,col_key,col_label,col_order) VALUES(?,?,?,?)", (tid, col_key, col_label, new_order))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/cols/<col_key>', methods=['DELETE'])
+@login_required
+def api_custom_table_col_delete(tid, col_key):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM custom_table_cols WHERE table_id=? AND col_key=?", (tid, col_key))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
+
+@app.route('/api/custom-tables/<int:tid>/cols/<col_key>', methods=['PUT'])
+@login_required
+def api_custom_table_col_rename(tid, col_key):
+    d = request.get_json()
+    new_label = d.get('col_label','').strip()
+    if not new_label:
+        return jsonify({'ok': False, 'error': 'missing label'}), 400
+    db = get_db()
+    try:
+        db.execute("UPDATE custom_table_cols SET col_label=? WHERE table_id=? AND col_key=?", (new_label, tid, col_key))
+        db.commit()
+        return jsonify({'ok': True})
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 400
 
 
 GROUPS_HTML = """<!DOCTYPE html>
