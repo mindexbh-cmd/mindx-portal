@@ -239,7 +239,7 @@ else:
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
-        db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
+    db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
         created_at TEXT DEFAULT (datetime('now')))""")
