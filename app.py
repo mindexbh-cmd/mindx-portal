@@ -732,7 +732,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-delete" onclick="confirmAttendanceDelete()">حذف</button>
     </div>
   </div>
-
+</div>
 <!-- ATTENDANCE EXCEL IMPORT MODAL -->
 <div class="modal-bg" id="attendanceExcelModal" style="display:none">
   <div class="modal" style="max-width:480px;width:95%">
@@ -792,7 +792,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
 </div>
-</div><!-- DYNAMIC CUSTOM TABLES CONTAINER -->
+<!-- DYNAMIC CUSTOM TABLES CONTAINER -->
 <div id="customTablesContainer"></div>
 
 <!-- NEW TABLE WIZARD MODAL -->
