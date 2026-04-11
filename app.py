@@ -94,6 +94,12 @@ def init_db():
         message TEXT,
         message_status TEXT,
         study_status TEXT)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS att_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
     db.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -227,7 +233,13 @@ else:
         message TEXT,
         message_status TEXT,
         study_status TEXT)""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
+    db2.execute("""CREATE TABLE IF NOT EXISTS att_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+        db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
         created_at TEXT DEFAULT (datetime('now')))""")
@@ -611,7 +623,9 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
     <button class="btn-add" onclick="openAttendanceAddModal()">+ إضافة سجل</button>
-  </div>
+  
+  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; اضافة جدول</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; تعديل الجدول</button></div>
   <div class="search-bar">
     <input type="text" id="attendanceSearchInput" placeholder="ابحث في سجل الغياب..." oninput="filterAttendanceTable()">
     <button class="btn-search" onclick="filterAttendanceTable()">بحث</button>
@@ -718,6 +732,66 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-delete" onclick="confirmAttendanceDelete()">حذف</button>
     </div>
   </div>
+
+<!-- ATTENDANCE EXCEL IMPORT MODAL -->
+<div class="modal-bg" id="attendanceExcelModal" style="display:none">
+  <div class="modal" style="max-width:480px;width:95%">
+    <h2 style="margin-bottom:14px;color:#388E3C;">&#128196; استيراد سجل غياب من Excel</h2>
+    <div style="background:#f1f8e9;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.88em;color:#2E7D32;line-height:1.7;">
+      <b>تعليمات:</b> يجب أن يحتوي ملف Excel على الأعمدة بهذا الترتيب:<br>
+      تاريخ أخذ الحضور، اليوم، المجموعة، اسم الطالب، رقم التواصل، الحالة، الرسالة، حالة إرسال الرسالة، حالة الدراسة
+    </div>
+    <button class="btn-add" style="width:100%;justify-content:center;" onclick="document.getElementById('attendanceExcelFileInput').click()">&#128194; اختر ملف Excel</button>
+    <input type="file" id="attendanceExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="readAttendanceExcelFile(this)">
+    <div id="attendanceExcelStatus" style="margin-top:10px;font-size:.9em;color:#555;text-align:center;"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeAttendanceExcelModal()">الغاء</button>
+      <button class="btn-save" id="attendanceExcelImportBtn" onclick="importAttendanceFromExcel()" style="display:none">استيراد</button>
+    </div>
+  </div>
+</div>
+
+<!-- ATTENDANCE TABLE EDIT MODAL -->
+<div class="modal-bg" id="attendanceTableEditModal" style="display:none">
+  <div class="modal" style="max-width:460px;width:95%">
+    <h2 style="margin-bottom:12px;color:#E65100;font-size:1.1em;">&#9881; تعديل جدول سجل الغياب</h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="btn-tab active" id="attTab1" onclick="switchAttTab('add')">إضافة عمود</button>
+      <button class="btn-tab" id="attTab2" onclick="switchAttTab('del')">حذف عمود</button>
+      <button class="btn-tab" id="attTab3" onclick="switchAttTab('rename')">تعديل عنوان</button>
+    </div>
+    <!-- Add column panel -->
+    <div id="attTabPanelAdd">
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اسم العمود الجديد</label>
+      <input type="text" id="att_new_col_name" placeholder="اسم العمود" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">مكان الإضافة:</div>
+      <select id="att_col_position" class="col-name-input" onchange="toggleAttPosition()">
+        <option value="end">في النهاية</option>
+        <option value="start">في البداية</option>
+        <option value="after">بعد عمود:</option>
+      </select>
+      <select id="att_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addAttendanceColumn()">إضافة</button>
+    </div>
+    <!-- Delete column panel -->
+    <div id="attTabPanelDel" style="display:none">
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اختر العمود للحذف</label>
+      <select id="att_del_col" class="col-name-input"></select>
+      <button style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteAttendanceColumn()">حذف العمود</button>
+    </div>
+    <!-- Rename column panel -->
+    <div id="attTabPanelRename" style="display:none">
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اختر العمود</label>
+      <select id="att_rename_col" class="col-name-input" onchange="fillAttRenameLabel()"></select>
+      <label style="font-size:.85em;color:#555;display:block;margin-top:8px;margin-bottom:4px;">الاسم الجديد</label>
+      <input type="text" id="att_rename_label" class="col-name-input" placeholder="الاسم الجديد">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateAttendanceColumnLabel()">حفظ</button>
+    </div>
+    <div style="margin-top:14px;text-align:left;">
+      <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">إغلاق</button>
+    </div>
+  </div>
+</div>
 </div><!-- DYNAMIC CUSTOM TABLES CONTAINER -->
 <div id="customTablesContainer"></div>
 
@@ -893,6 +967,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 </div>
 </div>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
 let allStudents=[];
 let deleteTargetId=null;
@@ -1748,6 +1823,161 @@ function openCustomImportModal(tid) {
 
 // Load custom tables on page load
 loadCustomTables();
+
+// ─── Attendance Excel Import ──────────────────────────────────────────────────
+var attendanceExcelRows = [];
+
+function openAttendanceExcelModal() {
+  attendanceExcelRows = [];
+  document.getElementById('attendanceExcelStatus').textContent = '';
+  document.getElementById('attendanceExcelImportBtn').style.display = 'none';
+  document.getElementById('attendanceExcelFileInput').value = '';
+  document.getElementById('attendanceExcelModal').style.display = 'flex';
+}
+
+function closeAttendanceExcelModal() {
+  document.getElementById('attendanceExcelModal').style.display = 'none';
+  attendanceExcelRows = [];
+}
+
+function readAttendanceExcelFile(input) {
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, {type: 'array'});
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      // Skip header row (row 0)
+      var dataRows = rows.slice(1).filter(function(r) { return r.some(function(c){ return String(c).trim() !== ''; }); });
+      attendanceExcelRows = dataRows;
+      document.getElementById('attendanceExcelStatus').textContent = 'تم قراءة ' + dataRows.length + ' صف. اضغط استيراد.';
+      document.getElementById('attendanceExcelImportBtn').style.display = dataRows.length > 0 ? 'inline-flex' : 'none';
+    } catch(err) {
+      document.getElementById('attendanceExcelStatus').textContent = 'خطأ في قراءة الملف: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function importAttendanceFromExcel() {
+  if(!attendanceExcelRows || attendanceExcelRows.length === 0) return;
+  var fields = ['attendance_date','day_name','group_name','student_name','contact_number','status','message','message_status','study_status'];
+  var batch = attendanceExcelRows.map(function(row) {
+    var obj = {};
+    fields.forEach(function(f,i){ obj[f] = String(row[i]||''); });
+    return obj;
+  });
+  var done = 0;
+  var total = batch.length;
+  var statusEl = document.getElementById('attendanceExcelStatus');
+  function sendNext(idx) {
+    if(idx >= total) {
+      statusEl.textContent = 'تم استيراد ' + done + ' سجل بنجاح!';
+      loadAttendance();
+      setTimeout(closeAttendanceExcelModal, 1500);
+      return;
+    }
+    fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(batch[idx])})
+      .then(function(r){ return r.json(); }).then(function(d){
+        if(d.ok) done++;
+        statusEl.textContent = 'جاري الاستيراد... ' + (idx+1) + ' / ' + total;
+        sendNext(idx+1);
+      }).catch(function(){ sendNext(idx+1); });
+  }
+  sendNext(0);
+}
+
+// ─── Attendance Column Management ────────────────────────────────────────────
+var allAttColumns = [];
+
+function loadAttColumns(callback) {
+  fetch('/api/att-columns').then(function(r){ return r.json(); }).then(function(cols){
+    allAttColumns = cols;
+    if(callback) callback(cols);
+  });
+}
+
+function openAttendanceTableEditModal() {
+  loadAttColumns(function(cols) {
+    // Populate dropdowns
+    var delSel = document.getElementById('att_del_col');
+    var renameSel = document.getElementById('att_rename_col');
+    var afterSel = document.getElementById('att_after_col');
+    delSel.innerHTML = '';
+    renameSel.innerHTML = '';
+    afterSel.innerHTML = '';
+    cols.forEach(function(c) {
+      var o1 = document.createElement('option'); o1.value = c.col_key; o1.textContent = c.col_label; delSel.appendChild(o1);
+      var o2 = document.createElement('option'); o2.value = c.col_key; o2.textContent = c.col_label; renameSel.appendChild(o2);
+      var o3 = document.createElement('option'); o3.value = c.col_key; o3.textContent = c.col_label; afterSel.appendChild(o3);
+    });
+    document.getElementById('att_new_col_name').value = '';
+    document.getElementById('att_col_position').value = 'end';
+    document.getElementById('att_after_col').style.display = 'none';
+    fillAttRenameLabel();
+    switchAttTab('add');
+    document.getElementById('attendanceTableEditModal').style.display = 'flex';
+  });
+}
+
+function closeAttendanceTableEditModal() {
+  document.getElementById('attendanceTableEditModal').style.display = 'none';
+}
+
+function switchAttTab(tab) {
+  var panels = ['attTabPanelAdd','attTabPanelDel','attTabPanelRename'];
+  var btns = ['attTab1','attTab2','attTab3'];
+  var idx = {add:0, del:1, rename:2}[tab];
+  panels.forEach(function(p,i){ document.getElementById(p).style.display = i===idx?'block':'none'; });
+  btns.forEach(function(b,i){ document.getElementById(b).classList.toggle('active', i===idx); });
+}
+
+function toggleAttPosition() {
+  var pos = document.getElementById('att_col_position').value;
+  document.getElementById('att_after_col').style.display = pos==='after'?'block':'none';
+}
+
+function fillAttRenameLabel() {
+  var sel = document.getElementById('att_rename_col');
+  var lbl = document.getElementById('att_rename_label');
+  if(sel && sel.options[sel.selectedIndex]) lbl.value = sel.options[sel.selectedIndex].text;
+}
+
+function addAttendanceColumn() {
+  var col_label = document.getElementById('att_new_col_name').value.trim();
+  if(!col_label){ showToast('أدخل اسم العمود','#e53935'); return; }
+  var position = document.getElementById('att_col_position').value;
+  var after_key = document.getElementById('att_after_col').value;
+  fetch('/api/att-columns', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:col_label, position:position, after_key:after_key})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم إضافة العمود','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function deleteAttendanceColumn() {
+  var col_key = document.getElementById('att_del_col').value;
+  if(!col_key) return;
+  fetch('/api/att-columns/' + col_key, {method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم الحذف','#e53935'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function updateAttendanceColumnLabel() {
+  var col_key = document.getElementById('att_rename_col').value;
+  var new_label = document.getElementById('att_rename_label').value.trim();
+  if(!new_label||!col_key){ showToast('أدخل الاسم الجديد','#e53935'); return; }
+  fetch('/api/att-columns/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:new_label})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ showToast('تم تعديل العنوان','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
 </script>
 </body>
 </html>"""
@@ -2145,6 +2375,101 @@ def api_attendance_delete(rid):
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
+
+
+# ─── Attendance Column Labels API ──────────────────────────────────────────────
+
+ATT_DEFAULT_COLS = [
+    ("attendance_date","تاريخ أخذ الحضور",1),
+    ("day_name","اليوم",2),
+    ("group_name","المجموعة",3),
+    ("student_name","اسم الطالب",4),
+    ("contact_number","رقم التواصل",5),
+    ("status","الحالة",6),
+    ("message","الرسالة",7),
+    ("message_status","حالة إرسال الرسالة",8),
+    ("study_status","حالة الدراسة",9),
+]
+
+@app.route('/api/att-columns', methods=['GET'])
+@login_required
+def api_att_columns_get():
+    db = get_db()
+    if db.execute("SELECT COUNT(*) FROM att_col_labels").fetchone()[0] == 0:
+        for key, label, order in ATT_DEFAULT_COLS:
+            try:
+                db.execute("INSERT INTO att_col_labels(col_key,col_label,col_order) VALUES(?,?,?)", (key, label, order))
+            except:
+                pass
+        db.commit()
+    cols = db.execute("SELECT * FROM att_col_labels ORDER BY col_order").fetchall()
+    return jsonify([dict(c) for c in cols])
+
+@app.route('/api/att-columns', methods=['POST'])
+@login_required
+def api_att_columns_add():
+    d = request.get_json()
+    col_label = d.get('col_label','').strip()
+    position = d.get('position','end')
+    after_key = d.get('after_key','')
+    if not col_label:
+        return jsonify({'ok':False,'error':'missing label'}),400
+    db = get_db()
+    try:
+        import re, time
+        col_key = 'att_col_' + str(int(time.time()*1000))[-6:]
+        max_order = db.execute("SELECT MAX(col_order) FROM att_col_labels").fetchone()[0] or 0
+        if position == 'start':
+            db.execute("UPDATE att_col_labels SET col_order=col_order+1")
+            new_order = 1
+        elif position == 'after' and after_key:
+            ao = db.execute("SELECT col_order FROM att_col_labels WHERE col_key=?", (after_key,)).fetchone()
+            ao = ao[0] if ao else max_order
+            db.execute("UPDATE att_col_labels SET col_order=col_order+1 WHERE col_order>?", (ao,))
+            new_order = ao + 1
+        else:
+            new_order = max_order + 1
+        db.execute("INSERT INTO att_col_labels(col_key,col_label,col_order) VALUES(?,?,?)", (col_key, col_label, new_order))
+        db.commit()
+        # Add column to attendance table
+        try:
+            db.execute("ALTER TABLE attendance ADD COLUMN " + col_key + " TEXT")
+            db.commit()
+        except:
+            pass
+        return jsonify({'ok':True})
+    except Exception as ex:
+        return jsonify({'ok':False,'error':str(ex)}),400
+
+@app.route('/api/att-columns/<col_key>', methods=['DELETE'])
+@login_required
+def api_att_columns_delete(col_key):
+    # Only allow deleting custom columns (not the 9 default ones)
+    default_keys = [c[0] for c in ATT_DEFAULT_COLS]
+    if col_key in default_keys:
+        return jsonify({'ok':False,'error':'لا يمكن حذف الأعمدة الأساسية'}),400
+    db = get_db()
+    try:
+        db.execute("DELETE FROM att_col_labels WHERE col_key=?", (col_key,))
+        db.commit()
+        return jsonify({'ok':True})
+    except Exception as ex:
+        return jsonify({'ok':False,'error':str(ex)}),400
+
+@app.route('/api/att-columns/<col_key>', methods=['PUT'])
+@login_required
+def api_att_columns_rename(col_key):
+    d = request.get_json()
+    new_label = d.get('col_label','').strip()
+    if not new_label:
+        return jsonify({'ok':False,'error':'missing label'}),400
+    db = get_db()
+    try:
+        db.execute("UPDATE att_col_labels SET col_label=? WHERE col_key=?", (new_label, col_key))
+        db.commit()
+        return jsonify({'ok':True})
+    except Exception as ex:
+        return jsonify({'ok':False,'error':str(ex)}),400
 
 
 # ─── Custom Tables API ────────────────────────────────────────────────────────
