@@ -1092,21 +1092,20 @@ function renderAttendanceTable(data) {
     var r = data[i];
     html += '<tr>';
     html += '<td>' + (i+1) + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'attendance_date\',this)">' + (r.attendance_date||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'day_name\',this)">' + (r.day_name||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'group_name\',this)">' + (r.group_name||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'student_name\',this)">' + (r.student_name||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'contact_number\',this)">' + (r.contact_number||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'status\',this)">' + (r.status||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'message\',this)">' + (r.message||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'message_status\',this)">' + (r.message_status||'') + '</td>';
-    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'study_status\',this)">' + (r.study_status||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="attendance_date" onclick="editAttendanceCellEl(this)">' + (r.attendance_date||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="day_name" onclick="editAttendanceCellEl(this)">' + (r.day_name||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="group_name" onclick="editAttendanceCellEl(this)">' + (r.group_name||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="student_name" onclick="editAttendanceCellEl(this)">' + (r.student_name||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="contact_number" onclick="editAttendanceCellEl(this)">' + (r.contact_number||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="status" onclick="editAttendanceCellEl(this)">' + (r.status||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="message" onclick="editAttendanceCellEl(this)">' + (r.message||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="message_status" onclick="editAttendanceCellEl(this)">' + (r.message_status||'') + '</td>';
+    html += '<td class="editable" data-id="' + r.id + '" data-field="study_status" onclick="editAttendanceCellEl(this)">' + (r.study_status||'') + '</td>';
     html += '<td><button class="btn-del-row" onclick="openAttendanceConfirm(' + r.id + ')">&#128465;</button></td>';
     html += '</tr>';
   }
   tbody.innerHTML = html;
 }
-
 function filterAttendanceTable() {
   var q = document.getElementById('attendanceSearchInput').value.toLowerCase();
   if(!q) { renderAttendanceTable(allAttendance); return; }
@@ -1155,6 +1154,13 @@ function saveAttendanceRecord() {
       if(d.ok){ closeAttendanceModal(); showToast('تم الحفظ','#4CAF50'); loadAttendance(); }
       else { showToast(d.error||'حدث خطأ','#e53935'); }
     });
+}
+
+function editAttendanceCellEl(tdEl) {
+  if(tdEl.querySelector('input,select,textarea')) return;
+  var id = parseInt(tdEl.getAttribute('data-id'));
+  var field = tdEl.getAttribute('data-field');
+  editAttendanceCell(id, field, tdEl);
 }
 
 function editAttendanceCell(id, field, tdEl) {
@@ -1213,7 +1219,6 @@ function editAttendanceCell(id, field, tdEl) {
   input.addEventListener('blur', saveCell);
   input.addEventListener('keydown', function(e){ if(e.key==='Enter' && field!=='message') { input.blur(); } });
 }
-
 function openAttendanceConfirm(id) {
   deletingAttendanceId = id;
   document.getElementById('attendanceConfirmModal').style.display = 'flex';
