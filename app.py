@@ -1442,16 +1442,14 @@ function buildCustomTableHTML(t) {
     '<span class="custom-table-title">&#128203; ' + t.tbl_name + '</span>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ إضافة صف</button>' +
-    '<button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openCustomImportModal(' + t.id + ')">&#128196; استيراد جدول</button>' +
     '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; تعديل الجدول</button>' +
-    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" onclick="openCustomTableDeleteConfirm(' + t.id + ','' + t.tbl_name + '')">&#128465; حذف الجدول</button>' +
+    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; حذف الجدول</button>' +
     '</div></div>' +
     '<div class="table-wrap"><table>' +
     '<thead><tr id="cthead_' + t.id + '">' + headerCells + '</tr></thead>' +
     '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
     '</table></div></div>';
 }
-
 // ── Wizard ────────────────────────────────────────────────────────────────────
 function openNewTableWizard() {
   document.getElementById('wiz_tbl_name').value = '';
@@ -1715,12 +1713,19 @@ function updateCustomColumnLabel() {
 }
 
 // ── Delete table ──────────────────────────────────────────────────────────────
+function openCustomTableDeleteConfirmById(btn) {
+  var tid = parseInt(btn.getAttribute('data-tid'));
+  var t = null;
+  for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid){ t=allCustomTables[i]; break; } }
+  var name = t ? t.tbl_name : '';
+  openCustomTableDeleteConfirm(tid, name);
+}
+
 function openCustomTableDeleteConfirm(tid, name) {
   deletingCustomTableId = tid;
   document.getElementById('customTableDeleteMsg').textContent = 'هل تريد حذف جدول "' + name + '"؟ سيتم حذف جميع البيانات.';
   document.getElementById('customTableDeleteConfirm').style.display = 'flex';
 }
-
 function closeCustomTableDeleteConfirm() {
   document.getElementById('customTableDeleteConfirm').style.display = 'none';
   deletingCustomTableId = null;
