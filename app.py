@@ -83,6 +83,17 @@ def init_db():
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
 
+    db.execute("""CREATE TABLE IF NOT EXISTS attendance(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attendance_date TEXT,
+        day_name TEXT,
+        group_name TEXT,
+        student_name TEXT,
+        contact_number TEXT,
+        status TEXT,
+        message TEXT,
+        message_status TEXT,
+        study_status TEXT)""")
     users = [
         ("admin","admin123","admin"),
         ("reception","rec123","reception"),
@@ -191,6 +202,17 @@ else:
     for col, coltype in new_cols:
         if col not in existing:
             db2.execute("ALTER TABLE students ADD COLUMN " + col + " " + coltype)
+    db2.execute("""CREATE TABLE IF NOT EXISTS attendance(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attendance_date TEXT,
+        day_name TEXT,
+        group_name TEXT,
+        student_name TEXT,
+        contact_number TEXT,
+        status TEXT,
+        message TEXT,
+        message_status TEXT,
+        study_status TEXT)""")
     db2.commit()
     db2.close()
 
@@ -336,6 +358,10 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .confirm-actions{display:flex;gap:12px;justify-content:center;}
 .btn-confirm-del{background:#e53935;color:#fff;border:none;padding:10px 26px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}
 .btn-confirm-cancel{background:#f5f5f5;color:#444;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+.btn-del-row{background:none;border:none;color:#e53935;font-size:16px;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.btn-del-row:hover{background:#fce4ec;}
+.editable{cursor:pointer;}
+.editable:hover{background:#f3eeff;}
 </style>
 </head>
 <body>
@@ -530,7 +556,126 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 </div>
 </div>
-<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد طلبة من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>الرقم الشخصي، اسم الطالب، الواتساب، النتيجة، المستوى 2026، المدرس 2026، هاتف الام، هاتف الاب، هاتف اخر، السكن، العنوان، الطريق، المجمع</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeStudentExcelModal()">الغاء</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد مجموعات من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>اسم المجموعة، اسم المدرس، المستوى، المقرر الفائت، وقت الدراسة، توقيت رمضان، توقيت الاونلاين، رابط المجموعة، الحصة بالدقيقة</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeGroupExcelModal()">الغاء</button></div></div></div><div class="toast" id="toast"></div>
+<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد طلبة من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>الرقم الشخصي، اسم الطالب، الواتساب، النتيجة، المستوى 2026، المدرس 2026، هاتف الام، هاتف الاب، هاتف اخر، السكن، العنوان، الطريق، المجمع</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeStudentExcelModal()">الغاء</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد مجموعات من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>اسم المجموعة، اسم المدرس، المستوى، المقرر الفائت، وقت الدراسة، توقيت رمضان، توقيت الاونلاين، رابط المجموعة، الحصة بالدقيقة</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeGroupExcelModal()">الغاء</button></div></div></div><div style="margin:30px 0 0 0;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; سجل الغياب</span>
+  </div>
+  <div class="stats" style="margin-bottom:10px;">
+    <div class="stat-card">
+      <span class="stat-num" id="attendanceTotalCount">0</span>
+      <span class="stat-label">إجمالي السجلات</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="btn-add" onclick="openAttendanceAddModal()">+ إضافة سجل</button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="attendanceSearchInput" placeholder="ابحث في سجل الغياب..." oninput="filterAttendanceTable()">
+    <button class="btn-search" onclick="filterAttendanceTable()">بحث</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>تاريخ أخذ الحضور</th>
+          <th>اليوم</th>
+          <th>المجموعة</th>
+          <th>اسم الطالب</th>
+          <th>رقم التواصل</th>
+          <th>الحالة</th>
+          <th>الرسالة</th>
+          <th>حالة إرسال الرسالة</th>
+          <th>حالة الدراسة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="attendanceBody"></tbody>
+    </table>
+  </div>
+</div>
+<!-- ATTENDANCE ADD/EDIT MODAL -->
+<div class="modal-bg" id="attendanceModal" style="display:none">
+  <div class="modal" style="max-width:520px;width:95%">
+    <h2 id="attendanceModalTitle" style="margin-bottom:16px;color:#6c3fa0;">إضافة سجل غياب</h2>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">تاريخ أخذ الحضور</label>
+          <input type="date" id="att_date" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">اليوم</label>
+          <input type="text" id="att_day" placeholder="مثال: الأحد" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">المجموعة</label>
+          <input type="text" id="att_group" placeholder="اسم المجموعة" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">اسم الطالب</label>
+          <input type="text" id="att_student" placeholder="اسم الطالب" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">رقم التواصل</label>
+          <input type="text" id="att_contact" placeholder="رقم الواتساب" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">الحالة</label>
+          <select id="att_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+            <option value="">-- اختر --</option>
+            <option>حاضر</option>
+            <option>غائب</option>
+            <option>متأخر</option>
+            <option>معتذر</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.85em;color:#555;">الرسالة</label>
+        <textarea id="att_message" rows="3" placeholder="نص الرسالة" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">حالة إرسال الرسالة</label>
+          <select id="att_msg_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+            <option value="">-- اختر --</option>
+            <option>تم الإرسال</option>
+            <option>لم يُرسل</option>
+            <option>فشل الإرسال</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.85em;color:#555;">حالة الدراسة</label>
+          <select id="att_study_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+            <option value="">-- اختر --</option>
+            <option>مستمر</option>
+            <option>منقطع</option>
+            <option>موقوف</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeAttendanceModal()">الغاء</button>
+      <button class="btn-save" onclick="saveAttendanceRecord()">حفظ</button>
+    </div>
+  </div>
+</div>
+<!-- ATTENDANCE CONFIRM DELETE MODAL -->
+<div class="confirm-bg" id="attendanceConfirmModal" style="display:none">
+  <div class="confirm-box">
+    <p>هل تريد حذف هذا السجل؟</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn-cancel" onclick="closeAttendanceConfirm()">الغاء</button>
+      <button class="btn-delete" onclick="confirmAttendanceDelete()">حذف</button>
+    </div>
+  </div>
+</div><div class="toast" id="toast"></div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
     <h2 id="groupModalTitle2" style="color:#0097A7;">اضافة مجموعة جديدة</h2>
@@ -923,6 +1068,173 @@ function updateGroupColumnLabel(){
     else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
   });
 }
+
+var allAttendance = [];
+var editingAttendanceId = null;
+var deletingAttendanceId = null;
+
+function loadAttendance() {
+  fetch('/api/attendance').then(r=>r.json()).then(data=>{
+    allAttendance = data;
+    document.getElementById('attendanceTotalCount').textContent = data.length;
+    renderAttendanceTable(data);
+  });
+}
+
+function renderAttendanceTable(data) {
+  var tbody = document.getElementById('attendanceBody');
+  if(!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" class="no-data">لا توجد سجلات، اضف أول سجل</td></tr>';
+    return;
+  }
+  var html = '';
+  for(var i=0; i<data.length; i++) {
+    var r = data[i];
+    html += '<tr>';
+    html += '<td>' + (i+1) + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'attendance_date\',this)">' + (r.attendance_date||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'day_name\',this)">' + (r.day_name||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'group_name\',this)">' + (r.group_name||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'student_name\',this)">' + (r.student_name||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'contact_number\',this)">' + (r.contact_number||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'status\',this)">' + (r.status||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'message\',this)">' + (r.message||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'message_status\',this)">' + (r.message_status||'') + '</td>';
+    html += '<td class="editable" onclick="editAttendanceCell(' + r.id + ',\'study_status\',this)">' + (r.study_status||'') + '</td>';
+    html += '<td><button class="btn-del-row" onclick="openAttendanceConfirm(' + r.id + ')">&#128465;</button></td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function filterAttendanceTable() {
+  var q = document.getElementById('attendanceSearchInput').value.toLowerCase();
+  if(!q) { renderAttendanceTable(allAttendance); return; }
+  var filtered = allAttendance.filter(function(r) {
+    return Object.values(r).some(function(v) { return String(v||'').toLowerCase().indexOf(q) !== -1; });
+  });
+  renderAttendanceTable(filtered);
+}
+
+function openAttendanceAddModal() {
+  editingAttendanceId = null;
+  document.getElementById('attendanceModalTitle').textContent = 'إضافة سجل غياب';
+  document.getElementById('att_date').value = '';
+  document.getElementById('att_day').value = '';
+  document.getElementById('att_group').value = '';
+  document.getElementById('att_student').value = '';
+  document.getElementById('att_contact').value = '';
+  document.getElementById('att_status').value = '';
+  document.getElementById('att_message').value = '';
+  document.getElementById('att_msg_status').value = '';
+  document.getElementById('att_study_status').value = '';
+  document.getElementById('attendanceModal').style.display = 'flex';
+}
+
+function closeAttendanceModal() {
+  document.getElementById('attendanceModal').style.display = 'none';
+  editingAttendanceId = null;
+}
+
+function saveAttendanceRecord() {
+  var data = {
+    attendance_date: document.getElementById('att_date').value,
+    day_name: document.getElementById('att_day').value,
+    group_name: document.getElementById('att_group').value,
+    student_name: document.getElementById('att_student').value,
+    contact_number: document.getElementById('att_contact').value,
+    status: document.getElementById('att_status').value,
+    message: document.getElementById('att_message').value,
+    message_status: document.getElementById('att_msg_status').value,
+    study_status: document.getElementById('att_study_status').value
+  };
+  var url = editingAttendanceId ? '/api/attendance/' + editingAttendanceId : '/api/attendance';
+  var method = editingAttendanceId ? 'PUT' : 'POST';
+  fetch(url, {method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.ok){ closeAttendanceModal(); showToast('تم الحفظ','#4CAF50'); loadAttendance(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+function editAttendanceCell(id, field, tdEl) {
+  if(tdEl.querySelector('input,select,textarea')) return;
+  var oldVal = tdEl.textContent.trim();
+  var input;
+  var selectOptions = {
+    'status': ['','حاضر','غائب','متأخر','معتذر'],
+    'message_status': ['','تم الإرسال','لم يُرسل','فشل الإرسال'],
+    'study_status': ['','مستمر','منقطع','موقوف']
+  };
+  if(selectOptions[field]) {
+    input = document.createElement('select');
+    input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
+    selectOptions[field].forEach(function(v){
+      var o = document.createElement('option');
+      o.value = v; o.textContent = v||'-- اختر --';
+      if(v === oldVal) o.selected = true;
+      input.appendChild(o);
+    });
+  } else if(field === 'message') {
+    input = document.createElement('textarea');
+    input.value = oldVal;
+    input.rows = 3;
+    input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;resize:vertical;';
+  } else if(field === 'attendance_date') {
+    input = document.createElement('input');
+    input.type = 'date';
+    input.value = oldVal;
+    input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
+  } else {
+    input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldVal;
+    input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
+  }
+  tdEl.innerHTML = '';
+  tdEl.appendChild(input);
+  input.focus();
+  var saved = false;
+  function saveCell() {
+    if(saved) return;
+    saved = true;
+    var newVal = input.value;
+    var rec = null;
+    for(var i=0; i<allAttendance.length; i++) { if(allAttendance[i].id===id){ rec=allAttendance[i]; break; } }
+    if(!rec) return;
+    var updated = Object.assign({}, rec);
+    updated[field] = newVal;
+    fetch('/api/attendance/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)})
+      .then(function(r){ return r.json(); }).then(function(d){
+        if(d.ok){ showToast('تم التحديث','#4CAF50'); loadAttendance(); }
+        else { showToast(d.error||'حدث خطأ','#e53935'); loadAttendance(); }
+      });
+  }
+  input.addEventListener('blur', saveCell);
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter' && field!=='message') { input.blur(); } });
+}
+
+function openAttendanceConfirm(id) {
+  deletingAttendanceId = id;
+  document.getElementById('attendanceConfirmModal').style.display = 'flex';
+}
+
+function closeAttendanceConfirm() {
+  document.getElementById('attendanceConfirmModal').style.display = 'none';
+  deletingAttendanceId = null;
+}
+
+function confirmAttendanceDelete() {
+  if(!deletingAttendanceId) return;
+  fetch('/api/attendance/' + deletingAttendanceId, {method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      closeAttendanceConfirm();
+      if(d.ok){ showToast('تم الحذف','#e53935'); loadAttendance(); }
+      else { showToast(d.error||'حدث خطأ','#e53935'); }
+    });
+}
+
+loadAttendance();
 </script>
 </body>
 </html>"""
@@ -1268,6 +1580,58 @@ def api_group_columns_update(col_key):
         return jsonify({"ok":True})
     except Exception as ex:
         return jsonify({"ok":False,"error":str(ex)}),400
+
+
+@app.route('/api/attendance', methods=['GET'])
+@login_required
+def api_attendance_get():
+    db = get_db()
+    rows = db.execute("SELECT * FROM attendance ORDER BY id DESC").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/attendance', methods=['POST'])
+@login_required
+def api_attendance_add():
+    d = request.get_json()
+    db = get_db()
+    try:
+        db.execute("""INSERT INTO attendance(attendance_date,day_name,group_name,student_name,contact_number,status,message,message_status,study_status)
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (d.get('attendance_date',''), d.get('day_name',''), d.get('group_name',''),
+             d.get('student_name',''), d.get('contact_number',''), d.get('status',''),
+             d.get('message',''), d.get('message_status',''), d.get('study_status','')))
+        db.commit()
+        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return jsonify({"ok": True, "id": rid})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route('/api/attendance/<int:rid>', methods=['PUT'])
+@login_required
+def api_attendance_update(rid):
+    d = request.get_json()
+    db = get_db()
+    try:
+        db.execute("""UPDATE attendance SET attendance_date=?,day_name=?,group_name=?,student_name=?,contact_number=?,status=?,message=?,message_status=?,study_status=? WHERE id=?""",
+            (d.get('attendance_date',''), d.get('day_name',''), d.get('group_name',''),
+             d.get('student_name',''), d.get('contact_number',''), d.get('status',''),
+             d.get('message',''), d.get('message_status',''), d.get('study_status',''), rid))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route('/api/attendance/<int:rid>', methods=['DELETE'])
+@login_required
+def api_attendance_delete(rid):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM attendance WHERE id=?", (rid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
 
 GROUPS_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
