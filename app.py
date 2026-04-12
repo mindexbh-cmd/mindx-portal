@@ -349,28 +349,36 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
 .btn-back:hover{background:rgba(255,255,255,.3);}
 .main{padding:24px 28px;}
-.section-title{font-size:20px;font-weight:800;color:#00897B;margin-bottom:16px;}
 .card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(0,137,123,.1);margin-bottom:24px;}
-.controls-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.controls-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
 .ctrl-group{display:flex;flex-direction:column;gap:5px;}
 .ctrl-label{font-size:12px;font-weight:700;color:#00897B;}
 select.group-select{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:200px;cursor:pointer;}
 select.group-select:focus{border-color:#00897B;background:#fff;}
 input.date-input{padding:10px 14px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;cursor:pointer;min-width:160px;direction:ltr;}
 input.date-input:focus{border-color:#00897B;background:#fff;}
-.day-badge{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border-radius:10px;font-size:15px;font-weight:700;min-width:110px;justify-content:center;}
-.day-badge.empty{background:#e0f2f1;color:#aaa;font-weight:600;}
-.student-count{font-size:13px;color:#666;background:#e0f2f1;padding:5px 12px;border-radius:20px;font-weight:600;align-self:flex-end;margin-bottom:2px;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow-x:auto;}
-table{width:100%;border-collapse:collapse;min-width:400px;}
-thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
-th{padding:13px 16px;font-size:14px;font-weight:700;text-align:right;}
-tbody tr{border-bottom:1px solid #e0f2f1;transition:background .15s;}
-tbody tr:hover{background:#e8f5e9;}
-td{padding:12px 16px;font-size:14px;color:#333;text-align:right;}
-td.num-cell{text-align:center;color:#888;font-size:13px;width:50px;}
-td.name-cell{font-weight:600;color:#00897B;}
-.no-data{text-align:center;padding:40px;color:#aaa;font-size:15px;}
+.day-badge{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border-radius:10px;font-size:15px;font-weight:700;min-width:110px;}
+.day-badge.empty{background:#e0f2f1;color:#9e9e9e;font-weight:600;}
+.student-count{font-size:13px;color:#fff;background:#00897B;padding:6px 14px;border-radius:20px;font-weight:700;align-self:flex-end;margin-bottom:2px;}
+.att-section{margin-top:0;}
+.att-section-title{font-size:18px;font-weight:800;color:#00897B;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
+.att-table-wrap table{width:100%;border-collapse:collapse;}
+.att-table-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
+.att-table-wrap th{padding:13px 18px;font-size:14px;font-weight:700;text-align:right;}
+.att-table-wrap th:first-child{text-align:center;width:52px;}
+.att-table-wrap tbody tr{border-bottom:1px solid #e0f2f1;transition:background .15s;}
+.att-table-wrap tbody tr:hover{background:#f0fdf9;}
+.att-table-wrap td{padding:10px 18px;font-size:14px;color:#333;text-align:right;vertical-align:middle;}
+.att-table-wrap td:first-child{text-align:center;color:#aaa;font-size:13px;font-weight:600;}
+.student-name-cell{font-weight:600;color:#1a1a2e;font-size:15px;}
+.status-select{padding:7px 14px;border:1.5px solid #80CBC4;border-radius:8px;font-size:14px;font-weight:600;background:#f0fdfc;color:#333;outline:none;cursor:pointer;min-width:130px;}
+.status-select:focus{border-color:#00897B;background:#fff;}
+.status-select.present{border-color:#43A047;background:#e8f5e9;color:#2e7d32;}
+.status-select.absent{border-color:#e53935;background:#fce4ec;color:#c62828;}
+.status-select.late{border-color:#FB8C00;background:#fff3e0;color:#e65100;}
+.empty-state{text-align:center;padding:48px 20px;color:#aaa;font-size:15px;}
+.empty-state-icon{font-size:40px;margin-bottom:10px;}
 .toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
 .toast.show{display:block;}
 </style>
@@ -400,24 +408,38 @@ td.name-cell{font-weight:600;color:#00897B;}
       <span class="student-count" id="studentCount" style="display:none;">0 طالب</span>
     </div>
   </div>
-  <div class="section-title" id="tableTitle" style="display:none;"></div>
-  <div class="table-wrap" id="studentsTableWrap" style="display:none;">
-    <table>
-      <thead>
-        <tr>
-          <th style="text-align:center;width:50px;">#</th>
-          <th>الاسم</th>
-        </tr>
-      </thead>
-      <tbody id="studentsTableBody">
-      </tbody>
-    </table>
+
+  <div class="att-section" id="attSection" style="display:none;">
+    <div class="att-section-title">
+      <span>&#9997;&#65039; كشف الحضور</span>
+      <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
+    </div>
+    <div class="att-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>الاسم</th>
+            <th>الحالة</th>
+          </tr>
+        </thead>
+        <tbody id="attTableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="emptyState" style="display:none;" class="att-table-wrap">
+    <div class="empty-state">
+      <div class="empty-state-icon">&#128218;</div>
+      <div>اختر مجموعة من القائمة أعلاه لعرض كشف الحضور</div>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
 var groupsData = {};
-var AR_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+var AR_DAYS = ['\u0627\u0644\u0623\u062d\u062f','\u0627\u0644\u0627\u062b\u0646\u064a\u0646','\u0627\u0644\u062b\u0644\u0627\u062b\u0627\u0621','\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621','\u0627\u0644\u062e\u0645\u064a\u0633','\u0627\u0644\u062c\u0645\u0639\u0629','\u0627\u0644\u0633\u0628\u062a'];
 
 function showToast(msg, bg) {
   var t = document.getElementById('toast');
@@ -433,16 +455,16 @@ function loadGroups() {
     .then(function(data) {
       groupsData = data;
       var sel = document.getElementById('groupSelect');
-      sel.innerHTML = '<option value="">&#8212; اختر المجموعة &#8212;</option>';
+      sel.innerHTML = '<option value="">&#8212; \u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 &#8212;</option>';
       var groups = Object.keys(data).sort();
       for(var i=0; i<groups.length; i++) {
         var opt = document.createElement('option');
         opt.value = groups[i];
-        opt.textContent = groups[i] + ' (' + data[groups[i]].length + ' طالب)';
+        opt.textContent = groups[i] + ' (' + data[groups[i]].length + ' \u0637\u0627\u0644\u0628)';
         sel.appendChild(opt);
       }
     })
-    .catch(function() { showToast('خطأ في تحميل البيانات', '#e53935'); });
+    .catch(function() { showToast('\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a', '#e53935'); });
 }
 
 function onDateChange() {
@@ -454,41 +476,62 @@ function onDateChange() {
     return;
   }
   var parts = val.split('-');
-  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-  var dayName = AR_DAYS[d.getDay()];
-  badge.textContent = dayName;
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  badge.textContent = AR_DAYS[d.getDay()];
   badge.className = 'day-badge';
+}
+
+function onStatusChange(sel, idx) {
+  var v = sel.value;
+  sel.className = 'status-select';
+  if(v === '\u062d\u0627\u0636\u0631') sel.className += ' present';
+  else if(v === '\u063a\u0627\u0626\u0628') sel.className += ' absent';
+  else if(v === '\u0645\u062a\u0623\u062e\u0631') sel.className += ' late';
 }
 
 function onGroupChange() {
   var sel = document.getElementById('groupSelect');
   var groupName = sel.value;
-  var tbody = document.getElementById('studentsTableBody');
-  var tableWrap = document.getElementById('studentsTableWrap');
-  var tableTitle = document.getElementById('tableTitle');
+  var tbody = document.getElementById('attTableBody');
+  var attSection = document.getElementById('attSection');
+  var emptyState = document.getElementById('emptyState');
   var countEl = document.getElementById('studentCount');
+  var groupNameEl = document.getElementById('attSectionGroupName');
+
   if(!groupName) {
-    tableWrap.style.display = 'none';
-    tableTitle.style.display = 'none';
+    attSection.style.display = 'none';
+    emptyState.style.display = 'block';
     countEl.style.display = 'none';
     tbody.innerHTML = '';
     return;
   }
+
   var students = groupsData[groupName] || [];
-  countEl.textContent = students.length + ' طالب';
-  countEl.style.display = 'inline-flex';
-  tableTitle.textContent = 'طلاب مجموعة: ' + groupName;
-  tableTitle.style.display = 'block';
+  countEl.textContent = students.length + ' \u0637\u0627\u0644\u0628';
+  countEl.style.display = 'inline-block';
+  groupNameEl.textContent = '\u2014 ' + groupName;
+
   if(students.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="2" class="no-data">لا يوجد طلاب في هذه المجموعة</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><div>\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</div></td></tr>';
   } else {
     var html = '';
     for(var i=0; i<students.length; i++) {
-      html += '<tr><td class="num-cell">' + (i+1) + '</td><td class="name-cell">' + (students[i].student_name || '-') + '</td></tr>';
+      var name = students[i].student_name || '-';
+      html += '<tr>';
+      html += '<td>' + (i+1) + '</td>';
+      html += '<td class="student-name-cell">' + name + '</td>';
+      html += '<td><select class="status-select" onchange="onStatusChange(this,' + i + ')">';
+      html += '<option value="">&#8212; \u0627\u062e\u062a\u0631 &#8212;</option>';
+      html += '<option value="\u062d\u0627\u0636\u0631">\u062d\u0627\u0636\u0631</option>';
+      html += '<option value="\u063a\u0627\u0626\u0628">\u063a\u0627\u0626\u0628</option>';
+      html += '<option value="\u0645\u062a\u0623\u062e\u0631">\u0645\u062a\u0623\u062e\u0631</option>';
+      html += '</select></td>';
+      html += '</tr>';
     }
     tbody.innerHTML = html;
   }
-  tableWrap.style.display = 'block';
+  attSection.style.display = 'block';
+  emptyState.style.display = 'none';
 }
 
 loadGroups();
