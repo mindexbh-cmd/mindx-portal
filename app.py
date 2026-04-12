@@ -351,11 +351,16 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .main{padding:24px 28px;}
 .section-title{font-size:20px;font-weight:800;color:#00897B;margin-bottom:16px;}
 .card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(0,137,123,.1);margin-bottom:24px;}
-.field-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:0;}
-.field-label{font-size:14px;font-weight:700;color:#00897B;white-space:nowrap;}
-select.group-select{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:240px;cursor:pointer;}
+.controls-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.ctrl-group{display:flex;flex-direction:column;gap:5px;}
+.ctrl-label{font-size:12px;font-weight:700;color:#00897B;}
+select.group-select{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:200px;cursor:pointer;}
 select.group-select:focus{border-color:#00897B;background:#fff;}
-.student-count{font-size:13px;color:#666;background:#e0f2f1;padding:5px 12px;border-radius:20px;font-weight:600;}
+input.date-input{padding:10px 14px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;cursor:pointer;min-width:160px;direction:ltr;}
+input.date-input:focus{border-color:#00897B;background:#fff;}
+.day-badge{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border-radius:10px;font-size:15px;font-weight:700;min-width:110px;justify-content:center;}
+.day-badge.empty{background:#e0f2f1;color:#aaa;font-weight:600;}
+.student-count{font-size:13px;color:#666;background:#e0f2f1;padding:5px 12px;border-radius:20px;font-weight:600;align-self:flex-end;margin-bottom:2px;}
 .table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow-x:auto;}
 table{width:100%;border-collapse:collapse;min-width:400px;}
 thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -377,11 +382,21 @@ td.name-cell{font-weight:600;color:#00897B;}
 </div>
 <div class="main">
   <div class="card">
-    <div class="field-row">
-      <span class="field-label">&#128218; المجموعة:</span>
-      <select class="group-select" id="groupSelect" onchange="onGroupChange()">
-        <option value="">&#8212; اختر المجموعة &#8212;</option>
-      </select>
+    <div class="controls-row">
+      <div class="ctrl-group">
+        <span class="ctrl-label">&#128218; المجموعة</span>
+        <select class="group-select" id="groupSelect" onchange="onGroupChange()">
+          <option value="">&#8212; اختر المجموعة &#8212;</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">&#128197; التاريخ</span>
+        <input type="date" class="date-input" id="dateInput" onchange="onDateChange()">
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">&#128340; اليوم</span>
+        <div class="day-badge empty" id="dayBadge">&#8212;</div>
+      </div>
       <span class="student-count" id="studentCount" style="display:none;">0 طالب</span>
     </div>
   </div>
@@ -402,6 +417,8 @@ td.name-cell{font-weight:600;color:#00897B;}
 <div class="toast" id="toast"></div>
 <script>
 var groupsData = {};
+var AR_DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
 function showToast(msg, bg) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -409,6 +426,7 @@ function showToast(msg, bg) {
   t.classList.add('show');
   setTimeout(function(){ t.classList.remove('show'); }, 3000);
 }
+
 function loadGroups() {
   fetch('/api/groups-students')
     .then(function(r){ return r.json(); })
@@ -426,6 +444,22 @@ function loadGroups() {
     })
     .catch(function() { showToast('خطأ في تحميل البيانات', '#e53935'); });
 }
+
+function onDateChange() {
+  var val = document.getElementById('dateInput').value;
+  var badge = document.getElementById('dayBadge');
+  if(!val) {
+    badge.textContent = '\u2014';
+    badge.className = 'day-badge empty';
+    return;
+  }
+  var parts = val.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  var dayName = AR_DAYS[d.getDay()];
+  badge.textContent = dayName;
+  badge.className = 'day-badge';
+}
+
 function onGroupChange() {
   var sel = document.getElementById('groupSelect');
   var groupName = sel.value;
@@ -442,7 +476,7 @@ function onGroupChange() {
   }
   var students = groupsData[groupName] || [];
   countEl.textContent = students.length + ' طالب';
-  countEl.style.display = 'inline-block';
+  countEl.style.display = 'inline-flex';
   tableTitle.textContent = 'طلاب مجموعة: ' + groupName;
   tableTitle.style.display = 'block';
   if(students.length === 0) {
@@ -456,6 +490,7 @@ function onGroupChange() {
   }
   tableWrap.style.display = 'block';
 }
+
 loadGroups();
 </script>
 </body>
