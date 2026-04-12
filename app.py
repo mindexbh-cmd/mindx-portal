@@ -341,10 +341,126 @@ ATTENDANCE_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>تسجيل الغياب - Mindex</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:#f5f3ff;min-height:100vh;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:20px;font-weight:800;}
+.btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+.btn-back:hover{background:rgba(255,255,255,.3);}
+.main{padding:24px 28px;}
+.section-title{font-size:20px;font-weight:800;color:#00897B;margin-bottom:16px;}
+.card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(0,137,123,.1);margin-bottom:24px;}
+.field-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:0;}
+.field-label{font-size:14px;font-weight:700;color:#00897B;white-space:nowrap;}
+select.group-select{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:240px;cursor:pointer;}
+select.group-select:focus{border-color:#00897B;background:#fff;}
+.student-count{font-size:13px;color:#666;background:#e0f2f1;padding:5px 12px;border-radius:20px;font-weight:600;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow-x:auto;}
+table{width:100%;border-collapse:collapse;min-width:400px;}
+thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
+th{padding:13px 16px;font-size:14px;font-weight:700;text-align:right;}
+tbody tr{border-bottom:1px solid #e0f2f1;transition:background .15s;}
+tbody tr:hover{background:#e8f5e9;}
+td{padding:12px 16px;font-size:14px;color:#333;text-align:right;}
+td.num-cell{text-align:center;color:#888;font-size:13px;width:50px;}
+td.name-cell{font-weight:600;color:#00897B;}
+.no-data{text-align:center;padding:40px;color:#aaa;font-size:15px;}
+.toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
+.toast.show{display:block;}
+</style>
 </head>
 <body>
+<div class="topbar">
+  <h1>&#128197; تسجيل الغياب</h1>
+  <a href="/dashboard" class="btn-back">&larr; الرئيسية</a>
+</div>
+<div class="main">
+  <div class="card">
+    <div class="field-row">
+      <span class="field-label">&#128218; المجموعة:</span>
+      <select class="group-select" id="groupSelect" onchange="onGroupChange()">
+        <option value="">&#8212; اختر المجموعة &#8212;</option>
+      </select>
+      <span class="student-count" id="studentCount" style="display:none;">0 طالب</span>
+    </div>
+  </div>
+  <div class="section-title" id="tableTitle" style="display:none;"></div>
+  <div class="table-wrap" id="studentsTableWrap" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:center;width:50px;">#</th>
+          <th>الاسم</th>
+        </tr>
+      </thead>
+      <tbody id="studentsTableBody">
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+var groupsData = {};
+function showToast(msg, bg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = bg || '#00897B';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+function loadGroups() {
+  fetch('/api/groups-students')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      groupsData = data;
+      var sel = document.getElementById('groupSelect');
+      sel.innerHTML = '<option value="">&#8212; اختر المجموعة &#8212;</option>';
+      var groups = Object.keys(data).sort();
+      for(var i=0; i<groups.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = groups[i];
+        opt.textContent = groups[i] + ' (' + data[groups[i]].length + ' طالب)';
+        sel.appendChild(opt);
+      }
+    })
+    .catch(function() { showToast('خطأ في تحميل البيانات', '#e53935'); });
+}
+function onGroupChange() {
+  var sel = document.getElementById('groupSelect');
+  var groupName = sel.value;
+  var tbody = document.getElementById('studentsTableBody');
+  var tableWrap = document.getElementById('studentsTableWrap');
+  var tableTitle = document.getElementById('tableTitle');
+  var countEl = document.getElementById('studentCount');
+  if(!groupName) {
+    tableWrap.style.display = 'none';
+    tableTitle.style.display = 'none';
+    countEl.style.display = 'none';
+    tbody.innerHTML = '';
+    return;
+  }
+  var students = groupsData[groupName] || [];
+  countEl.textContent = students.length + ' طالب';
+  countEl.style.display = 'inline-block';
+  tableTitle.textContent = 'طلاب مجموعة: ' + groupName;
+  tableTitle.style.display = 'block';
+  if(students.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" class="no-data">لا يوجد طلاب في هذه المجموعة</td></tr>';
+  } else {
+    var html = '';
+    for(var i=0; i<students.length; i++) {
+      html += '<tr><td class="num-cell">' + (i+1) + '</td><td class="name-cell">' + (students[i].student_name || '-') + '</td></tr>';
+    }
+    tbody.innerHTML = html;
+  }
+  tableWrap.style.display = 'block';
+}
+loadGroups();
+</script>
 </body>
 </html>"""
+
 
 DATABASE_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -2922,6 +3038,23 @@ def api_groups_delete(gid):
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/groups-students", methods=["GET"])
+@login_required
+def api_groups_students():
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT group_name_student FROM students WHERE group_name_student IS NOT NULL AND group_name_student != '' ORDER BY group_name_student"
+    ).fetchall()
+    groups = {}
+    for row in rows:
+        gname = row[0]
+        students = db.execute(
+            "SELECT id, student_name, personal_id FROM students WHERE group_name_student=? ORDER BY student_name",
+            (gname,)
+        ).fetchall()
+        groups[gname] = [dict(s) for s in students]
+    return jsonify(groups)
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
