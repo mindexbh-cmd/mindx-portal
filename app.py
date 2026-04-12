@@ -447,7 +447,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
       </div>
 
     </div>
-    <div class="search-wrap" id="searchWrap" style="display:none;">
+    <div class="search-wrap" id="searchWrap" style="display:flex;">
       <span class="search-icon">&#128269;</span>
       <input type="text" class="search-input" id="searchInput"
              placeholder="&#1575;&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605; &#1571;&#1608; &#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1588;&#1582;&#1589;&#1610;..."
@@ -586,6 +586,10 @@ function loadGroups() {
         opt.textContent = groups[i] + ' (' + data[groups[i]].length + ' \u0637\u0627\u0644\u0628)';
         sel.appendChild(opt);
       }
+      // Update search placeholder with count
+      var totalStudents = Object.values(data).reduce(function(a,b){return a+b.length;},0);
+      var inp = document.getElementById('searchInput');
+      if(inp) inp.placeholder = '\u0627\u0628\u062d\u062b \u0628\u064a\u0646 ' + totalStudents + ' \u0637\u0627\u0644\u0628...';
     })
     .catch(function() { showToast('\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a', '#e53935'); });
 }
@@ -607,7 +611,6 @@ function onControlChange() {
   // Hide everything and reset
   document.getElementById('attSection').style.display = 'none';
   document.getElementById('attFooterBtns').style.display = 'none';
-  document.getElementById('searchWrap').style.display = 'none';
   clearSearch();
   document.getElementById('alertBanner').className = 'alert-banner';
   document.getElementById('alertBanner').style.display = 'none';
@@ -649,7 +652,6 @@ function checkAndLoad(group, date) {
       }
       document.getElementById('attSection').style.display = 'block';
       document.getElementById('attFooterBtns').style.display = 'flex';
-      document.getElementById('searchWrap').style.display = 'flex';
     })
     .catch(function() {
       document.getElementById('checkSpinner').classList.remove('show');
