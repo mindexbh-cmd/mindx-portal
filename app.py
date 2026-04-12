@@ -325,125 +325,24 @@ HOME_HTML = """<!DOCTYPE html>
 body{background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:18px;}
 .btn{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
 .btn:hover{opacity:0.9;}
-.btn-attend{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;letter-spacing:0.5px;}
+.btn-attend{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
 .btn-attend:hover{opacity:0.9;}
-.att-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;}
-.att-modal-bg.open{display:flex;}
-.att-modal{background:#fff;border-radius:18px;padding:30px 28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,137,123,.2);border-top:4px solid #00897B;}
-.att-modal h2{font-size:20px;font-weight:800;color:#00695C;margin-bottom:20px;text-align:center;}
-.att-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.att-field label{display:block;font-size:13px;color:#00695C;font-weight:600;margin-bottom:4px;}
-.att-field input,.att-field select,.att-field textarea{width:100%;padding:9px 12px;border:1.5px solid #b2dfdb;border-radius:9px;font-size:14px;outline:none;background:#f0fdfa;direction:rtl;}
-.att-field input:focus,.att-field select:focus,.att-field textarea:focus{border-color:#00897B;background:#fff;}
-.att-field.full{grid-column:1/-1;}
-.att-modal-actions{display:flex;gap:12px;justify-content:center;margin-top:20px;}
-.att-btn-save{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:11px 34px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;}
-.att-btn-cancel{background:#e0f2f1;color:#00695C;border:none;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer;}
-.att-btn-cancel:hover{background:#b2dfdb;}
-.att-toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
-.att-toast.show{display:block;}
 </style>
 </head>
 <body>
 <a href="/database" class="btn">قاعدة البيانات</a>
-<button class="btn-attend" onclick="document.getElementById('attModal').classList.add('open')">تسجيل الغياب &#128197;</button>
-<div class="att-modal-bg" id="attModal">
-  <div class="att-modal">
-    <h2>رسالة الغياب ⚠️ تسجيل</h2>
-    <div class="att-form-grid">
-      <div class="att-field">
-        <label>تاريخ أخذ الحضور</label>
-        <input type="date" id="hm_att_date">
-      </div>
-      <div class="att-field">
-        <label>اليوم</label>
-        <input type="text" id="hm_att_day" placeholder="مثال: الأحد">
-      </div>
-      <div class="att-field">
-        <label>المجموعة</label>
-        <input type="text" id="hm_att_group" placeholder="اسم المجموعة">
-      </div>
-      <div class="att-field">
-        <label>اسم الطالب</label>
-        <input type="text" id="hm_att_student" placeholder="اسم الطالب">
-      </div>
-      <div class="att-field">
-        <label>رقم التواصل</label>
-        <input type="text" id="hm_att_contact" placeholder="رقم الواتسآب">
-      </div>
-      <div class="att-field">
-        <label>الحالة</label>
-        <select id="hm_att_status">
-          <option value="">-- اختر --</option>
-          <option>حاضر</option>
-          <option>غائب</option>
-          <option>متأخر</option>
-          <option>معتذر</option>
-        </select>
-      </div>
-      <div class="att-field full">
-        <label>الرسالة</label>
-        <textarea id="hm_att_message" rows="3" placeholder="نص الرسالة"></textarea>
-      </div>
-      <div class="att-field">
-        <label>حالة إرسال الرسالة</label>
-        <select id="hm_att_msg_status">
-          <option value="">-- اختر --</option>
-          <option>تم الإرسال</option>
-          <option>لم يُرسل</option>
-          <option>فشل الإرسال</option>
-        </select>
-      </div>
-      <div class="att-field">
-        <label>حالة الدراسة</label>
-        <select id="hm_att_study_status">
-          <option value="">-- اختر --</option>
-          <option>مستمر</option>
-          <option>منقطع</option>
-          <option>موقوف</option>
-        </select>
-      </div>
-    </div>
-    <div class="att-modal-actions">
-      <button class="att-btn-cancel" onclick="closeAttModal()">إلغاء</button>
-      <button class="att-btn-save" onclick="saveAttRecord()">حفظ</button>
-    </div>
-  </div>
-</div>
-<div class="att-toast" id="attToast"></div>
-<script>
-function closeAttModal(){
-  document.getElementById('attModal').classList.remove('open');
-  ['hm_att_date','hm_att_day','hm_att_group','hm_att_student','hm_att_contact','hm_att_status','hm_att_message','hm_att_msg_status','hm_att_study_status'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value='';
-  });
-}
-function showAttToast(msg,bg){
-  var t=document.getElementById('attToast');
-  t.textContent=msg; t.style.background=bg||'#00897B'; t.classList.add('show');
-  setTimeout(function(){t.classList.remove('show');},3000);
-}
-function saveAttRecord(){
-  var d={
-    attendance_date:document.getElementById('hm_att_date').value,
-    day_name:document.getElementById('hm_att_day').value,
-    group_name:document.getElementById('hm_att_group').value,
-    student_name:document.getElementById('hm_att_student').value,
-    contact_number:document.getElementById('hm_att_contact').value,
-    status:document.getElementById('hm_att_status').value,
-    message:document.getElementById('hm_att_message').value,
-    message_status:document.getElementById('hm_att_msg_status').value,
-    study_status:document.getElementById('hm_att_study_status').value
-  };
-  fetch('/api/attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
-  .then(function(r){return r.json();})
-  .then(function(res){
-    if(res.ok){closeAttModal();showAttToast('تم حفظ سجل الغياب بنجاح ✅');}
-    else{showAttToast('حدث خطأ. تأكد من تسجيل الدخول','#e53935');}
-  }).catch(function(){showAttToast('حدث خطأ. تأكد من تسجيل الدخول','#e53935');});
-}
-document.getElementById('attModal').addEventListener('click',function(e){if(e.target===this)closeAttModal();});
-</script>
+<a href="/attendance" class="btn-attend">تسجيل الغياب 📅</a>
+</body>
+</html>"""
+
+ATTENDANCE_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تسجيل الغياب - Mindex</title>
+</head>
+<body>
 </body>
 </html>"""
 
@@ -2124,6 +2023,11 @@ def login():
 @login_required
 def dashboard():
     return HOME_HTML
+
+@app.route("/attendance")
+@login_required
+def attendance():
+    return ATTENDANCE_HTML
 
 @app.route("/database")
 @login_required
