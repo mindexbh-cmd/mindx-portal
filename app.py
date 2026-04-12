@@ -329,6 +329,104 @@ body{background:#fff;display:flex;align-items:center;justify-content:center;min-
 </head>
 <body>
 <a href="/database" class="btn">قاعدة البيانات</a>
+<button class="btn-attend" onclick="document.getElementById('attModal').classList.add('open')">تسجيل الغياب &#128197;</button>
+<div class="att-modal-bg" id="attModal">
+  <div class="att-modal">
+    <h2>رسالة الغياب ⚠️ تسجيل</h2>
+    <div class="att-form-grid">
+      <div class="att-field">
+        <label>تاريخ أخذ الحضور</label>
+        <input type="date" id="hm_att_date">
+      </div>
+      <div class="att-field">
+        <label>اليوم</label>
+        <input type="text" id="hm_att_day" placeholder="مثال: الأحد">
+      </div>
+      <div class="att-field">
+        <label>المجموعة</label>
+        <input type="text" id="hm_att_group" placeholder="اسم المجموعة">
+      </div>
+      <div class="att-field">
+        <label>اسم الطالب</label>
+        <input type="text" id="hm_att_student" placeholder="اسم الطالب">
+      </div>
+      <div class="att-field">
+        <label>رقم التواصل</label>
+        <input type="text" id="hm_att_contact" placeholder="رقم الواتسآب">
+      </div>
+      <div class="att-field">
+        <label>الحالة</label>
+        <select id="hm_att_status">
+          <option value="">-- اختر --</option>
+          <option>حاضر</option>
+          <option>غائب</option>
+          <option>متأخر</option>
+          <option>معتذر</option>
+        </select>
+      </div>
+      <div class="att-field full">
+        <label>الرسالة</label>
+        <textarea id="hm_att_message" rows="3" placeholder="نص الرسالة"></textarea>
+      </div>
+      <div class="att-field">
+        <label>حالة إرسال الرسالة</label>
+        <select id="hm_att_msg_status">
+          <option value="">-- اختر --</option>
+          <option>تم الإرسال</option>
+          <option>لم يُرسل</option>
+          <option>فشل الإرسال</option>
+        </select>
+      </div>
+      <div class="att-field">
+        <label>حالة الدراسة</label>
+        <select id="hm_att_study_status">
+          <option value="">-- اختر --</option>
+          <option>مستمر</option>
+          <option>منقطع</option>
+          <option>موقوف</option>
+        </select>
+      </div>
+    </div>
+    <div class="att-modal-actions">
+      <button class="att-btn-cancel" onclick="closeAttModal()">إلغاء</button>
+      <button class="att-btn-save" onclick="saveAttRecord()">حفظ</button>
+    </div>
+  </div>
+</div>
+<div class="att-toast" id="attToast"></div>
+<script>
+function closeAttModal(){
+  document.getElementById('attModal').classList.remove('open');
+  ['hm_att_date','hm_att_day','hm_att_group','hm_att_student','hm_att_contact','hm_att_status','hm_att_message','hm_att_msg_status','hm_att_study_status'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+}
+function showAttToast(msg,bg){
+  var t=document.getElementById('attToast');
+  t.textContent=msg; t.style.background=bg||'#00897B'; t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},3000);
+}
+function saveAttRecord(){
+  var d={
+    attendance_date:document.getElementById('hm_att_date').value,
+    day_name:document.getElementById('hm_att_day').value,
+    group_name:document.getElementById('hm_att_group').value,
+    student_name:document.getElementById('hm_att_student').value,
+    contact_number:document.getElementById('hm_att_contact').value,
+    status:document.getElementById('hm_att_status').value,
+    message:document.getElementById('hm_att_message').value,
+    message_status:document.getElementById('hm_att_msg_status').value,
+    study_status:document.getElementById('hm_att_study_status').value
+  };
+  fetch('/api/attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(res.ok){closeAttModal();showAttToast('تم حفظ سجل الغياب بنجاح ✅');}
+    else{showAttToast('حدث خطأ. تأكد من تسجيل الدخول','#e53935');}
+  }).catch(function(){showAttToast('حدث خطأ. تأكد من تسجيل الدخول','#e53935');});
+}
+document.getElementById('attModal').addEventListener('click',function(e){if(e.target===this)closeAttModal();});
+</script>
 </body>
 </html>"""
 
