@@ -439,6 +439,15 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
     <span id="alertText"></span>
   </div>
 
+  <div class="search-wrap" id="searchWrap" style="display:flex;">
+    <span class="search-icon">&#128269;</span>
+    <input type="text" class="search-input" id="searchInput"
+           placeholder="&#1575;&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605; &#1571;&#1608; &#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1588;&#1582;&#1589;&#1610;..."
+           oninput="onSearchInput(this.value)"
+           autocomplete="off">
+    <span class="search-result-badge" id="searchBadge" style="display:none;"></span>
+    <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;" title="&#1605;&#1587;&#1581;">&#10006;</button>
+  </div>
   <div class="att-section" id="attSection" style="display:none;">
     <div class="att-section-header">
       <div class="att-section-title">
@@ -446,15 +455,6 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
       </div>
 
-    </div>
-    <div class="search-wrap" id="searchWrap" style="display:flex;">
-      <span class="search-icon">&#128269;</span>
-      <input type="text" class="search-input" id="searchInput"
-             placeholder="&#1575;&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605; &#1571;&#1608; &#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1588;&#1582;&#1589;&#1610;..."
-             oninput="onSearchInput(this.value)"
-             autocomplete="off">
-      <span class="search-result-badge" id="searchBadge" style="display:none;"></span>
-      <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;" title="&#1605;&#1587;&#1581;">&#10006;</button>
     </div>
     <div class="att-table-wrap">
       <table>
