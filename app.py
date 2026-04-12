@@ -322,9 +322,26 @@ HOME_HTML = """<!DOCTYPE html>
 <title>Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-body{background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+body{background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:18px;}
 .btn{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
 .btn:hover{opacity:0.9;}
+.btn-attend{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;letter-spacing:0.5px;}
+.btn-attend:hover{opacity:0.9;}
+.att-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;}
+.att-modal-bg.open{display:flex;}
+.att-modal{background:#fff;border-radius:18px;padding:30px 28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,137,123,.2);border-top:4px solid #00897B;}
+.att-modal h2{font-size:20px;font-weight:800;color:#00695C;margin-bottom:20px;text-align:center;}
+.att-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.att-field label{display:block;font-size:13px;color:#00695C;font-weight:600;margin-bottom:4px;}
+.att-field input,.att-field select,.att-field textarea{width:100%;padding:9px 12px;border:1.5px solid #b2dfdb;border-radius:9px;font-size:14px;outline:none;background:#f0fdfa;direction:rtl;}
+.att-field input:focus,.att-field select:focus,.att-field textarea:focus{border-color:#00897B;background:#fff;}
+.att-field.full{grid-column:1/-1;}
+.att-modal-actions{display:flex;gap:12px;justify-content:center;margin-top:20px;}
+.att-btn-save{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:11px 34px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;}
+.att-btn-cancel{background:#e0f2f1;color:#00695C;border:none;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer;}
+.att-btn-cancel:hover{background:#b2dfdb;}
+.att-toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
+.att-toast.show{display:block;}
 </style>
 </head>
 <body>
