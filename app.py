@@ -375,6 +375,14 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .att-footer-btns{display:flex;align-items:center;gap:14px;margin-top:22px;padding:0 4px;}
 .btn-cancel-att{background:#fff;color:#e53935;border:2px solid #e53935;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;}
 .btn-cancel-att:hover{background:#fdecea;transform:translateY(-2px);}
+.search-wrap{display:flex;align-items:center;gap:10px;margin-bottom:16px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,137,123,.1);padding:10px 16px;border:2px solid #e0f2f1;}
+.search-wrap:focus-within{border-color:#26A69A;box-shadow:0 2px 16px rgba(0,137,123,.2);}
+.search-icon{font-size:18px;color:#80CBC4;flex-shrink:0;}
+.search-input{flex:1;border:none;outline:none;font-size:15px;color:#333;background:transparent;direction:rtl;}
+.search-input::placeholder{color:#b2dfdb;}
+.search-clear{background:none;border:none;cursor:pointer;color:#80CBC4;font-size:18px;padding:0 2px;line-height:1;transition:color .2s;}
+.search-clear:hover{color:#e53935;}
+.search-result-badge{font-size:12px;color:#fff;background:#26A69A;border-radius:8px;padding:2px 8px;white-space:nowrap;}
 .att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
 .att-table-wrap table{width:100%;border-collapse:collapse;}
 .att-table-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -439,6 +447,15 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
       </div>
 
     </div>
+    <div class="search-wrap" id="searchWrap" style="display:none;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" id="searchInput"
+             placeholder="&#1575;&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605; &#1571;&#1608; &#1575;&#1604;&#1585;&#1602;&#1605; &#1575;&#1604;&#1588;&#1582;&#1589;&#1610;..."
+             oninput="onSearchInput(this.value)"
+             autocomplete="off">
+      <span class="search-result-badge" id="searchBadge" style="display:none;"></span>
+      <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;" title="&#1605;&#1587;&#1581;">&#10006;</button>
+    </div>
     <div class="att-table-wrap">
       <table>
         <thead>
@@ -477,6 +494,84 @@ function showToast(msg, bg) {
   setTimeout(function(){ t.classList.remove('show'); }, 3500);
 }
 
+function normalizeAr(s) {
+  if (!s) return '';
+  return s
+    .replace(/[أإآا]/g, 'ا')  // أإآا → ا
+    .replace(/[ةه]/g, 'ه')               // ةه → ه
+    .replace(/[ىي]/g, 'ي')               // ىي → ي
+    .replace(/[ً-ٟ]/g, '');                   // remove tashkeel
+}
+
+var _searchTimeout = null;
+
+function onSearchInput(val) {
+  var clearBtn = document.getElementById('searchClear');
+  var badge = document.getElementById('searchBadge');
+  if (val.trim()) {
+    clearBtn.style.display = 'inline-block';
+  } else {
+    clearBtn.style.display = 'none';
+    badge.style.display = 'none';
+  }
+  clearTimeout(_searchTimeout);
+  _searchTimeout = setTimeout(function() {
+    performSearch(val.trim());
+  }, 300);
+}
+
+function clearSearch() {
+  var input = document.getElementById('searchInput');
+  var clearBtn = document.getElementById('searchClear');
+  var badge = document.getElementById('searchBadge');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (badge) badge.style.display = 'none';
+}
+
+function performSearch(query) {
+  var badge = document.getElementById('searchBadge');
+  if (!query) { badge.style.display = 'none'; return; }
+
+  var norm = normalizeAr(query);
+  var found = null;
+  var foundGroup = '';
+
+  // Search in groupsData
+  var groups = Object.keys(groupsData);
+  for (var g = 0; g < groups.length; g++) {
+    var grp = groups[g];
+    var students = groupsData[grp];
+    for (var s = 0; s < students.length; s++) {
+      var st = students[s];
+      var nameNorm = normalizeAr(st.student_name || '');
+      var idNorm = (st.personal_id || '').toString().trim();
+      if (nameNorm.indexOf(norm) !== -1 || idNorm.indexOf(query) !== -1) {
+        found = st;
+        foundGroup = grp;
+        break;
+      }
+    }
+    if (found) break;
+  }
+
+  if (found) {
+    badge.textContent = 'تم العثور على: ' + foundGroup;
+    badge.style.display = 'inline-block';
+    // Select the group in dropdown
+    var sel = document.getElementById('groupSelect');
+    sel.value = foundGroup;
+    onControlChange();
+  } else {
+    badge.textContent = 'لا توجد نتيجة';
+    badge.style.background = '#ef9a9a';
+    badge.style.display = 'inline-block';
+    setTimeout(function() {
+      badge.style.background = '#26A69A';
+    }, 2000);
+  }
+}
+
 function loadGroups() {
   fetch('/api/groups-students')
     .then(function(r){ return r.json(); })
@@ -512,6 +607,8 @@ function onControlChange() {
   // Hide everything and reset
   document.getElementById('attSection').style.display = 'none';
   document.getElementById('attFooterBtns').style.display = 'none';
+  document.getElementById('searchWrap').style.display = 'none';
+  clearSearch();
   document.getElementById('alertBanner').className = 'alert-banner';
   document.getElementById('alertBanner').style.display = 'none';
   document.getElementById('studentCount').style.display = 'none';
@@ -552,6 +649,7 @@ function checkAndLoad(group, date) {
       }
       document.getElementById('attSection').style.display = 'block';
       document.getElementById('attFooterBtns').style.display = 'flex';
+      document.getElementById('searchWrap').style.display = 'flex';
     })
     .catch(function() {
       document.getElementById('checkSpinner').classList.remove('show');
