@@ -360,8 +360,18 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .day-badge{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border-radius:10px;font-size:15px;font-weight:700;min-width:110px;}
 .day-badge.empty{background:#e0f2f1;color:#9e9e9e;font-weight:600;}
 .student-count{font-size:13px;color:#fff;background:#00897B;padding:6px 14px;border-radius:20px;font-weight:700;align-self:flex-end;margin-bottom:2px;}
+/* Alert banner */
+.alert-banner{display:none;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:20px;display:none;align-items:center;gap:10px;}
+.alert-banner.exists{background:#fff3e0;border:2px solid #FB8C00;color:#e65100;display:flex;}
+.alert-banner.new{background:#e8f5e9;border:2px solid #43A047;color:#2e7d32;display:flex;}
+.alert-icon{font-size:20px;}
+/* Table */
 .att-section{margin-top:0;}
-.att-section-title{font-size:18px;font-weight:800;color:#00897B;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.att-section-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+.att-section-title{font-size:18px;font-weight:800;color:#00897B;display:flex;align-items:center;gap:8px;}
+.btn-save-all{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;}
+.btn-save-all:hover{opacity:.9;}
+.btn-save-all:disabled{background:#b2dfdb;cursor:not-allowed;opacity:.7;}
 .att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
 .att-table-wrap table{width:100%;border-collapse:collapse;}
 .att-table-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -378,9 +388,12 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .status-select.absent{border-color:#e53935;background:#fce4ec;color:#c62828;}
 .status-select.late{border-color:#FB8C00;background:#fff3e0;color:#e65100;}
 .empty-state{text-align:center;padding:48px 20px;color:#aaa;font-size:15px;}
-.empty-state-icon{font-size:40px;margin-bottom:10px;}
 .toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
 .toast.show{display:block;}
+.spinner{display:none;align-items:center;gap:8px;color:#00897B;font-size:13px;font-weight:600;}
+.spinner.show{display:flex;}
+.spin-circle{width:16px;height:16px;border:2px solid #b2dfdb;border-top-color:#00897B;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
@@ -393,46 +406,49 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
     <div class="controls-row">
       <div class="ctrl-group">
         <span class="ctrl-label">&#128218; المجموعة</span>
-        <select class="group-select" id="groupSelect" onchange="onGroupChange()">
+        <select class="group-select" id="groupSelect" onchange="onControlChange()">
           <option value="">&#8212; اختر المجموعة &#8212;</option>
         </select>
       </div>
       <div class="ctrl-group">
         <span class="ctrl-label">&#128197; التاريخ</span>
-        <input type="date" class="date-input" id="dateInput" onchange="onDateChange()">
+        <input type="date" class="date-input" id="dateInput" onchange="onControlChange()">
       </div>
       <div class="ctrl-group">
         <span class="ctrl-label">&#128340; اليوم</span>
         <div class="day-badge empty" id="dayBadge">&#8212;</div>
       </div>
-      <span class="student-count" id="studentCount" style="display:none;">0 طالب</span>
+      <span class="student-count" id="studentCount" style="display:none;"></span>
+      <div class="spinner" id="checkSpinner"><div class="spin-circle"></div><span>&#1580;&#1575;&#1585;&#1610; &#1575;&#1604;&#1578;&#1581;&#1602;&#1602;...</span></div>
     </div>
   </div>
 
+  <div class="alert-banner" id="alertBanner">
+    <span class="alert-icon" id="alertIcon"></span>
+    <span id="alertText"></span>
+  </div>
+
   <div class="att-section" id="attSection" style="display:none;">
-    <div class="att-section-title">
-      <span>&#9997;&#65039; كشف الحضور</span>
-      <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
+    <div class="att-section-header">
+      <div class="att-section-title">
+        <span>&#9997;&#65039; &#1603;&#1588;&#1601; &#1575;&#1604;&#1581;&#1590;&#1608;&#1585;</span>
+        <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
+      </div>
+      <button class="btn-save-all" id="btnSaveAll" onclick="saveAllAttendance()">
+        <span>&#128190;</span> <span id="btnSaveLabel">&#1581;&#1601;&#1592; &#1575;&#1604;&#1603;&#1588;&#1601;</span>
+      </button>
     </div>
     <div class="att-table-wrap">
       <table>
         <thead>
           <tr>
             <th>#</th>
-            <th>الاسم</th>
-            <th>الحالة</th>
+            <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
+            <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
           </tr>
         </thead>
-        <tbody id="attTableBody">
-        </tbody>
+        <tbody id="attTableBody"></tbody>
       </table>
-    </div>
-  </div>
-
-  <div id="emptyState" style="display:none;" class="att-table-wrap">
-    <div class="empty-state">
-      <div class="empty-state-icon">&#128218;</div>
-      <div>اختر مجموعة من القائمة أعلاه لعرض كشف الحضور</div>
     </div>
   </div>
 </div>
@@ -440,13 +456,16 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 <script>
 var groupsData = {};
 var AR_DAYS = ['\u0627\u0644\u0623\u062d\u062f','\u0627\u0644\u0627\u062b\u0646\u064a\u0646','\u0627\u0644\u062b\u0644\u0627\u062b\u0627\u0621','\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621','\u0627\u0644\u062e\u0645\u064a\u0633','\u0627\u0644\u062c\u0645\u0639\u0629','\u0627\u0644\u0633\u0628\u062a'];
+var currentMode = 'new'; // 'new' or 'exists'
+var existingRecords = {}; // keyed by student_name -> record id
+var checkTimeout = null;
 
 function showToast(msg, bg) {
   var t = document.getElementById('toast');
   t.textContent = msg;
   t.style.background = bg || '#00897B';
   t.classList.add('show');
-  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  setTimeout(function(){ t.classList.remove('show'); }, 3500);
 }
 
 function loadGroups() {
@@ -467,71 +486,181 @@ function loadGroups() {
     .catch(function() { showToast('\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a', '#e53935'); });
 }
 
-function onDateChange() {
-  var val = document.getElementById('dateInput').value;
+function updateDayBadge(val) {
   var badge = document.getElementById('dayBadge');
-  if(!val) {
-    badge.textContent = '\u2014';
-    badge.className = 'day-badge empty';
-    return;
-  }
-  var parts = val.split('-');
-  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  if(!val) { badge.textContent = '\u2014'; badge.className = 'day-badge empty'; return; }
+  var p = val.split('-');
+  var d = new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
   badge.textContent = AR_DAYS[d.getDay()];
   badge.className = 'day-badge';
 }
 
-function onStatusChange(sel, idx) {
-  var v = sel.value;
-  sel.className = 'status-select';
-  if(v === '\u062d\u0627\u0636\u0631') sel.className += ' present';
-  else if(v === '\u063a\u0627\u0626\u0628') sel.className += ' absent';
-  else if(v === '\u0645\u062a\u0623\u062e\u0631') sel.className += ' late';
+function onControlChange() {
+  var group = document.getElementById('groupSelect').value;
+  var date = document.getElementById('dateInput').value;
+  updateDayBadge(date);
+
+  // Hide everything and reset
+  document.getElementById('attSection').style.display = 'none';
+  document.getElementById('alertBanner').className = 'alert-banner';
+  document.getElementById('alertBanner').style.display = 'none';
+  document.getElementById('studentCount').style.display = 'none';
+
+  if(!group || !date) return;
+
+  // Debounce check
+  if(checkTimeout) clearTimeout(checkTimeout);
+  checkTimeout = setTimeout(function(){ checkAndLoad(group, date); }, 300);
 }
 
-function onGroupChange() {
-  var sel = document.getElementById('groupSelect');
-  var groupName = sel.value;
-  var tbody = document.getElementById('attTableBody');
-  var attSection = document.getElementById('attSection');
-  var emptyState = document.getElementById('emptyState');
-  var countEl = document.getElementById('studentCount');
-  var groupNameEl = document.getElementById('attSectionGroupName');
+function checkAndLoad(group, date) {
+  document.getElementById('checkSpinner').classList.add('show');
+  fetch('/api/attendance/check?group=' + encodeURIComponent(group) + '&date=' + encodeURIComponent(date))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      document.getElementById('checkSpinner').classList.remove('show');
+      var students = groupsData[group] || [];
+      document.getElementById('studentCount').textContent = students.length + ' \u0637\u0627\u0644\u0628';
+      document.getElementById('studentCount').style.display = 'inline-block';
+      document.getElementById('attSectionGroupName').textContent = '\u2014 ' + group;
 
-  if(!groupName) {
-    attSection.style.display = 'none';
-    emptyState.style.display = 'block';
-    countEl.style.display = 'none';
-    tbody.innerHTML = '';
-    return;
+      if(data.exists) {
+        currentMode = 'exists';
+        existingRecords = {};
+        for(var i=0; i<data.records.length; i++) {
+          existingRecords[data.records[i].student_name] = data.records[i];
+        }
+        showAlert('exists', '\u26a0\ufe0f \u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0645\u0633\u0628\u0642\u0627\u064b. \u064a\u0645\u0643\u0646\u0643 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0623\u062f\u0646\u0627\u0647.');
+        document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a';
+        renderTable(students, data.records);
+      } else {
+        currentMode = 'new';
+        existingRecords = {};
+        showAlert('new', '\u2705 \u0644\u0645 \u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e.');
+        document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u0643\u0634\u0641';
+        renderTable(students, []);
+      }
+      document.getElementById('attSection').style.display = 'block';
+    })
+    .catch(function() {
+      document.getElementById('checkSpinner').classList.remove('show');
+      showToast('\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062a\u062d\u0642\u0642', '#e53935');
+    });
+}
+
+function showAlert(type, msg) {
+  var banner = document.getElementById('alertBanner');
+  banner.className = 'alert-banner ' + type;
+  banner.style.display = 'flex';
+  document.getElementById('alertText').textContent = msg;
+}
+
+function onStatusChange(sel) {
+  sel.className = 'status-select';
+  if(sel.value === '\u062d\u0627\u0636\u0631') sel.className += ' present';
+  else if(sel.value === '\u063a\u0627\u0626\u0628') sel.className += ' absent';
+  else if(sel.value === '\u0645\u062a\u0623\u062e\u0631') sel.className += ' late';
+}
+
+function renderTable(students, existingList) {
+  var statusMap = {};
+  for(var i=0; i<existingList.length; i++) {
+    statusMap[existingList[i].student_name] = existingList[i].status || '';
   }
 
-  var students = groupsData[groupName] || [];
-  countEl.textContent = students.length + ' \u0637\u0627\u0644\u0628';
-  countEl.style.display = 'inline-block';
-  groupNameEl.textContent = '\u2014 ' + groupName;
-
-  if(students.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><div>\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</div></td></tr>';
+  var html = '';
+  if(!students.length) {
+    html = '<tr><td colspan="3" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
   } else {
-    var html = '';
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
+      var savedStatus = statusMap[name] || '';
+      var cssClass = 'status-select';
+      if(savedStatus === '\u062d\u0627\u0636\u0631') cssClass += ' present';
+      else if(savedStatus === '\u063a\u0627\u0626\u0628') cssClass += ' absent';
+      else if(savedStatus === '\u0645\u062a\u0623\u062e\u0631') cssClass += ' late';
+
       html += '<tr>';
       html += '<td>' + (i+1) + '</td>';
       html += '<td class="student-name-cell">' + name + '</td>';
-      html += '<td><select class="status-select" onchange="onStatusChange(this,' + i + ')">';
+      html += '<td><select class="' + cssClass + '" data-name="' + name.replace(/"/g, '&quot;') + '" onchange="onStatusChange(this)">';
       html += '<option value="">&#8212; \u0627\u062e\u062a\u0631 &#8212;</option>';
-      html += '<option value="\u062d\u0627\u0636\u0631">\u062d\u0627\u0636\u0631</option>';
-      html += '<option value="\u063a\u0627\u0626\u0628">\u063a\u0627\u0626\u0628</option>';
-      html += '<option value="\u0645\u062a\u0623\u062e\u0631">\u0645\u062a\u0623\u062e\u0631</option>';
+      html += '<option value="\u062d\u0627\u0636\u0631"' + (savedStatus==='\u062d\u0627\u0636\u0631'?' selected':'') + '>\u062d\u0627\u0636\u0631</option>';
+      html += '<option value="\u063a\u0627\u0626\u0628"' + (savedStatus==='\u063a\u0627\u0626\u0628'?' selected':'') + '>\u063a\u0627\u0626\u0628</option>';
+      html += '<option value="\u0645\u062a\u0623\u062e\u0631"' + (savedStatus==='\u0645\u062a\u0623\u062e\u0631'?' selected':'') + '>\u0645\u062a\u0623\u062e\u0631</option>';
       html += '</select></td>';
       html += '</tr>';
     }
-    tbody.innerHTML = html;
   }
-  attSection.style.display = 'block';
-  emptyState.style.display = 'none';
+  document.getElementById('attTableBody').innerHTML = html;
+}
+
+function saveAllAttendance() {
+  var group = document.getElementById('groupSelect').value;
+  var date = document.getElementById('dateInput').value;
+  var dayBadge = document.getElementById('dayBadge');
+  var dayName = dayBadge.className.includes('empty') ? '' : dayBadge.textContent;
+
+  if(!group || !date) { showToast('\u0627\u062e\u062a\u0631 \u0645\u062c\u0645\u0648\u0639\u0629 \u0648\u062a\u0627\u0631\u064a\u062e\u0627\u064b', '#e53935'); return; }
+
+  var rows = document.querySelectorAll('#attTableBody tr');
+  var saves = [];
+  var updates = [];
+
+  rows.forEach(function(tr) {
+    var sel = tr.querySelector('.status-select');
+    if(!sel) return;
+    var name = sel.getAttribute('data-name');
+    var status = sel.value;
+    if(!name) return;
+
+    if(currentMode === 'exists' && existingRecords[name]) {
+      // Update existing record
+      updates.push({ id: existingRecords[name].id, status: status,
+        attendance_date: existingRecords[name].attendance_date,
+        day_name: existingRecords[name].day_name,
+        group_name: existingRecords[name].group_name,
+        student_name: existingRecords[name].student_name,
+        contact_number: existingRecords[name].contact_number || '',
+        message: existingRecords[name].message || '',
+        message_status: existingRecords[name].message_status || '',
+        study_status: existingRecords[name].study_status || ''
+      });
+    } else if(currentMode === 'new') {
+      saves.push({ attendance_date: date, day_name: dayName,
+        group_name: group, student_name: name,
+        contact_number: '', status: status, message: '', message_status: '', study_status: '' });
+    }
+  });
+
+  var btn = document.getElementById('btnSaveAll');
+  btn.disabled = true;
+
+  var total = saves.length + updates.length;
+  var done = 0;
+
+  function finish() {
+    btn.disabled = false;
+    showToast('\u062a\u0645 \u062d\u0641\u0638 ' + done + '/' + total + ' \u0633\u062c\u0644', '#00897B');
+    // Reload to reflect saved state
+    checkAndLoad(group, date);
+  }
+
+  if(total === 0) { btn.disabled = false; showToast('\u0644\u0627 \u062a\u0648\u062c\u062f \u062a\u063a\u064a\u064a\u0631\u0627\u062a', '#888'); return; }
+
+  var pending = total;
+
+  saves.forEach(function(rec) {
+    fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rec) })
+      .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) done++; pending--; if(pending===0) finish(); })
+      .catch(function(){ pending--; if(pending===0) finish(); });
+  });
+
+  updates.forEach(function(rec) {
+    fetch('/api/attendance/' + rec.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rec) })
+      .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) done++; pending--; if(pending===0) finish(); })
+      .catch(function(){ pending--; if(pending===0) finish(); });
+  });
 }
 
 loadGroups();
@@ -3133,6 +3262,20 @@ def api_groups_students():
         ).fetchall()
         groups[gname] = [dict(s) for s in students]
     return jsonify(groups)
+
+@app.route("/api/attendance/check", methods=["GET"])
+@login_required
+def api_attendance_check():
+    group_name = request.args.get("group", "").strip()
+    att_date = request.args.get("date", "").strip()
+    if not group_name or not att_date:
+        return jsonify({"exists": False, "records": []})
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM attendance WHERE group_name=? AND attendance_date=? ORDER BY id ASC",
+        (group_name, att_date)
+    ).fetchall()
+    return jsonify({"exists": len(rows) > 0, "records": [dict(r) for r in rows]})
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
