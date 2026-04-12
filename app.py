@@ -372,6 +372,9 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .btn-save-all{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;}
 .btn-save-all:hover{opacity:.9;}
 .btn-save-all:disabled{background:#b2dfdb;cursor:not-allowed;opacity:.7;}
+.att-footer-btns{display:flex;align-items:center;gap:14px;margin-top:22px;padding:0 4px;}
+.btn-cancel-att{background:#fff;color:#e53935;border:2px solid #e53935;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;}
+.btn-cancel-att:hover{background:#fdecea;transform:translateY(-2px);}
 .att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
 .att-table-wrap table{width:100%;border-collapse:collapse;}
 .att-table-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -434,9 +437,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         <span>&#9997;&#65039; &#1603;&#1588;&#1601; &#1575;&#1604;&#1581;&#1590;&#1608;&#1585;</span>
         <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
       </div>
-      <button class="btn-save-all" id="btnSaveAll" onclick="saveAllAttendance()">
-        <span>&#128190;</span> <span id="btnSaveLabel">&#1581;&#1601;&#1592; &#1575;&#1604;&#1603;&#1588;&#1601;</span>
-      </button>
+
     </div>
     <div class="att-table-wrap">
       <table>
@@ -449,6 +450,14 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         </thead>
         <tbody id="attTableBody"></tbody>
       </table>
+    </div>
+    <div class="att-footer-btns" id="attFooterBtns" style="display:none;">
+      <button class="btn-save-all" id="btnSaveAll" onclick="saveAllAttendance()">
+        <span>&#128190;</span> <span id="btnSaveLabel">&#1581;&#1601;&#1592; &#1575;&#1604;&#1578;&#1587;&#1580;&#1610;&#1604;&#1575;&#1578;</span>
+      </button>
+      <button class="btn-cancel-att" onclick="window.location.href='/dashboard'">
+        <span>&#10006;</span> &#1573;&#1604;&#1594;&#1575;&#1569;
+      </button>
     </div>
   </div>
 </div>
@@ -502,6 +511,7 @@ function onControlChange() {
 
   // Hide everything and reset
   document.getElementById('attSection').style.display = 'none';
+  document.getElementById('attFooterBtns').style.display = 'none';
   document.getElementById('alertBanner').className = 'alert-banner';
   document.getElementById('alertBanner').style.display = 'none';
   document.getElementById('studentCount').style.display = 'none';
@@ -537,10 +547,11 @@ function checkAndLoad(group, date) {
         currentMode = 'new';
         existingRecords = {};
         showAlert('new', '\u2705 \u0644\u0645 \u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e.');
-        document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u0643\u0634\u0641';
+        document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0633\u062c\u064a\u0644\u0627\u062a';
         renderTable(students, []);
       }
       document.getElementById('attSection').style.display = 'block';
+      document.getElementById('attFooterBtns').style.display = 'flex';
     })
     .catch(function() {
       document.getElementById('checkSpinner').classList.remove('show');
