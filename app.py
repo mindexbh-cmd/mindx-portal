@@ -587,6 +587,7 @@ function onWaSent(link) {
   if (row) {
     var cb = row.querySelector('.sent-check');
     if (cb) cb.checked = true;
+    saveAllAttendance();
   }
 }
 
