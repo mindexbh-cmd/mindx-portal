@@ -384,7 +384,9 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .search-clear:hover{color:#e53935;}
 .search-result-badge{font-size:12px;color:#fff;background:#26A69A;border-radius:8px;padding:2px 8px;white-space:nowrap;}
 .action-cell{text-align:center;white-space:nowrap;}
-.btn-wa{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;}
+
+.sent-cell{text-align:center;padding:4px;}
+.sent-check{width:18px;height:18px;cursor:pointer;accent-color:#1a8754;vertical-align:middle;}.btn-wa{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;}
 .btn-wa:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(37,211,102,.4);color:#fff;}
 .btn-wa-disabled{opacity:0.38;cursor:not-allowed;pointer-events:none;background:linear-gradient(135deg,#bbb,#999) !important;color:#555 !important;box-shadow:none !important;}
 .wa-na{color:#b2dfdb;font-size:16px;}
@@ -470,6 +472,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
             <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
+            <th>تم الإرسال</th>
           </tr>
         </thead>
         <tbody id="attTableBody"></tbody>
@@ -576,6 +579,14 @@ function performSearch(query) {
     setTimeout(function() {
       badge.style.background = '#26A69A';
     }, 2000);
+  }
+}
+
+function onWaSent(link) {
+  var row = link.closest('tr');
+  if (row) {
+    var cb = row.querySelector('.sent-check');
+    if (cb) cb.checked = true;
   }
 }
 
@@ -730,7 +741,7 @@ function renderTable(students, existingList) {
 
   var html = '';
   if(!students.length) {
-    html = '<tr><td colspan="4" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
+    html = '<tr><td colspan="5" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
   } else {
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
@@ -759,7 +770,7 @@ function renderTable(students, existingList) {
           var waNum = wa.replace(/[^0-9]/g, '');
           if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
           var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
-          html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
+          html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '" onclick="onWaSent(this)">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
         } else {
           html += '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</button>';
         }
@@ -767,7 +778,8 @@ function renderTable(students, existingList) {
         html += '<span class="wa-na wa-missing">&#128242; &#10006;</span>';
       }
       html += '</td>';
-      html += '</tr>';
+      
+      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"></td>';html += '</tr>';
     }
   }
   document.getElementById('attTableBody').innerHTML = html;
