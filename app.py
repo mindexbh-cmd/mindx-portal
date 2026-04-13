@@ -386,6 +386,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .action-cell{text-align:center;white-space:nowrap;}
 .btn-wa{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;}
 .btn-wa:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(37,211,102,.4);color:#fff;}
+.btn-wa-disabled{opacity:0.38;cursor:not-allowed;pointer-events:none;background:linear-gradient(135deg,#bbb,#999) !important;color:#555 !important;box-shadow:none !important;}
 .wa-na{color:#b2dfdb;font-size:16px;}
 .wa-missing{color:#ffb3b3;font-size:13px;}
 .att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
@@ -717,7 +718,7 @@ function onStatusChange(sel) {
     var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msg);
     actionCell.innerHTML = '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
   } else {
-    actionCell.innerHTML = '<span class="wa-na">&#8212;</span>';
+    actionCell.innerHTML = '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</button>';
   }
 }
 
@@ -752,16 +753,18 @@ function renderTable(students, existingList) {
       var wa = students[i].whatsapp || '';
       var showWaBtn = (savedStatus === '\u063a\u0627\u0626\u0628' || savedStatus === '\u0645\u062a\u0623\u062e\u0631');
       html += '<td class="action-cell">';
-      if (wa && showWaBtn) {
-        var msgType = buildWaMsg(name, savedStatus);
-        var waNum = wa.replace(/[^0-9]/g, '');
-        if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
-        var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
-        html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
-      } else if (wa && !showWaBtn) {
-        html += '<span class="wa-na">&#8212;</span>';
+      if (wa) {
+        if (showWaBtn) {
+          var msgType = buildWaMsg(name, savedStatus);
+          var waNum = wa.replace(/[^0-9]/g, '');
+          if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
+          var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
+          html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
+        } else {
+          html += '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</button>';
+        }
       } else {
-        html += '<span class="wa-na wa-missing">&#128229; &#10006;</span>';
+        html += '<span class="wa-na wa-missing">&#128242; &#10006;</span>';
       }
       html += '</td>';
       html += '</tr>';
