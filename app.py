@@ -383,6 +383,11 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .search-clear{background:none;border:none;cursor:pointer;color:#80CBC4;font-size:18px;padding:0 2px;line-height:1;transition:color .2s;}
 .search-clear:hover{color:#e53935;}
 .search-result-badge{font-size:12px;color:#fff;background:#26A69A;border-radius:8px;padding:2px 8px;white-space:nowrap;}
+.action-cell{text-align:center;white-space:nowrap;}
+.btn-wa{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;}
+.btn-wa:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(37,211,102,.4);color:#fff;}
+.wa-na{color:#b2dfdb;font-size:16px;}
+.wa-missing{color:#ffb3b3;font-size:13px;}
 .att-table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
 .att-table-wrap table{width:100%;border-collapse:collapse;}
 .att-table-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -463,6 +468,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>#</th>
             <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
+            <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
           </tr>
         </thead>
         <tbody id="attTableBody"></tbody>
@@ -671,6 +677,28 @@ function onStatusChange(sel) {
   if(sel.value === '\u062d\u0627\u0636\u0631') sel.className += ' present';
   else if(sel.value === '\u063a\u0627\u0626\u0628') sel.className += ' absent';
   else if(sel.value === '\u0645\u062a\u0623\u062e\u0631') sel.className += ' late';
+  // Update WhatsApp button in the same row
+  var tr = sel.closest('tr');
+  if (!tr) return;
+  var actionCell = tr.querySelector('.action-cell');
+  if (!actionCell) return;
+  var existingLink = actionCell.querySelector('.btn-wa, .wa-na');
+  var name = sel.getAttribute('data-name') || '';
+  var wa = actionCell.getAttribute('data-wa') || (existingLink ? existingLink.getAttribute('data-wa') : '') || '';
+  var status = sel.value;
+  var showBtn = (status === '\u063a\u0627\u0626\u0628' || status === '\u0645\u062a\u0623\u062e\u0631');
+  if (!wa) { return; } // no phone, keep as-is
+  if (showBtn) {
+    var msg = status === '\u063a\u0627\u0626\u0628'
+      ? '\u0646\u0641\u064a\u062f\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 ' + name + ' \u0643\u0627\u0646 \u063a\u0627\u0626\u0628\u0627\u064b \u0627\u0644\u064a\u0648\u0645.'
+      : '\u0646\u0641\u064a\u062f\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 ' + name + ' \u0643\u0627\u0646 \u0645\u062a\u0623\u062e\u0631\u0627\u064b \u0627\u0644\u064a\u0648\u0645.';
+    var waNum = wa.replace(/[^0-9]/g, '');
+    if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
+    var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msg);
+    actionCell.innerHTML = '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
+  } else {
+    actionCell.innerHTML = '<span class="wa-na">&#8212;</span>';
+  }
 }
 
 function renderTable(students, existingList) {
@@ -681,7 +709,7 @@ function renderTable(students, existingList) {
 
   var html = '';
   if(!students.length) {
-    html = '<tr><td colspan="3" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
+    html = '<tr><td colspan="4" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
   } else {
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
@@ -700,6 +728,24 @@ function renderTable(students, existingList) {
       html += '<option value="\u063a\u0627\u0626\u0628"' + (savedStatus==='\u063a\u0627\u0626\u0628'?' selected':'') + '>\u063a\u0627\u0626\u0628</option>';
       html += '<option value="\u0645\u062a\u0623\u062e\u0631"' + (savedStatus==='\u0645\u062a\u0623\u062e\u0631'?' selected':'') + '>\u0645\u062a\u0623\u062e\u0631</option>';
       html += '</select></td>';
+      // WhatsApp button cell
+      var wa = students[i].whatsapp || '';
+      var showWaBtn = (savedStatus === '\u063a\u0627\u0626\u0628' || savedStatus === '\u0645\u062a\u0623\u062e\u0631');
+      html += '<td class="action-cell">';
+      if (wa && showWaBtn) {
+        var msgType = savedStatus === '\u063a\u0627\u0626\u0628'
+          ? '\u0646\u0641\u064a\u062f\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 ' + name + ' \u0643\u0627\u0646 \u063a\u0627\u0626\u0628\u0627\u064b \u0627\u0644\u064a\u0648\u0645.'
+          : '\u0646\u0641\u064a\u062f\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628 ' + name + ' \u0643\u0627\u0646 \u0645\u062a\u0623\u062e\u0631\u0627\u064b \u0627\u0644\u064a\u0648\u0645.';
+        var waNum = wa.replace(/[^0-9]/g, '');
+        if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
+        var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
+        html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
+      } else if (wa && !showWaBtn) {
+        html += '<span class="wa-na">&#8212;</span>';
+      } else {
+        html += '<span class="wa-na wa-missing">&#128229; &#10006;</span>';
+      }
+      html += '</td>';
       html += '</tr>';
     }
   }
@@ -3368,7 +3414,7 @@ def api_groups_students():
     for row in rows:
         gname = row[0]
         students = db.execute(
-            "SELECT id, student_name, personal_id FROM students WHERE group_name_student=? ORDER BY student_name",
+            "SELECT id, student_name, personal_id, whatsapp FROM students WHERE group_name_student=? ORDER BY student_name",
             (gname,)
         ).fetchall()
         groups[gname] = [dict(s) for s in students]
