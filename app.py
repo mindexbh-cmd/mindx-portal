@@ -1612,45 +1612,30 @@ function renderTaqseet() {
     tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">لا توجد بيانات</td></tr>';
     return;
   }
+  var fields = ['taqseet_method','student_name','course_amount','num_installments',
+    'inst1','date1','inst2','date2','inst3','date3','inst4','date4',
+    'inst5','date5','inst6','date6','inst7','date7','inst8','date8',
+    'inst9','date9','inst10','date10','inst11','date11','inst12','date12',
+    'study_hours','start_date'];
   tbody.innerHTML = allTaqseet.map(function(r, i) {
     var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
+    var cells = fields.map(function(f) {
+      return '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + f + '" style="padding:8px;min-width:80px;">' + (r[f]||'') + '</td>';
+    }).join('');
     return '<tr style="background:' + bg + ';">' +
       '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'taqseet_method\',this)" style="padding:8px;min-width:120px;">' + (r.taqseet_method||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'student_name\',this)" style="padding:8px;min-width:130px;">' + (r.student_name||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'course_amount\',this)" style="padding:8px;min-width:100px;">' + (r.course_amount||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'num_installments\',this)" style="padding:8px;">' + (r.num_installments||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst1\',this)" style="padding:8px;">' + (r.inst1||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date1\',this)" style="padding:8px;">' + (r.date1||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst2\',this)" style="padding:8px;">' + (r.inst2||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date2\',this)" style="padding:8px;">' + (r.date2||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst3\',this)" style="padding:8px;">' + (r.inst3||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date3\',this)" style="padding:8px;">' + (r.date3||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst4\',this)" style="padding:8px;">' + (r.inst4||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date4\',this)" style="padding:8px;">' + (r.date4||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst5\',this)" style="padding:8px;">' + (r.inst5||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date5\',this)" style="padding:8px;">' + (r.date5||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst6\',this)" style="padding:8px;">' + (r.inst6||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date6\',this)" style="padding:8px;">' + (r.date6||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst7\',this)" style="padding:8px;">' + (r.inst7||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date7\',this)" style="padding:8px;">' + (r.date7||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst8\',this)" style="padding:8px;">' + (r.inst8||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date8\',this)" style="padding:8px;">' + (r.date8||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst9\',this)" style="padding:8px;">' + (r.inst9||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date9\',this)" style="padding:8px;">' + (r.date9||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst10\',this)" style="padding:8px;">' + (r.inst10||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date10\',this)" style="padding:8px;">' + (r.date10||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst11\',this)" style="padding:8px;">' + (r.inst11||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date11\',this)" style="padding:8px;">' + (r.date11||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst12\',this)" style="padding:8px;">' + (r.inst12||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date12\',this)" style="padding:8px;">' + (r.date12||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'study_hours\',this)" style="padding:8px;">' + (r.study_hours||'') + '</td>' +
-      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'start_date\',this)" style="padding:8px;">' + (r.start_date||'') + '</td>' +
+      cells +
       '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
-        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet('+r.id+')">حذف</button>' +
+        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">حذف</button>' +
       '</td>' +
     '</tr>';
   }).join('');
+  // Attach blur events
+  tbody.querySelectorAll('.editable[data-field]').forEach(function(td) {
+    td.addEventListener('blur', function() {
+      saveTaqseetCell(parseInt(this.dataset.id), this.dataset.field, this);
+    });
+  });
 }
 
 function saveTaqseetCell(id, field, el) {
