@@ -906,7 +906,7 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;overscroll-behavior:none;
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:hidden;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow:auto;max-height:600px;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
