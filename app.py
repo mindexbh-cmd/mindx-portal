@@ -1061,46 +1061,55 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <!-- TAQSEET (PAYMENT PLANS) TABLE -->
 <div style="margin:30px 0 0 0;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
     <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; طريقة التقسيط</span>
+    <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
+    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; إضافة جدول</button>
+    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; إضافة عمود</button>
+    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; تعديل الجدول</button>
   </div>
-  <div class="stats" style="margin-bottom:10px;">
-    <div class="stat-card"><div class="stat-number" id="taqseetCount">0</div><div class="stat-label">إجمالي السجلات</div></div>
-  </div>
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn-primary" style="background:linear-gradient(135deg,#1a8754,#0f5132);" onclick="openAddTaqseet()">&#43; إضافة صف</button>
-  </div>
-  <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);">
-    <table style="width:100%;border-collapse:collapse;min-width:2800px;">
+  <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
+    <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
       <thead>
-        <tr style="background:linear-gradient(135deg,#6c3fa0,#4a2070);color:#fff;">
-          <th style="padding:10px 8px;white-space:nowrap;">#</th>
-          <th style="padding:10px 8px;white-space:nowrap;">طريقة التقسيط</th>
-          <th style="padding:10px 8px;white-space:nowrap;">اسم الطالب</th>
-          <th style="padding:10px 8px;white-space:nowrap;">مبلغ الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">عدد الأقساط</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 1</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 2</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 3</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 4</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 5</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 6</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 7</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 8</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 9</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 10</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 11</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 12</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;">عدد ساعات الدراسة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">تاريخ بدء الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">إجراءات</th>
+        <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
+          <th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">طريقة التقسيط</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">اسم الطالب</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">مبلغ الدورة</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">عدد الأقساط</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">عدد ساعات الدراسة</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ بدء الدورة</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">إجراءات</th>
         </tr>
       </thead>
       <tbody id="taqseetBody"></tbody>
     </table>
   </div>
 </div>
-
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -1381,52 +1390,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">إغلاق</button>
     </div>
   </div>
-</div>
-
-<!-- TAQSEET MODAL -->
-<div class="modal-bg" id="taqseetModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px;">
-  <div class="modal" style="background:#fff;border-radius:14px;padding:24px;max-width:900px;width:96%;margin:auto;">
-    <h2 id="taqseetModalTitle" style="margin-bottom:16px;color:#6c3fa0;font-size:1.1em;"></h2>
-    <form id="taqseetForm">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
-        <div><label style="font-size:12px;color:#555;">طريقة التقسيط</label><input name="taqseet_method" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;" placeholder="1-10"></div>
-        <div><label style="font-size:12px;color:#555;">اسم الطالب</label><input name="student_name" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">مبلغ الدورة</label><input name="course_amount" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">عدد الأقساط</label><input name="num_installments" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 1</label><input name="inst1" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 1</label><input name="date1" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 2</label><input name="inst2" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 2</label><input name="date2" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 3</label><input name="inst3" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 3</label><input name="date3" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 4</label><input name="inst4" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 4</label><input name="date4" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 5</label><input name="inst5" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 5</label><input name="date5" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 6</label><input name="inst6" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 6</label><input name="date6" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 7</label><input name="inst7" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 7</label><input name="date7" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 8</label><input name="inst8" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 8</label><input name="date8" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 9</label><input name="inst9" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 9</label><input name="date9" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 10</label><input name="inst10" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 10</label><input name="date10" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 11</label><input name="inst11" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 11</label><input name="date11" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">القسط 12</label><input name="inst12" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ الاستحقاق 12</label><input name="date12" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">عدد ساعات الدراسة</label><input name="study_hours" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-        <div><label style="font-size:12px;color:#555;">تاريخ بدء الدورة</label><input name="start_date" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:7px;font-size:13px;"></div>
-      </div>
-    </form>
-    <div style="margin-top:18px;text-align:left;display:flex;gap:10px;">
-      <button class="btn-primary" style="background:linear-gradient(135deg,#1a8754,#0f5132);" onclick="saveTaqseet()">حفظ</button>
-      <button class="btn-cancel" onclick="closeTaqseetModal()">إلغاء</button>
-    </div>
-  </div>
-</div>
+</d
 
 <!-- DYNAMIC CUSTOM TABLES CONTAINER -->
 <div id="customTablesContainer"></div>
@@ -1606,104 +1570,128 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
 // ─── Taqseet (Payment Plans) Table ──────────────────────────────────────────
-var allTaqseet = [];
+var allTaqseet = null;
 var editingTaqseetId = null;
 
 function loadTaqseet() {
-  fetch('/api/taqseet').then(r=>r.json()).then(data=>{
+  fetch('/api/taqseet').then(function(r){return r.json();}).then(function(data){
     allTaqseet = data;
-    document.getElementById('taqseetCount').textContent = data.length;
-    renderTaqseet();
+    if (allTaqseet.length < 10) {
+      var needed = 10 - allTaqseet.length;
+      var promises = [];
+      for (var i = 0; i < needed; i++) {
+        var rowNum = allTaqseet.length + i + 1;
+        promises.push(
+          fetch('/api/taqseet', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({taqseet_method: String(rowNum),
+              student_name:'', course_amount:'', num_installments:'',
+              inst1:'', date1:'', inst2:'', date2:'', inst3:'', date3:'',
+              inst4:'', date4:'', inst5:'', date5:'', inst6:'', date6:'',
+              inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
+              inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
+              study_hours:'', start_date:''})}).then(function(r){return r.json();})
+        );
+      }
+      Promise.all(promises).then(function(){
+        fetch('/api/taqseet').then(function(r){return r.json();}).then(function(d2){
+          allTaqseet = d2;
+          document.getElementById('taqseetCount').textContent = allTaqseet.length;
+          renderTaqseet();
+        });
+      });
+    } else {
+      document.getElementById('taqseetCount').textContent = allTaqseet.length;
+      renderTaqseet();
+    }
   });
 }
 
 function renderTaqseet() {
   var tbody = document.getElementById('taqseetBody');
-  if (!allTaqseet.length) {
+  if (!allTaqseet || !allTaqseet.length) {
     tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">لا توجد بيانات</td></tr>';
     return;
   }
-  tbody.innerHTML = allTaqseet.map(function(r,i){
-    return '<tr>' +
-      '<td>' + (i+1) + '</td>' +
-      '<td>' + (r.taqseet_method||'') + '</td>' +
-      '<td>' + (r.student_name||'') + '</td>' +
-      '<td>' + (r.course_amount||'') + '</td>' +
-      '<td>' + (r.num_installments||'') + '</td>' +
-      '<td>' + (r.inst1||'') + '</td><td>' + (r.date1||'') + '</td>' +
-      '<td>' + (r.inst2||'') + '</td><td>' + (r.date2||'') + '</td>' +
-      '<td>' + (r.inst3||'') + '</td><td>' + (r.date3||'') + '</td>' +
-      '<td>' + (r.inst4||'') + '</td><td>' + (r.date4||'') + '</td>' +
-      '<td>' + (r.inst5||'') + '</td><td>' + (r.date5||'') + '</td>' +
-      '<td>' + (r.inst6||'') + '</td><td>' + (r.date6||'') + '</td>' +
-      '<td>' + (r.inst7||'') + '</td><td>' + (r.date7||'') + '</td>' +
-      '<td>' + (r.inst8||'') + '</td><td>' + (r.date8||'') + '</td>' +
-      '<td>' + (r.inst9||'') + '</td><td>' + (r.date9||'') + '</td>' +
-      '<td>' + (r.inst10||'') + '</td><td>' + (r.date10||'') + '</td>' +
-      '<td>' + (r.inst11||'') + '</td><td>' + (r.date11||'') + '</td>' +
-      '<td>' + (r.inst12||'') + '</td><td>' + (r.date12||'') + '</td>' +
-      '<td>' + (r.study_hours||'') + '</td>' +
-      '<td>' + (r.start_date||'') + '</td>' +
-      '<td style="white-space:nowrap;">' +
-        '<button class="btn-icon" style="background:#1565C0;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="openEditTaqseet(' + r.id + ')">تعديل</button> ' +
-        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">حذف</button>' +
+  tbody.innerHTML = allTaqseet.map(function(r, i) {
+    var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
+    return '<tr style="background:' + bg + ';">' +
+      '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'taqseet_method\',this)" style="padding:8px;min-width:120px;">' + (r.taqseet_method||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'student_name\',this)" style="padding:8px;min-width:130px;">' + (r.student_name||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'course_amount\',this)" style="padding:8px;min-width:100px;">' + (r.course_amount||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'num_installments\',this)" style="padding:8px;">' + (r.num_installments||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst1\',this)" style="padding:8px;">' + (r.inst1||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date1\',this)" style="padding:8px;">' + (r.date1||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst2\',this)" style="padding:8px;">' + (r.inst2||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date2\',this)" style="padding:8px;">' + (r.date2||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst3\',this)" style="padding:8px;">' + (r.inst3||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date3\',this)" style="padding:8px;">' + (r.date3||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst4\',this)" style="padding:8px;">' + (r.inst4||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date4\',this)" style="padding:8px;">' + (r.date4||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst5\',this)" style="padding:8px;">' + (r.inst5||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date5\',this)" style="padding:8px;">' + (r.date5||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst6\',this)" style="padding:8px;">' + (r.inst6||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date6\',this)" style="padding:8px;">' + (r.date6||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst7\',this)" style="padding:8px;">' + (r.inst7||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date7\',this)" style="padding:8px;">' + (r.date7||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst8\',this)" style="padding:8px;">' + (r.inst8||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date8\',this)" style="padding:8px;">' + (r.date8||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst9\',this)" style="padding:8px;">' + (r.inst9||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date9\',this)" style="padding:8px;">' + (r.date9||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst10\',this)" style="padding:8px;">' + (r.inst10||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date10\',this)" style="padding:8px;">' + (r.date10||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst11\',this)" style="padding:8px;">' + (r.inst11||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date11\',this)" style="padding:8px;">' + (r.date11||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'inst12\',this)" style="padding:8px;">' + (r.inst12||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'date12\',this)" style="padding:8px;">' + (r.date12||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'study_hours\',this)" style="padding:8px;">' + (r.study_hours||'') + '</td>' +
+      '<td class="editable" contenteditable="true" onblur="saveTaqseetCell('+r.id+',\'start_date\',this)" style="padding:8px;">' + (r.start_date||'') + '</td>' +
+      '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
+        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet('+r.id+')">حذف</button>' +
       '</td>' +
     '</tr>';
   }).join('');
 }
 
-function openAddTaqseet() {
-  editingTaqseetId = null;
-  document.getElementById('taqseetModalTitle').textContent = 'إضافة صف جديد';
-  clearTaqseetForm();
-  document.getElementById('taqseetModal').style.display = 'flex';
-}
-
-function openEditTaqseet(id) {
-  editingTaqseetId = id;
-  var r = allTaqseet.find(function(x){return x.id===id;});
+function saveTaqseetCell(id, field, el) {
+  var val = el.innerText.trim();
+  var r = allTaqseet ? allTaqseet.find(function(x){return x.id===id;}) : null;
   if (!r) return;
-  document.getElementById('taqseetModalTitle').textContent = 'تعديل سجل';
-  var f = document.getElementById('taqseetForm');
-  ['taqseet_method','student_name','course_amount','num_installments',
-   'inst1','date1','inst2','date2','inst3','date3','inst4','date4',
-   'inst5','date5','inst6','date6','inst7','date7','inst8','date8',
-   'inst9','date9','inst10','date10','inst11','date11','inst12','date12',
-   'study_hours','start_date'].forEach(function(k){
-    var el = f.querySelector('[name="'+k+'"]');
-    if (el) el.value = r[k]||'';
-  });
-  document.getElementById('taqseetModal').style.display = 'flex';
+  var updated = {};
+  for (var k in r) { updated[k] = r[k]; }
+  updated[field] = val;
+  fetch('/api/taqseet/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updated)})
+    .then(function(res){return res.json();})
+    .then(function(){ if(r){ r[field] = val; } });
 }
 
-function clearTaqseetForm() {
-  document.getElementById('taqseetForm').querySelectorAll('input').forEach(function(el){el.value='';});
-}
-
-function closeTaqseetModal() {
-  document.getElementById('taqseetModal').style.display = 'none';
-  editingTaqseetId = null;
-}
-
-function saveTaqseet() {
-  var f = document.getElementById('taqseetForm');
-  var d = {};
-  f.querySelectorAll('input').forEach(function(el){d[el.name]=el.value;});
-  var url = editingTaqseetId ? '/api/taqseet/'+editingTaqseetId : '/api/taqseet';
-  var method = editingTaqseetId ? 'PUT' : 'POST';
-  fetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
-    .then(r=>r.json()).then(function(res){
-      if(res.ok){ closeTaqseetModal(); loadTaqseet(); showToast('تم الحفظ بنجاح','#1a8754'); }
-      else showToast('خطأ: '+res.error,'#c0392b');
-    });
+function openAddTaqseet() {
+  var nextNum = allTaqseet ? allTaqseet.length + 1 : 1;
+  fetch('/api/taqseet', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({taqseet_method: String(nextNum),
+      student_name:'', course_amount:'', num_installments:'',
+      inst1:'', date1:'', inst2:'', date2:'', inst3:'', date3:'',
+      inst4:'', date4:'', inst5:'', date5:'', inst6:'', date6:'',
+      inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
+      inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
+      study_hours:'', start_date:''})})
+    .then(function(){ loadTaqseet(); showToast('تم إضافة صف جديد', '#1a8754'); });
 }
 
 function deleteTaqseet(id) {
-  if(!confirm('هل تريد حذف هذا السجل؟')) return;
-  fetch('/api/taqseet/'+id,{method:'DELETE'}).then(r=>r.json()).then(function(){
+  if (!confirm('هل تريد حذف هذا الصف؟')) return;
+  fetch('/api/taqseet/' + id, {method:'DELETE'}).then(function(){
     loadTaqseet();
     showToast('تم الحذف','#c0392b');
   });
+}
+
+function openTaqseetColModal() {
+  showToast('ميزة إضافة عمود مخصص قيد التطوير', '#FF6B35');
+}
+
+function openTaqseetEditModal() {
+  showToast('ميزة تعديل الجدول قيد التطوير', '#9C27B0');
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
