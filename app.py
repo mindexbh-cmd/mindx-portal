@@ -146,7 +146,11 @@ def init_db():
         study_hours TEXT DEFAULT '',
         start_date TEXT DEFAULT ''
     )""")
-    db.commit()
+    # Add 10 default rows to taqseet if empty
+    if db.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
+        for i in range(1, 11):
+            db.execute("INSERT INTO taqseet (taqseet_method) VALUES (?)", (str(i),))
+        db.commit()
     db.close()
 
 if not os.path.exists(DB):
@@ -274,7 +278,11 @@ else:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_id INTEGER,
         row_data TEXT DEFAULT '{}')""")
-    db2.commit()
+    # Add 10 default rows to taqseet if empty
+    if db2.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
+        for i in range(1, 11):
+            db2.execute("INSERT INTO taqseet (taqseet_method) VALUES (?)", (str(i),))
+        db2.commit()
     db2.close()
 
 def login_required(f):
@@ -1576,33 +1584,8 @@ var editingTaqseetId = null;
 function loadTaqseet() {
   fetch('/api/taqseet').then(function(r){return r.json();}).then(function(data){
     allTaqseet = data;
-    if (allTaqseet.length < 10) {
-      var needed = 10 - allTaqseet.length;
-      var promises = [];
-      for (var i = 0; i < needed; i++) {
-        var rowNum = allTaqseet.length + i + 1;
-        promises.push(
-          fetch('/api/taqseet', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({taqseet_method: String(rowNum),
-              student_name:'', course_amount:'', num_installments:'',
-              inst1:'', date1:'', inst2:'', date2:'', inst3:'', date3:'',
-              inst4:'', date4:'', inst5:'', date5:'', inst6:'', date6:'',
-              inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
-              inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
-              study_hours:'', start_date:''})}).then(function(r){return r.json();})
-        );
-      }
-      Promise.all(promises).then(function(){
-        fetch('/api/taqseet').then(function(r){return r.json();}).then(function(d2){
-          allTaqseet = d2;
-          document.getElementById('taqseetCount').textContent = allTaqseet.length;
-          renderTaqseet();
-        });
-      });
-    } else {
-      document.getElementById('taqseetCount').textContent = allTaqseet.length;
-      renderTaqseet();
-    }
+    document.getElementById('taqseetCount').textContent = allTaqseet.length;
+    renderTaqseet();
   });
 }
 
