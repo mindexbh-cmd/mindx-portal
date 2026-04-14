@@ -146,7 +146,7 @@ def init_db():
         study_hours TEXT DEFAULT '',
         start_date TEXT DEFAULT ''
     )""")
-db.commit()
+    db.commit()
     db.close()
 
 if not os.path.exists(DB):
