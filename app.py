@@ -1,4 +1,4 @@
-from flask import Flask, request, session, redirect, g, jsonify
+ from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
 from functools import wraps
 
@@ -1106,6 +1106,45 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-confirm-del" id="confirmDelBtn">حذف</button>
       <button class="btn-confirm-cancel" onclick="closeConfirm()">الغاء</button>
     </div>
+  </div><!-- TAQSEET (PAYMENT PLANS) TABLE -->
+<div style="margin:30px 0 0 0;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; طريقة التقسيط</span>
+  </div>
+  <div class="stats" style="margin-bottom:10px;">
+    <div class="stat-card"><div class="stat-number" id="taqseetCount">0</div><div class="stat-label">إجمالي السجلات</div></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <button class="btn-primary" style="background:linear-gradient(135deg,#1a8754,#0f5132);" onclick="openAddTaqseet()">&#43; إضافة صف</button>
+  </div>
+  <div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);">
+    <table style="width:100%;border-collapse:collapse;min-width:2800px;">
+      <thead>
+        <tr style="background:linear-gradient(135deg,#6c3fa0,#4a2070);color:#fff;">
+          <th style="padding:10px 8px;white-space:nowrap;">#</th>
+          <th style="padding:10px 8px;white-space:nowrap;">طريقة التقسيط</th>
+          <th style="padding:10px 8px;white-space:nowrap;">اسم الطالب</th>
+          <th style="padding:10px 8px;white-space:nowrap;">مبلغ الدورة</th>
+          <th style="padding:10px 8px;white-space:nowrap;">عدد الأقساط</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 1</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 2</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 3</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 4</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 5</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 6</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 7</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 8</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 9</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 10</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 11</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;">القسط 12</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;">عدد ساعات الدراسة</th>
+          <th style="padding:10px 8px;white-space:nowrap;">تاريخ بدء الدورة</th>
+          <th style="padding:10px 8px;white-space:nowrap;">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="taqseetBody"></tbody>
+    </table>
   </div>
 </div>
 <!-- TABLE EDIT MODAL -->
@@ -1341,47 +1380,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
 </div>
-<!-- TAQSEET (PAYMENT PLANS) TABLE -->
-<div style="margin:30px 0 0 0;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; طريقة التقسيط</span>
-  </div>
-  <div class="stats" style="margin-bottom:10px;">
-    <div class="stat-card"><div class="stat-number" id="taqseetCount">0</div><div class="stat-label">إجمالي السجلات</div></div>
-  </div>
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn-primary" style="background:linear-gradient(135deg,#1a8754,#0f5132);" onclick="openAddTaqseet()">&#43; إضافة صف</button>
-  </div>
-  <div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);">
-    <table style="width:100%;border-collapse:collapse;min-width:2800px;">
-      <thead>
-        <tr style="background:linear-gradient(135deg,#6c3fa0,#4a2070);color:#fff;">
-          <th style="padding:10px 8px;white-space:nowrap;">#</th>
-          <th style="padding:10px 8px;white-space:nowrap;">طريقة التقسيط</th>
-          <th style="padding:10px 8px;white-space:nowrap;">اسم الطالب</th>
-          <th style="padding:10px 8px;white-space:nowrap;">مبلغ الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">عدد الأقساط</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 1</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 2</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 3</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 4</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 5</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 6</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 7</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 8</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 9</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 10</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 11</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;">القسط 12</th><th style="padding:10px 8px;white-space:nowrap;">تاريخ الاستحقاق 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;">عدد ساعات الدراسة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">تاريخ بدء الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;">إجراءات</th>
-        </tr>
-      </thead>
-      <tbody id="taqseetBody"></tbody>
-    </table>
-  </div>
-</div>
+
 <!-- TAQSEET MODAL -->
 <div class="modal-bg" id="taqseetModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px;">
   <div class="modal" style="background:#fff;border-radius:14px;padding:24px;max-width:900px;width:96%;margin:auto;">
