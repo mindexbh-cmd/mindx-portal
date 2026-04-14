@@ -1723,8 +1723,8 @@ async function confirmDelete(){
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
 function showToast(msg,bg='#6B3FA0'){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
-loadStudents()loadTaqseet();
-;
+loadStudents();
+loadTaqseet();
 var allGroups2=[];
 var groupDeleteTargetId2=null;
 function loadGroups2(){
