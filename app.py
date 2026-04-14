@@ -890,7 +890,7 @@ DATABASE_HTML = """<!DOCTYPE html>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 body{background:#f5f3ff;min-height:100vh;direction:rtl;}
-.topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+.topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1000;}
 .topbar h1{font-size:20px;font-weight:800;}
 .btn-home{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
 .btn-home:hover{background:rgba(255,255,255,.3);}
@@ -906,7 +906,7 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow:auto;max-height:500px;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
