@@ -1,4 +1,4 @@
- from flask import Flask, request, session, redirect, g, jsonify
+from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
 from functools import wraps
 
