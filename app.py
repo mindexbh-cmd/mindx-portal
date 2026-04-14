@@ -906,7 +906,7 @@ body{background:#f5f3ff;min-height:100vh;direction:rtl;}
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow:auto;max-height:500px;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:hidden;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
@@ -1069,7 +1069,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
     <button class="btn-primary" style="background:linear-gradient(135deg,#1a8754,#0f5132);" onclick="openAddTaqseet()">&#43; إضافة صف</button>
   </div>
-  <div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);">
+  <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);">
     <table style="width:100%;border-collapse:collapse;min-width:2800px;">
       <thead>
         <tr style="background:linear-gradient(135deg,#6c3fa0,#4a2070);color:#fff;">
@@ -2715,6 +2715,22 @@ function updateAttendanceColumnLabel() {
       else { showToast(d.error||'حدث خطأ','#e53935'); }
     });
 }
+</script>
+<script>
+// Fix: pass vertical scroll events to page when table container can't scroll vertically
+(function(){
+  function fixScrollPassthrough(el){
+    el.addEventListener('wheel',function(e){
+      if(e.deltaY===0) return;
+      var canUp=this.scrollTop>0;
+      var canDown=this.scrollTop<(this.scrollHeight-this.offsetHeight-1);
+      if(!canUp&&!canDown){e.preventDefault();window.scrollBy(0,e.deltaY);}
+    },{passive:false});
+  }
+  document.querySelectorAll('.table-wrap').forEach(fixScrollPassthrough);
+  var tw=document.getElementById('taqseetWrap');
+  if(tw) fixScrollPassthrough(tw);
+})();
 </script>
 </body>
 </html>"""
