@@ -57,6 +57,7 @@ def init_db():
         home_address TEXT,
         road TEXT,
         complex_name TEXT,
+        installment_type TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS student_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,6 +223,7 @@ else:
             ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
             ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
             ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
+            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -242,6 +244,7 @@ else:
         ("installment3", "TEXT"),
         ("installment4", "TEXT"),
         ("installment5", "TEXT"),
+        ("installment_type", "TEXT"),
     ]
     existing = [row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()]
     for col, coltype in new_cols:
@@ -923,6 +926,10 @@ tbody tr{border-bottom:1px solid #f0ebff;transition:background .15s;}
 tbody tr:hover{background:#faf7ff;}
 td{padding:11px 12px;font-size:13px;text-align:center;color:#444;} td.phone-cell{direction:ltr;unicode-bidi:embed;}
 td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
+.installment-cell{min-width:200px;}
+.installment-select{width:100%;padding:3px 5px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:#fff;}
+.installment-select-edit{width:100%;padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px;}
+.tq-detail{color:#555;font-size:11px;display:block;margin-top:2px;direction:rtl;}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
 .badge-pass{background:#e8f5e9;color:#2e7d32;}
 .badge-fail{background:#fce4ec;color:#c62828;}
@@ -1149,6 +1156,8 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <div class="field full"><label>عنوان المنزل</label><input id="f_home_address" placeholder="عنوان المنزل"></div>
 <div class="field"><label>الطريق</label><input id="f_road" placeholder="رقم الطريق"></div>
 <div class="field"><label>المجمع</label><input id="f_complex" placeholder="اسم المجمع"></div>
+</div>
+<div class="field"><label>اختيار نوع التقسيط</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- اختر --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
 </div>
     v>
     </div>
@@ -1666,10 +1675,54 @@ function openTaqseetEditModal() {
 let allStudents=[];
 let deleteTargetId=null;
 var allColumns=[];
-async function loadStudents(){
-const [sRes,cRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns')]);
+async function getTaqseetDetail(method){
+  if(!method||!allTaqseetData.length)return '';
+  var t=allTaqseetData.find(function(x){return x.taqseet_method===method;});
+  if(!t)return '';
+  return 'طريقة '+method+' — مبلغ الدورة: '+(t.course_amount||'')+'، عدد الأقساط: '+(t.num_installments||'')+'، القسط الأول: '+(t.inst1||'')+'، القسط الثاني: '+(t.inst2||'');
+}
+function populateTaqseetDropdowns(){
+  var selects=document.querySelectorAll('.installment-select');
+  selects.forEach(function(sel){
+    var curVal=sel.value;
+    while(sel.options.length>1)sel.remove(1);
+    allTaqseetData.forEach(function(t){
+      var opt=document.createElement('option');
+      opt.value=t.taqseet_method;
+      opt.text=t.taqseet_method;
+      if(t.taqseet_method===curVal)opt.selected=true;
+      sel.appendChild(opt);
+    });
+  });
+}
+function updateInstallmentType(sid,val){
+  fetch('/api/students/'+sid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({installment_type:val})})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d.ok){var s=allStudents.find(function(x){return x.id===sid;});if(s)s.installment_type=val; renderTable(allStudents);}});
+}
+function populateEditInstallmentSelect(curVal){
+  var sel=document.getElementById('f_installment_type');
+  if(!sel)return;
+  while(sel.options.length>1)sel.remove(1);
+  allTaqseetData.forEach(function(t){
+    var opt=document.createElement('option');
+    opt.value=t.taqseet_method;
+    opt.text=t.taqseet_method;
+    if(t.taqseet_method===curVal)opt.selected=true;
+    sel.appendChild(opt);
+  });
+  updateEditInstallmentDetail(curVal);
+}
+function updateEditInstallmentDetail(val){
+  var detail=getTaqseetDetail(val);
+  var existing=document.getElementById('edit_installment_detail');
+  if(existing)existing.textContent=detail;
+}
+var allTaqseetData=[];
+function loadStudents(){
+const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet')]);
 const sData=await sRes.json(); const cData=await cRes.json();
-allStudents=sData.students||[]; allColumns=cData.columns||[];
+allStudents=sData.students||[]; allColumns=cData.columns||[]; allTaqseetData=await tRes.json(); populateTaqseetDropdowns();
 renderTable(allStudents);
 document.getElementById('totalCount').textContent=allStudents.length;
 buildTableHeader();
@@ -1698,7 +1751,7 @@ else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
 else if(key==='final_result'){
 var badge=val==='ناجح'?'badge-pass':val==='راسب'?'badge-fail':'badge-pend';
 row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else{row+='<td>'+(val||'-')+'</td>';}
+}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- اختر --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+''+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
@@ -1710,8 +1763,8 @@ function filterTable(){
   renderTable(allStudents.filter(s=>(s.student_name||'').toLowerCase().includes(q)||(s.personal_id||'').toLowerCase().includes(q)));
 }
 function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة طالب جديد';document.getElementById('modal').classList.add('open');}
-function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='تعديل بيانات الطالب'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
-async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('الرقم الشخصي واسم الطالب مطلوبان','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'تم تعديل بيانات الطالب بنجاح':'تم اضافة الطالب بنجاح');loadStudents();} else{showToast(data.error||'حدث خطا','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
+function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='تعديل بيانات الطالب'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
+async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('الرقم الشخصي واسم الطالب مطلوبان','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'تم تعديل بيانات الطالب بنجاح':'تم اضافة الطالب بنجاح');loadStudents();} else{showToast(data.error||'حدث خطا','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
   if(!deleteTargetId)return;
   const res=await fetch('/api/students/'+deleteTargetId,{method:'DELETE'});
@@ -2748,8 +2801,8 @@ def api_students_add():
             (personal_id,student_name,whatsapp,class_name,old_new_2026,registration_term2_2026,
              group_name_student,group_online,final_result,level_reached_2026,suitable_level_2026,
              books_received,teacher_2026,installment1,installment2,installment3,installment4,
-             installment5,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             installment5,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name,installment_type)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
              d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
              d.get("group_name_student"), d.get("group_online"),
@@ -2758,7 +2811,7 @@ def api_students_add():
              d.get("installment1"), d.get("installment2"), d.get("installment3"),
              d.get("installment4"), d.get("installment5"),
              d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
-             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name")))
+             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type",""))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
@@ -2776,7 +2829,7 @@ def api_students_update(sid):
             final_result=?,level_reached_2026=?,suitable_level_2026=?,books_received=?,
             teacher_2026=?,installment1=?,installment2=?,installment3=?,installment4=?,
             installment5=?,mother_phone=?,father_phone=?,other_phone=?,residence=?,
-            home_address=?,road=?,complex_name=?
+            home_address=?,road=?,complex_name=?,installment_type=?
             WHERE id=?""",
             (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
              d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
@@ -2786,7 +2839,7 @@ def api_students_update(sid):
              d.get("installment1"), d.get("installment2"), d.get("installment3"),
              d.get("installment4"), d.get("installment5"),
              d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
-             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), sid))
+             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type"), sid))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
@@ -2861,6 +2914,7 @@ def api_columns_get():
             ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
             ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
             ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
+            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
         ]
         for key,label,order in default_cols:
             try:
