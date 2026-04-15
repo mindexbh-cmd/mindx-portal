@@ -2811,7 +2811,7 @@ def api_students_add():
              d.get("installment1"), d.get("installment2"), d.get("installment3"),
              d.get("installment4"), d.get("installment5"),
              d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
-             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type",""))
+             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type","")))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
