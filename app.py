@@ -223,7 +223,7 @@ else:
             ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
             ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
             ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
-            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
+            ("installment_type","اختيار نوع التقسيط",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -2914,7 +2914,7 @@ def api_columns_get():
             ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
             ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
             ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
-            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
+            ("installment_type","اختيار نوع التقسيط",26),
         ]
         for key,label,order in default_cols:
             try:
