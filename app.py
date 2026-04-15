@@ -1675,7 +1675,7 @@ function openTaqseetEditModal() {
 let allStudents=[];
 let deleteTargetId=null;
 var allColumns=[];
-async function getTaqseetDetail(method){
+function getTaqseetDetail(method){
   if(!method||!allTaqseetData.length)return '';
   var t=allTaqseetData.find(function(x){return x.taqseet_method===method;});
   if(!t)return '';
