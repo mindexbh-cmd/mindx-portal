@@ -223,16 +223,16 @@ else:
     # Seed default column labels if empty
     if db2.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
-            ("personal_id","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ",1),("student_name","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨",2),("whatsapp","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂÃÂÃÂ¯",3),
-            ("class_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂ",4),("old_new_2026","ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ 2026",5),("registration_term2_2026","ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026",6),
-            ("group_name_student","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©",7),("group_online","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ)",8),("final_result","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ© (ÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026)",9),
-            ("level_reached_2026","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ 2026",10),("suitable_level_2026","ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026ÃÂÃÂ",11),
-            ("books_received","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂ¨",12),("teacher_2026","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 2026",13),
-            ("installment1","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026",14),("installment2","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ",15),("installment3","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«",16),
-            ("installment4","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ¹",17),("installment5","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³",18),
-            ("mother_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ",19),("father_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨",20),("other_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂ±",21),
-            ("residence","ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ",22),("home_address","ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ",23),("road","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂ",24),("complex_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹",25),
-            ("installment_type","ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ·",26),
+            ("personal_id","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ",1),("student_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨",2),("whatsapp","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯",3),
+            ("class_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ",4),("old_new_2026","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ 2026",5),("registration_term2_2026","ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026",6),
+            ("group_name_student","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©",7),("group_online","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)",8),("final_result","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026)",9),
+            ("level_reached_2026","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ 2026",10),("suitable_level_2026","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026ÃÂÃÂÃÂÃÂ",11),
+            ("books_received","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¨",12),("teacher_2026","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 2026",13),
+            ("installment1","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026",14),("installment2","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",15),("installment3","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«",16),
+            ("installment4","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹",17),("installment5","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³",18),
+            ("mother_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ",19),("father_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨",20),("other_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±",21),
+            ("residence","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",22),("home_address","ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ",23),("road","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",24),("complex_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹",25),
+            ("installment_type","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -354,11 +354,11 @@ button{width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8
 </div>
 ERROR_PLACEHOLDER
 <form method="POST" action="/login">
-<label>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂ®ÃÂÃÂ¯ÃÂÃÂ</label>
+<label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</label>
 <input type="text" name="username" placeholder="username" required>
-<label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±</label>
+<label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±</label>
 <input type="password" name="password" placeholder="password" required>
-<button type="submit">ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ &larr;</button>
+<button type="submit">ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ &larr;</button>
 </form>
 </div>
 </body>
@@ -380,38 +380,38 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 </style>
 </head>
 <body>
-<a href="/database" class="btn">ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª</a>
-<a href="/attendance" class="btn-attend">ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨ ÃÂ°ÃÂÃÂÃÂ</a>
+<a href="/database" class="btn">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</a>
+<a href="/attendance" class="btn-attend">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ</a>
 
-<button class="btn" onclick="openPayModal()">&#x1F4B3; ÙØªØ§Ø¨Ø¹Ø© Ø§ÙØ¯ÙØ¹</button>
+<button class="btn" onclick="openPayModal()">&#x1F4B3; ÃÂÃÂªÃÂ§ÃÂ¨ÃÂ¹ÃÂ© ÃÂ§ÃÂÃÂ¯ÃÂÃÂ¹</button>
 
 <div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:1000;justify-content:center;align-items:center;">
   <div style="background:#fff;border-radius:20px;width:94%;max-width:640px;max-height:88vh;direction:rtl;text-align:right;position:relative;box-shadow:0 10px 40px rgba(107,63,160,0.22);display:flex;flex-direction:column;overflow:hidden;">
     <div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <span style="color:#fff;font-size:20px;font-weight:700;">&#x1F4B3; ÙØªØ§Ø¨Ø¹Ø© Ø§ÙØ¯ÙØ¹</span>
+      <span style="color:#fff;font-size:20px;font-weight:700;">&#x1F4B3; ÃÂÃÂªÃÂ§ÃÂ¨ÃÂ¹ÃÂ© ÃÂ§ÃÂÃÂ¯ÃÂÃÂ¹</span>
       <button onclick="closePayModal()" style="background:rgba(255,255,255,0.18);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:20px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">&times;</button>
     </div>
     <div style="padding:16px 20px 12px;border-bottom:1px solid #f0e8ff;background:#faf7ff;flex-shrink:0;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
         <div>
-          <label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">Ø§ÙÙØ¬ÙÙ<button class="btn" onclick="openPayModal()">&#x1F4B3; متابعة الدفع</button>
+          <label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">ÃÂ§ÃÂÃÂÃÂ¬ÃÂÃ<button class="btn" onclick="openPayModal()">&#x1F4B3; ÙØªØ§Ø¨Ø¹Ø© Ø§ÙØ¯ÙØ¹</button>
 
 <div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:1000;justify-content:center;align-items:center;">
   <div style="background:#fff;border-radius:20px;width:98%;max-width:1300px;max-height:92vh;direction:rtl;text-align:right;position:relative;box-shadow:0 10px 40px rgba(107,63,160,0.22);display:flex;flex-direction:column;overflow:hidden;">
     <div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:15px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <span style="color:#fff;font-size:18px;font-weight:700;">&#x1F4B3; متابعة الدفع</span>
+      <span style="color:#fff;font-size:18px;font-weight:700;">&#x1F4B3; ÙØªØ§Ø¨Ø¹Ø© Ø§ÙØ¯ÙØ¹</span>
       <button onclick="closePayModal()" style="background:rgba(255,255,255,0.18);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
     </div>
     <div style="padding:13px 18px 10px;border-bottom:1.5px solid #e8d8ff;background:#faf7ff;flex-shrink:0;">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:10px;align-items:end;">
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="onPayGroupChange()" style="width:100%;padding:8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#fff;color:#333;cursor:pointer;outline:none;"><option value="">اختر مجموعة</option></select></div>
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">التاريخ</label><input type="date" id="pm-date" oninput="onPayDateChange()" style="width:100%;padding:7px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#fff;color:#333;outline:none;"/></div>
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">اليوم</label><div id="pm-day" style="padding:8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#f0e8ff;color:#6B3FA0;font-weight:700;min-height:36px;">&#8212;</div></div>
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">بحث بالاسم</label><div style="position:relative;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#9b7dc8;">&#128269;</span><input type="text" id="pm-search" oninput="filterPayTable()" placeholder="ابحث عن طالب..." style="width:100%;padding:8px 32px 8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;outline:none;background:#fff;"/></div></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">Ø§ÙÙØ¬ÙÙØ¹Ø©</label><select id="pm-group" onchange="onPayGroupChange()" style="width:100%;padding:8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#fff;color:#333;cursor:pointer;outline:none;"><option value="">Ø§Ø®ØªØ± ÙØ¬ÙÙØ¹Ø©</option></select></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">Ø§ÙØªØ§Ø±ÙØ®</label><input type="date" id="pm-date" oninput="onPayDateChange()" style="width:100%;padding:7px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#fff;color:#333;outline:none;"/></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">Ø§ÙÙÙÙ</label><div id="pm-day" style="padding:8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;background:#f0e8ff;color:#6B3FA0;font-weight:700;min-height:36px;">&#8212;</div></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#6B3FA0;margin-bottom:4px;">Ø¨Ø­Ø« Ø¨Ø§ÙØ§Ø³Ù</label><div style="position:relative;"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#9b7dc8;">&#128269;</span><input type="text" id="pm-search" oninput="filterPayTable()" placeholder="Ø§Ø¨Ø­Ø« Ø¹Ù Ø·Ø§ÙØ¨..." style="width:100%;padding:8px 32px 8px 10px;border:1.5px solid #c9a8f0;border-radius:10px;font-size:13px;outline:none;background:#fff;"/></div></div>
       </div>
     </div>
     <div id="pm-count" style="padding:5px 18px;font-size:12px;color:#888;background:#fff;border-bottom:1px solid #f0e8ff;flex-shrink:0;"></div>
-    <div id="pm-table-wrap" style="flex:1;overflow:auto;"><div style="text-align:center;color:#bbb;padding:50px 20px;font-size:14px;">اختر مجموعة لعرض بيانات الدفع</div></div>
+    <div id="pm-table-wrap" style="flex:1;overflow:auto;"><div style="text-align:center;color:#bbb;padding:50px 20px;font-size:14px;">Ø§Ø®ØªØ± ÙØ¬ÙÙØ¹Ø© ÙØ¹Ø±Ø¶ Ø¨ÙØ§ÙØ§Øª Ø§ÙØ¯ÙØ¹</div></div>
   </div>
 </div>
 <style>
@@ -438,7 +438,7 @@ function closePayModal(){document.getElementById('pay-modal').style.display='non
 function loadPM(){
   fetch('/api/students').then(function(r){return r.json();}).then(function(d){
     _pms=d.students||[];_pml=true;popGrps();
-  }).catch(function(){document.getElementById('pm-table-wrap').innerHTML='<div style="color:#e53935;text-align:center;padding:40px;">خطأ</div>';});
+  }).catch(function(){document.getElementById('pm-table-wrap').innerHTML='<div style="color:#e53935;text-align:center;padding:40px;">Ø®Ø·Ø£</div>';});
 }
 function popGrps(){
   var s=document.getElementById('pm-group'),g=[];
@@ -446,15 +446,15 @@ function popGrps(){
   g.sort();while(s.options.length>1)s.remove(1);
   g.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});
 }
-var _days=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+var _days=['Ø§ÙØ£Ø­Ø¯','Ø§ÙØ§Ø«ÙÙÙ','Ø§ÙØ«ÙØ§Ø«Ø§Ø¡','Ø§ÙØ£Ø±Ø¨Ø¹Ø§Ø¡','Ø§ÙØ®ÙÙØ³','Ø§ÙØ¬ÙØ¹Ø©','Ø§ÙØ³Ø¨Øª'];
 function onPayDateChange(){
   var v=document.getElementById('pm-date').value;
   document.getElementById('pm-day').textContent=v?_days[new Date(v+'T00:00:00').getDay()]:'\u2014';
 }
 function onPayGroupChange(){
   var g=document.getElementById('pm-group').value;
-  if(!g){document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">اختر مجموعة</div>';return;}
-  document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">جاري التحميل...</div>';
+  if(!g){document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">Ø§Ø®ØªØ± ÙØ¬ÙÙØ¹Ø©</div>';return;}
+  document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">Ø¬Ø§Ø±Ù Ø§ÙØªØ­ÙÙÙ...</div>';
   fetch('/api/payments/group?group='+encodeURIComponent(g)).then(function(r){return r.json();}).then(function(d){
     _pmg=d.students||[];
     var ex=_pmg.map(function(x){return x.id;});
@@ -466,26 +466,26 @@ function onPayGroupChange(){
     renderPMT();
   });
 }
-function _na(s){return(s||'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');}
+function _na(s){return(s||'').replace(/[Ø£Ø¥Ø¢]/g,'Ø§').replace(/Ø©/g,'Ù').replace(/Ù/g,'Ù');}
 function filterPayTable(){
   var q=_na(document.getElementById('pm-search').value.trim());
   var f=!q?_pmg:_pmg.filter(function(s){return _na(s.student_name||'').indexOf(q)!==-1;});
-  document.getElementById('pm-count').textContent='عدد الطلاب: '+f.length;
+  document.getElementById('pm-count').textContent='Ø¹Ø¯Ø¯ Ø§ÙØ·ÙØ§Ø¨: '+f.length;
   renderPMRows(f);
 }
 function renderPMT(){
-  document.getElementById('pm-count').textContent='عدد الطلاب: '+_pmg.length;
-  if(!_pmg.length){document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">لا يوجد طلاب</div>';return;}
-  var h='<tr><th class="nm">الاسم</th>';
-  for(var n=1;n<=12;n++)h+='<th colspan="2">قسط '+n+'</th>';
+  document.getElementById('pm-count').textContent='Ø¹Ø¯Ø¯ Ø§ÙØ·ÙØ§Ø¨: '+_pmg.length;
+  if(!_pmg.length){document.getElementById('pm-table-wrap').innerHTML='<div style="text-align:center;color:#bbb;padding:50px;">ÙØ§ ÙÙØ¬Ø¯ Ø·ÙØ§Ø¨</div>';return;}
+  var h='<tr><th class="nm">Ø§ÙØ§Ø³Ù</th>';
+  for(var n=1;n<=12;n++)h+='<th colspan="2">ÙØ³Ø· '+n+'</th>';
   h+='</tr><tr><th class="nm sub"></th>';
-  for(var n=1;n<=12;n++){h+='<th class="sub">نوع</th><th class="sub">سعر / مدفوع / متبقي</th>';}
+  for(var n=1;n<=12;n++){h+='<th class="sub">ÙÙØ¹</th><th class="sub">Ø³Ø¹Ø± / ÙØ¯ÙÙØ¹ / ÙØªØ¨ÙÙ</th>';}
   h+='</tr>';
   document.getElementById('pm-table-wrap').innerHTML='<table id="pm-tbl" dir="rtl"><thead>'+h+'</thead><tbody id="pm-tbody"></tbody></table>';
   renderPMRows(_pmg);
 }
 function buildOpts(cur){
-  var s='<option value="">—</option>';
+  var s='<option value="">â</option>';
   for(var i=1;i<=12;i++)s+='<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+i+'</option>';
   return s;
 }
@@ -494,17 +494,17 @@ function renderPMRows(list){
   var h='';
   list.forEach(function(s){
     h+='<tr>';
-    h+='<td class="nm">'+(s.student_name||'—')+'</td>';
+    h+='<td class="nm">'+(s.student_name||'â')+'</td>';
     for(var n=1;n<=12;n++){
       var p=s.payments&&s.payments[n]?s.payments[n]:{inst_type:'',price:'',paid:''};
       var rem=((parseFloat(p.price)||0)-(parseFloat(p.paid)||0));
       var rc=rem<0?'pr neg':'pr';
       h+='<td style="min-width:58px;"><select class="pt" data-s="'+s.id+'" data-n="'+n+'">'+buildOpts(p.inst_type)+'</select></td>';
       h+='<td style="min-width:170px;">';
-      h+='<input class="pi" type="number" min="0" placeholder="سعر" value="'+(p.price||'')+'" data-s="'+s.id+'" data-n="'+n+'" data-r="p" oninput="calcR(this)"/>';
-      h+='<input class="pi" type="number" min="0" placeholder="مدفوع" value="'+(p.paid||'')+'" data-s="'+s.id+'" data-n="'+n+'" data-r="d" oninput="calcR(this)"/>';
+      h+='<input class="pi" type="number" min="0" placeholder="Ø³Ø¹Ø±" value="'+(p.price||'')+'" data-s="'+s.id+'" data-n="'+n+'" data-r="p" oninput="calcR(this)"/>';
+      h+='<input class="pi" type="number" min="0" placeholder="ÙØ¯ÙÙØ¹" value="'+(p.paid||'')+'" data-s="'+s.id+'" data-n="'+n+'" data-r="d" oninput="calcR(this)"/>';
       h+='<input class="'+rc+'" type="text" readonly value="'+(rem||0)+'" data-s="'+s.id+'" data-n="'+n+'" data-r="r"/>';
-      h+='<button class="ps" data-s="'+s.id+'" data-n="'+n+'" onclick="savePR(this)">حفظ</button>';
+      h+='<button class="ps" data-s="'+s.id+'" data-n="'+n+'" onclick="savePR(this)">Ø­ÙØ¸</button>';
       h+='</td>';
     }
     h+='</tr>';
@@ -526,17 +526,36 @@ function savePR(btn){
   var pe=document.querySelector('[data-s="'+s+'"][data-n="'+n+'"][data-r="p"]');
   var de=document.querySelector('[data-s="'+s+'"][data-n="'+n+'"][data-r="d"]');
   var pl={inst_type:te?te.value:'',price:parseFloat(pe?pe.value:0)||0,paid:parseFloat(de?de.value:0)||0};
-  btn.textContent='جاري...';btn.disabled=true;
+  btn.textContent='Ø¬Ø§Ø±Ù...';btn.disabled=true;
   fetch('/api/payments/'+s+'/'+n,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(pl)})
   .then(function(r){return r.json();})
-  .then(function(d){btn.textContent=d.ok?'✓':'خطأ';btn.disabled=false;setTimeout(function(){btn.textContent='حفظ';},1800);
+  .then(function(d){btn.textContent=d.ok?'â':'Ø®Ø·Ø£';btn.disabled=false;setTimeout(function(){btn.textContent='Ø­ÙØ¸';},1800);
     _pmg.forEach(function(x){if(String(x.id)===String(s)){if(!x.payments)x.payments={};x.payments[n]=pl;}});
-  }).catch(function(){btn.textContent='خطأ';btn.disabled=false;});
+  }).catch(function(){btn.textContent='Ø®Ø·Ø£';btn.disabled=false;});
 }
 </script>
 </body>
 </html>"""
-width:200px;cursor:pointer;}
+
+ATTENDANCE_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨ - Mindex</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:#f5f3ff;min-height:100vh;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+.topbar h1{font-size:20px;font-weight:800;}
+.btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+.btn-back:hover{background:rgba(255,255,255,.3);}
+.main{padding:24px 28px;}
+.card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(0,137,123,.1);margin-bottom:24px;}
+.controls-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+.ctrl-group{display:flex;flex-direction:column;gap:5px;}
+.ctrl-label{font-size:12px;font-weight:700;color:#00897B;}
+select.group-select{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:200px;cursor:pointer;}
 select.group-select:focus{border-color:#00897B;background:#fff;}
 input.date-input{padding:10px 14px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;cursor:pointer;min-width:160px;direction:ltr;}
 input.date-input:focus{border-color:#00897B;background:#fff;}
@@ -600,24 +619,24 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 </head>
 <body>
 <div class="topbar">
-  <h1>&#128197; ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</h1>
-  <a href="/dashboard" class="btn-back">&larr; ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</a>
+  <h1>&#128197; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</h1>
+  <a href="/dashboard" class="btn-back">&larr; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</a>
 </div>
 <div class="main">
   <div class="card">
     <div class="controls-row">
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128218; ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</span>
+        <span class="ctrl-label">&#128218; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</span>
         <select class="group-select" id="groupSelect" onchange="onControlChange()">
-          <option value="">&#8212; ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© &#8212;</option>
+          <option value="">&#8212; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© &#8212;</option>
         </select>
       </div>
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128197; ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ®</span>
+        <span class="ctrl-label">&#128197; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®</span>
         <input type="date" class="date-input" id="dateInput" onchange="onControlChange()">
       </div>
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128340; ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</span>
+        <span class="ctrl-label">&#128340; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</span>
         <div class="day-badge empty" id="dayBadge">&#8212;</div>
       </div>
       <span class="student-count" id="studentCount" style="display:none;"></span>
@@ -655,7 +674,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
             <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
-            <th>ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ</th>
+            <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</th>
           </tr>
         </thead>
         <tbody id="attTableBody"></tbody>
@@ -690,10 +709,10 @@ function showToast(msg, bg) {
 function normalizeAr(s) {
   if (!s) return '';
   return s
-    .replace(/[ÃÂÃÂ£ÃÂÃÂ¥ÃÂÃÂ¢ÃÂÃÂ§]/g, 'ÃÂÃÂ§')  // ÃÂÃÂ£ÃÂÃÂ¥ÃÂÃÂ¢ÃÂÃÂ§ ÃÂ¢ÃÂÃÂ ÃÂÃÂ§
-    .replace(/[ÃÂÃÂ©ÃÂÃÂ]/g, 'ÃÂÃÂ')               // ÃÂÃÂ©ÃÂÃÂ ÃÂ¢ÃÂÃÂ ÃÂÃÂ
-    .replace(/[ÃÂÃÂÃÂÃÂ]/g, 'ÃÂÃÂ')               // ÃÂÃÂÃÂÃÂ ÃÂ¢ÃÂÃÂ ÃÂÃÂ
-    .replace(/[ÃÂÃÂ-ÃÂÃÂ]/g, '');                   // remove tashkeel
+    .replace(/[ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ§]/g, 'ÃÂÃÂÃÂÃÂ§')  // ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ§ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§
+    .replace(/[ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ]/g, 'ÃÂÃÂÃÂÃÂ')               // ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ
+    .replace(/[ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ]/g, 'ÃÂÃÂÃÂÃÂ')               // ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ
+    .replace(/[ÃÂÃÂÃÂÃÂ-ÃÂÃÂÃÂÃÂ]/g, '');                   // remove tashkeel
 }
 
 var _searchTimeout = null;
@@ -749,14 +768,14 @@ function performSearch(query) {
   }
 
   if (found) {
-    badge.textContent = 'ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ«ÃÂÃÂÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ: ' + foundGroup;
+    badge.textContent = 'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: ' + foundGroup;
     badge.style.display = 'inline-block';
     // Select the group in dropdown
     var sel = document.getElementById('groupSelect');
     sel.value = foundGroup;
     onControlChange();
   } else {
-    badge.textContent = 'ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ©';
+    badge.textContent = 'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ©';
     badge.style.background = '#ef9a9a';
     badge.style.display = 'inline-block';
     setTimeout(function() {
@@ -1048,7 +1067,7 @@ DATABASE_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª - Mindex</title>
+<title>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 html,body{height:100%;overflow:hidden;margin:0;}
@@ -1136,91 +1155,91 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </head>
 <body>
 <div class="topbar">
-  <h1>ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ­ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ©</h1>
-  <a href="/dashboard" class="btn-home">&larr; ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</a>
+  <h1>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ©</h1>
+  <a href="/dashboard" class="btn-home">&larr; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</a>
 </div>
 <div class="main">
   <div class="page-title-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-    <div class="page-title" style="margin-bottom:0;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ©</div>
-    <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</a>
+    <div class="page-title" style="margin-bottom:0;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ©</div>
+    <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</a>
   </div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
-      <span class="stat-label">ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ©</span>
+      <span class="stat-label">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ©</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
-  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
+  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button></div>
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ« ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ..." oninput="filterTable()">
-    <button class="btn-search" onclick="filterTable()">ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ«</button>
+    <input type="text" id="searchInput" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ..." oninput="filterTable()">
+    <button class="btn-search" onclick="filterTable()">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</th>
-          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂÃÂÃÂ¯</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂ</th>
-          <th>ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ 2026</th>
-          <th>ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ)</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ© (ÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026)</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ 2026</th>
-          <th>ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026ÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂ¨</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 2026</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ¹</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³</th>
-          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ</th>
-          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</th>
-          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂ±</th>
-          <th>ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ</th>
-          <th>ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ 2026</th>
+          <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026)</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ 2026</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026ÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¨</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 2026</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>
         </tr>
       </thead>
       <tbody id="studentsBody">
-        <tr><td colspan="27" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</td></tr>
+        <tr><td colspan="27" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</td></tr>
       </tbody>
     </table>
   </div>
 
 <!-- ===== GROUPS TABLE SECTION ===== -->
 <div style="margin-top:40px;">
-  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</div>
+  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</div>
   <div class="stats">
     <div class="stat-card" style="border-top:3px solid #00BCD4;">
       <span class="stat-num" id="groupsTotalCount" style="color:#00BCD4;">0</span>
-      <span class="stat-label">ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</span>
+      <span class="stat-label">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button></div>
   <div class="search-bar">
-    <input type="text" id="groupSearchInput" placeholder="ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ« ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³..." oninput="filterGroupTable2()">
-    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ«</button>
+    <input type="text" id="groupSearchInput" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³..." oninput="filterGroupTable2()">
+    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ«</button>
   </div>
   <div class="table-wrap">
     <table style="min-width:1300px;">
       <thead>
         <tr id="groupsTheadRow" style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
-          <th>#</th><th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th><th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³</th><th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ / ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ±</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂª</th><th>ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</th>
-          <th>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ´ÃÂÃÂÃÂÃÂ± ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂ</th><th>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ)</th>
-          <th>ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th><th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</th><th>ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>
+          <th>#</th><th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th><th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³</th><th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂª</th><th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</th><th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</th>
+          <th>ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th><th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</th><th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>
         </tr>
       </thead>
       <tbody id="groupsBody2">
-        <tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</td></tr>
+        <tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</td></tr>
       </tbody>
     </table>
   </div>
@@ -1228,48 +1247,48 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- TAQSEET (PAYMENT PLANS) TABLE -->
 <div style="margin:30px 0 0 0;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; ÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ·</span>
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·</span>
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
-    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
-    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
+    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
+    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
   </div>
   <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
     <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
       <thead>
         <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
           <th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">ÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ·</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂº ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂ©</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ·</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂ 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ¨ÃÂÃÂ¯ÃÂÃÂ¡ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂ©</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂº ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ·</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¡ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>
         </tr>
       </thead>
       <tbody id="taqseetBody"></tbody>
@@ -1279,139 +1298,139 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h2 id="modalTitle">ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</h2>
+    <h2 id="modalTitle">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</h2>
     <input type="hidden" id="editId">
     <div class="form-grid">
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ *</label><input id="f_personal_id" placeholder="ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ *</label><input id="f_student_name" placeholder="ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂÃÂÃÂ¯</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂ</label><input id="f_class_name" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂµÃÂÃÂ A"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ 2026</label><input id="f_old_new_2026" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯"></div>
-<div class="field"><label>ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026</label><input id="f_registration_term2_2026" placeholder="ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ / ÃÂÃÂÃÂÃÂ§"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</label><input id="f_group_name_student" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ)</label><input id="f_group_online" placeholder="ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ© (ÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026)</label><select id="f_final_result"><option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option><option>ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ­</option><option>ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨</option><option>ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</option><option>ÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂ¨</option></select></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ 2026</label><input id="f_level_reached" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ© 5"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026ÃÂÃÂ</label><input id="f_suitable_level" placeholder="ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ / ÃÂÃÂÃÂÃÂ§"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂ¨</label><input id="f_books_received" placeholder="ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ / ÃÂÃÂÃÂÃÂ§"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 2026</label><input id="f_teacher" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026</label><input id="f_installment1" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂºÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ</label><input id="f_installment2" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂºÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«</label><input id="f_installment3" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂºÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ¹</label><input id="f_installment4" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂºÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³</label><input id="f_installment5" placeholder="ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂºÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂ±</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ</label><input id="f_residence" placeholder="ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ©"></div>
-<div class="field full"><label>ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ</label><input id="f_home_address" placeholder="ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂ</label><input id="f_road" placeholder="ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂ"></div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹</label><input id="f_complex" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ *</label><input id="f_personal_id" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ *</label><input id="f_student_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</label><input id="f_class_name" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ A"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ 2026</label><input id="f_old_new_2026" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026</label><input id="f_registration_term2_2026" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</label><input id="f_group_name_student" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</label><input id="f_group_online" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026)</label><select id="f_final_result"><option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option><option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ­</option><option>ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨</option><option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</option><option>ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¨</option></select></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ 2026</label><input id="f_level_reached" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© 5"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026ÃÂÃÂÃÂÃÂ</label><input id="f_suitable_level" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¨</label><input id="f_books_received" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 2026</label><input id="f_teacher" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026</label><input id="f_installment1" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label><input id="f_installment2" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«</label><input id="f_installment3" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹</label><input id="f_installment4" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³</label><input id="f_installment5" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ / ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label><input id="f_residence" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©"></div>
+<div class="field full"><label>ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ</label><input id="f_home_address" placeholder="ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label><input id="f_road" placeholder="ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ"></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹</label><input id="f_complex" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹"></div>
 </div>
-<div class="field"><label>ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ·</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
+<div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
 </div>
     v>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveStudent()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
-      <button class="btn-cancel" onclick="closeModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-save" onclick="saveStudent()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
+      <button class="btn-cancel" onclick="closeModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="confirmModal">
   <div class="confirm-box">
-    <h3>ÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</h3>
-    <p>ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ¹ ÃÂÃÂ¹ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡.</p>
+    <h3>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</h3>
+    <p>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡.</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="confirmDelBtn">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>
-      <button class="btn-confirm-cancel" onclick="closeConfirm()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-confirm-del" id="confirmDelBtn">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div><!-- TABLE EDIT MODAL -->
 <div class="modal-bg" id="tableEditModal">
 <div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
-<h2 style="color:#E55A2B;">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</h2>
+<h2 style="color:#E55A2B;">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</h2>
 <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #f0ebff;padding-bottom:10px;">
-<button id="tab-add-col" onclick="switchTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">ÃÂ¢ÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-<button id="tab-del-col" onclick="switchTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">ÃÂ¢ÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-<button id="tab-edit-col" onclick="switchTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+<button id="tab-add-col" onclick="switchTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+<button id="tab-del-col" onclick="switchTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+<button id="tab-edit-col" onclick="switchTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
 </div>
 <!-- Tab: Add Column -->
 <div id="panel-add-col">
-<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ *</label><input id="new_col_label" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ­ÃÂÃÂ¸ÃÂÃÂ§ÃÂÃÂª" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ *</label><input id="new_col_label" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
 <div class="field" style="margin-bottom:14px;">
-  <label style="color:#E55A2B;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</label>
+  <label style="color:#E55A2B;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</label>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <select id="new_col_position" onchange="togglePositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
-      <option value="end">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-      <option value="start">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¯ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-      <option value="after">ÃÂÃÂ¨ÃÂÃÂ¹ÃÂÃÂ¯ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
+      <option value="end">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+      <option value="start">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+      <option value="after">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
     </select>
     <select id="new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;">
-      <option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option>
+      <option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option>
     </select>
   </div>
 </div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
 </div>
 </div>
 <!-- Tab: Delete Column -->
 <div id="panel-del-col" style="display:none;">
-<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ *</label>
-<select id="del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option></select></div>
-<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">ÃÂ¢ÃÂÃÂ ÃÂ¯ÃÂ¸ÃÂ ÃÂÃÂªÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂÃÂÃÂ±: ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ©. ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ¹.</div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ *</label>
+<select id="del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂ¯ÃÂÃÂ¸ÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±: ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ©. ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹.</div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" style="background:#e53935;" onclick="deleteColumn()">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+<button class="btn-save" style="background:#e53935;" onclick="deleteColumn()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
 </div>
 </div>
 <!-- Tab: Edit Column Label -->
 <div id="panel-edit-col" style="display:none;">
-<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ *</label>
-<select id="edit_col_key" onchange="fillEditLabel()" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"><option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option></select></div>
-<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ *</label><input id="edit_col_label" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ *</label>
+<select id="edit_col_key" onchange="fillEditLabel()" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"><option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ *</label><input id="edit_col_label" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"></div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" onclick="updateColumnLabel()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+<button class="btn-save" onclick="updateColumnLabel()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
 </div>
 </div>
 <div class="modal-actions" style="margin-top:18px;justify-content:center;">
-<button class="btn-cancel" onclick="closeTableEditModal()">ÃÂÃÂ¥ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+<button class="btn-cancel" onclick="closeTableEditModal()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
 </div>
 </div>
 </div>
-<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ ÃÂÃÂ·ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ© ÃÂÃÂÃÂÃÂ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¨ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂÃÂÃÂ­ÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ±ÃÂÃÂªÃÂÃÂÃÂÃÂ¨:<br>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 2026ÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂ±ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯</button><button class="btn-cancel" onclick="closeStudentExcelModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª ÃÂÃÂÃÂÃÂ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¨ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂÃÂÃÂ­ÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ±ÃÂÃÂªÃÂÃÂÃÂÃÂ¨:<br>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂªÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯</button><button class="btn-cancel" onclick="closeGroupExcelModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button></div></div></div><div style="margin:30px 0 0 0;">
+<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨:<br>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 2026ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯</button><button class="btn-cancel" onclick="closeStudentExcelModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨:<br>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯</button><button class="btn-cancel" onclick="closeGroupExcelModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button></div></div></div><div style="margin:30px 0 0 0;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</span>
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</span>
   </div>
   <div class="stats" style="margin-bottom:10px;">
     <div class="stat-card">
       <span class="stat-num" id="attendanceTotalCount">0</span>
-      <span class="stat-label">ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂª</span>
+      <span class="stat-label">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</span>
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-    <button class="btn-add" onclick="openAttendanceAddModal()">+ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ</button>
+    <button class="btn-add" onclick="openAttendanceAddModal()">+ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ</button>
   
-  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button></div>
+  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button></div>
   <div class="search-bar">
-    <input type="text" id="attendanceSearchInput" placeholder="ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ« ÃÂÃÂÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨..." oninput="filterAttendanceTable()">
-    <button class="btn-search" onclick="filterAttendanceTable()">ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ«</button>
+    <input type="text" id="attendanceSearchInput" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨..." oninput="filterAttendanceTable()">
+    <button class="btn-search" onclick="filterAttendanceTable()">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ° ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</th>
-          <th>ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂµÃÂÃÂ</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</th>
-          <th>ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</th>
-          <th>ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</th>
-          <th>ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>
+          <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ° ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</th>
+          <th>ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>
         </tr>
       </thead>
       <tbody id="attendanceBody"></tbody>
@@ -1421,99 +1440,99 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ATTENDANCE ADD/EDIT MODAL -->
 <div class="modal-bg" id="attendanceModal" style="display:none">
   <div class="modal" style="max-width:520px;width:95%">
-    <h2 id="attendanceModalTitle" style="margin-bottom:16px;color:#6c3fa0;">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</h2>
+    <h2 id="attendanceModalTitle" style="margin-bottom:16px;color:#6c3fa0;">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</h2>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ° ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±</label>
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ° ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±</label>
           <input type="date" id="att_date" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label>
-          <input type="text" id="att_day" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ­ÃÂÃÂ¯" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label>
+          <input type="text" id="att_day" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</label>
-          <input type="text" id="att_group" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</label>
+          <input type="text" id="att_group" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</label>
-          <input type="text" id="att_student" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</label>
+          <input type="text" id="att_student" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂµÃÂÃÂ</label>
-          <input type="text" id="att_contact" placeholder="ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</label>
+          <input type="text" id="att_contact" placeholder="ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</label>
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</label>
           <select id="att_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option>
-            <option>ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ±</option>
-            <option>ÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂ¨</option>
-            <option>ÃÂÃÂÃÂÃÂªÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ±</option>
-            <option>ÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂ°ÃÂÃÂ±</option>
+            <option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option>
+            <option>ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±</option>
+            <option>ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¨</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ±</option>
           </select>
         </div>
       </div>
       <div>
-        <label style="font-size:.85em;color:#555;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</label>
-        <textarea id="att_message" rows="3" placeholder="ÃÂÃÂÃÂÃÂµ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;resize:vertical;"></textarea>
+        <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</label>
+        <textarea id="att_message" rows="3" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;resize:vertical;"></textarea>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</label>
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</label>
           <select id="att_msg_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option>
-            <option>ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ</option>
-            <option>ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ</option>
-            <option>ÃÂÃÂÃÂÃÂ´ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ</option>
+            <option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option>
+            <option>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</option>
           </select>
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</label>
+          <label style="font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</label>
           <select id="att_study_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option>
-            <option>ÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±</option>
-            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂ¹</option>
-            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</option>
+            <option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¹</option>
+            <option>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</option>
           </select>
         </div>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeAttendanceModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-      <button class="btn-save" onclick="saveAttendanceRecord()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
+      <button class="btn-cancel" onclick="closeAttendanceModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+      <button class="btn-save" onclick="saveAttendanceRecord()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
     </div>
   </div>
 </div>
 <!-- ATTENDANCE CONFIRM DELETE MODAL -->
 <div class="confirm-bg" id="attendanceConfirmModal" style="display:none">
   <div class="confirm-box">
-    <p>ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ</p>
+    <p>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</p>
     <div style="display:flex;gap:10px;justify-content:center;">
-      <button class="btn-cancel" onclick="closeAttendanceConfirm()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-      <button class="btn-delete" onclick="confirmAttendanceDelete()">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>
+      <button class="btn-cancel" onclick="closeAttendanceConfirm()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+      <button class="btn-delete" onclick="confirmAttendanceDelete()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>
     </div>
   </div>
 </div>
 <!-- ATTENDANCE EXCEL IMPORT MODAL -->
 <div class="modal-bg" id="attendanceExcelModal" style="display:none">
   <div class="modal" style="max-width:480px;width:95%">
-    <h2 style="margin-bottom:14px;color:#388E3C;">&#128196; ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ Excel</h2>
+    <h2 style="margin-bottom:14px;color:#388E3C;">&#128196; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</h2>
     <div style="background:#f1f8e9;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.88em;color:#2E7D32;line-height:1.7;">
-      <b>ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¨ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ±ÃÂÃÂªÃÂÃÂÃÂÃÂ¨:<br>
-      ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ° ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©
+      <b>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª:</b> ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨:<br>
+      ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ° ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©
     </div>
-    <button class="btn-add" style="width:100%;justify-content:center;" onclick="document.getElementById('attendanceExcelFileInput').click()">&#128194; ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button>
+    <button class="btn-add" style="width:100%;justify-content:center;" onclick="document.getElementById('attendanceExcelFileInput').click()">&#128194; ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Excel</button>
     <input type="file" id="attendanceExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="readAttendanceExcelFile(this)">
     <div id="attendanceExcelStatus" style="margin-top:10px;font-size:.9em;color:#555;text-align:center;"></div>
     <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeAttendanceExcelModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-      <button class="btn-save" id="attendanceExcelImportBtn" onclick="importAttendanceFromExcel()" style="display:none">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯</button>
+      <button class="btn-cancel" onclick="closeAttendanceExcelModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+      <button class="btn-save" id="attendanceExcelImportBtn" onclick="importAttendanceFromExcel()" style="display:none">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯</button>
     </div>
   </div>
 </div>
@@ -1521,41 +1540,41 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ATTENDANCE TABLE EDIT MODAL -->
 <div class="modal-bg" id="attendanceTableEditModal" style="display:none">
   <div class="modal" style="max-width:460px;width:95%">
-    <h2 style="margin-bottom:12px;color:#E65100;font-size:1.1em;">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨</h2>
+    <h2 style="margin-bottom:12px;color:#E65100;font-size:1.1em;">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</h2>
     <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button class="btn-tab active" id="attTab1" onclick="switchAttTab('add')">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-      <button class="btn-tab" id="attTab2" onclick="switchAttTab('del')">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-      <button class="btn-tab" id="attTab3" onclick="switchAttTab('rename')">ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+      <button class="btn-tab active" id="attTab1" onclick="switchAttTab('add')">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button class="btn-tab" id="attTab2" onclick="switchAttTab('del')">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button class="btn-tab" id="attTab3" onclick="switchAttTab('rename')">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
     </div>
     <!-- Add column panel -->
     <div id="attTabPanelAdd">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</label>
-      <input type="text" id="att_new_col_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯" class="col-name-input">
-      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©:</div>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</label>
+      <input type="text" id="att_new_col_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©:</div>
       <select id="att_col_position" class="col-name-input" onchange="toggleAttPosition()">
-        <option value="end">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-        <option value="start">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¯ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-        <option value="after">ÃÂÃÂ¨ÃÂÃÂ¹ÃÂÃÂ¯ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
+        <option value="end">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+        <option value="start">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+        <option value="after">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
       </select>
       <select id="att_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addAttendanceColumn()">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</button>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addAttendanceColumn()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</button>
     </div>
     <!-- Delete column panel -->
     <div id="attTabPanelDel" style="display:none">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</label>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</label>
       <select id="att_del_col" class="col-name-input"></select>
-      <button style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteAttendanceColumn()">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteAttendanceColumn()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
     </div>
     <!-- Rename column panel -->
     <div id="attTabPanelRename" style="display:none">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</label>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</label>
       <select id="att_rename_col" class="col-name-input" onchange="fillAttRenameLabel()"></select>
-      <label style="font-size:.85em;color:#555;display:block;margin-top:8px;margin-bottom:4px;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</label>
-      <input type="text" id="att_rename_label" class="col-name-input" placeholder="ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯">
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateAttendanceColumnLabel()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
+      <label style="font-size:.85em;color:#555;display:block;margin-top:8px;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</label>
+      <input type="text" id="att_rename_label" class="col-name-input" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateAttendanceColumnLabel()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
     </div>
     <div style="margin-top:14px;text-align:left;">
-      <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">ÃÂÃÂ¥ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+      <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
     </div>
   </div>
 </d
@@ -1566,7 +1585,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- NEW TABLE WIZARD MODAL -->
 <div class="modal-bg" id="newTableWizardModal" style="display:none">
   <div class="modal" style="max-width:540px;width:96%">
-    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; ÃÂÃÂ¥ÃÂÃÂÃÂÃÂ´ÃÂÃÂ§ÃÂÃÂ¡ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯</h2>
+    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</h2>
     <div class="step-indicator">
       <div class="step-dot active" id="wizDot1"></div>
       <div class="step-dot" id="wizDot2"></div>
@@ -1574,31 +1593,31 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <!-- Step 1: Name + cols/rows count -->
     <div class="wizard-step active" id="wizStep1">
       <div style="margin-bottom:12px;">
-        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</label>
-        <input type="text" id="wiz_tbl_name" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¯ÃÂÃÂ" class="col-name-input">
+        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</label>
+        <input type="text" id="wiz_tbl_name" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ" class="col-name-input">
       </div>
       <div style="display:flex;gap:12px;">
         <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©</label>
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©</label>
           <input type="number" id="wiz_col_count" min="1" max="20" value="3" class="col-name-input" style="width:100%;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂªÃÂÃÂ¯ÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ©</label>
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</label>
           <input type="number" id="wiz_row_count" min="0" max="100" value="0" class="col-name-input" style="width:100%;">
         </div>
       </div>
       <div class="wizard-nav">
-        <button class="btn-cancel" onclick="closeNewTableWizard()">ÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-        <button class="btn-save" onclick="wizardStep1Next()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂ &#8594;</button>
+        <button class="btn-cancel" onclick="closeNewTableWizard()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+        <button class="btn-save" onclick="wizardStep1Next()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ &#8594;</button>
       </div>
     </div>
     <!-- Step 2: Column names -->
     <div class="wizard-step" id="wizStep2">
-      <p style="font-size:.9em;color:#555;margin-bottom:10px;">ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ£ÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¡ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©:</p>
+      <p style="font-size:.9em;color:#555;margin-bottom:10px;">ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©:</p>
       <div id="wizColNamesContainer"></div>
       <div class="wizard-nav">
-        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; ÃÂÃÂ±ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹</button>
-        <button class="btn-save" onclick="wizardCreateTable()">&#10003; ÃÂÃÂ¥ÃÂÃÂÃÂÃÂ´ÃÂÃÂ§ÃÂÃÂ¡ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
+        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹</button>
+        <button class="btn-save" onclick="wizardCreateTable()">&#10003; ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
       </div>
     </div>
   </div>
@@ -1607,34 +1626,34 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- CUSTOM TABLE EDIT MODAL (add/delete/rename cols) -->
 <div class="modal-bg" id="customTableEditModal" style="display:none">
   <div class="modal" style="max-width:480px;width:96%">
-    <h2 id="customTableEditTitle" style="margin-bottom:12px;color:#1565C0;font-size:1.1em;">ÃÂ¢ÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</h2>
+    <h2 id="customTableEditTitle" style="margin-bottom:12px;color:#1565C0;font-size:1.1em;">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</h2>
     <div style="display:flex;gap:6px;margin-bottom:14px;" id="customTblTabBtns">
-      <button class="btn-tab active" id="ctab1" onclick="switchCustomTab('add')">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-      <button class="btn-tab" id="ctab2" onclick="switchCustomTab('del')">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
-      <button class="btn-tab" id="ctab3" onclick="switchCustomTab('rename')">ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+      <button class="btn-tab active" id="ctab1" onclick="switchCustomTab('add')">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button class="btn-tab" id="ctab2" onclick="switchCustomTab('del')">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button class="btn-tab" id="ctab3" onclick="switchCustomTab('rename')">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
     </div>
     <div id="ctabPanelAdd">
-      <input type="text" id="ctbl_new_col_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯" class="col-name-input">
-      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©:</div>
+      <input type="text" id="ctbl_new_col_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©:</div>
       <select id="ctbl_position" class="col-name-input" onchange="toggleCustomPosition()">
-        <option value="end">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-        <option value="start">ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ¯ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</option>
-        <option value="after">ÃÂÃÂ¨ÃÂÃÂ¹ÃÂÃÂ¯ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
+        <option value="end">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+        <option value="start">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</option>
+        <option value="after">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯:</option>
       </select>
       <select id="ctbl_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addCustomColumn()">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©</button>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addCustomColumn()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©</button>
     </div>
     <div id="ctabPanelDel" style="display:none">
       <select id="ctbl_del_col" class="col-name-input"></select>
-      <button class="btn-delete" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteCustomColumn()">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
+      <button class="btn-delete" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteCustomColumn()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯</button>
     </div>
     <div id="ctabPanelRename" style="display:none">
       <select id="ctbl_rename_col" class="col-name-input" onchange="fillCustomRenameLabel()"></select>
-      <input type="text" id="ctbl_rename_label" placeholder="ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯" class="col-name-input" style="margin-top:8px;">
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateCustomColumnLabel()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>
+      <input type="text" id="ctbl_rename_label" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯" class="col-name-input" style="margin-top:8px;">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateCustomColumnLabel()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>
     </div>
     <div style="margin-top:14px;text-align:left;">
-      <button class="btn-cancel" onclick="closeCustomTableEditModal()">ÃÂÃÂ¥ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ</button>
+      <button class="btn-cancel" onclick="closeCustomTableEditModal()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</button>
     </div>
   </div>
 </div>
@@ -1642,11 +1661,11 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ADD ROW MODAL FOR CUSTOM TABLE -->
 <div class="modal-bg" id="customRowModal" style="display:none">
   <div class="modal" style="max-width:500px;width:96%">
-    <h2 id="customRowModalTitle" style="margin-bottom:14px;color:#1565C0;font-size:1.1em;">ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂµÃÂÃÂ</h2>
+    <h2 id="customRowModalTitle" style="margin-bottom:14px;color:#1565C0;font-size:1.1em;">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</h2>
     <div id="customRowFormFields" style="display:flex;flex-direction:column;gap:10px;"></div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeCustomRowModal()">ÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-      <button class="btn-save" onclick="saveCustomRow()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
+      <button class="btn-cancel" onclick="closeCustomRowModal()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+      <button class="btn-save" onclick="saveCustomRow()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
     </div>
   </div>
 </div>
@@ -1654,49 +1673,49 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- CONFIRM DELETE CUSTOM TABLE -->
 <div class="confirm-bg" id="customTableDeleteConfirm" style="display:none">
   <div class="confirm-box">
-    <p id="customTableDeleteMsg">ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂ</p>
+    <p id="customTableDeleteMsg">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</p>
     <div style="display:flex;gap:10px;justify-content:center;">
-      <button class="btn-cancel" onclick="closeCustomTableDeleteConfirm()">ÃÂÃÂ¥ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
-      <button style="background:#e53935;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;" onclick="confirmCustomTableDelete()">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>
+      <button class="btn-cancel" onclick="closeCustomTableDeleteConfirm()">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
+      <button style="background:#e53935;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;" onclick="confirmCustomTableDelete()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>
     </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
-    <h2 id="groupModalTitle2" style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©</h2>
+    <h2 id="groupModalTitle2" style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©</h2>
     <input type="hidden" id="groupEditId2">
     <div class="form-grid">
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© *</label><input id="gf2_group_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³</label><input id="gf2_teacher_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ / ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ±</label><input id="gf2_level_course" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 3" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂª</label><input id="gf2_last_reached" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ© 5" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</label><input id="gf2_study_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂ¨ÃÂÃÂª 4-5 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ´ÃÂÃÂÃÂÃÂ± ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂ</label><input id="gf2_ramadan_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 8-9 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ)</label><input id="gf2_online_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 5-6 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</label><input id="gf2_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field full"><label style="color:#0097A7;">ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</label><input id="gf2_session_duration" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 60 ÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© *</label><input id="gf2_group_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³</label><input id="gf2_teacher_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±</label><input id="gf2_level_course" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 3" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂª</label><input id="gf2_last_reached" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© 5" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</label><input id="gf2_study_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂª 4-5 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</label><input id="gf2_ramadan_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 8-9 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</label><input id="gf2_online_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 5-6 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</label><input id="gf2_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field full"><label style="color:#0097A7;">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</label><input id="gf2_session_duration" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 60 ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="saveGroup2()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
-      <button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupModal2()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="saveGroup2()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
+      <button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupModal2()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="groupConfirmModal2">
   <div class="confirm-box">
-    <h3>ÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</h3>
-    <p>ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©ÃÂÃÂ</p>
+    <h3>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</h3>
+    <p>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="groupConfirmDelBtn2">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>
-      <button class="btn-confirm-cancel" onclick="closeGroupConfirm2()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-confirm-del" id="groupConfirmDelBtn2">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>
+      <button class="btn-confirm-cancel" onclick="closeGroupConfirm2()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div>
 </div>
 <!-- GROUP TABLE EDIT MODAL -->
 <div class="modal-bg" id="groupTableEditModal">
 <div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
-<h2 style="color:#E55A2B;">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</h2>
+<h2 style="color:#E55A2B;">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</h2>
 <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e0f7fa;padding-bottom:10px;">
 <button id="gtab-add-col" onclick="switchGroupTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#1573;&#1590;&#1575;&#1601;&#1577; &#1593;&#1605;&#1608;&#1583;</button>
 <button id="gtab-del-col" onclick="switchGroupTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f7fa;color:#0097A7;font-weight:700;cursor:pointer;font-size:13px;">&#10060; &#1581;&#1584;&#1601; &#1593;&#1605;&#1608;&#1583;</button>
@@ -1737,7 +1756,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Taqseet (Payment Plans) Table ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Taqseet (Payment Plans) Table ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 var allTaqseet = null;
 var editingTaqseetId = null;
 
@@ -1752,7 +1771,7 @@ function loadTaqseet() {
 function renderTaqseet() {
   var tbody = document.getElementById('taqseetBody');
   if (!allTaqseet || !allTaqseet.length) {
-    tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</td></tr>';
     return;
   }
   var fields = ['taqseet_method','student_name','course_amount','num_installments',
@@ -1769,7 +1788,7 @@ function renderTaqseet() {
       '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
       cells +
       '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
-        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>' +
+        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -1803,25 +1822,25 @@ function openAddTaqseet() {
       inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
       inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
       study_hours:'', start_date:''})})
-    .then(function(){ loadTaqseet(); showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂµÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯', '#1a8754'); });
+    .then(function(){ loadTaqseet(); showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯', '#1a8754'); });
 }
 
 function deleteTaqseet(id) {
-  if (!confirm('ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ')) return;
+  if (!confirm('ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')) return;
   fetch('/api/taqseet/' + id, {method:'DELETE'}).then(function(){
     loadTaqseet();
-    showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#c0392b');
+    showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#c0392b');
   });
 }
 
 function openTaqseetColModal() {
-  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ© ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ®ÃÂÃÂµÃÂÃÂµ ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂ±', '#FF6B35');
+  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂµ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±', '#FF6B35');
 }
 
 function openTaqseetEditModal() {
-  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ© ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂ±', '#9C27B0');
+  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±', '#9C27B0');
 }
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 
 let allStudents=[];
 let deleteTargetId=null;
@@ -1830,7 +1849,7 @@ function getTaqseetDetail(method){
   if(!method||!allTaqseetData.length)return '';
   var t=allTaqseetData.find(function(x){return x.taqseet_method===method;});
   if(!t)return '';
-  return 'ÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂ© '+method+' ÃÂ¢ÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂº ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂ©: '+(t.course_amount||'')+'ÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ·: '+(t.num_installments||'')+'ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ: '+(t.inst1||'')+'ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ: '+(t.inst2||'');
+  return 'ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© '+method+' ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂº ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ©: '+(t.course_amount||'')+'ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ·: '+(t.num_installments||'')+'ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: '+(t.inst1||'')+'ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: '+(t.inst2||'');
 }
 function populateTaqseetDropdowns(){
   var selects=document.querySelectorAll('.installment-select');
@@ -1883,13 +1902,13 @@ var thead=document.querySelector('#studentsBody').closest('table').querySelector
 if(!thead)return;
 var html='<th>#</th>';
 for(var i=0;i<allColumns.length;i++){html+='<th>'+allColumns[i].col_label+'</th>';}
-html+='<th>ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>';
+html+='<th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>';
 thead.innerHTML=html;
 }
 function renderTable(list){
 var body=document.getElementById('studentsBody');
 var colCount=allColumns.length+2;
-if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨</td></tr>';return;}
+if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨</td></tr>';return;}
 var html='';
 for(var i=0;i<list.length;i++){
 var s2=list[i];
@@ -1900,9 +1919,9 @@ var val=s2[key]||'';
 if(key==='personal_id'){row+='<td><b>'+val+'</b></td>';}
 else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
 else if(key==='final_result'){
-var badge=val==='ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ­'?'badge-pass':val==='ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨'?'badge-fail':'badge-pend';
+var badge=val==='ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ­'?'badge-pass':val==='ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨'?'badge-fail':'badge-pend';
 row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
+}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
@@ -1913,16 +1932,16 @@ function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   renderTable(allStudents.filter(s=>(s.student_name||'').toLowerCase().includes(q)||(s.personal_id||'').toLowerCase().includes(q)));
 }
-function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯';document.getElementById('modal').classList.add('open');}
-function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
-async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂ','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­':'ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­');loadStudents();} else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
+function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯';document.getElementById('modal').classList.add('open');}
+function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
+async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­':'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­');loadStudents();} else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
   if(!deleteTargetId)return;
   const res=await fetch('/api/students/'+deleteTargetId,{method:'DELETE'});
   const data=await res.json();
   closeConfirm();
-  if(data.ok){showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­');loadStudents();}
-  else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§ ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#e53935');}
+  if(data.ok){showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­');loadStudents();}
+  else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#e53935');}
   deleteTargetId=null;
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
@@ -1979,13 +1998,13 @@ function clearGroupForm2(){
   for(var x=0;x<ids.length;x++){var el=document.getElementById('gf2_'+ids[x]);if(el)el.value='';}
   document.getElementById('groupEditId2').value='';
 }
-function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©';document.getElementById('groupModal2').classList.add('open');}
+function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©';document.getElementById('groupModal2').classList.add('open');}
 function openGroupEdit2(id){
   var g=null;
   for(var x=0;x<allGroups2.length;x++){if(allGroups2[x].id===id){g=allGroups2[x];break;}}
   if(!g)return;
   document.getElementById('groupEditId2').value=id;
-  document.getElementById('groupModalTitle2').textContent='ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©';
+  document.getElementById('groupModalTitle2').textContent='ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©';
   document.getElementById('gf2_group_name').value=g.group_name||'';
   document.getElementById('gf2_teacher_name').value=g.teacher_name||'';
   document.getElementById('gf2_level_course').value=g.level_course||'';
@@ -2011,26 +2030,26 @@ function saveGroup2(){
     group_link:document.getElementById('gf2_group_link').value.trim(),
     session_duration:document.getElementById('gf2_session_duration').value.trim()
   };
-  if(!bd.group_name){showToast('ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂ¨','#e53935');return;}
+  if(!bd.group_name){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨','#e53935');return;}
   var url=editId?'/api/groups/'+editId:'/api/groups';
   var method=editId?'PUT':'POST';
   fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(bd)}).then(function(r){return r.json();}).then(function(data){
-    if(data.ok){closeGroupModal2();showToast(editId?'ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©':'ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©','#00BCD4');loadGroups2();}
-    else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
-  }).catch(function(){showToast('ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');});
+    if(data.ok){closeGroupModal2();showToast(editId?'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©':'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©','#00BCD4');loadGroups2();}
+    else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
+  }).catch(function(){showToast('ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');});
 }
 function askGroupDelete2(id){groupDeleteTargetId2=id;document.getElementById('groupConfirmModal2').classList.add('open');document.getElementById('groupConfirmDelBtn2').onclick=confirmGroupDelete2;}
 function confirmGroupDelete2(){
   if(!groupDeleteTargetId2)return;
   fetch('/api/groups/'+groupDeleteTargetId2,{method:'DELETE',credentials:'include'}).then(function(r){return r.json();}).then(function(data){
     closeGroupConfirm2();
-    if(data.ok){showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©','#00BCD4');loadGroups2();}
-    else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+    if(data.ok){showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©','#00BCD4');loadGroups2();}
+    else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
     groupDeleteTargetId2=null;
   }).catch(function(){closeGroupConfirm2();});
 }
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
-var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="ÃÂÃÂªÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ© "+parsed.length+" ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨. ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂºÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="ÃÂÃÂªÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ© "+parsed.length+" ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©. ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂºÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="ÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂ¯ÃÂÃÂ§","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";return;}if(data.ok){closeStudentExcelModal();showToast("ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ "+data.imported+" ÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­");loadStudents();}else{showToast("ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§","#e53935");}btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";}).catch(function(){showToast("ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§ ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="ÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂ¯ÃÂÃÂ§","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";return;}if(data.ok){closeGroupExcelModal();showToast("ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ "+data.imported+" ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­","#00BCD4");loadGroups2();}else{showToast("ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§","#e53935");}btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";}).catch(function(){showToast("ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§ ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯";});}
+var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ© "+parsed.length+" ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨. ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ© "+parsed.length+" ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©. ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";return;}if(data.ok){closeStudentExcelModal();showToast("ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ "+data.imported+" ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­");loadStudents();}else{showToast("ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§","#e53935");}btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";}).catch(function(){showToast("ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";return;}if(data.ok){closeGroupExcelModal();showToast("ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ "+data.imported+" ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­","#00BCD4");loadGroups2();}else{showToast("ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§","#e53935");}btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";}).catch(function(){showToast("ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯","#e53935");btn.disabled=false;btn.textContent="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯";});}
 loadGroups2();
 function openTableEditModal(){
   loadColumnsForEdit();
@@ -2053,9 +2072,9 @@ function loadColumnsForEdit(){
     var delSel=document.getElementById('del_col_key');
     var editSel=document.getElementById('edit_col_key');
     var afterSel=document.getElementById('new_col_after');
-    delSel.innerHTML='<option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option>';
-    editSel.innerHTML='<option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option>';
-    afterSel.innerHTML='<option value="">ÃÂ¢ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂ¢ÃÂÃÂ</option>';
+    delSel.innerHTML='<option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option>';
+    editSel.innerHTML='<option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option>';
+    afterSel.innerHTML='<option value="">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</option>';
     for(var i=0;i<cols.length;i++){
       delSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
       editSel.innerHTML+='<option value="'+cols[i].col_key+'" data-label="'+cols[i].col_label+'">'+cols[i].col_label+'</option>';
@@ -2075,36 +2094,36 @@ function togglePositionCol(){
 }
 function addColumn(){
   var label=document.getElementById('new_col_label').value.trim();
-  if(!label){showToast('ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935');return;}
+  if(!label){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935');return;}
   var posVal=document.getElementById('new_col_position').value;
   var afterCol=document.getElementById('new_col_after').value;
   var key='col_'+Date.now();
   var payload={col_key:key,col_label:label,position:posVal};
   if(posVal==='after'&&afterCol){payload.after_col=afterCol;}
   fetch('/api/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂ¯ÃÂÃÂ§','#e53935');return;}
-    if(d.ok){document.getElementById('new_col_label').value='';document.getElementById('new_col_position').value='end';togglePositionCol();closeTableEditModal();showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­');loadStudents();}
-    else{showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§','#e53935');return;}
+    if(d.ok){document.getElementById('new_col_label').value='';document.getElementById('new_col_position').value='end';togglePositionCol();closeTableEditModal();showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­');loadStudents();}
+    else{showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
   });
 }
 function deleteColumn(){
   var key=document.getElementById('del_col_key').value;
-  if(!key){showToast('ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ§','#e53935');return;}
-  if(!confirm('ÃÂÃÂÃÂÃÂ ÃÂÃÂ£ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂªÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ.'))return;
+  if(!key){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§','#e53935');return;}
+  if(!confirm('ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ.'))return;
   fetch('/api/columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂ¯ÃÂÃÂ§','#e53935');return;}
-    if(d.ok){closeTableEditModal();showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯');loadStudents();}
-    else{showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯');loadStudents();}
+    else{showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
   });
 }
 function updateColumnLabel(){
   var key=document.getElementById('edit_col_key').value;
   var label=document.getElementById('edit_col_label').value.trim();
-  if(!key||!label){showToast('ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ','#e53935');return;}
+  if(!key||!label){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ','#e53935');return;}
   fetch('/api/columns/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ³ÃÂÃÂ©ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂ¯ÃÂÃÂ§','#e53935');return;}
-    if(d.ok){closeTableEditModal();showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ');loadStudents();}
-    else{showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ§','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ');loadStudents();}
+    else{showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
   });
 }
 
@@ -2202,7 +2221,7 @@ function loadAttendance() {
 function renderAttendanceTable(data) {
   var tbody = document.getElementById('attendanceBody');
   if(!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ</td></tr>';
     return;
   }
   var html = '';
@@ -2235,7 +2254,7 @@ function filterAttendanceTable() {
 
 function openAttendanceAddModal() {
   editingAttendanceId = null;
-  document.getElementById('attendanceModalTitle').textContent = 'ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨';
+  document.getElementById('attendanceModalTitle').textContent = 'ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨';
   document.getElementById('att_date').value = '';
   document.getElementById('att_day').value = '';
   document.getElementById('att_group').value = '';
@@ -2269,8 +2288,8 @@ function saveAttendanceRecord() {
   var method = editingAttendanceId ? 'PUT' : 'POST';
   fetch(url, {method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ closeAttendanceModal(); showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸','#4CAF50'); loadAttendance(); loadTaqseet(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ closeAttendanceModal(); showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸','#4CAF50'); loadAttendance(); loadTaqseet(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
@@ -2286,16 +2305,16 @@ function editAttendanceCell(id, field, tdEl) {
   var oldVal = tdEl.textContent.trim();
   var input;
   var selectOptions = {
-    'status': ['','ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ±','ÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂ¨','ÃÂÃÂÃÂÃÂªÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ±','ÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂ°ÃÂÃÂ±'],
-    'message_status': ['','ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ','ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ','ÃÂÃÂÃÂÃÂ´ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ'],
-    'study_status': ['','ÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂ¹','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ']
+    'status': ['','ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±','ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂ¨','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ±'],
+    'message_status': ['','ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ'],
+    'study_status': ['','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ¹','ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ']
   };
   if(selectOptions[field]) {
     input = document.createElement('select');
     input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
     selectOptions[field].forEach(function(v){
       var o = document.createElement('option');
-      o.value = v; o.textContent = v||'-- ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂ± --';
+      o.value = v; o.textContent = v||'-- ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ± --';
       if(v === oldVal) o.selected = true;
       input.appendChild(o);
     });
@@ -2330,8 +2349,8 @@ function editAttendanceCell(id, field, tdEl) {
     updated[field] = newVal;
     fetch('/api/attendance/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ«','#4CAF50'); loadAttendance(); }
-        else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); loadAttendance(); }
+        if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«','#4CAF50'); loadAttendance(); }
+        else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); loadAttendance(); }
       });
   }
   input.addEventListener('blur', saveCell);
@@ -2352,14 +2371,14 @@ function confirmAttendanceDelete() {
   fetch('/api/attendance/' + deletingAttendanceId, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
       closeAttendanceConfirm();
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#e53935'); loadAttendance(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#e53935'); loadAttendance(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
 loadAttendance();
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Custom Tables JS ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Custom Tables JS ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 var allCustomTables = [];
 var currentCustomTableId = null;
 var editingCustomRowId = null;
@@ -2394,7 +2413,7 @@ function buildCustomTableHTML(t) {
 
   var bodyRows = '';
   if(rows.length === 0) {
-    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ£ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂµÃÂÃÂ</td></tr>';
+    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</td></tr>';
   } else {
     for(var j=0; j<rows.length; j++) {
       var r = rows[j];
@@ -2415,16 +2434,16 @@ function buildCustomTableHTML(t) {
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
     '<span class="custom-table-title">&#128203; ' + t.tbl_name + '</span>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂµÃÂÃÂ</button>' +
-    '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>' +
-    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ</button>' +
+    '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ</button>' +
+    '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>' +
+    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>' +
     '</div></div>' +
     '<div class="table-wrap"><table>' +
     '<thead><tr id="cthead_' + t.id + '">' + headerCells + '</tr></thead>' +
     '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
     '</table></div></div>';
 }
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Wizard ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Wizard ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function openNewTableWizard() {
   document.getElementById('wiz_tbl_name').value = '';
   document.getElementById('wiz_col_count').value = '3';
@@ -2443,15 +2462,15 @@ function closeNewTableWizard() {
 function wizardStep1Next() {
   var name = document.getElementById('wiz_tbl_name').value.trim();
   var cols = parseInt(document.getElementById('wiz_col_count').value) || 1;
-  if(!name) { showToast('ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ','#e53935'); return; }
-  if(cols < 1 || cols > 20) { showToast('ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¨ ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 1-20','#e53935'); return; }
+  if(!name) { showToast('ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ','#e53935'); return; }
+  if(cols < 1 || cols > 20) { showToast('ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 1-20','#e53935'); return; }
   var container = document.getElementById('wizColNamesContainer');
   container.innerHTML = '';
   for(var i=0; i<cols; i++) {
     var inp = document.createElement('input');
     inp.type = 'text';
     inp.className = 'col-name-input';
-    inp.placeholder = 'ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ' + (i+1);
+    inp.placeholder = 'ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ' + (i+1);
     inp.id = 'wizCol_' + i;
     container.appendChild(inp);
   }
@@ -2475,29 +2494,29 @@ function wizardCreateTable() {
   var cols = [];
   for(var i=0; i<colInputs.length; i++) {
     var v = colInputs[i].value.trim();
-    cols.push(v || ('ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ' + (i+1)));
+    cols.push(v || ('ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ' + (i+1)));
   }
   var payload = { tbl_name: name, cols: cols, row_count: rowCount };
   fetch('/api/custom-tables', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(function(r){ return r.json(); }).then(function(d){
       if(d.ok) {
         closeNewTableWizard();
-        showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂÃÂÃÂ´ÃÂÃÂ§ÃÂÃÂ¡ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ','#4CAF50');
+        showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ','#4CAF50');
         loadCustomTables();
       } else {
-        showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935');
+        showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935');
       }
     });
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Row add/edit ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Row add/edit ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function openCustomRowModal(tid) {
   currentCustomTableId = tid;
   editingCustomRowId = null;
   var t = null;
   for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
   if(!t) return;
-  document.getElementById('customRowModalTitle').textContent = 'ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂµÃÂÃÂ - ' + t.tbl_name;
+  document.getElementById('customRowModalTitle').textContent = 'ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ - ' + t.tbl_name;
   var fields = document.getElementById('customRowFormFields');
   fields.innerHTML = '';
   var cols = t.cols || [];
@@ -2535,20 +2554,20 @@ function saveCustomRow() {
   }
   fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: row_data})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok) { closeCustomRowModal(); showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸','#4CAF50'); loadCustomTables(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok) { closeCustomRowModal(); showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸','#4CAF50'); loadCustomTables(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
 function deleteCustomRow(tid, rid) {
   fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok) { showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#e53935'); loadCustomTables(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok) { showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#e53935'); loadCustomTables(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Inline cell edit ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Inline cell edit ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function editCustomCell(tdEl) {
   if(tdEl.querySelector('input')) return;
   var tid = parseInt(tdEl.getAttribute('data-tid'));
@@ -2576,21 +2595,21 @@ function editCustomCell(tdEl) {
     updated[ckey] = newVal;
     fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ«','#4CAF50'); loadCustomTables(); }
-        else{ showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); loadCustomTables(); }
+        if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«','#4CAF50'); loadCustomTables(); }
+        else{ showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); loadCustomTables(); }
       });
   }
   input.addEventListener('blur', saveCell);
   input.addEventListener('keydown', function(e){ if(e.key==='Enter') input.blur(); });
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Table edit modal (add/delete/rename cols) ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Table edit modal (add/delete/rename cols) ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function openCustomTableEditModal(tid) {
   currentCustomTableId = tid;
   var t = null;
   for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
   if(!t) return;
-  document.getElementById('customTableEditTitle').textContent = 'ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ: ' + t.tbl_name;
+  document.getElementById('customTableEditTitle').textContent = 'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: ' + t.tbl_name;
   switchCustomTab('add');
   loadCustomColsForEdit(t);
   document.getElementById('customTableEditModal').style.display = 'flex';
@@ -2652,14 +2671,14 @@ function fillCustomRenameLabel() {
 function addCustomColumn() {
   var tid = currentCustomTableId;
   var col_label = document.getElementById('ctbl_new_col_name').value.trim();
-  if(!col_label) { showToast('ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
+  if(!col_label) { showToast('ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
   var position = document.getElementById('ctbl_position').value;
   var after_key = document.getElementById('ctbl_after_col').value;
   var payload = { col_label: col_label, position: position, after_key: after_key };
   fetch('/api/custom-tables/' + tid + '/cols', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
@@ -2669,8 +2688,8 @@ function deleteCustomColumn() {
   if(!col_key) return;
   fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#e53935'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#e53935'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
@@ -2678,15 +2697,15 @@ function updateCustomColumnLabel() {
   var tid = currentCustomTableId;
   var col_key = document.getElementById('ctbl_rename_col').value;
   var new_label = document.getElementById('ctbl_rename_label').value.trim();
-  if(!new_label || !col_key) { showToast('ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
+  if(!new_label || !col_key) { showToast('ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
   fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label: new_label})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Delete table ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Delete table ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function openCustomTableDeleteConfirmById(btn) {
   var tid = parseInt(btn.getAttribute('data-tid'));
   var t = null;
@@ -2697,7 +2716,7 @@ function openCustomTableDeleteConfirmById(btn) {
 
 function openCustomTableDeleteConfirm(tid, name) {
   deletingCustomTableId = tid;
-  document.getElementById('customTableDeleteMsg').textContent = 'ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ "' + name + '"ÃÂÃÂ ÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª.';
+  document.getElementById('customTableDeleteMsg').textContent = 'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ "' + name + '"ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª.';
   document.getElementById('customTableDeleteConfirm').style.display = 'flex';
 }
 function closeCustomTableDeleteConfirm() {
@@ -2710,20 +2729,20 @@ function confirmCustomTableDelete() {
   fetch('/api/custom-tables/' + deletingCustomTableId, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
       closeCustomTableDeleteConfirm();
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ','#e53935'); loadCustomTables(); }
-      else{ showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ','#e53935'); loadCustomTables(); }
+      else{ showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Import stub (placeholder) ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Import stub (placeholder) ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 function openCustomImportModal(tid) {
-  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂ','#FF9800');
+  showToast('ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ','#FF9800');
 }
 
 // Load custom tables on page load
 loadCustomTables();
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Attendance Excel Import ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Attendance Excel Import ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 var attendanceExcelRows = [];
 
 function openAttendanceExcelModal() {
@@ -2752,10 +2771,10 @@ function readAttendanceExcelFile(input) {
       // Skip header row (row 0)
       var dataRows = rows.slice(1).filter(function(r) { return r.some(function(c){ return String(c).trim() !== ''; }); });
       attendanceExcelRows = dataRows;
-      document.getElementById('attendanceExcelStatus').textContent = 'ÃÂÃÂªÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ© ' + dataRows.length + ' ÃÂÃÂµÃÂÃÂ. ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂºÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯.';
+      document.getElementById('attendanceExcelStatus').textContent = 'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ© ' + dataRows.length + ' ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ. ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯.';
       document.getElementById('attendanceExcelImportBtn').style.display = dataRows.length > 0 ? 'inline-flex' : 'none';
     } catch(err) {
-      document.getElementById('attendanceExcelStatus').textContent = 'ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£ ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: ' + err.message;
+      document.getElementById('attendanceExcelStatus').textContent = 'ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ: ' + err.message;
     }
   };
   reader.readAsArrayBuffer(file);
@@ -2774,7 +2793,7 @@ function importAttendanceFromExcel() {
   var statusEl = document.getElementById('attendanceExcelStatus');
   function sendNext(idx) {
     if(idx >= total) {
-      statusEl.textContent = 'ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯ ' + done + ' ÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­!';
+      statusEl.textContent = 'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ' + done + ' ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­!';
       loadAttendance();
       setTimeout(closeAttendanceExcelModal, 1500);
       return;
@@ -2782,14 +2801,14 @@ function importAttendanceFromExcel() {
     fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(batch[idx])})
       .then(function(r){ return r.json(); }).then(function(d){
         if(d.ok) done++;
-        statusEl.textContent = 'ÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¯... ' + (idx+1) + ' / ' + total;
+        statusEl.textContent = 'ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯... ' + (idx+1) + ' / ' + total;
         sendNext(idx+1);
       }).catch(function(){ sendNext(idx+1); });
   }
   sendNext(0);
 }
 
-// ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Attendance Column Management ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+// ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Attendance Column Management ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 var allAttColumns = [];
 
 function loadAttColumns(callback) {
@@ -2847,13 +2866,13 @@ function fillAttRenameLabel() {
 
 function addAttendanceColumn() {
   var col_label = document.getElementById('att_new_col_name').value.trim();
-  if(!col_label){ showToast('ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
+  if(!col_label){ showToast('ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
   var position = document.getElementById('att_col_position').value;
   var after_key = document.getElementById('att_after_col').value;
   fetch('/api/att-columns', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:col_label, position:position, after_key:after_key})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ¯','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
@@ -2862,19 +2881,19 @@ function deleteAttendanceColumn() {
   if(!col_key) return;
   fetch('/api/att-columns/' + col_key, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ','#e53935'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ','#e53935'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 
 function updateAttendanceColumnLabel() {
   var col_key = document.getElementById('att_rename_col').value;
   var new_label = document.getElementById('att_rename_label').value.trim();
-  if(!new_label||!col_key){ showToast('ÃÂÃÂ£ÃÂÃÂ¯ÃÂÃÂ®ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
+  if(!new_label||!col_key){ showToast('ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯','#e53935'); return; }
   fetch('/api/att-columns/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:new_label})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ£','#e53935'); }
+      if(d.ok){ showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ£','#e53935'); }
     });
 }
 </script>
@@ -2916,7 +2935,7 @@ def login():
     user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
                       (username, hp(password))).fetchone()
     if not user:
-        return render_login("ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂ®ÃÂÃÂ¯ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂºÃÂÃÂÃÂÃÂ·"), 401
+        return render_login("ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·"), 401
     session["user"] = dict(user)
     return redirect("/dashboard")
 
@@ -3081,17 +3100,17 @@ def api_columns_get():
         is_visible INTEGER DEFAULT 1)""")
     if db.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
-            ("personal_id","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ´ÃÂÃÂ®ÃÂÃÂµÃÂÃÂ",1),("student_name","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨",2),("whatsapp","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¨ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂªÃÂÃÂÃÂÃÂ¯",3),
-            ("class_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂ",4),("old_new_2026","ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ 2026",5),("registration_term2_2026","ÃÂÃÂªÃÂÃÂ³ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026",6),
-            ("group_name_student","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©",7),("group_online","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ)",8),
-            ("final_result","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂÃÂÃÂ© (ÃÂÃÂªÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026)",9),
-            ("level_reached_2026","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ 2026",10),("suitable_level_2026","ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂ§ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 2026ÃÂÃÂ",11),
-            ("books_received","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂ¨",12),("teacher_2026","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 2026",13),
-            ("installment1","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ 2026",14),("installment2","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ",15),("installment3","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂÃÂÃÂ«",16),
-            ("installment4","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ¹",17),("installment5","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³",18),
-            ("mother_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ",19),("father_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¨",20),("other_phone","ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂ±",21),
-            ("residence","ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ",22),("home_address","ÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂ",23),("road","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ±ÃÂÃÂÃÂÃÂ",24),("complex_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¹",25),
-            ("installment_type","ÃÂÃÂ§ÃÂÃÂ®ÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ·",26),
+            ("personal_id","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ",1),("student_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨",2),("whatsapp","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯",3),
+            ("class_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ",4),("old_new_2026","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ 2026",5),("registration_term2_2026","ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026",6),
+            ("group_name_student","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©",7),("group_online","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)",8),
+            ("final_result","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026)",9),
+            ("level_reached_2026","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ 2026",10),("suitable_level_2026","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026ÃÂÃÂÃÂÃÂ",11),
+            ("books_received","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¨",12),("teacher_2026","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 2026",13),
+            ("installment1","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 2026",14),("installment2","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",15),("installment3","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«",16),
+            ("installment4","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¹",17),("installment5","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³",18),
+            ("mother_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ",19),("father_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨",20),("other_phone","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ±",21),
+            ("residence","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",22),("home_address","ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ²ÃÂÃÂÃÂÃÂ",23),("road","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",24),("complex_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹",25),
+            ("installment_type","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -3186,11 +3205,11 @@ def api_group_columns_get():
         is_visible INTEGER DEFAULT 1)""")
     if db.execute("SELECT COUNT(*) FROM group_col_labels").fetchone()[0] == 0:
         default_cols = [
-            ("group_name","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©",1),("teacher_name","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³",2),
-            ("level_course","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ / ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ±",3),("last_reached","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂª",4),
-            ("study_time","ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©",5),("ramadan_time","ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ´ÃÂÃÂÃÂÃÂ± ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂ",6),
-            ("online_time","ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ)",7),("group_link","ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©",8),
-            ("session_duration","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)",9),
+            ("group_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©",1),("teacher_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³",2),
+            ("level_course","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±",3),("last_reached","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂª",4),
+            ("study_time","ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©",5),("ramadan_time","ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ",6),
+            ("online_time","ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)",7),("group_link","ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©",8),
+            ("session_duration","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)",9),
         ]
         for key,label,order in default_cols:
             try:
@@ -3324,18 +3343,18 @@ def api_attendance_delete(rid):
 
 
 
-# ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Attendance Column Labels API ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+# ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Attendance Column Labels API ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 
 ATT_DEFAULT_COLS = [
-    ("attendance_date","ÃÂÃÂªÃÂÃÂ§ÃÂÃÂ±ÃÂÃÂÃÂÃÂ® ÃÂÃÂ£ÃÂÃÂ®ÃÂÃÂ° ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ¶ÃÂÃÂÃÂÃÂ±",1),
-    ("day_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",2),
-    ("group_name","ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©",3),
-    ("student_name","ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ·ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨",4),
-    ("contact_number","ÃÂÃÂ±ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂµÃÂÃÂ",5),
-    ("status","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©",6),
-    ("message","ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©",7),
-    ("message_status","ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ¥ÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂÃÂÃÂ©",8),
-    ("study_status","ÃÂÃÂ­ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©",9),
+    ("attendance_date","ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ® ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ° ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±",1),
+    ("day_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ",2),
+    ("group_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©",3),
+    ("student_name","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨",4),
+    ("contact_number","ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ",5),
+    ("status","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©",6),
+    ("message","ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©",7),
+    ("message_status","ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©",8),
+    ("study_status","ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©",9),
 ]
 
 @app.route('/api/att-columns', methods=['GET'])
@@ -3394,7 +3413,7 @@ def api_att_columns_delete(col_key):
     # Only allow deleting custom columns (not the 9 default ones)
     default_keys = [c[0] for c in ATT_DEFAULT_COLS]
     if col_key in default_keys:
-        return jsonify({'ok':False,'error':'ÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ£ÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂÃÂÃÂ©'}),400
+        return jsonify({'ok':False,'error':'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©'}),400
     db = get_db()
     try:
         db.execute("DELETE FROM att_col_labels WHERE col_key=?", (col_key,))
@@ -3419,7 +3438,7 @@ def api_att_columns_rename(col_key):
         return jsonify({'ok':False,'error':str(ex)}),400
 
 
-# ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Custom Tables API ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+# ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Custom Tables API ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 
 @app.route('/api/custom-tables', methods=['GET'])
 @login_required
@@ -3576,7 +3595,7 @@ GROUPS_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª - Mindex</title>
+<title>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 body{background:#f5f3ff;min-height:100vh;direction:rtl;}
@@ -3640,73 +3659,73 @@ td.link-cell a:hover{text-decoration:underline;}
 </head>
 <body>
 <div class="topbar">
-  <h1>&#128101; ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</h1>
-  <a href="/database" class="btn-back">&larr; ÃÂÃÂÃÂÃÂ§ÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª</a>
+  <h1>&#128101; ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</h1>
+  <a href="/database" class="btn-back">&larr; ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</a>
 </div>
 <div class="main">
-  <div class="page-title">ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</div>
+  <div class="page-title">ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
-      <span class="stat-label">ÃÂÃÂ¥ÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂª</span>
+      <span class="stat-label">ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</span>
     </div>
   </div>
-  <button class="btn-add" onclick="openAddModal()">+ ÃÂÃÂ¥ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</button>
+  <button class="btn-add" onclick="openAddModal()">+ ÃÂÃÂÃÂÃÂ¥ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</button>
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ« ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ£ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³..." oninput="filterTable()">
-    <button class="btn-search" onclick="filterTable()">ÃÂÃÂ¨ÃÂÃÂ­ÃÂÃÂ«</button>
+    <input type="text" id="searchInput" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ£ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³..." oninput="filterTable()">
+    <button class="btn-search" onclick="filterTable()">ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ / ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ±</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂª</th>
-          <th>ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</th>
-          <th>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ´ÃÂÃÂÃÂÃÂ± ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂ</th>
-          <th>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ)</th>
-          <th>ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</th>
-          <th>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</th>
-          <th>ÃÂÃÂ§ÃÂÃÂ¬ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ§ÃÂÃÂª</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂª</th>
+          <th>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</th>
+          <th>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</th>
+          <th>ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</th>
+          <th>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª</th>
         </tr>
       </thead>
       <tbody id="groupsBody">
-        <tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</td></tr>
+        <tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h2 id="modalTitle">ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©</h2>
+    <h2 id="modalTitle">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©</h2>
     <input type="hidden" id="editId">
     <div class="form-grid">
-      <div class="field"><label>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© *</label><input id="f_group_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©"></div>
-      <div class="field"><label>ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ *</label><input id="f_teacher_name" placeholder="ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³"></div>
-      <div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ / ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ±</label><input id="f_level_course" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂªÃÂÃÂÃÂÃÂ 3 - ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂ¨ A"></div>
-      <div class="field"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂ± ÃÂÃÂ§ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂ¦ÃÂÃÂª</label><input id="f_last_reached" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ© 5 - ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ³ 3"></div>
-      <div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ©</label><input id="f_study_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: ÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂ¨ÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂ«ÃÂÃÂÃÂÃÂÃÂÃÂ 4-5 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ"></div>
-      <div class="field"><label>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ´ÃÂÃÂÃÂÃÂ± ÃÂÃÂ±ÃÂÃÂÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂ</label><input id="f_ramadan_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 8-9 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ"></div>
-      <div class="field"><label>ÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ (ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¹ÃÂÃÂ§ÃÂÃÂ¯ÃÂÃÂ)</label><input id="f_online_time" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 5-6 ÃÂÃÂÃÂÃÂ³ÃÂÃÂ§ÃÂÃÂ¡ÃÂÃÂ"></div>
-      <div class="field"><label>ÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ· ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</label><input id="f_group_link" placeholder="https://..." class="ltr"></div>
-      <div class="field full"><label>ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂµÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</label><input id="f_session_duration" placeholder="ÃÂÃÂÃÂÃÂ«ÃÂÃÂ§ÃÂÃÂ: 60 ÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© *</label><input id="f_group_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ *</label><input id="f_teacher_name" placeholder="ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ / ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ±</label><input id="f_level_course" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 3 - ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ A"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¦ÃÂÃÂÃÂÃÂª</label><input id="f_last_reached" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ© 5 - ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ³ 3"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ©</label><input id="f_study_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ 4-5 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ´ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ± ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ</label><input id="f_ramadan_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 8-9 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ (ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ)</label><input id="f_online_time" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 5-6 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡ÃÂÃÂÃÂÃÂ"></div>
+      <div class="field"><label>ÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ· ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</label><input id="f_group_link" placeholder="https://..." class="ltr"></div>
+      <div class="field full"><label>ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂµÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© (ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ)</label><input id="f_session_duration" placeholder="ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ«ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ: 60 ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ©"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveGroup()">ÃÂÃÂ­ÃÂÃÂÃÂÃÂ¸</button>
-      <button class="btn-cancel" onclick="closeModal()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-save" onclick="saveGroup()">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¸</button>
+      <button class="btn-cancel" onclick="closeModal()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="confirmModal">
   <div class="confirm-box">
-    <h3>ÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</h3>
-    <p>ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂªÃÂÃÂ§ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂªÃÂÃÂ±ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©ÃÂÃÂ</p>
+    <h3>ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</h3>
+    <p>ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©ÃÂÃÂÃÂÃÂ</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="confirmDelBtn">ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ</button>
-      <button class="btn-confirm-cancel" onclick="closeConfirm()">ÃÂÃÂ§ÃÂÃÂÃÂÃÂºÃÂÃÂ§ÃÂÃÂ¡</button>
+      <button class="btn-confirm-del" id="confirmDelBtn">ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ</button>
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂºÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¡</button>
     </div>
   </div>
 </div>
@@ -3723,9 +3742,9 @@ async function loadGroups(){
 }
 function renderTable(list){
   const body=document.getElementById('groupsBody');
-  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂ§ ÃÂÃÂªÃÂÃÂÃÂÃÂ¬ÃÂÃÂ¯ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©</td></tr>';return;}
+  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©</td></tr>';return;}
   body.innerHTML=list.map((g,i)=>{
-    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank">ÃÂÃÂÃÂÃÂªÃÂÃÂ­ ÃÂÃÂ§ÃÂÃÂÃÂÃÂ±ÃÂÃÂ§ÃÂÃÂ¨ÃÂÃÂ·</a>':'-';
+    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ­ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ±ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂ·</a>':'-';
     return '<tr><td>'+(i+1)+'</td><td class="name-cell">'+(g.group_name||'-')+'</td><td>'+(g.teacher_name||'-')+'</td><td>'+(g.level_course||'-')+'</td><td>'+(g.last_reached||'-')+'</td><td>'+(g.study_time||'-')+'</td><td>'+(g.ramadan_time||'-')+'</td><td>'+(g.online_time||'-')+'</td><td class="link-cell">'+link+'</td><td>'+(g.session_duration||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+g.id+')">&#128465;</button></td></tr>';
   }).join('');
 }
@@ -3737,11 +3756,11 @@ function clearForm(){
   ['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';});
   document.getElementById('editId').value='';
 }
-function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¬ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ¯ÃÂÃÂ©';document.getElementById('modal').classList.add('open');}
+function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ©';document.getElementById('modal').classList.add('open');}
 function openEdit(id){
   const g=allGroups.find(x=>x.id===id);if(!g)return;
   document.getElementById('editId').value=id;
-  document.getElementById('modalTitle').textContent='ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ§ÃÂÃÂª ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ©';
+  document.getElementById('modalTitle').textContent='ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂª ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ©';
   document.getElementById('f_group_name').value=g.group_name||'';
   document.getElementById('f_teacher_name').value=g.teacher_name||'';
   document.getElementById('f_level_course').value=g.level_course||'';
@@ -3767,13 +3786,13 @@ async function saveGroup(){
     group_link:document.getElementById('f_group_link').value.trim(),
     session_duration:document.getElementById('f_session_duration').value.trim(),
   };
-  if(!body.group_name){showToast('ÃÂÃÂ§ÃÂÃÂ³ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂ¨','#e53935');return;}
+  if(!body.group_name){showToast('ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ³ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¨','#e53935');return;}
   const url=editId?'/api/groups/'+editId:'/api/groups';
   const method=editId?'PUT':'POST';
   const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
   const data=await res.json();
-  if(data.ok){closeModal();showToast(editId?'ÃÂÃÂªÃÂÃÂ ÃÂÃÂªÃÂÃÂ¹ÃÂÃÂ¯ÃÂÃÂÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­':'ÃÂÃÂªÃÂÃÂ ÃÂÃÂ§ÃÂÃÂ¶ÃÂÃÂ§ÃÂÃÂÃÂÃÂ© ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­');loadGroups();}
-  else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+  if(data.ok){closeModal();showToast(editId?'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­':'ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ¶ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­');loadGroups();}
+  else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
 }
 function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
@@ -3781,8 +3800,8 @@ async function confirmDelete(){
   const res=await fetch('/api/groups/'+deleteTargetId,{method:'DELETE',credentials:'include'});
   const data=await res.json();
   closeConfirm();
-  if(data.ok){showToast('ÃÂÃÂªÃÂÃÂ ÃÂÃÂ­ÃÂÃÂ°ÃÂÃÂ ÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂ© ÃÂÃÂ¨ÃÂÃÂÃÂÃÂ¬ÃÂÃÂ§ÃÂÃÂ­');loadGroups();}
-  else{showToast(data.error||'ÃÂÃÂ­ÃÂÃÂ¯ÃÂÃÂ« ÃÂÃÂ®ÃÂÃÂ·ÃÂÃÂ§','#e53935');}
+  if(data.ok){showToast('ÃÂÃÂÃÂÃÂªÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂ ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¹ÃÂÃÂÃÂÃÂ© ÃÂÃÂÃÂÃÂ¨ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬ÃÂÃÂÃÂÃÂ§ÃÂÃÂÃÂÃÂ­');loadGroups();}
+  else{showToast(data.error||'ÃÂÃÂÃÂÃÂ­ÃÂÃÂÃÂÃÂ¯ÃÂÃÂÃÂÃÂ« ÃÂÃÂÃÂÃÂ®ÃÂÃÂÃÂÃÂ·ÃÂÃÂÃÂÃÂ§','#e53935');}
   deleteTargetId=null;
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
@@ -3889,7 +3908,7 @@ def api_logout():
 
 # v2
 
-# ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Taqseet (Payment Plans) API ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
+# ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Taqseet (Payment Plans) API ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
 
 @app.route('/api/taqseet', methods=['GET'])
 @login_required
