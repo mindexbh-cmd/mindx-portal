@@ -1751,7 +1751,7 @@ else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
 else if(key==='final_result'){
 var badge=val==='ناجح'?'badge-pass':val==='راسب'?'badge-fail':'badge-pend';
 row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- اختر --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+''+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
+}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- اختر --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
