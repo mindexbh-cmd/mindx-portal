@@ -214,16 +214,16 @@ else:
     # Seed default column labels if empty
     if db2.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
-            ("personal_id","الرقم الشخصي",1),("student_name","اسم الطالب",2),("whatsapp","هاتف الواتساب المعتمد",3),
-            ("class_name","الصف",4),("old_new_2026","قديم جديد 2026",5),("registration_term2_2026","تسجيل الفصل الثاني 2026",6),
-            ("group_name_student","المجموعة",7),("group_online","المجموعة (الاونلاين)",8),("final_result","النتيجة النهائية (تحديد المستوى 2026)",9),
-            ("level_reached_2026","الى اين وصل الطالب 2026",10),("suitable_level_2026","هل الطالب مناسب لهذا المستوى 2026؟",11),
-            ("books_received","استلام الكتب",12),("teacher_2026","المدرس 2026",13),
-            ("installment1","القسط الاول 2026",14),("installment2","القسط الثاني",15),("installment3","القسط الثالث",16),
-            ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
-            ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
-            ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
-            ("installment_type","اختيار نوع التقسيط",26),
+            ("personal_id","Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ",1),("student_name","Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨",2),("whatsapp","ÙØ§ØªÙ Ø§ÙÙØ§ØªØ³Ø§Ø¨ Ø§ÙÙØ¹ØªÙØ¯",3),
+            ("class_name","Ø§ÙØµÙ",4),("old_new_2026","ÙØ¯ÙÙ Ø¬Ø¯ÙØ¯ 2026",5),("registration_term2_2026","ØªØ³Ø¬ÙÙ Ø§ÙÙØµÙ Ø§ÙØ«Ø§ÙÙ 2026",6),
+            ("group_name_student","Ø§ÙÙØ¬ÙÙØ¹Ø©",7),("group_online","Ø§ÙÙØ¬ÙÙØ¹Ø© (Ø§ÙØ§ÙÙÙØ§ÙÙ)",8),("final_result","Ø§ÙÙØªÙØ¬Ø© Ø§ÙÙÙØ§Ø¦ÙØ© (ØªØ­Ø¯ÙØ¯ Ø§ÙÙØ³ØªÙÙ 2026)",9),
+            ("level_reached_2026","Ø§ÙÙ Ø§ÙÙ ÙØµÙ Ø§ÙØ·Ø§ÙØ¨ 2026",10),("suitable_level_2026","ÙÙ Ø§ÙØ·Ø§ÙØ¨ ÙÙØ§Ø³Ø¨ ÙÙØ°Ø§ Ø§ÙÙØ³ØªÙÙ 2026Ø",11),
+            ("books_received","Ø§Ø³ØªÙØ§Ù Ø§ÙÙØªØ¨",12),("teacher_2026","Ø§ÙÙØ¯Ø±Ø³ 2026",13),
+            ("installment1","Ø§ÙÙØ³Ø· Ø§ÙØ§ÙÙ 2026",14),("installment2","Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙÙ",15),("installment3","Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙØ«",16),
+            ("installment4","Ø§ÙÙØ³Ø· Ø§ÙØ±Ø§Ø¨Ø¹",17),("installment5","Ø§ÙÙØ³Ø· Ø§ÙØ®Ø§ÙØ³",18),
+            ("mother_phone","ÙØ§ØªÙ Ø§ÙØ§Ù",19),("father_phone","ÙØ§ØªÙ Ø§ÙØ§Ø¨",20),("other_phone","ÙØ§ØªÙ Ø§Ø®Ø±",21),
+            ("residence","ÙÙØ§Ù Ø§ÙØ³ÙÙ",22),("home_address","Ø¹ÙÙØ§Ù Ø§ÙÙÙØ²Ù",23),("road","Ø§ÙØ·Ø±ÙÙ",24),("complex_name","Ø§ÙÙØ¬ÙØ¹",25),
+            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -336,11 +336,11 @@ button{width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8
 </div>
 ERROR_PLACEHOLDER
 <form method="POST" action="/login">
-<label>اسم المستخدم</label>
+<label>Ø§Ø³Ù Ø§ÙÙØ³ØªØ®Ø¯Ù</label>
 <input type="text" name="username" placeholder="username" required>
-<label>كلمة المرور</label>
+<label>ÙÙÙØ© Ø§ÙÙØ±ÙØ±</label>
 <input type="password" name="password" placeholder="password" required>
-<button type="submit">دخول &larr;</button>
+<button type="submit">Ø¯Ø®ÙÙ &larr;</button>
 </form>
 </div>
 </body>
@@ -362,68 +362,16 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 </style>
 </head>
 <body>
-<a href="/database" class="btn">قاعدة البيانات</a>
-<a href="/attendance" class="btn-attend">تسجيل الغياب 📅</a>
+<a href="/database" class="btn">ÙØ§Ø¹Ø¯Ø© Ø§ÙØ¨ÙØ§ÙØ§Øª</a>
+<a href="/attendance" class="btn-attend">ØªØ³Ø¬ÙÙ Ø§ÙØºÙØ§Ø¨ ð</a>
 
 <button class="btn" onclick="document.getElementById('pay-modal').style.display='flex'">&#x1F4B3; متابعة الدفع</button>
 
 <div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
-  <div style="background:#fff;border-radius:18px;padding:36px 32px;width:90%;max-width:480px;direction:rtl;text-align:right;position:relative;box-shadow:0 8px 32px rgba(107,63,160,0.18);">
-    <button onclick="document.getElementById('pay-modal').style.display='none'" style="position:absolute;top:14px;left:18px;background:none;border:none;font-size:22px;cursor:pointer;color:#999;">&times;</button>
-    <h2 style="color:#6B3FA0;margin-bottom:20px;font-size:22px;">متابعة الدفع</h2>
-    <div style="margin-bottom:14px;">
-      <label style="display:block;margin-bottom:6px;color:#555;font-weight:600;">الرقم الشخصي</label>
-      <input id="pay-pid" type="text" placeholder="ادخل الرقم الشخصي" style="width:100%;padding:11px 14px;border:1.5px solid #ccc;border-radius:10px;font-size:15px;box-sizing:border-box;"/>
-    </div>
-    <button onclick="searchPayment()" style="width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:16px;">بحث</button>
-    <div id="pay-result" style="display:none;border:1.5px solid #e0d4f7;border-radius:12px;padding:16px;background:#faf7ff;"></div>
+  <div style="background:#fff;border-radius:18px;width:90%;max-width:600px;min-height:400px;direction:rtl;text-align:right;position:relative;box-shadow:0 8px 32px rgba(107,63,160,0.18);overflow:hidden;">
+    <button onclick="document.getElementById('pay-modal').style.display='none'" style="position:absolute;top:14px;left:18px;background:none;border:none;font-size:22px;cursor:pointer;color:#999;z-index:10;">&times;</button>
   </div>
 </div>
-
-<script>
-function searchPayment(){
-  var pid = document.getElementById('pay-pid').value.trim();
-  if(!pid){alert('رجاءً أدخل الرقم الشخصي'); return;}
-  var resultDiv = document.getElementById('pay-result');
-  resultDiv.style.display='block';
-  resultDiv.innerHTML = 'جاري البحث...';
-  fetch('/api/students').then(function(r){return r.json();}).then(function(data){
-    var students = data.students || [];
-    var student = students.find(function(s){ return s.personal_id == pid; });
-    if(!student){
-      resultDiv.innerHTML = '<p style="color:#e53935;font-weight:600;">لم يتم إيجاد طالب بهذا الرقم</p>';
-      return;
-    }
-    var inst = student.installment_type;
-    fetch('/api/taqseet').then(function(r){return r.json();}).then(function(taq){
-      var method = taq.find(function(t){return t.taqseet_method==inst;});
-      var html = '<p style="font-weight:700;color:#6B3FA0;font-size:16px;margin-bottom:10px;">' + (student.student_name||'') + '</p>';
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
-      var installments = [
-        {label:'القسط الأول',val:student.installment1},
-        {label:'القسط الثاني',val:student.installment2},
-        {label:'القسط الثالث',val:student.installment3},
-        {label:'القسط الرابع',val:student.installment4},
-        {label:'القسط الخامس',val:student.installment5}
-      ];
-      installments.forEach(function(i){
-        if(i.val){
-          var color = i.val==='مدفوع'?'#2e7d32':'#c62828';
-          var bg = i.val==='مدفوع'?'#e8f5e9':'#fce4ec';
-          html += '<div style="background:'+bg+';border-radius:8px;padding:8px 10px;"><span style="font-size:12px;color:#777;">'+i.label+'</span><br><b style="color:'+color+';">'+i.val+'</b></div>';
-        }
-      });
-      html += '</div>';
-      if(method&&method.course_amount){
-        html += '<p style="margin-top:10px;color:#555;font-size:13px;">نوع التقسيط: طريقة '+inst+' — مبلغ الدورة: '+method.course_amount+'</p>';
-      }
-      resultDiv.innerHTML = html;
-    }).catch(function(){resultDiv.innerHTML = html;});
-  }).catch(function(){
-    resultDiv.innerHTML = '<p style="color:#e53935;">حدث خطأ في البحث</p>';
-  });
-}
-</script>
 </body>
 </html>"""
 
@@ -432,7 +380,7 @@ ATTENDANCE_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>تسجيل الغياب - Mindex</title>
+<title>ØªØ³Ø¬ÙÙ Ø§ÙØºÙØ§Ø¨ - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 body{background:#f5f3ff;min-height:100vh;direction:rtl;}
@@ -509,24 +457,24 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 </head>
 <body>
 <div class="topbar">
-  <h1>&#128197; تسجيل الغياب</h1>
-  <a href="/dashboard" class="btn-back">&larr; الرئيسية</a>
+  <h1>&#128197; ØªØ³Ø¬ÙÙ Ø§ÙØºÙØ§Ø¨</h1>
+  <a href="/dashboard" class="btn-back">&larr; Ø§ÙØ±Ø¦ÙØ³ÙØ©</a>
 </div>
 <div class="main">
   <div class="card">
     <div class="controls-row">
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128218; المجموعة</span>
+        <span class="ctrl-label">&#128218; Ø§ÙÙØ¬ÙÙØ¹Ø©</span>
         <select class="group-select" id="groupSelect" onchange="onControlChange()">
-          <option value="">&#8212; اختر المجموعة &#8212;</option>
+          <option value="">&#8212; Ø§Ø®ØªØ± Ø§ÙÙØ¬ÙÙØ¹Ø© &#8212;</option>
         </select>
       </div>
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128197; التاريخ</span>
+        <span class="ctrl-label">&#128197; Ø§ÙØªØ§Ø±ÙØ®</span>
         <input type="date" class="date-input" id="dateInput" onchange="onControlChange()">
       </div>
       <div class="ctrl-group">
-        <span class="ctrl-label">&#128340; اليوم</span>
+        <span class="ctrl-label">&#128340; Ø§ÙÙÙÙ</span>
         <div class="day-badge empty" id="dayBadge">&#8212;</div>
       </div>
       <span class="student-count" id="studentCount" style="display:none;"></span>
@@ -564,7 +512,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
             <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
-            <th>تم الإرسال</th>
+            <th>ØªÙ Ø§ÙØ¥Ø±Ø³Ø§Ù</th>
           </tr>
         </thead>
         <tbody id="attTableBody"></tbody>
@@ -599,10 +547,10 @@ function showToast(msg, bg) {
 function normalizeAr(s) {
   if (!s) return '';
   return s
-    .replace(/[أإآا]/g, 'ا')  // أإآا → ا
-    .replace(/[ةه]/g, 'ه')               // ةه → ه
-    .replace(/[ىي]/g, 'ي')               // ىي → ي
-    .replace(/[ً-ٟ]/g, '');                   // remove tashkeel
+    .replace(/[Ø£Ø¥Ø¢Ø§]/g, 'Ø§')  // Ø£Ø¥Ø¢Ø§ â Ø§
+    .replace(/[Ø©Ù]/g, 'Ù')               // Ø©Ù â Ù
+    .replace(/[ÙÙ]/g, 'Ù')               // ÙÙ â Ù
+    .replace(/[Ù-Ù]/g, '');                   // remove tashkeel
 }
 
 var _searchTimeout = null;
@@ -658,14 +606,14 @@ function performSearch(query) {
   }
 
   if (found) {
-    badge.textContent = 'تم العثور على: ' + foundGroup;
+    badge.textContent = 'ØªÙ Ø§ÙØ¹Ø«ÙØ± Ø¹ÙÙ: ' + foundGroup;
     badge.style.display = 'inline-block';
     // Select the group in dropdown
     var sel = document.getElementById('groupSelect');
     sel.value = foundGroup;
     onControlChange();
   } else {
-    badge.textContent = 'لا توجد نتيجة';
+    badge.textContent = 'ÙØ§ ØªÙØ¬Ø¯ ÙØªÙØ¬Ø©';
     badge.style.background = '#ef9a9a';
     badge.style.display = 'inline-block';
     setTimeout(function() {
@@ -957,7 +905,7 @@ DATABASE_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>قاعدة البيانات - Mindex</title>
+<title>ÙØ§Ø¹Ø¯Ø© Ø§ÙØ¨ÙØ§ÙØ§Øª - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 html,body{height:100%;overflow:hidden;margin:0;}
@@ -1045,91 +993,91 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </head>
 <body>
 <div class="topbar">
-  <h1>الصفحة الرئيسية لمعلومات الطلبة</h1>
-  <a href="/dashboard" class="btn-home">&larr; الرئيسية</a>
+  <h1>Ø§ÙØµÙØ­Ø© Ø§ÙØ±Ø¦ÙØ³ÙØ© ÙÙØ¹ÙÙÙØ§Øª Ø§ÙØ·ÙØ¨Ø©</h1>
+  <a href="/dashboard" class="btn-home">&larr; Ø§ÙØ±Ø¦ÙØ³ÙØ©</a>
 </div>
 <div class="main">
   <div class="page-title-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-    <div class="page-title" style="margin-bottom:0;">قاعدة بيانات الطلبة</div>
-    <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; معلومات المجموعات</a>
+    <div class="page-title" style="margin-bottom:0;">ÙØ§Ø¹Ø¯Ø© Ø¨ÙØ§ÙØ§Øª Ø§ÙØ·ÙØ¨Ø©</div>
+    <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; ÙØ¹ÙÙÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</a>
   </div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
-      <span class="stat-label">إجمالي الطلبة</span>
+      <span class="stat-label">Ø¥Ø¬ÙØ§ÙÙ Ø§ÙØ·ÙØ¨Ø©</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ إضافة طالب</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; تعديل الجدول</button>
-  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; إضافة جدول جديد</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ Ø¥Ø¶Ø§ÙØ© Ø·Ø§ÙØ¨</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; Ø§Ø¶Ø§ÙØ© Ø¬Ø¯ÙÙ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</button>
+  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; Ø¥Ø¶Ø§ÙØ© Ø¬Ø¯ÙÙ Ø¬Ø¯ÙØ¯</button></div>
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الرقم الشخصي..." oninput="filterTable()">
-    <button class="btn-search" onclick="filterTable()">بحث</button>
+    <input type="text" id="searchInput" placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§ÙØ§Ø³Ù Ø£Ù Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ..." oninput="filterTable()">
+    <button class="btn-search" onclick="filterTable()">Ø¨Ø­Ø«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>الرقم الشخصي</th>
-          <th>اسم الطالب</th>
-          <th>هاتف الواتساب المعتمد</th>
-          <th>الصف</th>
-          <th>قديم جديد 2026</th>
-          <th>تسجيل الفصل الثاني 2026</th>
-          <th>المجموعة</th>
-          <th>المجموعة (الاونلاين)</th>
-          <th>النتيجة النهائية (تحديد المستوى 2026)</th>
-          <th>الى اين وصل الطالب 2026</th>
-          <th>هل الطالب مناسب لهذا المستوى 2026؟</th>
-          <th>استلام الكتب</th>
-          <th>المدرس 2026</th>
-          <th>القسط الاول 2026</th>
-          <th>القسط الثاني</th>
-          <th>القسط الثالث</th>
-          <th>القسط الرابع</th>
-          <th>القسط الخامس</th>
-          <th>هاتف الام</th>
-          <th>هاتف الاب</th>
-          <th>هاتف اخر</th>
-          <th>مكان السكن</th>
-          <th>عنوان المنزل</th>
-          <th>الطريق</th>
-          <th>المجمع</th>
-          <th>اجراءات</th>
+          <th>Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ</th>
+          <th>Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨</th>
+          <th>ÙØ§ØªÙ Ø§ÙÙØ§ØªØ³Ø§Ø¨ Ø§ÙÙØ¹ØªÙØ¯</th>
+          <th>Ø§ÙØµÙ</th>
+          <th>ÙØ¯ÙÙ Ø¬Ø¯ÙØ¯ 2026</th>
+          <th>ØªØ³Ø¬ÙÙ Ø§ÙÙØµÙ Ø§ÙØ«Ø§ÙÙ 2026</th>
+          <th>Ø§ÙÙØ¬ÙÙØ¹Ø©</th>
+          <th>Ø§ÙÙØ¬ÙÙØ¹Ø© (Ø§ÙØ§ÙÙÙØ§ÙÙ)</th>
+          <th>Ø§ÙÙØªÙØ¬Ø© Ø§ÙÙÙØ§Ø¦ÙØ© (ØªØ­Ø¯ÙØ¯ Ø§ÙÙØ³ØªÙÙ 2026)</th>
+          <th>Ø§ÙÙ Ø§ÙÙ ÙØµÙ Ø§ÙØ·Ø§ÙØ¨ 2026</th>
+          <th>ÙÙ Ø§ÙØ·Ø§ÙØ¨ ÙÙØ§Ø³Ø¨ ÙÙØ°Ø§ Ø§ÙÙØ³ØªÙÙ 2026Ø</th>
+          <th>Ø§Ø³ØªÙØ§Ù Ø§ÙÙØªØ¨</th>
+          <th>Ø§ÙÙØ¯Ø±Ø³ 2026</th>
+          <th>Ø§ÙÙØ³Ø· Ø§ÙØ§ÙÙ 2026</th>
+          <th>Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙÙ</th>
+          <th>Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙØ«</th>
+          <th>Ø§ÙÙØ³Ø· Ø§ÙØ±Ø§Ø¨Ø¹</th>
+          <th>Ø§ÙÙØ³Ø· Ø§ÙØ®Ø§ÙØ³</th>
+          <th>ÙØ§ØªÙ Ø§ÙØ§Ù</th>
+          <th>ÙØ§ØªÙ Ø§ÙØ§Ø¨</th>
+          <th>ÙØ§ØªÙ Ø§Ø®Ø±</th>
+          <th>ÙÙØ§Ù Ø§ÙØ³ÙÙ</th>
+          <th>Ø¹ÙÙØ§Ù Ø§ÙÙÙØ²Ù</th>
+          <th>Ø§ÙØ·Ø±ÙÙ</th>
+          <th>Ø§ÙÙØ¬ÙØ¹</th>
+          <th>Ø§Ø¬Ø±Ø§Ø¡Ø§Øª</th>
         </tr>
       </thead>
       <tbody id="studentsBody">
-        <tr><td colspan="27" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>
+        <tr><td colspan="27" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø§Ø¶Ù Ø§ÙÙ Ø·Ø§ÙØ¨</td></tr>
       </tbody>
     </table>
   </div>
 
 <!-- ===== GROUPS TABLE SECTION ===== -->
 <div style="margin-top:40px;">
-  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; معلومات المجموعات (يدوي)</div>
+  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; ÙØ¹ÙÙÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø§Øª (ÙØ¯ÙÙ)</div>
   <div class="stats">
     <div class="stat-card" style="border-top:3px solid #00BCD4;">
       <span class="stat-num" id="groupsTotalCount" style="color:#00BCD4;">0</span>
-      <span class="stat-label">إجمالي المجموعات</span>
+      <span class="stat-label">Ø¥Ø¬ÙØ§ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ إضافة مجموعة</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; اضافة جدول</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; تعديل الجدول</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ Ø¥Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø©</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; Ø§Ø¶Ø§ÙØ© Ø¬Ø¯ÙÙ</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</button></div>
   <div class="search-bar">
-    <input type="text" id="groupSearchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterGroupTable2()">
-    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">بحث</button>
+    <input type="text" id="groupSearchInput" placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© Ø£Ù Ø§ÙÙØ¯Ø±Ø³..." oninput="filterGroupTable2()">
+    <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">Ø¨Ø­Ø«</button>
   </div>
   <div class="table-wrap">
     <table style="min-width:1300px;">
       <thead>
         <tr id="groupsTheadRow" style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
-          <th>#</th><th>اسم المجموعة</th><th>اسم المدرس</th><th>المستوى / المقرر</th>
-          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th><th>وقت الدراسة</th>
-          <th>توقيت شهر رمضان</th><th>توقيت الاونلاين (العادي)</th>
-          <th>رابط المجموعة</th><th>الحصة بالدقيقة (يدوي)</th><th>اجراءات</th>
+          <th>#</th><th>Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©</th><th>Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³</th><th>Ø§ÙÙØ³ØªÙÙ / Ø§ÙÙÙØ±Ø±</th>
+          <th>Ø§ÙÙÙØ±Ø± Ø§ÙØ°Ù ØªÙ Ø§ÙÙØµÙÙ Ø§ÙÙÙ Ø§ÙÙØµÙ Ø§ÙÙØ§Ø¦Øª</th><th>ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©</th>
+          <th>ØªÙÙÙØª Ø´ÙØ± Ø±ÙØ¶Ø§Ù</th><th>ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙ (Ø§ÙØ¹Ø§Ø¯Ù)</th>
+          <th>Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©</th><th>Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ© (ÙØ¯ÙÙ)</th><th>Ø§Ø¬Ø±Ø§Ø¡Ø§Øª</th>
         </tr>
       </thead>
       <tbody id="groupsBody2">
-        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
+        <tr><td colspan="11" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø§Ø¶Ù Ø§ÙÙ ÙØ¬ÙÙØ¹Ø©</td></tr>
       </tbody>
     </table>
   </div>
@@ -1137,48 +1085,48 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- TAQSEET (PAYMENT PLANS) TABLE -->
 <div style="margin:30px 0 0 0;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; طريقة التقسيط</span>
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; Ø·Ø±ÙÙØ© Ø§ÙØªÙØ³ÙØ·</span>
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
-    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; إضافة جدول</button>
-    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; إضافة عمود</button>
-    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; تعديل الجدول</button>
+    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; Ø¥Ø¶Ø§ÙØ© Ø¬Ø¯ÙÙ</button>
+    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯</button>
+    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</button>
   </div>
   <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
     <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
       <thead>
         <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
           <th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">طريقة التقسيط</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">اسم الطالب</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">مبلغ الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">عدد الأقساط</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 1</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 2</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 3</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 4</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 5</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 6</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 7</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 8</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 9</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 10</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 11</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">القسط 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ الاستحقاق 12</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">عدد ساعات الدراسة</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">تاريخ بدء الدورة</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">إجراءات</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">Ø·Ø±ÙÙØ© Ø§ÙØªÙØ³ÙØ·</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">ÙØ¨ÙØº Ø§ÙØ¯ÙØ±Ø©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">Ø¹Ø¯Ø¯ Ø§ÙØ£ÙØ³Ø§Ø·</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">Ø§ÙÙØ³Ø· 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø§ÙØ§Ø³ØªØ­ÙØ§Ù 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">Ø¹Ø¯Ø¯ Ø³Ø§Ø¹Ø§Øª Ø§ÙØ¯Ø±Ø§Ø³Ø©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">ØªØ§Ø±ÙØ® Ø¨Ø¯Ø¡ Ø§ÙØ¯ÙØ±Ø©</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
         </tr>
       </thead>
       <tbody id="taqseetBody"></tbody>
@@ -1188,139 +1136,139 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h2 id="modalTitle">اضافة طالب جديد</h2>
+    <h2 id="modalTitle">Ø§Ø¶Ø§ÙØ© Ø·Ø§ÙØ¨ Ø¬Ø¯ÙØ¯</h2>
     <input type="hidden" id="editId">
     <div class="form-grid">
-<div class="field"><label>الرقم الشخصي *</label><input id="f_personal_id" placeholder="الرقم الشخصي"></div>
-<div class="field"><label>اسم الطالب *</label><input id="f_student_name" placeholder="الاسم الكامل"></div>
-<div class="field"><label>هاتف الواتساب المعتمد</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>الصف</label><input id="f_class_name" placeholder="مثال: صف A"></div>
-<div class="field"><label>قديم جديد 2026</label><input id="f_old_new_2026" placeholder="قديم أو جديد"></div>
-<div class="field"><label>تسجيل الفصل الثاني 2026</label><input id="f_registration_term2_2026" placeholder="نعم / لا"></div>
-<div class="field"><label>المجموعة</label><input id="f_group_name_student" placeholder="اسم المجموعة"></div>
-<div class="field"><label>المجموعة (الاونلاين)</label><input id="f_group_online" placeholder="مجموعة الاونلاين"></div>
-<div class="field"><label>النتيجة النهائية (تحديد المستوى 2026)</label><select id="f_final_result"><option value="">-- اختر --</option><option>ناجح</option><option>راسب</option><option>قيد التقييم</option><option>غائب</option></select></div>
-<div class="field"><label>الى اين وصل الطالب 2026</label><input id="f_level_reached" placeholder="مثال: الوحدة 5"></div>
-<div class="field"><label>هل الطالب مناسب لهذا المستوى 2026؟</label><input id="f_suitable_level" placeholder="نعم / لا"></div>
-<div class="field"><label>استلام الكتب</label><input id="f_books_received" placeholder="نعم / لا"></div>
-<div class="field"><label>المدرس 2026</label><input id="f_teacher" placeholder="اسم المدرس"></div>
-<div class="field"><label>القسط الاول 2026</label><input id="f_installment1" placeholder="مدفوع / غير مدفوع"></div>
-<div class="field"><label>القسط الثاني</label><input id="f_installment2" placeholder="مدفوع / غير مدفوع"></div>
-<div class="field"><label>القسط الثالث</label><input id="f_installment3" placeholder="مدفوع / غير مدفوع"></div>
-<div class="field"><label>القسط الرابع</label><input id="f_installment4" placeholder="مدفوع / غير مدفوع"></div>
-<div class="field"><label>القسط الخامس</label><input id="f_installment5" placeholder="مدفوع / غير مدفوع"></div>
-<div class="field"><label>هاتف الام</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>هاتف الاب</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>هاتف اخر</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>مكان السكن</label><input id="f_residence" placeholder="المنطقة"></div>
-<div class="field full"><label>عنوان المنزل</label><input id="f_home_address" placeholder="عنوان المنزل"></div>
-<div class="field"><label>الطريق</label><input id="f_road" placeholder="رقم الطريق"></div>
-<div class="field"><label>المجمع</label><input id="f_complex" placeholder="اسم المجمع"></div>
+<div class="field"><label>Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ *</label><input id="f_personal_id" placeholder="Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ"></div>
+<div class="field"><label>Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨ *</label><input id="f_student_name" placeholder="Ø§ÙØ§Ø³Ù Ø§ÙÙØ§ÙÙ"></div>
+<div class="field"><label>ÙØ§ØªÙ Ø§ÙÙØ§ØªØ³Ø§Ø¨ Ø§ÙÙØ¹ØªÙØ¯</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>Ø§ÙØµÙ</label><input id="f_class_name" placeholder="ÙØ«Ø§Ù: ØµÙ A"></div>
+<div class="field"><label>ÙØ¯ÙÙ Ø¬Ø¯ÙØ¯ 2026</label><input id="f_old_new_2026" placeholder="ÙØ¯ÙÙ Ø£Ù Ø¬Ø¯ÙØ¯"></div>
+<div class="field"><label>ØªØ³Ø¬ÙÙ Ø§ÙÙØµÙ Ø§ÙØ«Ø§ÙÙ 2026</label><input id="f_registration_term2_2026" placeholder="ÙØ¹Ù / ÙØ§"></div>
+<div class="field"><label>Ø§ÙÙØ¬ÙÙØ¹Ø©</label><input id="f_group_name_student" placeholder="Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©"></div>
+<div class="field"><label>Ø§ÙÙØ¬ÙÙØ¹Ø© (Ø§ÙØ§ÙÙÙØ§ÙÙ)</label><input id="f_group_online" placeholder="ÙØ¬ÙÙØ¹Ø© Ø§ÙØ§ÙÙÙØ§ÙÙ"></div>
+<div class="field"><label>Ø§ÙÙØªÙØ¬Ø© Ø§ÙÙÙØ§Ø¦ÙØ© (ØªØ­Ø¯ÙØ¯ Ø§ÙÙØ³ØªÙÙ 2026)</label><select id="f_final_result"><option value="">-- Ø§Ø®ØªØ± --</option><option>ÙØ§Ø¬Ø­</option><option>Ø±Ø§Ø³Ø¨</option><option>ÙÙØ¯ Ø§ÙØªÙÙÙÙ</option><option>ØºØ§Ø¦Ø¨</option></select></div>
+<div class="field"><label>Ø§ÙÙ Ø§ÙÙ ÙØµÙ Ø§ÙØ·Ø§ÙØ¨ 2026</label><input id="f_level_reached" placeholder="ÙØ«Ø§Ù: Ø§ÙÙØ­Ø¯Ø© 5"></div>
+<div class="field"><label>ÙÙ Ø§ÙØ·Ø§ÙØ¨ ÙÙØ§Ø³Ø¨ ÙÙØ°Ø§ Ø§ÙÙØ³ØªÙÙ 2026Ø</label><input id="f_suitable_level" placeholder="ÙØ¹Ù / ÙØ§"></div>
+<div class="field"><label>Ø§Ø³ØªÙØ§Ù Ø§ÙÙØªØ¨</label><input id="f_books_received" placeholder="ÙØ¹Ù / ÙØ§"></div>
+<div class="field"><label>Ø§ÙÙØ¯Ø±Ø³ 2026</label><input id="f_teacher" placeholder="Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³"></div>
+<div class="field"><label>Ø§ÙÙØ³Ø· Ø§ÙØ§ÙÙ 2026</label><input id="f_installment1" placeholder="ÙØ¯ÙÙØ¹ / ØºÙØ± ÙØ¯ÙÙØ¹"></div>
+<div class="field"><label>Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙÙ</label><input id="f_installment2" placeholder="ÙØ¯ÙÙØ¹ / ØºÙØ± ÙØ¯ÙÙØ¹"></div>
+<div class="field"><label>Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙØ«</label><input id="f_installment3" placeholder="ÙØ¯ÙÙØ¹ / ØºÙØ± ÙØ¯ÙÙØ¹"></div>
+<div class="field"><label>Ø§ÙÙØ³Ø· Ø§ÙØ±Ø§Ø¨Ø¹</label><input id="f_installment4" placeholder="ÙØ¯ÙÙØ¹ / ØºÙØ± ÙØ¯ÙÙØ¹"></div>
+<div class="field"><label>Ø§ÙÙØ³Ø· Ø§ÙØ®Ø§ÙØ³</label><input id="f_installment5" placeholder="ÙØ¯ÙÙØ¹ / ØºÙØ± ÙØ¯ÙÙØ¹"></div>
+<div class="field"><label>ÙØ§ØªÙ Ø§ÙØ§Ù</label><input id="f_mother_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÙØ§ØªÙ Ø§ÙØ§Ø¨</label><input id="f_father_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÙØ§ØªÙ Ø§Ø®Ø±</label><input id="f_other_phone" placeholder="+973 XXXX XXXX" class="ltr"></div>
+<div class="field"><label>ÙÙØ§Ù Ø§ÙØ³ÙÙ</label><input id="f_residence" placeholder="Ø§ÙÙÙØ·ÙØ©"></div>
+<div class="field full"><label>Ø¹ÙÙØ§Ù Ø§ÙÙÙØ²Ù</label><input id="f_home_address" placeholder="Ø¹ÙÙØ§Ù Ø§ÙÙÙØ²Ù"></div>
+<div class="field"><label>Ø§ÙØ·Ø±ÙÙ</label><input id="f_road" placeholder="Ø±ÙÙ Ø§ÙØ·Ø±ÙÙ"></div>
+<div class="field"><label>Ø§ÙÙØ¬ÙØ¹</label><input id="f_complex" placeholder="Ø§Ø³Ù Ø§ÙÙØ¬ÙØ¹"></div>
 </div>
-<div class="field"><label>اختيار نوع التقسيط</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- اختر --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
+<div class="field"><label>Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- Ø§Ø®ØªØ± --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
 </div>
     v>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveStudent()">حفظ</button>
-      <button class="btn-cancel" onclick="closeModal()">الغاء</button>
+      <button class="btn-save" onclick="saveStudent()">Ø­ÙØ¸</button>
+      <button class="btn-cancel" onclick="closeModal()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="confirmModal">
   <div class="confirm-box">
-    <h3>تاكيد الحذف</h3>
-    <p>هل انت متاكد انك تريد حذف هذا الطالب؟ لا يمكن التراجع عن هذا الاجراء.</p>
+    <h3>ØªØ§ÙÙØ¯ Ø§ÙØ­Ø°Ù</h3>
+    <p>ÙÙ Ø§ÙØª ÙØªØ§ÙØ¯ Ø§ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù ÙØ°Ø§ Ø§ÙØ·Ø§ÙØ¨Ø ÙØ§ ÙÙÙÙ Ø§ÙØªØ±Ø§Ø¬Ø¹ Ø¹Ù ÙØ°Ø§ Ø§ÙØ§Ø¬Ø±Ø§Ø¡.</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="confirmDelBtn">حذف</button>
-      <button class="btn-confirm-cancel" onclick="closeConfirm()">الغاء</button>
+      <button class="btn-confirm-del" id="confirmDelBtn">Ø­Ø°Ù</button>
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div><!-- TABLE EDIT MODAL -->
 <div class="modal-bg" id="tableEditModal">
 <div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
-<h2 style="color:#E55A2B;">&#9881; تعديل الجدول</h2>
+<h2 style="color:#E55A2B;">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</h2>
 <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #f0ebff;padding-bottom:10px;">
-<button id="tab-add-col" onclick="switchTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">➕ إضافة عمود</button>
-<button id="tab-del-col" onclick="switchTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">❌ حذف عمود</button>
-<button id="tab-edit-col" onclick="switchTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; تعديل عنوان</button>
+<button id="tab-add-col" onclick="switchTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">â Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯</button>
+<button id="tab-del-col" onclick="switchTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">â Ø­Ø°Ù Ø¹ÙÙØ¯</button>
+<button id="tab-edit-col" onclick="switchTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#f0ebff;color:#6B3FA0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; ØªØ¹Ø¯ÙÙ Ø¹ÙÙØ§Ù</button>
 </div>
 <!-- Tab: Add Column -->
 <div id="panel-add-col">
-<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">عنوان العمود الجديد *</label><input id="new_col_label" placeholder="مثال: ملاحظات" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">Ø¹ÙÙØ§Ù Ø§ÙØ¹ÙÙØ¯ Ø§ÙØ¬Ø¯ÙØ¯ *</label><input id="new_col_label" placeholder="ÙØ«Ø§Ù: ÙÙØ§Ø­Ø¸Ø§Øª" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
 <div class="field" style="margin-bottom:14px;">
-  <label style="color:#E55A2B;">موقع العمود الجديد</label>
+  <label style="color:#E55A2B;">ÙÙÙØ¹ Ø§ÙØ¹ÙÙØ¯ Ø§ÙØ¬Ø¯ÙØ¯</label>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <select id="new_col_position" onchange="togglePositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
-      <option value="end">في النهاية</option>
-      <option value="start">في البداية</option>
-      <option value="after">بعد عمود:</option>
+      <option value="end">ÙÙ Ø§ÙÙÙØ§ÙØ©</option>
+      <option value="start">ÙÙ Ø§ÙØ¨Ø¯Ø§ÙØ©</option>
+      <option value="after">Ø¨Ø¹Ø¯ Ø¹ÙÙØ¯:</option>
     </select>
     <select id="new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;">
-      <option value="">— اختر العمود —</option>
+      <option value="">â Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯ â</option>
     </select>
   </div>
 </div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">إضافة عمود</button>
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addColumn()">Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯</button>
 </div>
 </div>
 <!-- Tab: Delete Column -->
 <div id="panel-del-col" style="display:none;">
-<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">اختر العمود للحذف *</label>
-<select id="del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">— اختر عمود —</option></select></div>
-<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">⚠️ تحذير: حذف العمود يحذف جميع بياناته من كل الطلبة. لا يمكن التراجع.</div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯ ÙÙØ­Ø°Ù *</label>
+<select id="del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">â Ø§Ø®ØªØ± Ø¹ÙÙØ¯ â</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">â ï¸ ØªØ­Ø°ÙØ±: Ø­Ø°Ù Ø§ÙØ¹ÙÙØ¯ ÙØ­Ø°Ù Ø¬ÙÙØ¹ Ø¨ÙØ§ÙØ§ØªÙ ÙÙ ÙÙ Ø§ÙØ·ÙØ¨Ø©. ÙØ§ ÙÙÙÙ Ø§ÙØªØ±Ø§Ø¬Ø¹.</div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" style="background:#e53935;" onclick="deleteColumn()">حذف العمود</button>
+<button class="btn-save" style="background:#e53935;" onclick="deleteColumn()">Ø­Ø°Ù Ø§ÙØ¹ÙÙØ¯</button>
 </div>
 </div>
 <!-- Tab: Edit Column Label -->
 <div id="panel-edit-col" style="display:none;">
-<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">اختر العمود *</label>
-<select id="edit_col_key" onchange="fillEditLabel()" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"><option value="">— اختر عمود —</option></select></div>
-<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">الاسم الجديد *</label><input id="edit_col_label" placeholder="اسم العمود" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯ *</label>
+<select id="edit_col_key" onchange="fillEditLabel()" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"><option value="">â Ø§Ø®ØªØ± Ø¹ÙÙØ¯ â</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#6B3FA0;">Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯ *</label><input id="edit_col_label" placeholder="Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯" style="width:100%;padding:10px;border:1.5px solid #E0D5F0;border-radius:9px;font-size:14px;background:#faf7ff;"></div>
 <div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
-<button class="btn-save" onclick="updateColumnLabel()">حفظ العنوان</button>
+<button class="btn-save" onclick="updateColumnLabel()">Ø­ÙØ¸ Ø§ÙØ¹ÙÙØ§Ù</button>
 </div>
 </div>
 <div class="modal-actions" style="margin-top:18px;justify-content:center;">
-<button class="btn-cancel" onclick="closeTableEditModal()">إغلاق</button>
+<button class="btn-cancel" onclick="closeTableEditModal()">Ø¥ØºÙØ§Ù</button>
 </div>
 </div>
 </div>
-<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد طلبة من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>الرقم الشخصي، اسم الطالب، الواتساب، النتيجة، المستوى 2026، المدرس 2026، هاتف الام، هاتف الاب، هاتف اخر، السكن، العنوان، الطريق، المجمع</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeStudentExcelModal()">الغاء</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; استيراد مجموعات من Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>تعليمات:</b> يجب أن يكون ملف Excel يحتوي على الأعمدة بهذا الترتيب:<br>اسم المجموعة، اسم المدرس، المستوى، المقرر الفائت، وقت الدراسة، توقيت رمضان، توقيت الاونلاين، رابط المجموعة، الحصة بالدقيقة</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; اختر ملف Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">لم يتم اختيار ملف</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">استيراد</button><button class="btn-cancel" onclick="closeGroupExcelModal()">الغاء</button></div></div></div><div style="margin:30px 0 0 0;">
+<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; Ø§Ø³ØªÙØ±Ø§Ø¯ Ø·ÙØ¨Ø© ÙÙ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ØªØ¹ÙÙÙØ§Øª:</b> ÙØ¬Ø¨ Ø£Ù ÙÙÙÙ ÙÙÙ Excel ÙØ­ØªÙÙ Ø¹ÙÙ Ø§ÙØ£Ø¹ÙØ¯Ø© Ø¨ÙØ°Ø§ Ø§ÙØªØ±ØªÙØ¨:<br>Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙØ Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨Ø Ø§ÙÙØ§ØªØ³Ø§Ø¨Ø Ø§ÙÙØªÙØ¬Ø©Ø Ø§ÙÙØ³ØªÙÙ 2026Ø Ø§ÙÙØ¯Ø±Ø³ 2026Ø ÙØ§ØªÙ Ø§ÙØ§ÙØ ÙØ§ØªÙ Ø§ÙØ§Ø¨Ø ÙØ§ØªÙ Ø§Ø®Ø±Ø Ø§ÙØ³ÙÙØ Ø§ÙØ¹ÙÙØ§ÙØ Ø§ÙØ·Ø±ÙÙØ Ø§ÙÙØ¬ÙØ¹</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; Ø§Ø®ØªØ± ÙÙÙ Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÙÙ ÙØªÙ Ø§Ø®ØªÙØ§Ø± ÙÙÙ</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">Ø§Ø³ØªÙØ±Ø§Ø¯</button><button class="btn-cancel" onclick="closeStudentExcelModal()">Ø§ÙØºØ§Ø¡</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; Ø§Ø³ØªÙØ±Ø§Ø¯ ÙØ¬ÙÙØ¹Ø§Øª ÙÙ Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>ØªØ¹ÙÙÙØ§Øª:</b> ÙØ¬Ø¨ Ø£Ù ÙÙÙÙ ÙÙÙ Excel ÙØ­ØªÙÙ Ø¹ÙÙ Ø§ÙØ£Ø¹ÙØ¯Ø© Ø¨ÙØ°Ø§ Ø§ÙØªØ±ØªÙØ¨:<br>Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©Ø Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³Ø Ø§ÙÙØ³ØªÙÙØ Ø§ÙÙÙØ±Ø± Ø§ÙÙØ§Ø¦ØªØ ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©Ø ØªÙÙÙØª Ø±ÙØ¶Ø§ÙØ ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙØ Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©Ø Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ©</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; Ø§Ø®ØªØ± ÙÙÙ Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">ÙÙ ÙØªÙ Ø§Ø®ØªÙØ§Ø± ÙÙÙ</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">Ø§Ø³ØªÙØ±Ø§Ø¯</button><button class="btn-cancel" onclick="closeGroupExcelModal()">Ø§ÙØºØ§Ø¡</button></div></div></div><div style="margin:30px 0 0 0;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; سجل الغياب</span>
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; Ø³Ø¬Ù Ø§ÙØºÙØ§Ø¨</span>
   </div>
   <div class="stats" style="margin-bottom:10px;">
     <div class="stat-card">
       <span class="stat-num" id="attendanceTotalCount">0</span>
-      <span class="stat-label">إجمالي السجلات</span>
+      <span class="stat-label">Ø¥Ø¬ÙØ§ÙÙ Ø§ÙØ³Ø¬ÙØ§Øª</span>
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-    <button class="btn-add" onclick="openAttendanceAddModal()">+ إضافة سجل</button>
+    <button class="btn-add" onclick="openAttendanceAddModal()">+ Ø¥Ø¶Ø§ÙØ© Ø³Ø¬Ù</button>
   
-  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; اضافة جدول</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; تعديل الجدول</button></div>
+  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; Ø§Ø¶Ø§ÙØ© Ø¬Ø¯ÙÙ</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</button></div>
   <div class="search-bar">
-    <input type="text" id="attendanceSearchInput" placeholder="ابحث في سجل الغياب..." oninput="filterAttendanceTable()">
-    <button class="btn-search" onclick="filterAttendanceTable()">بحث</button>
+    <input type="text" id="attendanceSearchInput" placeholder="Ø§Ø¨Ø­Ø« ÙÙ Ø³Ø¬Ù Ø§ÙØºÙØ§Ø¨..." oninput="filterAttendanceTable()">
+    <button class="btn-search" onclick="filterAttendanceTable()">Ø¨Ø­Ø«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>تاريخ أخذ الحضور</th>
-          <th>اليوم</th>
-          <th>المجموعة</th>
-          <th>اسم الطالب</th>
-          <th>رقم التواصل</th>
-          <th>الحالة</th>
-          <th>الرسالة</th>
-          <th>حالة إرسال الرسالة</th>
-          <th>حالة الدراسة</th>
-          <th>إجراءات</th>
+          <th>ØªØ§Ø±ÙØ® Ø£Ø®Ø° Ø§ÙØ­Ø¶ÙØ±</th>
+          <th>Ø§ÙÙÙÙ</th>
+          <th>Ø§ÙÙØ¬ÙÙØ¹Ø©</th>
+          <th>Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨</th>
+          <th>Ø±ÙÙ Ø§ÙØªÙØ§ØµÙ</th>
+          <th>Ø§ÙØ­Ø§ÙØ©</th>
+          <th>Ø§ÙØ±Ø³Ø§ÙØ©</th>
+          <th>Ø­Ø§ÙØ© Ø¥Ø±Ø³Ø§Ù Ø§ÙØ±Ø³Ø§ÙØ©</th>
+          <th>Ø­Ø§ÙØ© Ø§ÙØ¯Ø±Ø§Ø³Ø©</th>
+          <th>Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
         </tr>
       </thead>
       <tbody id="attendanceBody"></tbody>
@@ -1330,99 +1278,99 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ATTENDANCE ADD/EDIT MODAL -->
 <div class="modal-bg" id="attendanceModal" style="display:none">
   <div class="modal" style="max-width:520px;width:95%">
-    <h2 id="attendanceModalTitle" style="margin-bottom:16px;color:#6c3fa0;">إضافة سجل غياب</h2>
+    <h2 id="attendanceModalTitle" style="margin-bottom:16px;color:#6c3fa0;">Ø¥Ø¶Ø§ÙØ© Ø³Ø¬Ù ØºÙØ§Ø¨</h2>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">تاريخ أخذ الحضور</label>
+          <label style="font-size:.85em;color:#555;">ØªØ§Ø±ÙØ® Ø£Ø®Ø° Ø§ÙØ­Ø¶ÙØ±</label>
           <input type="date" id="att_date" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">اليوم</label>
-          <input type="text" id="att_day" placeholder="مثال: الأحد" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">Ø§ÙÙÙÙ</label>
+          <input type="text" id="att_day" placeholder="ÙØ«Ø§Ù: Ø§ÙØ£Ø­Ø¯" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">المجموعة</label>
-          <input type="text" id="att_group" placeholder="اسم المجموعة" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">Ø§ÙÙØ¬ÙÙØ¹Ø©</label>
+          <input type="text" id="att_group" placeholder="Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">اسم الطالب</label>
-          <input type="text" id="att_student" placeholder="اسم الطالب" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨</label>
+          <input type="text" id="att_student" placeholder="Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">رقم التواصل</label>
-          <input type="text" id="att_contact" placeholder="رقم الواتساب" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
+          <label style="font-size:.85em;color:#555;">Ø±ÙÙ Ø§ÙØªÙØ§ØµÙ</label>
+          <input type="text" id="att_contact" placeholder="Ø±ÙÙ Ø§ÙÙØ§ØªØ³Ø§Ø¨" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">الحالة</label>
+          <label style="font-size:.85em;color:#555;">Ø§ÙØ­Ø§ÙØ©</label>
           <select id="att_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- اختر --</option>
-            <option>حاضر</option>
-            <option>غائب</option>
-            <option>متأخر</option>
-            <option>معتذر</option>
+            <option value="">-- Ø§Ø®ØªØ± --</option>
+            <option>Ø­Ø§Ø¶Ø±</option>
+            <option>ØºØ§Ø¦Ø¨</option>
+            <option>ÙØªØ£Ø®Ø±</option>
+            <option>ÙØ¹ØªØ°Ø±</option>
           </select>
         </div>
       </div>
       <div>
-        <label style="font-size:.85em;color:#555;">الرسالة</label>
-        <textarea id="att_message" rows="3" placeholder="نص الرسالة" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;resize:vertical;"></textarea>
+        <label style="font-size:.85em;color:#555;">Ø§ÙØ±Ø³Ø§ÙØ©</label>
+        <textarea id="att_message" rows="3" placeholder="ÙØµ Ø§ÙØ±Ø³Ø§ÙØ©" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;resize:vertical;"></textarea>
       </div>
       <div style="display:flex;gap:10px;">
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">حالة إرسال الرسالة</label>
+          <label style="font-size:.85em;color:#555;">Ø­Ø§ÙØ© Ø¥Ø±Ø³Ø§Ù Ø§ÙØ±Ø³Ø§ÙØ©</label>
           <select id="att_msg_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- اختر --</option>
-            <option>تم الإرسال</option>
-            <option>لم يُرسل</option>
-            <option>فشل الإرسال</option>
+            <option value="">-- Ø§Ø®ØªØ± --</option>
+            <option>ØªÙ Ø§ÙØ¥Ø±Ø³Ø§Ù</option>
+            <option>ÙÙ ÙÙØ±Ø³Ù</option>
+            <option>ÙØ´Ù Ø§ÙØ¥Ø±Ø³Ø§Ù</option>
           </select>
         </div>
         <div style="flex:1">
-          <label style="font-size:.85em;color:#555;">حالة الدراسة</label>
+          <label style="font-size:.85em;color:#555;">Ø­Ø§ÙØ© Ø§ÙØ¯Ø±Ø§Ø³Ø©</label>
           <select id="att_study_status" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;">
-            <option value="">-- اختر --</option>
-            <option>مستمر</option>
-            <option>منقطع</option>
-            <option>موقوف</option>
+            <option value="">-- Ø§Ø®ØªØ± --</option>
+            <option>ÙØ³ØªÙØ±</option>
+            <option>ÙÙÙØ·Ø¹</option>
+            <option>ÙÙÙÙÙ</option>
           </select>
         </div>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeAttendanceModal()">الغاء</button>
-      <button class="btn-save" onclick="saveAttendanceRecord()">حفظ</button>
+      <button class="btn-cancel" onclick="closeAttendanceModal()">Ø§ÙØºØ§Ø¡</button>
+      <button class="btn-save" onclick="saveAttendanceRecord()">Ø­ÙØ¸</button>
     </div>
   </div>
 </div>
 <!-- ATTENDANCE CONFIRM DELETE MODAL -->
 <div class="confirm-bg" id="attendanceConfirmModal" style="display:none">
   <div class="confirm-box">
-    <p>هل تريد حذف هذا السجل؟</p>
+    <p>ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù ÙØ°Ø§ Ø§ÙØ³Ø¬ÙØ</p>
     <div style="display:flex;gap:10px;justify-content:center;">
-      <button class="btn-cancel" onclick="closeAttendanceConfirm()">الغاء</button>
-      <button class="btn-delete" onclick="confirmAttendanceDelete()">حذف</button>
+      <button class="btn-cancel" onclick="closeAttendanceConfirm()">Ø§ÙØºØ§Ø¡</button>
+      <button class="btn-delete" onclick="confirmAttendanceDelete()">Ø­Ø°Ù</button>
     </div>
   </div>
 </div>
 <!-- ATTENDANCE EXCEL IMPORT MODAL -->
 <div class="modal-bg" id="attendanceExcelModal" style="display:none">
   <div class="modal" style="max-width:480px;width:95%">
-    <h2 style="margin-bottom:14px;color:#388E3C;">&#128196; استيراد سجل غياب من Excel</h2>
+    <h2 style="margin-bottom:14px;color:#388E3C;">&#128196; Ø§Ø³ØªÙØ±Ø§Ø¯ Ø³Ø¬Ù ØºÙØ§Ø¨ ÙÙ Excel</h2>
     <div style="background:#f1f8e9;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.88em;color:#2E7D32;line-height:1.7;">
-      <b>تعليمات:</b> يجب أن يحتوي ملف Excel على الأعمدة بهذا الترتيب:<br>
-      تاريخ أخذ الحضور، اليوم، المجموعة، اسم الطالب، رقم التواصل، الحالة، الرسالة، حالة إرسال الرسالة، حالة الدراسة
+      <b>ØªØ¹ÙÙÙØ§Øª:</b> ÙØ¬Ø¨ Ø£Ù ÙØ­ØªÙÙ ÙÙÙ Excel Ø¹ÙÙ Ø§ÙØ£Ø¹ÙØ¯Ø© Ø¨ÙØ°Ø§ Ø§ÙØªØ±ØªÙØ¨:<br>
+      ØªØ§Ø±ÙØ® Ø£Ø®Ø° Ø§ÙØ­Ø¶ÙØ±Ø Ø§ÙÙÙÙØ Ø§ÙÙØ¬ÙÙØ¹Ø©Ø Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨Ø Ø±ÙÙ Ø§ÙØªÙØ§ØµÙØ Ø§ÙØ­Ø§ÙØ©Ø Ø§ÙØ±Ø³Ø§ÙØ©Ø Ø­Ø§ÙØ© Ø¥Ø±Ø³Ø§Ù Ø§ÙØ±Ø³Ø§ÙØ©Ø Ø­Ø§ÙØ© Ø§ÙØ¯Ø±Ø§Ø³Ø©
     </div>
-    <button class="btn-add" style="width:100%;justify-content:center;" onclick="document.getElementById('attendanceExcelFileInput').click()">&#128194; اختر ملف Excel</button>
+    <button class="btn-add" style="width:100%;justify-content:center;" onclick="document.getElementById('attendanceExcelFileInput').click()">&#128194; Ø§Ø®ØªØ± ÙÙÙ Excel</button>
     <input type="file" id="attendanceExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="readAttendanceExcelFile(this)">
     <div id="attendanceExcelStatus" style="margin-top:10px;font-size:.9em;color:#555;text-align:center;"></div>
     <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeAttendanceExcelModal()">الغاء</button>
-      <button class="btn-save" id="attendanceExcelImportBtn" onclick="importAttendanceFromExcel()" style="display:none">استيراد</button>
+      <button class="btn-cancel" onclick="closeAttendanceExcelModal()">Ø§ÙØºØ§Ø¡</button>
+      <button class="btn-save" id="attendanceExcelImportBtn" onclick="importAttendanceFromExcel()" style="display:none">Ø§Ø³ØªÙØ±Ø§Ø¯</button>
     </div>
   </div>
 </div>
@@ -1430,41 +1378,41 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ATTENDANCE TABLE EDIT MODAL -->
 <div class="modal-bg" id="attendanceTableEditModal" style="display:none">
   <div class="modal" style="max-width:460px;width:95%">
-    <h2 style="margin-bottom:12px;color:#E65100;font-size:1.1em;">&#9881; تعديل جدول سجل الغياب</h2>
+    <h2 style="margin-bottom:12px;color:#E65100;font-size:1.1em;">&#9881; ØªØ¹Ø¯ÙÙ Ø¬Ø¯ÙÙ Ø³Ø¬Ù Ø§ÙØºÙØ§Ø¨</h2>
     <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button class="btn-tab active" id="attTab1" onclick="switchAttTab('add')">إضافة عمود</button>
-      <button class="btn-tab" id="attTab2" onclick="switchAttTab('del')">حذف عمود</button>
-      <button class="btn-tab" id="attTab3" onclick="switchAttTab('rename')">تعديل عنوان</button>
+      <button class="btn-tab active" id="attTab1" onclick="switchAttTab('add')">Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯</button>
+      <button class="btn-tab" id="attTab2" onclick="switchAttTab('del')">Ø­Ø°Ù Ø¹ÙÙØ¯</button>
+      <button class="btn-tab" id="attTab3" onclick="switchAttTab('rename')">ØªØ¹Ø¯ÙÙ Ø¹ÙÙØ§Ù</button>
     </div>
     <!-- Add column panel -->
     <div id="attTabPanelAdd">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اسم العمود الجديد</label>
-      <input type="text" id="att_new_col_name" placeholder="اسم العمود" class="col-name-input">
-      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">مكان الإضافة:</div>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯ Ø§ÙØ¬Ø¯ÙØ¯</label>
+      <input type="text" id="att_new_col_name" placeholder="Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÙÙØ§Ù Ø§ÙØ¥Ø¶Ø§ÙØ©:</div>
       <select id="att_col_position" class="col-name-input" onchange="toggleAttPosition()">
-        <option value="end">في النهاية</option>
-        <option value="start">في البداية</option>
-        <option value="after">بعد عمود:</option>
+        <option value="end">ÙÙ Ø§ÙÙÙØ§ÙØ©</option>
+        <option value="start">ÙÙ Ø§ÙØ¨Ø¯Ø§ÙØ©</option>
+        <option value="after">Ø¨Ø¹Ø¯ Ø¹ÙÙØ¯:</option>
       </select>
       <select id="att_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addAttendanceColumn()">إضافة</button>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addAttendanceColumn()">Ø¥Ø¶Ø§ÙØ©</button>
     </div>
     <!-- Delete column panel -->
     <div id="attTabPanelDel" style="display:none">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اختر العمود للحذف</label>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯ ÙÙØ­Ø°Ù</label>
       <select id="att_del_col" class="col-name-input"></select>
-      <button style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteAttendanceColumn()">حذف العمود</button>
+      <button style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteAttendanceColumn()">Ø­Ø°Ù Ø§ÙØ¹ÙÙØ¯</button>
     </div>
     <!-- Rename column panel -->
     <div id="attTabPanelRename" style="display:none">
-      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">اختر العمود</label>
+      <label style="font-size:.85em;color:#555;display:block;margin-bottom:4px;">Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯</label>
       <select id="att_rename_col" class="col-name-input" onchange="fillAttRenameLabel()"></select>
-      <label style="font-size:.85em;color:#555;display:block;margin-top:8px;margin-bottom:4px;">الاسم الجديد</label>
-      <input type="text" id="att_rename_label" class="col-name-input" placeholder="الاسم الجديد">
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateAttendanceColumnLabel()">حفظ</button>
+      <label style="font-size:.85em;color:#555;display:block;margin-top:8px;margin-bottom:4px;">Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯</label>
+      <input type="text" id="att_rename_label" class="col-name-input" placeholder="Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateAttendanceColumnLabel()">Ø­ÙØ¸</button>
     </div>
     <div style="margin-top:14px;text-align:left;">
-      <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">إغلاق</button>
+      <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">Ø¥ØºÙØ§Ù</button>
     </div>
   </div>
 </d
@@ -1475,7 +1423,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- NEW TABLE WIZARD MODAL -->
 <div class="modal-bg" id="newTableWizardModal" style="display:none">
   <div class="modal" style="max-width:540px;width:96%">
-    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; إنشاء جدول جديد</h2>
+    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; Ø¥ÙØ´Ø§Ø¡ Ø¬Ø¯ÙÙ Ø¬Ø¯ÙØ¯</h2>
     <div class="step-indicator">
       <div class="step-dot active" id="wizDot1"></div>
       <div class="step-dot" id="wizDot2"></div>
@@ -1483,31 +1431,31 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <!-- Step 1: Name + cols/rows count -->
     <div class="wizard-step active" id="wizStep1">
       <div style="margin-bottom:12px;">
-        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">اسم الجدول</label>
-        <input type="text" id="wiz_tbl_name" placeholder="مثال: سجل التقدم" class="col-name-input">
+        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">Ø§Ø³Ù Ø§ÙØ¬Ø¯ÙÙ</label>
+        <input type="text" id="wiz_tbl_name" placeholder="ÙØ«Ø§Ù: Ø³Ø¬Ù Ø§ÙØªÙØ¯Ù" class="col-name-input">
       </div>
       <div style="display:flex;gap:12px;">
         <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">عدد الأعمدة</label>
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">Ø¹Ø¯Ø¯ Ø§ÙØ£Ø¹ÙØ¯Ø©</label>
           <input type="number" id="wiz_col_count" min="1" max="20" value="3" class="col-name-input" style="width:100%;">
         </div>
         <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">عدد الصفوف الابتدائية</label>
+          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">Ø¹Ø¯Ø¯ Ø§ÙØµÙÙÙ Ø§ÙØ§Ø¨ØªØ¯Ø§Ø¦ÙØ©</label>
           <input type="number" id="wiz_row_count" min="0" max="100" value="0" class="col-name-input" style="width:100%;">
         </div>
       </div>
       <div class="wizard-nav">
-        <button class="btn-cancel" onclick="closeNewTableWizard()">إلغاء</button>
-        <button class="btn-save" onclick="wizardStep1Next()">التالي &#8594;</button>
+        <button class="btn-cancel" onclick="closeNewTableWizard()">Ø¥ÙØºØ§Ø¡</button>
+        <button class="btn-save" onclick="wizardStep1Next()">Ø§ÙØªØ§ÙÙ &#8594;</button>
       </div>
     </div>
     <!-- Step 2: Column names -->
     <div class="wizard-step" id="wizStep2">
-      <p style="font-size:.9em;color:#555;margin-bottom:10px;">أدخل أسماء الأعمدة:</p>
+      <p style="font-size:.9em;color:#555;margin-bottom:10px;">Ø£Ø¯Ø®Ù Ø£Ø³ÙØ§Ø¡ Ø§ÙØ£Ø¹ÙØ¯Ø©:</p>
       <div id="wizColNamesContainer"></div>
       <div class="wizard-nav">
-        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; رجوع</button>
-        <button class="btn-save" onclick="wizardCreateTable()">&#10003; إنشاء الجدول</button>
+        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; Ø±Ø¬ÙØ¹</button>
+        <button class="btn-save" onclick="wizardCreateTable()">&#10003; Ø¥ÙØ´Ø§Ø¡ Ø§ÙØ¬Ø¯ÙÙ</button>
       </div>
     </div>
   </div>
@@ -1516,34 +1464,34 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- CUSTOM TABLE EDIT MODAL (add/delete/rename cols) -->
 <div class="modal-bg" id="customTableEditModal" style="display:none">
   <div class="modal" style="max-width:480px;width:96%">
-    <h2 id="customTableEditTitle" style="margin-bottom:12px;color:#1565C0;font-size:1.1em;">⚙ تعديل الجدول</h2>
+    <h2 id="customTableEditTitle" style="margin-bottom:12px;color:#1565C0;font-size:1.1em;">â ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</h2>
     <div style="display:flex;gap:6px;margin-bottom:14px;" id="customTblTabBtns">
-      <button class="btn-tab active" id="ctab1" onclick="switchCustomTab('add')">إضافة عمود</button>
-      <button class="btn-tab" id="ctab2" onclick="switchCustomTab('del')">حذف عمود</button>
-      <button class="btn-tab" id="ctab3" onclick="switchCustomTab('rename')">تعديل عنوان</button>
+      <button class="btn-tab active" id="ctab1" onclick="switchCustomTab('add')">Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯</button>
+      <button class="btn-tab" id="ctab2" onclick="switchCustomTab('del')">Ø­Ø°Ù Ø¹ÙÙØ¯</button>
+      <button class="btn-tab" id="ctab3" onclick="switchCustomTab('rename')">ØªØ¹Ø¯ÙÙ Ø¹ÙÙØ§Ù</button>
     </div>
     <div id="ctabPanelAdd">
-      <input type="text" id="ctbl_new_col_name" placeholder="اسم العمود الجديد" class="col-name-input">
-      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">مكان الإضافة:</div>
+      <input type="text" id="ctbl_new_col_name" placeholder="Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯ Ø§ÙØ¬Ø¯ÙØ¯" class="col-name-input">
+      <div style="margin:8px 0 4px 0;font-size:.85em;color:#555;">ÙÙØ§Ù Ø§ÙØ¥Ø¶Ø§ÙØ©:</div>
       <select id="ctbl_position" class="col-name-input" onchange="toggleCustomPosition()">
-        <option value="end">في النهاية</option>
-        <option value="start">في البداية</option>
-        <option value="after">بعد عمود:</option>
+        <option value="end">ÙÙ Ø§ÙÙÙØ§ÙØ©</option>
+        <option value="start">ÙÙ Ø§ÙØ¨Ø¯Ø§ÙØ©</option>
+        <option value="after">Ø¨Ø¹Ø¯ Ø¹ÙÙØ¯:</option>
       </select>
       <select id="ctbl_after_col" class="col-name-input" style="display:none;margin-top:6px;"></select>
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addCustomColumn()">إضافة</button>
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="addCustomColumn()">Ø¥Ø¶Ø§ÙØ©</button>
     </div>
     <div id="ctabPanelDel" style="display:none">
       <select id="ctbl_del_col" class="col-name-input"></select>
-      <button class="btn-delete" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteCustomColumn()">حذف العمود</button>
+      <button class="btn-delete" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;font-weight:700;cursor:pointer;background:#e53935;color:#fff;" onclick="deleteCustomColumn()">Ø­Ø°Ù Ø§ÙØ¹ÙÙØ¯</button>
     </div>
     <div id="ctabPanelRename" style="display:none">
       <select id="ctbl_rename_col" class="col-name-input" onchange="fillCustomRenameLabel()"></select>
-      <input type="text" id="ctbl_rename_label" placeholder="الاسم الجديد" class="col-name-input" style="margin-top:8px;">
-      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateCustomColumnLabel()">حفظ التعديل</button>
+      <input type="text" id="ctbl_rename_label" placeholder="Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯" class="col-name-input" style="margin-top:8px;">
+      <button class="btn-save" style="margin-top:10px;width:100%;" onclick="updateCustomColumnLabel()">Ø­ÙØ¸ Ø§ÙØªØ¹Ø¯ÙÙ</button>
     </div>
     <div style="margin-top:14px;text-align:left;">
-      <button class="btn-cancel" onclick="closeCustomTableEditModal()">إغلاق</button>
+      <button class="btn-cancel" onclick="closeCustomTableEditModal()">Ø¥ØºÙØ§Ù</button>
     </div>
   </div>
 </div>
@@ -1551,11 +1499,11 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- ADD ROW MODAL FOR CUSTOM TABLE -->
 <div class="modal-bg" id="customRowModal" style="display:none">
   <div class="modal" style="max-width:500px;width:96%">
-    <h2 id="customRowModalTitle" style="margin-bottom:14px;color:#1565C0;font-size:1.1em;">إضافة صف</h2>
+    <h2 id="customRowModalTitle" style="margin-bottom:14px;color:#1565C0;font-size:1.1em;">Ø¥Ø¶Ø§ÙØ© ØµÙ</h2>
     <div id="customRowFormFields" style="display:flex;flex-direction:column;gap:10px;"></div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
-      <button class="btn-cancel" onclick="closeCustomRowModal()">إلغاء</button>
-      <button class="btn-save" onclick="saveCustomRow()">حفظ</button>
+      <button class="btn-cancel" onclick="closeCustomRowModal()">Ø¥ÙØºØ§Ø¡</button>
+      <button class="btn-save" onclick="saveCustomRow()">Ø­ÙØ¸</button>
     </div>
   </div>
 </div>
@@ -1563,49 +1511,49 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 <!-- CONFIRM DELETE CUSTOM TABLE -->
 <div class="confirm-bg" id="customTableDeleteConfirm" style="display:none">
   <div class="confirm-box">
-    <p id="customTableDeleteMsg">هل تريد حذف هذا الجدول؟</p>
+    <p id="customTableDeleteMsg">ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù ÙØ°Ø§ Ø§ÙØ¬Ø¯ÙÙØ</p>
     <div style="display:flex;gap:10px;justify-content:center;">
-      <button class="btn-cancel" onclick="closeCustomTableDeleteConfirm()">إلغاء</button>
-      <button style="background:#e53935;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;" onclick="confirmCustomTableDelete()">حذف</button>
+      <button class="btn-cancel" onclick="closeCustomTableDeleteConfirm()">Ø¥ÙØºØ§Ø¡</button>
+      <button style="background:#e53935;color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;" onclick="confirmCustomTableDelete()">Ø­Ø°Ù</button>
     </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
-    <h2 id="groupModalTitle2" style="color:#0097A7;">اضافة مجموعة جديدة</h2>
+    <h2 id="groupModalTitle2" style="color:#0097A7;">Ø§Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø© Ø¬Ø¯ÙØ¯Ø©</h2>
     <input type="hidden" id="groupEditId2">
     <div class="form-grid">
-      <div class="field"><label style="color:#0097A7;">اسم المجموعة *</label><input id="gf2_group_name" placeholder="اسم المجموعة" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">اسم المدرس</label><input id="gf2_teacher_name" placeholder="اسم المدرس" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">المستوى / المقرر</label><input id="gf2_level_course" placeholder="مثال: المستوى 3" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">المقرر الذي تم الوصول اليه الفصل الفائت</label><input id="gf2_last_reached" placeholder="مثال: الوحدة 5" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">وقت الدراسة</label><input id="gf2_study_time" placeholder="مثال: السبت 4-5 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">توقيت شهر رمضان</label><input id="gf2_ramadan_time" placeholder="مثال: 8-9 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">توقيت الاونلاين (العادي)</label><input id="gf2_online_time" placeholder="مثال: 5-6 مساء" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">رابط المجموعة</label><input id="gf2_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field full"><label style="color:#0097A7;">الحصة بالدقيقة (يدوي)</label><input id="gf2_session_duration" placeholder="مثال: 60 دقيقة" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© *</label><input id="gf2_group_name" placeholder="Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³</label><input id="gf2_teacher_name" placeholder="Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">Ø§ÙÙØ³ØªÙÙ / Ø§ÙÙÙØ±Ø±</label><input id="gf2_level_course" placeholder="ÙØ«Ø§Ù: Ø§ÙÙØ³ØªÙÙ 3" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">Ø§ÙÙÙØ±Ø± Ø§ÙØ°Ù ØªÙ Ø§ÙÙØµÙÙ Ø§ÙÙÙ Ø§ÙÙØµÙ Ø§ÙÙØ§Ø¦Øª</label><input id="gf2_last_reached" placeholder="ÙØ«Ø§Ù: Ø§ÙÙØ­Ø¯Ø© 5" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©</label><input id="gf2_study_time" placeholder="ÙØ«Ø§Ù: Ø§ÙØ³Ø¨Øª 4-5 ÙØ³Ø§Ø¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ØªÙÙÙØª Ø´ÙØ± Ø±ÙØ¶Ø§Ù</label><input id="gf2_ramadan_time" placeholder="ÙØ«Ø§Ù: 8-9 ÙØ³Ø§Ø¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙ (Ø§ÙØ¹Ø§Ø¯Ù)</label><input id="gf2_online_time" placeholder="ÙØ«Ø§Ù: 5-6 ÙØ³Ø§Ø¡" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field"><label style="color:#0097A7;">Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©</label><input id="gf2_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
+      <div class="field full"><label style="color:#0097A7;">Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ© (ÙØ¯ÙÙ)</label><input id="gf2_session_duration" placeholder="ÙØ«Ø§Ù: 60 Ø¯ÙÙÙØ©" style="border-color:#b2ebf2;background:#f0fdff;"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="saveGroup2()">حفظ</button>
-      <button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupModal2()">الغاء</button>
+      <button class="btn-save" style="background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="saveGroup2()">Ø­ÙØ¸</button>
+      <button class="btn-cancel" style="background:#e0f7fa;color:#0097A7;" onclick="closeGroupModal2()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="groupConfirmModal2">
   <div class="confirm-box">
-    <h3>تاكيد الحذف</h3>
-    <p>هل انت متاكد من حذف هذه المجموعة؟</p>
+    <h3>ØªØ§ÙÙØ¯ Ø§ÙØ­Ø°Ù</h3>
+    <p>ÙÙ Ø§ÙØª ÙØªØ§ÙØ¯ ÙÙ Ø­Ø°Ù ÙØ°Ù Ø§ÙÙØ¬ÙÙØ¹Ø©Ø</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="groupConfirmDelBtn2">حذف</button>
-      <button class="btn-confirm-cancel" onclick="closeGroupConfirm2()">الغاء</button>
+      <button class="btn-confirm-del" id="groupConfirmDelBtn2">Ø­Ø°Ù</button>
+      <button class="btn-confirm-cancel" onclick="closeGroupConfirm2()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div>
 </div>
 <!-- GROUP TABLE EDIT MODAL -->
 <div class="modal-bg" id="groupTableEditModal">
 <div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
-<h2 style="color:#E55A2B;">&#9881; تعديل جدول المجموعات</h2>
+<h2 style="color:#E55A2B;">&#9881; ØªØ¹Ø¯ÙÙ Ø¬Ø¯ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</h2>
 <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e0f7fa;padding-bottom:10px;">
 <button id="gtab-add-col" onclick="switchGroupTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#1573;&#1590;&#1575;&#1601;&#1577; &#1593;&#1605;&#1608;&#1583;</button>
 <button id="gtab-del-col" onclick="switchGroupTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f7fa;color:#0097A7;font-weight:700;cursor:pointer;font-size:13px;">&#10060; &#1581;&#1584;&#1601; &#1593;&#1605;&#1608;&#1583;</button>
@@ -1646,7 +1594,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
-// ─── Taqseet (Payment Plans) Table ──────────────────────────────────────────
+// âââ Taqseet (Payment Plans) Table ââââââââââââââââââââââââââââââââââââââââââ
 var allTaqseet = null;
 var editingTaqseetId = null;
 
@@ -1661,7 +1609,7 @@ function loadTaqseet() {
 function renderTaqseet() {
   var tbody = document.getElementById('taqseetBody');
   if (!allTaqseet || !allTaqseet.length) {
-    tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">لا توجد بيانات</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§Øª</td></tr>';
     return;
   }
   var fields = ['taqseet_method','student_name','course_amount','num_installments',
@@ -1678,7 +1626,7 @@ function renderTaqseet() {
       '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
       cells +
       '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
-        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">حذف</button>' +
+        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">Ø­Ø°Ù</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -1712,25 +1660,25 @@ function openAddTaqseet() {
       inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
       inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
       study_hours:'', start_date:''})})
-    .then(function(){ loadTaqseet(); showToast('تم إضافة صف جديد', '#1a8754'); });
+    .then(function(){ loadTaqseet(); showToast('ØªÙ Ø¥Ø¶Ø§ÙØ© ØµÙ Ø¬Ø¯ÙØ¯', '#1a8754'); });
 }
 
 function deleteTaqseet(id) {
-  if (!confirm('هل تريد حذف هذا الصف؟')) return;
+  if (!confirm('ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù ÙØ°Ø§ Ø§ÙØµÙØ')) return;
   fetch('/api/taqseet/' + id, {method:'DELETE'}).then(function(){
     loadTaqseet();
-    showToast('تم الحذف','#c0392b');
+    showToast('ØªÙ Ø§ÙØ­Ø°Ù','#c0392b');
   });
 }
 
 function openTaqseetColModal() {
-  showToast('ميزة إضافة عمود مخصص قيد التطوير', '#FF6B35');
+  showToast('ÙÙØ²Ø© Ø¥Ø¶Ø§ÙØ© Ø¹ÙÙØ¯ ÙØ®ØµØµ ÙÙØ¯ Ø§ÙØªØ·ÙÙØ±', '#FF6B35');
 }
 
 function openTaqseetEditModal() {
-  showToast('ميزة تعديل الجدول قيد التطوير', '#9C27B0');
+  showToast('ÙÙØ²Ø© ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ ÙÙØ¯ Ø§ÙØªØ·ÙÙØ±', '#9C27B0');
 }
-// ─────────────────────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 let allStudents=[];
 let deleteTargetId=null;
@@ -1739,7 +1687,7 @@ function getTaqseetDetail(method){
   if(!method||!allTaqseetData.length)return '';
   var t=allTaqseetData.find(function(x){return x.taqseet_method===method;});
   if(!t)return '';
-  return 'طريقة '+method+' — مبلغ الدورة: '+(t.course_amount||'')+'، عدد الأقساط: '+(t.num_installments||'')+'، القسط الأول: '+(t.inst1||'')+'، القسط الثاني: '+(t.inst2||'');
+  return 'Ø·Ø±ÙÙØ© '+method+' â ÙØ¨ÙØº Ø§ÙØ¯ÙØ±Ø©: '+(t.course_amount||'')+'Ø Ø¹Ø¯Ø¯ Ø§ÙØ£ÙØ³Ø§Ø·: '+(t.num_installments||'')+'Ø Ø§ÙÙØ³Ø· Ø§ÙØ£ÙÙ: '+(t.inst1||'')+'Ø Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙÙ: '+(t.inst2||'');
 }
 function populateTaqseetDropdowns(){
   var selects=document.querySelectorAll('.installment-select');
@@ -1792,13 +1740,13 @@ var thead=document.querySelector('#studentsBody').closest('table').querySelector
 if(!thead)return;
 var html='<th>#</th>';
 for(var i=0;i<allColumns.length;i++){html+='<th>'+allColumns[i].col_label+'</th>';}
-html+='<th>اجراءات</th>';
+html+='<th>Ø§Ø¬Ø±Ø§Ø¡Ø§Øª</th>';
 thead.innerHTML=html;
 }
 function renderTable(list){
 var body=document.getElementById('studentsBody');
 var colCount=allColumns.length+2;
-if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">لا توجد بيانات، اضف اول طالب</td></tr>';return;}
+if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø§Ø¶Ù Ø§ÙÙ Ø·Ø§ÙØ¨</td></tr>';return;}
 var html='';
 for(var i=0;i<list.length;i++){
 var s2=list[i];
@@ -1809,9 +1757,9 @@ var val=s2[key]||'';
 if(key==='personal_id'){row+='<td><b>'+val+'</b></td>';}
 else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
 else if(key==='final_result'){
-var badge=val==='ناجح'?'badge-pass':val==='راسب'?'badge-fail':'badge-pend';
+var badge=val==='ÙØ§Ø¬Ø­'?'badge-pass':val==='Ø±Ø§Ø³Ø¨'?'badge-fail':'badge-pend';
 row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- اختر --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
+}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- Ø§Ø®ØªØ± --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
@@ -1822,16 +1770,16 @@ function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   renderTable(allStudents.filter(s=>(s.student_name||'').toLowerCase().includes(q)||(s.personal_id||'').toLowerCase().includes(q)));
 }
-function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة طالب جديد';document.getElementById('modal').classList.add('open');}
-function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='تعديل بيانات الطالب'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
-async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('الرقم الشخصي واسم الطالب مطلوبان','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'تم تعديل بيانات الطالب بنجاح':'تم اضافة الطالب بنجاح');loadStudents();} else{showToast(data.error||'حدث خطا','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
+function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='Ø§Ø¶Ø§ÙØ© Ø·Ø§ÙØ¨ Ø¬Ø¯ÙØ¯';document.getElementById('modal').classList.add('open');}
+function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').textContent='ØªØ¹Ø¯ÙÙ Ø¨ÙØ§ÙØ§Øª Ø§ÙØ·Ø§ÙØ¨'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
+async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ ÙØ§Ø³Ù Ø§ÙØ·Ø§ÙØ¨ ÙØ·ÙÙØ¨Ø§Ù','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'ØªÙ ØªØ¹Ø¯ÙÙ Ø¨ÙØ§ÙØ§Øª Ø§ÙØ·Ø§ÙØ¨ Ø¨ÙØ¬Ø§Ø­':'ØªÙ Ø§Ø¶Ø§ÙØ© Ø§ÙØ·Ø§ÙØ¨ Ø¨ÙØ¬Ø§Ø­');loadStudents();} else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
   if(!deleteTargetId)return;
   const res=await fetch('/api/students/'+deleteTargetId,{method:'DELETE'});
   const data=await res.json();
   closeConfirm();
-  if(data.ok){showToast('تم حذف الطالب بنجاح');loadStudents();}
-  else{showToast(data.error||'حدث خطا في الحذف','#e53935');}
+  if(data.ok){showToast('ØªÙ Ø­Ø°Ù Ø§ÙØ·Ø§ÙØ¨ Ø¨ÙØ¬Ø§Ø­');loadStudents();}
+  else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§ ÙÙ Ø§ÙØ­Ø°Ù','#e53935');}
   deleteTargetId=null;
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
@@ -1888,13 +1836,13 @@ function clearGroupForm2(){
   for(var x=0;x<ids.length;x++){var el=document.getElementById('gf2_'+ids[x]);if(el)el.value='';}
   document.getElementById('groupEditId2').value='';
 }
-function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='اضافة مجموعة جديدة';document.getElementById('groupModal2').classList.add('open');}
+function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='Ø§Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø© Ø¬Ø¯ÙØ¯Ø©';document.getElementById('groupModal2').classList.add('open');}
 function openGroupEdit2(id){
   var g=null;
   for(var x=0;x<allGroups2.length;x++){if(allGroups2[x].id===id){g=allGroups2[x];break;}}
   if(!g)return;
   document.getElementById('groupEditId2').value=id;
-  document.getElementById('groupModalTitle2').textContent='تعديل بيانات المجموعة';
+  document.getElementById('groupModalTitle2').textContent='ØªØ¹Ø¯ÙÙ Ø¨ÙØ§ÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø©';
   document.getElementById('gf2_group_name').value=g.group_name||'';
   document.getElementById('gf2_teacher_name').value=g.teacher_name||'';
   document.getElementById('gf2_level_course').value=g.level_course||'';
@@ -1920,26 +1868,26 @@ function saveGroup2(){
     group_link:document.getElementById('gf2_group_link').value.trim(),
     session_duration:document.getElementById('gf2_session_duration').value.trim()
   };
-  if(!bd.group_name){showToast('اسم المجموعة مطلوب','#e53935');return;}
+  if(!bd.group_name){showToast('Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© ÙØ·ÙÙØ¨','#e53935');return;}
   var url=editId?'/api/groups/'+editId:'/api/groups';
   var method=editId?'PUT':'POST';
   fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(bd)}).then(function(r){return r.json();}).then(function(data){
-    if(data.ok){closeGroupModal2();showToast(editId?'تم تعديل المجموعة':'تم اضافة المجموعة','#00BCD4');loadGroups2();}
-    else{showToast(data.error||'حدث خطا','#e53935');}
-  }).catch(function(){showToast('حدث خطا','#e53935');});
+    if(data.ok){closeGroupModal2();showToast(editId?'ØªÙ ØªØ¹Ø¯ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø©':'ØªÙ Ø§Ø¶Ø§ÙØ© Ø§ÙÙØ¬ÙÙØ¹Ø©','#00BCD4');loadGroups2();}
+    else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
+  }).catch(function(){showToast('Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');});
 }
 function askGroupDelete2(id){groupDeleteTargetId2=id;document.getElementById('groupConfirmModal2').classList.add('open');document.getElementById('groupConfirmDelBtn2').onclick=confirmGroupDelete2;}
 function confirmGroupDelete2(){
   if(!groupDeleteTargetId2)return;
   fetch('/api/groups/'+groupDeleteTargetId2,{method:'DELETE',credentials:'include'}).then(function(r){return r.json();}).then(function(data){
     closeGroupConfirm2();
-    if(data.ok){showToast('تم حذف المجموعة','#00BCD4');loadGroups2();}
-    else{showToast(data.error||'حدث خطا','#e53935');}
+    if(data.ok){showToast('ØªÙ Ø­Ø°Ù Ø§ÙÙØ¬ÙÙØ¹Ø©','#00BCD4');loadGroups2();}
+    else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
     groupDeleteTargetId2=null;
   }).catch(function(){closeGroupConfirm2();});
 }
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
-var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="لم يتم اختيار ملف";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("الملف فارغ","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="تم قراءة "+parsed.length+" طالب. اضغط استيراد.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("الملف فارغ","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="تم قراءة "+parsed.length+" مجموعة. اضغط استيراد.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("لا توجد بيانات","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="جاري الاستيراد...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("انتهت الجلسة، سجل الدخول مجددا","#e53935");btn.disabled=false;btn.textContent="استيراد";return;}if(data.ok){closeStudentExcelModal();showToast("تم استيراد "+data.imported+" طالب بنجاح");loadStudents();}else{showToast("حدث خطا","#e53935");}btn.disabled=false;btn.textContent="استيراد";}).catch(function(){showToast("حدث خطا في الاستيراد","#e53935");btn.disabled=false;btn.textContent="استيراد";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="لم يتم اختيار ملف";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("لا توجد بيانات","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="جاري الاستيراد...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("انتهت الجلسة، سجل الدخول مجددا","#e53935");btn.disabled=false;btn.textContent="استيراد";return;}if(data.ok){closeGroupExcelModal();showToast("تم استيراد "+data.imported+" مجموعة بنجاح","#00BCD4");loadGroups2();}else{showToast("حدث خطا","#e53935");}btn.disabled=false;btn.textContent="استيراد";}).catch(function(){showToast("حدث خطا في الاستيراد","#e53935");btn.disabled=false;btn.textContent="استيراد";});}
+var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="ÙÙ ÙØªÙ Ø§Ø®ØªÙØ§Ø± ÙÙÙ";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("Ø§ÙÙÙÙ ÙØ§Ø±Øº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="ØªÙ ÙØ±Ø§Ø¡Ø© "+parsed.length+" Ø·Ø§ÙØ¨. Ø§Ø¶ØºØ· Ø§Ø³ØªÙØ±Ø§Ø¯.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("Ø§ÙÙÙÙ ÙØ§Ø±Øº","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="ØªÙ ÙØ±Ø§Ø¡Ø© "+parsed.length+" ÙØ¬ÙÙØ¹Ø©. Ø§Ø¶ØºØ· Ø§Ø³ØªÙØ±Ø§Ø¯.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§Øª","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="Ø¬Ø§Ø±Ù Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("Ø§ÙØªÙØª Ø§ÙØ¬ÙØ³Ø©Ø Ø³Ø¬Ù Ø§ÙØ¯Ø®ÙÙ ÙØ¬Ø¯Ø¯Ø§","#e53935");btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";return;}if(data.ok){closeStudentExcelModal();showToast("ØªÙ Ø§Ø³ØªÙØ±Ø§Ø¯ "+data.imported+" Ø·Ø§ÙØ¨ Ø¨ÙØ¬Ø§Ø­");loadStudents();}else{showToast("Ø­Ø¯Ø« Ø®Ø·Ø§","#e53935");}btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";}).catch(function(){showToast("Ø­Ø¯Ø« Ø®Ø·Ø§ ÙÙ Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯","#e53935");btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="ÙÙ ÙØªÙ Ø§Ø®ØªÙØ§Ø± ÙÙÙ";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§Øª","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="Ø¬Ø§Ø±Ù Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("Ø§ÙØªÙØª Ø§ÙØ¬ÙØ³Ø©Ø Ø³Ø¬Ù Ø§ÙØ¯Ø®ÙÙ ÙØ¬Ø¯Ø¯Ø§","#e53935");btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";return;}if(data.ok){closeGroupExcelModal();showToast("ØªÙ Ø§Ø³ØªÙØ±Ø§Ø¯ "+data.imported+" ÙØ¬ÙÙØ¹Ø© Ø¨ÙØ¬Ø§Ø­","#00BCD4");loadGroups2();}else{showToast("Ø­Ø¯Ø« Ø®Ø·Ø§","#e53935");}btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";}).catch(function(){showToast("Ø­Ø¯Ø« Ø®Ø·Ø§ ÙÙ Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯","#e53935");btn.disabled=false;btn.textContent="Ø§Ø³ØªÙØ±Ø§Ø¯";});}
 loadGroups2();
 function openTableEditModal(){
   loadColumnsForEdit();
@@ -1962,9 +1910,9 @@ function loadColumnsForEdit(){
     var delSel=document.getElementById('del_col_key');
     var editSel=document.getElementById('edit_col_key');
     var afterSel=document.getElementById('new_col_after');
-    delSel.innerHTML='<option value="">— اختر عمود —</option>';
-    editSel.innerHTML='<option value="">— اختر عمود —</option>';
-    afterSel.innerHTML='<option value="">— اختر العمود —</option>';
+    delSel.innerHTML='<option value="">â Ø§Ø®ØªØ± Ø¹ÙÙØ¯ â</option>';
+    editSel.innerHTML='<option value="">â Ø§Ø®ØªØ± Ø¹ÙÙØ¯ â</option>';
+    afterSel.innerHTML='<option value="">â Ø§Ø®ØªØ± Ø§ÙØ¹ÙÙØ¯ â</option>';
     for(var i=0;i<cols.length;i++){
       delSel.innerHTML+='<option value="'+cols[i].col_key+'">'+cols[i].col_label+'</option>';
       editSel.innerHTML+='<option value="'+cols[i].col_key+'" data-label="'+cols[i].col_label+'">'+cols[i].col_label+'</option>';
@@ -1984,36 +1932,36 @@ function togglePositionCol(){
 }
 function addColumn(){
   var label=document.getElementById('new_col_label').value.trim();
-  if(!label){showToast('ادخل عنوان العمود','#e53935');return;}
+  if(!label){showToast('Ø§Ø¯Ø®Ù Ø¹ÙÙØ§Ù Ø§ÙØ¹ÙÙØ¯','#e53935');return;}
   var posVal=document.getElementById('new_col_position').value;
   var afterCol=document.getElementById('new_col_after').value;
   var key='col_'+Date.now();
   var payload={col_key:key,col_label:label,position:posVal};
   if(posVal==='after'&&afterCol){payload.after_col=afterCol;}
   fetch('/api/columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
-    if(d.ok){document.getElementById('new_col_label').value='';document.getElementById('new_col_position').value='end';togglePositionCol();closeTableEditModal();showToast('تم إضافة العمود بنجاح');loadStudents();}
-    else{showToast(d.error||'حدث خطا','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('Ø§ÙØªÙØª Ø§ÙØ¬ÙØ³Ø©Ø Ø³Ø¬Ù Ø§ÙØ¯Ø®ÙÙ ÙØ¬Ø¯Ø¯Ø§','#e53935');return;}
+    if(d.ok){document.getElementById('new_col_label').value='';document.getElementById('new_col_position').value='end';togglePositionCol();closeTableEditModal();showToast('ØªÙ Ø¥Ø¶Ø§ÙØ© Ø§ÙØ¹ÙÙØ¯ Ø¨ÙØ¬Ø§Ø­');loadStudents();}
+    else{showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
   });
 }
 function deleteColumn(){
   var key=document.getElementById('del_col_key').value;
-  if(!key){showToast('اختر عمودا','#e53935');return;}
-  if(!confirm('هل أنت متأكد من حذف هذا العمود؟ سيتم حذف جميع بياناته.'))return;
+  if(!key){showToast('Ø§Ø®ØªØ± Ø¹ÙÙØ¯Ø§','#e53935');return;}
+  if(!confirm('ÙÙ Ø£ÙØª ÙØªØ£ÙØ¯ ÙÙ Ø­Ø°Ù ÙØ°Ø§ Ø§ÙØ¹ÙÙØ¯Ø Ø³ÙØªÙ Ø­Ø°Ù Ø¬ÙÙØ¹ Ø¨ÙØ§ÙØ§ØªÙ.'))return;
   fetch('/api/columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
-    if(d.ok){closeTableEditModal();showToast('تم حذف العمود');loadStudents();}
-    else{showToast(d.error||'حدث خطا','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('Ø§ÙØªÙØª Ø§ÙØ¬ÙØ³Ø©Ø Ø³Ø¬Ù Ø§ÙØ¯Ø®ÙÙ ÙØ¬Ø¯Ø¯Ø§','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('ØªÙ Ø­Ø°Ù Ø§ÙØ¹ÙÙØ¯');loadStudents();}
+    else{showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
   });
 }
 function updateColumnLabel(){
   var key=document.getElementById('edit_col_key').value;
   var label=document.getElementById('edit_col_label').value.trim();
-  if(!key||!label){showToast('اختر عمودا وادخل الاسم','#e53935');return;}
+  if(!key||!label){showToast('Ø§Ø®ØªØ± Ø¹ÙÙØ¯Ø§ ÙØ§Ø¯Ø®Ù Ø§ÙØ§Ø³Ù','#e53935');return;}
   fetch('/api/columns/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('انتهت الجلسة، سجل الدخول مجددا','#e53935');return;}
-    if(d.ok){closeTableEditModal();showToast('تم تعديل العنوان');loadStudents();}
-    else{showToast(d.error||'حدث خطا','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('Ø§ÙØªÙØª Ø§ÙØ¬ÙØ³Ø©Ø Ø³Ø¬Ù Ø§ÙØ¯Ø®ÙÙ ÙØ¬Ø¯Ø¯Ø§','#e53935');return;}
+    if(d.ok){closeTableEditModal();showToast('ØªÙ ØªØ¹Ø¯ÙÙ Ø§ÙØ¹ÙÙØ§Ù');loadStudents();}
+    else{showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
   });
 }
 
@@ -2111,7 +2059,7 @@ function loadAttendance() {
 function renderAttendanceTable(data) {
   var tbody = document.getElementById('attendanceBody');
   if(!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" class="no-data">لا توجد سجلات، اضف أول سجل</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø³Ø¬ÙØ§ØªØ Ø§Ø¶Ù Ø£ÙÙ Ø³Ø¬Ù</td></tr>';
     return;
   }
   var html = '';
@@ -2144,7 +2092,7 @@ function filterAttendanceTable() {
 
 function openAttendanceAddModal() {
   editingAttendanceId = null;
-  document.getElementById('attendanceModalTitle').textContent = 'إضافة سجل غياب';
+  document.getElementById('attendanceModalTitle').textContent = 'Ø¥Ø¶Ø§ÙØ© Ø³Ø¬Ù ØºÙØ§Ø¨';
   document.getElementById('att_date').value = '';
   document.getElementById('att_day').value = '';
   document.getElementById('att_group').value = '';
@@ -2178,8 +2126,8 @@ function saveAttendanceRecord() {
   var method = editingAttendanceId ? 'PUT' : 'POST';
   fetch(url, {method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ closeAttendanceModal(); showToast('تم الحفظ','#4CAF50'); loadAttendance(); loadTaqseet(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ closeAttendanceModal(); showToast('ØªÙ Ø§ÙØ­ÙØ¸','#4CAF50'); loadAttendance(); loadTaqseet(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
@@ -2195,16 +2143,16 @@ function editAttendanceCell(id, field, tdEl) {
   var oldVal = tdEl.textContent.trim();
   var input;
   var selectOptions = {
-    'status': ['','حاضر','غائب','متأخر','معتذر'],
-    'message_status': ['','تم الإرسال','لم يُرسل','فشل الإرسال'],
-    'study_status': ['','مستمر','منقطع','موقوف']
+    'status': ['','Ø­Ø§Ø¶Ø±','ØºØ§Ø¦Ø¨','ÙØªØ£Ø®Ø±','ÙØ¹ØªØ°Ø±'],
+    'message_status': ['','ØªÙ Ø§ÙØ¥Ø±Ø³Ø§Ù','ÙÙ ÙÙØ±Ø³Ù','ÙØ´Ù Ø§ÙØ¥Ø±Ø³Ø§Ù'],
+    'study_status': ['','ÙØ³ØªÙØ±','ÙÙÙØ·Ø¹','ÙÙÙÙÙ']
   };
   if(selectOptions[field]) {
     input = document.createElement('select');
     input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
     selectOptions[field].forEach(function(v){
       var o = document.createElement('option');
-      o.value = v; o.textContent = v||'-- اختر --';
+      o.value = v; o.textContent = v||'-- Ø§Ø®ØªØ± --';
       if(v === oldVal) o.selected = true;
       input.appendChild(o);
     });
@@ -2239,8 +2187,8 @@ function editAttendanceCell(id, field, tdEl) {
     updated[field] = newVal;
     fetch('/api/attendance/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('تم التحديث','#4CAF50'); loadAttendance(); }
-        else { showToast(d.error||'حدث خطأ','#e53935'); loadAttendance(); }
+        if(d.ok){ showToast('ØªÙ Ø§ÙØªØ­Ø¯ÙØ«','#4CAF50'); loadAttendance(); }
+        else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); loadAttendance(); }
       });
   }
   input.addEventListener('blur', saveCell);
@@ -2261,14 +2209,14 @@ function confirmAttendanceDelete() {
   fetch('/api/attendance/' + deletingAttendanceId, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
       closeAttendanceConfirm();
-      if(d.ok){ showToast('تم الحذف','#e53935'); loadAttendance(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø§ÙØ­Ø°Ù','#e53935'); loadAttendance(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
 loadAttendance();
 
-// ─── Custom Tables JS ────────────────────────────────────────────────────────
+// âââ Custom Tables JS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 var allCustomTables = [];
 var currentCustomTableId = null;
 var editingCustomRowId = null;
@@ -2303,7 +2251,7 @@ function buildCustomTableHTML(t) {
 
   var bodyRows = '';
   if(rows.length === 0) {
-    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">لا توجد بيانات، أضف أول صف</td></tr>';
+    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø£Ø¶Ù Ø£ÙÙ ØµÙ</td></tr>';
   } else {
     for(var j=0; j<rows.length; j++) {
       var r = rows[j];
@@ -2324,16 +2272,16 @@ function buildCustomTableHTML(t) {
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
     '<span class="custom-table-title">&#128203; ' + t.tbl_name + '</span>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ إضافة صف</button>' +
-    '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; تعديل الجدول</button>' +
-    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; حذف الجدول</button>' +
+    '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ Ø¥Ø¶Ø§ÙØ© ØµÙ</button>' +
+    '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; ØªØ¹Ø¯ÙÙ Ø§ÙØ¬Ø¯ÙÙ</button>' +
+    '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; Ø­Ø°Ù Ø§ÙØ¬Ø¯ÙÙ</button>' +
     '</div></div>' +
     '<div class="table-wrap"><table>' +
     '<thead><tr id="cthead_' + t.id + '">' + headerCells + '</tr></thead>' +
     '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
     '</table></div></div>';
 }
-// ── Wizard ────────────────────────────────────────────────────────────────────
+// ââ Wizard ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function openNewTableWizard() {
   document.getElementById('wiz_tbl_name').value = '';
   document.getElementById('wiz_col_count').value = '3';
@@ -2352,15 +2300,15 @@ function closeNewTableWizard() {
 function wizardStep1Next() {
   var name = document.getElementById('wiz_tbl_name').value.trim();
   var cols = parseInt(document.getElementById('wiz_col_count').value) || 1;
-  if(!name) { showToast('أدخل اسم الجدول','#e53935'); return; }
-  if(cols < 1 || cols > 20) { showToast('عدد الأعمدة يجب أن يكون 1-20','#e53935'); return; }
+  if(!name) { showToast('Ø£Ø¯Ø®Ù Ø§Ø³Ù Ø§ÙØ¬Ø¯ÙÙ','#e53935'); return; }
+  if(cols < 1 || cols > 20) { showToast('Ø¹Ø¯Ø¯ Ø§ÙØ£Ø¹ÙØ¯Ø© ÙØ¬Ø¨ Ø£Ù ÙÙÙÙ 1-20','#e53935'); return; }
   var container = document.getElementById('wizColNamesContainer');
   container.innerHTML = '';
   for(var i=0; i<cols; i++) {
     var inp = document.createElement('input');
     inp.type = 'text';
     inp.className = 'col-name-input';
-    inp.placeholder = 'اسم العمود ' + (i+1);
+    inp.placeholder = 'Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯ ' + (i+1);
     inp.id = 'wizCol_' + i;
     container.appendChild(inp);
   }
@@ -2384,29 +2332,29 @@ function wizardCreateTable() {
   var cols = [];
   for(var i=0; i<colInputs.length; i++) {
     var v = colInputs[i].value.trim();
-    cols.push(v || ('عمود ' + (i+1)));
+    cols.push(v || ('Ø¹ÙÙØ¯ ' + (i+1)));
   }
   var payload = { tbl_name: name, cols: cols, row_count: rowCount };
   fetch('/api/custom-tables', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(function(r){ return r.json(); }).then(function(d){
       if(d.ok) {
         closeNewTableWizard();
-        showToast('تم إنشاء الجدول','#4CAF50');
+        showToast('ØªÙ Ø¥ÙØ´Ø§Ø¡ Ø§ÙØ¬Ø¯ÙÙ','#4CAF50');
         loadCustomTables();
       } else {
-        showToast(d.error||'حدث خطأ','#e53935');
+        showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935');
       }
     });
 }
 
-// ── Row add/edit ───────────────────────────────────────────────────────────────
+// ââ Row add/edit âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function openCustomRowModal(tid) {
   currentCustomTableId = tid;
   editingCustomRowId = null;
   var t = null;
   for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
   if(!t) return;
-  document.getElementById('customRowModalTitle').textContent = 'إضافة صف - ' + t.tbl_name;
+  document.getElementById('customRowModalTitle').textContent = 'Ø¥Ø¶Ø§ÙØ© ØµÙ - ' + t.tbl_name;
   var fields = document.getElementById('customRowFormFields');
   fields.innerHTML = '';
   var cols = t.cols || [];
@@ -2444,20 +2392,20 @@ function saveCustomRow() {
   }
   fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: row_data})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok) { closeCustomRowModal(); showToast('تم الحفظ','#4CAF50'); loadCustomTables(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok) { closeCustomRowModal(); showToast('ØªÙ Ø§ÙØ­ÙØ¸','#4CAF50'); loadCustomTables(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
 function deleteCustomRow(tid, rid) {
   fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok) { showToast('تم الحذف','#e53935'); loadCustomTables(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok) { showToast('ØªÙ Ø§ÙØ­Ø°Ù','#e53935'); loadCustomTables(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
-// ── Inline cell edit ──────────────────────────────────────────────────────────
+// ââ Inline cell edit ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function editCustomCell(tdEl) {
   if(tdEl.querySelector('input')) return;
   var tid = parseInt(tdEl.getAttribute('data-tid'));
@@ -2485,21 +2433,21 @@ function editCustomCell(tdEl) {
     updated[ckey] = newVal;
     fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('تم التحديث','#4CAF50'); loadCustomTables(); }
-        else{ showToast(d.error||'حدث خطأ','#e53935'); loadCustomTables(); }
+        if(d.ok){ showToast('ØªÙ Ø§ÙØªØ­Ø¯ÙØ«','#4CAF50'); loadCustomTables(); }
+        else{ showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); loadCustomTables(); }
       });
   }
   input.addEventListener('blur', saveCell);
   input.addEventListener('keydown', function(e){ if(e.key==='Enter') input.blur(); });
 }
 
-// ── Table edit modal (add/delete/rename cols) ─────────────────────────────────
+// ââ Table edit modal (add/delete/rename cols) âââââââââââââââââââââââââââââââââ
 function openCustomTableEditModal(tid) {
   currentCustomTableId = tid;
   var t = null;
   for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
   if(!t) return;
-  document.getElementById('customTableEditTitle').textContent = 'تعديل جدول: ' + t.tbl_name;
+  document.getElementById('customTableEditTitle').textContent = 'ØªØ¹Ø¯ÙÙ Ø¬Ø¯ÙÙ: ' + t.tbl_name;
   switchCustomTab('add');
   loadCustomColsForEdit(t);
   document.getElementById('customTableEditModal').style.display = 'flex';
@@ -2561,14 +2509,14 @@ function fillCustomRenameLabel() {
 function addCustomColumn() {
   var tid = currentCustomTableId;
   var col_label = document.getElementById('ctbl_new_col_name').value.trim();
-  if(!col_label) { showToast('أدخل اسم العمود','#e53935'); return; }
+  if(!col_label) { showToast('Ø£Ø¯Ø®Ù Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯','#e53935'); return; }
   var position = document.getElementById('ctbl_position').value;
   var after_key = document.getElementById('ctbl_after_col').value;
   var payload = { col_label: col_label, position: position, after_key: after_key };
   fetch('/api/custom-tables/' + tid + '/cols', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم إضافة العمود','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø¥Ø¶Ø§ÙØ© Ø§ÙØ¹ÙÙØ¯','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
@@ -2578,8 +2526,8 @@ function deleteCustomColumn() {
   if(!col_key) return;
   fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم الحذف','#e53935'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø§ÙØ­Ø°Ù','#e53935'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
@@ -2587,15 +2535,15 @@ function updateCustomColumnLabel() {
   var tid = currentCustomTableId;
   var col_key = document.getElementById('ctbl_rename_col').value;
   var new_label = document.getElementById('ctbl_rename_label').value.trim();
-  if(!new_label || !col_key) { showToast('أدخل الاسم الجديد','#e53935'); return; }
+  if(!new_label || !col_key) { showToast('Ø£Ø¯Ø®Ù Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯','#e53935'); return; }
   fetch('/api/custom-tables/' + tid + '/cols/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label: new_label})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم تعديل العنوان','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
-      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ ØªØ¹Ø¯ÙÙ Ø§ÙØ¹ÙÙØ§Ù','#00BCD4'); loadCustomTables(); closeCustomTableEditModal(); }
+      else{ showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
-// ── Delete table ──────────────────────────────────────────────────────────────
+// ââ Delete table ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function openCustomTableDeleteConfirmById(btn) {
   var tid = parseInt(btn.getAttribute('data-tid'));
   var t = null;
@@ -2606,7 +2554,7 @@ function openCustomTableDeleteConfirmById(btn) {
 
 function openCustomTableDeleteConfirm(tid, name) {
   deletingCustomTableId = tid;
-  document.getElementById('customTableDeleteMsg').textContent = 'هل تريد حذف جدول "' + name + '"؟ سيتم حذف جميع البيانات.';
+  document.getElementById('customTableDeleteMsg').textContent = 'ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù Ø¬Ø¯ÙÙ "' + name + '"Ø Ø³ÙØªÙ Ø­Ø°Ù Ø¬ÙÙØ¹ Ø§ÙØ¨ÙØ§ÙØ§Øª.';
   document.getElementById('customTableDeleteConfirm').style.display = 'flex';
 }
 function closeCustomTableDeleteConfirm() {
@@ -2619,20 +2567,20 @@ function confirmCustomTableDelete() {
   fetch('/api/custom-tables/' + deletingCustomTableId, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
       closeCustomTableDeleteConfirm();
-      if(d.ok){ showToast('تم حذف الجدول','#e53935'); loadCustomTables(); }
-      else{ showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø­Ø°Ù Ø§ÙØ¬Ø¯ÙÙ','#e53935'); loadCustomTables(); }
+      else{ showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
-// ── Import stub (placeholder) ─────────────────────────────────────────────────
+// ââ Import stub (placeholder) âââââââââââââââââââââââââââââââââââââââââââââââââ
 function openCustomImportModal(tid) {
-  showToast('ميزة الاستيراد قريباً','#FF9800');
+  showToast('ÙÙØ²Ø© Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯ ÙØ±ÙØ¨Ø§Ù','#FF9800');
 }
 
 // Load custom tables on page load
 loadCustomTables();
 
-// ─── Attendance Excel Import ──────────────────────────────────────────────────
+// âââ Attendance Excel Import ââââââââââââââââââââââââââââââââââââââââââââââââââ
 var attendanceExcelRows = [];
 
 function openAttendanceExcelModal() {
@@ -2661,10 +2609,10 @@ function readAttendanceExcelFile(input) {
       // Skip header row (row 0)
       var dataRows = rows.slice(1).filter(function(r) { return r.some(function(c){ return String(c).trim() !== ''; }); });
       attendanceExcelRows = dataRows;
-      document.getElementById('attendanceExcelStatus').textContent = 'تم قراءة ' + dataRows.length + ' صف. اضغط استيراد.';
+      document.getElementById('attendanceExcelStatus').textContent = 'ØªÙ ÙØ±Ø§Ø¡Ø© ' + dataRows.length + ' ØµÙ. Ø§Ø¶ØºØ· Ø§Ø³ØªÙØ±Ø§Ø¯.';
       document.getElementById('attendanceExcelImportBtn').style.display = dataRows.length > 0 ? 'inline-flex' : 'none';
     } catch(err) {
-      document.getElementById('attendanceExcelStatus').textContent = 'خطأ في قراءة الملف: ' + err.message;
+      document.getElementById('attendanceExcelStatus').textContent = 'Ø®Ø·Ø£ ÙÙ ÙØ±Ø§Ø¡Ø© Ø§ÙÙÙÙ: ' + err.message;
     }
   };
   reader.readAsArrayBuffer(file);
@@ -2683,7 +2631,7 @@ function importAttendanceFromExcel() {
   var statusEl = document.getElementById('attendanceExcelStatus');
   function sendNext(idx) {
     if(idx >= total) {
-      statusEl.textContent = 'تم استيراد ' + done + ' سجل بنجاح!';
+      statusEl.textContent = 'ØªÙ Ø§Ø³ØªÙØ±Ø§Ø¯ ' + done + ' Ø³Ø¬Ù Ø¨ÙØ¬Ø§Ø­!';
       loadAttendance();
       setTimeout(closeAttendanceExcelModal, 1500);
       return;
@@ -2691,14 +2639,14 @@ function importAttendanceFromExcel() {
     fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(batch[idx])})
       .then(function(r){ return r.json(); }).then(function(d){
         if(d.ok) done++;
-        statusEl.textContent = 'جاري الاستيراد... ' + (idx+1) + ' / ' + total;
+        statusEl.textContent = 'Ø¬Ø§Ø±Ù Ø§ÙØ§Ø³ØªÙØ±Ø§Ø¯... ' + (idx+1) + ' / ' + total;
         sendNext(idx+1);
       }).catch(function(){ sendNext(idx+1); });
   }
   sendNext(0);
 }
 
-// ─── Attendance Column Management ────────────────────────────────────────────
+// âââ Attendance Column Management ââââââââââââââââââââââââââââââââââââââââââââ
 var allAttColumns = [];
 
 function loadAttColumns(callback) {
@@ -2756,13 +2704,13 @@ function fillAttRenameLabel() {
 
 function addAttendanceColumn() {
   var col_label = document.getElementById('att_new_col_name').value.trim();
-  if(!col_label){ showToast('أدخل اسم العمود','#e53935'); return; }
+  if(!col_label){ showToast('Ø£Ø¯Ø®Ù Ø§Ø³Ù Ø§ÙØ¹ÙÙØ¯','#e53935'); return; }
   var position = document.getElementById('att_col_position').value;
   var after_key = document.getElementById('att_after_col').value;
   fetch('/api/att-columns', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:col_label, position:position, after_key:after_key})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم إضافة العمود','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø¥Ø¶Ø§ÙØ© Ø§ÙØ¹ÙÙØ¯','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
@@ -2771,19 +2719,19 @@ function deleteAttendanceColumn() {
   if(!col_key) return;
   fetch('/api/att-columns/' + col_key, {method:'DELETE'})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم الحذف','#e53935'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ Ø§ÙØ­Ø°Ù','#e53935'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 
 function updateAttendanceColumnLabel() {
   var col_key = document.getElementById('att_rename_col').value;
   var new_label = document.getElementById('att_rename_label').value.trim();
-  if(!new_label||!col_key){ showToast('أدخل الاسم الجديد','#e53935'); return; }
+  if(!new_label||!col_key){ showToast('Ø£Ø¯Ø®Ù Ø§ÙØ§Ø³Ù Ø§ÙØ¬Ø¯ÙØ¯','#e53935'); return; }
   fetch('/api/att-columns/' + col_key, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({col_label:new_label})})
     .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok){ showToast('تم تعديل العنوان','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
-      else { showToast(d.error||'حدث خطأ','#e53935'); }
+      if(d.ok){ showToast('ØªÙ ØªØ¹Ø¯ÙÙ Ø§ÙØ¹ÙÙØ§Ù','#00BCD4'); closeAttendanceTableEditModal(); loadAttendance(); }
+      else { showToast(d.error||'Ø­Ø¯Ø« Ø®Ø·Ø£','#e53935'); }
     });
 }
 </script>
@@ -2825,7 +2773,7 @@ def login():
     user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
                       (username, hp(password))).fetchone()
     if not user:
-        return render_login("اسم المستخدم او كلمة المرور غلط"), 401
+        return render_login("Ø§Ø³Ù Ø§ÙÙØ³ØªØ®Ø¯Ù Ø§Ù ÙÙÙØ© Ø§ÙÙØ±ÙØ± ØºÙØ·"), 401
     session["user"] = dict(user)
     return redirect("/dashboard")
 
@@ -2964,17 +2912,17 @@ def api_columns_get():
         is_visible INTEGER DEFAULT 1)""")
     if db.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
-            ("personal_id","الرقم الشخصي",1),("student_name","اسم الطالب",2),("whatsapp","هاتف الواتساب المعتمد",3),
-            ("class_name","الصف",4),("old_new_2026","قديم جديد 2026",5),("registration_term2_2026","تسجيل الفصل الثاني 2026",6),
-            ("group_name_student","المجموعة",7),("group_online","المجموعة (الاونلاين)",8),
-            ("final_result","النتيجة النهائية (تحديد المستوى 2026)",9),
-            ("level_reached_2026","الى اين وصل الطالب 2026",10),("suitable_level_2026","هل الطالب مناسب لهذا المستوى 2026؟",11),
-            ("books_received","استلام الكتب",12),("teacher_2026","المدرس 2026",13),
-            ("installment1","القسط الاول 2026",14),("installment2","القسط الثاني",15),("installment3","القسط الثالث",16),
-            ("installment4","القسط الرابع",17),("installment5","القسط الخامس",18),
-            ("mother_phone","هاتف الام",19),("father_phone","هاتف الاب",20),("other_phone","هاتف اخر",21),
-            ("residence","مكان السكن",22),("home_address","عنوان المنزل",23),("road","الطريق",24),("complex_name","المجمع",25),
-            ("installment_type","اختيار نوع التقسيط",26),
+            ("personal_id","Ø§ÙØ±ÙÙ Ø§ÙØ´Ø®ØµÙ",1),("student_name","Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨",2),("whatsapp","ÙØ§ØªÙ Ø§ÙÙØ§ØªØ³Ø§Ø¨ Ø§ÙÙØ¹ØªÙØ¯",3),
+            ("class_name","Ø§ÙØµÙ",4),("old_new_2026","ÙØ¯ÙÙ Ø¬Ø¯ÙØ¯ 2026",5),("registration_term2_2026","ØªØ³Ø¬ÙÙ Ø§ÙÙØµÙ Ø§ÙØ«Ø§ÙÙ 2026",6),
+            ("group_name_student","Ø§ÙÙØ¬ÙÙØ¹Ø©",7),("group_online","Ø§ÙÙØ¬ÙÙØ¹Ø© (Ø§ÙØ§ÙÙÙØ§ÙÙ)",8),
+            ("final_result","Ø§ÙÙØªÙØ¬Ø© Ø§ÙÙÙØ§Ø¦ÙØ© (ØªØ­Ø¯ÙØ¯ Ø§ÙÙØ³ØªÙÙ 2026)",9),
+            ("level_reached_2026","Ø§ÙÙ Ø§ÙÙ ÙØµÙ Ø§ÙØ·Ø§ÙØ¨ 2026",10),("suitable_level_2026","ÙÙ Ø§ÙØ·Ø§ÙØ¨ ÙÙØ§Ø³Ø¨ ÙÙØ°Ø§ Ø§ÙÙØ³ØªÙÙ 2026Ø",11),
+            ("books_received","Ø§Ø³ØªÙØ§Ù Ø§ÙÙØªØ¨",12),("teacher_2026","Ø§ÙÙØ¯Ø±Ø³ 2026",13),
+            ("installment1","Ø§ÙÙØ³Ø· Ø§ÙØ§ÙÙ 2026",14),("installment2","Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙÙ",15),("installment3","Ø§ÙÙØ³Ø· Ø§ÙØ«Ø§ÙØ«",16),
+            ("installment4","Ø§ÙÙØ³Ø· Ø§ÙØ±Ø§Ø¨Ø¹",17),("installment5","Ø§ÙÙØ³Ø· Ø§ÙØ®Ø§ÙØ³",18),
+            ("mother_phone","ÙØ§ØªÙ Ø§ÙØ§Ù",19),("father_phone","ÙØ§ØªÙ Ø§ÙØ§Ø¨",20),("other_phone","ÙØ§ØªÙ Ø§Ø®Ø±",21),
+            ("residence","ÙÙØ§Ù Ø§ÙØ³ÙÙ",22),("home_address","Ø¹ÙÙØ§Ù Ø§ÙÙÙØ²Ù",23),("road","Ø§ÙØ·Ø±ÙÙ",24),("complex_name","Ø§ÙÙØ¬ÙØ¹",25),
+            ("installment_type","Ø§Ø®ØªÙØ§Ø± ÙÙØ¹ Ø§ÙØªÙØ³ÙØ·",26),
         ]
         for key,label,order in default_cols:
             try:
@@ -3069,11 +3017,11 @@ def api_group_columns_get():
         is_visible INTEGER DEFAULT 1)""")
     if db.execute("SELECT COUNT(*) FROM group_col_labels").fetchone()[0] == 0:
         default_cols = [
-            ("group_name","اسم المجموعة",1),("teacher_name","اسم المدرس",2),
-            ("level_course","المستوى / المقرر",3),("last_reached","المقرر الذي تم الوصول اليه الفصل الفائت",4),
-            ("study_time","وقت الدراسة",5),("ramadan_time","توقيت شهر رمضان",6),
-            ("online_time","توقيت الاونلاين (العادي)",7),("group_link","رابط المجموعة",8),
-            ("session_duration","الحصة بالدقيقة (يدوي)",9),
+            ("group_name","Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©",1),("teacher_name","Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³",2),
+            ("level_course","Ø§ÙÙØ³ØªÙÙ / Ø§ÙÙÙØ±Ø±",3),("last_reached","Ø§ÙÙÙØ±Ø± Ø§ÙØ°Ù ØªÙ Ø§ÙÙØµÙÙ Ø§ÙÙÙ Ø§ÙÙØµÙ Ø§ÙÙØ§Ø¦Øª",4),
+            ("study_time","ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©",5),("ramadan_time","ØªÙÙÙØª Ø´ÙØ± Ø±ÙØ¶Ø§Ù",6),
+            ("online_time","ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙ (Ø§ÙØ¹Ø§Ø¯Ù)",7),("group_link","Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©",8),
+            ("session_duration","Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ© (ÙØ¯ÙÙ)",9),
         ]
         for key,label,order in default_cols:
             try:
@@ -3207,18 +3155,18 @@ def api_attendance_delete(rid):
 
 
 
-# ─── Attendance Column Labels API ──────────────────────────────────────────────
+# âââ Attendance Column Labels API ââââââââââââââââââââââââââââââââââââââââââââââ
 
 ATT_DEFAULT_COLS = [
-    ("attendance_date","تاريخ أخذ الحضور",1),
-    ("day_name","اليوم",2),
-    ("group_name","المجموعة",3),
-    ("student_name","اسم الطالب",4),
-    ("contact_number","رقم التواصل",5),
-    ("status","الحالة",6),
-    ("message","الرسالة",7),
-    ("message_status","حالة إرسال الرسالة",8),
-    ("study_status","حالة الدراسة",9),
+    ("attendance_date","ØªØ§Ø±ÙØ® Ø£Ø®Ø° Ø§ÙØ­Ø¶ÙØ±",1),
+    ("day_name","Ø§ÙÙÙÙ",2),
+    ("group_name","Ø§ÙÙØ¬ÙÙØ¹Ø©",3),
+    ("student_name","Ø§Ø³Ù Ø§ÙØ·Ø§ÙØ¨",4),
+    ("contact_number","Ø±ÙÙ Ø§ÙØªÙØ§ØµÙ",5),
+    ("status","Ø§ÙØ­Ø§ÙØ©",6),
+    ("message","Ø§ÙØ±Ø³Ø§ÙØ©",7),
+    ("message_status","Ø­Ø§ÙØ© Ø¥Ø±Ø³Ø§Ù Ø§ÙØ±Ø³Ø§ÙØ©",8),
+    ("study_status","Ø­Ø§ÙØ© Ø§ÙØ¯Ø±Ø§Ø³Ø©",9),
 ]
 
 @app.route('/api/att-columns', methods=['GET'])
@@ -3277,7 +3225,7 @@ def api_att_columns_delete(col_key):
     # Only allow deleting custom columns (not the 9 default ones)
     default_keys = [c[0] for c in ATT_DEFAULT_COLS]
     if col_key in default_keys:
-        return jsonify({'ok':False,'error':'لا يمكن حذف الأعمدة الأساسية'}),400
+        return jsonify({'ok':False,'error':'ÙØ§ ÙÙÙÙ Ø­Ø°Ù Ø§ÙØ£Ø¹ÙØ¯Ø© Ø§ÙØ£Ø³Ø§Ø³ÙØ©'}),400
     db = get_db()
     try:
         db.execute("DELETE FROM att_col_labels WHERE col_key=?", (col_key,))
@@ -3302,7 +3250,7 @@ def api_att_columns_rename(col_key):
         return jsonify({'ok':False,'error':str(ex)}),400
 
 
-# ─── Custom Tables API ────────────────────────────────────────────────────────
+# âââ Custom Tables API ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @app.route('/api/custom-tables', methods=['GET'])
 @login_required
@@ -3459,7 +3407,7 @@ GROUPS_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>معلومات المجموعات - Mindex</title>
+<title>ÙØ¹ÙÙÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø§Øª - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
 body{background:#f5f3ff;min-height:100vh;direction:rtl;}
@@ -3523,73 +3471,73 @@ td.link-cell a:hover{text-decoration:underline;}
 </head>
 <body>
 <div class="topbar">
-  <h1>&#128101; معلومات المجموعات</h1>
-  <a href="/database" class="btn-back">&larr; قاعدة البيانات</a>
+  <h1>&#128101; ÙØ¹ÙÙÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</h1>
+  <a href="/database" class="btn-back">&larr; ÙØ§Ø¹Ø¯Ø© Ø§ÙØ¨ÙØ§ÙØ§Øª</a>
 </div>
 <div class="main">
-  <div class="page-title">جدول المجموعات</div>
+  <div class="page-title">Ø¬Ø¯ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
-      <span class="stat-label">إجمالي المجموعات</span>
+      <span class="stat-label">Ø¥Ø¬ÙØ§ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø§Øª</span>
     </div>
   </div>
-  <button class="btn-add" onclick="openAddModal()">+ إضافة مجموعة</button>
+  <button class="btn-add" onclick="openAddModal()">+ Ø¥Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø©</button>
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="ابحث باسم المجموعة أو المدرس..." oninput="filterTable()">
-    <button class="btn-search" onclick="filterTable()">بحث</button>
+    <input type="text" id="searchInput" placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© Ø£Ù Ø§ÙÙØ¯Ø±Ø³..." oninput="filterTable()">
+    <button class="btn-search" onclick="filterTable()">Ø¨Ø­Ø«</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>اسم المجموعة</th>
-          <th>اسم المدرس</th>
-          <th>المستوى / المقرر</th>
-          <th>المقرر الذي تم الوصول اليه الفصل الفائت</th>
-          <th>وقت الدراسة</th>
-          <th>توقيت شهر رمضان</th>
-          <th>توقيت الاونلاين (العادي)</th>
-          <th>رابط المجموعة</th>
-          <th>الحصة بالدقيقة (يدوي)</th>
-          <th>اجراءات</th>
+          <th>Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©</th>
+          <th>Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³</th>
+          <th>Ø§ÙÙØ³ØªÙÙ / Ø§ÙÙÙØ±Ø±</th>
+          <th>Ø§ÙÙÙØ±Ø± Ø§ÙØ°Ù ØªÙ Ø§ÙÙØµÙÙ Ø§ÙÙÙ Ø§ÙÙØµÙ Ø§ÙÙØ§Ø¦Øª</th>
+          <th>ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©</th>
+          <th>ØªÙÙÙØª Ø´ÙØ± Ø±ÙØ¶Ø§Ù</th>
+          <th>ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙ (Ø§ÙØ¹Ø§Ø¯Ù)</th>
+          <th>Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©</th>
+          <th>Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ© (ÙØ¯ÙÙ)</th>
+          <th>Ø§Ø¬Ø±Ø§Ø¡Ø§Øª</th>
         </tr>
       </thead>
       <tbody id="groupsBody">
-        <tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>
+        <tr><td colspan="11" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø§Ø¶Ù Ø§ÙÙ ÙØ¬ÙÙØ¹Ø©</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h2 id="modalTitle">اضافة مجموعة جديدة</h2>
+    <h2 id="modalTitle">Ø§Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø© Ø¬Ø¯ÙØ¯Ø©</h2>
     <input type="hidden" id="editId">
     <div class="form-grid">
-      <div class="field"><label>اسم المجموعة *</label><input id="f_group_name" placeholder="اسم المجموعة"></div>
-      <div class="field"><label>اسم المدرس *</label><input id="f_teacher_name" placeholder="اسم المدرس"></div>
-      <div class="field"><label>المستوى / المقرر</label><input id="f_level_course" placeholder="مثال: المستوى 3 - كتاب A"></div>
-      <div class="field"><label>المقرر الذي تم الوصول اليه الفصل الفائت</label><input id="f_last_reached" placeholder="مثال: الوحدة 5 - الدرس 3"></div>
-      <div class="field"><label>وقت الدراسة</label><input id="f_study_time" placeholder="مثال: السبت والاثنين 4-5 مساءً"></div>
-      <div class="field"><label>توقيت شهر رمضان</label><input id="f_ramadan_time" placeholder="مثال: 8-9 مساءً"></div>
-      <div class="field"><label>توقيت الاونلاين (العادي)</label><input id="f_online_time" placeholder="مثال: 5-6 مساءً"></div>
-      <div class="field"><label>رابط المجموعة</label><input id="f_group_link" placeholder="https://..." class="ltr"></div>
-      <div class="field full"><label>الحصة بالدقيقة (يدوي)</label><input id="f_session_duration" placeholder="مثال: 60 دقيقة"></div>
+      <div class="field"><label>Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© *</label><input id="f_group_name" placeholder="Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø©"></div>
+      <div class="field"><label>Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³ *</label><input id="f_teacher_name" placeholder="Ø§Ø³Ù Ø§ÙÙØ¯Ø±Ø³"></div>
+      <div class="field"><label>Ø§ÙÙØ³ØªÙÙ / Ø§ÙÙÙØ±Ø±</label><input id="f_level_course" placeholder="ÙØ«Ø§Ù: Ø§ÙÙØ³ØªÙÙ 3 - ÙØªØ§Ø¨ A"></div>
+      <div class="field"><label>Ø§ÙÙÙØ±Ø± Ø§ÙØ°Ù ØªÙ Ø§ÙÙØµÙÙ Ø§ÙÙÙ Ø§ÙÙØµÙ Ø§ÙÙØ§Ø¦Øª</label><input id="f_last_reached" placeholder="ÙØ«Ø§Ù: Ø§ÙÙØ­Ø¯Ø© 5 - Ø§ÙØ¯Ø±Ø³ 3"></div>
+      <div class="field"><label>ÙÙØª Ø§ÙØ¯Ø±Ø§Ø³Ø©</label><input id="f_study_time" placeholder="ÙØ«Ø§Ù: Ø§ÙØ³Ø¨Øª ÙØ§ÙØ§Ø«ÙÙÙ 4-5 ÙØ³Ø§Ø¡Ù"></div>
+      <div class="field"><label>ØªÙÙÙØª Ø´ÙØ± Ø±ÙØ¶Ø§Ù</label><input id="f_ramadan_time" placeholder="ÙØ«Ø§Ù: 8-9 ÙØ³Ø§Ø¡Ù"></div>
+      <div class="field"><label>ØªÙÙÙØª Ø§ÙØ§ÙÙÙØ§ÙÙ (Ø§ÙØ¹Ø§Ø¯Ù)</label><input id="f_online_time" placeholder="ÙØ«Ø§Ù: 5-6 ÙØ³Ø§Ø¡Ù"></div>
+      <div class="field"><label>Ø±Ø§Ø¨Ø· Ø§ÙÙØ¬ÙÙØ¹Ø©</label><input id="f_group_link" placeholder="https://..." class="ltr"></div>
+      <div class="field full"><label>Ø§ÙØ­ØµØ© Ø¨Ø§ÙØ¯ÙÙÙØ© (ÙØ¯ÙÙ)</label><input id="f_session_duration" placeholder="ÙØ«Ø§Ù: 60 Ø¯ÙÙÙØ©"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" onclick="saveGroup()">حفظ</button>
-      <button class="btn-cancel" onclick="closeModal()">الغاء</button>
+      <button class="btn-save" onclick="saveGroup()">Ø­ÙØ¸</button>
+      <button class="btn-cancel" onclick="closeModal()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div>
 </div>
 <div class="confirm-bg" id="confirmModal">
   <div class="confirm-box">
-    <h3>تاكيد الحذف</h3>
-    <p>هل انت متاكد انك تريد حذف هذه المجموعة؟</p>
+    <h3>ØªØ§ÙÙØ¯ Ø§ÙØ­Ø°Ù</h3>
+    <p>ÙÙ Ø§ÙØª ÙØªØ§ÙØ¯ Ø§ÙÙ ØªØ±ÙØ¯ Ø­Ø°Ù ÙØ°Ù Ø§ÙÙØ¬ÙÙØ¹Ø©Ø</p>
     <div class="confirm-actions">
-      <button class="btn-confirm-del" id="confirmDelBtn">حذف</button>
-      <button class="btn-confirm-cancel" onclick="closeConfirm()">الغاء</button>
+      <button class="btn-confirm-del" id="confirmDelBtn">Ø­Ø°Ù</button>
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">Ø§ÙØºØ§Ø¡</button>
     </div>
   </div>
 </div>
@@ -3606,9 +3554,9 @@ async function loadGroups(){
 }
 function renderTable(list){
   const body=document.getElementById('groupsBody');
-  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">لا توجد بيانات، اضف اول مجموعة</td></tr>';return;}
+  if(!list.length){body.innerHTML='<tr><td colspan="11" class="no-data">ÙØ§ ØªÙØ¬Ø¯ Ø¨ÙØ§ÙØ§ØªØ Ø§Ø¶Ù Ø§ÙÙ ÙØ¬ÙÙØ¹Ø©</td></tr>';return;}
   body.innerHTML=list.map((g,i)=>{
-    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank">فتح الرابط</a>':'-';
+    const link=g.group_link?'<a href="'+g.group_link+'" target="_blank">ÙØªØ­ Ø§ÙØ±Ø§Ø¨Ø·</a>':'-';
     return '<tr><td>'+(i+1)+'</td><td class="name-cell">'+(g.group_name||'-')+'</td><td>'+(g.teacher_name||'-')+'</td><td>'+(g.level_course||'-')+'</td><td>'+(g.last_reached||'-')+'</td><td>'+(g.study_time||'-')+'</td><td>'+(g.ramadan_time||'-')+'</td><td>'+(g.online_time||'-')+'</td><td class="link-cell">'+link+'</td><td>'+(g.session_duration||'-')+'</td><td><button class="action-btn btn-edit" onclick="openEdit('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+g.id+')">&#128465;</button></td></tr>';
   }).join('');
 }
@@ -3620,11 +3568,11 @@ function clearForm(){
   ['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';});
   document.getElementById('editId').value='';
 }
-function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='اضافة مجموعة جديدة';document.getElementById('modal').classList.add('open');}
+function openAddModal(){clearForm();document.getElementById('modalTitle').textContent='Ø§Ø¶Ø§ÙØ© ÙØ¬ÙÙØ¹Ø© Ø¬Ø¯ÙØ¯Ø©';document.getElementById('modal').classList.add('open');}
 function openEdit(id){
   const g=allGroups.find(x=>x.id===id);if(!g)return;
   document.getElementById('editId').value=id;
-  document.getElementById('modalTitle').textContent='تعديل بيانات المجموعة';
+  document.getElementById('modalTitle').textContent='ØªØ¹Ø¯ÙÙ Ø¨ÙØ§ÙØ§Øª Ø§ÙÙØ¬ÙÙØ¹Ø©';
   document.getElementById('f_group_name').value=g.group_name||'';
   document.getElementById('f_teacher_name').value=g.teacher_name||'';
   document.getElementById('f_level_course').value=g.level_course||'';
@@ -3650,13 +3598,13 @@ async function saveGroup(){
     group_link:document.getElementById('f_group_link').value.trim(),
     session_duration:document.getElementById('f_session_duration').value.trim(),
   };
-  if(!body.group_name){showToast('اسم المجموعة مطلوب','#e53935');return;}
+  if(!body.group_name){showToast('Ø§Ø³Ù Ø§ÙÙØ¬ÙÙØ¹Ø© ÙØ·ÙÙØ¨','#e53935');return;}
   const url=editId?'/api/groups/'+editId:'/api/groups';
   const method=editId?'PUT':'POST';
   const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
   const data=await res.json();
-  if(data.ok){closeModal();showToast(editId?'تم تعديل المجموعة بنجاح':'تم اضافة المجموعة بنجاح');loadGroups();}
-  else{showToast(data.error||'حدث خطا','#e53935');}
+  if(data.ok){closeModal();showToast(editId?'ØªÙ ØªØ¹Ø¯ÙÙ Ø§ÙÙØ¬ÙÙØ¹Ø© Ø¨ÙØ¬Ø§Ø­':'ØªÙ Ø§Ø¶Ø§ÙØ© Ø§ÙÙØ¬ÙÙØ¹Ø© Ø¨ÙØ¬Ø§Ø­');loadGroups();}
+  else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
 }
 function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
@@ -3664,8 +3612,8 @@ async function confirmDelete(){
   const res=await fetch('/api/groups/'+deleteTargetId,{method:'DELETE',credentials:'include'});
   const data=await res.json();
   closeConfirm();
-  if(data.ok){showToast('تم حذف المجموعة بنجاح');loadGroups();}
-  else{showToast(data.error||'حدث خطا','#e53935');}
+  if(data.ok){showToast('ØªÙ Ø­Ø°Ù Ø§ÙÙØ¬ÙÙØ¹Ø© Ø¨ÙØ¬Ø§Ø­');loadGroups();}
+  else{showToast(data.error||'Ø­Ø¯Ø« Ø®Ø·Ø§','#e53935');}
   deleteTargetId=null;
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
@@ -3772,7 +3720,7 @@ def api_logout():
 
 # v2
 
-# ─── Taqseet (Payment Plans) API ────────────────────────────────────────────
+# âââ Taqseet (Payment Plans) API ââââââââââââââââââââââââââââââââââââââââââââ
 
 @app.route('/api/taqseet', methods=['GET'])
 @login_required
