@@ -1720,7 +1720,7 @@ function updateEditInstallmentDetail(val){
 }
 var allTaqseetData=[];
 async function loadStudents(){
-const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet')]);
+const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet').catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
 const sData=await sRes.json(); const cData=await cRes.json();
 allStudents=sData.students||[]; allColumns=cData.columns||[]; allTaqseetData=await tRes.json(); populateTaqseetDropdowns();
 renderTable(allStudents);
