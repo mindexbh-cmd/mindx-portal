@@ -364,6 +364,66 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 <body>
 <a href="/database" class="btn">قاعدة البيانات</a>
 <a href="/attendance" class="btn-attend">تسجيل الغياب 📅</a>
+
+<button class="btn" onclick="document.getElementById('pay-modal').style.display='flex'">&#x1F4B3; متابعة الدفع</button>
+
+<div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+  <div style="background:#fff;border-radius:18px;padding:36px 32px;width:90%;max-width:480px;direction:rtl;text-align:right;position:relative;box-shadow:0 8px 32px rgba(107,63,160,0.18);">
+    <button onclick="document.getElementById('pay-modal').style.display='none'" style="position:absolute;top:14px;left:18px;background:none;border:none;font-size:22px;cursor:pointer;color:#999;">&times;</button>
+    <h2 style="color:#6B3FA0;margin-bottom:20px;font-size:22px;">متابعة الدفع</h2>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;margin-bottom:6px;color:#555;font-weight:600;">الرقم الشخصي</label>
+      <input id="pay-pid" type="text" placeholder="ادخل الرقم الشخصي" style="width:100%;padding:11px 14px;border:1.5px solid #ccc;border-radius:10px;font-size:15px;box-sizing:border-box;"/>
+    </div>
+    <button onclick="searchPayment()" style="width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:16px;">بحث</button>
+    <div id="pay-result" style="display:none;border:1.5px solid #e0d4f7;border-radius:12px;padding:16px;background:#faf7ff;"></div>
+  </div>
+</div>
+
+<script>
+function searchPayment(){
+  var pid = document.getElementById('pay-pid').value.trim();
+  if(!pid){alert('رجاءً أدخل الرقم الشخصي'); return;}
+  var resultDiv = document.getElementById('pay-result');
+  resultDiv.style.display='block';
+  resultDiv.innerHTML = 'جاري البحث...';
+  fetch('/api/students').then(function(r){return r.json();}).then(function(data){
+    var students = data.students || [];
+    var student = students.find(function(s){ return s.personal_id == pid; });
+    if(!student){
+      resultDiv.innerHTML = '<p style="color:#e53935;font-weight:600;">لم يتم إيجاد طالب بهذا الرقم</p>';
+      return;
+    }
+    var inst = student.installment_type;
+    fetch('/api/taqseet').then(function(r){return r.json();}).then(function(taq){
+      var method = taq.find(function(t){return t.taqseet_method==inst;});
+      var html = '<p style="font-weight:700;color:#6B3FA0;font-size:16px;margin-bottom:10px;">' + (student.student_name||'') + '</p>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+      var installments = [
+        {label:'القسط الأول',val:student.installment1},
+        {label:'القسط الثاني',val:student.installment2},
+        {label:'القسط الثالث',val:student.installment3},
+        {label:'القسط الرابع',val:student.installment4},
+        {label:'القسط الخامس',val:student.installment5}
+      ];
+      installments.forEach(function(i){
+        if(i.val){
+          var color = i.val==='مدفوع'?'#2e7d32':'#c62828';
+          var bg = i.val==='مدفوع'?'#e8f5e9':'#fce4ec';
+          html += '<div style="background:'+bg+';border-radius:8px;padding:8px 10px;"><span style="font-size:12px;color:#777;">'+i.label+'</span><br><b style="color:'+color+';">'+i.val+'</b></div>';
+        }
+      });
+      html += '</div>';
+      if(method&&method.course_amount){
+        html += '<p style="margin-top:10px;color:#555;font-size:13px;">نوع التقسيط: طريقة '+inst+' — مبلغ الدورة: '+method.course_amount+'</p>';
+      }
+      resultDiv.innerHTML = html;
+    }).catch(function(){resultDiv.innerHTML = html;});
+  }).catch(function(){
+    resultDiv.innerHTML = '<p style="color:#e53935;">حدث خطأ في البحث</p>';
+  });
+}
+</script>
 </body>
 </html>"""
 
