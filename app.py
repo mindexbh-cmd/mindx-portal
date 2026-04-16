@@ -1017,8 +1017,8 @@ body{background:#f5f3ff;direction:rtl;display:flex;flex-direction:column;}
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;min-width:2800px;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:auto;direction:ltr;}
+table{width:100%;border-collapse:collapse;min-width:2800px;direction:rtl;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:center;white-space:nowrap;}
 tbody tr{border-bottom:1px solid #f0ebff;transition:background .15s;}
