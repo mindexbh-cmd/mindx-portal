@@ -2,7 +2,7 @@ from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
 from functools import wraps
 
-app = Flask(__name__)
+app = Flask(__name__)h
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
 DB = os.environ.get("DB_PATH", "mindx.db")
 
@@ -638,10 +638,10 @@ function showToast(msg, bg) {
 function normalizeAr(s) {
   if (!s) return '';
   return s
-    .replace(/[&#x623;&#x625;&#x622;&#x627;]/g, '&#x627;')  // &#x623;&#x625;&#x622;&#x627; &#x2192; &#x627;
-    .replace(/[&#x629;&#x647;]/g, '&#x647;')               // &#x629;&#x647; &#x2192; &#x647;
-    .replace(/[&#x649;&#x64A;]/g, '&#x64A;')               // &#x649;&#x64A; &#x2192; &#x64A;
-    .replace(/[&#x64B;-&#x65F;]/g, '');                   // remove tashkeel
+    .replace(/[أإآا]/g, 'ا')  // أإآا → ا
+    .replace(/[ةه]/g, 'ه')               // ةه → ه
+    .replace(/[ىي]/g, 'ي')               // ىي → ي
+    .replace(/[ً-ٟ]/g, '');                   // remove tashkeel
 }
 
 var _searchTimeout = null;
