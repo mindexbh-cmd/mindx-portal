@@ -1224,6 +1224,46 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </table>
   </div>
 </div>
+<div style="margin:30px 0 0 0;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
+  </div>
+  <div class="stats" style="margin-bottom:10px;">
+    <div class="stat-card">
+      <span class="stat-num" id="attendanceTotalCount">0</span>
+      <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x633;&#x62C;&#x644;&#x627;&#x62A;</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="btn-add" onclick="openAttendanceAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
+  
+  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
+  <div class="search-bar">
+    <input type="text" id="attendanceSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x641;&#x64A; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;..." oninput="filterAttendanceTable()">
+    <button class="btn-search" onclick="filterAttendanceTable()">&#x628;&#x62D;&#x62B;</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x623;&#x62E;&#x630; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
+          <th>&#x627;&#x644;&#x64A;&#x648;&#x645;</th>
+          <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th>
+          <th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</th>
+          <th>&#x631;&#x642;&#x645; &#x627;&#x644;&#x62A;&#x648;&#x627;&#x635;&#x644;</th>
+          <th>&#x627;&#x644;&#x62D;&#x627;&#x644;&#x629;</th>
+          <th>&#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</th>
+          <th>&#x62D;&#x627;&#x644;&#x629; &#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</th>
+          <th>&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</th>
+          <th>&#x625;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>
+        </tr>
+      </thead>
+      <tbody id="attendanceBody"></tbody>
+    </table>
+  </div>
+</div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -1274,7 +1314,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-confirm-del" id="confirmDelBtn">&#x62D;&#x630;&#x641;</button>
       <button class="btn-confirm-cancel" onclick="closeConfirm()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button>
     </div>
-  </div><!-- TABLE EDIT MODAL -->
+  </div></div><!-- TABLE EDIT MODAL -->
 <div class="modal-bg" id="tableEditModal">
 <div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
 <h2 style="color:#E55A2B;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</h2>
@@ -1326,46 +1366,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 </div>
 </div>
-<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; &#x637;&#x644;&#x628;&#x629; &#x645;&#x646; Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>&#x62A;&#x639;&#x644;&#x64A;&#x645;&#x627;&#x62A;:</b> &#x64A;&#x62C;&#x628; &#x623;&#x646; &#x64A;&#x643;&#x648;&#x646; &#x645;&#x644;&#x641; Excel &#x64A;&#x62D;&#x62A;&#x648;&#x64A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x628;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x631;&#x62A;&#x64A;&#x628;:<br>&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x60C; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;&#x60C; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628;&#x60C; &#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629;&#x60C; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026&#x60C; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633; 2026&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x627;&#x645;&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x627;&#x628;&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x62E;&#x631;&#x60C; &#x627;&#x644;&#x633;&#x643;&#x646;&#x60C; &#x627;&#x644;&#x639;&#x646;&#x648;&#x627;&#x646;&#x60C; &#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;&#x60C; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x644;&#x641; Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button><button class="btn-cancel" onclick="closeStudentExcelModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#x645;&#x646; Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>&#x62A;&#x639;&#x644;&#x64A;&#x645;&#x627;&#x62A;:</b> &#x64A;&#x62C;&#x628; &#x623;&#x646; &#x64A;&#x643;&#x648;&#x646; &#x645;&#x644;&#x641; Excel &#x64A;&#x62D;&#x62A;&#x648;&#x64A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x628;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x631;&#x62A;&#x64A;&#x628;:<br>&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x60C; &#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;&#x60C; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649;&#x60C; &#x627;&#x644;&#x645;&#x642;&#x631;&#x631; &#x627;&#x644;&#x641;&#x627;&#x626;&#x62A;&#x60C; &#x648;&#x642;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;&#x60C; &#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x631;&#x645;&#x636;&#x627;&#x646;&#x60C; &#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;&#x60C; &#x631;&#x627;&#x628;&#x637; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x60C; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629;</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x644;&#x641; Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button><button class="btn-cancel" onclick="closeGroupExcelModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div style="margin:30px 0 0 0;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
-  </div>
-  <div class="stats" style="margin-bottom:10px;">
-    <div class="stat-card">
-      <span class="stat-num" id="attendanceTotalCount">0</span>
-      <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x633;&#x62C;&#x644;&#x627;&#x62A;</span>
-    </div>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-    <button class="btn-add" onclick="openAttendanceAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
-  
-  <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
-  <div class="search-bar">
-    <input type="text" id="attendanceSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x641;&#x64A; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;..." oninput="filterAttendanceTable()">
-    <button class="btn-search" onclick="filterAttendanceTable()">&#x628;&#x62D;&#x62B;</button>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x623;&#x62E;&#x630; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
-          <th>&#x627;&#x644;&#x64A;&#x648;&#x645;</th>
-          <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th>
-          <th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</th>
-          <th>&#x631;&#x642;&#x645; &#x627;&#x644;&#x62A;&#x648;&#x627;&#x635;&#x644;</th>
-          <th>&#x627;&#x644;&#x62D;&#x627;&#x644;&#x629;</th>
-          <th>&#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</th>
-          <th>&#x62D;&#x627;&#x644;&#x629; &#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</th>
-          <th>&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</th>
-          <th>&#x625;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>
-        </tr>
-      </thead>
-      <tbody id="attendanceBody"></tbody>
-    </table>
-  </div>
-</div>
+<!-- STUDENT EXCEL IMPORT MODAL --><div class="modal-bg" id="studentExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; &#x637;&#x644;&#x628;&#x629; &#x645;&#x646; Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>&#x62A;&#x639;&#x644;&#x64A;&#x645;&#x627;&#x62A;:</b> &#x64A;&#x62C;&#x628; &#x623;&#x646; &#x64A;&#x643;&#x648;&#x646; &#x645;&#x644;&#x641; Excel &#x64A;&#x62D;&#x62A;&#x648;&#x64A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x628;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x631;&#x62A;&#x64A;&#x628;:<br>&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x60C; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;&#x60C; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628;&#x60C; &#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629;&#x60C; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026&#x60C; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633; 2026&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x627;&#x645;&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x627;&#x628;&#x60C; &#x647;&#x627;&#x62A;&#x641; &#x627;&#x62E;&#x631;&#x60C; &#x627;&#x644;&#x633;&#x643;&#x646;&#x60C; &#x627;&#x644;&#x639;&#x646;&#x648;&#x627;&#x646;&#x60C; &#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;&#x60C; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;</div><div style="text-align:center;margin:20px 0;"><input type="file" id="studentExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('studentExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x644;&#x641; Excel</button><div id="studentExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div></div><div id="studentExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="studentExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="studentExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importStudentsFromExcel()">&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button><button class="btn-cancel" onclick="closeStudentExcelModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><!-- GROUP EXCEL IMPORT MODAL --><div class="modal-bg" id="groupExcelModal"><div class="modal" style="border-top:4px solid #43A047;max-width:500px;"><h2 style="color:#2E7D32;">&#128196; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#x645;&#x646; Excel</h2><div style="margin-bottom:16px;background:#f1f8e9;border-radius:10px;padding:14px;font-size:13px;color:#33691e;direction:rtl;"><b>&#x62A;&#x639;&#x644;&#x64A;&#x645;&#x627;&#x62A;:</b> &#x64A;&#x62C;&#x628; &#x623;&#x646; &#x64A;&#x643;&#x648;&#x646; &#x645;&#x644;&#x641; Excel &#x64A;&#x62D;&#x62A;&#x648;&#x64A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x628;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x631;&#x62A;&#x64A;&#x628;:<br>&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x60C; &#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;&#x60C; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649;&#x60C; &#x627;&#x644;&#x645;&#x642;&#x631;&#x631; &#x627;&#x644;&#x641;&#x627;&#x626;&#x62A;&#x60C; &#x648;&#x642;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;&#x60C; &#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x631;&#x645;&#x636;&#x627;&#x646;&#x60C; &#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;&#x60C; &#x631;&#x627;&#x628;&#x637; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x60C; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629;</div><div style="text-align:center;margin:20px 0;"><input type="file" id="groupExcelFile" accept=".xlsx,.xls,.csv" style="display:none;"><button onclick="document.getElementById('groupExcelFile').click();" style="background:#43A047;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#128193; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x644;&#x641; Excel</button><div id="groupExcelFileName" style="margin-top:10px;font-size:13px;color:#666;">&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div></div><div id="groupExcelPreview" style="display:none;margin-bottom:14px;"><div style="font-size:13px;color:#2E7D32;font-weight:700;margin-bottom:6px;" id="groupExcelCount"></div></div><div class="modal-actions"><button class="btn-save" id="groupExcelImportBtn" style="background:linear-gradient(135deg,#43A047,#2E7D32);display:none;" onclick="importGroupsFromExcel()">&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button><button class="btn-cancel" onclick="closeGroupExcelModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div>
 <!-- ATTENDANCE ADD/EDIT MODAL -->
 <div class="modal-bg" id="attendanceModal" style="display:none">
   <div class="modal" style="max-width:520px;width:95%">
