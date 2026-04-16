@@ -999,13 +999,13 @@ DATABASE_HTML = """<!DOCTYPE html>
 <title>&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; - Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-html{height:100%;overflow:hidden;margin:0;direction:ltr;}body{height:100%;overflow:hidden;margin:0;}
+html{height:100%;overflow:hidden;margin:0;direction:rtl;}body{height:100%;overflow:hidden;margin:0;}
 body{background:#f5f3ff;direction:rtl;display:flex;flex-direction:column;}
 .topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
 .topbar h1{font-size:20px;font-weight:800;}
 .btn-home{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
 .btn-home:hover{background:rgba(255,255,255,.3);}
-.main{padding:24px 28px;flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;direction:ltr;}.main>*{direction:rtl;}
+.main{padding:24px 28px;flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;direction:rtl;}
 .page-title{font-size:22px;font-weight:800;color:#6B3FA0;margin-bottom:20px;}
 .stats{display:flex;gap:14px;margin-bottom:22px;}
 .stat-card{background:#fff;border-radius:12px;padding:14px 22px;box-shadow:0 2px 10px rgba(107,63,160,.1);display:flex;flex-direction:column;align-items:center;min-width:120px;}
@@ -1017,7 +1017,7 @@ body{background:#f5f3ff;direction:rtl;display:flex;flex-direction:column;}
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:auto;direction:ltr;}
+.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:auto;direction:rtl;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:right;white-space:nowrap;}
