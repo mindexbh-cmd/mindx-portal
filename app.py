@@ -1298,8 +1298,6 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <div class="field"><label>&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x646;&#x648;&#x639; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</label><select id="f_installment_type" class="installment-select-edit" onchange="updateEditInstallmentDetail(this.value)"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select><small id="edit_installment_detail" style="display:block;color:#555;margin-top:4px;font-size:12px;direction:rtl"></small></div>
 </div>
-    v>
-    </div>
     <div class="modal-actions">
       <button class="btn-save" onclick="saveStudent()">&#x62D;&#x641;&#x638;</button>
       <button class="btn-cancel" onclick="closeModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button>
