@@ -2,7 +2,7 @@ from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
 from functools import wraps
 
-app = Flask(__name__)
+app = Flask(__name__)h
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
 DB = os.environ.get("DB_PATH", "mindx.db")
 
@@ -866,9 +866,9 @@ function onStatusChange(sel) {
 }
 
 function renderTable(students, existingList) {
-  var statusMap = {};
+  var statusMap = {}; var msgStatusMap = {};
   for(var i=0; i<existingList.length; i++) {
-    statusMap[existingList[i].student_name] = existingList[i].status || '';
+    statusMap[existingList[i].student_name] = existingList[i].status || ''; msgStatusMap[existingList[i].student_name] = existingList[i].message_status || '';
   }
 
   var html = '';
@@ -877,7 +877,7 @@ function renderTable(students, existingList) {
   } else {
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
-      var savedStatus = statusMap[name] || '';
+      var savedStatus = statusMap[name] || ''; var savedMsgStatus = msgStatusMap[name] || '';
       var cssClass = 'status-select';
       if(savedStatus === '\u062d\u0627\u0636\u0631') cssClass += ' present';
       else if(savedStatus === '\u063a\u0627\u0626\u0628') cssClass += ' absent';
@@ -911,7 +911,7 @@ function renderTable(students, existingList) {
       }
       html += '</td>';
       
-      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"></td>';html += '</tr>';
+      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (savedMsgStatus === '1' ? ' checked' : '') + '></td>';html += '</tr>';
     }
   }
   document.getElementById('attTableBody').innerHTML = html;
@@ -945,7 +945,7 @@ function saveAllAttendance() {
         student_name: existingRecords[name].student_name,
         contact_number: existingRecords[name].contact_number || '',
         message: existingRecords[name].message || '',
-        message_status: existingRecords[name].message_status || '',
+        message_status: (tr.querySelector('.sent-check') && tr.querySelector('.sent-check').checked) ? '1' : (existingRecords[name].message_status || ''),
         study_status: existingRecords[name].study_status || ''
       });
     } else if(currentMode === 'new') {
