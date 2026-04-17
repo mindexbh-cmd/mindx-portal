@@ -1237,8 +1237,6 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-    <button class="btn-add" onclick="openAttendanceAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
-  
   <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
   <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
   <div class="search-bar">
@@ -3346,14 +3344,28 @@ def api_attendance_add():
     d = request.get_json()
     db = get_db()
     try:
-        db.execute("""INSERT INTO attendance(attendance_date,day_name,group_name,student_name,contact_number,status,message,message_status,study_status)
-            VALUES(?,?,?,?,?,?,?,?,?)""",
-            (d.get('attendance_date',''), d.get('day_name',''), d.get('group_name',''),
-             d.get('student_name',''), d.get('contact_number',''), d.get('status',''),
-             d.get('message',''), d.get('message_status',''), d.get('study_status','')))
-        db.commit()
-        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-        return jsonify({"ok": True, "id": rid})
+        attendance_date = d.get('attendance_date','')
+        group_name = d.get('group_name','')
+        student_name = d.get('student_name','')
+        existing = db.execute(
+            "SELECT id FROM attendance WHERE student_name=? AND attendance_date=? AND group_name=?",
+            (student_name, attendance_date, group_name)
+        ).fetchone()
+        if existing:
+            db.execute("""UPDATE attendance SET day_name=?,contact_number=?,status=?,message=?,message_status=?,study_status=? WHERE id=?""",
+                (d.get('day_name',''), d.get('contact_number',''), d.get('status',''),
+                 d.get('message',''), d.get('message_status',''), d.get('study_status',''), existing[0]))
+            db.commit()
+            return jsonify({"ok": True, "id": existing[0], "updated": True})
+        else:
+            db.execute("""INSERT INTO attendance(attendance_date,day_name,group_name,student_name,contact_number,status,message,message_status,study_status)
+                VALUES(?,?,?,?,?,?,?,?,?)""",
+                (attendance_date, d.get('day_name',''), group_name,
+                 student_name, d.get('contact_number',''), d.get('status',''),
+                 d.get('message',''), d.get('message_status',''), d.get('study_status','')))
+            db.commit()
+            rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            return jsonify({"ok": True, "id": rid, "updated": False})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
