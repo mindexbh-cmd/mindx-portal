@@ -1226,7 +1226,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </table>
   </div>
 </div>
-<div style="margin:30px 0 0 0;display:none;">
+<div style="margin:30px 0 0 0;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
     <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
   </div>
