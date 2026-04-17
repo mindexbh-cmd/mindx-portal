@@ -2894,9 +2894,9 @@ function openAttendanceTableEditModal() {
     renameSel.innerHTML = '';
     afterSel.innerHTML = '';
     cols.forEach(function(c) {
-      var o1 = document.createElement('option'); o1.value = c.col_key; o1.textContent = c.col_label; delSel.appendChild(o1);
-      var o2 = document.createElement('option'); o2.value = c.col_key; o2.textContent = c.col_label; renameSel.appendChild(o2);
-      var o3 = document.createElement('option'); o3.value = c.col_key; o3.textContent = c.col_label; afterSel.appendChild(o3);
+      var o1 = document.createElement('option'); o1.value = c.col_key; o1.innerHTML = c.col_label; delSel.appendChild(o1);
+      var o2 = document.createElement('option'); o2.value = c.col_key; o2.innerHTML = c.col_label; renameSel.appendChild(o2);
+      var o3 = document.createElement('option'); o3.value = c.col_key; o3.innerHTML = c.col_label; afterSel.appendChild(o3);
     });
     document.getElementById('att_new_col_name').value = '';
     document.getElementById('att_col_position').value = 'end';
