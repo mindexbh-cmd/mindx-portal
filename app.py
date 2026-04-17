@@ -2014,64 +2014,64 @@ async function openDeleteTableModal() {
   _selectedDeleteTableId = null;
   _selectedDeleteTableName = null;
   window._selectedDeleteTableType = null;
-  const listEl = document.getElementById('deleteTableList');
+  var listEl = document.getElementById('deleteTableList');
   listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x062C;&#x0627;&#x0631; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</p>';
   document.body.appendChild(document.getElementById('deleteTableModal'));
   document.body.appendChild(document.getElementById('deleteTableConfirmModal'));
   document.getElementById('deleteTableModal').classList.add('open');
   try {
-    const res = await fetch('/api/custom-tables');
-    const customTables = await res.json();
-    // Build combined list: fixed tables from DOM + custom tables from API
+    var res = await fetch('/api/custom-tables');
+    var customTables = await res.json();
     var allItems = [];
-    // Fixed tables
     var fixedDefs = [
       {domId: 'studentsBody', name: '&#x0642;&#x0627;&#x0639;&#x062F;&#x0629; &#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;'},
       {domId: 'groupsBody2', name: '&#x0645;&#x0639;&#x0644;&#x0648;&#x0645;&#x0627;&#x062A; &#x0627;&#x0644;&#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A;'},
       {domId: 'taqseetTable', name: '&#x0637;&#x0631;&#x064A;&#x0642;&#x0629; &#x0627;&#x0644;&#x062A;&#x0642;&#x0633;&#x064A;&#x0637;'},
       {domId: 'attendanceBody', name: '&#x0633;&#x062C;&#x0644; &#x0627;&#x0644;&#x063A;&#x064A;&#x0627;&#x0628;'}
     ];
-    fixedDefs.forEach(function(f) {
-      if (document.getElementById(f.domId)) {
-        allItems.push({id: 'fixed__' + f.domId, name: f.name, type: 'fixed'});
+    for (var i = 0; i < fixedDefs.length; i++) {
+      if (document.getElementById(fixedDefs[i].domId)) {
+        allItems.push({id: 'fixed__' + fixedDefs[i].domId, name: fixedDefs[i].name, type: 'fixed'});
       }
-    });
-    // Custom tables from API
+    }
     if (customTables && customTables.length > 0) {
-      customTables.forEach(function(t) {
-        allItems.push({id: t.id, name: t.tbl_name, type: 'custom'});
-      });
+      for (var j = 0; j < customTables.length; j++) {
+        allItems.push({id: customTables[j].id, name: customTables[j].tbl_name, type: 'custom'});
+      }
     }
     if (allItems.length === 0) {
       listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x0644;&#x0627; &#x062A;&#x0648;&#x062C;&#x062F; &#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0644;&#x0639;&#x0631;&#x0636;&#x0647;&#x0627;</p>';
       return;
     }
-    listEl.innerHTML = allItems.map(function(t) {
+    var html = '';
+    for (var k = 0; k < allItems.length; k++) {
+      var t = allItems[k];
       var icon = t.type === 'custom' ? '&#x1F4CB;' : '&#x1F4CA;';
       var badge = t.type === 'fixed' ? '<span style="font-size:0.72em;background:#e67e22;color:#fff;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle;">&#x062B;&#x0627;&#x0628;&#x062A;</span>' : '';
-      return '<div class="delete-table-item" id="dti_' + t.id + '" onclick="selectDeleteTable('' + t.id + '', '' + t.name.replace(/'/g, "\\'") + '', '' + t.type + '')" style="padding:12px 16px;border-radius:8px;cursor:pointer;border:2px solid transparent;margin-bottom:6px;background:#fff;transition:all .2s;font-weight:600;font-size:1em;color:#333;display:flex;align-items:center;gap:8px;">' +
+      html += '<div class="delete-table-item" id="dti_' + t.id + '" data-tid="' + t.id + '" data-tname="' + t.name + '" data-ttype="' + t.type + '" onclick="selectDeleteTableFromEl(this)" style="padding:12px 16px;border-radius:8px;cursor:pointer;border:2px solid transparent;margin-bottom:6px;background:#fff;transition:all .2s;font-weight:600;font-size:1em;color:#333;display:flex;align-items:center;gap:8px;">' +
         '<span style="font-size:1.2em;">' + icon + '</span>' + badge + t.name + '</div>';
-    }).join('');
+    }
+    listEl.innerHTML = html;
   } catch(e) {
     listEl.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:20px;">&#x062E;&#x0637;&#x0623; &#x0641;&#x064A; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A;</p>';
   }
 }
 
-function selectDeleteTable(id, name, type) {
+function selectDeleteTableFromEl(el) {
+  var id = el.getAttribute('data-tid');
+  var name = el.getAttribute('data-tname');
+  var type = el.getAttribute('data-ttype');
   _selectedDeleteTableId = id;
   _selectedDeleteTableName = name;
-  window._selectedDeleteTableType = type || 'custom';
-  document.querySelectorAll('.delete-table-item').forEach(el => {
-    el.style.borderColor = 'transparent';
-    el.style.background = '#fff';
-    el.style.color = '#333';
+  window._selectedDeleteTableType = type;
+  document.querySelectorAll('.delete-table-item').forEach(function(item) {
+    item.style.borderColor = 'transparent';
+    item.style.background = '#fff';
+    item.style.color = '#333';
   });
-  const el = document.getElementById('dti_' + id);
-  if (el) {
-    el.style.borderColor = '#e74c3c';
-    el.style.background = '#ffeaea';
-    el.style.color = '#c0392b';
-  }
+  el.style.borderColor = '#e74c3c';
+  el.style.background = '#ffeaea';
+  el.style.color = '#c0392b';
 }
 
 function closeDeleteTableModal() {
@@ -2082,7 +2082,7 @@ function closeDeleteTableModal() {
 
 function confirmDeleteTableSave() {
   if (!_selectedDeleteTableId) {
-    alert('&#x064A;&#x0631;&#x062C;&#x0649; &#x0627;&#x062E;&#x062A;&#x064A;&#x0627;&#x0631; &#x062C;&#x062F;&#x0648;&#x0644; &#x0623;&#x0648;&#x0644;&#x0627;&#x064B;');
+    alert('\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u062C\u062F\u0648\u0644 \u0623\u0648\u0644\u0627\u064B');
     return;
   }
   document.getElementById('deleteTableModal').classList.remove('open');
@@ -2099,23 +2099,23 @@ async function executeDeleteTable() {
   document.getElementById('deleteTableConfirmModal').classList.remove('open');
   var tableType = window._selectedDeleteTableType || 'custom';
   if (tableType === 'fixed') {
-    alert('&#x0644;&#x0627; &#x064A;&#x0645;&#x0643;&#x0646; &#x062D;&#x0630;&#x0641; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0627;&#x0644;&#x062B;&#x0627;&#x0628;&#x062A;&#x0629;.\n&#x064A;&#x0645;&#x0643;&#x0646; &#x062D;&#x0630;&#x0641; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0627;&#x0644;&#x0645;&#x062E;&#x0635;&#x0635;&#x0629; &#x0641;&#x0642;&#x0637; (&#x0627;&#x0644;&#x062A;&#x064A; &#x0623;&#x0646;&#x0634;&#x0623;&#x062A;&#x0647;&#x0627; &#x0628;&#x0632;&#x0631; \u2018\u2795 &#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x062C;&#x062F;&#x0648;&#x0644; &#x062C;&#x062F;&#x064A;&#x062F;\u2019).');
+    alert('\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u062B\u0627\u0628\u062A\u0629.\n\u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0645\u062E\u0635\u0635\u0629 \u0641\u0642\u0637.');
     _selectedDeleteTableId = null;
     _selectedDeleteTableName = null;
     return;
   }
   try {
-    const res = await fetch('/api/custom-tables/' + _selectedDeleteTableId, { method: 'DELETE' });
-    const data = await res.json();
+    var res = await fetch('/api/custom-tables/' + _selectedDeleteTableId, { method: 'DELETE' });
+    var data = await res.json();
     if (data.ok) {
       typeof loadCustomTables === 'function' && loadCustomTables();
       _selectedDeleteTableId = null;
       _selectedDeleteTableName = null;
     } else {
-      alert('&#x062E;&#x0637;&#x0623;: ' + (data.error || '&#x0641;&#x0634;&#x0644; &#x0627;&#x0644;&#x062D;&#x0630;&#x0641;'));
+      alert('\u062E\u0637\u0623: ' + (data.error || '\u0641\u0634\u0644 \u0627\u0644\u062D\u0630\u0641'));
     }
   } catch(e) {
-    alert('&#x062D;&#x062F;&#x062B; &#x062E;&#x0637;&#x0623; &#x0641;&#x064A; &#x0627;&#x0644;&#x0627;&#x062A;&#x0635;&#x0627;&#x0644; &#x0628;&#x0627;&#x0644;&#x062E;&#x0627;&#x062F;&#x0645;');
+    alert('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645');
   }
 }
 // ═══════════════════════════════════════════════════════
