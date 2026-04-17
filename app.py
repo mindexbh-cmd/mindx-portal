@@ -388,6 +388,30 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 <button class="btn" onclick="pmOpen()">&#x1F4B3; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</button>
 
 <div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:20px auto;border-radius:14px;max-width:99%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4B3; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:160px;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label><input type="date" id="pm-date" onchange="pmSetDay()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:0.95rem;"></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x64A;&#x648;&#x645;</label><input type="text" id="pm-day" readonly style="padding:7px 12px;border-radius:8px;border:1.5px solid #ccc;background:#f0f0f0;min-width:90px;font-size:0.95rem;"></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x628;&#x62D;&#x62B;</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645;..." style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:170px;font-size:0.95rem;"></div></div></div><div style="overflow-x:auto;"><table id="pm-tbl" style="border-collapse:collapse;width:100%;min-width:2600px;font-size:0.76rem;"><thead><tr style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;text-align:center;"><th rowspan="2" style="padding:8px 14px;border:1px solid #9b6fd4;position:sticky;right:0;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);z-index:2;min-width:140px;">&#x627;&#x644;&#x627;&#x633;&#x645;</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 1</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 2</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 3</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 4</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 5</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 6</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 7</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 8</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 9</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 10</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 11</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 12</th></tr><tr style="background:#ede7f6;color:#4a148c;text-align:center;"><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th></tr></thead><tbody id="pm-tbody"></tbody></table></div></div></div>
+
+<!-- DELETE TABLE MODAL -->
+<div class="modal-bg" id="deleteTableModal" style="display:none;">
+  <div class="modal" style="max-width:480px;width:95%;border-top:4px solid #e74c3c;">
+    <h2 style="margin-bottom:16px;color:#c0392b;">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</h2>
+    <p style="margin-bottom:12px;color:#555;font-size:.95em;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641;&#x647;:</p>
+    <div id="deleteTableList" style="max-height:280px;overflow-y:auto;border:1.5px solid #eee;border-radius:10px;padding:8px;margin-bottom:16px;background:#fafafa;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeDeleteTableModal()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button class="btn-save" style="background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="confirmDeleteTableSave()">&#x62D;&#x641;&#x638;</button>
+    </div>
+  </div>
+</div>
+<!-- DELETE TABLE CONFIRM MODAL -->
+<div class="confirm-bg" id="deleteTableConfirmModal" style="display:none;">
+  <div class="confirm-box">
+    <p>&#x647;&#x644; &#x623;&#x646;&#x62A; &#x645;&#x62A;&#x623;&#x643;&#x62F; &#x645;&#x646; &#x62D;&#x630;&#x641; &#x647;&#x630;&#x627; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;&#x61F;</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
+      <button class="btn-cancel" onclick="closeDeleteTableConfirm()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button class="btn-delete" onclick="executeDeleteTable()">&#x62A;&#x623;&#x643;&#x64A;&#x62F;</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var _pmStudents=[];
 function _norm(s){return(s||"").replace(/[&#x623;&#x625;&#x622;&#x671;]/g,"&#x627;").replace(/&#x629;/g,"&#x647;").replace(/&#x649;/g,"&#x64A;");}
@@ -1068,6 +1092,8 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .editable:hover{background:#f3eeff;}
 .btn-new-table{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
 .btn-new-table:hover{opacity:0.9;}
+.btn-delete-table{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.btn-delete-table:hover{opacity:0.9;}
 .custom-table-section{margin:30px 0 0 0;}
 .custom-table-title{font-size:1.2em;font-weight:700;color:#1565C0;margin-bottom:8px;}
 .wizard-step{display:none;}
@@ -1099,7 +1125,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644; &#x62C;&#x62F;&#x64A;&#x62F;</button></div>
+  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644; &#x62C;&#x62F;&#x64A;&#x62F;</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">&#x628;&#x62D;&#x62B;</button>
@@ -1979,6 +2005,91 @@ function confirmGroupDelete2(){
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
 var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x637;&#x627;&#x644;&#x628;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeStudentExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x637;&#x627;&#x644;&#x628; &#x628;&#x646;&#x62C;&#x627;&#x62D;");loadStudents();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeGroupExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x628;&#x646;&#x62C;&#x627;&#x62D;","#00BCD4");loadGroups2();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}
 loadGroups2();
+
+// ═══════════════════════════════════════════════════════
+// DELETE TABLE MODAL FUNCTIONS
+// ═══════════════════════════════════════════════════════
+let _selectedDeleteTableId = null;
+let _selectedDeleteTableName = null;
+
+async function openDeleteTableModal() {
+  _selectedDeleteTableId = null;
+  _selectedDeleteTableName = null;
+  const listEl = document.getElementById('deleteTableList');
+  listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x62C;&#x627;&#x631; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</p>';
+  document.getElementById('deleteTableModal').style.display = 'flex';
+  try {
+    const res = await fetch('/api/custom-tables');
+    const tables = await res.json();
+    if (!tables || tables.length === 0) {
+      listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x62C;&#x62F;&#x627;&#x648;&#x644; &#x645;&#x62E;&#x635;&#x635;&#x629; &#x644;&#x62D;&#x630;&#x641;&#x647;&#x627;</p>';
+      return;
+    }
+    listEl.innerHTML = tables.map(t => `
+      <div class="delete-table-item" id="dti_${t.id}" onclick="selectDeleteTable(${t.id}, '${t.tbl_name.replace(/'/g,"\\'")}')" style="padding:12px 16px;border-radius:8px;cursor:pointer;border:2px solid transparent;margin-bottom:6px;background:#fff;transition:all .2s;font-weight:600;font-size:1em;color:#333;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.2em;">&#x1F4CB;</span> ${t.tbl_name}
+      </div>
+    `).join('');
+  } catch(e) {
+    listEl.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:20px;">&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x62A;&#x62D;&#x645;&#x64A;&#x644; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</p>';
+  }
+}
+
+function selectDeleteTable(id, name) {
+  _selectedDeleteTableId = id;
+  _selectedDeleteTableName = name;
+  document.querySelectorAll('.delete-table-item').forEach(el => {
+    el.style.borderColor = 'transparent';
+    el.style.background = '#fff';
+    el.style.color = '#333';
+  });
+  const el = document.getElementById('dti_' + id);
+  if (el) {
+    el.style.borderColor = '#e74c3c';
+    el.style.background = '#ffeaea';
+    el.style.color = '#c0392b';
+  }
+}
+
+function closeDeleteTableModal() {
+  document.getElementById('deleteTableModal').style.display = 'none';
+  _selectedDeleteTableId = null;
+  _selectedDeleteTableName = null;
+}
+
+function confirmDeleteTableSave() {
+  if (!_selectedDeleteTableId) {
+    alert('&#x64A;&#x631;&#x62C;&#x649; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x62C;&#x62F;&#x648;&#x644; &#x623;&#x648;&#x644;&#x627;&#x64B;');
+    return;
+  }
+  document.getElementById('deleteTableModal').style.display = 'none';
+  document.getElementById('deleteTableConfirmModal').style.display = 'flex';
+}
+
+function closeDeleteTableConfirm() {
+  document.getElementById('deleteTableConfirmModal').style.display = 'none';
+  document.getElementById('deleteTableModal').style.display = 'flex';
+}
+
+async function executeDeleteTable() {
+  if (!_selectedDeleteTableId) return;
+  document.getElementById('deleteTableConfirmModal').style.display = 'none';
+  try {
+    const res = await fetch('/api/custom-tables/' + _selectedDeleteTableId, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) {
+      loadAllTables && loadAllTables();
+      _selectedDeleteTableId = null;
+      _selectedDeleteTableName = null;
+    } else {
+      alert('&#x62E;&#x637;&#x623;: ' + (data.error || '&#x641;&#x634;&#x644; &#x627;&#x644;&#x62D;&#x630;&#x641;'));
+    }
+  } catch(e) {
+    alert('&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644; &#x628;&#x627;&#x644;&#x62E;&#x627;&#x62F;&#x645;');
+  }
+}
+// ═══════════════════════════════════════════════════════
+
 function openTableEditModal(){
   loadColumnsForEdit();
   document.getElementById('tableEditModal').classList.add('open');
