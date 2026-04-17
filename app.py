@@ -1686,7 +1686,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 </div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <!-- DELETE TABLE MODAL -->
-<div class="modal-bg" id="deleteTableModal" style="display:none;">
+<div class="modal-bg" id="deleteTableModal">
   <div class="modal" style="max-width:480px;width:95%;border-top:4px solid #e74c3c;">
     <h2 style="margin-bottom:16px;color:#c0392b;">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</h2>
     <p style="margin-bottom:12px;color:#555;font-size:.95em;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641;&#x647;:</p>
@@ -1698,7 +1698,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
 </div>
 <!-- DELETE TABLE CONFIRM MODAL -->
-<div class="confirm-bg" id="deleteTableConfirmModal" style="display:none;">
+<div class="confirm-bg" id="deleteTableConfirmModal">
   <div class="confirm-box">
     <p>&#x647;&#x644; &#x623;&#x646;&#x62A; &#x645;&#x62A;&#x623;&#x643;&#x62F; &#x645;&#x646; &#x62D;&#x630;&#x641; &#x647;&#x630;&#x627; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;&#x61F;</p>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
