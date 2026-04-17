@@ -2015,7 +2015,9 @@ async function openDeleteTableModal() {
   _selectedDeleteTableName = null;
   const listEl = document.getElementById('deleteTableList');
   listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x62C;&#x627;&#x631; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</p>';
-  document.getElementById('deleteTableModal').style.display = 'flex';
+  document.body.appendChild(document.getElementById('deleteTableModal'));
+  document.body.appendChild(document.getElementById('deleteTableConfirmModal'));
+  document.getElementById('deleteTableModal').classList.add('open');
   try {
     const res = await fetch('/api/custom-tables');
     const tables = await res.json();
@@ -2050,7 +2052,7 @@ function selectDeleteTable(id, name) {
 }
 
 function closeDeleteTableModal() {
-  document.getElementById('deleteTableModal').style.display = 'none';
+  document.getElementById('deleteTableModal').classList.remove('open');
   _selectedDeleteTableId = null;
   _selectedDeleteTableName = null;
 }
@@ -2060,18 +2062,18 @@ function confirmDeleteTableSave() {
     alert('&#x64A;&#x631;&#x62C;&#x649; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x62C;&#x62F;&#x648;&#x644; &#x623;&#x648;&#x644;&#x627;&#x64B;');
     return;
   }
-  document.getElementById('deleteTableModal').style.display = 'none';
-  document.getElementById('deleteTableConfirmModal').style.display = 'flex';
+  document.getElementById('deleteTableModal').classList.remove('open');
+  document.getElementById('deleteTableConfirmModal').classList.add('open');
 }
 
 function closeDeleteTableConfirm() {
-  document.getElementById('deleteTableConfirmModal').style.display = 'none';
-  document.getElementById('deleteTableModal').style.display = 'flex';
+  document.getElementById('deleteTableConfirmModal').classList.remove('open');
+  document.getElementById('deleteTableModal').classList.add('open');
 }
 
 async function executeDeleteTable() {
   if (!_selectedDeleteTableId) return;
-  document.getElementById('deleteTableConfirmModal').style.display = 'none';
+  document.getElementById('deleteTableConfirmModal').classList.remove('open');
   try {
     const res = await fetch('/api/custom-tables/' + _selectedDeleteTableId, { method: 'DELETE' });
     const data = await res.json();
