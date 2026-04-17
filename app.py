@@ -2013,31 +2013,54 @@ let _selectedDeleteTableName = null;
 async function openDeleteTableModal() {
   _selectedDeleteTableId = null;
   _selectedDeleteTableName = null;
+  window._selectedDeleteTableType = null;
   const listEl = document.getElementById('deleteTableList');
-  listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x62C;&#x627;&#x631; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</p>';
+  listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x062C;&#x0627;&#x0631; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</p>';
   document.body.appendChild(document.getElementById('deleteTableModal'));
   document.body.appendChild(document.getElementById('deleteTableConfirmModal'));
   document.getElementById('deleteTableModal').classList.add('open');
   try {
     const res = await fetch('/api/custom-tables');
-    const tables = await res.json();
-    if (!tables || tables.length === 0) {
-      listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x62C;&#x62F;&#x627;&#x648;&#x644; &#x645;&#x62E;&#x635;&#x635;&#x629; &#x644;&#x62D;&#x630;&#x641;&#x647;&#x627;</p>';
+    const customTables = await res.json();
+    // Build combined list: fixed tables from DOM + custom tables from API
+    var allItems = [];
+    // Fixed tables
+    var fixedDefs = [
+      {domId: 'studentsBody', name: '&#x0642;&#x0627;&#x0639;&#x062F;&#x0629; &#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;'},
+      {domId: 'groupsBody2', name: '&#x0645;&#x0639;&#x0644;&#x0648;&#x0645;&#x0627;&#x062A; &#x0627;&#x0644;&#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A;'},
+      {domId: 'taqseetTable', name: '&#x0637;&#x0631;&#x064A;&#x0642;&#x0629; &#x0627;&#x0644;&#x062A;&#x0642;&#x0633;&#x064A;&#x0637;'},
+      {domId: 'attendanceBody', name: '&#x0633;&#x062C;&#x0644; &#x0627;&#x0644;&#x063A;&#x064A;&#x0627;&#x0628;'}
+    ];
+    fixedDefs.forEach(function(f) {
+      if (document.getElementById(f.domId)) {
+        allItems.push({id: 'fixed__' + f.domId, name: f.name, type: 'fixed'});
+      }
+    });
+    // Custom tables from API
+    if (customTables && customTables.length > 0) {
+      customTables.forEach(function(t) {
+        allItems.push({id: t.id, name: t.tbl_name, type: 'custom'});
+      });
+    }
+    if (allItems.length === 0) {
+      listEl.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">&#x0644;&#x0627; &#x062A;&#x0648;&#x062C;&#x062F; &#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0644;&#x0639;&#x0631;&#x0636;&#x0647;&#x0627;</p>';
       return;
     }
-    listEl.innerHTML = tables.map(t => `
-      <div class="delete-table-item" id="dti_${t.id}" onclick="selectDeleteTable(${t.id}, '${t.tbl_name.replace(/'/g,"\\'")}')" style="padding:12px 16px;border-radius:8px;cursor:pointer;border:2px solid transparent;margin-bottom:6px;background:#fff;transition:all .2s;font-weight:600;font-size:1em;color:#333;display:flex;align-items:center;gap:8px;">
-        <span style="font-size:1.2em;">&#x1F4CB;</span> ${t.tbl_name}
-      </div>
-    `).join('');
+    listEl.innerHTML = allItems.map(function(t) {
+      var icon = t.type === 'custom' ? '&#x1F4CB;' : '&#x1F4CA;';
+      var badge = t.type === 'fixed' ? '<span style="font-size:0.72em;background:#e67e22;color:#fff;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle;">&#x062B;&#x0627;&#x0628;&#x062A;</span>' : '';
+      return '<div class="delete-table-item" id="dti_' + t.id + '" onclick="selectDeleteTable('' + t.id + '', '' + t.name.replace(/'/g, "\\'") + '', '' + t.type + '')" style="padding:12px 16px;border-radius:8px;cursor:pointer;border:2px solid transparent;margin-bottom:6px;background:#fff;transition:all .2s;font-weight:600;font-size:1em;color:#333;display:flex;align-items:center;gap:8px;">' +
+        '<span style="font-size:1.2em;">' + icon + '</span>' + badge + t.name + '</div>';
+    }).join('');
   } catch(e) {
-    listEl.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:20px;">&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x62A;&#x62D;&#x645;&#x64A;&#x644; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</p>';
+    listEl.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:20px;">&#x062E;&#x0637;&#x0623; &#x0641;&#x064A; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A;</p>';
   }
 }
 
-function selectDeleteTable(id, name) {
+function selectDeleteTable(id, name, type) {
   _selectedDeleteTableId = id;
   _selectedDeleteTableName = name;
+  window._selectedDeleteTableType = type || 'custom';
   document.querySelectorAll('.delete-table-item').forEach(el => {
     el.style.borderColor = 'transparent';
     el.style.background = '#fff';
@@ -2059,7 +2082,7 @@ function closeDeleteTableModal() {
 
 function confirmDeleteTableSave() {
   if (!_selectedDeleteTableId) {
-    alert('&#x64A;&#x631;&#x62C;&#x649; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x62C;&#x62F;&#x648;&#x644; &#x623;&#x648;&#x644;&#x627;&#x64B;');
+    alert('&#x064A;&#x0631;&#x062C;&#x0649; &#x0627;&#x062E;&#x062A;&#x064A;&#x0627;&#x0631; &#x062C;&#x062F;&#x0648;&#x0644; &#x0623;&#x0648;&#x0644;&#x0627;&#x064B;');
     return;
   }
   document.getElementById('deleteTableModal').classList.remove('open');
@@ -2074,18 +2097,25 @@ function closeDeleteTableConfirm() {
 async function executeDeleteTable() {
   if (!_selectedDeleteTableId) return;
   document.getElementById('deleteTableConfirmModal').classList.remove('open');
+  var tableType = window._selectedDeleteTableType || 'custom';
+  if (tableType === 'fixed') {
+    alert('&#x0644;&#x0627; &#x064A;&#x0645;&#x0643;&#x0646; &#x062D;&#x0630;&#x0641; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0627;&#x0644;&#x062B;&#x0627;&#x0628;&#x062A;&#x0629;.\n&#x064A;&#x0645;&#x0643;&#x0646; &#x062D;&#x0630;&#x0641; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x0627;&#x0644;&#x0645;&#x062E;&#x0635;&#x0635;&#x0629; &#x0641;&#x0642;&#x0637; (&#x0627;&#x0644;&#x062A;&#x064A; &#x0623;&#x0646;&#x0634;&#x0623;&#x062A;&#x0647;&#x0627; &#x0628;&#x0632;&#x0631; \u2018\u2795 &#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x062C;&#x062F;&#x0648;&#x0644; &#x062C;&#x062F;&#x064A;&#x062F;\u2019).');
+    _selectedDeleteTableId = null;
+    _selectedDeleteTableName = null;
+    return;
+  }
   try {
     const res = await fetch('/api/custom-tables/' + _selectedDeleteTableId, { method: 'DELETE' });
     const data = await res.json();
     if (data.ok) {
-      loadAllTables && loadAllTables();
+      typeof loadCustomTables === 'function' && loadCustomTables();
       _selectedDeleteTableId = null;
       _selectedDeleteTableName = null;
     } else {
-      alert('&#x62E;&#x637;&#x623;: ' + (data.error || '&#x641;&#x634;&#x644; &#x627;&#x644;&#x62D;&#x630;&#x641;'));
+      alert('&#x062E;&#x0637;&#x0623;: ' + (data.error || '&#x0641;&#x0634;&#x0644; &#x0627;&#x0644;&#x062D;&#x0630;&#x0641;'));
     }
   } catch(e) {
-    alert('&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644; &#x628;&#x627;&#x644;&#x62E;&#x627;&#x62F;&#x645;');
+    alert('&#x062D;&#x062F;&#x062B; &#x062E;&#x0637;&#x0623; &#x0641;&#x064A; &#x0627;&#x0644;&#x0627;&#x062A;&#x0635;&#x0627;&#x0644; &#x0628;&#x0627;&#x0644;&#x062E;&#x0627;&#x062F;&#x0645;');
   }
 }
 // ═══════════════════════════════════════════════════════
