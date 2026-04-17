@@ -2027,7 +2027,6 @@ async function openDeleteTableModal() {
       {domId: 'studentsBody', name: '&#x0642;&#x0627;&#x0639;&#x062F;&#x0629; &#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;'},
       {domId: 'groupsBody2', name: '&#x0645;&#x0639;&#x0644;&#x0648;&#x0645;&#x0627;&#x062A; &#x0627;&#x0644;&#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A;'},
       {domId: 'taqseetTable', name: '&#x0637;&#x0631;&#x064A;&#x0642;&#x0629; &#x0627;&#x0644;&#x062A;&#x0642;&#x0633;&#x064A;&#x0637;'},
-      {domId: 'attendanceBody', name: '&#x0633;&#x062C;&#x0644; &#x0627;&#x0644;&#x063A;&#x064A;&#x0627;&#x0628;'}
     ];
     for (var i = 0; i < fixedDefs.length; i++) {
       if (document.getElementById(fixedDefs[i].domId)) {
