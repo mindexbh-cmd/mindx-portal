@@ -2099,7 +2099,7 @@ async function executeDeleteTable() {
   document.getElementById('deleteTableConfirmModal').classList.remove('open');
   var tableType = window._selectedDeleteTableType || 'custom';
   if (tableType === 'fixed') {
-    alert('\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u062B\u0627\u0628\u062A\u0629.\n\u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0645\u062E\u0635\u0635\u0629 \u0641\u0642\u0637.');
+    alert('\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u062B\u0627\u0628\u062A\u0629. \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0645\u062E\u0635\u0635\u0629 \u0641\u0642\u0637.');
     _selectedDeleteTableId = null;
     _selectedDeleteTableName = null;
     return;
