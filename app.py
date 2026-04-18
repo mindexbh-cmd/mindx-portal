@@ -415,7 +415,7 @@ function pmTypeChange(sel){
   var price=tq["inst"+inst]||"";
   var row=sel.closest("tr");
   if(!row)return;
-  var priceInp=row.querySelector(".pm-price[data-inst=\""+inst+"\"]");
+  var priceInp=null;var _ps=row.querySelectorAll(".pm-price");for(var _pi=0;_pi<_ps.length;_pi++){if(String(_ps[_pi].dataset.inst)===String(inst)){priceInp=_ps[_pi];break;}}
   if(priceInp&&(priceInp.value===null||priceInp.value===""||priceInp.value==="0")){priceInp.value=price;pmCalc(priceInp);}
 }
 function pmSetDay(){
