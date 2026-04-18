@@ -2,7 +2,7 @@ from flask import Flask, request, session, redirect, g, jsonify
 import sqlite3, hashlib, os, json
 from functools import wraps
 
-app = Flask(__name__)h
+app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
 DB = os.environ.get("DB_PATH", "mindx.db")
 
