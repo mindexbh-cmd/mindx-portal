@@ -442,17 +442,17 @@ function pmLoadGroup(){
         tdT.appendChild(sel);tr.appendChild(tdT);
         var tdP=document.createElement("td");tdP.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iP=document.createElement("input");iP.type="number";iP.dataset.sid=row.id;iP.dataset.inst=i;iP.className="pm-price";
-        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="&#x627;&#x644;&#x633;&#x639;&#x631;";
+        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="السعر";
         iP.oninput=function(){pmCalc(this);};tdP.appendChild(iP);tr.appendChild(tdP);
         var tdPd=document.createElement("td");tdPd.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iPd=document.createElement("input");iPd.type="number";iPd.dataset.sid=row.id;iPd.dataset.inst=i;iPd.className="pm-paid";
-        iPd.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iPd.value=pd.paid!=null&&pd.paid!==0?pd.paid:"";iPd.placeholder="&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;";
+        iPd.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iPd.value=pd.paid!=null&&pd.paid!==0?pd.paid:"";iPd.placeholder="المدفوع";
         iPd.oninput=function(){pmCalc(this);};tdPd.appendChild(iPd);tr.appendChild(tdPd);
         var tdR=document.createElement("td");tdR.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;background:#f0fff0;";
         var sp=document.createElement("span");sp.className="pm-rem-"+i;
         var pr=parseFloat(pd.price)||0;var pa=parseFloat(pd.paid)||0;
         sp.textContent=pr?(pr-pa).toFixed(2):"";tdR.appendChild(sp);
-        var sv=document.createElement("button");sv.textContent="&#x62D;&#x641;&#x638;";sv.dataset.sid=row.id;sv.dataset.inst=i;
+        var sv=document.createElement("button");sv.textContent="حفظ";sv.dataset.sid=row.id;sv.dataset.inst=i;
         sv.style.cssText="display:block;width:100%;margin-top:2px;padding:2px 4px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.7rem;";
         sv.onclick=function(){pmSave(this);};tdR.appendChild(sv);tr.appendChild(tdR);
       }
