@@ -428,7 +428,7 @@ function pmLoadGroup(){
         tdT.appendChild(sel);tr.appendChild(tdT);
         var tdP=document.createElement("td");tdP.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iP=document.createElement("input");iP.type="number";iP.dataset.sid=row.id;iP.dataset.inst=i;iP.className="pm-price";
-        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:"";iP.placeholder="&#x627;&#x644;&#x633;&#x639;&#x631;";
+        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="&#x627;&#x644;&#x633;&#x639;&#x631;";
         iP.oninput=function(){pmCalc(this);};tdP.appendChild(iP);tr.appendChild(tdP);
         var tdPd=document.createElement("td");tdPd.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iPd=document.createElement("input");iPd.type="number";iPd.dataset.sid=row.id;iPd.dataset.inst=i;iPd.className="pm-paid";
@@ -4043,10 +4043,14 @@ def api_payment_put(student_id, inst_num):
 def api_payments_group():
     db = get_db()
     group = request.args.get('group','')
-    students = db.execute("SELECT id,student_name FROM students WHERE group_name_student=? ORDER BY student_name", (group,)).fetchall()
+    students = db.execute("SELECT id,student_name,installment_type FROM students WHERE group_name_student=? ORDER BY student_name", (group,)).fetchall()
     result = []
     for s in students:
         row = {"id": s[0], "name": s[1]}
+        tq = db.execute("SELECT inst1,inst2,inst3,inst4,inst5,inst6,inst7,inst8,inst9,inst10,inst11,inst12 FROM taqseet WHERE taqseet_method=?", (str(s[2] or ''),)).fetchone()
+        if tq:
+            for n in range(1,13):
+                row["tq_inst"+str(n)] = tq[n-1] if tq[n-1] else ''
         payments = db.execute("SELECT inst_num,inst_type,price,paid FROM student_payments WHERE student_id=?", (s[0],)).fetchall()
         for p in payments:
             row["inst_"+str(p[0])] = {"inst_type": p[1], "price": p[2], "paid": p[3]}
