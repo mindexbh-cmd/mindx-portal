@@ -396,11 +396,11 @@ function pmOpen(){
   if(!window._pmGL){window._pmGL=true;
     fetch("/api/students").then(r=>r.json()).then(function(data){
       var seen={};var sel=document.getElementById("pm-group");
-      data.forEach(function(st){
+      (data.students||data).forEach(function(st){
         var g=st.group_name_student||"";
         if(g&&!seen[g]){seen[g]=1;var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o);}
       });
-      _pmStudents=data;
+      _pmStudents=data.students||data;
     });
   }
 }
