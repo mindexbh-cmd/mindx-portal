@@ -471,7 +471,7 @@ function pmSave(btn){
   var body={inst_type:((tr.querySelector(".pm-type[data-inst='"+inst+"']")||{}).value||""),
     price:parseFloat(((tr.querySelector(".pm-price[data-inst='"+inst+"']")||{}).value))||0,
     paid:parseFloat(((tr.querySelector(".pm-paid[data-inst='"+inst+"']")||{}).value))||0};
-  fetch("/api/payments/"+sid+"/"+inst,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).then(function(d){btn.textContent=d.ok?"&#x2713;":"&#x274C;";setTimeout(function(){btn.textContent="&#x62D;&#x641;&#x638;";},1800);});
+  fetch("/api/payments/"+sid+"/"+inst,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).then(function(d){btn.textContent=d.ok?"✓":"❌";setTimeout(function(){btn.textContent="حفظ";},1800);});
 }
 function pmFilter(){
   var q=_norm(document.getElementById("pm-search").value.toLowerCase());
