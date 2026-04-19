@@ -4073,6 +4073,14 @@ def api_payment_put(student_id, inst_num):
     db.execute("""INSERT OR REPLACE INTO student_payments(student_id,inst_num,inst_type,price,paid) VALUES(?,?,?,?,?)""",
         (student_id, inst_num, data.get('inst_type',''), data.get('price',0), data.get('paid',0)))
     db.commit()
+    # Sync paid amount to taqseet table
+    paid_val = data.get('paid', 0)
+    student_row = db.execute("SELECT installment_type FROM students WHERE id=?", (student_id,)).fetchone()
+    if student_row and student_row[0]:
+        paid_col = "paid" + str(inst_num)
+        db.execute("UPDATE taqseet SET " + paid_col + "=? WHERE taqseet_method=?",
+                   (str(paid_val), str(student_row[0])))
+        db.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/payments/group')
