@@ -424,7 +424,7 @@ function pmTypeChange(sel){
 }
 function pmSetDay(){
   var d=document.getElementById("pm-date").value;if(!d)return;
-  var days=["Ø§ÙØ£Ø­Ø¯","Ø§ÙØ§Ø«ÙÙÙ","Ø§ÙØ«ÙØ§Ø«Ø§Ø¡","Ø§ÙØ£Ø±Ø¨Ø¹Ø§Ø¡","Ø§ÙØ®ÙÙØ³","Ø§ÙØ¬ÙØ¹Ø©","Ø§ÙØ³Ø¨Øª"];
+  var days=["\u0627\u0644\u0623\u062d\u062f","\u0627\u0644\u0627\u062b\u0646\u064a\u0646","\u0627\u0644\u062b\u0644\u0627\u062b\u0627\u0621","\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621","\u0627\u0644\u062e\u0645\u064a\u0633","\u0627\u0644\u062c\u0645\u0639\u0629","\u0627\u0644\u0633\u0628\u062a"];
   document.getElementById("pm-day").value=days[new Date(d).getDay()];
 }
 function pmLoadGroup(){
@@ -446,17 +446,17 @@ function pmLoadGroup(){
         tdT.appendChild(sel);tr.appendChild(tdT);
         var tdP=document.createElement("td");tdP.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iP=document.createElement("input");iP.type="number";iP.dataset.sid=row.id;iP.dataset.inst=i;iP.className="pm-price";
-        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="Ø§ÙØ³Ø¹Ø±";
+        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="\u0627\u0644\u0633\u0639\u0631";
         iP.oninput=function(){pmCalc(this);};tdP.appendChild(iP);tr.appendChild(tdP);
         var tdPd=document.createElement("td");tdPd.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
         var iPd=document.createElement("input");iPd.type="number";iPd.dataset.sid=row.id;iPd.dataset.inst=i;iPd.className="pm-paid";
-        iPd.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iPd.value=pd.paid!=null&&pd.paid!==0?pd.paid:"";iPd.placeholder="Ø§ÙÙØ¯ÙÙØ¹";
+        iPd.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iPd.value=pd.paid!=null&&pd.paid!==0?pd.paid:"";iPd.placeholder="\u0627\u0644\u0645\u062f\u0641\u0648\u0639";
         iPd.oninput=function(){pmCalc(this);};tdPd.appendChild(iPd);tr.appendChild(tdPd);
         var tdR=document.createElement("td");tdR.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;background:#f0fff0;";
         var sp=document.createElement("span");sp.className="pm-rem-"+i;
         var pr=parseFloat(pd.price)||0;var pa=parseFloat(pd.paid)||0;
         sp.textContent=pr?(pr-pa).toFixed(2):"";tdR.appendChild(sp);
-        var sv=document.createElement("button");sv.textContent="Ø­ÙØ¸";sv.dataset.sid=row.id;sv.dataset.inst=i;
+        var sv=document.createElement("button");sv.textContent="\u062d\u0641\u0638";sv.dataset.sid=row.id;sv.dataset.inst=i;
         sv.style.cssText="display:block;width:100%;margin-top:2px;padding:2px 4px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.7rem;";
         sv.onclick=function(){pmSave(this);};tdR.appendChild(sv);tr.appendChild(tdR);
       }
@@ -475,7 +475,7 @@ function pmSave(btn){
   var body={inst_type:((tr.querySelector(".pm-type[data-inst='"+inst+"']")||{}).value||""),
     price:parseFloat(((tr.querySelector(".pm-price[data-inst='"+inst+"']")||{}).value))||0,
     paid:parseFloat(((tr.querySelector(".pm-paid[data-inst='"+inst+"']")||{}).value))||0};
-  fetch("/api/payments/"+sid+"/"+inst,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).then(function(d){btn.textContent=d.ok?"â":"â";setTimeout(function(){btn.textContent="Ø­ÙØ¸";},1800);});
+  fetch("/api/payments/"+sid+"/"+inst,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).then(function(d){btn.textContent=d.ok?"\u2713":"\u274c";setTimeout(function(){btn.textContent="\u062d\u0641\u0638";},1800);});
 }
 function pmFilter(){
   var q=_norm(document.getElementById("pm-search").value.toLowerCase());
@@ -656,10 +656,10 @@ function showToast(msg, bg) {
 function normalizeAr(s) {
   if (!s) return '';
   return s
-    .replace(/[Ø£Ø¥Ø¢Ø§]/g, 'Ø§')  // Ø£Ø¥Ø¢Ø§ â Ø§
-    .replace(/[Ø©Ù]/g, 'Ù')               // Ø©Ù â Ù
-    .replace(/[ÙÙ]/g, 'Ù')               // ÙÙ â Ù
-    .replace(/[Ù-Ù]/g, '');                   // remove tashkeel
+    .replace(/[\u0623\u0625\u0622\u0627]/g, '\u0627')  // \u0623\u0625\u0622\u0627 \u2192 \u0627
+    .replace(/[\u0629\u0647]/g, '\u0647')               // \u0629\u0647 \u2192 \u0647
+    .replace(/[\u0649\u064a]/g, '\u064a')               // \u0649\u064a \u2192 \u064a
+    .replace(/[\u064b-\u065f]/g, '');                   // remove tashkeel
 }
 
 var _searchTimeout = null;
@@ -2020,9 +2020,9 @@ function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').clas
 var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x637;&#x627;&#x644;&#x628;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeStudentExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x637;&#x627;&#x644;&#x628; &#x628;&#x646;&#x62C;&#x627;&#x62D;");loadStudents();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeGroupExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x628;&#x646;&#x62C;&#x627;&#x62D;","#00BCD4");loadGroups2();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}
 loadGroups2();
 
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // DELETE TABLE MODAL FUNCTIONS
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 let _selectedDeleteTableId = null;
 let _selectedDeleteTableName = null;
 
@@ -2133,7 +2133,7 @@ async function executeDeleteTable() {
     alert('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645');
   }
 }
-// âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 function openTableEditModal(){
   loadColumnsForEdit();
