@@ -132,18 +132,18 @@ def init_db():
         student_name TEXT DEFAULT '',
         course_amount TEXT DEFAULT '',
         num_installments TEXT DEFAULT '',
-        inst1 TEXT DEFAULT '', date1 TEXT DEFAULT '',
-        inst2 TEXT DEFAULT '', date2 TEXT DEFAULT '',
-        inst3 TEXT DEFAULT '', date3 TEXT DEFAULT '',
-        inst4 TEXT DEFAULT '', date4 TEXT DEFAULT '',
-        inst5 TEXT DEFAULT '', date5 TEXT DEFAULT '',
-        inst6 TEXT DEFAULT '', date6 TEXT DEFAULT '',
-        inst7 TEXT DEFAULT '', date7 TEXT DEFAULT '',
-        inst8 TEXT DEFAULT '', date8 TEXT DEFAULT '',
-        inst9 TEXT DEFAULT '', date9 TEXT DEFAULT '',
-        inst10 TEXT DEFAULT '', date10 TEXT DEFAULT '',
-        inst11 TEXT DEFAULT '', date11 TEXT DEFAULT '',
-        inst12 TEXT DEFAULT '', date12 TEXT DEFAULT '',
+        inst1 TEXT DEFAULT '', paid1 TEXT DEFAULT '', date1 TEXT DEFAULT '',
+        inst2 TEXT DEFAULT '', paid2 TEXT DEFAULT '', date2 TEXT DEFAULT '',
+        inst3 TEXT DEFAULT '', paid3 TEXT DEFAULT '', date3 TEXT DEFAULT '',
+        inst4 TEXT DEFAULT '', paid4 TEXT DEFAULT '', date4 TEXT DEFAULT '',
+        inst5 TEXT DEFAULT '', paid5 TEXT DEFAULT '', date5 TEXT DEFAULT '',
+        inst6 TEXT DEFAULT '', paid6 TEXT DEFAULT '', date6 TEXT DEFAULT '',
+        inst7 TEXT DEFAULT '', paid7 TEXT DEFAULT '', date7 TEXT DEFAULT '',
+        inst8 TEXT DEFAULT '', paid8 TEXT DEFAULT '', date8 TEXT DEFAULT '',
+        inst9 TEXT DEFAULT '', paid9 TEXT DEFAULT '', date9 TEXT DEFAULT '',
+        inst10 TEXT DEFAULT '', paid10 TEXT DEFAULT '', date10 TEXT DEFAULT '',
+        inst11 TEXT DEFAULT '', paid11 TEXT DEFAULT '', date11 TEXT DEFAULT '',
+        inst12 TEXT DEFAULT '', paid12 TEXT DEFAULT '', date12 TEXT DEFAULT '',
         study_hours TEXT DEFAULT '',
         start_date TEXT DEFAULT ''
     )""")
@@ -291,6 +291,13 @@ else:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_id INTEGER,
         row_data TEXT DEFAULT '{}')""")
+    # Add paid1..paid12 columns to taqseet if missing
+    tq_existing = [row[1] for row in db2.execute("PRAGMA table_info(taqseet)").fetchall()]
+    for pn in range(1, 13):
+        pcol = "paid" + str(pn)
+        if pcol not in tq_existing:
+            db2.execute("ALTER TABLE taqseet ADD COLUMN " + pcol + " TEXT DEFAULT ''")
+    db2.commit()
     # Add 10 default rows to taqseet if empty
     if db2.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
         for i in range(1, 11):
@@ -1212,28 +1219,40 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
           <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 1</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 1</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 1</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 2</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 2</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 2</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 3</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 3</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 3</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 4</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 4</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 4</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 5</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 5</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 5</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 6</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 6</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 6</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 7</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 7</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 7</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 8</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 8</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 8</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 9</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 9</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 9</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 10</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 10</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 10</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 11</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 11</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 11</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 12</th>
+          <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639; 12</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 12</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:100px;">&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x628;&#x62F;&#x621; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</th>
@@ -1739,13 +1758,13 @@ function loadTaqseet() {
 function renderTaqseet() {
   var tbody = document.getElementById('taqseetBody');
   if (!allTaqseet || !allTaqseet.length) {
-    tbody.innerHTML = '<tr><td colspan="32" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="44" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
     return;
   }
   var fields = ['taqseet_method','student_name','course_amount','num_installments',
-    'inst1','date1','inst2','date2','inst3','date3','inst4','date4',
-    'inst5','date5','inst6','date6','inst7','date7','inst8','date8',
-    'inst9','date9','inst10','date10','inst11','date11','inst12','date12',
+    'inst1','paid1','date1','inst2','paid2','date2','inst3','paid3','date3','inst4','paid4','date4',
+    'inst5','paid5','date5','inst6','paid6','date6','inst7','paid7','date7','inst8','paid8','date8',
+    'inst9','paid9','date9','inst10','paid10','date10','inst11','paid11','date11','inst12','paid12','date12',
     'study_hours','start_date'];
   tbody.innerHTML = allTaqseet.map(function(r, i) {
     var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
@@ -1785,10 +1804,10 @@ function openAddTaqseet() {
   fetch('/api/taqseet', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({taqseet_method: String(nextNum),
       student_name:'', course_amount:'', num_installments:'',
-      inst1:'', date1:'', inst2:'', date2:'', inst3:'', date3:'',
-      inst4:'', date4:'', inst5:'', date5:'', inst6:'', date6:'',
-      inst7:'', date7:'', inst8:'', date8:'', inst9:'', date9:'',
-      inst10:'', date10:'', inst11:'', date11:'', inst12:'', date12:'',
+      inst1:'', paid1:'', date1:'', inst2:'', paid2:'', date2:'', inst3:'', paid3:'', date3:'',
+      inst4:'', paid4:'', date4:'', inst5:'', paid5:'', date5:'', inst6:'', paid6:'', date6:'',
+      inst7:'', paid7:'', date7:'', inst8:'', paid8:'', date8:'', inst9:'', paid9:'', date9:'',
+      inst10:'', paid10:'', date10:'', inst11:'', paid11:'', date11:'', inst12:'', paid12:'', date12:'',
       study_hours:'', start_date:''})})
     .then(function(){ loadTaqseet(); showToast('&#x62A;&#x645; &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641; &#x62C;&#x62F;&#x64A;&#x62F;', '#1a8754'); });
 }
@@ -3996,19 +4015,19 @@ def api_taqseet_post():
     db = get_db()
     db.execute("""INSERT INTO taqseet (
         taqseet_method, student_name, course_amount, num_installments,
-        inst1, date1, inst2, date2, inst3, date3, inst4, date4,
-        inst5, date5, inst6, date6, inst7, date7, inst8, date8,
-        inst9, date9, inst10, date10, inst11, date11, inst12, date12,
+        inst1, paid1, date1, inst2, paid2, date2, inst3, paid3, date3, inst4, paid4, date4,
+        inst5, paid5, date5, inst6, paid6, date6, inst7, paid7, date7, inst8, paid8, date8,
+        inst9, paid9, date9, inst10, paid10, date10, inst11, paid11, date11, inst12, paid12, date12,
         study_hours, start_date
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
     (d.get('taqseet_method',''), d.get('student_name',''), d.get('course_amount',''),
      d.get('num_installments',''),
-     d.get('inst1',''), d.get('date1',''), d.get('inst2',''), d.get('date2',''),
-     d.get('inst3',''), d.get('date3',''), d.get('inst4',''), d.get('date4',''),
-     d.get('inst5',''), d.get('date5',''), d.get('inst6',''), d.get('date6',''),
-     d.get('inst7',''), d.get('date7',''), d.get('inst8',''), d.get('date8',''),
-     d.get('inst9',''), d.get('date9',''), d.get('inst10',''), d.get('date10',''),
-     d.get('inst11',''), d.get('date11',''), d.get('inst12',''), d.get('date12',''),
+     d.get('inst1',''), d.get('paid1',''), d.get('date1',''), d.get('inst2',''), d.get('paid2',''), d.get('date2',''),
+     d.get('inst3',''), d.get('paid3',''), d.get('date3',''), d.get('inst4',''), d.get('paid4',''), d.get('date4',''),
+     d.get('inst5',''), d.get('paid5',''), d.get('date5',''), d.get('inst6',''), d.get('paid6',''), d.get('date6',''),
+     d.get('inst7',''), d.get('paid7',''), d.get('date7',''), d.get('inst8',''), d.get('paid8',''), d.get('date8',''),
+     d.get('inst9',''), d.get('paid9',''), d.get('date9',''), d.get('inst10',''), d.get('paid10',''), d.get('date10',''),
+     d.get('inst11',''), d.get('paid11',''), d.get('date11',''), d.get('inst12',''), d.get('paid12',''), d.get('date12',''),
      d.get('study_hours',''), d.get('start_date','')))
     db.commit()
     return jsonify({"ok": True, "id": db.execute("SELECT last_insert_rowid()").fetchone()[0]})
@@ -4020,19 +4039,19 @@ def api_taqseet_put(row_id):
     db = get_db()
     db.execute("""UPDATE taqseet SET
         taqseet_method=?, student_name=?, course_amount=?, num_installments=?,
-        inst1=?, date1=?, inst2=?, date2=?, inst3=?, date3=?, inst4=?, date4=?,
-        inst5=?, date5=?, inst6=?, date6=?, inst7=?, date7=?, inst8=?, date8=?,
-        inst9=?, date9=?, inst10=?, date10=?, inst11=?, date11=?, inst12=?, date12=?,
+        inst1=?, paid1=?, date1=?, inst2=?, paid2=?, date2=?, inst3=?, paid3=?, date3=?, inst4=?, paid4=?, date4=?,
+        inst5=?, paid5=?, date5=?, inst6=?, paid6=?, date6=?, inst7=?, paid7=?, date7=?, inst8=?, paid8=?, date8=?,
+        inst9=?, paid9=?, date9=?, inst10=?, paid10=?, date10=?, inst11=?, paid11=?, date11=?, inst12=?, paid12=?, date12=?,
         study_hours=?, start_date=?
         WHERE id=?""",
     (d.get('taqseet_method',''), d.get('student_name',''), d.get('course_amount',''),
      d.get('num_installments',''),
-     d.get('inst1',''), d.get('date1',''), d.get('inst2',''), d.get('date2',''),
-     d.get('inst3',''), d.get('date3',''), d.get('inst4',''), d.get('date4',''),
-     d.get('inst5',''), d.get('date5',''), d.get('inst6',''), d.get('date6',''),
-     d.get('inst7',''), d.get('date7',''), d.get('inst8',''), d.get('date8',''),
-     d.get('inst9',''), d.get('date9',''), d.get('inst10',''), d.get('date10',''),
-     d.get('inst11',''), d.get('date11',''), d.get('inst12',''), d.get('date12',''),
+     d.get('inst1',''), d.get('paid1',''), d.get('date1',''), d.get('inst2',''), d.get('paid2',''), d.get('date2',''),
+     d.get('inst3',''), d.get('paid3',''), d.get('date3',''), d.get('inst4',''), d.get('paid4',''), d.get('date4',''),
+     d.get('inst5',''), d.get('paid5',''), d.get('date5',''), d.get('inst6',''), d.get('paid6',''), d.get('date6',''),
+     d.get('inst7',''), d.get('paid7',''), d.get('date7',''), d.get('inst8',''), d.get('paid8',''), d.get('date8',''),
+     d.get('inst9',''), d.get('paid9',''), d.get('date9',''), d.get('inst10',''), d.get('paid10',''), d.get('date10',''),
+     d.get('inst11',''), d.get('paid11',''), d.get('date11',''), d.get('inst12',''), d.get('paid12',''), d.get('date12',''),
      d.get('study_hours',''), d.get('start_date',''), row_id))
     db.commit()
     return jsonify({"ok": True})
