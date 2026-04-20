@@ -70,6 +70,18 @@ def init_db():
         online_time TEXT,
         group_link TEXT,
         session_duration TEXT,
+        student_count TEXT,
+        study_days TEXT,
+        online_days TEXT,
+        online_time_ramadan TEXT,
+        sessions_total_auto TEXT,
+        sessions_nonramadan_auto TEXT,
+        sessions_ramadan_auto TEXT,
+        sessions_online_auto TEXT,
+        session_minutes_normal TEXT,
+        hours_in_person_auto TEXT,
+        hours_online_only TEXT,
+        hours_all_online TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS column_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,6 +226,18 @@ else:
         online_time TEXT,
         group_link TEXT,
         session_duration TEXT,
+        student_count TEXT,
+        study_days TEXT,
+        online_days TEXT,
+        online_time_ramadan TEXT,
+        sessions_total_auto TEXT,
+        sessions_nonramadan_auto TEXT,
+        sessions_ramadan_auto TEXT,
+        sessions_online_auto TEXT,
+        session_minutes_normal TEXT,
+        hours_in_person_auto TEXT,
+        hours_online_only TEXT,
+        hours_all_online TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     
     db2.execute("""CREATE TABLE IF NOT EXISTS column_labels(
@@ -268,6 +292,24 @@ else:
     for col, coltype in new_cols:
         if col not in existing:
             db2.execute("ALTER TABLE students ADD COLUMN " + col + " " + coltype)
+    new_group_cols = [
+        ("student_count", "TEXT"),
+        ("study_days", "TEXT"),
+        ("online_days", "TEXT"),
+        ("online_time_ramadan", "TEXT"),
+        ("sessions_total_auto", "TEXT"),
+        ("sessions_nonramadan_auto", "TEXT"),
+        ("sessions_ramadan_auto", "TEXT"),
+        ("sessions_online_auto", "TEXT"),
+        ("session_minutes_normal", "TEXT"),
+        ("hours_in_person_auto", "TEXT"),
+        ("hours_online_only", "TEXT"),
+        ("hours_all_online", "TEXT"),
+    ]
+    group_existing = [row[1] for row in db2.execute("PRAGMA table_info(student_groups)").fetchall()]
+    for col, coltype in new_group_cols:
+        if col not in group_existing:
+            db2.execute("ALTER TABLE student_groups ADD COLUMN " + col + " " + coltype)
     db2.execute("""CREATE TABLE IF NOT EXISTS attendance(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         attendance_date TEXT,
@@ -3029,13 +3071,25 @@ var IMPORT_DEFS = {
     fields: [
       {key:"group_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
       {key:"teacher_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062F\u0631\u0633"},
-      {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649"},
-      {key:"last_reached", ar:"\u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0641\u0627\u0626\u062A"},
+      {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649 \u0627\u0648 \u0627\u0644\u0645\u0642\u0631\u0631"},
+      {key:"last_reached", ar:"\u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0630\u064A \u062A\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0627\u0644\u064A\u0647 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u0641\u0627\u0626\u062A"},
+      {key:"student_count", ar:"\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0627\u0628"},
+      {key:"study_days", ar:"\u0627\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
       {key:"study_time", ar:"\u0648\u0642\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
-      {key:"ramadan_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0631\u0645\u0636\u0627\u0646"},
-      {key:"online_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646"},
-      {key:"group_link", ar:"\u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
-      {key:"session_duration", ar:"\u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629"}
+      {key:"ramadan_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646"},
+      {key:"online_days", ar:"\u0627\u064A\u0627\u0645 \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646"},
+      {key:"online_time_ramadan", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646)"},
+      {key:"online_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u0627\u0644\u0639\u0627\u062F\u064A)"},
+      {key:"group_link", ar:"\u0631\u0627\u0628\u0637 \u0628\u062B \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
+      {key:"sessions_total_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u0627\u062C\u0645\u0627\u0644\u064A (\u062A\u0644\u0642\u0627\u0626\u064A)"},
+      {key:"sessions_nonramadan_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 \u0642\u0628\u0644 \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646 \u0648 \u0628\u0639\u062F\u0647 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
+      {key:"sessions_ramadan_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 \u0641\u064A \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
+      {key:"sessions_online_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
+      {key:"session_minutes_normal", ar:"\u0645\u062F\u0629 \u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u0644\u0648\u0642\u062A \u0627\u0644\u0627\u0639\u062A\u064A\u0627\u062F\u064A (\u064A\u062F\u0648\u064A)"},
+      {key:"session_duration", ar:"\u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646"},
+      {key:"hours_in_person_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
+      {key:"hours_online_only", ar:"\u0639\u062F\u062F \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 \u0641\u0642\u0637"},
+      {key:"hours_all_online", ar:"\u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u064A\u0629 \u0643\u0644\u0647\u0627 \u0628\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646"}
     ]
   },
   attendance: {
@@ -3636,6 +3690,26 @@ def api_group_columns_get():
             except:
                 pass
         db.commit()
+    extra_group_cols = [
+        ("student_count","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628;",10),
+        ("study_days","&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;",11),
+        ("online_days","&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",12),
+        ("online_time_ramadan","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;)",13),
+        ("sessions_total_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x62C;&#x645;&#x627;&#x644;&#x64A; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",14),
+        ("sessions_nonramadan_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x642;&#x628;&#x644; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646; &#x648; &#x628;&#x639;&#x62F;&#x647; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",15),
+        ("sessions_ramadan_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x641;&#x64A; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",16),
+        ("sessions_online_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",17),
+        ("session_minutes_normal","&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)",18),
+        ("hours_in_person_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",19),
+        ("hours_online_only","&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;",20),
+        ("hours_all_online","&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",21),
+    ]
+    for key,label,order in extra_group_cols:
+        try:
+            db.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
+        except:
+            pass
+    db.commit()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM group_col_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
@@ -4437,6 +4511,10 @@ IMPORT_TABLE_FIELDS = {
     "student_groups": [
         "group_name","teacher_name","level_course","last_reached","study_time",
         "ramadan_time","online_time","group_link","session_duration",
+        "student_count","study_days","online_days","online_time_ramadan",
+        "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto",
+        "sessions_online_auto","session_minutes_normal",
+        "hours_in_person_auto","hours_online_only","hours_all_online",
     ],
     "attendance": [
         "attendance_date","day_name","group_name","student_name","contact_number",
