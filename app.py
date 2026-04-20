@@ -3031,7 +3031,8 @@ function onGenExcelTableChange() {
 function readGenericExcelFile(input) {
   var file = input.files[0]; if(!file) return;
   var tbl = document.getElementById('genExcelTable').value;
-  if(!tbl){ document.getElementById('genExcelStatus').textContent = "\u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644 \u0623\u0648\u0644\u0627\u064B"; return; }
+  var statusEl = document.getElementById('genExcelStatus');
+  if(!tbl){ statusEl.textContent = "\u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644 \u0623\u0648\u0644\u0627\u064B"; return; }
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -3040,17 +3041,39 @@ function readGenericExcelFile(input) {
       var sheet = wb.Sheets[wb.SheetNames[0]];
       var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
       if(!rows.length || !rows[0] || !rows[0].length){
-        document.getElementById('genExcelStatus').textContent = "\u0627\u0644\u0645\u0644\u0641 \u0641\u0627\u0631\u063A";
+        statusEl.textContent = "\u0627\u0644\u0645\u0644\u0641 \u0641\u0627\u0631\u063A";
         return;
       }
-      genExcelHeaders = rows[0].map(function(h){ return String(h==null?'':h).trim(); });
+      genExcelHeaders = rows[0].map(function(h){ return String(h==null?'':h).replace(/^\uFEFF/,'').trim(); });
       genExcelRows = rows.slice(1).filter(function(r){
         return r.some(function(c){ return String(c).trim() !== ''; });
       });
-      document.getElementById('genExcelStatus').textContent = "\u062A\u0645 \u0642\u0631\u0627\u0621\u0629 " + genExcelRows.length + " \u0635\u0641";
-      document.getElementById('genExcelImportBtn').style.display = genExcelRows.length > 0 ? 'inline-flex' : 'none';
+      var defs = IMPORT_DEFS[tbl];
+      var matched = [], unmatched = [];
+      for(var i=0;i<genExcelHeaders.length;i++){
+        var h = genExcelHeaders[i]; if(!h){ continue; }
+        var hn = _arNorm(h), found = null;
+        for(var j=0;j<defs.fields.length;j++){
+          var f = defs.fields[j];
+          if(hn === f.key || hn === _arNorm(f.ar)){ found = f.key; break; }
+        }
+        if(found) matched.push(h + ' \u2192 ' + found);
+        else unmatched.push(h);
+      }
+      var html = '<div style="text-align:right;">'
+        + '<div><b>' + genExcelRows.length + '</b> ' + (genExcelRows.length===1?"\u0635\u0641":"\u0635\u0641\u0648\u0641") + ' \u2014 '
+        + '\u0645\u0637\u0627\u0628\u0642\u0629: <b>' + matched.length + '</b> / \u063A\u064A\u0631 \u0645\u0637\u0627\u0628\u0642: <b>' + unmatched.length + '</b></div>';
+      if(unmatched.length){
+        html += '<div style="margin-top:6px;color:#c62828;font-size:12px;">\u0627\u0644\u0623\u0639\u0645\u062F\u0629 \u0627\u0644\u062A\u064A \u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0639\u0631\u0641 \u0639\u0644\u064A\u0647\u0627: ' + unmatched.map(function(u){return '"' + u + '"';}).join('\u060C ') + '</div>';
+      }
+      if(!matched.length){
+        html += '<div style="margin-top:6px;color:#c62828;font-weight:700;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0631\u0624\u0648\u0633 \u0645\u0639\u0631\u0648\u0641\u0629</div>';
+      }
+      html += '</div>';
+      statusEl.innerHTML = html;
+      document.getElementById('genExcelImportBtn').style.display = (genExcelRows.length > 0 && matched.length > 0) ? 'inline-flex' : 'none';
     } catch(err) {
-      document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623: " + err.message;
+      statusEl.textContent = "\u062E\u0637\u0623: " + err.message;
     }
   };
   reader.readAsArrayBuffer(file);
@@ -3081,26 +3104,33 @@ function importGenericFromExcel() {
   if(!defs || !genExcelRows.length) return;
   var mapped = genExcelRows.map(function(r){ return mapGenericRow(genExcelHeaders, r, defs); });
   var btn = document.getElementById('genExcelImportBtn');
+  var statusEl = document.getElementById('genExcelStatus');
   btn.disabled = true;
   btn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F...";
   fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table: tbl, rows: mapped})})
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if(d && d.ok){
-        document.getElementById('genExcelStatus').textContent = "\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F " + d.imported + " \u0635\u0641";
-        if(defs.refresh && typeof window[defs.refresh] === 'function') { try { window[defs.refresh](); } catch(e) {} }
-        if(typeof showToast === 'function') showToast("\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F " + d.imported + " \u0635\u0641 \u0628\u0646\u062C\u0627\u062D");
-        setTimeout(closeGenericExcelModal, 1200);
-      } else {
-        document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623: " + ((d && d.error) || '');
-      }
       btn.disabled = false;
       btn.textContent = "\u0627\u0633\u062A\u064A\u0631\u0627\u062F";
+      if(d && d.ok){
+        var ins = d.imported || 0, ign = d.ignored || 0, err = d.errors || 0;
+        var parts = ["\u062A\u0645 \u0627\u0644\u0625\u062F\u0631\u0627\u062C: " + ins];
+        if(ign) parts.push("\u0645\u062A\u062C\u0627\u0647\u0644: " + ign);
+        if(err) parts.push("\u062E\u0637\u0623: " + err);
+        statusEl.textContent = parts.join(" \u2014 ");
+        if(defs.refresh && typeof window[defs.refresh] === 'function') { try { window[defs.refresh](); } catch(e) {} }
+        if(typeof showToast === 'function') showToast(parts.join(" \u2014 "));
+        if(ins > 0 && ign === 0 && err === 0) {
+          setTimeout(closeGenericExcelModal, 1200);
+        }
+      } else {
+        statusEl.textContent = "\u062E\u0637\u0623: " + ((d && d.error) || '');
+      }
     })
     .catch(function(){
-      document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644";
       btn.disabled = false;
       btn.textContent = "\u0627\u0633\u062A\u064A\u0631\u0627\u062F";
+      statusEl.textContent = "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644";
     });
 }
 
@@ -4321,6 +4351,7 @@ def api_import():
         return jsonify({"ok": False, "error": "unknown table"}), 400
     db = get_db()
     imported = 0
+    ignored = 0
     errors = 0
     cols = ",".join(fields)
     placeholders = ",".join(["?"] * len(fields))
@@ -4328,12 +4359,15 @@ def api_import():
     for r in rows:
         try:
             values = tuple(str(r.get(f, "") or "") for f in fields)
-            db.execute(sql, values)
-            imported += 1
+            cur = db.execute(sql, values)
+            if cur.rowcount > 0:
+                imported += 1
+            else:
+                ignored += 1
         except Exception:
             errors += 1
     db.commit()
-    return jsonify({"ok": True, "imported": imported, "errors": errors})
+    return jsonify({"ok": True, "imported": imported, "ignored": ignored, "errors": errors, "received": len(rows)})
 
 @app.route('/api/attendance/sessions', methods=['GET'])
 @login_required
