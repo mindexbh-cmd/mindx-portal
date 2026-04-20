@@ -3055,13 +3055,19 @@ function readGenericExcelFile(input) {
   };
   reader.readAsArrayBuffer(file);
 }
+function _arNorm(s){
+  return String(s==null?'':s).trim()
+    .replace(/[\u0623\u0625\u0622\u0671]/g,'\u0627')
+    .replace(/\u0629/g,'\u0647')
+    .replace(/\u0649/g,'\u064A');
+}
 function mapGenericRow(headers, row, defs) {
   var result = {};
   for(var i=0; i<headers.length; i++){
-    var h = headers[i]; if(!h) continue;
+    var h = _arNorm(headers[i]); if(!h) continue;
     for(var j=0; j<defs.fields.length; j++){
       var f = defs.fields[j];
-      if(h === f.key || h === f.ar){
+      if(h === f.key || h === _arNorm(f.ar)){
         result[f.key] = String(row[i]==null?'':row[i]);
         break;
       }
