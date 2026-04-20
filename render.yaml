@@ -8,6 +8,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DB_PATH
-        value: /tmp/mindx.db
+        value: /var/data/mindx.db
+    disk:
+      name: mindx-data
+      mountPath: /var/data
+      sizeGB: 1
 
 # redeploy 2026-04-10T12:06:17.295Z
