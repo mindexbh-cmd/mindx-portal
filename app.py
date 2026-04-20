@@ -1189,8 +1189,6 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .btn-del-row:hover{background:#fce4ec;}
 .editable{cursor:pointer;}
 .editable:hover{background:#f3eeff;}
-.btn-new-table{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
-.btn-new-table:hover{opacity:0.9;}
 .btn-delete-table{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
 .btn-delete-table:hover{opacity:0.9;}
 .custom-table-section{margin:30px 0 0 0;}
@@ -1672,47 +1670,6 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 
 <!-- DYNAMIC CUSTOM TABLES CONTAINER -->
 <div id="customTablesContainer"></div>
-
-<!-- NEW TABLE WIZARD MODAL -->
-<div class="modal-bg" id="newTableWizardModal" style="display:none">
-  <div class="modal" style="max-width:540px;width:96%">
-    <h2 style="margin-bottom:6px;color:#1565C0;">&#10010; &#x625;&#x646;&#x634;&#x627;&#x621; &#x62C;&#x62F;&#x648;&#x644; &#x62C;&#x62F;&#x64A;&#x62F;</h2>
-    <div class="step-indicator">
-      <div class="step-dot active" id="wizDot1"></div>
-      <div class="step-dot" id="wizDot2"></div>
-    </div>
-    <!-- Step 1: Name + cols/rows count -->
-    <div class="wizard-step active" id="wizStep1">
-      <div style="margin-bottom:12px;">
-        <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
-        <input type="text" id="wiz_tbl_name" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62A;&#x642;&#x62F;&#x645;" class="col-name-input">
-      </div>
-      <div style="display:flex;gap:12px;">
-        <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;</label>
-          <input type="number" id="wiz_col_count" min="1" max="20" value="3" class="col-name-input" style="width:100%;">
-        </div>
-        <div style="flex:1">
-          <label style="font-size:.87em;color:#555;display:block;margin-bottom:4px;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x627;&#x628;&#x62A;&#x62F;&#x627;&#x626;&#x64A;&#x629;</label>
-          <input type="number" id="wiz_row_count" min="0" max="100" value="0" class="col-name-input" style="width:100%;">
-        </div>
-      </div>
-      <div class="wizard-nav">
-        <button class="btn-cancel" onclick="closeNewTableWizard()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
-        <button class="btn-save" onclick="wizardStep1Next()">&#x627;&#x644;&#x62A;&#x627;&#x644;&#x64A; &#8594;</button>
-      </div>
-    </div>
-    <!-- Step 2: Column names -->
-    <div class="wizard-step" id="wizStep2">
-      <p style="font-size:.9em;color:#555;margin-bottom:10px;">&#x623;&#x62F;&#x62E;&#x644; &#x623;&#x633;&#x645;&#x627;&#x621; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;:</p>
-      <div id="wizColNamesContainer"></div>
-      <div class="wizard-nav">
-        <button class="btn-cancel" onclick="wizardGoBack()">&#8592; &#x631;&#x62C;&#x648;&#x639;</button>
-        <button class="btn-save" onclick="wizardCreateTable()">&#10003; &#x625;&#x646;&#x634;&#x627;&#x621; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- CUSTOM TABLE EDIT MODAL (add/delete/rename cols) -->
 <div class="modal-bg" id="customTableEditModal" style="display:none">
@@ -2672,72 +2629,6 @@ function buildCustomTableHTML(t) {
     '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
     '</table></div></div>';
 }
-// &#x2500;&#x2500; Wizard &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
-function openNewTableWizard() {
-  document.getElementById('wiz_tbl_name').value = '';
-  document.getElementById('wiz_col_count').value = '3';
-  document.getElementById('wiz_row_count').value = '0';
-  document.getElementById('wizStep1').classList.add('active');
-  document.getElementById('wizStep2').classList.remove('active');
-  document.getElementById('wizDot1').classList.add('active');
-  document.getElementById('wizDot2').classList.remove('active');
-  document.getElementById('newTableWizardModal').style.display = 'flex';
-}
-
-function closeNewTableWizard() {
-  document.getElementById('newTableWizardModal').style.display = 'none';
-}
-
-function wizardStep1Next() {
-  var name = document.getElementById('wiz_tbl_name').value.trim();
-  var cols = parseInt(document.getElementById('wiz_col_count').value) || 1;
-  if(!name) { showToast('&#x623;&#x62F;&#x62E;&#x644; &#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;','#e53935'); return; }
-  if(cols < 1 || cols > 20) { showToast('&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x64A;&#x62C;&#x628; &#x623;&#x646; &#x64A;&#x643;&#x648;&#x646; 1-20','#e53935'); return; }
-  var container = document.getElementById('wizColNamesContainer');
-  container.innerHTML = '';
-  for(var i=0; i<cols; i++) {
-    var inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'col-name-input';
-    inp.placeholder = '&#x627;&#x633;&#x645; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; ' + (i+1);
-    inp.id = 'wizCol_' + i;
-    container.appendChild(inp);
-  }
-  document.getElementById('wizStep1').classList.remove('active');
-  document.getElementById('wizStep2').classList.add('active');
-  document.getElementById('wizDot1').classList.remove('active');
-  document.getElementById('wizDot2').classList.add('active');
-}
-
-function wizardGoBack() {
-  document.getElementById('wizStep2').classList.remove('active');
-  document.getElementById('wizStep1').classList.add('active');
-  document.getElementById('wizDot2').classList.remove('active');
-  document.getElementById('wizDot1').classList.add('active');
-}
-
-function wizardCreateTable() {
-  var name = document.getElementById('wiz_tbl_name').value.trim();
-  var rowCount = parseInt(document.getElementById('wiz_row_count').value) || 0;
-  var colInputs = document.querySelectorAll('[id^="wizCol_"]');
-  var cols = [];
-  for(var i=0; i<colInputs.length; i++) {
-    var v = colInputs[i].value.trim();
-    cols.push(v || ('&#x639;&#x645;&#x648;&#x62F; ' + (i+1)));
-  }
-  var payload = { tbl_name: name, cols: cols, row_count: rowCount };
-  fetch('/api/custom-tables', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-    .then(function(r){ return r.json(); }).then(function(d){
-      if(d.ok) {
-        closeNewTableWizard();
-        showToast('&#x62A;&#x645; &#x625;&#x646;&#x634;&#x627;&#x621; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;','#4CAF50');
-        loadCustomTables();
-      } else {
-        showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935');
-      }
-    });
-}
-
 // &#x2500;&#x2500; Row add/edit &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 function openCustomRowModal(tid) {
   currentCustomTableId = tid;
