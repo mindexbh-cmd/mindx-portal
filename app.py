@@ -3316,6 +3316,19 @@ def api_students_delete(sid):
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
+@app.route("/api/students/clear", methods=["POST"])
+@login_required
+def api_students_clear():
+    user = session.get("user", {}) or {}
+    if user.get("role") != "admin":
+        return jsonify({"ok": False, "error": "admin only"}), 403
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+    db.execute("DELETE FROM students")
+    db.execute("DELETE FROM sqlite_sequence WHERE name='students'")
+    db.commit()
+    return jsonify({"ok": True, "deleted": count})
+
 @app.route("/api/students/bulk", methods=["POST"])
 @login_required
 def api_students_bulk():
