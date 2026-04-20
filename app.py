@@ -161,6 +161,13 @@ def init_db():
         paid REAL DEFAULT 0,
         UNIQUE(student_id, inst_num)
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS session_durations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT,
+        session_date TEXT,
+        duration_minutes INTEGER DEFAULT 0,
+        UNIQUE(group_name, session_date)
+    )""")
     db.commit()
     db.close()
 
@@ -312,6 +319,13 @@ else:
         paid REAL DEFAULT 0,
         UNIQUE(student_id, inst_num)
     )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS session_durations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT,
+        session_date TEXT,
+        duration_minutes INTEGER DEFAULT 0,
+        UNIQUE(group_name, session_date)
+    )""")
     db2.commit()
     db2.close()
 
@@ -388,6 +402,8 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 .btn-attend:hover{opacity:0.9;}
 .btn-sessions{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
 .btn-sessions:hover{opacity:0.9;}
+.btn-duration{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
+.btn-duration:hover{opacity:0.9;}
 </style>
 </head>
 <body>
@@ -398,9 +414,20 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 
 <button class="btn-sessions" onclick="ssOpen()">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
 
-<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:480px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
+<button class="btn-duration" onclick="sdOpen()">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
+
+<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:520px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
+
+<div id="sd-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:560px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(21,101,192,0.25);"><div style="background:linear-gradient(135deg,#1565C0,#1E88E5);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('sd-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#e3f2fd;border-bottom:1px solid #bbdefb;"><label style="display:block;font-weight:bold;color:#0d47a1;margin-bottom:6px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sd-group" onchange="sdLoadDates()" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #1E88E5;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div id="sd-body" style="padding:14px 20px;max-height:55vh;overflow:auto;font-size:0.95rem;color:#333;"></div><div id="sd-footer" style="padding:12px 20px;border-top:1px solid #eee;text-align:center;display:none;"><button id="sd-save" onclick="sdSave()" style="padding:10px 36px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">&#x62D;&#x641;&#x638;</button></div></div></div>
 
 <script>
+function _fmtHM(m){
+  m=parseInt(m||0,10);if(!m)return"";
+  var h=Math.floor(m/60),r=m%60,s="";
+  if(h)s+=h+" \u0633\u0627\u0639\u0629";
+  if(r)s+=(s?" ":"")+r+" \u062F\u0642\u064A\u0642\u0629";
+  return s;
+}
 function ssOpen(){
   document.getElementById("ss-modal").style.display="block";
   var body=document.getElementById("ss-body");
@@ -409,10 +436,60 @@ function ssOpen(){
     if(!rows||!rows.length){body.innerHTML="\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u063A\u064A\u0627\u0628";return;}
     var html="";
     rows.forEach(function(r){
-      html+="<div style='padding:10px 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:14px;'><span style='font-weight:700;color:#4a148c;'>"+(r.group_name||"")+"</span><span style='color:#E65100;font-weight:700;'>"+r.sessions+" \u062D\u0635\u0629</span></div>";
+      var hm=_fmtHM(r.total_minutes);
+      html+="<div style='padding:10px 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:14px;align-items:center;'>"
+          +"<span style='font-weight:700;color:#4a148c;'>"+(r.group_name||"")+"</span>"
+          +"<span style='text-align:left;'>"
+          +"<span style='color:#E65100;font-weight:700;'>"+r.sessions+" \u062D\u0635\u0629</span>"
+          +(hm?"<span style='color:#1565C0;font-weight:700;margin-right:10px;'>"+hm+"</span>":"")
+          +"</span></div>";
     });
     body.innerHTML=html;
   }).catch(function(){body.innerHTML="\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644";});
+}
+function sdOpen(){
+  document.getElementById("sd-modal").style.display="block";
+  document.getElementById("sd-body").innerHTML="";
+  document.getElementById("sd-footer").style.display="none";
+  var sel=document.getElementById("sd-group");
+  sel.innerHTML="<option value=''>\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u2014</option>";
+  fetch("/api/attendance/groups").then(r=>r.json()).then(function(groups){
+    groups.forEach(function(g){var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o);});
+  });
+}
+function sdLoadDates(){
+  var g=document.getElementById("sd-group").value;
+  var body=document.getElementById("sd-body");
+  var footer=document.getElementById("sd-footer");
+  if(!g){body.innerHTML="";footer.style.display="none";return;}
+  body.innerHTML="\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...";
+  footer.style.display="none";
+  fetch("/api/attendance/group-dates?group="+encodeURIComponent(g)).then(r=>r.json()).then(function(rows){
+    if(!rows||!rows.length){body.innerHTML="\u0644\u0627 \u062A\u0648\u062C\u062F \u062D\u0635\u0635";return;}
+    var html="<table style='width:100%;border-collapse:collapse;'><thead><tr style='background:#e3f2fd;color:#0d47a1;'><th style='padding:8px;border:1px solid #bbdefb;text-align:center;'>\u0627\u0644\u062A\u0627\u0631\u064A\u062E</th><th style='padding:8px;border:1px solid #bbdefb;text-align:center;'>\u0627\u0644\u0645\u062F\u0629 (\u062F\u0642\u064A\u0642\u0629)</th></tr></thead><tbody>";
+    rows.forEach(function(r){
+      html+="<tr><td style='padding:6px;border:1px solid #e0e0e0;text-align:center;font-weight:600;'>"+(r.session_date||"")+"</td>"
+          +"<td style='padding:6px;border:1px solid #e0e0e0;text-align:center;'>"
+          +"<input type='number' class='sd-dur' data-date='"+(r.session_date||"")+"' value='"+(r.duration_minutes||"")+"' min='0' style='width:90px;padding:5px 8px;border-radius:6px;border:1px solid #1E88E5;text-align:center;'></td></tr>";
+    });
+    html+="</tbody></table>";
+    body.innerHTML=html;
+    footer.style.display="block";
+  }).catch(function(){body.innerHTML="\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644";});
+}
+function sdSave(){
+  var g=document.getElementById("sd-group").value;if(!g)return;
+  var items=[];
+  document.querySelectorAll(".sd-dur").forEach(function(inp){
+    items.push({session_date:inp.dataset.date,duration_minutes:parseInt(inp.value||0,10)||0});
+  });
+  var btn=document.getElementById("sd-save");var orig=btn.textContent;btn.textContent="...";btn.disabled=true;
+  fetch("/api/session-durations",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({group_name:g,items:items})})
+    .then(r=>r.json()).then(function(d){
+      btn.textContent=d.ok?"\u062A\u0645 \u0627\u0644\u062D\u0641\u0638 \u2713":"\u062E\u0637\u0623";
+      setTimeout(function(){btn.textContent=orig;btn.disabled=false;},1600);
+    }).catch(function(){btn.textContent="\u062E\u0637\u0623";setTimeout(function(){btn.textContent=orig;btn.disabled=false;},1600);});
+}
 }
 </script>
 
@@ -4113,13 +4190,75 @@ def api_payment_put(student_id, inst_num):
 def api_attendance_sessions():
     db = get_db()
     rows = db.execute(
-        "SELECT group_name, COUNT(DISTINCT attendance_date) AS sessions "
-        "FROM attendance "
-        "WHERE group_name IS NOT NULL AND group_name != '' "
-        "AND attendance_date IS NOT NULL AND attendance_date != '' "
-        "GROUP BY group_name ORDER BY group_name"
+        "SELECT a.group_name, COUNT(DISTINCT a.attendance_date) AS sessions, "
+        "COALESCE((SELECT SUM(duration_minutes) FROM session_durations sd "
+        "          WHERE sd.group_name = a.group_name), 0) AS total_minutes "
+        "FROM attendance a "
+        "WHERE a.group_name IS NOT NULL AND a.group_name != '' "
+        "AND a.attendance_date IS NOT NULL AND a.attendance_date != '' "
+        "GROUP BY a.group_name ORDER BY a.group_name"
     ).fetchall()
-    return jsonify([{"group_name": r[0], "sessions": r[1]} for r in rows])
+    return jsonify([
+        {"group_name": r[0], "sessions": r[1], "total_minutes": int(r[2] or 0)}
+        for r in rows
+    ])
+
+@app.route('/api/attendance/groups', methods=['GET'])
+@login_required
+def api_attendance_groups():
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT group_name FROM attendance "
+        "WHERE group_name IS NOT NULL AND group_name != '' "
+        "ORDER BY group_name"
+    ).fetchall()
+    return jsonify([r[0] for r in rows])
+
+@app.route('/api/attendance/group-dates', methods=['GET'])
+@login_required
+def api_attendance_group_dates():
+    group = request.args.get('group', '')
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT a.attendance_date, "
+        "COALESCE(sd.duration_minutes, 0) AS duration "
+        "FROM attendance a "
+        "LEFT JOIN session_durations sd "
+        "  ON sd.group_name = a.group_name AND sd.session_date = a.attendance_date "
+        "WHERE a.group_name = ? AND a.attendance_date IS NOT NULL AND a.attendance_date != '' "
+        "ORDER BY a.attendance_date",
+        (group,)
+    ).fetchall()
+    return jsonify([
+        {"session_date": r[0], "duration_minutes": int(r[1] or 0)}
+        for r in rows
+    ])
+
+@app.route('/api/session-durations', methods=['POST'])
+@login_required
+def api_session_durations_save():
+    d = request.get_json() or {}
+    group = d.get('group_name', '')
+    items = d.get('items', [])
+    if not group:
+        return jsonify({"ok": False, "error": "group_name required"}), 400
+    db = get_db()
+    try:
+        for it in items:
+            date = it.get('session_date', '')
+            mins = int(it.get('duration_minutes') or 0)
+            if not date:
+                continue
+            db.execute(
+                "INSERT INTO session_durations(group_name, session_date, duration_minutes) "
+                "VALUES(?,?,?) "
+                "ON CONFLICT(group_name, session_date) DO UPDATE SET duration_minutes=excluded.duration_minutes",
+                (group, date, mins)
+            )
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
 
 @app.route('/api/payments/group')
 @login_required
