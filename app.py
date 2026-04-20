@@ -3044,6 +3044,14 @@ function _parseWith(data, opts){
   var sheet = wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
 }
+function _findHeaderIdx(rows){
+  var limit = Math.min(rows.length, 30);
+  for(var i=0;i<limit;i++){
+    var r = rows[i];
+    if(r && r.some(function(c){ return String(c==null?'':c).trim() !== ''; })) return i;
+  }
+  return -1;
+}
 function _decodeBytes(data, enc){
   try { return new TextDecoder(enc, {fatal:false}).decode(data); }
   catch(e){ return null; }
@@ -3071,11 +3079,13 @@ function readGenericExcelFile(input) {
       for(var a=0;a<attempts.length;a++){
         try {
           var rows = _parseWith(attempts[a].data, {type: attempts[a].type});
-          if(!rows.length || !rows[0]) continue;
-          var headers = rows[0].map(function(h){ return String(h==null?'':h).replace(/^\uFEFF/,'').trim(); });
+          if(!rows.length) continue;
+          var hIdx = _findHeaderIdx(rows);
+          if(hIdx < 0) continue;
+          var headers = rows[hIdx].map(function(h){ return String(h==null?'':h).replace(/^\uFEFF/,'').trim(); });
           var m = _countMatches(headers, defs);
           if(!best || m > best.matchCount){
-            best = { rows: rows, headers: headers, matchCount: m, cp: attempts[a].label };
+            best = { rows: rows, headers: headers, matchCount: m, cp: attempts[a].label, headerIdx: hIdx };
           }
           if(m > 0) break;
         } catch(ex) { /* try next */ }
@@ -3085,7 +3095,7 @@ function readGenericExcelFile(input) {
         return;
       }
       genExcelHeaders = best.headers;
-      genExcelRows = best.rows.slice(1).filter(function(r){
+      genExcelRows = best.rows.slice(best.headerIdx + 1).filter(function(r){
         return r.some(function(c){ return String(c).trim() !== ''; });
       });
       try { console.log('[import] headers:', genExcelHeaders, 'codepage:', best.cp, 'matches:', best.matchCount); } catch(e){}
