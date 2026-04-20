@@ -1204,6 +1204,11 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .btn-tab{background:#f0ebff;color:#6c3fa0;border:none;padding:8px 14px;border-radius:8px;font-size:.9em;font-weight:600;cursor:pointer;}
 .btn-tab.active{background:#6c3fa0;color:#fff;}
 .btn-tab:hover{opacity:0.85;}
+.bulk-cb{width:16px;height:16px;cursor:pointer;accent-color:#6B3FA0;vertical-align:middle;}
+.bulk-col{width:38px;text-align:center;padding:6px 4px !important;}
+.btn-bulk-del{display:none;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;align-items:center;gap:6px;}
+.btn-bulk-del.show{display:inline-flex;}
+.btn-bulk-del:hover{opacity:0.9;}
 </style>
 </head>
 <body>
@@ -1226,7 +1231,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
+  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">&#x628;&#x62D;&#x62B;</button>
@@ -1235,6 +1240,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <table>
       <thead>
         <tr>
+          <th class="bulk-col"><input type="checkbox" id="selectAll_students" class="bulk-cb" onclick="_bulkSelectAll('studentsBody','selectAll_students','bulkDelBtn_students',this.checked)"></th>
           <th>#</th>
           <th>&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;</th>
           <th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</th>
@@ -1265,7 +1271,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
         </tr>
       </thead>
       <tbody id="studentsBody">
-        <tr><td colspan="27" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>
+        <tr><td colspan="28" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>
       </tbody>
     </table>
   </div>
@@ -1279,7 +1285,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">&#x628;&#x62D;&#x62B;</button>
@@ -1288,6 +1294,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <table style="min-width:1300px;">
       <thead>
         <tr id="groupsTheadRow" style="background:linear-gradient(135deg,#00BCD4,#0097A7);">
+          <th class="bulk-col"><input type="checkbox" id="selectAll_groups" class="bulk-cb" onclick="_bulkSelectAll('groupsBody2','selectAll_groups','bulkDelBtn_groups',this.checked)"></th>
           <th>#</th><th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th><th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;</th><th>&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; / &#x627;&#x644;&#x645;&#x642;&#x631;&#x631;</th>
           <th>&#x627;&#x644;&#x645;&#x642;&#x631;&#x631; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x645; &#x627;&#x644;&#x648;&#x635;&#x648;&#x644; &#x627;&#x644;&#x64A;&#x647; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x641;&#x627;&#x626;&#x62A;</th><th>&#x648;&#x642;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</th>
           <th>&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;</th><th>&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x627;&#x644;&#x639;&#x627;&#x62F;&#x64A;)</th>
@@ -1295,7 +1302,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
         </tr>
       </thead>
       <tbody id="groupsBody2">
-        <tr><td colspan="11" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</td></tr>
+        <tr><td colspan="12" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</td></tr>
       </tbody>
     </table>
   </div>
@@ -1308,11 +1315,13 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
     <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
     <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button id="bulkDelBtn_taqseet" class="btn-bulk-del" style="padding:8px 16px;font-size:13px;" onclick="_bulkDelete('taqseetBody',function(id){return '/api/taqseet/'+id;},loadTaqseet,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
   <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
     <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
       <thead>
         <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
+          <th class="bulk-col" style="padding:10px 8px;"><input type="checkbox" id="selectAll_taqseet" class="bulk-cb" onclick="_bulkSelectAll('taqseetBody','selectAll_taqseet','bulkDelBtn_taqseet',this.checked)"></th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:120px;">&#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</th>
           <th style="padding:10px 8px;white-space:nowrap;min-width:130px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</th>
@@ -1375,7 +1384,8 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
   <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+  <button id="bulkDelBtn_attendance" class="btn-bulk-del" onclick="_bulkDelete('attendanceBody',function(id){return '/api/attendance/'+id;},loadAttendance,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="attendanceSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x641;&#x64A; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;..." oninput="filterAttendanceTable()">
     <button class="btn-search" onclick="filterAttendanceTable()">&#x628;&#x62D;&#x62B;</button>
@@ -1384,6 +1394,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <table>
       <thead>
         <tr>
+          <th class="bulk-col"><input type="checkbox" id="selectAll_attendance" class="bulk-cb" onclick="_bulkSelectAll('attendanceBody','selectAll_attendance','bulkDelBtn_attendance',this.checked)"></th>
           <th>#</th>
           <th>&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x623;&#x62E;&#x630; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
           <th>&#x627;&#x644;&#x64A;&#x648;&#x645;</th>
@@ -1827,7 +1838,44 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
 </div>
 <script>
-// &#x2500;&#x2500;&#x2500; Taqseet (Payment Plans) Table &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
+// Bulk-select helpers shared across all tables on this page.
+function _bulkToggleAll(tbodyId, checked){
+  var tb = document.getElementById(tbodyId); if(!tb) return;
+  tb.querySelectorAll('.bulk-cb').forEach(function(b){ b.checked = checked; });
+}
+function _bulkUpdate(tbodyId, selectAllId, btnId){
+  var tb = document.getElementById(tbodyId); if(!tb) return;
+  var all = tb.querySelectorAll('.bulk-cb');
+  var checked = tb.querySelectorAll('.bulk-cb:checked');
+  var btn = document.getElementById(btnId);
+  if(btn){ if(checked.length>0) btn.classList.add('show'); else btn.classList.remove('show'); }
+  var sa = document.getElementById(selectAllId);
+  if(sa){
+    sa.checked = all.length>0 && checked.length===all.length;
+    sa.indeterminate = checked.length>0 && checked.length<all.length;
+  }
+}
+function _bulkSelectAll(tbodyId, selectAllId, btnId, checked){
+  _bulkToggleAll(tbodyId, checked);
+  _bulkUpdate(tbodyId, selectAllId, btnId);
+}
+function _bulkIds(tbodyId){
+  var tb = document.getElementById(tbodyId); if(!tb) return [];
+  return Array.from(tb.querySelectorAll('.bulk-cb:checked')).map(function(b){ return b.getAttribute('data-id'); });
+}
+function _bulkDelete(tbodyId, urlFn, refreshFn, confirmMsg){
+  var ids = _bulkIds(tbodyId);
+  if(!ids.length) return;
+  if(!confirm(confirmMsg.replace('{n}', ids.length))) return;
+  Promise.all(ids.map(function(id){
+    return fetch(urlFn(id), {method:'DELETE', credentials:'include'}).then(function(r){return r.ok;}).catch(function(){return false;});
+  })).then(function(results){
+    var ok = results.filter(function(x){return x;}).length;
+    showToast('\u062A\u0645 \u062D\u0630\u0641 ' + ok + ' \u0645\u0646 ' + ids.length, ok===ids.length?'#6B3FA0':'#e53935');
+    if(typeof refreshFn === 'function') refreshFn();
+  });
+}
+// \u2500\u2500\u2500 Taqseet (Payment Plans) Table \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var allTaqseet = null;
 var editingTaqseetId = null;
 
@@ -1842,7 +1890,8 @@ function loadTaqseet() {
 function renderTaqseet() {
   var tbody = document.getElementById('taqseetBody');
   if (!allTaqseet || !allTaqseet.length) {
-    tbody.innerHTML = '<tr><td colspan="44" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="45" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
+    _bulkUpdate('taqseetBody','selectAll_taqseet','bulkDelBtn_taqseet');
     return;
   }
   var fields = ['taqseet_method','student_name','course_amount','num_installments',
@@ -1856,6 +1905,7 @@ function renderTaqseet() {
       return '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + f + '" style="padding:8px;min-width:80px;">' + (r[f]||'') + '</td>';
     }).join('');
     return '<tr style="background:' + bg + ';">' +
+      '<td class="bulk-col" style="padding:8px;"><input type="checkbox" class="bulk-cb" data-id="' + r.id + '" onclick="_bulkUpdate(\\'taqseetBody\\',\\'selectAll_taqseet\\',\\'bulkDelBtn_taqseet\\')"></td>' +
       '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
       cells +
       '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
@@ -1971,19 +2021,19 @@ buildTableHeader();
 function buildTableHeader(){
 var thead=document.querySelector('#studentsBody').closest('table').querySelector('thead tr');
 if(!thead)return;
-var html='<th>#</th>';
+var html='<th class="bulk-col"><input type="checkbox" id="selectAll_students" class="bulk-cb" onclick="_bulkSelectAll(\\'studentsBody\\',\\'selectAll_students\\',\\'bulkDelBtn_students\\',this.checked)"></th><th>#</th>';
 for(var i=0;i<allColumns.length;i++){html+='<th>'+allColumns[i].col_label+'</th>';}
 html+='<th>&#x627;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>';
 thead.innerHTML=html;
 }
 function renderTable(list){
 var body=document.getElementById('studentsBody');
-var colCount=allColumns.length+2;
-if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>';return;}
+var colCount=allColumns.length+3;
+if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>';_bulkUpdate('studentsBody','selectAll_students','bulkDelBtn_students');return;}
 var html='';
 for(var i=0;i<list.length;i++){
 var s2=list[i];
-var row='<tr><td>'+(i+1)+'</td>';
+var row='<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+s2.id+'" onclick="_bulkUpdate(\\'studentsBody\\',\\'selectAll_students\\',\\'bulkDelBtn_students\\')"></td><td>'+(i+1)+'</td>';
 for(var j=0;j<allColumns.length;j++){
 var key=allColumns[j].col_key;
 var val=s2[key]||'';
@@ -2035,19 +2085,19 @@ function loadGroups2(){
 function buildGroupTableHeader(){
   var thead=document.getElementById('groupsTheadRow');
   if(!thead)return;
-  var html='<th>#</th>';
+  var html='<th class="bulk-col"><input type="checkbox" id="selectAll_groups" class="bulk-cb" onclick="_bulkSelectAll(\\'groupsBody2\\',\\'selectAll_groups\\',\\'bulkDelBtn_groups\\',this.checked)"></th><th>#</th>';
   for(var i=0;i<allGroupColumns.length;i++){html+='<th>'+allGroupColumns[i].col_label+'</th>';}
   html+='<th>&#1575;&#1580;&#1585;&#1575;&#1569;&#1575;&#1578;</th>';
   thead.innerHTML=html;
 }
 function renderGroupTable2(list){
   var body=document.getElementById('groupsBody2');
-  var colCount=allGroupColumns.length+2;
-  if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';return;}
+  var colCount=allGroupColumns.length+3;
+  if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';_bulkUpdate('groupsBody2','selectAll_groups','bulkDelBtn_groups');return;}
   var html='';
   for(var i=0;i<list.length;i++){
     var g=list[i];
-    var row='<tr><td>'+(i+1)+'</td>';
+    var row='<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+g.id+'" onclick="_bulkUpdate(\\'groupsBody2\\',\\'selectAll_groups\\',\\'bulkDelBtn_groups\\')"></td><td>'+(i+1)+'</td>';
     for(var j=0;j<allGroupColumns.length;j++){
       var key=allGroupColumns[j].col_key;
       var val=g[key]||'';
@@ -2408,13 +2458,15 @@ function loadAttendance() {
 function renderAttendanceTable(data) {
   var tbody = document.getElementById('attendanceBody');
   if(!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x633;&#x62C;&#x644;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x623;&#x648;&#x644; &#x633;&#x62C;&#x644;</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x633;&#x62C;&#x644;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x623;&#x648;&#x644; &#x633;&#x62C;&#x644;</td></tr>';
+    _bulkUpdate('attendanceBody','selectAll_attendance','bulkDelBtn_attendance');
     return;
   }
   var html = '';
   for(var i=0; i<data.length; i++) {
     var r = data[i];
     html += '<tr>';
+    html += '<td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="' + r.id + '" onclick="_bulkUpdate(\\'attendanceBody\\',\\'selectAll_attendance\\',\\'bulkDelBtn_attendance\\')"></td>';
     html += '<td>' + (i+1) + '</td>';
     html += '<td class="editable" data-id="' + r.id + '" data-field="attendance_date" onclick="editAttendanceCellEl(this)">' + (r.attendance_date||'') + '</td>';
     html += '<td class="editable" data-id="' + r.id + '" data-field="day_name" onclick="editAttendanceCellEl(this)">' + (r.day_name||'') + '</td>';
@@ -2592,7 +2644,10 @@ function renderAllCustomTables() {
 function buildCustomTableHTML(t) {
   var cols = t.cols || [];
   var rows = t.rows || [];
-  var headerCells = '<th>#</th>';
+  var tbodyId = 'ctbody_' + t.id;
+  var saId = 'selectAll_custom_' + t.id;
+  var btnId = 'bulkDelBtn_custom_' + t.id;
+  var headerCells = '<th class="bulk-col"><input type="checkbox" id="' + saId + '" class="bulk-cb" onclick="_bulkSelectAll(\\'' + tbodyId + '\\',\\'' + saId + '\\',\\'' + btnId + '\\',this.checked)"></th><th>#</th>';
   for(var i=0; i<cols.length; i++) {
     headerCells += '<th>' + (cols[i].col_label||'') + '</th>';
   }
@@ -2600,12 +2655,13 @@ function buildCustomTableHTML(t) {
 
   var bodyRows = '';
   if(rows.length === 0) {
-    bodyRows = '<tr><td colspan="' + (cols.length+2) + '" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x623;&#x636;&#x641; &#x623;&#x648;&#x644; &#x635;&#x641;</td></tr>';
+    bodyRows = '<tr><td colspan="' + (cols.length+3) + '" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x623;&#x636;&#x641; &#x623;&#x648;&#x644; &#x635;&#x641;</td></tr>';
   } else {
     for(var j=0; j<rows.length; j++) {
       var r = rows[j];
       var rd = r.row_data || {};
       bodyRows += '<tr>';
+      bodyRows += '<td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="' + r.id + '" onclick="_bulkUpdate(\\'' + tbodyId + '\\',\\'' + saId + '\\',\\'' + btnId + '\\')"></td>';
       bodyRows += '<td>' + (j+1) + '</td>';
       for(var k=0; k<cols.length; k++) {
         var ck = cols[k].col_key;
@@ -2617,6 +2673,9 @@ function buildCustomTableHTML(t) {
     }
   }
 
+  var tid = t.id;
+  var bulkBtn = '<button id="' + btnId + '" class="btn-bulk-del" style="font-size:13px;padding:6px 12px;border-radius:8px;" onclick="_bulkDelete(\\'' + tbodyId + '\\',function(id){return \\'/api/custom-tables/' + tid + '/rows/\\'+id;},loadCustomTables,\\'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;\\')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>';
+
   return '<div class="custom-table-section" id="ctsec_' + t.id + '">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
     '<span class="custom-table-title">&#128203; ' + t.tbl_name + '</span>' +
@@ -2624,10 +2683,11 @@ function buildCustomTableHTML(t) {
     '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641;</button>' +
     '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>' +
     '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>' +
+    bulkBtn +
     '</div></div>' +
     '<div class="table-wrap"><table>' +
     '<thead><tr id="cthead_' + t.id + '">' + headerCells + '</tr></thead>' +
-    '<tbody id="ctbody_' + t.id + '">' + bodyRows + '</tbody>' +
+    '<tbody id="' + tbodyId + '">' + bodyRows + '</tbody>' +
     '</table></div></div>';
 }
 // &#x2500;&#x2500; Row add/edit &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
