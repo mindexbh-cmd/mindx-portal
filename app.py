@@ -1227,7 +1227,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-new-table" onclick="openNewTableWizard()">&#10010; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644; &#x62C;&#x62F;&#x64A;&#x62F;</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
+  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">&#x628;&#x62D;&#x62B;</button>
@@ -1582,6 +1582,31 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <div style="display:flex;gap:10px;justify-content:center;">
       <button class="btn-cancel" onclick="closeAttendanceConfirm()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button>
       <button class="btn-delete" onclick="confirmAttendanceDelete()">&#x62D;&#x630;&#x641;</button>
+    </div>
+  </div>
+</div>
+<!-- GENERIC EXCEL IMPORT MODAL -->
+<div class="modal-bg" id="genExcelModal">
+  <div class="modal" style="border-top:4px solid #3F51B5;max-width:520px;">
+    <h2 style="color:#3F51B5;">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</h2>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:13px;color:#3F51B5;font-weight:600;margin-bottom:6px;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
+      <select id="genExcelTable" onchange="onGenExcelTableChange()" style="width:100%;padding:10px;border:1.5px solid #C5CAE9;border-radius:9px;font-size:14px;background:#fafafa;">
+        <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &mdash;</option>
+        <option value="students">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</option>
+        <option value="student_groups">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</option>
+        <option value="attendance">&#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</option>
+        <option value="taqseet">&#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</option>
+      </select>
+    </div>
+    <div id="genExcelFileRow" style="display:none;text-align:center;margin:14px 0;">
+      <input type="file" id="genExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="readGenericExcelFile(this)">
+      <button onclick="document.getElementById('genExcelFileInput').click();" style="background:#3F51B5;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">&#x1F4C1; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x644;&#x641; Excel</button>
+    </div>
+    <div id="genExcelStatus" style="margin-top:10px;font-size:13px;color:#555;text-align:center;min-height:18px;"></div>
+    <div class="modal-actions">
+      <button class="btn-save" id="genExcelImportBtn" style="background:linear-gradient(135deg,#3F51B5,#5C6BC0);display:none;" onclick="importGenericFromExcel()">&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button>
+      <button class="btn-cancel" onclick="closeGenericExcelModal()">&#x627;&#x644;&#x63A;&#x627;&#x621;</button>
     </div>
   </div>
 </div>
@@ -3012,6 +3037,176 @@ function importAttendanceFromExcel() {
   sendNext(0);
 }
 
+// Generic Excel Import
+var IMPORT_DEFS = {
+  students: {
+    title: "\u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628\u0629",
+    refresh: "loadStudents",
+    fields: [
+      {key:"personal_id", ar:"\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A"},
+      {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
+      {key:"whatsapp", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F"},
+      {key:"class_name", ar:"\u0627\u0644\u0635\u0641"},
+      {key:"old_new_2026", ar:"\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026"},
+      {key:"registration_term2_2026", ar:"\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026"},
+      {key:"group_name_student", ar:"\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
+      {key:"group_online", ar:"\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)"},
+      {key:"final_result", ar:"\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629"},
+      {key:"level_reached_2026", ar:"\u0627\u0644\u0649 \u0627\u064A\u0646 \u0648\u0635\u0644 \u0627\u0644\u0637\u0627\u0644\u0628 2026"},
+      {key:"suitable_level_2026", ar:"\u0647\u0644 \u0627\u0644\u0637\u0627\u0644\u0628 \u0645\u0646\u0627\u0633\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 2026"},
+      {key:"books_received", ar:"\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0643\u062A\u0628"},
+      {key:"teacher_2026", ar:"\u0627\u0644\u0645\u062F\u0631\u0633 2026"},
+      {key:"installment1", ar:"\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0627\u0648\u0644 2026"},
+      {key:"installment2", ar:"\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062B\u0627\u0646\u064A"},
+      {key:"installment3", ar:"\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062B\u0627\u0644\u062B"},
+      {key:"installment4", ar:"\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0631\u0627\u0628\u0639"},
+      {key:"installment5", ar:"\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062E\u0627\u0645\u0633"},
+      {key:"mother_phone", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0627\u0645"},
+      {key:"father_phone", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0627\u0628"},
+      {key:"other_phone", ar:"\u0647\u0627\u062A\u0641 \u0627\u062E\u0631"},
+      {key:"residence", ar:"\u0645\u0643\u0627\u0646 \u0627\u0644\u0633\u0643\u0646"},
+      {key:"home_address", ar:"\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0646\u0632\u0644"},
+      {key:"road", ar:"\u0627\u0644\u0637\u0631\u064A\u0642"},
+      {key:"complex_name", ar:"\u0627\u0644\u0645\u062C\u0645\u0639"},
+      {key:"installment_type", ar:"\u0627\u062E\u062A\u064A\u0627\u0631 \u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637"}
+    ]
+  },
+  student_groups: {
+    title: "\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A",
+    refresh: "loadGroups2",
+    fields: [
+      {key:"group_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
+      {key:"teacher_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062F\u0631\u0633"},
+      {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649"},
+      {key:"last_reached", ar:"\u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0641\u0627\u0626\u062A"},
+      {key:"study_time", ar:"\u0648\u0642\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
+      {key:"ramadan_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0631\u0645\u0636\u0627\u0646"},
+      {key:"online_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646"},
+      {key:"group_link", ar:"\u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
+      {key:"session_duration", ar:"\u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629"}
+    ]
+  },
+  attendance: {
+    title: "\u0633\u062C\u0644 \u0627\u0644\u063A\u064A\u0627\u0628",
+    refresh: "loadAttendance",
+    fields: [
+      {key:"attendance_date", ar:"\u062A\u0627\u0631\u064A\u062E \u0623\u062E\u0630 \u0627\u0644\u062D\u0636\u0648\u0631"},
+      {key:"day_name", ar:"\u0627\u0644\u064A\u0648\u0645"},
+      {key:"group_name", ar:"\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
+      {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
+      {key:"contact_number", ar:"\u0631\u0642\u0645 \u0627\u0644\u062A\u0648\u0627\u0635\u0644"},
+      {key:"status", ar:"\u0627\u0644\u062D\u0627\u0644\u0629"},
+      {key:"message", ar:"\u0627\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"message_status", ar:"\u062D\u0627\u0644\u0629 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"study_status", ar:"\u062D\u0627\u0644\u0629 \u0627\u0644\u062F\u0631\u0627\u0633\u0629"}
+    ]
+  },
+  taqseet: {
+    title: "\u062C\u062F\u0648\u0644 \u0627\u0644\u062A\u0642\u0633\u064A\u0637",
+    refresh: "",
+    fields: [
+      {key:"taqseet_method", ar:"\u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637"},
+      {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
+      {key:"course_amount", ar:"\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629"},
+      {key:"num_installments", ar:"\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637"},
+      {key:"study_hours", ar:"\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
+      {key:"start_date", ar:"\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0628\u062F\u0621"}
+    ]
+  }
+};
+var genExcelRows = [];
+var genExcelHeaders = [];
+function openGenericExcelModal() {
+  document.getElementById('genExcelTable').value = '';
+  document.getElementById('genExcelFileInput').value = '';
+  document.getElementById('genExcelFileRow').style.display = 'none';
+  document.getElementById('genExcelStatus').textContent = '';
+  document.getElementById('genExcelImportBtn').style.display = 'none';
+  genExcelRows = []; genExcelHeaders = [];
+  document.getElementById('genExcelModal').classList.add('open');
+}
+function closeGenericExcelModal() {
+  document.getElementById('genExcelModal').classList.remove('open');
+  genExcelRows = []; genExcelHeaders = [];
+}
+function onGenExcelTableChange() {
+  var tbl = document.getElementById('genExcelTable').value;
+  document.getElementById('genExcelFileRow').style.display = tbl ? 'block' : 'none';
+  document.getElementById('genExcelFileInput').value = '';
+  document.getElementById('genExcelStatus').textContent = '';
+  document.getElementById('genExcelImportBtn').style.display = 'none';
+  genExcelRows = []; genExcelHeaders = [];
+}
+function readGenericExcelFile(input) {
+  var file = input.files[0]; if(!file) return;
+  var tbl = document.getElementById('genExcelTable').value;
+  if(!tbl){ document.getElementById('genExcelStatus').textContent = "\u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644 \u0623\u0648\u0644\u0627\u064B"; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, {type:'array'});
+      var sheet = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      if(!rows.length || !rows[0] || !rows[0].length){
+        document.getElementById('genExcelStatus').textContent = "\u0627\u0644\u0645\u0644\u0641 \u0641\u0627\u0631\u063A";
+        return;
+      }
+      genExcelHeaders = rows[0].map(function(h){ return String(h==null?'':h).trim(); });
+      genExcelRows = rows.slice(1).filter(function(r){
+        return r.some(function(c){ return String(c).trim() !== ''; });
+      });
+      document.getElementById('genExcelStatus').textContent = "\u062A\u0645 \u0642\u0631\u0627\u0621\u0629 " + genExcelRows.length + " \u0635\u0641";
+      document.getElementById('genExcelImportBtn').style.display = genExcelRows.length > 0 ? 'inline-flex' : 'none';
+    } catch(err) {
+      document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623: " + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function mapGenericRow(headers, row, defs) {
+  var result = {};
+  for(var i=0; i<headers.length; i++){
+    var h = headers[i]; if(!h) continue;
+    for(var j=0; j<defs.fields.length; j++){
+      var f = defs.fields[j];
+      if(h === f.key || h === f.ar){
+        result[f.key] = String(row[i]==null?'':row[i]);
+        break;
+      }
+    }
+  }
+  return result;
+}
+function importGenericFromExcel() {
+  var tbl = document.getElementById('genExcelTable').value;
+  var defs = IMPORT_DEFS[tbl];
+  if(!defs || !genExcelRows.length) return;
+  var mapped = genExcelRows.map(function(r){ return mapGenericRow(genExcelHeaders, r, defs); });
+  var btn = document.getElementById('genExcelImportBtn');
+  btn.disabled = true;
+  btn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F...";
+  fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table: tbl, rows: mapped})})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.ok){
+        document.getElementById('genExcelStatus').textContent = "\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F " + d.imported + " \u0635\u0641";
+        if(defs.refresh && typeof window[defs.refresh] === 'function') { try { window[defs.refresh](); } catch(e) {} }
+        if(typeof showToast === 'function') showToast("\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F " + d.imported + " \u0635\u0641 \u0628\u0646\u062C\u0627\u062D");
+        setTimeout(closeGenericExcelModal, 1200);
+      } else {
+        document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623: " + ((d && d.error) || '');
+      }
+      btn.disabled = false;
+      btn.textContent = "\u0627\u0633\u062A\u064A\u0631\u0627\u062F";
+    })
+    .catch(function(){
+      document.getElementById('genExcelStatus').textContent = "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644";
+      btn.disabled = false;
+      btn.textContent = "\u0627\u0633\u062A\u064A\u0631\u0627\u062F";
+    });
+}
+
 // &#x2500;&#x2500;&#x2500; Attendance Column Management &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 var allAttColumns = [];
 
@@ -4183,6 +4378,65 @@ def api_payment_put(student_id, inst_num):
                    (str(paid_val), str(student_row[0])))
         db.commit()
     return jsonify({"ok": True})
+
+IMPORT_TABLE_FIELDS = {
+    "students": [
+        "personal_id","student_name","whatsapp","class_name","old_new_2026",
+        "registration_term2_2026","group_name_student","group_online","final_result",
+        "level_reached_2026","suitable_level_2026","books_received","teacher_2026",
+        "installment1","installment2","installment3","installment4","installment5",
+        "mother_phone","father_phone","other_phone","residence","home_address",
+        "road","complex_name","installment_type",
+    ],
+    "student_groups": [
+        "group_name","teacher_name","level_course","last_reached","study_time",
+        "ramadan_time","online_time","group_link","session_duration",
+    ],
+    "attendance": [
+        "attendance_date","day_name","group_name","student_name","contact_number",
+        "status","message","message_status","study_status",
+    ],
+    "taqseet": [
+        "taqseet_method","student_name","course_amount","num_installments",
+        "inst1","paid1","date1","inst2","paid2","date2","inst3","paid3","date3",
+        "inst4","paid4","date4","inst5","paid5","date5","inst6","paid6","date6",
+        "inst7","paid7","date7","inst8","paid8","date8","inst9","paid9","date9",
+        "inst10","paid10","date10","inst11","paid11","date11","inst12","paid12","date12",
+        "study_hours","start_date",
+    ],
+}
+
+IMPORT_TABLE_SQL = {
+    "students": "INSERT OR IGNORE INTO students",
+    "student_groups": "INSERT INTO student_groups",
+    "attendance": "INSERT INTO attendance",
+    "taqseet": "INSERT INTO taqseet",
+}
+
+@app.route('/api/import', methods=['POST'])
+@login_required
+def api_import():
+    d = request.get_json() or {}
+    table = d.get('table', '')
+    rows = d.get('rows', [])
+    fields = IMPORT_TABLE_FIELDS.get(table)
+    if not fields:
+        return jsonify({"ok": False, "error": "unknown table"}), 400
+    db = get_db()
+    imported = 0
+    errors = 0
+    cols = ",".join(fields)
+    placeholders = ",".join(["?"] * len(fields))
+    sql = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
+    for r in rows:
+        try:
+            values = tuple(str(r.get(f, "") or "") for f in fields)
+            db.execute(sql, values)
+            imported += 1
+        except Exception:
+            errors += 1
+    db.commit()
+    return jsonify({"ok": True, "imported": imported, "errors": errors})
 
 @app.route('/api/attendance/sessions', methods=['GET'])
 @login_required
