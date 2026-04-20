@@ -3028,6 +3028,26 @@ function onGenExcelTableChange() {
   document.getElementById('genExcelImportBtn').style.display = 'none';
   genExcelRows = []; genExcelHeaders = [];
 }
+function _countMatches(headers, defs){
+  var n = 0;
+  for(var i=0;i<headers.length;i++){
+    var hn = _arNorm(headers[i]); if(!hn) continue;
+    for(var j=0;j<defs.fields.length;j++){
+      var f = defs.fields[j];
+      if(hn === f.key || hn === _arNorm(f.ar)){ n++; break; }
+    }
+  }
+  return n;
+}
+function _parseWith(data, opts){
+  var wb = XLSX.read(data, opts);
+  var sheet = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+}
+function _decodeBytes(data, enc){
+  try { return new TextDecoder(enc, {fatal:false}).decode(data); }
+  catch(e){ return null; }
+}
 function readGenericExcelFile(input) {
   var file = input.files[0]; if(!file) return;
   var tbl = document.getElementById('genExcelTable').value;
@@ -3037,18 +3057,38 @@ function readGenericExcelFile(input) {
   reader.onload = function(e) {
     try {
       var data = new Uint8Array(e.target.result);
-      var wb = XLSX.read(data, {type:'array'});
-      var sheet = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
-      if(!rows.length || !rows[0] || !rows[0].length){
+      var isCsv = /\.(csv|txt)$/i.test(file.name);
+      var defs = IMPORT_DEFS[tbl];
+      var best = null;
+      var attempts = [];
+      if(isCsv){
+        var utf8 = _decodeBytes(data,'utf-8');
+        var w1256 = _decodeBytes(data,'windows-1256');
+        if(utf8)  attempts.push({type:'string', data:utf8,  label:'utf-8'});
+        if(w1256) attempts.push({type:'string', data:w1256, label:'windows-1256'});
+      }
+      attempts.push({type:'array', data:data, label:'xlsx'});
+      for(var a=0;a<attempts.length;a++){
+        try {
+          var rows = _parseWith(attempts[a].data, {type: attempts[a].type});
+          if(!rows.length || !rows[0]) continue;
+          var headers = rows[0].map(function(h){ return String(h==null?'':h).replace(/^\uFEFF/,'').trim(); });
+          var m = _countMatches(headers, defs);
+          if(!best || m > best.matchCount){
+            best = { rows: rows, headers: headers, matchCount: m, cp: attempts[a].label };
+          }
+          if(m > 0) break;
+        } catch(ex) { /* try next */ }
+      }
+      if(!best || !best.rows.length || !best.headers.length){
         statusEl.textContent = "\u0627\u0644\u0645\u0644\u0641 \u0641\u0627\u0631\u063A";
         return;
       }
-      genExcelHeaders = rows[0].map(function(h){ return String(h==null?'':h).replace(/^\uFEFF/,'').trim(); });
-      genExcelRows = rows.slice(1).filter(function(r){
+      genExcelHeaders = best.headers;
+      genExcelRows = best.rows.slice(1).filter(function(r){
         return r.some(function(c){ return String(c).trim() !== ''; });
       });
-      var defs = IMPORT_DEFS[tbl];
+      try { console.log('[import] headers:', genExcelHeaders, 'codepage:', best.cp, 'matches:', best.matchCount); } catch(e){}
       var matched = [], unmatched = [];
       for(var i=0;i<genExcelHeaders.length;i++){
         var h = genExcelHeaders[i]; if(!h){ continue; }
@@ -3062,12 +3102,15 @@ function readGenericExcelFile(input) {
       }
       var html = '<div style="text-align:right;">'
         + '<div><b>' + genExcelRows.length + '</b> ' + (genExcelRows.length===1?"\u0635\u0641":"\u0635\u0641\u0648\u0641") + ' \u2014 '
-        + '\u0645\u0637\u0627\u0628\u0642\u0629: <b>' + matched.length + '</b> / \u063A\u064A\u0631 \u0645\u0637\u0627\u0628\u0642: <b>' + unmatched.length + '</b></div>';
+        + '\u0645\u0637\u0627\u0628\u0642\u0629: <b>' + matched.length + '</b> / \u063A\u064A\u0631 \u0645\u0637\u0627\u0628\u0642: <b>' + unmatched.length + '</b>'
+        + (best.cp ? ' <span style="color:#888;font-size:11px;">(' + best.cp + ')</span>' : '')
+        + '</div>';
       if(unmatched.length){
         html += '<div style="margin-top:6px;color:#c62828;font-size:12px;">\u0627\u0644\u0623\u0639\u0645\u062F\u0629 \u0627\u0644\u062A\u064A \u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u062A\u0639\u0631\u0641 \u0639\u0644\u064A\u0647\u0627: ' + unmatched.map(function(u){return '"' + u + '"';}).join('\u060C ') + '</div>';
       }
       if(!matched.length){
-        html += '<div style="margin-top:6px;color:#c62828;font-weight:700;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0631\u0624\u0648\u0633 \u0645\u0639\u0631\u0648\u0641\u0629</div>';
+        html += '<div style="margin-top:6px;color:#c62828;font-weight:700;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0631\u0624\u0648\u0633 \u0645\u0639\u0631\u0648\u0641\u0629</div>'
+          + '<div style="margin-top:4px;color:#555;font-size:11px;">\u0627\u0644\u0631\u0624\u0648\u0633 \u0627\u0644\u062A\u064A \u062A\u0645 \u0642\u0631\u0627\u0621\u062A\u0647\u0627: ' + genExcelHeaders.map(function(u){return '"' + u + '"';}).join('\u060C ') + '</div>';
       }
       html += '</div>';
       statusEl.innerHTML = html;
@@ -3079,10 +3122,15 @@ function readGenericExcelFile(input) {
   reader.readAsArrayBuffer(file);
 }
 function _arNorm(s){
-  return String(s==null?'':s).trim()
+  var t = String(s==null?'':s).replace(/^\uFEFF/,'');
+  try { t = t.normalize('NFKD'); } catch(e) {}
+  return t
+    .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g,'')
     .replace(/[\u0623\u0625\u0622\u0671]/g,'\u0627')
     .replace(/\u0629/g,'\u0647')
-    .replace(/\u0649/g,'\u064A');
+    .replace(/\u0649/g,'\u064A')
+    .replace(/\s+/g,' ')
+    .trim();
 }
 function mapGenericRow(headers, row, defs) {
   var result = {};
