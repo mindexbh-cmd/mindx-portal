@@ -1093,6 +1093,15 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .status-select.absent{border-color:#e53935;background:#fce4ec;color:#c62828;}
 .status-select.late{border-color:#FB8C00;background:#fff3e0;color:#e65100;}
 .empty-state{text-align:center;padding:48px 20px;color:#aaa;font-size:15px;}
+.att-stat{text-align:center;font-weight:700;font-variant-numeric:tabular-nums;}
+.att-stat-present{color:#2e7d32;}
+.att-stat-absent{color:#c62828;}
+.att-stat-late{color:#e65100;}
+.att-stat-pct{color:#00695C;}
+.att-stat-pct-low{color:#c62828;}
+.att-stat-pct-mid{color:#e65100;}
+.att-stat-bar{height:4px;border-radius:2px;background:#e0f2f1;margin-top:3px;overflow:hidden;}
+.att-stat-bar-fill{height:100%;background:linear-gradient(135deg,#00897B,#4DB6AC);}
 .toast{position:fixed;bottom:28px;right:28px;background:#00897B;color:#fff;padding:13px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,137,123,.3);}
 .toast.show{display:block;}
 .spinner{display:none;align-items:center;gap:8px;color:#00897B;font-size:13px;font-weight:600;}
@@ -1159,6 +1168,10 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
             <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
             <th>&#x62A;&#x645; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</th>
+            <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
+            <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</th>
+            <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</th>
+            <th style="text-align:center;">&#x646;&#x633;&#x628;&#x629; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631; %</th>
           </tr>
         </thead>
         <tbody id="attTableBody"></tbody>
@@ -1352,9 +1365,13 @@ function onControlChange() {
 
 function checkAndLoad(group, date) {
   document.getElementById('checkSpinner').classList.add('show');
-  fetch('/api/attendance/check?group=' + encodeURIComponent(group) + '&date=' + encodeURIComponent(date))
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
+  Promise.all([
+    fetch('/api/attendance/check?group=' + encodeURIComponent(group) + '&date=' + encodeURIComponent(date)).then(function(r){ return r.json(); }),
+    fetch('/api/attendance/student-stats?group=' + encodeURIComponent(group)).then(function(r){ return r.json(); }).catch(function(){ return {stats:{}}; })
+  ]).then(function(results) {
+    var data = results[0];
+    var statsResp = results[1] || {};
+    var stats = statsResp.stats || {};
       document.getElementById('checkSpinner').classList.remove('show');
       var students = groupsData[group] || [];
       document.getElementById('studentCount').textContent = students.length + ' \u0637\u0627\u0644\u0628';
@@ -1369,13 +1386,13 @@ function checkAndLoad(group, date) {
         }
         showAlert('exists', '\u26a0\ufe0f \u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0645\u0633\u0628\u0642\u0627\u064b. \u064a\u0645\u0643\u0646\u0643 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0623\u062f\u0646\u0627\u0647.');
         document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a';
-        renderTable(students, data.records);
+        renderTable(students, data.records, stats);
       } else {
         currentMode = 'new';
         existingRecords = {};
         showAlert('new', '\u2705 \u0644\u0645 \u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e.');
         document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0633\u062c\u064a\u0644\u0627\u062a';
-        renderTable(students, []);
+        renderTable(students, [], stats);
       }
       document.getElementById('attSection').style.display = 'block';
       document.getElementById('attFooterBtns').style.display = 'flex';
@@ -1420,7 +1437,8 @@ function onStatusChange(sel) {
   }
 }
 
-function renderTable(students, existingList) {
+function renderTable(students, existingList, stats) {
+  stats = stats || {};
   var statusMap = {}; var msgStatusMap = {};
   for(var i=0; i<existingList.length; i++) {
     statusMap[existingList[i].student_name] = existingList[i].status || ''; msgStatusMap[existingList[i].student_name] = existingList[i].message_status || '';
@@ -1428,7 +1446,7 @@ function renderTable(students, existingList) {
 
   var html = '';
   if(!students.length) {
-    html = '<tr><td colspan="5" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
+    html = '<tr><td colspan="9" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
   } else {
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
@@ -1466,7 +1484,21 @@ function renderTable(students, existingList) {
       }
       html += '</td>';
       
-      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (savedMsgStatus === '1' ? ' checked' : '') + '></td>';html += '</tr>';
+      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (savedMsgStatus === '1' ? ' checked' : '') + '></td>';
+      // Attendance stat cells (present/absent/late/percentage).
+      var st = stats[name] || {present:0, absent:0, late:0, total:0, pct:0};
+      var pctCls = 'att-stat att-stat-pct';
+      if (st.total) {
+        if (st.pct < 50) pctCls = 'att-stat att-stat-pct-low';
+        else if (st.pct < 75) pctCls = 'att-stat att-stat-pct-mid';
+      }
+      html += '<td class="att-stat att-stat-present">' + st.present + '</td>';
+      html += '<td class="att-stat att-stat-absent">' + st.absent + '</td>';
+      html += '<td class="att-stat att-stat-late">' + st.late + '</td>';
+      html += '<td class="' + pctCls + '">' + (st.total ? (st.pct + '%') : '&mdash;') +
+              (st.total ? '<div class="att-stat-bar"><div class="att-stat-bar-fill" style="width:' + Math.min(100, st.pct) + '%;"></div></div>' : '') +
+              '</td>';
+      html += '</tr>';
     }
   }
   document.getElementById('attTableBody').innerHTML = html;
@@ -5024,6 +5056,43 @@ def api_attendance_check():
         (group_name, att_date)
     ).fetchall()
     return jsonify({"exists": len(rows) > 0, "records": [dict(r) for r in rows]})
+
+@app.route("/api/attendance/student-stats", methods=["GET"])
+@login_required
+def api_attendance_student_stats():
+    group_name = request.args.get("group", "").strip()
+    db = get_db()
+    if group_name:
+        rows = db.execute(
+            "SELECT student_name, status FROM attendance "
+            "WHERE group_name=? AND student_name IS NOT NULL AND student_name<>''",
+            (group_name,)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT student_name, status FROM attendance "
+            "WHERE student_name IS NOT NULL AND student_name<>''"
+        ).fetchall()
+    STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
+    STATUS_ABSENT  = "\u063A\u0627\u0626\u0628"
+    STATUS_LATE    = "\u0645\u062A\u0623\u062E\u0631"
+    stats = {}
+    for r in rows:
+        name = r["student_name"]
+        if not name:
+            continue
+        s = stats.setdefault(name, {"present": 0, "absent": 0, "late": 0, "total": 0})
+        s["total"] += 1
+        st = (r["status"] or "").strip()
+        if st == STATUS_PRESENT:
+            s["present"] += 1
+        elif st == STATUS_ABSENT:
+            s["absent"] += 1
+        elif st == STATUS_LATE:
+            s["late"] += 1
+    for name, s in stats.items():
+        s["pct"] = round(s["present"] / s["total"] * 100, 1) if s["total"] else 0.0
+    return jsonify({"ok": True, "stats": stats})
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
