@@ -1472,7 +1472,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">&#x628;&#x62D;&#x62B;</button>
@@ -2381,6 +2381,14 @@ function saveGroup2(){
     if(data.ok){closeGroupModal2();showToast(editId?'&#x62A;&#x645; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;':'&#x62A;&#x645; &#x627;&#x636;&#x627;&#x641;&#x629; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;','#00BCD4');loadGroups2();}
     else{showToast(data.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;','#e53935');}
   }).catch(function(){showToast('&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;','#e53935');});
+}
+function cleanupEmptyGroups(){
+  if(!confirm('\u0647\u0644 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u062C\u0645\u064A\u0639 \u0627\u0644\u0635\u0641\u0648\u0641 \u0627\u0644\u0641\u0627\u0631\u063A\u0629\u061F')) return;
+  fetch('/api/groups/cleanup-empty',{method:'POST',credentials:'include'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){showToast('\u062A\u0645 \u062D\u0630\u0641 ' + (d.deleted||0) + ' \u0635\u0641 \u0641\u0627\u0631\u063A','#00BCD4');loadGroups2();}
+      else{showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
+    }).catch(function(){showToast('\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');});
 }
 function askGroupDelete2(id){groupDeleteTargetId2=id;document.getElementById('groupConfirmModal2').classList.add('open');document.getElementById('groupConfirmDelBtn2').onclick=confirmGroupDelete2;}
 function confirmGroupDelete2(){
@@ -4565,6 +4573,18 @@ def api_groups_delete(gid):
         db.execute("DELETE FROM student_groups WHERE id=?", (gid,))
         db.commit()
         return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/groups/cleanup-empty", methods=["POST"])
+@login_required
+def api_groups_cleanup_empty():
+    try:
+        db = get_db()
+        cur = db.execute("DELETE FROM student_groups WHERE group_name IS NULL OR TRIM(group_name) = ''")
+        deleted = cur.rowcount if cur.rowcount is not None else 0
+        db.commit()
+        return jsonify({"ok": True, "deleted": deleted})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
