@@ -216,14 +216,6 @@ def init_db():
         online_time TEXT,
         group_link TEXT,
         session_duration TEXT,
-        student_count TEXT,
-        study_days TEXT,
-        online_days TEXT,
-        online_time_ramadan TEXT,
-        sessions_total_auto TEXT,
-        sessions_nonramadan_auto TEXT,
-        sessions_ramadan_auto TEXT,
-        sessions_online_auto TEXT,
         session_minutes_normal TEXT,
         hours_in_person_auto TEXT,
         hours_online_only TEXT,
@@ -371,14 +363,6 @@ if True:
         online_time TEXT,
         group_link TEXT,
         session_duration TEXT,
-        student_count TEXT,
-        study_days TEXT,
-        online_days TEXT,
-        online_time_ramadan TEXT,
-        sessions_total_auto TEXT,
-        sessions_nonramadan_auto TEXT,
-        sessions_ramadan_auto TEXT,
-        sessions_online_auto TEXT,
         session_minutes_normal TEXT,
         hours_in_person_auto TEXT,
         hours_online_only TEXT,
@@ -438,14 +422,6 @@ if True:
         if col not in existing:
             db2.execute("ALTER TABLE students ADD COLUMN " + col + " " + coltype)
     new_group_cols = [
-        ("student_count", "TEXT"),
-        ("study_days", "TEXT"),
-        ("online_days", "TEXT"),
-        ("online_time_ramadan", "TEXT"),
-        ("sessions_total_auto", "TEXT"),
-        ("sessions_nonramadan_auto", "TEXT"),
-        ("sessions_ramadan_auto", "TEXT"),
-        ("sessions_online_auto", "TEXT"),
         ("session_minutes_normal", "TEXT"),
         ("hours_in_person_auto", "TEXT"),
         ("hours_online_only", "TEXT"),
@@ -455,6 +431,23 @@ if True:
     for col, coltype in new_group_cols:
         if col not in group_existing:
             db2.execute("ALTER TABLE student_groups ADD COLUMN " + col + " " + coltype)
+    # One-time cleanup: drop obsolete columns that were added in earlier deploys.
+    drop_group_cols = [
+        "student_count","study_days","online_days","online_time_ramadan",
+        "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto","sessions_online_auto",
+    ]
+    group_existing = [row[1] for row in db2.execute("PRAGMA table_info(student_groups)").fetchall()]
+    for col in drop_group_cols:
+        if col in group_existing:
+            try:
+                db2.execute('ALTER TABLE student_groups DROP COLUMN "' + col + '"')
+            except Exception:
+                pass
+        try:
+            db2.execute("DELETE FROM group_col_labels WHERE col_key=?", (col,))
+        except Exception:
+            pass
+    db2.commit()
     db2.execute("""CREATE TABLE IF NOT EXISTS attendance(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         attendance_date TEXT,
@@ -1942,15 +1935,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <div class="field"><label style="color:#0097A7;">&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x627;&#x644;&#x639;&#x627;&#x62F;&#x64A;)</label><input id="gf2_online_time" placeholder="&#x645;&#x62B;&#x627;&#x644;: 5-6 &#x645;&#x633;&#x627;&#x621;" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x631;&#x627;&#x628;&#x637; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><input id="gf2_group_link" placeholder="https://..." class="ltr" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; (&#x64A;&#x62F;&#x648;&#x64A;)</label><input id="gf2_session_duration" placeholder="&#x645;&#x62B;&#x627;&#x644;: 60 &#x62F;&#x642;&#x64A;&#x642;&#x629;" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628;</label><input id="gf2_student_count" placeholder="&#x645;&#x62B;&#x627;&#x644;: 15" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</label><input id="gf2_study_days" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x633;&#x628;&#x62A; &#x648; &#x627;&#x644;&#x623;&#x62D;&#x62F;" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;</label><input id="gf2_online_days" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x62B;&#x644;&#x627;&#x62B;&#x627;&#x621;" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;)</label><input id="gf2_online_time_ramadan" placeholder="&#x645;&#x62B;&#x627;&#x644;: 10-11 &#x644;&#x64A;&#x644;&#x627;" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)</label><input id="gf2_session_minutes_normal" placeholder="&#x645;&#x62B;&#x627;&#x644;: 60" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x62C;&#x645;&#x627;&#x644;&#x64A; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)</label><input id="gf2_sessions_total_auto" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x642;&#x628;&#x644; &#x648; &#x628;&#x639;&#x62F; &#x631;&#x645;&#x636;&#x627;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)</label><input id="gf2_sessions_nonramadan_auto" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x641;&#x64A; &#x631;&#x645;&#x636;&#x627;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)</label><input id="gf2_sessions_ramadan_auto" style="border-color:#b2ebf2;background:#f0fdff;"></div>
-      <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)</label><input id="gf2_sessions_online_auto" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)</label><input id="gf2_hours_in_person_auto" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;</label><input id="gf2_hours_online_only" style="border-color:#b2ebf2;background:#f0fdff;"></div>
       <div class="field"><label style="color:#0097A7;">&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;</label><input id="gf2_hours_all_online" style="border-color:#b2ebf2;background:#f0fdff;"></div>
@@ -2314,7 +2299,7 @@ function filterGroupTable2(){
   renderGroupTable2(allGroups2.filter(function(g){return (g.group_name||'').toLowerCase().indexOf(q)>-1||(g.teacher_name||'').toLowerCase().indexOf(q)>-1;}));
 }
 function clearGroupForm2(){
-  var ids=['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration','student_count','study_days','online_days','online_time_ramadan','session_minutes_normal','sessions_total_auto','sessions_nonramadan_auto','sessions_ramadan_auto','sessions_online_auto','hours_in_person_auto','hours_online_only','hours_all_online'];
+  var ids=['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration','session_minutes_normal','hours_in_person_auto','hours_online_only','hours_all_online'];
   for(var x=0;x<ids.length;x++){var el=document.getElementById('gf2_'+ids[x]);if(el)el.value='';}
   document.getElementById('groupEditId2').value='';
 }
@@ -2334,15 +2319,7 @@ function openGroupEdit2(id){
   document.getElementById('gf2_online_time').value=g.online_time||'';
   document.getElementById('gf2_group_link').value=g.group_link||'';
   document.getElementById('gf2_session_duration').value=g.session_duration||'';
-  document.getElementById('gf2_student_count').value=g.student_count||'';
-  document.getElementById('gf2_study_days').value=g.study_days||'';
-  document.getElementById('gf2_online_days').value=g.online_days||'';
-  document.getElementById('gf2_online_time_ramadan').value=g.online_time_ramadan||'';
   document.getElementById('gf2_session_minutes_normal').value=g.session_minutes_normal||'';
-  document.getElementById('gf2_sessions_total_auto').value=g.sessions_total_auto||'';
-  document.getElementById('gf2_sessions_nonramadan_auto').value=g.sessions_nonramadan_auto||'';
-  document.getElementById('gf2_sessions_ramadan_auto').value=g.sessions_ramadan_auto||'';
-  document.getElementById('gf2_sessions_online_auto').value=g.sessions_online_auto||'';
   document.getElementById('gf2_hours_in_person_auto').value=g.hours_in_person_auto||'';
   document.getElementById('gf2_hours_online_only').value=g.hours_online_only||'';
   document.getElementById('gf2_hours_all_online').value=g.hours_all_online||'';
@@ -2361,15 +2338,7 @@ function saveGroup2(){
     online_time:document.getElementById('gf2_online_time').value.trim(),
     group_link:document.getElementById('gf2_group_link').value.trim(),
     session_duration:document.getElementById('gf2_session_duration').value.trim(),
-    student_count:document.getElementById('gf2_student_count').value.trim(),
-    study_days:document.getElementById('gf2_study_days').value.trim(),
-    online_days:document.getElementById('gf2_online_days').value.trim(),
-    online_time_ramadan:document.getElementById('gf2_online_time_ramadan').value.trim(),
     session_minutes_normal:document.getElementById('gf2_session_minutes_normal').value.trim(),
-    sessions_total_auto:document.getElementById('gf2_sessions_total_auto').value.trim(),
-    sessions_nonramadan_auto:document.getElementById('gf2_sessions_nonramadan_auto').value.trim(),
-    sessions_ramadan_auto:document.getElementById('gf2_sessions_ramadan_auto').value.trim(),
-    sessions_online_auto:document.getElementById('gf2_sessions_online_auto').value.trim(),
     hours_in_person_auto:document.getElementById('gf2_hours_in_person_auto').value.trim(),
     hours_online_only:document.getElementById('gf2_hours_online_only').value.trim(),
     hours_all_online:document.getElementById('gf2_hours_all_online').value.trim()
@@ -2653,36 +2622,36 @@ function toggleGroupPositionCol(){
 }
 function addGroupColumn(){
   var label=document.getElementById('g_new_col_label').value.trim();
-  if(!label){showToast('&#1575;&#1583;&#1582;&#1604; &#1593;&#1606;&#1608;&#1575;&#1606; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;','#e53935');return;}
+  if(!label){showToast('\u0627\u062F\u062E\u0644 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0639\u0645\u0648\u062F','#e53935');return;}
   var posVal=document.getElementById('g_new_col_position').value;
   var afterCol=document.getElementById('g_new_col_after').value;
   var key='gcol_'+Date.now();
   var payload={col_key:key,col_label:label,position:posVal};
   if(posVal==='after'&&afterCol){payload.after_col=afterCol;}
   fetch('/api/group-columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
-    if(d.ok){document.getElementById('g_new_col_label').value='';document.getElementById('g_new_col_position').value='end';toggleGroupPositionCol();closeGroupTableEditModal();showToast('&#1578;&#1605; &#1573;&#1590;&#1575;&#1601;&#1577; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583; &#1576;&#1606;&#1580;&#1575;&#1581;','#00BCD4');loadGroups2();}
-    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u0633\u062C\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627','#e53935');return;}
+    if(d.ok){document.getElementById('g_new_col_label').value='';document.getElementById('g_new_col_position').value='end';toggleGroupPositionCol();closeGroupTableEditModal();showToast('\u062A\u0645 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0645\u0648\u062F \u0628\u0646\u062C\u0627\u062D','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
   });
 }
 function deleteGroupColumn(){
   var key=document.getElementById('g_del_col_key').value;
-  if(!key){showToast('&#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583;&#1575;','#e53935');return;}
-  if(!confirm('&#1607;&#1604; &#1571;&#1606;&#1578; &#1605;&#1578;&#1571;&#1603;&#1583; &#1605;&#1606; &#1581;&#1584;&#1601; &#1607;&#1584;&#1575; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;&#1567;'))return;
+  if(!key){showToast('\u0627\u062E\u062A\u0631 \u0639\u0645\u0648\u062F\u0627','#e53935');return;}
+  if(!confirm('\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062F\u061F'))return;
   fetch('/api/group-columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
-    if(d.ok){closeGroupTableEditModal();showToast('&#1578;&#1605; &#1581;&#1584;&#1601; &#1575;&#1604;&#1593;&#1605;&#1608;&#1583;','#00BCD4');loadGroups2();}
-    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u0633\u062C\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627','#e53935');return;}
+    if(d.ok){closeGroupTableEditModal();showToast('\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062F','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
   });
 }
 function updateGroupColumnLabel(){
   var key=document.getElementById('g_edit_col_key').value;
   var label=document.getElementById('g_edit_col_label').value.trim();
-  if(!key||!label){showToast('&#1575;&#1582;&#1578;&#1585; &#1593;&#1605;&#1608;&#1583;&#1575; &#1608;&#1575;&#1583;&#1582;&#1604; &#1575;&#1604;&#1575;&#1587;&#1605;','#e53935');return;}
+  if(!key||!label){showToast('\u0627\u062E\u062A\u0631 \u0639\u0645\u0648\u062F\u0627 \u0648\u0627\u062F\u062E\u0644 \u0627\u0644\u0627\u0633\u0645','#e53935');return;}
   fetch('/api/group-columns/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})}).then(function(r){return r.text();}).then(function(txt){
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('&#1575;&#1606;&#1578;&#1607;&#1578; &#1575;&#1604;&#1580;&#1604;&#1587;&#1577;&#1548; &#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1605;&#1580;&#1583;&#1583;&#1575;','#e53935');return;}
-    if(d.ok){closeGroupTableEditModal();showToast('&#1578;&#1605; &#1578;&#1593;&#1583;&#1610;&#1604; &#1575;&#1604;&#1593;&#1606;&#1608;&#1575;&#1606;','#00BCD4');loadGroups2();}
-    else{showToast(d.error||'&#1581;&#1583;&#1579; &#1582;&#1591;&#1575;','#e53935');}
+    var d;try{d=JSON.parse(txt);}catch(e){showToast('\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u0633\u062C\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627','#e53935');return;}
+    if(d.ok){closeGroupTableEditModal();showToast('\u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646','#00BCD4');loadGroups2();}
+    else{showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
   });
 }
 
@@ -3275,18 +3244,10 @@ var IMPORT_DEFS = {
       {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649 \u0627\u0648 \u0627\u0644\u0645\u0642\u0631\u0631"},
       {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649 / \u0627\u0644\u0645\u0642\u0631\u0631"},
       {key:"last_reached", ar:"\u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0630\u064A \u062A\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0627\u0644\u064A\u0647 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u0641\u0627\u0626\u062A"},
-      {key:"student_count", ar:"\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0627\u0628"},
-      {key:"study_days", ar:"\u0627\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
       {key:"study_time", ar:"\u0648\u0642\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
       {key:"ramadan_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646"},
-      {key:"online_days", ar:"\u0627\u064A\u0627\u0645 \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646"},
-      {key:"online_time_ramadan", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646)"},
       {key:"online_time", ar:"\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u0627\u0644\u0639\u0627\u062F\u064A)"},
       {key:"group_link", ar:"\u0631\u0627\u0628\u0637 \u0628\u062B \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
-      {key:"sessions_total_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u0627\u062C\u0645\u0627\u0644\u064A (\u062A\u0644\u0642\u0627\u0626\u064A)"},
-      {key:"sessions_nonramadan_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 \u0642\u0628\u0644 \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646 \u0648 \u0628\u0639\u062F\u0647 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
-      {key:"sessions_ramadan_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 \u0641\u064A \u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
-      {key:"sessions_online_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u062D\u0635\u0635 \u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
       {key:"session_minutes_normal", ar:"\u0645\u062F\u0629 \u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u0644\u0648\u0642\u062A \u0627\u0644\u0627\u0639\u062A\u064A\u0627\u062F\u064A (\u064A\u062F\u0648\u064A)"},
       {key:"session_duration", ar:"\u0627\u0644\u062D\u0635\u0629 \u0628\u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0634\u0647\u0631 \u0631\u0645\u0636\u0627\u0646"},
       {key:"hours_in_person_auto", ar:"\u0639\u062F\u062F \u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062D\u0636\u0648\u0631\u064A\u0629 (\u062A\u0644\u0642\u0627\u0626\u064A)"},
@@ -3888,18 +3849,10 @@ def api_group_columns_get():
                 pass
         db.commit()
     extra_group_cols = [
-        ("student_count","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628;",10),
-        ("study_days","&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;",11),
-        ("online_days","&#x627;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",12),
-        ("online_time_ramadan","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;)",13),
-        ("sessions_total_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x62C;&#x645;&#x627;&#x644;&#x64A; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",14),
-        ("sessions_nonramadan_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x642;&#x628;&#x644; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646; &#x648; &#x628;&#x639;&#x62F;&#x647; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",15),
-        ("sessions_ramadan_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; &#x641;&#x64A; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",16),
-        ("sessions_online_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",17),
-        ("session_minutes_normal","&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)",18),
-        ("hours_in_person_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",19),
-        ("hours_online_only","&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;",20),
-        ("hours_all_online","&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",21),
+        ("session_minutes_normal","&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)",10),
+        ("hours_in_person_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",11),
+        ("hours_online_only","&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;",12),
+        ("hours_all_online","&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",13),
     ]
     for key,label,order in extra_group_cols:
         try:
@@ -4533,18 +4486,13 @@ def api_groups_add():
         db.execute("""INSERT INTO student_groups
             (group_name,teacher_name,level_course,last_reached,study_time,
              ramadan_time,online_time,group_link,session_duration,
-             student_count,study_days,online_days,online_time_ramadan,
-             sessions_total_auto,sessions_nonramadan_auto,sessions_ramadan_auto,
-             sessions_online_auto,session_minutes_normal,
+             session_minutes_normal,
              hours_in_person_auto,hours_online_only,hours_all_online)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
              d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
              d.get("online_time"), d.get("group_link"), d.get("session_duration"),
-             d.get("student_count"), d.get("study_days"), d.get("online_days"),
-             d.get("online_time_ramadan"), d.get("sessions_total_auto"),
-             d.get("sessions_nonramadan_auto"), d.get("sessions_ramadan_auto"),
-             d.get("sessions_online_auto"), d.get("session_minutes_normal"),
+             d.get("session_minutes_normal"),
              d.get("hours_in_person_auto"), d.get("hours_online_only"),
              d.get("hours_all_online")))
         db.commit()
@@ -4561,18 +4509,13 @@ def api_groups_update(gid):
         db.execute("""UPDATE student_groups SET
             group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
             ramadan_time=?,online_time=?,group_link=?,session_duration=?,
-            student_count=?,study_days=?,online_days=?,online_time_ramadan=?,
-            sessions_total_auto=?,sessions_nonramadan_auto=?,sessions_ramadan_auto=?,
-            sessions_online_auto=?,session_minutes_normal=?,
+            session_minutes_normal=?,
             hours_in_person_auto=?,hours_online_only=?,hours_all_online=?
             WHERE id=?""",
             (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
              d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
              d.get("online_time"), d.get("group_link"), d.get("session_duration"),
-             d.get("student_count"), d.get("study_days"), d.get("online_days"),
-             d.get("online_time_ramadan"), d.get("sessions_total_auto"),
-             d.get("sessions_nonramadan_auto"), d.get("sessions_ramadan_auto"),
-             d.get("sessions_online_auto"), d.get("session_minutes_normal"),
+             d.get("session_minutes_normal"),
              d.get("hours_in_person_auto"), d.get("hours_online_only"),
              d.get("hours_all_online"), gid))
         db.commit()
@@ -4738,9 +4681,7 @@ IMPORT_TABLE_FIELDS = {
     "student_groups": [
         "group_name","teacher_name","level_course","last_reached","study_time",
         "ramadan_time","online_time","group_link","session_duration",
-        "student_count","study_days","online_days","online_time_ramadan",
-        "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto",
-        "sessions_online_auto","session_minutes_normal",
+        "session_minutes_normal",
         "hours_in_person_auto","hours_online_only","hours_all_online",
     ],
     "attendance": [
