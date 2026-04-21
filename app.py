@@ -1733,7 +1733,13 @@ body{background:#f5f3ff;direction:rtl;display:flex;flex-direction:column;}
 .search-bar input{flex:1;padding:10px 16px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;outline:none;background:#fff;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
-.table-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(107,63,160,.1);overflow-x:auto;overflow-y:auto;direction:rtl;}
+.table-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(107,63,160,.08);overflow-x:auto;overflow-y:auto;direction:rtl;border:1px solid #f0ebff;}
+/* Section cards grouping each data table + its action bar. */
+.db-section{background:#fff;border-radius:16px;padding:22px 24px;margin-bottom:28px;box-shadow:0 3px 14px rgba(107,63,160,.08);border:1px solid #eee;}
+.db-section-title{font-size:19px;font-weight:800;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #f0ebff;display:flex;align-items:center;gap:10px;}
+.db-section .table-wrap{box-shadow:none;border:1px solid #eee;}
+.custom-table-section{background:#fff;border-radius:16px;padding:22px 24px;margin:0 0 28px 0;box-shadow:0 3px 14px rgba(21,101,192,.08);border:1px solid #e0f0ff;}
+.custom-table-section .table-wrap{box-shadow:none;border:1px solid #eee;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 th{padding:13px 12px;font-size:13px;font-weight:700;text-align:right;white-space:nowrap;}
@@ -1829,6 +1835,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</a>
     </div>
   </div>
+  <div class="db-section">
+  <div class="db-section-title" style="color:#6B3FA0;">&#x1F393; &#x642;&#x627;&#x639;&#x62F;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</div>
   <div class="stats">
     <div class="stat-card">
       <span class="stat-num" id="totalCount">0</span>
@@ -1880,10 +1888,11 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       </tbody>
     </table>
   </div>
+  </div>
 
 <!-- ===== GROUPS TABLE SECTION ===== -->
-<div style="margin-top:40px;">
-  <div style="font-size:20px;font-weight:800;color:#0097A7;margin-bottom:16px;">&#128101; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; (&#x64A;&#x62F;&#x648;&#x64A;)</div>
+<div class="db-section">
+  <div class="db-section-title" style="color:#0097A7;">&#128101; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
   <div class="stats">
     <div class="stat-card" style="border-top:3px solid #00BCD4;">
       <span class="stat-num" id="groupsTotalCount" style="color:#00BCD4;">0</span>
@@ -1913,9 +1922,9 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
 </div>
 <!-- TAQSEET (PAYMENT PLANS) TABLE -->
-<div style="margin:30px 0 0 0;">
+<div class="db-section">
+  <div class="db-section-title" style="color:#6c3fa0;">&#128203; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128203; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</span>
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
     <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
     <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
@@ -1978,10 +1987,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     </table>
   </div>
 </div>
-<div style="margin:30px 0 0 0;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <span style="font-size:1.3em;font-weight:700;color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
-  </div>
+<div class="db-section">
+  <div class="db-section-title" style="color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
   <div class="stats" style="margin-bottom:10px;">
     <div class="stat-card">
       <span class="stat-num" id="attendanceTotalCount">0</span>
