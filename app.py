@@ -1420,6 +1420,16 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .btn-bulk-del{display:none;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;align-items:center;gap:6px;}
 .btn-bulk-del.show{display:inline-flex;}
 .btn-bulk-del:hover{opacity:0.9;}
+/* Frozen column styling — cells that stay pinned as the .table-wrap scrolls */
+.frozen-col{position:sticky!important;z-index:2;}
+thead .frozen-col{z-index:4;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+tbody .frozen-col{background:#fff;box-shadow:-2px 0 4px rgba(0,0,0,0.06);}
+tbody tr:hover .frozen-col{background:#faf7ff;}
+.freeze-modal-body{max-height:50vh;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 10px;margin:10px 0;}
+.freeze-modal-body label{display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-bottom:1px solid #f5f5f5;}
+.freeze-modal-body label:last-child{border-bottom:none;}
+.freeze-modal-body label:hover{background:#f3eeff;}
+.freeze-modal-body input{margin:0;}
 </style>
 </head>
 <body>
@@ -1442,7 +1452,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
+  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('students')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">&#x628;&#x62D;&#x62B;</button>
@@ -1496,7 +1506,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('student_groups')">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('student_groups')">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('groups')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">&#x628;&#x62D;&#x62B;</button>
@@ -1526,6 +1536,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
     <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
     <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
     <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button onclick="openFreezeModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
     <button id="bulkDelBtn_taqseet" class="btn-bulk-del" style="padding:8px 16px;font-size:13px;" onclick="_bulkDelete('taqseetBody',function(id){return '/api/taqseet/'+id;},loadTaqseet,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
   <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
@@ -1596,6 +1607,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
   <button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
   <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('attendance')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
   <button id="bulkDelBtn_attendance" class="btn-bulk-del" onclick="_bulkDelete('attendanceBody',function(id){return '/api/attendance/'+id;},loadAttendance,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="attendanceSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x641;&#x64A; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;..." oninput="filterAttendanceTable()">
@@ -1952,6 +1964,18 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- SHARED FREEZE COLUMNS MODAL -->
+<div class="modal-bg" id="freezeModal">
+  <div class="modal" style="max-width:520px;border-top:4px solid #1565C0;">
+    <h2 id="freezeModalTitle" style="color:#1565C0;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;</h2>
+    <div style="background:#e3f2fd;border-radius:8px;padding:10px;font-size:13px;color:#0d47a1;margin-bottom:8px;direction:rtl;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62A;&#x64A; &#x62A;&#x631;&#x64A;&#x62F; &#x62A;&#x62B;&#x628;&#x64A;&#x62A;&#x647;&#x627; &#x639;&#x644;&#x649; &#x627;&#x644;&#x64A;&#x645;&#x64A;&#x646; &#x639;&#x646;&#x62F; &#x627;&#x644;&#x62A;&#x645;&#x631;&#x64A;&#x631;.</div>
+    <div id="freezeModalBody" class="freeze-modal-body" dir="rtl"></div>
+    <div class="modal-actions">
+      <button class="btn-save" style="background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="applyFreezeFromModal()">&#x62A;&#x637;&#x628;&#x64A;&#x642;</button>
+      <button class="btn-cancel" onclick="closeFreezeModal()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="groupModal2">
   <div class="modal" style="border-top:4px solid #00BCD4;">
     <h2 id="groupModalTitle2" style="color:#0097A7;">&#x627;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x62C;&#x62F;&#x64A;&#x62F;&#x629;</h2>
@@ -2090,6 +2114,97 @@ function _bulkDelete(tbodyId, urlFn, refreshFn, confirmMsg){
     if(typeof refreshFn === 'function') refreshFn();
   });
 }
+
+// Freeze-columns helpers shared across every table on this page.
+// Freeze state is saved to localStorage keyed by tableKey (e.g. "students",
+// "groups", "custom_<tid>"). Stored as an array of column indices (the <th>
+// positions inside the table's thead tr).
+var _freezeCurrentTable = null;
+function _freezeKey(tableKey){ return 'freeze_'+tableKey; }
+function _freezeLoad(tableKey){
+  try { return JSON.parse(localStorage.getItem(_freezeKey(tableKey)) || '[]') || []; }
+  catch(e){ return []; }
+}
+function _freezeSave(tableKey, indices){
+  try { localStorage.setItem(_freezeKey(tableKey), JSON.stringify(indices)); } catch(e){}
+}
+function _freezeTableForKey(tableKey){
+  if (tableKey.indexOf('custom_') === 0) {
+    var tid = tableKey.substring(7);
+    var tbody = document.getElementById('ctbody_' + tid);
+    return tbody ? tbody.closest('table') : null;
+  }
+  var tbodyIds = { students:'studentsBody', groups:'groupsBody2', taqseet:'taqseetBody', attendance:'attendanceBody' };
+  var tbody = document.getElementById(tbodyIds[tableKey]);
+  return tbody ? tbody.closest('table') : null;
+}
+function applyFreezeToTable(tableKey){
+  var table = _freezeTableForKey(tableKey);
+  if (!table) return;
+  // Clear any prior freeze styling.
+  table.querySelectorAll('.frozen-col').forEach(function(el){
+    el.classList.remove('frozen-col');
+    el.style.position = '';
+    el.style.right = '';
+    el.style.zIndex = '';
+  });
+  var indices = _freezeLoad(tableKey);
+  if (!indices.length) return;
+  var headerTr = table.querySelector('thead tr');
+  if (!headerTr) return;
+  var ths = headerTr.querySelectorAll('th');
+  var bodyRows = table.querySelectorAll('tbody tr');
+  var cumRight = 0;
+  for (var i = 0; i < ths.length; i++) {
+    if (indices.indexOf(i) < 0) continue;
+    var w = ths[i].offsetWidth;
+    _pinCell(ths[i], cumRight, true);
+    for (var r = 0; r < bodyRows.length; r++) {
+      var cell = bodyRows[r].children[i];
+      if (cell) _pinCell(cell, cumRight, false);
+    }
+    cumRight += w;
+  }
+}
+function _pinCell(el, offset, isHeader){
+  el.classList.add('frozen-col');
+  el.style.position = 'sticky';
+  el.style.right = offset + 'px';
+  el.style.zIndex = isHeader ? '4' : '2';
+}
+function openFreezeModal(tableKey){
+  _freezeCurrentTable = tableKey;
+  var table = _freezeTableForKey(tableKey);
+  if (!table) { showToast('\u0627\u0644\u062C\u062F\u0648\u0644 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D','#e53935'); return; }
+  var ths = table.querySelectorAll('thead tr th');
+  var frozen = _freezeLoad(tableKey);
+  var body = document.getElementById('freezeModalBody');
+  var html = '';
+  for (var i = 0; i < ths.length; i++) {
+    var th = ths[i];
+    if (th.classList.contains('bulk-col')) continue;
+    var label = (th.textContent || '').trim();
+    if (!label) label = '#' + (i+1);
+    var checked = frozen.indexOf(i) >= 0 ? 'checked' : '';
+    html += '<label><input type="checkbox" data-idx="'+i+'" '+checked+'><span>'+label.replace(/</g,'&lt;')+'</span></label>';
+  }
+  body.innerHTML = html || '<div style="color:#888;padding:8px;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u0639\u0645\u062F\u0629</div>';
+  document.getElementById('freezeModal').classList.add('open');
+}
+function closeFreezeModal(){
+  document.getElementById('freezeModal').classList.remove('open');
+  _freezeCurrentTable = null;
+}
+function applyFreezeFromModal(){
+  if (!_freezeCurrentTable) { closeFreezeModal(); return; }
+  var boxes = document.querySelectorAll('#freezeModalBody input[type=checkbox]:checked');
+  var indices = Array.from(boxes).map(function(b){ return parseInt(b.getAttribute('data-idx'),10); }).filter(function(x){ return !isNaN(x); });
+  indices.sort(function(a,b){ return a-b; });
+  _freezeSave(_freezeCurrentTable, indices);
+  applyFreezeToTable(_freezeCurrentTable);
+  showToast('\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u062A\u062C\u0645\u064A\u062F','#1565C0');
+  closeFreezeModal();
+}
 // \u2500\u2500\u2500 Taqseet (Payment Plans) Table \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var allTaqseet = null;
 var editingTaqseetId = null;
@@ -2107,6 +2222,7 @@ function renderTaqseet() {
   if (!allTaqseet || !allTaqseet.length) {
     tbody.innerHTML = '<tr><td colspan="45" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
     _bulkUpdate('taqseetBody','selectAll_taqseet','bulkDelBtn_taqseet');
+    applyFreezeToTable('taqseet');
     return;
   }
   var fields = ['taqseet_method','student_name','course_amount','num_installments',
@@ -2134,6 +2250,7 @@ function renderTaqseet() {
       saveTaqseetCell(parseInt(this.dataset.id), this.dataset.field, this);
     });
   });
+  applyFreezeToTable('taqseet');
 }
 
 function saveTaqseetCell(id, field, el) {
@@ -2232,6 +2349,7 @@ allStudents=sData.students||[]; allColumns=cData.columns||[]; allTaqseetData=awa
 renderTable(allStudents);
 document.getElementById('totalCount').textContent=allStudents.length;
 buildTableHeader();
+applyFreezeToTable('students');
 }
 function buildTableHeader(){
 var thead=document.querySelector('#studentsBody').closest('table').querySelector('thead tr');
@@ -2244,7 +2362,7 @@ thead.innerHTML=html;
 function renderTable(list){
 var body=document.getElementById('studentsBody');
 var colCount=allColumns.length+3;
-if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>';_bulkUpdate('studentsBody','selectAll_students','bulkDelBtn_students');return;}
+if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>';_bulkUpdate('studentsBody','selectAll_students','bulkDelBtn_students');applyFreezeToTable('students');return;}
 var html='';
 for(var i=0;i<list.length;i++){
 var s2=list[i];
@@ -2263,6 +2381,7 @@ row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#99
 html+=row;
 }
 body.innerHTML=html;
+applyFreezeToTable('students');
 }
 function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
@@ -2338,6 +2457,7 @@ function loadGroups2(){
     buildGroupTableHeader();
     renderGroupTable2(allGroups2);
     document.getElementById('groupsTotalCount').textContent=allGroups2.length;
+    applyFreezeToTable('groups');
   }).catch(function(){});
 }
 function buildGroupTableHeader(){
@@ -2351,7 +2471,7 @@ function buildGroupTableHeader(){
 function renderGroupTable2(list){
   var body=document.getElementById('groupsBody2');
   var colCount=allGroupColumns.length+3;
-  if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';_bulkUpdate('groupsBody2','selectAll_groups','bulkDelBtn_groups');return;}
+  if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';_bulkUpdate('groupsBody2','selectAll_groups','bulkDelBtn_groups');applyFreezeToTable('groups');return;}
   var html='';
   for(var i=0;i<list.length;i++){
     var g=list[i];
@@ -2367,6 +2487,7 @@ function renderGroupTable2(list){
     html+=row;
   }
   body.innerHTML=html;
+  applyFreezeToTable('groups');
 }
 function filterGroupTable2(){
   var q=document.getElementById('groupSearchInput').value.toLowerCase();
@@ -2753,6 +2874,7 @@ function renderAttendanceTable(data) {
   if(!data || data.length === 0) {
     tbody.innerHTML = '<tr><td colspan="12" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x633;&#x62C;&#x644;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x623;&#x648;&#x644; &#x633;&#x62C;&#x644;</td></tr>';
     _bulkUpdate('attendanceBody','selectAll_attendance','bulkDelBtn_attendance');
+    applyFreezeToTable('attendance');
     return;
   }
   var html = '';
@@ -2774,6 +2896,7 @@ function renderAttendanceTable(data) {
     html += '</tr>';
   }
   tbody.innerHTML = html;
+  applyFreezeToTable('attendance');
 }
 function filterAttendanceTable() {
   var q = document.getElementById('attendanceSearchInput').value.toLowerCase();
@@ -2932,6 +3055,10 @@ function renderAllCustomTables() {
     html += buildCustomTableHTML(t);
   }
   container.innerHTML = html;
+  // Re-apply saved freeze state on each custom table.
+  for (var j = 0; j < allCustomTables.length; j++) {
+    applyFreezeToTable('custom_' + allCustomTables[j].id);
+  }
 }
 
 function buildCustomTableHTML(t) {
@@ -2968,6 +3095,7 @@ function buildCustomTableHTML(t) {
 
   var tid = t.id;
   var bulkBtn = '<button id="' + btnId + '" class="btn-bulk-del" style="font-size:13px;padding:6px 12px;border-radius:8px;" onclick="_bulkDelete(\\'' + tbodyId + '\\',function(id){return \\'/api/custom-tables/' + tid + '/rows/\\'+id;},loadCustomTables,\\'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;\\')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>';
+  var freezeBtn = '<button class="btn-add" style="background:linear-gradient(135deg,#1565C0,#1E88E5);font-size:13px;padding:6px 12px;border-radius:8px;" onclick="openFreezeModal(\\'custom_' + tid + '\\')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>';
 
   return '<div class="custom-table-section" id="ctsec_' + t.id + '">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
@@ -2976,6 +3104,7 @@ function buildCustomTableHTML(t) {
     '<button class="btn-add" onclick="openCustomRowModal(' + t.id + ')">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641;</button>' +
     '<button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openCustomTableEditModal(' + t.id + ')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>' +
     '<button class="btn-del-row" style="font-size:13px;padding:6px 12px;border-radius:8px;" data-tid="' + t.id + '" onclick="openCustomTableDeleteConfirmById(this)">&#128465; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>' +
+    freezeBtn +
     bulkBtn +
     '</div></div>' +
     '<div class="table-wrap"><table>' +
