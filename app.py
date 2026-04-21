@@ -2598,9 +2598,17 @@ function updateColumnLabel(){
 
 var allGroupColumns=[];
 function openGroupTableEditModal(){
-  loadGroupColumnsForEdit();
-  document.getElementById('groupTableEditModal').classList.add('open');
-  switchGroupTab('add-col');
+  try {
+    console.log('[groups] openGroupTableEditModal fired');
+    var modal = document.getElementById('groupTableEditModal');
+    if(!modal){ console.error('[groups] groupTableEditModal element missing'); alert('\u062E\u0637\u0623: \u0627\u0644\u0646\u0627\u0641\u0630\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629'); return; }
+    loadGroupColumnsForEdit();
+    modal.classList.add('open');
+    switchGroupTab('add-col');
+  } catch(e) {
+    console.error('[groups] openGroupTableEditModal threw:', e);
+    showToast('\u062E\u0637\u0623: ' + (e && e.message ? e.message : e), '#e53935');
+  }
 }
 function closeGroupTableEditModal(){document.getElementById('groupTableEditModal').classList.remove('open');}
 function switchGroupTab(tab){
@@ -2613,8 +2621,12 @@ function switchGroupTab(tab){
   }
 }
 function loadGroupColumnsForEdit(){
-  fetch('/api/group-columns',{credentials:'include'}).then(function(r){return r.json();}).then(function(data){
+  fetch('/api/group-columns',{credentials:'include'}).then(function(r){
+    if(!r.ok){ console.error('[groups] /api/group-columns HTTP', r.status); }
+    return r.json();
+  }).then(function(data){
     var cols=data.columns||[];
+    console.log('[groups] loaded', cols.length, 'column labels');
     var delSel=document.getElementById('g_del_col_key');
     var editSel=document.getElementById('g_edit_col_key');
     var afterSel=document.getElementById('g_new_col_after');
