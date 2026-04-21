@@ -1669,6 +1669,9 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
 .btn-tab:hover{opacity:0.85;}
 .bulk-cb{width:16px;height:16px;cursor:pointer;accent-color:#6B3FA0;vertical-align:middle;}
 .bulk-col{width:38px;text-align:center;padding:6px 4px !important;}
+/* Taqseet: cells locked because the course amount is fully allocated. */
+.taqseet-locked{background:#ececec !important;color:#bbb !important;cursor:not-allowed !important;user-select:none;}
+.taqseet-locked:focus{outline:none;}
 .btn-bulk-del{display:none;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;align-items:center;gap:6px;}
 .btn-bulk-del.show{display:inline-flex;}
 .btn-bulk-del:hover{opacity:0.9;}
@@ -2500,13 +2503,58 @@ function renderTaqseet() {
       '</td>' +
     '</tr>';
   }).join('');
-  // Attach blur events
+  // Attach blur events + real-time lock updates for inst*/course_amount.
   tbody.querySelectorAll('.editable[data-field]').forEach(function(td) {
     td.addEventListener('blur', function() {
       saveTaqseetCell(parseInt(this.dataset.id), this.dataset.field, this);
     });
+    var f = td.dataset.field;
+    if (/^inst\d+$/.test(f) || f === 'course_amount') {
+      td.addEventListener('input', function() {
+        updateTaqseetLockState(this.closest('tr'));
+      });
+    }
   });
+  // Initial lock evaluation per row (reflect whatever's already saved).
+  tbody.querySelectorAll('tr').forEach(function(tr){ updateTaqseetLockState(tr); });
   applyFreezeToTable('taqseet');
+}
+
+function _taqseetParseNum(s){
+  var v = parseFloat(String(s == null ? '' : s).replace(/,/g, ''));
+  return isNaN(v) ? 0 : v;
+}
+function _taqseetSetLocked(cell, lock){
+  if (!cell) return;
+  if (lock) {
+    cell.setAttribute('contenteditable', 'false');
+    cell.classList.add('taqseet-locked');
+  } else {
+    cell.setAttribute('contenteditable', 'true');
+    cell.classList.remove('taqseet-locked');
+  }
+}
+function updateTaqseetLockState(tr){
+  if (!tr) return;
+  var courseCell = tr.querySelector('td[data-field="course_amount"]');
+  var courseAmt = courseCell ? _taqseetParseNum(courseCell.innerText) : 0;
+  // No valid ceiling -> every inst cell stays editable.
+  if (courseAmt <= 0) {
+    for (var i = 1; i <= 12; i++) {
+      _taqseetSetLocked(tr.querySelector('td[data-field="inst'+i+'"]'), false);
+    }
+    return;
+  }
+  var sum = 0, locked = false;
+  for (var i = 1; i <= 12; i++) {
+    var c = tr.querySelector('td[data-field="inst'+i+'"]');
+    if (!c) continue;
+    if (locked) { _taqseetSetLocked(c, true); continue; }
+    var v = _taqseetParseNum(c.innerText);
+    if (v > 0) sum += v;
+    _taqseetSetLocked(c, false);
+    if (sum >= courseAmt) locked = true;
+  }
 }
 
 function saveTaqseetCell(id, field, el) {
@@ -2528,6 +2576,7 @@ function saveTaqseetCell(id, field, el) {
     if (!isNaN(courseAmt) && courseAmt > 0 && sum > courseAmt) {
       showToast('\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 (' + sum + ') \u064A\u062A\u062C\u0627\u0648\u0632 \u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629 (' + courseAmt + ')', '#e53935');
       el.innerText = r[field] == null ? '' : String(r[field]);
+      updateTaqseetLockState(el.closest('tr'));
       return;
     }
     updated.num_installments = String(installmentCount);
