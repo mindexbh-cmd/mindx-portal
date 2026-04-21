@@ -1865,7 +1865,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <button class="btn-cancel" onclick="closeAttendanceTableEditModal()">&#x625;&#x63A;&#x644;&#x627;&#x642;</button>
     </div>
   </div>
-</d
+</div>
 
 <!-- DYNAMIC CUSTOM TABLES CONTAINER -->
 <div id="customTablesContainer"></div>
