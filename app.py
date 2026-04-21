@@ -2282,6 +2282,49 @@ async function confirmDelete(){
 }
 function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');}
 function showToast(msg,bg='#6B3FA0'){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+// Belt-and-suspenders: set the student-modal labels via unicode escapes so the
+// text renders even if a user's browser or a cached proxy somehow fails to
+// decode the HTML entities in the static markup.
+(function(){
+  var STUDENT_LABELS = {
+    f_personal_id: '\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A *',
+    f_student_name: '\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 *',
+    f_whatsapp: '\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F',
+    f_class_name: '\u0627\u0644\u0635\u0641',
+    f_old_new_2026: '\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026',
+    f_registration_term2_2026: '\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026',
+    f_group_name_student: '\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629',
+    f_group_online: '\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)',
+    f_final_result: '\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 (\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0633\u062A\u0648\u0649 2026)',
+    f_level_reached: '\u0627\u0644\u0649 \u0627\u064A\u0646 \u0648\u0635\u0644 \u0627\u0644\u0637\u0627\u0644\u0628 2026',
+    f_suitable_level: '\u0647\u0644 \u0627\u0644\u0637\u0627\u0644\u0628 \u0645\u0646\u0627\u0633\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 2026\u061F',
+    f_books_received: '\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0643\u062A\u0628',
+    f_teacher: '\u0627\u0644\u0645\u062F\u0631\u0633 2026',
+    f_installment1: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0627\u0648\u0644 2026',
+    f_installment2: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062B\u0627\u0646\u064A',
+    f_installment3: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062B\u0627\u0644\u062B',
+    f_installment4: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0631\u0627\u0628\u0639',
+    f_installment5: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u062E\u0627\u0645\u0633',
+    f_mother_phone: '\u0647\u0627\u062A\u0641 \u0627\u0644\u0627\u0645',
+    f_father_phone: '\u0647\u0627\u062A\u0641 \u0627\u0644\u0627\u0628',
+    f_other_phone: '\u0647\u0627\u062A\u0641 \u0627\u062E\u0631',
+    f_residence: '\u0645\u0643\u0627\u0646 \u0627\u0644\u0633\u0643\u0646',
+    f_home_address: '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0646\u0632\u0644',
+    f_road: '\u0627\u0644\u0637\u0631\u064A\u0642',
+    f_complex: '\u0627\u0644\u0645\u062C\u0645\u0639',
+    f_installment_type: '\u0627\u062E\u062A\u064A\u0627\u0631 \u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637'
+  };
+  function applyStudentLabels(){
+    for (var id in STUDENT_LABELS) {
+      var inp = document.getElementById(id);
+      if (inp && inp.previousElementSibling && inp.previousElementSibling.tagName === 'LABEL') {
+        inp.previousElementSibling.textContent = STUDENT_LABELS[id];
+      }
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyStudentLabels);
+  else applyStudentLabels();
+})();
 loadStudents();
 loadTaqseet();
 var allGroups2=[];
@@ -4483,24 +4526,22 @@ def api_groups_get():
     rows = db.execute("SELECT * FROM student_groups ORDER BY id ASC").fetchall()
     return jsonify({"groups": [dict(r) for r in rows]})
 
+def _student_groups_writable_cols(db):
+    # Reflect the live schema so a user who has deleted a column via the UI
+    # (e.g. session_duration) doesn't break every subsequent add/update.
+    cols = [r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()]
+    return [c for c in cols if c not in ("id", "created_at")]
+
 @app.route("/api/groups", methods=["POST"])
 @login_required
 def api_groups_add():
-    d = request.get_json()
+    d = request.get_json() or {}
+    db = get_db()
     try:
-        db = get_db()
-        db.execute("""INSERT INTO student_groups
-            (group_name,teacher_name,level_course,last_reached,study_time,
-             ramadan_time,online_time,group_link,session_duration,
-             session_minutes_normal,
-             hours_in_person_auto,hours_online_only,hours_all_online)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
-             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
-             d.get("online_time"), d.get("group_link"), d.get("session_duration"),
-             d.get("session_minutes_normal"),
-             d.get("hours_in_person_auto"), d.get("hours_online_only"),
-             d.get("hours_all_online")))
+        cols = _student_groups_writable_cols(db)
+        placeholders = ",".join(["?"] * len(cols))
+        values = tuple(d.get(c) for c in cols)
+        db.execute("INSERT INTO student_groups (" + ",".join(cols) + ") VALUES (" + placeholders + ")", values)
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
@@ -4509,21 +4550,13 @@ def api_groups_add():
 @app.route("/api/groups/<int:gid>", methods=["PUT"])
 @login_required
 def api_groups_update(gid):
-    d = request.get_json()
+    d = request.get_json() or {}
+    db = get_db()
     try:
-        db = get_db()
-        db.execute("""UPDATE student_groups SET
-            group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
-            ramadan_time=?,online_time=?,group_link=?,session_duration=?,
-            session_minutes_normal=?,
-            hours_in_person_auto=?,hours_online_only=?,hours_all_online=?
-            WHERE id=?""",
-            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
-             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
-             d.get("online_time"), d.get("group_link"), d.get("session_duration"),
-             d.get("session_minutes_normal"),
-             d.get("hours_in_person_auto"), d.get("hours_online_only"),
-             d.get("hours_all_online"), gid))
+        cols = _student_groups_writable_cols(db)
+        set_clause = ",".join([c + "=?" for c in cols])
+        values = tuple(d.get(c) for c in cols) + (gid,)
+        db.execute("UPDATE student_groups SET " + set_clause + " WHERE id=?", values)
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
