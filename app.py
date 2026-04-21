@@ -448,6 +448,37 @@ if True:
         except Exception:
             pass
     db2.commit()
+    # Seed the default group_col_labels ONCE per DB, via a migration marker row.
+    # Never re-seed on later requests — that used to resurrect columns the user
+    # had just deleted through the UI.
+    db2.execute("CREATE TABLE IF NOT EXISTS schema_migrations(tag TEXT PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
+    applied = set(r[0] for r in db2.execute("SELECT tag FROM schema_migrations").fetchall())
+    if "group_labels_v2" not in applied:
+        seed_group_labels = [
+            ("group_name","&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;",1),
+            ("teacher_name","&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;",2),
+            ("level_course","&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; / &#x627;&#x644;&#x645;&#x642;&#x631;&#x631;",3),
+            ("last_reached","&#x627;&#x644;&#x645;&#x642;&#x631;&#x631; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x645; &#x627;&#x644;&#x648;&#x635;&#x648;&#x644; &#x627;&#x644;&#x64A;&#x647; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x641;&#x627;&#x626;&#x62A;",4),
+            ("study_time","&#x648;&#x642;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;",5),
+            ("ramadan_time","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;",6),
+            ("online_time","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x627;&#x644;&#x639;&#x627;&#x62F;&#x64A;)",7),
+            ("group_link","&#x631;&#x627;&#x628;&#x637; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;",8),
+            ("session_duration","&#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; (&#x64A;&#x62F;&#x648;&#x64A;)",9),
+            ("session_minutes_normal","&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)",10),
+            ("hours_in_person_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",11),
+            ("hours_online_only","&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;",12),
+            ("hours_all_online","&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",13),
+        ]
+        for key, label, order in seed_group_labels:
+            try:
+                db2.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)", (key, label, order))
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("group_labels_v2",))
+        except Exception:
+            pass
+    db2.commit()
     db2.execute("""CREATE TABLE IF NOT EXISTS attendance(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         attendance_date TEXT,
@@ -2635,22 +2666,21 @@ function addGroupColumn(){
   });
 }
 function deleteGroupColumn(){
-  var key=document.getElementById('g_del_col_key').value;
-  console.log('[groups] deleteGroupColumn key=', key);
-  if(!key){showToast('\u0627\u062E\u062A\u0631 \u0639\u0645\u0648\u062F\u0627','#e53935');return;}
-  if(!confirm('\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062F\u061F'))return;
-  fetch('/api/group-columns/'+encodeURIComponent(key),{method:'DELETE',credentials:'include'}).then(function(r){
-    console.log('[groups] DELETE response status:', r.status);
-    return r.text();
-  }).then(function(txt){
-    console.log('[groups] DELETE response body:', txt);
-    var d;try{d=JSON.parse(txt);}catch(e){showToast('\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u0633\u062C\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627','#e53935');return;}
-    if(d.ok){closeGroupTableEditModal();showToast('\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062F','#00BCD4');loadGroups2();}
-    else{console.error('[groups] delete returned not-ok:', d); showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
-  }).catch(function(err){
-    console.error('[groups] DELETE fetch failed:', err);
-    showToast('\u062D\u062F\u062B \u062E\u0637\u0623: '+(err&&err.message?err.message:err),'#e53935');
-  });
+  var key = document.getElementById('g_del_col_key').value;
+  if (!key) { showToast('\u0627\u062E\u062A\u0631 \u0639\u0645\u0648\u062F\u0627', '#e53935'); return; }
+  if (!confirm('\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062F\u061F')) return;
+  fetch('/api/group-columns/' + encodeURIComponent(key), { method: 'DELETE', credentials: 'include' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok) {
+        closeGroupTableEditModal();
+        showToast('\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062F', '#00BCD4');
+        loadGroups2();
+      } else {
+        showToast((d && d.error) || '\u062D\u062F\u062B \u062E\u0637\u0623', '#e53935');
+      }
+    })
+    .catch(function(){ showToast('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644', '#e53935'); });
 }
 function updateGroupColumnLabel(){
   var key=document.getElementById('g_edit_col_key').value;
@@ -3836,38 +3866,6 @@ def api_columns_update(col_key):
 @login_required
 def api_group_columns_get():
     db = get_db()
-    db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        col_key TEXT UNIQUE,
-        col_label TEXT,
-        col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
-    if db.execute("SELECT COUNT(*) FROM group_col_labels").fetchone()[0] == 0:
-        default_cols = [
-            ("group_name","&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;",1),("teacher_name","&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;",2),
-            ("level_course","&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; / &#x627;&#x644;&#x645;&#x642;&#x631;&#x631;",3),("last_reached","&#x627;&#x644;&#x645;&#x642;&#x631;&#x631; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x645; &#x627;&#x644;&#x648;&#x635;&#x648;&#x644; &#x627;&#x644;&#x64A;&#x647; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x641;&#x627;&#x626;&#x62A;",4),
-            ("study_time","&#x648;&#x642;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;",5),("ramadan_time","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x634;&#x647;&#x631; &#x631;&#x645;&#x636;&#x627;&#x646;",6),
-            ("online_time","&#x62A;&#x648;&#x642;&#x64A;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; (&#x627;&#x644;&#x639;&#x627;&#x62F;&#x64A;)",7),("group_link","&#x631;&#x627;&#x628;&#x637; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;",8),
-            ("session_duration","&#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; (&#x64A;&#x62F;&#x648;&#x64A;)",9),
-        ]
-        for key,label,order in default_cols:
-            try:
-                db.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
-            except:
-                pass
-        db.commit()
-    extra_group_cols = [
-        ("session_minutes_normal","&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x628;&#x627;&#x644;&#x62F;&#x642;&#x64A;&#x642;&#x629; &#x644;&#x644;&#x648;&#x642;&#x62A; &#x627;&#x644;&#x627;&#x639;&#x62A;&#x64A;&#x627;&#x62F;&#x64A; (&#x64A;&#x62F;&#x648;&#x64A;)",10),
-        ("hours_in_person_auto","&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;&#x64A;&#x629; (&#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;)",11),
-        ("hours_online_only","&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646; &#x641;&#x642;&#x637;",12),
-        ("hours_all_online","&#x627;&#x644;&#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x64A;&#x629; &#x643;&#x644;&#x647;&#x627; &#x628;&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;",13),
-    ]
-    for key,label,order in extra_group_cols:
-        try:
-            db.execute("INSERT INTO group_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
-        except:
-            pass
-    db.commit()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM group_col_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
@@ -3911,17 +3909,17 @@ def api_group_columns_add():
 @app.route("/api/group-columns/<col_key>", methods=["DELETE"])
 @login_required
 def api_group_columns_delete(col_key):
+    safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
+    if not safe_key or safe_key != col_key:
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
     db = get_db()
     try:
-        pragma = db.execute("PRAGMA table_info(student_groups)").fetchall()
-        all_cols = [r[1] for r in pragma]
-        if col_key in all_cols:
-            db.execute('ALTER TABLE student_groups DROP COLUMN "' + col_key + '"')
-        db.execute("DELETE FROM group_col_labels WHERE col_key=?",(col_key,))
-        db.commit()
-        return jsonify({"ok":True})
-    except Exception as ex:
-        return jsonify({"ok":False,"error":str(ex)}),400
+        db.execute('ALTER TABLE student_groups DROP COLUMN "' + safe_key + '"')
+    except Exception:
+        pass  # Column may not exist on the physical table; label row still needs to go.
+    db.execute("DELETE FROM group_col_labels WHERE col_key=?", (col_key,))
+    db.commit()
+    return jsonify({"ok": True})
 
 @app.route("/api/group-columns/<col_key>", methods=["PUT"])
 @login_required
