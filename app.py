@@ -607,17 +607,53 @@ HOME_HTML = """<!DOCTYPE html>
 <title>Mindex</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-body{background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:18px;}
-.btn{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
-.btn:hover{opacity:0.9;}
-.btn-attend{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
-.btn-attend:hover{opacity:0.9;}
-.btn-sessions{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
-.btn-sessions:hover{opacity:0.9;}
-.btn-duration{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
-.btn-duration:hover{opacity:0.9;}
-.btn-search-student{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#4DB6AC);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
-.btn-search-student:hover{opacity:0.9;}
+body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh;direction:rtl;}
+.dh-topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(107,63,160,.15);}
+.dh-topbar-title{font-size:22px;font-weight:800;display:flex;align-items:center;gap:12px;}
+.dh-topbar-right{display:flex;align-items:center;gap:12px;font-size:14px;}
+.dh-logout{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:7px 16px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;}
+.dh-logout:hover{background:rgba(255,255,255,.3);}
+.dh-main{padding:28px 32px;max-width:1400px;margin:0 auto;}
+.dh-section-title{font-size:20px;font-weight:800;color:#4a148c;margin:8px 0 16px;display:flex;align-items:center;gap:10px;}
+.dh-section-title:not(:first-child){margin-top:32px;}
+.dh-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px;}
+.dh-stat-card{background:#fff;border-radius:14px;padding:20px 18px 18px 22px;box-shadow:0 3px 12px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;border:1px solid #eee;}
+.dh-stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.09);}
+.dh-stat-card::before{content:'';position:absolute;top:0;right:0;width:5px;height:100%;background:#6B3FA0;}
+.dh-stat-card.purple::before{background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
+.dh-stat-card.teal::before{background:linear-gradient(180deg,#00897B,#26A69A);}
+.dh-stat-card.orange::before{background:linear-gradient(180deg,#E65100,#FB8C00);}
+.dh-stat-card.blue::before{background:linear-gradient(180deg,#1565C0,#1E88E5);}
+.dh-stat-card.red::before{background:linear-gradient(180deg,#c0392b,#e74c3c);}
+.dh-stat-card.green::before{background:linear-gradient(180deg,#2E7D32,#43A047);}
+.dh-stat-card.pink::before{background:linear-gradient(180deg,#AD1457,#EC407A);}
+.dh-stat-card.indigo::before{background:linear-gradient(180deg,#3F51B5,#5C6BC0);}
+.dh-stat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dh-stat-icon{font-size:26px;opacity:.85;}
+.dh-stat-number{font-size:32px;font-weight:800;color:#222;line-height:1.1;font-variant-numeric:tabular-nums;}
+.dh-stat-label{font-size:13px;color:#666;font-weight:600;}
+.dh-actions-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;}
+.dh-action-card{color:#fff;border-radius:16px;padding:24px 22px;text-decoration:none;display:flex;flex-direction:column;gap:6px;min-height:130px;box-shadow:0 4px 16px rgba(107,63,160,.15);cursor:pointer;border:none;transition:transform .15s,box-shadow .15s;font-family:inherit;text-align:right;font-size:inherit;}
+.dh-action-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(107,63,160,.25);}
+.dh-action-icon{font-size:32px;}
+.dh-action-title{font-size:18px;font-weight:800;}
+.dh-action-desc{font-size:12.5px;font-weight:500;opacity:.92;margin-top:2px;}
+.dh-a-purple{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);}
+.dh-a-teal{background:linear-gradient(135deg,#00897B,#26A69A);}
+.dh-a-orange{background:linear-gradient(135deg,#E65100,#FB8C00);}
+.dh-a-blue{background:linear-gradient(135deg,#1565C0,#1E88E5);}
+.dh-a-green{background:linear-gradient(135deg,#2E7D32,#43A047);}
+.dh-a-search{background:linear-gradient(135deg,#00695C,#4DB6AC);}
+@media (max-width: 768px){
+  .dh-main{padding:20px 14px;}
+  .dh-stats-grid,.dh-actions-grid{grid-template-columns:1fr 1fr;gap:12px;}
+  .dh-stat-number{font-size:24px;}
+  .dh-topbar{padding:14px 16px;}
+  .dh-topbar-title{font-size:17px;}
+}
+@media (max-width: 460px){
+  .dh-stats-grid,.dh-actions-grid{grid-template-columns:1fr;}
+}
 /* Student-search modal */
 .srm-header{background:linear-gradient(135deg,#00897B,#4DB6AC);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
 .srm-header span{color:#fff;font-size:1.2rem;font-weight:bold;}
@@ -651,16 +687,92 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 </style>
 </head>
 <body>
-<a href="/database" class="btn">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</a>
-<a href="/attendance" class="btn-attend">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; &#x1F4C5;</a>
+<div class="dh-topbar">
+  <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
+  <div class="dh-topbar-right">
+    <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
+    <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
+  </div>
+</div>
+<div class="dh-main">
+  <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
+  <div class="dh-stats-grid">
+    <div class="dh-stat-card teal">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F1EC;&#x1F1E7;</span></div>
+      <div class="dh-stat-number" id="stat-english-students">&ndash;</div>
+      <div class="dh-stat-label">&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x625;&#x646;&#x62C;&#x644;&#x64A;&#x632;&#x64A;</div>
+    </div>
+    <div class="dh-stat-card purple">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F9EE;</span></div>
+      <div class="dh-stat-number" id="stat-math-students">&ndash;</div>
+      <div class="dh-stat-label">&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x631;&#x64A;&#x627;&#x636;&#x64A;&#x627;&#x62A;</div>
+    </div>
+    <div class="dh-stat-card blue">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F465;</span></div>
+      <div class="dh-stat-number" id="stat-groups">&ndash;</div>
+      <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
+    </div>
+    <div class="dh-stat-card green">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F468;&#x200D;&#x1F3EB;</span></div>
+      <div class="dh-stat-number" id="stat-teachers">&ndash;</div>
+      <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;&#x64A;&#x646;</div>
+    </div>
+    <div class="dh-stat-card orange">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4BC;</span></div>
+      <div class="dh-stat-number" id="stat-staff">&ndash;</div>
+      <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;&#x64A;&#x646;</div>
+    </div>
+    <div class="dh-stat-card pink">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4D8;</span></div>
+      <div class="dh-stat-number" id="stat-english-levels">&ndash;</div>
+      <div class="dh-stat-label">&#x645;&#x633;&#x62A;&#x648;&#x64A;&#x627;&#x62A; &#x627;&#x644;&#x625;&#x646;&#x62C;&#x644;&#x64A;&#x632;&#x64A;</div>
+    </div>
+    <div class="dh-stat-card indigo">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4C5;</span></div>
+      <div class="dh-stat-number" id="stat-attendance-rate">&ndash;</div>
+      <div class="dh-stat-label">&#x646;&#x633;&#x628;&#x629; &#x627;&#x644;&#x627;&#x644;&#x62A;&#x632;&#x627;&#x645; &#x628;&#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
+    </div>
+    <div class="dh-stat-card red">
+      <div class="dh-stat-top"><span class="dh-stat-icon">&#x26A0;&#xFE0F;</span></div>
+      <div class="dh-stat-number" id="stat-violations">&ndash;</div>
+      <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</div>
+    </div>
+  </div>
 
-<button class="btn" onclick="pmOpen()">&#x1F4B3; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</button>
-
-<button class="btn-sessions" onclick="ssOpen()">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
-
-<button class="btn-duration" onclick="sdOpen()">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
-
-<button class="btn-search-student" onclick="srOpen()">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</button>
+  <div class="dh-section-title">&#x26A1; &#x627;&#x644;&#x642;&#x648;&#x627;&#x626;&#x645; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
+  <div class="dh-actions-grid">
+    <a href="/database" class="dh-action-card dh-a-purple">
+      <div class="dh-action-icon">&#x1F4C1;</div>
+      <div class="dh-action-title">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</div>
+      <div class="dh-action-desc">&#x62C;&#x645;&#x64A;&#x639; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x648;&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
+    </a>
+    <a href="/attendance" class="dh-action-card dh-a-teal">
+      <div class="dh-action-icon">&#x1F4C5;</div>
+      <div class="dh-action-title">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
+      <div class="dh-action-desc">&#x625;&#x636;&#x627;&#x641;&#x629; &#x623;&#x648; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
+    </a>
+    <button class="dh-action-card dh-a-purple" onclick="pmOpen()">
+      <div class="dh-action-icon">&#x1F4B3;</div>
+      <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</div>
+      <div class="dh-action-desc">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637; &#x648;&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</div>
+    </button>
+    <button class="dh-action-card dh-a-orange" onclick="ssOpen()">
+      <div class="dh-action-icon">&#x1F4CA;</div>
+      <div class="dh-action-title">&#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
+      <div class="dh-action-desc">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x648;&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x648;&#x642;&#x62A;</div>
+    </button>
+    <button class="dh-action-card dh-a-blue" onclick="sdOpen()">
+      <div class="dh-action-icon">&#x23F1;&#xFE0F;</div>
+      <div class="dh-action-title">&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
+      <div class="dh-action-desc">&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x648;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x645;&#x62F;&#x629; &#x643;&#x644; &#x62D;&#x635;&#x629;</div>
+    </button>
+    <button class="dh-action-card dh-a-search" onclick="srOpen()">
+      <div class="dh-action-icon">&#x1F50D;</div>
+      <div class="dh-action-title">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</div>
+      <div class="dh-action-desc">&#x628;&#x62D;&#x62B; &#x633;&#x631;&#x64A;&#x639; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;</div>
+    </button>
+  </div>
+</div>
 
 <div id="sr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;">
   <div style="background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
@@ -687,6 +799,23 @@ function _fmtHM(m){
   if(r)s+=(s?" ":"")+r+" \u062F\u0642\u064A\u0642\u0629";
   return s;
 }
+function dhLoadStats(){
+  fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
+    function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+    set('stat-english-students', d.english_students || 0);
+    set('stat-math-students',    d.math_students || 0);
+    set('stat-groups',           d.groups || 0);
+    set('stat-teachers',         d.teachers || 0);
+    set('stat-staff',            d.staff || 0);
+    set('stat-english-levels',   d.english_levels || 0);
+    set('stat-attendance-rate',  (d.attendance_rate || 0) + '%');
+    set('stat-violations',       d.violations || 0);
+  }).catch(function(){
+    // leave placeholders; not fatal
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadStats);
+else dhLoadStats();
 function ssOpen(){
   document.getElementById("ss-modal").style.display="block";
   var body=document.getElementById("ss-body");
@@ -4149,7 +4278,9 @@ def login():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return HOME_HTML
+    user = session.get("user") or {}
+    username = user.get("username") or user.get("name") or ""
+    return HOME_HTML.replace("USER_PLACEHOLDER", username)
 
 @app.route("/attendance")
 @login_required
@@ -5137,6 +5268,86 @@ def api_attendance_check():
         (group_name, att_date)
     ).fetchall()
     return jsonify({"exists": len(rows) > 0, "records": [dict(r) for r in rows]})
+
+@app.route("/api/dashboard/stats", methods=["GET"])
+@login_required
+def api_dashboard_stats():
+    db = get_db()
+    def _count_any(cols, keywords, table="students"):
+        if not keywords: return 0
+        clauses, params = [], []
+        for kw in keywords:
+            pattern = "%" + kw.lower() + "%"
+            for col in cols:
+                clauses.append("lower(" + col + ") LIKE ?")
+                params.append(pattern)
+        sql = "SELECT COUNT(DISTINCT id) FROM " + table + " WHERE " + " OR ".join(clauses)
+        try:
+            return db.execute(sql, tuple(params)).fetchone()[0] or 0
+        except Exception:
+            return 0
+    english_kws = ["\u0625\u0646\u062C\u0644\u064A\u0632\u064A", "\u0627\u0646\u062C\u0644\u064A\u0632\u064A", "english"]
+    math_kws    = ["\u0631\u064A\u0627\u0636\u064A\u0627\u062A", "math"]
+    student_cols = ("group_name_student", "class_name", "teacher_2026", "group_online")
+    english_students = _count_any(student_cols, english_kws)
+    math_students    = _count_any(student_cols, math_kws)
+    try:
+        groups = db.execute("SELECT COUNT(*) FROM student_groups").fetchone()[0] or 0
+    except Exception:
+        groups = 0
+    try:
+        teachers = db.execute(
+            "SELECT COUNT(DISTINCT teacher_name) FROM student_groups "
+            "WHERE teacher_name IS NOT NULL AND teacher_name<>''"
+        ).fetchone()[0] or 0
+    except Exception:
+        teachers = 0
+    try:
+        staff = db.execute(
+            "SELECT COUNT(*) FROM users WHERE role IS NOT NULL AND role<>'' "
+            "AND role<>'admin' AND role<>'teacher'"
+        ).fetchone()[0] or 0
+    except Exception:
+        staff = 0
+    try:
+        english_levels = db.execute(
+            "SELECT COUNT(DISTINCT level_course) FROM student_groups "
+            "WHERE level_course IS NOT NULL AND level_course<>'' AND ("
+            "lower(level_course) LIKE ? OR level_course LIKE ? OR level_course LIKE ?)",
+            ("%english%", "%\u0625\u0646\u062C\u0644\u064A\u0632\u064A%", "%\u0627\u0646\u062C\u0644\u064A\u0632\u064A%")
+        ).fetchone()[0] or 0
+    except Exception:
+        english_levels = 0
+    STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
+    STATUS_ABSENT  = "\u063A\u0627\u0626\u0628"
+    STATUS_LATE    = "\u0645\u062A\u0623\u062E\u0631"
+    try:
+        total_att = db.execute(
+            "SELECT COUNT(*) FROM attendance WHERE status IN (?,?,?)",
+            (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE)
+        ).fetchone()[0] or 0
+        present_att = db.execute(
+            "SELECT COUNT(*) FROM attendance WHERE status=?",
+            (STATUS_PRESENT,)
+        ).fetchone()[0] or 0
+        violations = db.execute(
+            "SELECT COUNT(*) FROM attendance WHERE status IN (?,?)",
+            (STATUS_ABSENT, STATUS_LATE)
+        ).fetchone()[0] or 0
+    except Exception:
+        total_att = present_att = violations = 0
+    attendance_rate = round(present_att / total_att * 100, 1) if total_att else 0.0
+    return jsonify({
+        "ok": True,
+        "english_students": english_students,
+        "math_students": math_students,
+        "groups": groups,
+        "teachers": teachers,
+        "staff": staff,
+        "english_levels": english_levels,
+        "attendance_rate": attendance_rate,
+        "violations": violations,
+    })
 
 @app.route("/api/attendance/student-stats", methods=["GET"])
 @login_required
