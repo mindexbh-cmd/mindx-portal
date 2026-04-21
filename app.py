@@ -616,6 +616,38 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 .btn-sessions:hover{opacity:0.9;}
 .btn-duration{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
 .btn-duration:hover{opacity:0.9;}
+.btn-search-student{display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#00897B,#4DB6AC);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px;}
+.btn-search-student:hover{opacity:0.9;}
+/* Student-search modal */
+.srm-header{background:linear-gradient(135deg,#00897B,#4DB6AC);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+.srm-header span{color:#fff;font-size:1.2rem;font-weight:bold;}
+.srm-close{color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;}
+.srm-search{padding:14px 20px;background:#e0f2f1;border-bottom:1px solid #b2dfdb;}
+.srm-search input{width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid #4DB6AC;font-size:1rem;background:#fff;outline:none;}
+.srm-body{padding:14px 20px;max-height:70vh;overflow:auto;}
+.srm-result{padding:10px 12px;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:6px;cursor:pointer;background:#fafafa;transition:all .15s;}
+.srm-result:hover{background:#e0f2f1;border-color:#4DB6AC;}
+.srm-result-name{font-weight:700;color:#00695C;}
+.srm-result-meta{font-size:0.85em;color:#555;margin-top:2px;}
+.srm-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:0;}
+.srm-section{padding:14px 18px;border-bottom:1px solid #eee;}
+.srm-section:last-child{border-bottom:none;}
+.srm-section-title{font-weight:700;color:#00695C;font-size:1.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.srm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.srm-field{display:flex;flex-direction:column;gap:3px;}
+.srm-field label{font-size:0.82em;color:#607D8B;font-weight:600;}
+.srm-field input,.srm-field select{padding:7px 10px;border:1.2px solid #b2dfdb;border-radius:8px;font-size:0.95rem;background:#fafafa;outline:none;}
+.srm-field input:focus,.srm-field select:focus{background:#fff;border-color:#4DB6AC;}
+.srm-readonly{background:#eceff1 !important;color:#455A64;}
+.srm-totals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.srm-stat{background:#f5f5f5;padding:10px;border-radius:8px;text-align:center;}
+.srm-stat-num{font-size:1.3em;font-weight:700;color:#00695C;}
+.srm-stat-lbl{font-size:0.8em;color:#607D8B;margin-top:2px;}
+.srm-actions{padding:12px 18px;border-top:1px solid #eee;text-align:center;display:flex;gap:10px;justify-content:center;}
+.srm-save{padding:10px 32px;background:linear-gradient(135deg,#00897B,#4DB6AC);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.srm-cancel{padding:10px 24px;background:#eceff1;color:#455A64;border:none;border-radius:10px;font-weight:600;cursor:pointer;}
+.srm-pct-bar{height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:4px;}
+.srm-pct-bar-inner{height:100%;background:#4DB6AC;}
 </style>
 </head>
 <body>
@@ -627,6 +659,21 @@ body{background:#fff;display:flex;flex-direction:column;align-items:center;justi
 <button class="btn-sessions" onclick="ssOpen()">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
 
 <button class="btn-duration" onclick="sdOpen()">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</button>
+
+<button class="btn-search-student" onclick="srOpen()">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</button>
+
+<div id="sr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;">
+  <div style="background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
+    <div class="srm-header"><span>&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</span><span class="srm-close" onclick="srClose()">&times;</span></div>
+    <div class="srm-search">
+      <input id="sr-query" type="text" oninput="srFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x2026;">
+    </div>
+    <div class="srm-body">
+      <div id="sr-results"></div>
+      <div id="sr-details" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
 
 <div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:520px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
 
@@ -701,6 +748,179 @@ function sdSave(){
       btn.textContent=d.ok?"\u062A\u0645 \u0627\u0644\u062D\u0641\u0638 \u2713":"\u062E\u0637\u0623";
       setTimeout(function(){btn.textContent=orig;btn.disabled=false;},1600);
     }).catch(function(){btn.textContent="\u062E\u0637\u0623";setTimeout(function(){btn.textContent=orig;btn.disabled=false;},1600);});
+}
+
+// ===== Student search (fuzzy) =====
+var _srStudents = [];
+var _srCurrentId = null;
+function _srNorm(s){
+  return String(s==null?'':s)
+    .replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627')  // أ إ آ ٱ → ا
+    .replace(/\u0629/g, '\u0647')  // ة → ه
+    .replace(/\u0649/g, '\u064A')  // ى → ي
+    .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')  // strip diacritics
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .trim();
+}
+function _srScore(query, candidate){
+  // Higher = better match. Substring > subsequence > char overlap.
+  var q = _srNorm(query);
+  var c = _srNorm(candidate);
+  if (!q) return 0;
+  if (c === q) return 10000;
+  if (c.indexOf(q) === 0) return 9000;
+  if (c.indexOf(q) >= 0) return 8000;
+  // Subsequence: q's chars appear in c in order, possibly with gaps.
+  var i = 0, j = 0, matched = 0;
+  while (i < q.length && j < c.length) {
+    if (q.charAt(i) === c.charAt(j)) { matched++; i++; }
+    j++;
+  }
+  if (i === q.length) return 5000 + matched * 10 - (c.length - q.length);
+  // Partial char overlap as last resort.
+  var shared = 0, seen = {};
+  for (var k=0; k<c.length; k++) seen[c.charAt(k)] = true;
+  for (var k=0; k<q.length; k++) if (seen[q.charAt(k)]) shared++;
+  if (shared >= Math.max(1, q.length - 2)) return 100 + shared;
+  return 0;
+}
+function srOpen(){
+  document.getElementById('sr-modal').style.display = 'block';
+  document.getElementById('sr-query').value = '';
+  document.getElementById('sr-results').innerHTML = '';
+  document.getElementById('sr-details').innerHTML = '';
+  _srCurrentId = null;
+  fetch('/api/students').then(function(r){return r.json();}).then(function(data){
+    _srStudents = data.students || [];
+    document.getElementById('sr-query').focus();
+  }).catch(function(){ document.getElementById('sr-results').innerHTML = '<div style="color:#c00;padding:12px;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644</div>'; });
+}
+function srClose(){ document.getElementById('sr-modal').style.display = 'none'; _srCurrentId = null; }
+function srFilter(){
+  var q = document.getElementById('sr-query').value.trim();
+  var results = document.getElementById('sr-results');
+  if (!q) { results.innerHTML = ''; return; }
+  var scored = [];
+  for (var i=0; i<_srStudents.length; i++) {
+    var s = _srStudents[i];
+    var scoreName = _srScore(q, s.student_name || '');
+    var scorePid = _srScore(q, s.personal_id || '');
+    var score = Math.max(scoreName, scorePid);
+    if (score > 0) scored.push({ s: s, score: score });
+  }
+  scored.sort(function(a,b){ return b.score - a.score; });
+  scored = scored.slice(0, 10);
+  if (!scored.length) { results.innerHTML = '<div style="padding:12px;color:#888;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0646\u062A\u0627\u0626\u062C</div>'; return; }
+  var html = '';
+  for (var i=0; i<scored.length; i++) {
+    var s = scored[i].s;
+    html += '<div class="srm-result" onclick="srPick('+s.id+')">'
+         +  '<div class="srm-result-name">'+(s.student_name||'-')+'</div>'
+         +  '<div class="srm-result-meta">\u0631\u0642\u0645: '+(s.personal_id||'-')
+         +  (s.class_name?(' &middot; \u0627\u0644\u0635\u0641: '+s.class_name):'')
+         +  (s.group_name_student?(' &middot; \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629: '+s.group_name_student):'')
+         +  '</div></div>';
+  }
+  results.innerHTML = html;
+}
+function srPick(sid){
+  _srCurrentId = sid;
+  document.getElementById('sr-results').innerHTML = '';
+  document.getElementById('sr-details').innerHTML = '<div style="padding:12px;color:#555;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
+  fetch('/api/students/'+sid+'/details').then(function(r){return r.json();}).then(function(d){
+    if (!d.ok) { document.getElementById('sr-details').innerHTML = '<div style="color:#c00;padding:12px;">'+(d.error||'\u062E\u0637\u0623')+'</div>'; return; }
+    _srRenderCard(d);
+  });
+}
+function _srField(id, label, value, readonly){
+  var v = value == null ? '' : String(value);
+  v = v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  return '<div class="srm-field"><label>'+label+'</label><input id="'+id+'" value="'+v+'"'+(readonly?' readonly class="srm-readonly"':'')+'></div>';
+}
+function _srRenderCard(d){
+  var s = d.student || {};
+  var att = d.attendance || {};
+  var tot = d.payment_totals || {};
+  var html = '<div class="srm-card">';
+  // BASIC
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F464 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u0629</div><div class="srm-grid">';
+  html += _srField('sr_personal_id','\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A', s.personal_id);
+  html += _srField('sr_student_name','\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628', s.student_name);
+  html += _srField('sr_whatsapp','\u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628', s.whatsapp);
+  html += _srField('sr_class_name','\u0627\u0644\u0635\u0641', s.class_name);
+  html += _srField('sr_group_name_student','\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629', s.group_name_student);
+  html += _srField('sr_group_online','\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)', s.group_online);
+  html += _srField('sr_old_new_2026','\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026', s.old_new_2026);
+  html += _srField('sr_registration_term2_2026','\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026', s.registration_term2_2026);
+  html += _srField('sr_teacher_2026','\u0627\u0644\u0645\u062F\u0631\u0633 2026', s.teacher_2026);
+  html += _srField('sr_books_received','\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0643\u062A\u0628', s.books_received);
+  html += _srField('sr_final_result','\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629', s.final_result);
+  html += _srField('sr_level_reached_2026','\u0627\u0644\u0649 \u0627\u064A\u0646 \u0648\u0635\u0644 2026', s.level_reached_2026);
+  html += _srField('sr_suitable_level_2026','\u0645\u0646\u0627\u0633\u0628 \u0644\u0644\u0645\u0633\u062A\u0648\u0649 2026\u061F', s.suitable_level_2026);
+  html += '</div></div>';
+  // CONTACT
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4DE \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0648\u0627\u0644\u0633\u0643\u0646</div><div class="srm-grid">';
+  html += _srField('sr_mother_phone','\u0647\u0627\u062A\u0641 \u0627\u0644\u0623\u0645', s.mother_phone);
+  html += _srField('sr_father_phone','\u0647\u0627\u062A\u0641 \u0627\u0644\u0623\u0628', s.father_phone);
+  html += _srField('sr_other_phone','\u0647\u0627\u062A\u0641 \u0622\u062E\u0631', s.other_phone);
+  html += _srField('sr_residence','\u0645\u0643\u0627\u0646 \u0627\u0644\u0633\u0643\u0646', s.residence);
+  html += _srField('sr_home_address','\u0627\u0644\u0639\u0646\u0648\u0627\u0646', s.home_address);
+  html += _srField('sr_road','\u0627\u0644\u0637\u0631\u064A\u0642', s.road);
+  html += _srField('sr_complex_name','\u0627\u0644\u0645\u062C\u0645\u0639', s.complex_name);
+  html += '</div></div>';
+  // PAYMENTS
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B3 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u062F\u0641\u0639</div><div class="srm-grid">';
+  html += _srField('sr_installment_type','\u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637', s.installment_type);
+  html += _srField('sr_installment1','\u0627\u0644\u0642\u0633\u0637 1', s.installment1);
+  html += _srField('sr_installment2','\u0627\u0644\u0642\u0633\u0637 2', s.installment2);
+  html += _srField('sr_installment3','\u0627\u0644\u0642\u0633\u0637 3', s.installment3);
+  html += _srField('sr_installment4','\u0627\u0644\u0642\u0633\u0637 4', s.installment4);
+  html += _srField('sr_installment5','\u0627\u0644\u0642\u0633\u0637 5', s.installment5);
+  html += '</div>';
+  html += '<div class="srm-totals">'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.paid||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0645\u062F\u0641\u0648\u0639</div></div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.price||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A</div></div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.remaining||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0645\u062A\u0628\u0642\u064A</div></div>'
+       + '</div></div>';
+  // ATTENDANCE
+  var pct = function(v){ return (v||0)+'%'; };
+  var bar = function(v){ return '<div class="srm-pct-bar"><div class="srm-pct-bar-inner" style="width:'+(Math.min(100,v||0))+'%"></div></div>'; };
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4C5 \u0625\u062D\u0635\u0627\u0626\u064A\u0627\u062A \u0627\u0644\u062D\u0636\u0648\u0631 ('+att.total+' \u062C\u0644\u0633\u0629)</div>';
+  html += '<div class="srm-totals">'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.present_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u062D\u0636\u0648\u0631 ('+att.present+')</div>'+bar(att.present_rate)+'</div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u063A\u064A\u0627\u0628 ('+att.absent+')</div>'+bar(att.absent_rate)+'</div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u062A\u0623\u062E\u064A\u0631 ('+att.late+')</div>'+bar(att.late_rate)+'</div>'
+       + '</div></div>';
+  // ACTIONS
+  html += '<div class="srm-actions">'
+       +  '<button class="srm-save" onclick="srSave()">\U0001F4BE \u062D\u0641\u0638</button>'
+       +  '<button class="srm-cancel" onclick="srClose()">\u0625\u063A\u0644\u0627\u0642</button>'
+       +  '</div>';
+  html += '</div>';
+  document.getElementById('sr-details').innerHTML = html;
+}
+function srSave(){
+  if (!_srCurrentId) return;
+  var ids = ['personal_id','student_name','whatsapp','class_name','group_name_student','group_online','old_new_2026','registration_term2_2026','teacher_2026','books_received','final_result','level_reached_2026','suitable_level_2026','mother_phone','father_phone','other_phone','residence','home_address','road','complex_name','installment_type','installment1','installment2','installment3','installment4','installment5'];
+  var body = {};
+  for (var i=0; i<ids.length; i++) {
+    var el = document.getElementById('sr_'+ids[i]);
+    if (el) body[ids[i]] = el.value;
+  }
+  fetch('/api/students/'+_srCurrentId, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        // Refresh the card with the latest details.
+        srPick(_srCurrentId);
+        // Also refresh our local students cache so the result list stays accurate.
+        fetch('/api/students').then(function(r){return r.json();}).then(function(data){ _srStudents = data.students || []; });
+      } else {
+        alert(d.error || '\u062D\u062F\u062B \u062E\u0637\u0623');
+      }
+    })
+    .catch(function(){ alert('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644'); });
 }
 </script>
 
@@ -3899,6 +4119,66 @@ def api_students_delete(sid):
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/students/<int:sid>/details", methods=["GET"])
+@login_required
+def api_student_details(sid):
+    db = get_db()
+    student = db.execute("SELECT * FROM students WHERE id=?", (sid,)).fetchone()
+    if not student:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    s_dict = dict(student)
+    pay_rows = db.execute(
+        "SELECT inst_num, inst_type, price, paid FROM student_payments WHERE student_id=? ORDER BY inst_num",
+        (sid,)
+    ).fetchall()
+    payments = [dict(r) for r in pay_rows]
+    def _num(v):
+        try: return float(v or 0)
+        except Exception: return 0.0
+    total_paid = sum(_num(p.get("paid")) for p in payments)
+    total_price = sum(_num(p.get("price")) for p in payments)
+    remaining = total_price - total_paid
+    # Attendance rollup by student_name. Status labels match what the
+    # attendance modal writes: حاضر / غائب / متأخر / معتذر.
+    STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
+    STATUS_ABSENT  = "\u063A\u0627\u0626\u0628"
+    STATUS_LATE    = "\u0645\u062A\u0623\u062E\u0631"
+    STATUS_EXCUSED = "\u0645\u0639\u062A\u0630\u0631"
+    student_name = s_dict.get("student_name") or ""
+    att_rows = db.execute(
+        "SELECT status FROM attendance WHERE student_name=?",
+        (student_name,)
+    ).fetchall() if student_name else []
+    total = len(att_rows)
+    def _count(label):
+        return sum(1 for r in att_rows if (r["status"] or "").strip() == label)
+    present = _count(STATUS_PRESENT)
+    absent  = _count(STATUS_ABSENT)
+    late    = _count(STATUS_LATE)
+    excused = _count(STATUS_EXCUSED)
+    def _pct(n):
+        return round(n / total * 100, 1) if total else 0.0
+    return jsonify({
+        "ok": True,
+        "student": s_dict,
+        "payments": payments,
+        "payment_totals": {
+            "paid": total_paid,
+            "price": total_price,
+            "remaining": remaining,
+        },
+        "attendance": {
+            "total": total,
+            "present": present,
+            "absent": absent,
+            "late": late,
+            "excused": excused,
+            "present_rate": _pct(present),
+            "absent_rate":  _pct(absent),
+            "late_rate":    _pct(late),
+        },
+    })
 
 @app.route("/api/students/bulk", methods=["POST"])
 @login_required
