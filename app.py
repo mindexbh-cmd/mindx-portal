@@ -2313,9 +2313,9 @@ function filterGroupTable2(){
   var q=document.getElementById('groupSearchInput').value.toLowerCase();
   renderGroupTable2(allGroups2.filter(function(g){return (g.group_name||'').toLowerCase().indexOf(q)>-1||(g.teacher_name||'').toLowerCase().indexOf(q)>-1;}));
 }
-var GROUP_MODAL_FIELDS=['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration','student_count','study_days','online_days','online_time_ramadan','session_minutes_normal','sessions_total_auto','sessions_nonramadan_auto','sessions_ramadan_auto','sessions_online_auto','hours_in_person_auto','hours_online_only','hours_all_online'];
 function clearGroupForm2(){
-  for(var x=0;x<GROUP_MODAL_FIELDS.length;x++){var el=document.getElementById('gf2_'+GROUP_MODAL_FIELDS[x]);if(el)el.value='';}
+  var ids=['group_name','teacher_name','level_course','last_reached','study_time','ramadan_time','online_time','group_link','session_duration','student_count','study_days','online_days','online_time_ramadan','session_minutes_normal','sessions_total_auto','sessions_nonramadan_auto','sessions_ramadan_auto','sessions_online_auto','hours_in_person_auto','hours_online_only','hours_all_online'];
+  for(var x=0;x<ids.length;x++){var el=document.getElementById('gf2_'+ids[x]);if(el)el.value='';}
   document.getElementById('groupEditId2').value='';
 }
 function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='\u0627\u0636\u0627\u0641\u0629 \u0645\u062C\u0645\u0648\u0639\u0629 \u062C\u062F\u064A\u062F\u0629';document.getElementById('groupModal2').classList.add('open');}
@@ -2325,14 +2325,55 @@ function openGroupEdit2(id){
   if(!g)return;
   document.getElementById('groupEditId2').value=id;
   document.getElementById('groupModalTitle2').textContent='\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629';
-  for(var y=0;y<GROUP_MODAL_FIELDS.length;y++){var k=GROUP_MODAL_FIELDS[y];var el=document.getElementById('gf2_'+k);if(el)el.value=(g[k]==null?'':g[k]);}
+  document.getElementById('gf2_group_name').value=g.group_name||'';
+  document.getElementById('gf2_teacher_name').value=g.teacher_name||'';
+  document.getElementById('gf2_level_course').value=g.level_course||'';
+  document.getElementById('gf2_last_reached').value=g.last_reached||'';
+  document.getElementById('gf2_study_time').value=g.study_time||'';
+  document.getElementById('gf2_ramadan_time').value=g.ramadan_time||'';
+  document.getElementById('gf2_online_time').value=g.online_time||'';
+  document.getElementById('gf2_group_link').value=g.group_link||'';
+  document.getElementById('gf2_session_duration').value=g.session_duration||'';
+  document.getElementById('gf2_student_count').value=g.student_count||'';
+  document.getElementById('gf2_study_days').value=g.study_days||'';
+  document.getElementById('gf2_online_days').value=g.online_days||'';
+  document.getElementById('gf2_online_time_ramadan').value=g.online_time_ramadan||'';
+  document.getElementById('gf2_session_minutes_normal').value=g.session_minutes_normal||'';
+  document.getElementById('gf2_sessions_total_auto').value=g.sessions_total_auto||'';
+  document.getElementById('gf2_sessions_nonramadan_auto').value=g.sessions_nonramadan_auto||'';
+  document.getElementById('gf2_sessions_ramadan_auto').value=g.sessions_ramadan_auto||'';
+  document.getElementById('gf2_sessions_online_auto').value=g.sessions_online_auto||'';
+  document.getElementById('gf2_hours_in_person_auto').value=g.hours_in_person_auto||'';
+  document.getElementById('gf2_hours_online_only').value=g.hours_online_only||'';
+  document.getElementById('gf2_hours_all_online').value=g.hours_all_online||'';
   document.getElementById('groupModal2').classList.add('open');
 }
 function closeGroupModal2(){document.getElementById('groupModal2').classList.remove('open');}
 function saveGroup2(){
   var editId=document.getElementById('groupEditId2').value;
-  var bd={};
-  for(var z=0;z<GROUP_MODAL_FIELDS.length;z++){var k=GROUP_MODAL_FIELDS[z];var el=document.getElementById('gf2_'+k);bd[k]=el?el.value.trim():'';}
+  var bd={
+    group_name:document.getElementById('gf2_group_name').value.trim(),
+    teacher_name:document.getElementById('gf2_teacher_name').value.trim(),
+    level_course:document.getElementById('gf2_level_course').value.trim(),
+    last_reached:document.getElementById('gf2_last_reached').value.trim(),
+    study_time:document.getElementById('gf2_study_time').value.trim(),
+    ramadan_time:document.getElementById('gf2_ramadan_time').value.trim(),
+    online_time:document.getElementById('gf2_online_time').value.trim(),
+    group_link:document.getElementById('gf2_group_link').value.trim(),
+    session_duration:document.getElementById('gf2_session_duration').value.trim(),
+    student_count:document.getElementById('gf2_student_count').value.trim(),
+    study_days:document.getElementById('gf2_study_days').value.trim(),
+    online_days:document.getElementById('gf2_online_days').value.trim(),
+    online_time_ramadan:document.getElementById('gf2_online_time_ramadan').value.trim(),
+    session_minutes_normal:document.getElementById('gf2_session_minutes_normal').value.trim(),
+    sessions_total_auto:document.getElementById('gf2_sessions_total_auto').value.trim(),
+    sessions_nonramadan_auto:document.getElementById('gf2_sessions_nonramadan_auto').value.trim(),
+    sessions_ramadan_auto:document.getElementById('gf2_sessions_ramadan_auto').value.trim(),
+    sessions_online_auto:document.getElementById('gf2_sessions_online_auto').value.trim(),
+    hours_in_person_auto:document.getElementById('gf2_hours_in_person_auto').value.trim(),
+    hours_online_only:document.getElementById('gf2_hours_online_only').value.trim(),
+    hours_all_online:document.getElementById('gf2_hours_all_online').value.trim()
+  };
   if(!bd.group_name){showToast('&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x645;&#x637;&#x644;&#x648;&#x628;','#e53935');return;}
   var url=editId?'/api/groups/'+editId:'/api/groups';
   var method=editId?'PUT':'POST';
@@ -4453,29 +4494,12 @@ loadGroups();
 def groups():
     return GROUPS_HTML
 
-GROUP_FIELDS = [
-    "group_name","teacher_name","level_course","last_reached","study_time",
-    "ramadan_time","online_time","group_link","session_duration",
-    "student_count","study_days","online_days","online_time_ramadan",
-    "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto",
-    "sessions_online_auto","session_minutes_normal",
-    "hours_in_person_auto","hours_online_only","hours_all_online",
-]
-GROUP_SELECT_COLS = ["id"] + GROUP_FIELDS + ["created_at"]
-
 @app.route("/api/groups", methods=["GET"])
 @login_required
 def api_groups_get():
     db = get_db()
-    sql = "SELECT " + ",".join(GROUP_SELECT_COLS) + " FROM student_groups ORDER BY id DESC"
-    rows = db.execute(sql).fetchall()
-    groups = []
-    for r in rows:
-        obj = {}
-        for i, col in enumerate(GROUP_SELECT_COLS):
-            obj[col] = r[i]
-        groups.append(obj)
-    return jsonify({"groups": groups})
+    rows = db.execute("SELECT * FROM student_groups ORDER BY id DESC").fetchall()
+    return jsonify({"groups": [dict(r) for r in rows]})
 
 @app.route("/api/groups", methods=["POST"])
 @login_required
@@ -4483,10 +4507,23 @@ def api_groups_add():
     d = request.get_json()
     try:
         db = get_db()
-        cols = ",".join(GROUP_FIELDS)
-        placeholders = ",".join(["?"] * len(GROUP_FIELDS))
-        values = tuple(d.get(f) for f in GROUP_FIELDS)
-        db.execute("INSERT INTO student_groups (" + cols + ") VALUES (" + placeholders + ")", values)
+        db.execute("""INSERT INTO student_groups
+            (group_name,teacher_name,level_course,last_reached,study_time,
+             ramadan_time,online_time,group_link,session_duration,
+             student_count,study_days,online_days,online_time_ramadan,
+             sessions_total_auto,sessions_nonramadan_auto,sessions_ramadan_auto,
+             sessions_online_auto,session_minutes_normal,
+             hours_in_person_auto,hours_online_only,hours_all_online)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
+             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
+             d.get("online_time"), d.get("group_link"), d.get("session_duration"),
+             d.get("student_count"), d.get("study_days"), d.get("online_days"),
+             d.get("online_time_ramadan"), d.get("sessions_total_auto"),
+             d.get("sessions_nonramadan_auto"), d.get("sessions_ramadan_auto"),
+             d.get("sessions_online_auto"), d.get("session_minutes_normal"),
+             d.get("hours_in_person_auto"), d.get("hours_online_only"),
+             d.get("hours_all_online")))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
@@ -4498,9 +4535,23 @@ def api_groups_update(gid):
     d = request.get_json()
     try:
         db = get_db()
-        set_clause = ",".join([f + "=?" for f in GROUP_FIELDS])
-        values = tuple(d.get(f) for f in GROUP_FIELDS) + (gid,)
-        db.execute("UPDATE student_groups SET " + set_clause + " WHERE id=?", values)
+        db.execute("""UPDATE student_groups SET
+            group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
+            ramadan_time=?,online_time=?,group_link=?,session_duration=?,
+            student_count=?,study_days=?,online_days=?,online_time_ramadan=?,
+            sessions_total_auto=?,sessions_nonramadan_auto=?,sessions_ramadan_auto=?,
+            sessions_online_auto=?,session_minutes_normal=?,
+            hours_in_person_auto=?,hours_online_only=?,hours_all_online=?
+            WHERE id=?""",
+            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
+             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
+             d.get("online_time"), d.get("group_link"), d.get("session_duration"),
+             d.get("student_count"), d.get("study_days"), d.get("online_days"),
+             d.get("online_time_ramadan"), d.get("sessions_total_auto"),
+             d.get("sessions_nonramadan_auto"), d.get("sessions_ramadan_auto"),
+             d.get("sessions_online_auto"), d.get("session_minutes_normal"),
+             d.get("hours_in_person_auto"), d.get("hours_online_only"),
+             d.get("hours_all_online"), gid))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
