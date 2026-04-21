@@ -1472,7 +1472,7 @@ td.name-cell{font-weight:600;color:#6B3FA0;text-align:right;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGroupExcelModal()">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('student_groups')">&#128196; &#x627;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">&#x628;&#x62D;&#x62B;</button>
@@ -3261,6 +3261,7 @@ var IMPORT_DEFS = {
       {key:"group_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
       {key:"teacher_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0645\u062F\u0631\u0633"},
       {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649 \u0627\u0648 \u0627\u0644\u0645\u0642\u0631\u0631"},
+      {key:"level_course", ar:"\u0627\u0644\u0645\u0633\u062A\u0648\u0649 / \u0627\u0644\u0645\u0642\u0631\u0631"},
       {key:"last_reached", ar:"\u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0630\u064A \u062A\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0627\u0644\u064A\u0647 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u0641\u0627\u0626\u062A"},
       {key:"student_count", ar:"\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0627\u0628"},
       {key:"study_days", ar:"\u0627\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
@@ -3311,10 +3312,11 @@ var IMPORT_DEFS = {
 };
 var genExcelRows = [];
 var genExcelHeaders = [];
-function openGenericExcelModal() {
-  document.getElementById('genExcelTable').value = '';
+function openGenericExcelModal(preselectTable) {
+  var sel = document.getElementById('genExcelTable');
+  sel.value = preselectTable || '';
   document.getElementById('genExcelFileInput').value = '';
-  document.getElementById('genExcelFileRow').style.display = 'none';
+  document.getElementById('genExcelFileRow').style.display = sel.value ? 'block' : 'none';
   document.getElementById('genExcelStatus').textContent = '';
   document.getElementById('genExcelImportBtn').style.display = 'none';
   genExcelRows = []; genExcelHeaders = [];
