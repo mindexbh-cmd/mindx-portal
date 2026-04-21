@@ -2636,12 +2636,20 @@ function addGroupColumn(){
 }
 function deleteGroupColumn(){
   var key=document.getElementById('g_del_col_key').value;
+  console.log('[groups] deleteGroupColumn key=', key);
   if(!key){showToast('\u0627\u062E\u062A\u0631 \u0639\u0645\u0648\u062F\u0627','#e53935');return;}
   if(!confirm('\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062F\u061F'))return;
-  fetch('/api/group-columns/'+key,{method:'DELETE',credentials:'include'}).then(function(r){return r.text();}).then(function(txt){
+  fetch('/api/group-columns/'+encodeURIComponent(key),{method:'DELETE',credentials:'include'}).then(function(r){
+    console.log('[groups] DELETE response status:', r.status);
+    return r.text();
+  }).then(function(txt){
+    console.log('[groups] DELETE response body:', txt);
     var d;try{d=JSON.parse(txt);}catch(e){showToast('\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u0633\u062C\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627','#e53935');return;}
     if(d.ok){closeGroupTableEditModal();showToast('\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062F','#00BCD4');loadGroups2();}
-    else{showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
+    else{console.error('[groups] delete returned not-ok:', d); showToast(d.error||'\u062D\u062F\u062B \u062E\u0637\u0623','#e53935');}
+  }).catch(function(err){
+    console.error('[groups] DELETE fetch failed:', err);
+    showToast('\u062D\u062F\u062B \u062E\u0637\u0623: '+(err&&err.message?err.message:err),'#e53935');
   });
 }
 function updateGroupColumnLabel(){
