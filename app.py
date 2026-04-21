@@ -1,15 +1,161 @@
 from flask import Flask, request, session, redirect, g, jsonify
-import sqlite3, hashlib, os, json
+import sqlite3, hashlib, os, json, re as _re
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
 DB = os.environ.get("DB_PATH", "mindx.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
+
+
+class _Row(dict):
+    """Row type that supports r[int], r['name'], dict(r), and r.keys() — compatible with sqlite3.Row usage throughout the app."""
+    def __init__(self, values, columns):
+        super().__init__(zip(columns, values))
+        object.__setattr__(self, '_columns', columns)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return dict.__getitem__(self, self._columns[key])
+        return dict.__getitem__(self, key)
+
+    def keys(self):
+        return list(self._columns)
+
+
+class _StaticCursor:
+    """Canned-rows cursor used to emulate SELECT last_insert_rowid()."""
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self.rowcount = len(rows)
+
+    def fetchone(self):
+        return self._rows.pop(0) if self._rows else None
+
+    def fetchall(self):
+        out, self._rows = self._rows, []
+        return out
+
+    def close(self):
+        pass
+
+
+class _PgCursor:
+    def __init__(self, cur):
+        self._cur = cur
+        self._cols = None
+
+    def _columns(self):
+        if self._cols is None and self._cur.description:
+            self._cols = [d[0] for d in self._cur.description]
+        return self._cols or []
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        if row is None:
+            return None
+        return _Row(row, self._columns())
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        cols = self._columns()
+        return [_Row(r, cols) for r in rows]
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
+
+
+def _pg_translate(sql):
+    """Rewrite SQLite dialect to Postgres dialect."""
+    m = _re.search(r"PRAGMA\s+table_info\s*\(\s*(\w+)\s*\)", sql, _re.I)
+    if m:
+        tbl = m.group(1).lower()
+        return (
+            "SELECT (ordinal_position - 1) AS cid, column_name AS name, "
+            "data_type AS type, "
+            "CASE WHEN is_nullable='NO' THEN 1 ELSE 0 END AS notnull, "
+            "column_default AS dflt_value, 0 AS pk "
+            "FROM information_schema.columns WHERE table_name = '" + tbl + "' "
+            "ORDER BY ordinal_position"
+        )
+    sql = _re.sub(r"\bINTEGER\s+PRIMARY\s+KEY(\s+AUTOINCREMENT)?\b", "SERIAL PRIMARY KEY", sql, flags=_re.I)
+    sql = sql.replace("datetime('now')", "NOW()::text")
+    sql = _re.sub(r"\bDATETIME\b", "TIMESTAMP", sql)
+    if _re.search(r"\bINSERT\s+OR\s+IGNORE\b", sql, _re.I):
+        sql = _re.sub(r"\bINSERT\s+OR\s+IGNORE\b", "INSERT", sql, flags=_re.I)
+        sql = sql.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+    sql = sql.replace("?", "%s")
+    return sql
+
+
+class _PgConnection:
+    """Sqlite3.Connection-shaped wrapper over psycopg2."""
+    def __init__(self, conn):
+        self._conn = conn
+        self._conn.autocommit = True  # Match SQLite's implicit-commit flow; avoids aborted-transaction pitfalls with try/except swallows.
+        self._last_insert_id = None
+        self.row_factory = None  # Unused; present for API compatibility.
+
+    def execute(self, sql, params=()):
+        if _re.search(r"\blast_insert_rowid\s*\(", sql, _re.I):
+            return _StaticCursor([_Row([self._last_insert_id], ["last_insert_rowid"])])
+        translated = _pg_translate(sql)
+        is_insert = bool(_re.match(r"\s*INSERT\s+INTO\s", translated, _re.I))
+        if is_insert and "RETURNING" not in translated.upper():
+            translated = translated.rstrip().rstrip(";") + " RETURNING id"
+        cur = self._conn.cursor()
+        if params:
+            cur.execute(translated, tuple(params))
+        else:
+            cur.execute(translated)
+        if is_insert:
+            try:
+                row = cur.fetchone()
+                if row is not None:
+                    self._last_insert_id = row[0]
+            except Exception:
+                pass
+        return _PgCursor(cur)
+
+    def commit(self):
+        pass  # autocommit mode
+
+    def rollback(self):
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+
+
+def _new_connection():
+    if USE_PG:
+        return _PgConnection(psycopg2.connect(DATABASE_URL))
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB)
-        g.db.row_factory = sqlite3.Row
+        g.db = _new_connection()
     return g.db
 
 @app.teardown_appcontext
@@ -22,7 +168,7 @@ def hp(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
 def init_db():
-    db = sqlite3.connect(DB)
+    db = _new_connection()
     db.execute("""CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY,
         username TEXT UNIQUE,
@@ -183,10 +329,9 @@ def init_db():
     db.commit()
     db.close()
 
-if not os.path.exists(DB):
-    init_db()
-else:
-    db2 = sqlite3.connect(DB)
+init_db()
+if True:
+    db2 = _new_connection()
     db2.execute("""CREATE TABLE IF NOT EXISTS students(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         personal_id TEXT UNIQUE,
@@ -3634,17 +3779,10 @@ def api_columns_add():
 def api_columns_delete(col_key):
     db = get_db()
     try:
-        # SQLite doesn't support DROP COLUMN directly (before 3.35), rebuild table
-        rows = db.execute("SELECT col_key FROM column_labels ORDER BY col_order").fetchall()
-        remaining = [r[0] for r in rows if r[0] != col_key]
-        # Get all columns in students table
         pragma = db.execute("PRAGMA table_info(students)").fetchall()
         all_cols = [r[1] for r in pragma]
-        keep_cols = [c2 for c2 in all_cols if c2 != col_key]
-        cols_str = ",".join(keep_cols)
-        db.execute("CREATE TABLE students_backup AS SELECT "+cols_str+" FROM students")
-        db.execute("DROP TABLE students")
-        db.execute("ALTER TABLE students_backup RENAME TO students")
+        if col_key in all_cols:
+            db.execute('ALTER TABLE students DROP COLUMN "' + col_key + '"')
         db.execute("DELETE FROM column_labels WHERE col_key=?",(col_key,))
         db.commit()
         return jsonify({"ok":True})
@@ -3757,11 +3895,8 @@ def api_group_columns_delete(col_key):
     try:
         pragma = db.execute("PRAGMA table_info(student_groups)").fetchall()
         all_cols = [r[1] for r in pragma]
-        keep_cols = [c for c in all_cols if c != col_key]
-        cols_str = ",".join(keep_cols)
-        db.execute("CREATE TABLE student_groups_backup AS SELECT "+cols_str+" FROM student_groups")
-        db.execute("DROP TABLE student_groups")
-        db.execute("ALTER TABLE student_groups_backup RENAME TO student_groups")
+        if col_key in all_cols:
+            db.execute('ALTER TABLE student_groups DROP COLUMN "' + col_key + '"')
         db.execute("DELETE FROM group_col_labels WHERE col_key=?",(col_key,))
         db.commit()
         return jsonify({"ok":True})
@@ -4486,7 +4621,8 @@ def api_taqseet_delete(row_id):
 def api_payment_put(student_id, inst_num):
     db = get_db()
     data = request.get_json()
-    db.execute("""INSERT OR REPLACE INTO student_payments(student_id,inst_num,inst_type,price,paid) VALUES(?,?,?,?,?)""",
+    db.execute("""INSERT INTO student_payments(student_id,inst_num,inst_type,price,paid) VALUES(?,?,?,?,?)
+        ON CONFLICT(student_id,inst_num) DO UPDATE SET inst_type=EXCLUDED.inst_type, price=EXCLUDED.price, paid=EXCLUDED.paid""",
         (student_id, inst_num, data.get('inst_type',''), data.get('price',0), data.get('paid',0)))
     db.commit()
     # Sync paid amount to taqseet table
