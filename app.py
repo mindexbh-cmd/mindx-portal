@@ -1734,11 +1734,29 @@ body{background:#f5f3ff;direction:rtl;display:flex;flex-direction:column;}
 .search-bar input:focus{border-color:#6B3FA0;}
 .btn-search{background:#6B3FA0;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
 .table-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(107,63,160,.08);overflow-x:auto;overflow-y:auto;direction:rtl;border:1px solid #f0ebff;}
+/* Sticky nav bar with pills that scroll to each section. */
+.db-nav{position:sticky;top:0;background:rgba(255,255,255,0.95);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:60;padding:12px 24px;margin:-24px -28px 24px;border-bottom:1px solid #eee;display:flex;gap:10px;flex-wrap:wrap;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,0.04);}
+.db-nav-label{font-size:13px;color:#888;font-weight:700;margin-left:4px;}
+.db-nav-btn{padding:8px 16px;border-radius:10px;background:#f5f3ff;color:#6B3FA0;font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;border:1.5px solid transparent;cursor:pointer;transition:all .15s;}
+.db-nav-btn:hover{background:#ede7f6;border-color:#8B5CC8;}
+.db-nav-btn.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;box-shadow:0 3px 8px rgba(107,63,160,0.25);}
+.db-nav-btn.teal{background:#e0f2f1;color:#00695C;}
+.db-nav-btn.teal:hover{background:#b2dfdb;border-color:#00897B;}
+.db-nav-btn.teal.active{background:linear-gradient(135deg,#00695C,#4DB6AC);color:#fff;}
+.db-nav-btn.cyan{background:#e0f7fa;color:#0097A7;}
+.db-nav-btn.cyan:hover{background:#b2ebf2;border-color:#00BCD4;}
+.db-nav-btn.cyan.active{background:linear-gradient(135deg,#00838F,#00BCD4);color:#fff;}
+.db-nav-btn.orange{background:#fff3e0;color:#E65100;}
+.db-nav-btn.orange:hover{background:#ffe0b2;border-color:#FB8C00;}
+.db-nav-btn.orange.active{background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;}
+.db-nav-btn.blue{background:#e3f2fd;color:#1565C0;}
+.db-nav-btn.blue:hover{background:#bbdefb;border-color:#1E88E5;}
+.db-nav-btn.blue.active{background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;}
 /* Section cards grouping each data table + its action bar. */
-.db-section{background:#fff;border-radius:16px;padding:22px 24px;margin-bottom:28px;box-shadow:0 3px 14px rgba(107,63,160,.08);border:1px solid #eee;}
+.db-section{background:#fff;border-radius:16px;padding:22px 24px;margin-bottom:28px;box-shadow:0 3px 14px rgba(107,63,160,.08);border:1px solid #eee;scroll-margin-top:80px;}
 .db-section-title{font-size:19px;font-weight:800;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #f0ebff;display:flex;align-items:center;gap:10px;}
 .db-section .table-wrap{box-shadow:none;border:1px solid #eee;}
-.custom-table-section{background:#fff;border-radius:16px;padding:22px 24px;margin:0 0 28px 0;box-shadow:0 3px 14px rgba(21,101,192,.08);border:1px solid #e0f0ff;}
+.custom-table-section{background:#fff;border-radius:16px;padding:22px 24px;margin:0 0 28px 0;box-shadow:0 3px 14px rgba(21,101,192,.08);border:1px solid #e0f0ff;scroll-margin-top:80px;}
 .custom-table-section .table-wrap{box-shadow:none;border:1px solid #eee;}
 table{width:100%;border-collapse:collapse;min-width:2800px;}
 thead tr{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
@@ -1835,7 +1853,15 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       <a href="/groups" class="btn-groups" style="background:linear-gradient(135deg,#00BCD4,#0097A7);color:#fff;padding:11px 26px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">&#128101; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</a>
     </div>
   </div>
-  <div class="db-section">
+  <div class="db-nav" id="dbNav">
+    <span class="db-nav-label">&#x627;&#x644;&#x627;&#x646;&#x62A;&#x642;&#x627;&#x644; &#x625;&#x644;&#x649;:</span>
+    <a class="db-nav-btn" href="#sec-students" data-target="sec-students" onclick="dbNavGo(event,'sec-students')">&#x1F393; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</a>
+    <a class="db-nav-btn cyan" href="#sec-groups" data-target="sec-groups" onclick="dbNavGo(event,'sec-groups')">&#x1F465; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</a>
+    <a class="db-nav-btn" href="#sec-taqseet" data-target="sec-taqseet" onclick="dbNavGo(event,'sec-taqseet')">&#x1F4CB; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</a>
+    <a class="db-nav-btn orange" href="#sec-attendance" data-target="sec-attendance" onclick="dbNavGo(event,'sec-attendance')">&#x1F4C5; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</a>
+    <span id="dbNavCustom"></span>
+  </div>
+  <div class="db-section" id="sec-students">
   <div class="db-section-title" style="color:#6B3FA0;">&#x1F393; &#x642;&#x627;&#x639;&#x62F;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</div>
   <div class="stats">
     <div class="stat-card">
@@ -1891,7 +1917,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
 
 <!-- ===== GROUPS TABLE SECTION ===== -->
-<div class="db-section">
+<div class="db-section" id="sec-groups">
   <div class="db-section-title" style="color:#0097A7;">&#128101; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
   <div class="stats">
     <div class="stat-card" style="border-top:3px solid #00BCD4;">
@@ -1922,7 +1948,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
 </div>
 <!-- TAQSEET (PAYMENT PLANS) TABLE -->
-<div class="db-section">
+<div class="db-section" id="sec-taqseet">
   <div class="db-section-title" style="color:#6c3fa0;">&#128203; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
@@ -1987,7 +2013,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     </table>
   </div>
 </div>
-<div class="db-section">
+<div class="db-section" id="sec-attendance">
   <div class="db-section-title" style="color:#6c3fa0;">&#128197; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
   <div class="stats" style="margin-bottom:10px;">
     <div class="stat-card">
@@ -2468,6 +2494,30 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
 </div>
 <script>
+// Database-page section nav: smooth-scroll to the picked table and track the
+// active tab. Works for the four fixed sections plus any custom tables.
+function dbNavGo(e, id) {
+  if (e) e.preventDefault();
+  var el = document.getElementById(id);
+  if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+  dbNavSetActive(id);
+}
+function dbNavSetActive(id) {
+  document.querySelectorAll('.db-nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.querySelector('.db-nav-btn[data-target="'+id+'"]');
+  if (btn) btn.classList.add('active');
+}
+function dbNavRefreshCustom(tables) {
+  var holder = document.getElementById('dbNavCustom');
+  if (!holder) return;
+  var html = '';
+  (tables || []).forEach(function(t){
+    var id = 'ctsec_' + t.id;
+    var name = (t.tbl_name || '').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    html += '<a class="db-nav-btn blue" href="#' + id + '" data-target="' + id + '" onclick="dbNavGo(event,\\'' + id + '\\')">' + '\U0001F4CB ' + name + '</a>';
+  });
+  holder.innerHTML = html;
+}
 // Bulk-select helpers shared across all tables on this page.
 function _bulkToggleAll(tbodyId, checked){
   var tb = document.getElementById(tbodyId); if(!tb) return;
@@ -3527,6 +3577,10 @@ function renderAllCustomTables() {
   // Re-apply saved freeze state on each custom table.
   for (var j = 0; j < allCustomTables.length; j++) {
     applyFreezeToTable('custom_' + allCustomTables[j].id);
+  }
+  // Keep the section-nav tabs in sync with whatever custom tables exist.
+  if (typeof dbNavRefreshCustom === 'function') {
+    dbNavRefreshCustom(allCustomTables);
   }
 }
 
