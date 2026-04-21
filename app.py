@@ -2485,6 +2485,10 @@ function renderTaqseet() {
   tbody.innerHTML = allTaqseet.map(function(r, i) {
     var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
     var cells = fields.map(function(f) {
+      // num_installments is auto-calculated from inst1..inst12 and is not hand-editable.
+      if (f === 'num_installments') {
+        return '<td data-id="' + r.id + '" data-field="' + f + '" title="\u064A\u062D\u0633\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B" style="padding:8px;min-width:80px;background:#eef5ff;color:#1565C0;font-weight:700;text-align:center;">' + (r[f]||'') + '</td>';
+      }
       return '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + f + '" style="padding:8px;min-width:80px;">' + (r[f]||'') + '</td>';
     }).join('');
     return '<tr style="background:' + bg + ';">' +
@@ -2512,9 +2516,37 @@ function saveTaqseetCell(id, field, el) {
   var updated = {};
   for (var k in r) { updated[k] = r[k]; }
   updated[field] = val;
+  var affectsInstallments = /^inst\d+$/.test(field) || field === 'course_amount';
+  var installmentCount = 0;
+  if (affectsInstallments) {
+    var sum = 0;
+    for (var i = 1; i <= 12; i++) {
+      var v = parseFloat(String(updated['inst'+i] || '').replace(/,/g, ''));
+      if (!isNaN(v) && v > 0) { sum += v; installmentCount++; }
+    }
+    var courseAmt = parseFloat(String(updated.course_amount || '').replace(/,/g, ''));
+    if (!isNaN(courseAmt) && courseAmt > 0 && sum > courseAmt) {
+      showToast('\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 (' + sum + ') \u064A\u062A\u062C\u0627\u0648\u0632 \u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629 (' + courseAmt + ')', '#e53935');
+      el.innerText = r[field] == null ? '' : String(r[field]);
+      return;
+    }
+    updated.num_installments = String(installmentCount);
+  }
   fetch('/api/taqseet/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updated)})
     .then(function(res){return res.json();})
-    .then(function(){ if(r){ r[field] = val; } });
+    .then(function(){
+      if (r) {
+        r[field] = val;
+        if (affectsInstallments) {
+          r.num_installments = String(installmentCount);
+          var tr = el.closest('tr');
+          if (tr) {
+            var niCell = tr.querySelector('td[data-field="num_installments"]');
+            if (niCell) niCell.innerText = String(installmentCount);
+          }
+        }
+      }
+    });
 }
 
 function openAddTaqseet() {
