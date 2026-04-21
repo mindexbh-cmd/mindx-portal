@@ -1008,14 +1008,14 @@ function performSearch(query) {
   }
 
   if (found) {
-    badge.textContent = '&#x62A;&#x645; &#x627;&#x644;&#x639;&#x62B;&#x648;&#x631; &#x639;&#x644;&#x649;: ' + foundGroup;
+    badge.textContent = '\u062A\u0645 \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649: ' + foundGroup;
     badge.style.display = 'inline-block';
     // Select the group in dropdown
     var sel = document.getElementById('groupSelect');
     sel.value = foundGroup;
     onControlChange();
   } else {
-    badge.textContent = '&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x646;&#x62A;&#x64A;&#x62C;&#x629;';
+    badge.textContent = '\u0644\u0627 \u062A\u0648\u062C\u062F \u0646\u062A\u064A\u062C\u0629';
     badge.style.background = '#ef9a9a';
     badge.style.display = 'inline-block';
     setTimeout(function() {
@@ -2306,13 +2306,13 @@ function clearGroupForm2(){
   for(var x=0;x<ids.length;x++){var el=document.getElementById('gf2_'+ids[x]);if(el)el.value='';}
   document.getElementById('groupEditId2').value='';
 }
-function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='&#x627;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x62C;&#x62F;&#x64A;&#x62F;&#x629;';document.getElementById('groupModal2').classList.add('open');}
+function openAddGroupModal2(){clearGroupForm2();document.getElementById('groupModalTitle2').textContent='\u0627\u0636\u0627\u0641\u0629 \u0645\u062C\u0645\u0648\u0639\u0629 \u062C\u062F\u064A\u062F\u0629';document.getElementById('groupModal2').classList.add('open');}
 function openGroupEdit2(id){
   var g=null;
   for(var x=0;x<allGroups2.length;x++){if(allGroups2[x].id===id){g=allGroups2[x];break;}}
   if(!g)return;
   document.getElementById('groupEditId2').value=id;
-  document.getElementById('groupModalTitle2').textContent='&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;';
+  document.getElementById('groupModalTitle2').textContent='\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629';
   document.getElementById('gf2_group_name').value=g.group_name||'';
   document.getElementById('gf2_teacher_name').value=g.teacher_name||'';
   document.getElementById('gf2_level_course').value=g.level_course||'';
@@ -2740,7 +2740,7 @@ function editAttendanceCell(id, field, tdEl) {
     input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
     selectOptions[field].forEach(function(v){
       var o = document.createElement('option');
-      o.value = v; o.textContent = v||'-- &#x627;&#x62E;&#x62A;&#x631; --';
+      o.value = v; o.textContent = v||'-- \u0627\u062E\u062A\u0631 --';
       if(v === oldVal) o.selected = true;
       input.appendChild(o);
     });
@@ -3084,7 +3084,7 @@ function openCustomTableDeleteConfirmById(btn) {
 
 function openCustomTableDeleteConfirm(tid, name) {
   deletingCustomTableId = tid;
-  document.getElementById('customTableDeleteMsg').textContent = '&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; &#x62C;&#x62F;&#x648;&#x644; "' + name + '"&#x61F; &#x633;&#x64A;&#x62A;&#x645; &#x62D;&#x630;&#x641; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;.';
+  document.getElementById('customTableDeleteMsg').textContent = '\u0647\u0644 \u062A\u0631\u064A\u062F \u062D\u0630\u0641 \u062C\u062F\u0648\u0644 "' + name + '"\u061F \u0633\u064A\u062A\u0645 \u062D\u0630\u0641 \u062C\u0645\u064A\u0639 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A.';
   document.getElementById('customTableDeleteConfirm').style.display = 'flex';
 }
 function closeCustomTableDeleteConfirm() {
@@ -3139,10 +3139,10 @@ function readAttendanceExcelFile(input) {
       // Skip header row (row 0)
       var dataRows = rows.slice(1).filter(function(r) { return r.some(function(c){ return String(c).trim() !== ''; }); });
       attendanceExcelRows = dataRows;
-      document.getElementById('attendanceExcelStatus').textContent = '&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; ' + dataRows.length + ' &#x635;&#x641;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.';
+      document.getElementById('attendanceExcelStatus').textContent = '\u062A\u0645 \u0642\u0631\u0627\u0621\u0629 ' + dataRows.length + ' \u0635\u0641. \u0627\u0636\u063A\u0637 \u0627\u0633\u062A\u064A\u0631\u0627\u062F.';
       document.getElementById('attendanceExcelImportBtn').style.display = dataRows.length > 0 ? 'inline-flex' : 'none';
     } catch(err) {
-      document.getElementById('attendanceExcelStatus').textContent = '&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x642;&#x631;&#x627;&#x621;&#x629; &#x627;&#x644;&#x645;&#x644;&#x641;: ' + err.message;
+      document.getElementById('attendanceExcelStatus').textContent = '\u062E\u0637\u0623 \u0641\u064A \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0645\u0644\u0641: ' + err.message;
     }
   };
   reader.readAsArrayBuffer(file);
@@ -3161,7 +3161,7 @@ function importAttendanceFromExcel() {
   var statusEl = document.getElementById('attendanceExcelStatus');
   function sendNext(idx) {
     if(idx >= total) {
-      statusEl.textContent = '&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; ' + done + ' &#x633;&#x62C;&#x644; &#x628;&#x646;&#x62C;&#x627;&#x62D;!';
+      statusEl.textContent = '\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F ' + done + ' \u0633\u062C\u0644 \u0628\u0646\u062C\u0627\u062D!';
       loadAttendance();
       setTimeout(closeAttendanceExcelModal, 1500);
       return;
@@ -3169,7 +3169,7 @@ function importAttendanceFromExcel() {
     fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(batch[idx])})
       .then(function(r){ return r.json(); }).then(function(d){
         if(d.ok) done++;
-        statusEl.textContent = '&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;... ' + (idx+1) + ' / ' + total;
+        statusEl.textContent = '\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F... ' + (idx+1) + ' / ' + total;
         sendNext(idx+1);
       }).catch(function(){ sendNext(idx+1); });
   }
@@ -4465,19 +4465,25 @@ def api_groups_get():
     rows = db.execute("SELECT * FROM student_groups ORDER BY id DESC").fetchall()
     return jsonify({"groups": [dict(r) for r in rows]})
 
+GROUP_FIELDS = [
+    "group_name","teacher_name","level_course","last_reached","study_time",
+    "ramadan_time","online_time","group_link","session_duration",
+    "student_count","study_days","online_days","online_time_ramadan",
+    "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto",
+    "sessions_online_auto","session_minutes_normal",
+    "hours_in_person_auto","hours_online_only","hours_all_online",
+]
+
 @app.route("/api/groups", methods=["POST"])
 @login_required
 def api_groups_add():
     d = request.get_json()
     try:
         db = get_db()
-        db.execute("""INSERT INTO student_groups
-            (group_name,teacher_name,level_course,last_reached,study_time,
-             ramadan_time,online_time,group_link,session_duration)
-            VALUES(?,?,?,?,?,?,?,?,?)""",
-            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
-             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
-             d.get("online_time"), d.get("group_link"), d.get("session_duration")))
+        cols = ",".join(GROUP_FIELDS)
+        placeholders = ",".join(["?"] * len(GROUP_FIELDS))
+        values = tuple(d.get(f) for f in GROUP_FIELDS)
+        db.execute("INSERT INTO student_groups (" + cols + ") VALUES (" + placeholders + ")", values)
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
@@ -4489,13 +4495,9 @@ def api_groups_update(gid):
     d = request.get_json()
     try:
         db = get_db()
-        db.execute("""UPDATE student_groups SET
-            group_name=?,teacher_name=?,level_course=?,last_reached=?,study_time=?,
-            ramadan_time=?,online_time=?,group_link=?,session_duration=?
-            WHERE id=?""",
-            (d.get("group_name"), d.get("teacher_name"), d.get("level_course"),
-             d.get("last_reached"), d.get("study_time"), d.get("ramadan_time"),
-             d.get("online_time"), d.get("group_link"), d.get("session_duration"), gid))
+        set_clause = ",".join([f + "=?" for f in GROUP_FIELDS])
+        values = tuple(d.get(f) for f in GROUP_FIELDS) + (gid,)
+        db.execute("UPDATE student_groups SET " + set_clause + " WHERE id=?", values)
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
