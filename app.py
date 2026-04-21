@@ -3442,6 +3442,7 @@ function _arNorm(s){
   try { t = t.normalize('NFKD'); } catch(e) {}
   return t
     .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g,'')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g,'')
     .replace(/[\u0623\u0625\u0622\u0671]/g,'\u0627')
     .replace(/\u0629/g,'\u0647')
     .replace(/\u0649/g,'\u064A')
@@ -4508,7 +4509,7 @@ def groups():
 @login_required
 def api_groups_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM student_groups ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM student_groups ORDER BY id ASC").fetchall()
     return jsonify({"groups": [dict(r) for r in rows]})
 
 @app.route("/api/groups", methods=["POST"])
