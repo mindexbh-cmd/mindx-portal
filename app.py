@@ -1181,6 +1181,13 @@ function srSave(){
 .mab-teal{background:linear-gradient(135deg,#00897B,#26A69A);}
 .mab-purple{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);}
 .mab-orange{background:linear-gradient(135deg,#E65100,#FB8C00);}
+.mab-red{background:linear-gradient(135deg,#c0392b,#e74c3c);}
+.msg-abs-section-head{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;gap:10px;flex-wrap:wrap;}
+.msg-abs-section-head .msg-cat-header{margin:0;padding-bottom:0;border:none;}
+.msg-abs-sent{font-size:.82rem;color:#2E7D32;font-weight:700;margin-inline-end:6px;}
+.msg-abs-count-absent{color:#c0392b;}
+.msg-abs-count-late{color:#E65100;}
+
 .msg-cat-header{font-weight:800;color:#4a148c;margin:14px 0 8px;font-size:1rem;border-bottom:1.5px dashed #d1c4e9;padding-bottom:5px;}
 .msg-tpl-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;}
 .msg-tpl-card{position:relative;background:#f5f0ff;border:1px solid #e1d3f7;border-radius:10px;padding:12px 14px;cursor:pointer;transition:background .12s,border-color .12s;}
@@ -1257,6 +1264,10 @@ function srSave(){
           <button type="button" class="msg-action-btn mab-orange" onclick="msgOpenReminders()">
             <span class="mab-title">&#x23F0; &#x62C;&#x62F;&#x648;&#x644;&#x629; &#x62A;&#x630;&#x643;&#x64A;&#x631;</span>
             <span class="mab-desc">&#x62C;&#x62F;&#x648;&#x644;&#x629; &#x62A;&#x630;&#x643;&#x64A;&#x631; &#x644;&#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x644;&#x629; &#x641;&#x64A; &#x648;&#x642;&#x62A; &#x645;&#x62D;&#x62F;&#x62F;</span>
+          </button>
+          <button type="button" class="msg-action-btn mab-red" onclick="msgOpenAbsence()">
+            <span class="mab-title">&#x1F6A8; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; &#x648;&#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</span>
+            <span class="mab-desc">&#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x626;&#x644; &#x644;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x64A;&#x646; &#x648;&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x64A;&#x646; &#x641;&#x64A; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x644;&#x64A;&#x648;&#x645; &#x645;&#x62D;&#x62F;&#x62F;</span>
           </button>
         </div>
         <div id="msg-tpl-wrap"></div>
@@ -1370,6 +1381,43 @@ function srSave(){
       </div>
       <div class="msg-cat-header">&#x627;&#x644;&#x62A;&#x630;&#x643;&#x64A;&#x631;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x627;&#x644;&#x64A;&#x629;</div>
       <div id="msg-rem-list" class="msg-rem-list"></div>
+    </div>
+  </div>
+</div>
+<div id="msg-abs-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header" style="background:linear-gradient(135deg,#c0392b,#e74c3c);">
+      <span class="msg-header-title">&#x1F6A8; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; &#x648;&#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</span>
+      <button class="msg-close" onclick="msgCloseAbsence()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <div class="msg-form-grid">
+        <div>
+          <label class="msg-label" for="msg-abs-date" style="margin:0 0 4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label>
+          <input id="msg-abs-date" class="msg-input" type="date" onchange="msgAbsenceLoad()">
+        </div>
+        <div>
+          <label class="msg-label" for="msg-abs-group" style="margin:0 0 4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
+          <select id="msg-abs-group" class="msg-select" onchange="msgAbsenceLoad()">
+            <option value="">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x2014;</option>
+          </select>
+        </div>
+      </div>
+      <div id="msg-abs-status" class="msg-empty" style="display:none;"></div>
+      <div id="msg-abs-absent-wrap" style="display:none;">
+        <div class="msg-abs-section-head">
+          <div class="msg-cat-header">&#x1F6AB; <span class="msg-abs-count-absent">&#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x648;&#x646;</span> (<span id="msg-abs-absent-count">0</span>)</div>
+          <button type="button" class="msg-bulk" onclick="msgAbsenceBulk('absent')">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644; - &#x63A;&#x627;&#x626;&#x628;&#x648;&#x646;</button>
+        </div>
+        <div id="msg-abs-absent-list" class="msg-student-list"></div>
+      </div>
+      <div id="msg-abs-late-wrap" style="display:none;">
+        <div class="msg-abs-section-head">
+          <div class="msg-cat-header">&#x23F0; <span class="msg-abs-count-late">&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646;</span> (<span id="msg-abs-late-count">0</span>)</div>
+          <button type="button" class="msg-bulk" onclick="msgAbsenceBulk('late')">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644; - &#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646;</button>
+        </div>
+        <div id="msg-abs-late-list" class="msg-student-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1856,6 +1904,141 @@ function _msgFireReminder(r){
     };
   } catch(e) {}
 }
+
+var _msgAbsenceRows = [];
+var _msgAbsenceLoadedGroups = false;
+function msgOpenAbsence(){
+  document.getElementById('msg-abs-modal').style.display = 'block';
+  if (!_msgAbsenceLoadedGroups) { _msgAbsencePopulateGroups(); }
+  // default date to today if not already chosen
+  var d = document.getElementById('msg-abs-date');
+  if (!d.value) { var now = new Date(); var m = String(now.getMonth()+1).padStart(2,'0'); var day = String(now.getDate()).padStart(2,'0'); d.value = now.getFullYear()+'-'+m+'-'+day; }
+}
+function msgCloseAbsence(){ document.getElementById('msg-abs-modal').style.display = 'none'; }
+function _msgAbsencePopulateGroups(){
+  var sel = document.getElementById('msg-abs-group'); if (!sel) return;
+  // Preserve the current empty option then append unique group names.
+  var placeholder = sel.options[0];
+  sel.innerHTML = ''; if (placeholder) sel.appendChild(placeholder);
+  var seen = {};
+  for (var i=0; i<_msgGroups.length; i++) {
+    var n = (_msgGroups[i].group_name || '').trim();
+    if (!n || seen[n]) continue; seen[n] = 1;
+    sel.appendChild(new Option(n, n));
+  }
+  _msgAbsenceLoadedGroups = true;
+}
+function msgAbsenceLoad(){
+  var d = document.getElementById('msg-abs-date').value;
+  var g = document.getElementById('msg-abs-group').value;
+  var status = document.getElementById('msg-abs-status');
+  var absW = document.getElementById('msg-abs-absent-wrap');
+  var lateW = document.getElementById('msg-abs-late-wrap');
+  absW.style.display = 'none'; lateW.style.display = 'none';
+  if (!d || !g) {
+    status.style.display = 'block';
+    status.textContent = '\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629';
+    return;
+  }
+  status.style.display = 'block';
+  status.textContent = 'جاري التحميل...';
+  fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(d) + '&group=' + encodeURIComponent(g), { credentials:'include' })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      _msgAbsenceRows = (data && data.rows) || [];
+      if (!_msgAbsenceRows.length) {
+        status.style.display = 'block';
+        status.textContent = '\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u063A\u064A\u0627\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645';
+        return;
+      }
+      status.style.display = 'none';
+      _msgAbsenceRender();
+    })
+    .catch(function(){ status.style.display = 'block'; status.textContent = '\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644'; });
+}
+function _msgAbsenceRender(){
+  var absList = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === '\u063A\u0627\u0626\u0628'; });
+  var lateList = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === '\u0645\u062A\u0623\u062E\u0631'; });
+  _msgAbsenceRenderSection('absent', absList);
+  _msgAbsenceRenderSection('late', lateList);
+}
+function _msgAbsenceRenderSection(kind, rows){
+  var wrap = document.getElementById('msg-abs-' + kind + '-wrap');
+  var list = document.getElementById('msg-abs-' + kind + '-list');
+  var count = document.getElementById('msg-abs-' + kind + '-count');
+  list.innerHTML = '';
+  count.textContent = rows.length;
+  wrap.style.display = 'block';
+  if (!rows.length) {
+    var e = document.createElement('div'); e.className = 'msg-empty';
+    e.textContent = kind === 'absent' ? '\u0644\u0627 \u064A\u0648\u062C\u062F \u063A\u0627\u0626\u0628\u0648\u0646' : '\u0644\u0627 \u064A\u0648\u062C\u062F \u0645\u062A\u0623\u062E\u0631\u0648\u0646';
+    list.appendChild(e); return;
+  }
+  rows.forEach(function(r){
+    var row = document.createElement('div'); row.className = 'msg-student-row';
+    row.dataset.attId = String(r.id);
+    var left = document.createElement('span'); left.className = 'msg-student-name';
+    left.textContent = r.student_name || '-';
+    row.appendChild(left);
+    var right = document.createElement('span'); right.style.display = 'flex'; right.style.alignItems = 'center';
+    var sent = document.createElement('span'); sent.className = 'msg-abs-sent';
+    sent.textContent = (r.message_status === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644') ? ('✓ \u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644') : '';
+    right.appendChild(sent);
+    var phone = _msgCleanPhone(r.whatsapp);
+    if (phone) {
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'msg-wa';
+      btn.textContent = '\u0648\u0627\u062A\u0633\u0627\u0628';
+      btn.addEventListener('click', (function(rec, k){ return function(){ _msgAbsenceOpenWa(rec, k); }; })(r, kind));
+      right.appendChild(btn);
+    } else {
+      var sp = document.createElement('span'); sp.className = 'msg-wa msg-wa-disabled'; sp.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645'; right.appendChild(sp);
+    }
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+}
+function _msgAbsenceMessage(row, kind){
+  var name = row.student_name || '';
+  if (kind === 'late') return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u062A\u0623\u062E\u0631/\u062A \u0639\u0646 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u064A\u0648\u0645';
+  return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u0643\u0627\u0646/\u062A \u063A\u0627\u0626\u0628\u0627\u064B/\u0629 \u0627\u0644\u064A\u0648\u0645';
+}
+function _msgAbsenceTemplateName(kind){
+  return kind === 'late' ? '\u062A\u0623\u062E\u064A\u0631' : '\u063A\u064A\u0627\u0628';
+}
+function _msgAbsenceMarkSent(row){
+  if (!row || !row.id) return;
+  row.message_status = '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644';
+  var rowEl = document.querySelector('.msg-student-row[data-att-id="' + row.id + '"]');
+  if (rowEl) { var badge = rowEl.querySelector('.msg-abs-sent'); if (badge) badge.textContent = '✓ \u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644'; }
+  fetch('/api/attendance/' + row.id + '/mark-sent', { method:'POST', credentials:'include' }).catch(function(){});
+}
+function _msgAbsenceLog(row, kind){
+  var body = { student_name: row.student_name || '', student_whatsapp: _msgCleanPhone(row.whatsapp) || (row.whatsapp || ''), template_name: _msgAbsenceTemplateName(kind) };
+  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) }).catch(function(){});
+}
+function _msgAbsenceOpenWa(row, kind){
+  var phone = _msgCleanPhone(row.whatsapp); if (!phone) return;
+  var text = _msgAbsenceMessage(row, kind);
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+  _msgAbsenceLog(row, kind);
+  _msgAbsenceMarkSent(row);
+}
+function msgAbsenceBulk(kind){
+  var statusVal = kind === 'late' ? '\u0645\u062A\u0623\u062E\u0631' : '\u063A\u0627\u0626\u0628';
+  var targets = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === statusVal && _msgCleanPhone(r.whatsapp); });
+  if (!targets.length) { alert('\u0644\u0627 \u064A\u0648\u062C\u062F \u0623\u064A \u0637\u0627\u0644\u0628 \u0628\u0631\u0642\u0645 \u0648\u0627\u062A\u0633\u0627\u0628 \u0635\u0627\u0644\u062D'); return; }
+  if (targets.length > 1 && !confirm('\u0633\u064A\u062A\u0645 \u0641\u062A\u062D \u0639\u062F\u0629 \u0646\u0648\u0627\u0641\u0630 \u0648\u0627\u062A\u0633\u0627\u0628 \u2014 \u0647\u0644 \u062A\u0631\u064A\u062F \u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629\u061F')) return;
+  targets.forEach(function(row, idx){
+    setTimeout(function(){
+      var phone = _msgCleanPhone(row.whatsapp);
+      var text = _msgAbsenceMessage(row, kind);
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+      _msgAbsenceLog(row, kind);
+      _msgAbsenceMarkSent(row);
+    }, idx * 400);
+  });
+}
+
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msgStartScheduler);
 else msgStartScheduler();
 </script>
@@ -5564,6 +5747,38 @@ def api_attendance_delete(rid):
     db = get_db()
     try:
         db.execute("DELETE FROM attendance WHERE id=?", (rid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route('/api/attendance/by-date-group', methods=['GET'])
+@login_required
+def api_attendance_by_date_group():
+    date = request.args.get('date', '')
+    group = request.args.get('group', '')
+    if not date or not group:
+        return jsonify({"rows": []})
+    db = get_db()
+    rows = db.execute(
+        """SELECT a.id, a.attendance_date, a.group_name, a.student_name, a.status,
+                  a.message_status, s.whatsapp
+             FROM attendance a
+             LEFT JOIN students s ON s.student_name = a.student_name
+            WHERE a.attendance_date=? AND a.group_name=?
+            ORDER BY a.student_name""",
+        (date, group)
+    ).fetchall()
+    return jsonify({"rows": [dict(r) for r in rows]})
+
+@app.route('/api/attendance/<int:rid>/mark-sent', methods=['POST'])
+@login_required
+def api_attendance_mark_sent(rid):
+    db = get_db()
+    try:
+        # "تم الإرسال" == "تم الإرسال"
+        db.execute("UPDATE attendance SET message_status=? WHERE id=?",
+                   ("تم الإرسال", rid))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
