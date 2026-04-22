@@ -1244,6 +1244,9 @@ function srSave(){
 .msg-abs-undo.show{display:flex;transform:translateY(0);opacity:1;}
 .msg-abs-undo:hover{background:#455a64;}
 .msg-abs-undo-count{opacity:.7;font-variant-numeric:tabular-nums;min-width:24px;text-align:left;}
+.msg-abs-all-dates{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:.82rem;color:#4a148c;font-weight:700;cursor:pointer;user-select:none;}
+.msg-abs-all-dates input{width:auto;margin:0;cursor:pointer;accent-color:#6B3FA0;}
+.msg-abs-card-date{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#ede7f6;color:#4a148c;font-weight:700;font-size:.74rem;}
 
 
 
@@ -1476,6 +1479,7 @@ function srSave(){
         <div>
           <label class="msg-label" for="msg-abs-date" style="margin:0 0 4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label>
           <input id="msg-abs-date" class="msg-input" type="date" onchange="msgAbsenceLoad()">
+          <label class="msg-abs-all-dates"><input type="checkbox" id="msg-abs-all-dates-chk" onchange="msgAbsenceToggleAllDates()"> &#x1F5D3;&#xFE0F; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x62A;&#x648;&#x627;&#x631;&#x64A;&#x62E;</label>
         </div>
         <div>
           <label class="msg-label" for="msg-abs-group" style="margin:0 0 4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
@@ -2045,6 +2049,18 @@ function msgCloseAbsence(){
   document.getElementById('msg-abs-modal').style.display = 'none';
   _msgAbsenceHideUndo();
 }
+function msgAbsenceToggleAllDates(){
+  var chk = document.getElementById('msg-abs-all-dates-chk');
+  var dateInp = document.getElementById('msg-abs-date');
+  if (chk && chk.checked) {
+    dateInp.disabled = true;
+    dateInp.classList.add('msg-input-disabled');
+  } else {
+    dateInp.disabled = false;
+    dateInp.classList.remove('msg-input-disabled');
+  }
+  msgAbsenceLoad();
+}
 
 function _msgAbsenceResetView(message){
   document.getElementById('msg-abs-alert').style.display = 'none';
@@ -2091,10 +2107,13 @@ function _msgAbsenceRefreshGeneralStats(){
 }
 
 function msgAbsenceLoad(){
-  var d = document.getElementById('msg-abs-date').value;
+  var chk = document.getElementById('msg-abs-all-dates-chk');
+  var allDates = !!(chk && chk.checked);
+  var d = allDates ? '__all__' : document.getElementById('msg-abs-date').value;
   var g = document.getElementById('msg-abs-group').value;
-  // "Today" shown in the stats strip follows the picker.
-  _msgAbsenceRefreshGeneralStats();
+  // "Today" shown in the stats strip follows the picker when a specific
+  // date is chosen; when "all dates" is on, leave it at whatever was set.
+  if (!allDates) _msgAbsenceRefreshGeneralStats();
   if (!d || !g) { _msgAbsenceResetView('\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629'); return; }
   _msgAbsenceResetView('\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...');
   fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(d) + '&group=' + encodeURIComponent(g), { credentials:'include' })
@@ -2157,6 +2176,14 @@ function _msgAbsenceBuildCard(r){
   nameEl.textContent = nameLabel;
   left.appendChild(nameEl);
   var meta = document.createElement('div'); meta.className = 'msg-abs-card-meta';
+  // In "all dates" mode the roster spans multiple days, so surface the
+  // attendance_date on every card so rows from different days don't blur.
+  var allDatesOn = !!(document.getElementById('msg-abs-all-dates-chk') && document.getElementById('msg-abs-all-dates-chk').checked);
+  if (allDatesOn && r.attendance_date) {
+    var dp = document.createElement('span'); dp.className = 'msg-abs-card-date';
+    dp.textContent = '\U0001F4C5 ' + r.attendance_date;
+    meta.appendChild(dp);
+  }
   var badge = document.createElement('span');
   badge.className = 'msg-abs-badge msg-abs-badge-' + card.dataset.kind;
   badge.textContent = card.dataset.kind === 'late' ? '\u0645\u062A\u0623\u062E\u0631' : '\u063A\u0627\u0626\u0628';
@@ -6150,7 +6177,11 @@ def api_attendance_delete(rid):
 def api_attendance_by_date_group():
     date = request.args.get('date', '')
     group = request.args.get('group', '')
-    if not date:
+    # date or group (or both) may be the sentinel '__all__' meaning "drop that
+    # filter". Empty group is treated like __all__ for backwards-compatibility.
+    all_dates  = (date  == '__all__')
+    all_groups = (group == '__all__' or group == '')
+    if not date and not all_dates:
         return jsonify({"rows": []})
     db = get_db()
     base = (
@@ -6164,16 +6195,18 @@ def api_attendance_by_date_group():
         "       GROUP BY student_name "
         "  ) ml ON ml.student_name = a.student_name "
     )
-    if group == '__all__' or group == '':
-        rows = db.execute(
-            base + "WHERE a.attendance_date=? ORDER BY a.group_name, a.student_name",
-            (date,)
-        ).fetchall()
+    # Cap the result so "all dates + all groups" doesn't ship the entire
+    # attendance history in one response.
+    tail = " ORDER BY a.attendance_date DESC, a.group_name, a.student_name LIMIT 1000"
+    if all_dates and all_groups:
+        rows = db.execute(base + tail).fetchall()
+    elif all_dates:
+        rows = db.execute(base + "WHERE a.group_name=?" + tail, (group,)).fetchall()
+    elif all_groups:
+        rows = db.execute(base + "WHERE a.attendance_date=?" + tail, (date,)).fetchall()
     else:
-        rows = db.execute(
-            base + "WHERE a.attendance_date=? AND a.group_name=? ORDER BY a.student_name",
-            (date, group)
-        ).fetchall()
+        rows = db.execute(base + "WHERE a.attendance_date=? AND a.group_name=?" + tail,
+                          (date, group)).fetchall()
     return jsonify({"rows": [dict(r) for r in rows]})
 
 @app.route('/api/attendance/<int:rid>/mark-sent', methods=['POST'])
