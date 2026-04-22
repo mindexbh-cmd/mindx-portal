@@ -1216,6 +1216,35 @@ function srSave(){
 .msg-abs-card-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .msg-abs-sent-badge{font-size:.78rem;color:#2E7D32;font-weight:700;white-space:nowrap;}
 .msg-abs-last{font-size:.74rem;color:#888;white-space:nowrap;}
+.msg-abs-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+.msg-abs-stat{position:relative;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:3px;overflow:hidden;}
+.msg-abs-stat::before{content:'';position:absolute;top:0;right:0;width:4px;height:100%;background:#999;}
+.msg-abs-stat-absent::before{background:#c0392b;}
+.msg-abs-stat-late::before{background:#E65100;}
+.msg-abs-stat-sent::before{background:#2E7D32;}
+.msg-abs-stat-never::before{background:#6B3FA0;}
+.msg-abs-stat-top{display:flex;justify-content:flex-end;}
+.msg-abs-stat-icon{font-size:18px;opacity:.85;}
+.msg-abs-stat-num{font-size:1.6rem;font-weight:800;color:#222;line-height:1.1;font-variant-numeric:tabular-nums;}
+.msg-abs-stat-lbl{font-size:.78rem;color:#666;font-weight:700;}
+.msg-abs-confirm{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;align-items:center;justify-content:center;animation:msg-abs-fade .18s ease;}
+.msg-abs-confirm.show{display:flex;}
+@keyframes msg-abs-fade{from{opacity:0;}to{opacity:1;}}
+.msg-abs-confirm-box{background:#fff;border-radius:14px;padding:22px 24px;max-width:380px;width:92%;box-shadow:0 16px 48px rgba(0,0,0,.25);text-align:center;transform:scale(.96);animation:msg-abs-pop .18s ease forwards;}
+@keyframes msg-abs-pop{to{transform:scale(1);}}
+.msg-abs-confirm-title{font-size:1.05rem;font-weight:800;color:#4a148c;margin-bottom:6px;}
+.msg-abs-confirm-sub{font-size:.9rem;color:#6a5494;margin-bottom:18px;font-weight:600;}
+.msg-abs-confirm-btns{display:flex;gap:10px;justify-content:center;}
+.msg-abs-confirm-btn{border:none;border-radius:10px;padding:10px 22px;font-weight:800;cursor:pointer;font-family:inherit;font-size:.92rem;}
+.msg-abs-confirm-btn-yes{background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;box-shadow:0 3px 10px rgba(46,125,50,.3);}
+.msg-abs-confirm-btn-yes:hover{filter:brightness(1.05);}
+.msg-abs-confirm-btn-no{background:#eceff1;color:#455A64;}
+.msg-abs-confirm-btn-no:hover{background:#cfd8dc;}
+.msg-abs-undo{position:fixed;left:0;right:0;bottom:0;background:#37474f;color:#eceff1;font-size:.82rem;padding:9px 16px;display:none;align-items:center;justify-content:center;gap:10px;z-index:10000;font-weight:600;cursor:pointer;transform:translateY(100%);transition:transform .25s ease, opacity .25s ease;opacity:0;box-shadow:0 -2px 12px rgba(0,0,0,.2);}
+.msg-abs-undo.show{display:flex;transform:translateY(0);opacity:1;}
+.msg-abs-undo:hover{background:#455a64;}
+.msg-abs-undo-count{opacity:.7;font-variant-numeric:tabular-nums;min-width:24px;text-align:left;}
+
 
 
 .msg-cat-header{font-weight:800;color:#4a148c;margin:14px 0 8px;font-size:1rem;border-bottom:1.5px dashed #d1c4e9;padding-bottom:5px;}
@@ -1421,6 +1450,28 @@ function srSave(){
       <button class="msg-close" onclick="msgCloseAbsence()">&times;</button>
     </div>
     <div class="msg-body">
+      <div class="msg-abs-stats">
+        <div class="msg-abs-stat msg-abs-stat-absent">
+          <div class="msg-abs-stat-top"><span class="msg-abs-stat-icon">&#x1F534;</span></div>
+          <div class="msg-abs-stat-num" id="msg-abs-gs-absent">&ndash;</div>
+          <div class="msg-abs-stat-lbl">&#x63A;&#x627;&#x626;&#x628;&#x648;&#x646; &#x627;&#x644;&#x64A;&#x648;&#x645;</div>
+        </div>
+        <div class="msg-abs-stat msg-abs-stat-late">
+          <div class="msg-abs-stat-top"><span class="msg-abs-stat-icon">&#x23F0;</span></div>
+          <div class="msg-abs-stat-num" id="msg-abs-gs-late">&ndash;</div>
+          <div class="msg-abs-stat-lbl">&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646; &#x627;&#x644;&#x64A;&#x648;&#x645;</div>
+        </div>
+        <div class="msg-abs-stat msg-abs-stat-sent">
+          <div class="msg-abs-stat-top"><span class="msg-abs-stat-icon">&#x2705;</span></div>
+          <div class="msg-abs-stat-num" id="msg-abs-gs-sent">&ndash;</div>
+          <div class="msg-abs-stat-lbl">&#x62A;&#x645; &#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x626;&#x644; (&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A;)</div>
+        </div>
+        <div class="msg-abs-stat msg-abs-stat-never">
+          <div class="msg-abs-stat-top"><span class="msg-abs-stat-icon">&#x26A0;&#xFE0F;</span></div>
+          <div class="msg-abs-stat-num" id="msg-abs-gs-never">&ndash;</div>
+          <div class="msg-abs-stat-lbl">&#x644;&#x645; &#x62A;&#x64F;&#x631;&#x633;&#x644; &#x644;&#x647;&#x645; &#x631;&#x633;&#x627;&#x626;&#x644; (&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A;)</div>
+        </div>
+      </div>
       <div class="msg-form-grid">
         <div>
           <label class="msg-label" for="msg-abs-date" style="margin:0 0 4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label>
@@ -1430,6 +1481,7 @@ function srSave(){
           <label class="msg-label" for="msg-abs-group" style="margin:0 0 4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
           <select id="msg-abs-group" class="msg-select" onchange="msgAbsenceLoad()">
             <option value="">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x2014;</option>
+            <option value="__all__">&#x1F310; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</option>
           </select>
         </div>
       </div>
@@ -1467,6 +1519,20 @@ function srSave(){
       </div>
     </div>
   </div>
+</div>
+<div id="msg-abs-confirm" class="msg-abs-confirm">
+  <div class="msg-abs-confirm-box">
+    <div class="msg-abs-confirm-title">&#x647;&#x644; &#x623;&#x631;&#x633;&#x644;&#x62A; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629; &#x641;&#x639;&#x644;&#x627;&#x64B;&#x61F;</div>
+    <div class="msg-abs-confirm-sub" id="msg-abs-confirm-name"></div>
+    <div class="msg-abs-confirm-btns">
+      <button type="button" id="msg-abs-confirm-no"  class="msg-abs-confirm-btn msg-abs-confirm-btn-no">&#x644;&#x627; &#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button type="button" id="msg-abs-confirm-yes" class="msg-abs-confirm-btn msg-abs-confirm-btn-yes">&#x646;&#x639;&#x645; &#x623;&#x631;&#x633;&#x644;&#x62A;</button>
+    </div>
+  </div>
+</div>
+<div id="msg-abs-undo" class="msg-abs-undo">
+  <span id="msg-abs-undo-text"></span>
+  <span id="msg-abs-undo-count" class="msg-abs-undo-count"></span>
 </div>
 <script>
 var _msgGroups = [];
@@ -1954,9 +2020,15 @@ function _msgFireReminder(r){
 
 var _msgAbsenceRows = [];
 var _msgAbsenceFilter = 'unsent';
+var _MSG_ABS_DAYS = ['\u0627\u0644\u0623\u062D\u062F','\u0627\u0644\u0627\u062B\u0646\u064A\u0646','\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621','\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621','\u0627\u0644\u062E\u0645\u064A\u0633','\u0627\u0644\u062C\u0645\u0639\u0629','\u0627\u0644\u0633\u0628\u062A'];
+var _msgAbsUndoTimeout = null;
+var _msgAbsUndoTick = null;
+var _msgAbsUndoActive = false;
+
 function msgOpenAbsence(){
   document.getElementById('msg-abs-modal').style.display = 'block';
   _msgAbsencePopulateGroups();
+  _msgAbsenceRefreshGeneralStats();
   var d = document.getElementById('msg-abs-date');
   if (!d.value) {
     var now = new Date();
@@ -1969,9 +2041,13 @@ function msgOpenAbsence(){
   if (document.getElementById('msg-abs-group').value) msgAbsenceLoad();
   else _msgAbsenceResetView('\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629');
 }
-function msgCloseAbsence(){ document.getElementById('msg-abs-modal').style.display = 'none'; }
+function msgCloseAbsence(){
+  document.getElementById('msg-abs-modal').style.display = 'none';
+  _msgAbsenceHideUndo();
+}
+
 function _msgAbsenceResetView(message){
-  var alert = document.getElementById('msg-abs-alert'); alert.style.display = 'none';
+  document.getElementById('msg-abs-alert').style.display = 'none';
   document.getElementById('msg-abs-filters').style.display = 'none';
   document.getElementById('msg-abs-section-unsent').style.display = 'none';
   document.getElementById('msg-abs-section-sent').style.display = 'none';
@@ -1979,31 +2055,52 @@ function _msgAbsenceResetView(message){
   if (message) { status.style.display = 'block'; status.textContent = message; }
   else { status.style.display = 'none'; }
 }
+
 function _msgAbsencePopulateGroups(){
   var sel = document.getElementById('msg-abs-group'); if (!sel) return;
   var previous = sel.value;
-  var placeholder = sel.options[0];
+  // Preserve the two fixed options at the top: the placeholder and جميع المجموعات.
+  var keep = [];
+  for (var i=0; i<sel.options.length; i++) {
+    var v = sel.options[i].value;
+    if (v === '' || v === '__all__') keep.push(sel.options[i].cloneNode(true));
+  }
   fetch('/api/attendance/groups',{credentials:'include'}).then(function(r){ return r.json(); }).then(function(data){
-    sel.innerHTML = ''; if (placeholder) sel.appendChild(placeholder);
+    sel.innerHTML = '';
+    keep.forEach(function(o){ sel.appendChild(o); });
     (Array.isArray(data) ? data : []).forEach(function(n){
       n = (n || '').trim(); if (!n) return;
       sel.appendChild(new Option(n, n));
     });
     if (previous) {
-      for (var i=0; i<sel.options.length; i++) { if (sel.options[i].value === previous) { sel.value = previous; break; } }
+      for (var j=0; j<sel.options.length; j++) { if (sel.options[j].value === previous) { sel.value = previous; break; } }
     }
   }).catch(function(){});
 }
+
+function _msgAbsenceRefreshGeneralStats(){
+  var today = (document.getElementById('msg-abs-date') && document.getElementById('msg-abs-date').value) || '';
+  var url = '/api/attendance/general-stats' + (today ? ('?today=' + encodeURIComponent(today)) : '');
+  fetch(url, {credentials:'include'}).then(function(r){ return r.json(); }).then(function(d){
+    if (!d) return;
+    document.getElementById('msg-abs-gs-absent').textContent = d.absent_today != null ? d.absent_today : '-';
+    document.getElementById('msg-abs-gs-late').textContent   = d.late_today != null   ? d.late_today   : '-';
+    document.getElementById('msg-abs-gs-sent').textContent   = d.sent_ever != null    ? d.sent_ever    : '-';
+    document.getElementById('msg-abs-gs-never').textContent  = d.never_sent != null   ? d.never_sent   : '-';
+  }).catch(function(){});
+}
+
 function msgAbsenceLoad(){
   var d = document.getElementById('msg-abs-date').value;
   var g = document.getElementById('msg-abs-group').value;
+  // "Today" shown in the stats strip follows the picker.
+  _msgAbsenceRefreshGeneralStats();
   if (!d || !g) { _msgAbsenceResetView('\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629'); return; }
   _msgAbsenceResetView('\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...');
   fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(d) + '&group=' + encodeURIComponent(g), { credentials:'include' })
     .then(function(r){ return r.json(); })
     .then(function(data){
       var rows = (data && data.rows) || [];
-      // Keep only الغائب / المتأخر rows — we don't message حاضر / معتذر.
       _msgAbsenceRows = rows.filter(function(r){ var s = (r.status||'').trim(); return s === '\u063A\u0627\u0626\u0628' || s === '\u0645\u062A\u0623\u062E\u0631'; });
       if (!_msgAbsenceRows.length) { _msgAbsenceResetView('\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u063A\u064A\u0627\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645'); return; }
       document.getElementById('msg-abs-status').style.display = 'none';
@@ -2012,10 +2109,11 @@ function msgAbsenceLoad(){
     })
     .catch(function(){ _msgAbsenceResetView('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644'); });
 }
+
 function _msgAbsenceIsSent(r){ return (r.message_status || '').trim() === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644'; }
 function _msgAbsenceStatusKind(r){ return ((r.status || '').trim() === '\u0645\u062A\u0623\u062E\u0631') ? 'late' : 'absent'; }
+
 function _msgAbsenceSortRows(rows){
-  // Unsent first, then sent. Within each group, absent-first, then late, then by name.
   return rows.slice().sort(function(a,b){
     var sa = _msgAbsenceIsSent(a) ? 1 : 0;
     var sb = _msgAbsenceIsSent(b) ? 1 : 0;
@@ -2025,6 +2123,7 @@ function _msgAbsenceSortRows(rows){
     return (a.student_name || '').localeCompare(b.student_name || '');
   });
 }
+
 function _msgAbsenceRender(){
   var sorted = _msgAbsenceSortRows(_msgAbsenceRows);
   var unsentList = document.getElementById('msg-abs-unsent-list');
@@ -2039,6 +2138,7 @@ function _msgAbsenceRender(){
   _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent);
   _msgAbsenceApplyFilter();
 }
+
 function _msgAbsenceBuildCard(r){
   var card = document.createElement('div');
   card.className = 'msg-abs-card';
@@ -2049,7 +2149,12 @@ function _msgAbsenceBuildCard(r){
   if (card.dataset.sent === '1') card.classList.add('is-sent');
   var left = document.createElement('div'); left.className = 'msg-abs-card-left';
   var nameEl = document.createElement('div'); nameEl.className = 'msg-abs-card-name';
-  nameEl.textContent = r.student_name || '-';
+  // With the "all groups" option, surface the group name next to each student.
+  var nameLabel = r.student_name || '-';
+  if (document.getElementById('msg-abs-group').value === '__all__' && r.group_name) {
+    nameLabel += ' · ' + r.group_name;
+  }
+  nameEl.textContent = nameLabel;
   left.appendChild(nameEl);
   var meta = document.createElement('div'); meta.className = 'msg-abs-card-meta';
   var badge = document.createElement('span');
@@ -2079,13 +2184,14 @@ function _msgAbsenceBuildCard(r){
   card.appendChild(right);
   return card;
 }
+
 function _msgAbsenceFormatDate(raw){
-  // Server returns 'YYYY-MM-DD HH:MM:SS' or an ISO string. Keep the date + HH:MM for brevity.
   if (!raw) return '';
   var s = String(raw).replace('T',' ');
   var m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
   return m ? (m[1] + ' ' + m[2]) : s;
 }
+
 function _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent){
   var nUnsent = nUnsentAbs + nUnsentLate;
   document.getElementById('msg-abs-unsent-count').textContent = nUnsent;
@@ -2104,121 +2210,226 @@ function _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent){
     alert.innerHTML = '&#x1F534; <span><b>' + nUnsentAbs + '</b>' + ' \u063A\u0627\u0626\u0628\u064A\u0646 \u0648 ' + '<b>' + nUnsentLate + '</b>' + ' \u0645\u062A\u0623\u062E\u0631\u064A\u0646 \u0628\u062F\u0648\u0646 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u064A\u0648\u0645' + '</span>';
   }
 }
+
 function _msgAbsenceSetFilterButton(filter){
-  var btns = document.querySelectorAll('.msg-abs-filter');
-  btns.forEach(function(b){ b.classList.toggle('active', b.dataset.filter === filter); });
+  document.querySelectorAll('.msg-abs-filter').forEach(function(b){
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
 }
 function msgAbsenceSetFilter(filter){
   _msgAbsenceFilter = filter;
   _msgAbsenceSetFilterButton(filter);
   _msgAbsenceApplyFilter();
 }
+
 function _msgAbsenceApplyFilter(){
   var unsent = document.getElementById('msg-abs-section-unsent');
   var sent = document.getElementById('msg-abs-section-sent');
   var f = _msgAbsenceFilter;
   var showUnsent = (f === 'unsent' || f === 'all');
   var showSent   = (f === 'sent'   || f === 'all');
-  // Hide entire section only if it has zero cards; otherwise the header
-  // stays visible so the count remains in view.
   var uHas = !!document.querySelector('#msg-abs-unsent-list .msg-abs-card');
   var sHas = !!document.querySelector('#msg-abs-sent-list .msg-abs-card');
   unsent.style.display = (showUnsent && uHas) ? 'block' : 'none';
   sent.style.display   = (showSent   && sHas) ? 'block' : 'none';
-  var bulk = document.getElementById('msg-abs-bulk-btn');
-  // Bulk send only makes sense on the unsent side; hide it otherwise.
-  bulk.style.display = (f !== 'sent' && uHas) ? 'inline-flex' : 'none';
-  // When the filter has nothing to show (e.g. unsent view but everyone
-  // already received their message), surface a friendly status line.
+  document.getElementById('msg-abs-bulk-btn').style.display = (f !== 'sent' && uHas) ? 'inline-flex' : 'none';
   var status = document.getElementById('msg-abs-status');
   if (!uHas && !sHas) { status.style.display = 'block'; status.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629'; return; }
   if (f === 'unsent' && !uHas) { status.style.display = 'block'; status.textContent = '\u0643\u0644 \u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u062A\u0645 \u0625\u0631\u0633\u0627\u0644\u0647\u0627'; return; }
   if (f === 'sent'   && !sHas) { status.style.display = 'block'; status.textContent = '\u0644\u0645 \u064A\u062A\u0645 \u0625\u0631\u0633\u0627\u0644 \u0623\u064A \u0631\u0633\u0627\u0644\u0629 \u0628\u0639\u062F'; return; }
   status.style.display = 'none';
 }
+
+function _msgAbsenceDayName(dateStr){
+  if (!dateStr) return '';
+  var m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  // Use explicit year/month/day and UTC to avoid timezone drift around midnight.
+  var d = new Date(Date.UTC(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)));
+  if (isNaN(d)) return '';
+  return _MSG_ABS_DAYS[d.getUTCDay()];
+}
+
 function _msgAbsenceMessage(row){
   var kind = _msgAbsenceStatusKind(row);
   var name = row.student_name || '';
-  if (kind === 'late') return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u062A\u0623\u062E\u0631/\u062A \u0639\u0646 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u064A\u0648\u0645';
-  return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u0643\u0627\u0646/\u062A \u063A\u0627\u0626\u0628\u0627\u064B/\u0629 \u0627\u0644\u064A\u0648\u0645';
+  var date = row.attendance_date || '';
+  var day = _msgAbsenceDayName(date);
+  var dayPhrase = day ? ('\u064A\u0648\u0645 ' + day + ' \u0627\u0644\u0645\u0648\u0627\u0641\u0642 ' + date) : date;
+  if (kind === 'late') return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u062A\u0623\u062E\u0631/\u062A \u0639\u0646 \u0627\u0644\u062D\u0636\u0648\u0631 ' + dayPhrase;
+  return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u0643\u0627\u0646/\u062A \u063A\u0627\u0626\u0628\u0627\u064B/\u0629 ' + dayPhrase;
 }
+
 function _msgAbsenceTemplateName(row){
   return _msgAbsenceStatusKind(row) === 'late' ? '\u062A\u0623\u062E\u064A\u0631' : '\u063A\u064A\u0627\u0628';
 }
-function _msgAbsenceLogSend(row, phone){
+
+function _msgAbsenceLogSend(row, phone, cb){
   var body = { student_name: row.student_name || '', student_whatsapp: phone || (row.whatsapp || ''), template_name: _msgAbsenceTemplateName(row) };
-  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) }).catch(function(){});
+  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (typeof cb === 'function') cb((d && d.id) || null); })
+    .catch(function(){ if (typeof cb === 'function') cb(null); });
 }
+
 function _msgAbsenceMarkSent(row){
   if (!row || !row.id) return;
   fetch('/api/attendance/' + row.id + '/mark-sent', { method:'POST', credentials:'include' }).catch(function(){});
 }
-function _msgAbsenceTransitionToSent(row){
-  var card = document.querySelector('.msg-abs-card[data-att-id="' + row.id + '"]');
-  if (!card || card.dataset.sent === '1') return;
-  // Phase 1: fade + slide out of its current spot.
-  card.classList.add('leaving');
-  setTimeout(function(){
-    // Update local row state.
-    row.message_status = '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644';
-    row.last_sent = _msgAbsenceNowString();
-    // Rebuild the card so badges / meta reflect the new state.
-    var fresh = _msgAbsenceBuildCard(row);
-    fresh.classList.add('arriving');
-    var sentList = document.getElementById('msg-abs-sent-list');
-    sentList.appendChild(fresh);
-    card.parentNode && card.parentNode.removeChild(card);
-    // Recompute counts/alert.
-    var nUnsentAbs = 0, nUnsentLate = 0, nSent = 0;
-    _msgAbsenceRows.forEach(function(r){
-      if (_msgAbsenceIsSent(r)) nSent++;
-      else if (_msgAbsenceStatusKind(r) === 'late') nUnsentLate++;
-      else nUnsentAbs++;
-    });
-    _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent);
-    _msgAbsenceApplyFilter();
-    // Phase 2: fade in on the new side.
-    requestAnimationFrame(function(){ fresh.classList.remove('arriving'); });
-  }, 320);
+
+function _msgAbsenceUnmarkSent(row){
+  if (!row || !row.id) return;
+  fetch('/api/attendance/' + row.id + '/unmark-sent', { method:'POST', credentials:'include' }).catch(function(){});
 }
+
 function _msgAbsenceNowString(){
   var d = new Date();
   function p(n){ return String(n).padStart(2,'0'); }
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
 }
+
+function _msgAbsenceRecomputeCounts(){
+  var nUnsentAbs = 0, nUnsentLate = 0, nSent = 0;
+  _msgAbsenceRows.forEach(function(r){
+    if (_msgAbsenceIsSent(r)) nSent++;
+    else if (_msgAbsenceStatusKind(r) === 'late') nUnsentLate++;
+    else nUnsentAbs++;
+  });
+  _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent);
+  _msgAbsenceApplyFilter();
+}
+
+function _msgAbsenceTransition(row, toSent){
+  var card = document.querySelector('.msg-abs-card[data-att-id="' + row.id + '"]');
+  if (!card) return;
+  if ((toSent && card.dataset.sent === '1') || (!toSent && card.dataset.sent === '0')) return;
+  card.classList.add('leaving');
+  setTimeout(function(){
+    var fresh = _msgAbsenceBuildCard(row);
+    fresh.classList.add('arriving');
+    var target = document.getElementById(toSent ? 'msg-abs-sent-list' : 'msg-abs-unsent-list');
+    target.appendChild(fresh);
+    card.parentNode && card.parentNode.removeChild(card);
+    _msgAbsenceRecomputeCounts();
+    requestAnimationFrame(function(){ fresh.classList.remove('arriving'); });
+  }, 320);
+}
+
+function _msgAbsenceShowConfirm(row, onYes){
+  var box = document.getElementById('msg-abs-confirm');
+  document.getElementById('msg-abs-confirm-name').textContent = row.student_name || '';
+  box.classList.add('show');
+  var yes = document.getElementById('msg-abs-confirm-yes');
+  var no = document.getElementById('msg-abs-confirm-no');
+  function cleanup(){ box.classList.remove('show'); yes.onclick = null; no.onclick = null; }
+  yes.onclick = function(){ cleanup(); onYes(); };
+  no.onclick = function(){ cleanup(); };
+}
+
+function _msgAbsenceHideUndo(){
+  if (_msgAbsUndoTimeout) { clearTimeout(_msgAbsUndoTimeout); _msgAbsUndoTimeout = null; }
+  if (_msgAbsUndoTick)    { clearInterval(_msgAbsUndoTick); _msgAbsUndoTick = null; }
+  var bar = document.getElementById('msg-abs-undo');
+  bar.classList.remove('show');
+  _msgAbsUndoActive = false;
+  setTimeout(function(){ if (!bar.classList.contains('show')) bar.style.display = 'none'; }, 280);
+  bar.onclick = null;
+}
+
+function _msgAbsenceShowUndo(label, onUndo){
+  _msgAbsenceHideUndo();
+  var bar = document.getElementById('msg-abs-undo');
+  var text = document.getElementById('msg-abs-undo-text');
+  var count = document.getElementById('msg-abs-undo-count');
+  var secs = 30;
+  text.textContent = '\u21A9 \u062A\u0631\u0627\u062C\u0639 \u2014 ' + label;
+  count.textContent = '(' + secs + ')';
+  bar.style.display = 'flex';
+  _msgAbsUndoActive = true;
+  requestAnimationFrame(function(){ bar.classList.add('show'); });
+  bar.onclick = function(){
+    if (!_msgAbsUndoActive) return;
+    _msgAbsenceHideUndo();
+    if (typeof onUndo === 'function') onUndo();
+  };
+  _msgAbsUndoTick = setInterval(function(){
+    secs--;
+    if (secs <= 0) { _msgAbsenceHideUndo(); return; }
+    count.textContent = '(' + secs + ')';
+  }, 1000);
+  _msgAbsUndoTimeout = setTimeout(function(){ _msgAbsenceHideUndo(); }, secs * 1000);
+}
+
+function _msgAbsenceUndoRow(row){
+  // Remove the log entry this toast owns (if any), unmark attendance,
+  // clear local last-sent if we were the one that set it, and bounce
+  // the card back to the unsent list.
+  if (row._last_log_id) {
+    fetch('/api/message-log/' + row._last_log_id, { method:'DELETE', credentials:'include' }).catch(function(){});
+    row._last_log_id = null;
+  }
+  _msgAbsenceUnmarkSent(row);
+  row.message_status = '';
+  if (row._last_sent_was_self) { row.last_sent = row._prior_last_sent || null; row._last_sent_was_self = false; }
+  _msgAbsenceTransition(row, false);
+  _msgAbsenceRefreshGeneralStats();
+}
+
+function _msgAbsenceSendAndMark(row){
+  var phone = _msgCleanPhone(row.whatsapp); if (!phone) return;
+  _msgAbsenceLogSend(row, phone, function(logId){ row._last_log_id = logId; });
+  _msgAbsenceMarkSent(row);
+  row._prior_last_sent = row.last_sent;
+  row._last_sent_was_self = true;
+  row.message_status = '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644';
+  row.last_sent = _msgAbsenceNowString();
+  _msgAbsenceTransition(row, true);
+  _msgAbsenceRefreshGeneralStats();
+}
+
 function _msgAbsenceOpenWa(row){
   var phone = _msgCleanPhone(row.whatsapp); if (!phone) return;
   var text = _msgAbsenceMessage(row);
+  // 1) Fire the wa.me open inside the user gesture so the popup isn't blocked.
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
-  _msgAbsenceLogSend(row, phone);
-  _msgAbsenceMarkSent(row);
-  _msgAbsenceTransitionToSent(row);
-}
-function _msgAbsenceVisibleTargets(){
-  // Only open links for rows visible under the current filter AND still
-  // unsent AND carrying a valid phone.
-  var f = _msgAbsenceFilter;
-  return _msgAbsenceRows.filter(function(r){
-    if (_msgAbsenceIsSent(r)) return false; // never bulk-send to already-sent
-    if (!_msgCleanPhone(r.whatsapp)) return false;
-    if (f === 'sent') return false;
-    return true; // 'unsent' and 'all' both include unsent rows
+  // 2) Ask whether the user actually sent it. Marking + logging only happen on yes.
+  _msgAbsenceShowConfirm(row, function(){
+    _msgAbsenceSendAndMark(row);
+    _msgAbsenceShowUndo((row.student_name || ''), function(){ _msgAbsenceUndoRow(row); });
   });
 }
+
+function _msgAbsenceVisibleTargets(){
+  var f = _msgAbsenceFilter;
+  return _msgAbsenceRows.filter(function(r){
+    if (_msgAbsenceIsSent(r)) return false;
+    if (!_msgCleanPhone(r.whatsapp)) return false;
+    if (f === 'sent') return false;
+    return true;
+  });
+}
+
 function msgAbsenceBulk(){
   var targets = _msgAbsenceVisibleTargets();
   if (!targets.length) { alert('\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0645\u0637\u0627\u0628\u0642\u0648\u0646 \u0644\u0644\u0641\u0644\u062A\u0631 \u0627\u0644\u062D\u0627\u0644\u064A'); return; }
   if (targets.length > 1 && !confirm('\u0633\u064A\u062A\u0645 \u0641\u062A\u062D \u0639\u062F\u0629 \u0646\u0648\u0627\u0641\u0630 \u0648\u0627\u062A\u0633\u0627\u0628 \u2014 \u0647\u0644 \u062A\u0631\u064A\u062F \u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629\u061F')) return;
+  // Open all wa.me URLs first (stagger so popup blockers don't nuke them),
+  // then auto-mark+log without per-row confirmation. The undo toast acts as
+  // the single recovery surface.
   targets.forEach(function(row, idx){
     setTimeout(function(){
       var phone = _msgCleanPhone(row.whatsapp);
       var text = _msgAbsenceMessage(row);
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
-      _msgAbsenceLogSend(row, phone);
-      _msgAbsenceMarkSent(row);
-      _msgAbsenceTransitionToSent(row);
+      _msgAbsenceSendAndMark(row);
     }, idx * 400);
   });
+  // Show one grouped undo toast once the last send has fired.
+  setTimeout(function(){
+    _msgAbsenceShowUndo(targets.length + ' \u0637\u0644\u0627\u0628', function(){
+      targets.forEach(function(row){ _msgAbsenceUndoRow(row); });
+    });
+  }, targets.length * 400 + 100);
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msgStartScheduler);
@@ -5939,23 +6150,30 @@ def api_attendance_delete(rid):
 def api_attendance_by_date_group():
     date = request.args.get('date', '')
     group = request.args.get('group', '')
-    if not date or not group:
+    if not date:
         return jsonify({"rows": []})
     db = get_db()
-    rows = db.execute(
-        """SELECT a.id, a.attendance_date, a.group_name, a.student_name, a.status,
-                  a.message_status, s.whatsapp, ml.last_sent
-             FROM attendance a
-             LEFT JOIN students s ON s.student_name = a.student_name
-             LEFT JOIN (
-                 SELECT student_name, MAX(sent_at) AS last_sent
-                   FROM message_log
-                  GROUP BY student_name
-             ) ml ON ml.student_name = a.student_name
-            WHERE a.attendance_date=? AND a.group_name=?
-            ORDER BY a.student_name""",
-        (date, group)
-    ).fetchall()
+    base = (
+        "SELECT a.id, a.attendance_date, a.group_name, a.student_name, a.status, "
+        "       a.message_status, s.whatsapp, ml.last_sent "
+        "  FROM attendance a "
+        "  LEFT JOIN students s ON s.student_name = a.student_name "
+        "  LEFT JOIN ( "
+        "      SELECT student_name, MAX(sent_at) AS last_sent "
+        "        FROM message_log "
+        "       GROUP BY student_name "
+        "  ) ml ON ml.student_name = a.student_name "
+    )
+    if group == '__all__' or group == '':
+        rows = db.execute(
+            base + "WHERE a.attendance_date=? ORDER BY a.group_name, a.student_name",
+            (date,)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            base + "WHERE a.attendance_date=? AND a.group_name=? ORDER BY a.student_name",
+            (date, group)
+        ).fetchall()
     return jsonify({"rows": [dict(r) for r in rows]})
 
 @app.route('/api/attendance/<int:rid>/mark-sent', methods=['POST'])
@@ -5963,13 +6181,56 @@ def api_attendance_by_date_group():
 def api_attendance_mark_sent(rid):
     db = get_db()
     try:
-        # "تم الإرسال" == "تم الإرسال"
         db.execute("UPDATE attendance SET message_status=? WHERE id=?",
                    ("تم الإرسال", rid))
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route('/api/attendance/<int:rid>/unmark-sent', methods=['POST'])
+@login_required
+def api_attendance_unmark_sent(rid):
+    db = get_db()
+    try:
+        db.execute("UPDATE attendance SET message_status=? WHERE id=?", ('', rid))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route('/api/attendance/general-stats', methods=['GET'])
+@login_required
+def api_attendance_general_stats():
+    today = (request.args.get('today') or '').strip()
+    if not today:
+        from datetime import date as _date
+        today = _date.today().isoformat()
+    db = get_db()
+    absent_today = db.execute(
+        "SELECT COUNT(*) FROM attendance WHERE attendance_date=? AND status=?",
+        (today, 'غائب')
+    ).fetchone()[0]
+    late_today = db.execute(
+        "SELECT COUNT(*) FROM attendance WHERE attendance_date=? AND status=?",
+        (today, 'متأخر')
+    ).fetchone()[0]
+    sent_ever = db.execute(
+        "SELECT COUNT(DISTINCT student_name) FROM message_log "
+        "WHERE student_name IS NOT NULL AND student_name != ''"
+    ).fetchone()[0]
+    total_students = db.execute(
+        "SELECT COUNT(*) FROM students "
+        "WHERE student_name IS NOT NULL AND student_name != ''"
+    ).fetchone()[0]
+    never_sent = max(0, total_students - sent_ever)
+    return jsonify({
+        "today": today,
+        "absent_today": absent_today,
+        "late_today": late_today,
+        "sent_ever": sent_ever,
+        "never_sent": never_sent,
+    })
 
 
 
@@ -7067,7 +7328,21 @@ def api_message_log_add():
         (d.get('student_name') or '', d.get('student_whatsapp') or '', d.get('template_name') or '')
     )
     db.commit()
-    return jsonify({"ok": True})
+    # Return the new row id so callers (e.g. undo toasts) can remove exactly
+    # the log entry they created if the user changes their mind.
+    new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    return jsonify({"ok": True, "id": new_id})
+
+@app.route('/api/message-log/<int:lid>', methods=['DELETE'])
+@login_required
+def api_message_log_delete(lid):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM message_log WHERE id=?", (lid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
 
 @app.route('/api/message-reminders', methods=['GET'])
 @login_required
