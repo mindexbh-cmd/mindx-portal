@@ -1247,8 +1247,8 @@ function srSave(){
       <div id="msg-hub">
         <div class="msg-actions-row">
           <button type="button" class="msg-action-btn mab-teal" onclick="msgShowComposer()">
-            <span class="mab-title">&#x1F551; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x648;&#x642;&#x62A; &#x648;&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</span>
-            <span class="mab-desc">&#x642;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x644;&#x629; &#x644;&#x625;&#x628;&#x644;&#x627;&#x63A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x628;&#x648;&#x642;&#x62A; &#x648;&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</span>
+            <span class="mab-title">&#x1F4E4; &#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x644;&#x629;</span>
+            <span class="mab-desc">&#x643;&#x62A;&#x627;&#x628;&#x629; &#x631;&#x633;&#x627;&#x644;&#x629; &#x648;&#x625;&#x631;&#x633;&#x627;&#x644;&#x647;&#x627; &#x644;&#x637;&#x644;&#x628;&#x629; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</span>
           </button>
           <button type="button" class="msg-action-btn mab-purple" onclick="msgOpenLog()">
             <span class="mab-title">&#x1F4DC; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</span>
@@ -1267,6 +1267,10 @@ function srSave(){
           <span class="spacer"></span>
           <button type="button" class="msg-save-tpl" onclick="msgOpenSaveDialog()">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</button>
         </div>
+        <label class="msg-label" for="msg-tpl-picker">&#x1F4DA; &#x627;&#x62E;&#x62A;&#x631; &#x642;&#x627;&#x644;&#x628;&#x627;&#x64B; &#x645;&#x62D;&#x641;&#x648;&#x638;&#x627;&#x64B;</label>
+        <select id="msg-tpl-picker" class="msg-select" onchange="msgLoadTemplateFromPicker(this)">
+          <option value="">&mdash; &#x627;&#x628;&#x62F;&#x623; &#x631;&#x633;&#x627;&#x644;&#x629; &#x62C;&#x62F;&#x64A;&#x62F;&#x629; &#x623;&#x648; &#x627;&#x62E;&#x62A;&#x631; &#x642;&#x627;&#x644;&#x628;&#x627;&#x64B; &mdash;</option>
+        </select>
         <label class="msg-label" for="msg-text">&#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label>
         <textarea id="msg-text" class="msg-textarea" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x642;&#x627;&#x644;&#x628; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;&#x2026;"></textarea>
         <div class="msg-vars">
@@ -1595,7 +1599,42 @@ function _msgRefreshTemplates(){
     _msgTemplates = (d && d.templates) || [];
     _msgRenderTemplateList();
     _msgPopulateReminderTemplateSelect();
+    _msgPopulateTemplatePicker();
   });
+}
+function _msgPopulateTemplatePicker(){
+  var sel = document.getElementById('msg-tpl-picker'); if (!sel) return;
+  var prev = sel.value;
+  sel.innerHTML = '';
+  sel.appendChild(new Option('\u2014 \u0627\u0628\u062F\u0623 \u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629 \u0623\u0648 \u0627\u062E\u062A\u0631 \u0642\u0627\u0644\u0628\u0627\u064B \u2014', ''));
+  if (!_msgTemplates.length) return;
+  var byCat = {};
+  _msgTemplates.forEach(function(t){
+    var cat = t.category || _MSG_CATEGORIES[_MSG_CATEGORIES.length - 1];
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(t);
+  });
+  var order = _MSG_CATEGORIES.slice();
+  Object.keys(byCat).forEach(function(c){ if (order.indexOf(c) < 0) order.push(c); });
+  order.forEach(function(cat){
+    var rows = byCat[cat] || []; if (!rows.length) return;
+    var og = document.createElement('optgroup'); og.label = cat;
+    rows.forEach(function(t){ og.appendChild(new Option(t.name || '-', String(t.id))); });
+    sel.appendChild(og);
+  });
+  // Preserve previous selection if the template still exists.
+  if (prev) {
+    for (var i=0; i<sel.options.length; i++) { if (sel.options[i].value === prev) { sel.value = prev; return; } }
+  }
+}
+function msgLoadTemplateFromPicker(sel){
+  var id = sel.value;
+  if (!id) return;
+  var tpl = null;
+  for (var i=0; i<_msgTemplates.length; i++) { if (String(_msgTemplates[i].id) === String(id)) { tpl = _msgTemplates[i]; break; } }
+  if (!tpl) return;
+  _msgCurrentTemplateName = tpl.name || '';
+  document.getElementById('msg-text').value = tpl.content || '';
 }
 function _msgRenderTemplateList(){
   var wrap = document.getElementById('msg-tpl-wrap');
@@ -1634,6 +1673,7 @@ function _msgRenderTemplateList(){
 function _msgLoadTemplate(t){
   _msgCurrentTemplateName = t.name || '';
   document.getElementById('msg-text').value = t.content || '';
+  var pick = document.getElementById('msg-tpl-picker'); if (pick) pick.value = String(t.id || '');
   msgShowComposer();
 }
 function _msgDeleteTemplate(id){
