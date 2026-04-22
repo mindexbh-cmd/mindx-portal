@@ -321,6 +321,30 @@ def init_db():
         session_type TEXT DEFAULT '',
         UNIQUE(group_name, session_date)
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS message_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        category TEXT,
+        content TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS message_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_name TEXT,
+        student_whatsapp TEXT,
+        template_name TEXT,
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS message_reminders(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        day_of_week INTEGER,
+        time_of_day TEXT,
+        template_id INTEGER,
+        group_name TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     db.commit()
     db.close()
 
@@ -542,6 +566,30 @@ if True:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_id INTEGER,
         row_data TEXT DEFAULT '{}')""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS message_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        category TEXT,
+        content TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS message_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_name TEXT,
+        student_whatsapp TEXT,
+        template_name TEXT,
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS message_reminders(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        day_of_week INTEGER,
+        time_of_day TEXT,
+        template_id INTEGER,
+        group_name TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     # Add paid1..paid12 columns to taqseet if missing
     tq_existing = [row[1] for row in db2.execute("PRAGMA table_info(taqseet)").fetchall()]
     for pn in range(1, 13):
@@ -1120,18 +1168,34 @@ function srSave(){
 
 <style>
 .msg-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;}
-.msg-box{background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);}
+.msg-box{background:#fff;margin:20px auto;border-radius:14px;max-width:780px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);}
 .msg-header{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
 .msg-header-title{color:#fff;font-size:1.2rem;font-weight:bold;display:flex;align-items:center;gap:8px;}
 .msg-header .msg-close{color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;background:none;border:none;padding:0;}
-.msg-body{padding:18px 22px;max-height:78vh;overflow:auto;}
-.msg-hub-card{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:14px;cursor:pointer;width:100%;text-align:right;font-family:inherit;box-shadow:0 4px 14px rgba(0,137,123,.18);transition:transform .15s,box-shadow .15s;}
-.msg-hub-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,137,123,.28);}
-.msg-hub-card .msg-hub-icon{font-size:30px;}
-.msg-hub-card .msg-hub-title{font-size:1.05rem;font-weight:800;}
-.msg-hub-card .msg-hub-desc{font-size:.82rem;opacity:.92;margin-top:2px;}
-.msg-back{background:#ede7f6;color:#4a148c;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;}
+.msg-body{padding:18px 22px;max-height:80vh;overflow:auto;}
+.msg-actions-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;}
+.msg-action-btn{color:#fff;border:none;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;cursor:pointer;text-align:right;font-family:inherit;font-size:inherit;box-shadow:0 4px 14px rgba(0,0,0,.08);transition:transform .15s,box-shadow .15s;}
+.msg-action-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.15);}
+.msg-action-btn .mab-title{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:6px;}
+.msg-action-btn .mab-desc{font-size:.78rem;opacity:.92;}
+.mab-teal{background:linear-gradient(135deg,#00897B,#26A69A);}
+.mab-purple{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);}
+.mab-orange{background:linear-gradient(135deg,#E65100,#FB8C00);}
+.msg-cat-header{font-weight:800;color:#4a148c;margin:14px 0 8px;font-size:1rem;border-bottom:1.5px dashed #d1c4e9;padding-bottom:5px;}
+.msg-tpl-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;}
+.msg-tpl-card{position:relative;background:#f5f0ff;border:1px solid #e1d3f7;border-radius:10px;padding:12px 14px;cursor:pointer;transition:background .12s,border-color .12s;}
+.msg-tpl-card:hover{background:#ede3ff;border-color:#b39ddb;}
+.msg-tpl-card .mtc-name{font-weight:800;color:#4a148c;font-size:.98rem;margin-bottom:3px;padding-inline-start:22px;}
+.msg-tpl-card .mtc-preview{font-size:.83rem;color:#6a5494;line-height:1.45;max-height:3em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;padding-inline-start:22px;}
+.msg-tpl-card .mtc-del{position:absolute;top:6px;inset-inline-start:6px;width:22px;height:22px;border:none;border-radius:50%;background:#fff;color:#c62828;font-weight:900;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15);line-height:22px;font-size:14px;padding:0;}
+.msg-tpl-card .mtc-del:hover{background:#ffebee;}
+.msg-tpl-empty{padding:10px;color:#888;font-size:.9rem;}
+.msg-compose-tools{display:flex;gap:8px;align-items:center;margin-bottom:4px;}
+.msg-compose-tools .spacer{flex:1;}
+.msg-back{background:#ede7f6;color:#4a148c;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;font-family:inherit;}
 .msg-back:hover{background:#d1c4e9;}
+.msg-save-tpl{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.9rem;font-family:inherit;}
+.msg-save-tpl:hover{filter:brightness(1.05);}
 .msg-label{display:block;font-weight:700;color:#4a148c;margin:14px 0 6px;font-size:.95rem;}
 .msg-textarea{width:100%;min-height:130px;padding:11px 13px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.97rem;background:#faf7ff;font-family:inherit;direction:rtl;resize:vertical;outline:none;}
 .msg-textarea:focus{border-color:#6B3FA0;background:#fff;}
@@ -1144,6 +1208,12 @@ function srSave(){
 .msg-picker-field .msg-label{margin-top:6px;}
 .msg-select{width:100%;padding:10px 12px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.95rem;background:#faf7ff;outline:none;font-family:inherit;}
 .msg-select:focus{border-color:#6B3FA0;background:#fff;}
+.msg-input{width:100%;padding:10px 12px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.95rem;background:#faf7ff;outline:none;font-family:inherit;}
+.msg-input:focus{border-color:#6B3FA0;background:#fff;}
+.msg-students-head{display:flex;justify-content:space-between;align-items:center;}
+.msg-bulk{background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.87rem;font-family:inherit;}
+.msg-bulk:hover{filter:brightness(1.05);}
+.msg-bulk:disabled{background:#bdbdbd;cursor:not-allowed;}
 .msg-student-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
 .msg-student-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f5f0ff;border:1px solid #e1d3f7;border-radius:10px;gap:10px;}
 .msg-student-name{font-weight:700;color:#4a148c;font-size:.96rem;}
@@ -1151,6 +1221,21 @@ function srSave(){
 .msg-wa:hover{filter:brightness(1.05);}
 .msg-wa-disabled{background:#bdbdbd;cursor:not-allowed;pointer-events:none;}
 .msg-empty{padding:14px;color:#888;text-align:center;font-size:.92rem;}
+.msg-log-tbl{width:100%;border-collapse:collapse;font-size:.92rem;}
+.msg-log-tbl th{background:#ede7f6;color:#4a148c;padding:8px 10px;text-align:right;border-bottom:2px solid #d1c4e9;font-size:.88rem;}
+.msg-log-tbl td{padding:7px 10px;border-bottom:1px solid #eee;}
+.msg-log-tbl tr:hover td{background:#faf7ff;}
+.msg-rem-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.msg-rem-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f5f0ff;border:1px solid #e1d3f7;border-radius:10px;gap:10px;}
+.msg-rem-row .mrr-main{font-weight:700;color:#4a148c;font-size:.95rem;}
+.msg-rem-row .mrr-meta{font-size:.8rem;color:#6a5494;margin-top:2px;}
+.msg-rem-del{background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:.82rem;font-family:inherit;}
+.msg-rem-del:hover{background:#ffcdd2;}
+.msg-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:10px;}
+.msg-submit{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:10px;padding:10px 28px;font-weight:800;cursor:pointer;font-family:inherit;font-size:.95rem;}
+.msg-submit:hover{filter:brightness(1.05);}
+.msg-submit-row{display:flex;gap:10px;justify-content:flex-end;margin-top:10px;}
+.msg-cancel{background:#ede7f6;color:#4a148c;border:none;border-radius:10px;padding:10px 22px;font-weight:700;cursor:pointer;font-family:inherit;font-size:.95rem;}
 </style>
 <div id="msg-modal" class="msg-modal">
   <div class="msg-box">
@@ -1160,17 +1245,28 @@ function srSave(){
     </div>
     <div class="msg-body">
       <div id="msg-hub">
-        <button type="button" class="msg-hub-card" onclick="msgShowComposer()">
-          <span class="msg-hub-icon">&#x1F551;</span>
-          <span style="flex:1;">
-            <span class="msg-hub-title" style="display:block;">&#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x648;&#x642;&#x62A; &#x648;&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</span>
-            <span class="msg-hub-desc" style="display:block;">&#x642;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x644;&#x629; &#x644;&#x625;&#x628;&#x644;&#x627;&#x63A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x628;&#x648;&#x642;&#x62A; &#x648;&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</span>
-          </span>
-          <span style="font-size:22px;">&#x276E;</span>
-        </button>
+        <div class="msg-actions-row">
+          <button type="button" class="msg-action-btn mab-teal" onclick="msgShowComposer()">
+            <span class="mab-title">&#x1F551; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x648;&#x642;&#x62A; &#x648;&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</span>
+            <span class="mab-desc">&#x642;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x644;&#x629; &#x644;&#x625;&#x628;&#x644;&#x627;&#x63A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x628;&#x648;&#x642;&#x62A; &#x648;&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</span>
+          </button>
+          <button type="button" class="msg-action-btn mab-purple" onclick="msgOpenLog()">
+            <span class="mab-title">&#x1F4DC; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</span>
+            <span class="mab-desc">&#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x62A;&#x64A; &#x62A;&#x645; &#x625;&#x631;&#x633;&#x627;&#x644;&#x647;&#x627;</span>
+          </button>
+          <button type="button" class="msg-action-btn mab-orange" onclick="msgOpenReminders()">
+            <span class="mab-title">&#x23F0; &#x62C;&#x62F;&#x648;&#x644;&#x629; &#x62A;&#x630;&#x643;&#x64A;&#x631;</span>
+            <span class="mab-desc">&#x62C;&#x62F;&#x648;&#x644;&#x629; &#x62A;&#x630;&#x643;&#x64A;&#x631; &#x644;&#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x644;&#x629; &#x641;&#x64A; &#x648;&#x642;&#x62A; &#x645;&#x62D;&#x62F;&#x62F;</span>
+          </button>
+        </div>
+        <div id="msg-tpl-wrap"></div>
       </div>
       <div id="msg-composer" style="display:none;">
-        <button type="button" class="msg-back" onclick="msgShowHub()">&#x276F; &#x631;&#x62C;&#x648;&#x639;</button>
+        <div class="msg-compose-tools">
+          <button type="button" class="msg-back" onclick="msgShowHub()">&#x276F; &#x631;&#x62C;&#x648;&#x639;</button>
+          <span class="spacer"></span>
+          <button type="button" class="msg-save-tpl" onclick="msgOpenSaveDialog()">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</button>
+        </div>
         <label class="msg-label" for="msg-text">&#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label>
         <textarea id="msg-text" class="msg-textarea" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x642;&#x627;&#x644;&#x628; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;&#x2026;"></textarea>
         <div class="msg-vars">
@@ -1183,7 +1279,7 @@ function srSave(){
           <div class="msg-picker-field">
             <label class="msg-label" for="msg-table">&#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
             <select id="msg-table" class="msg-select" onchange="msgOnTableChange()">
-              <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &mdash;</option>
+              <option value="">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x2014;</option>
               <option value="students">&#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</option>
               <option value="groups">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</option>
             </select>
@@ -1195,11 +1291,81 @@ function srSave(){
         </div>
         <label class="msg-label" for="msg-group">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
         <select id="msg-group" class="msg-select" onchange="msgRenderStudents()">
-          <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option>
+          <option value="">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x2014;</option>
         </select>
-        <label class="msg-label" id="msg-students-label" style="display:none;">&#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</label>
+        <div class="msg-students-head">
+          <label class="msg-label" id="msg-students-label" style="display:none;margin-bottom:0;">&#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</label>
+          <button type="button" id="msg-bulk-btn" class="msg-bulk" style="display:none;" onclick="msgBulkOpen()">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644;</button>
+        </div>
         <div id="msg-students" class="msg-student-list"></div>
       </div>
+    </div>
+  </div>
+</div>
+<div id="msg-save-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header">
+      <span class="msg-header-title">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</span>
+      <button class="msg-close" onclick="msgCloseSaveDialog()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <label class="msg-label" for="msg-tpl-name">&#x627;&#x633;&#x645; &#x627;&#x644;&#x642;&#x627;&#x644;&#x628;</label>
+      <input id="msg-tpl-name" class="msg-input" type="text">
+      <label class="msg-label" for="msg-tpl-cat">&#x627;&#x644;&#x62A;&#x635;&#x646;&#x64A;&#x641;</label>
+      <select id="msg-tpl-cat" class="msg-select">
+        <option value="&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</option>
+        <option value="&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A;">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A;</option>
+        <option value="&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</option>
+        <option value="&#x623;&#x62E;&#x631;&#x649;">&#x623;&#x62E;&#x631;&#x649;</option>
+      </select>
+      <div class="msg-submit-row">
+        <button type="button" class="msg-cancel" onclick="msgCloseSaveDialog()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+        <button type="button" class="msg-submit" onclick="msgSaveTemplate()">&#x62D;&#x641;&#x638;</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="msg-log-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header">
+      <span class="msg-header-title">&#x1F4DC; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</span>
+      <button class="msg-close" onclick="msgCloseLog()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <div id="msg-log-body"></div>
+    </div>
+  </div>
+</div>
+<div id="msg-rem-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header">
+      <span class="msg-header-title">&#x23F0; &#x62C;&#x62F;&#x648;&#x644;&#x629; &#x62A;&#x630;&#x643;&#x64A;&#x631;</span>
+      <button class="msg-close" onclick="msgCloseReminders()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <div class="msg-cat-header">&#x62A;&#x630;&#x643;&#x64A;&#x631; &#x62C;&#x62F;&#x64A;&#x62F;</div>
+      <div class="msg-form-grid">
+        <div><label class="msg-label" for="msg-rem-name" style="margin:0 0 4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x62A;&#x630;&#x643;&#x64A;&#x631;</label><input id="msg-rem-name" class="msg-input" type="text"></div>
+        <div><label class="msg-label" for="msg-rem-day" style="margin:0 0 4px;">&#x627;&#x644;&#x64A;&#x648;&#x645;</label>
+          <select id="msg-rem-day" class="msg-select">
+            <option value="0">&#x627;&#x644;&#x623;&#x62D;&#x62F;</option>
+            <option value="1">&#x627;&#x644;&#x627;&#x62B;&#x646;&#x64A;&#x646;</option>
+            <option value="2">&#x627;&#x644;&#x62B;&#x644;&#x627;&#x62B;&#x627;&#x621;</option>
+            <option value="3">&#x627;&#x644;&#x623;&#x631;&#x628;&#x639;&#x627;&#x621;</option>
+            <option value="4">&#x627;&#x644;&#x62E;&#x645;&#x64A;&#x633;</option>
+            <option value="5">&#x627;&#x644;&#x62C;&#x645;&#x639;&#x629;</option>
+            <option value="6">&#x627;&#x644;&#x633;&#x628;&#x62A;</option>
+          </select>
+        </div>
+        <div><label class="msg-label" for="msg-rem-time" style="margin:0 0 4px;">&#x627;&#x644;&#x648;&#x642;&#x62A;</label><input id="msg-rem-time" class="msg-input" type="time"></div>
+        <div><label class="msg-label" for="msg-rem-tpl" style="margin:0 0 4px;">&#x627;&#x644;&#x642;&#x627;&#x644;&#x628;</label><select id="msg-rem-tpl" class="msg-select"></select></div>
+        <div><label class="msg-label" for="msg-rem-group" style="margin:0 0 4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="msg-rem-group" class="msg-select"></select></div>
+      </div>
+      <div class="msg-submit-row">
+        <button type="button" class="msg-submit" onclick="msgSaveReminder()">&#x62D;&#x641;&#x638;</button>
+      </div>
+      <div class="msg-cat-header">&#x627;&#x644;&#x62A;&#x630;&#x643;&#x64A;&#x631;&#x627;&#x62A; &#x627;&#x644;&#x62D;&#x627;&#x644;&#x64A;&#x629;</div>
+      <div id="msg-rem-list" class="msg-rem-list"></div>
     </div>
   </div>
 </div>
@@ -1207,11 +1373,19 @@ function srSave(){
 var _msgGroups = [];
 var _msgStudentsByGroup = {};
 var _msgTableColumns = { students: [], groups: [] };
+var _msgTemplates = [];
+var _msgReminders = [];
+var _msgCurrentTemplateName = '';
 var _msgLoaded = false;
+var _msgSchedulerStarted = false;
+var _MSG_CATEGORIES = ['\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u063A\u064A\u0627\u0628', '\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0623\u0648\u0642\u0627\u062A', '\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u062F\u0641\u0639', '\u0623\u062E\u0631\u0649'];
+var _MSG_DAY_NAMES  = ['\u0627\u0644\u0623\u062D\u062F','\u0627\u0644\u0627\u062B\u0646\u064A\u0646','\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621','\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621','\u0627\u0644\u062E\u0645\u064A\u0633','\u0627\u0644\u062C\u0645\u0639\u0629','\u0627\u0644\u0633\u0628\u062A'];
+
 function msgOpen(){
   document.getElementById('msg-modal').style.display='block';
   msgShowHub();
-  if (_msgLoaded) return;
+  msgStartScheduler();
+  if (_msgLoaded) { _msgRefreshTemplates(); return; }
   _msgLoaded = true;
   Promise.all([
     fetch('/api/groups',{credentials:'include'}).then(function(r){return r.json();}),
@@ -1231,17 +1405,26 @@ function msgOpen(){
     }
     _msgTableColumns.students = _msgBuildColumnList((res[2] && res[2].columns) || [], students[0]);
     _msgTableColumns.groups   = _msgBuildColumnList((res[3] && res[3].columns) || [], _msgGroups[0]);
-    var sel = document.getElementById('msg-group');
-    var seen = {};
-    for (var j=0; j<_msgGroups.length; j++) {
-      var name = (_msgGroups[j].group_name || '').trim();
-      if (!name || seen[name]) continue;
-      seen[name] = 1;
-      var opt = document.createElement('option');
-      opt.value = name; opt.textContent = name;
-      sel.appendChild(opt);
-    }
+    _msgPopulateGroupSelects();
+    _msgRefreshTemplates();
   }).catch(function(){ _msgLoaded = false; });
+}
+function _msgPopulateGroupSelects(){
+  var targets = ['msg-group','msg-rem-group'];
+  var seen = {};
+  var names = [];
+  for (var i=0; i<_msgGroups.length; i++) {
+    var n = (_msgGroups[i].group_name || '').trim();
+    if (!n || seen[n]) continue;
+    seen[n] = 1; names.push(n);
+  }
+  targets.forEach(function(id){
+    var sel = document.getElementById(id); if (!sel) return;
+    var first = sel.options[0]; sel.innerHTML = '';
+    if (id === 'msg-group') { sel.appendChild(new Option('\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u2014','')); }
+    else { sel.appendChild(new Option('\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629','')); }
+    names.forEach(function(n){ sel.appendChild(new Option(n, n)); });
+  });
 }
 function msgClose(){ document.getElementById('msg-modal').style.display='none'; }
 function msgShowHub(){
@@ -1277,8 +1460,7 @@ function _msgDecodeEntities(s){
   return d.value;
 }
 function _msgBuildColumnList(labelRows, sampleRow){
-  var keys = [];
-  var seen = {};
+  var keys = []; var seen = {};
   labelRows.forEach(function(r){
     if (!r || !r.col_key) return;
     seen[r.col_key] = 1;
@@ -1296,11 +1478,9 @@ function msgOnTableChange(){
   var t = document.getElementById('msg-table').value;
   var sel = document.getElementById('msg-col');
   sel.innerHTML = '<option value="">—</option>';
-  var cols = _msgTableColumns[t] || [];
-  cols.forEach(function(c){
+  (_msgTableColumns[t] || []).forEach(function(c){
     var opt = document.createElement('option');
-    opt.value = c.key;
-    opt.textContent = c.label + ' (' + c.key + ')';
+    opt.value = c.key; opt.textContent = c.label + ' (' + c.key + ')';
     sel.appendChild(opt);
   });
 }
@@ -1337,9 +1517,10 @@ function msgRenderStudents(){
   var gname = document.getElementById('msg-group').value;
   var wrap = document.getElementById('msg-students');
   var lbl = document.getElementById('msg-students-label');
+  var bulk = document.getElementById('msg-bulk-btn');
   wrap.innerHTML = '';
-  if (!gname) { lbl.style.display = 'none'; return; }
-  lbl.style.display = 'block';
+  if (!gname) { lbl.style.display = 'none'; bulk.style.display = 'none'; return; }
+  lbl.style.display = 'block'; bulk.style.display = 'inline-block';
   var students = _msgStudentsByGroup[gname] || [];
   if (!students.length) {
     var empty = document.createElement('div');
@@ -1358,8 +1539,7 @@ function msgRenderStudents(){
     var phone = _msgCleanPhone(s.whatsapp);
     if (phone) {
       var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'msg-wa';
+      btn.type = 'button'; btn.className = 'msg-wa';
       btn.textContent = '\u0648\u0627\u062A\u0633\u0627\u0628';
       btn.addEventListener('click', (function(student, groupName){
         return function(){ _msgOpenWa(student, groupName); };
@@ -1382,7 +1562,262 @@ function _msgOpenWa(student, gname){
   var text = _msgFill(tpl, student, group);
   var url = 'https://wa.me/' + phone + (text ? ('?text=' + encodeURIComponent(text)) : '');
   window.open(url, '_blank');
+  _msgLogSend(student, phone);
 }
+function _msgLogSend(student, phone){
+  var body = {
+    student_name: (student && student.student_name) || '',
+    student_whatsapp: phone || ((student && student.whatsapp) || ''),
+    template_name: _msgCurrentTemplateName || '\u0631\u0633\u0627\u0644\u0629 \u0645\u062E\u0635\u0635\u0629'
+  };
+  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) }).catch(function(){});
+}
+function msgBulkOpen(){
+  var gname = document.getElementById('msg-group').value;
+  if (!gname) { alert('\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0623\u0648\u0644\u0627\u064B'); return; }
+  var students = _msgStudentsByGroup[gname] || [];
+  var targets = students.filter(function(s){ return _msgCleanPhone(s.whatsapp); });
+  if (!targets.length) { alert('\u0644\u0627 \u064A\u0648\u062C\u062F \u0623\u064A \u0637\u0627\u0644\u0628 \u0628\u0631\u0642\u0645 \u0648\u0627\u062A\u0633\u0627\u0628 \u0635\u0627\u0644\u062D \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629'); return; }
+  if (targets.length > 1 && !confirm('\u0633\u064A\u062A\u0645 \u0641\u062A\u062D \u0639\u062F\u0629 \u0646\u0648\u0627\u0641\u0630 \u0648\u0627\u062A\u0633\u0627\u0628 \u2014 \u0647\u0644 \u062A\u0631\u064A\u062F \u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629\u061F')) return;
+  var group = _msgFindGroup(gname);
+  var tpl = document.getElementById('msg-text').value || '';
+  targets.forEach(function(s, idx){
+    var phone = _msgCleanPhone(s.whatsapp);
+    var text = _msgFill(tpl, s, group);
+    var url = 'https://wa.me/' + phone + (text ? ('?text=' + encodeURIComponent(text)) : '');
+    setTimeout(function(){ window.open(url, '_blank'); _msgLogSend(s, phone); }, idx * 400);
+  });
+}
+
+// ---- Templates ----
+function _msgRefreshTemplates(){
+  return fetch('/api/message-templates',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    _msgTemplates = (d && d.templates) || [];
+    _msgRenderTemplateList();
+    _msgPopulateReminderTemplateSelect();
+  });
+}
+function _msgRenderTemplateList(){
+  var wrap = document.getElementById('msg-tpl-wrap');
+  wrap.innerHTML = '';
+  if (!_msgTemplates.length) {
+    var h = document.createElement('div'); h.className = 'msg-cat-header'; h.textContent = '\u0627\u0644\u0642\u0648\u0627\u0644\u0628 \u0627\u0644\u0645\u062D\u0641\u0648\u0638\u0629'; wrap.appendChild(h);
+    var e = document.createElement('div'); e.className = 'msg-tpl-empty'; e.textContent = '\u0644\u0627 \u062A\u0648\u062C\u062F \u0642\u0648\u0627\u0644\u0628 \u0645\u062D\u0641\u0648\u0638\u0629 \u0628\u0639\u062F'; wrap.appendChild(e);
+    return;
+  }
+  var byCat = {};
+  _msgTemplates.forEach(function(t){
+    var cat = t.category || '\u0623\u062E\u0631\u0649';
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(t);
+  });
+  var order = _MSG_CATEGORIES.slice();
+  Object.keys(byCat).forEach(function(c){ if (order.indexOf(c) < 0) order.push(c); });
+  order.forEach(function(cat){
+    var rows = byCat[cat] || []; if (!rows.length) return;
+    var h = document.createElement('div'); h.className = 'msg-cat-header'; h.textContent = cat; wrap.appendChild(h);
+    var list = document.createElement('div'); list.className = 'msg-tpl-list';
+    rows.forEach(function(t){
+      var card = document.createElement('div'); card.className = 'msg-tpl-card';
+      var del = document.createElement('button'); del.type='button'; del.className='mtc-del'; del.textContent='×';
+      del.title = '\u062D\u0630\u0641';
+      del.addEventListener('click', function(ev){ ev.stopPropagation(); _msgDeleteTemplate(t.id); });
+      card.appendChild(del);
+      var name = document.createElement('div'); name.className='mtc-name'; name.textContent = t.name || '-'; card.appendChild(name);
+      var prev = document.createElement('div'); prev.className='mtc-preview'; prev.textContent = t.content || ''; card.appendChild(prev);
+      card.addEventListener('click', function(){ _msgLoadTemplate(t); });
+      list.appendChild(card);
+    });
+    wrap.appendChild(list);
+  });
+}
+function _msgLoadTemplate(t){
+  _msgCurrentTemplateName = t.name || '';
+  document.getElementById('msg-text').value = t.content || '';
+  msgShowComposer();
+}
+function _msgDeleteTemplate(id){
+  if (!confirm('\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0642\u0627\u0644\u0628\u061F')) return;
+  fetch('/api/message-templates/' + id, { method:'DELETE', credentials:'include' })
+    .then(function(){ return _msgRefreshTemplates(); });
+}
+function msgOpenSaveDialog(){
+  var content = (document.getElementById('msg-text').value || '').trim();
+  if (!content) return;
+  document.getElementById('msg-tpl-name').value = _msgCurrentTemplateName || '';
+  document.getElementById('msg-save-modal').style.display = 'block';
+}
+function msgCloseSaveDialog(){ document.getElementById('msg-save-modal').style.display = 'none'; }
+function msgSaveTemplate(){
+  var name = (document.getElementById('msg-tpl-name').value || '').trim();
+  var cat = document.getElementById('msg-tpl-cat').value || '\u0623\u062E\u0631\u0649';
+  var content = document.getElementById('msg-text').value || '';
+  if (!name || !content.trim()) return;
+  fetch('/api/message-templates', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({name:name, category:cat, content:content}) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok) { _msgCurrentTemplateName = name; msgCloseSaveDialog(); _msgRefreshTemplates(); }
+    });
+}
+
+// ---- Log ----
+function msgOpenLog(){
+  document.getElementById('msg-log-modal').style.display = 'block';
+  var body = document.getElementById('msg-log-body'); body.innerHTML = '';
+  fetch('/api/message-log',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    var rows = (d && d.log) || [];
+    if (!rows.length) { body.innerHTML = '<div class="msg-empty">\u0644\u0627 \u062A\u0648\u062C\u062F \u0631\u0633\u0627\u0626\u0644 \u0645\u0633\u062C\u0644\u0629</div>'; return; }
+    var tbl = document.createElement('table'); tbl.className = 'msg-log-tbl';
+    var thead = document.createElement('thead');
+    var trh = document.createElement('tr');
+    ['\u0627\u0644\u062A\u0627\u0631\u064A\u062E','\u0627\u0644\u0637\u0627\u0644\u0628','\u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628','\u0627\u0644\u0642\u0627\u0644\u0628'].forEach(function(h){
+      var th = document.createElement('th'); th.textContent = h; trh.appendChild(th);
+    });
+    thead.appendChild(trh); tbl.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function(r){
+      var tr = document.createElement('tr');
+      [r.sent_at, r.student_name, r.student_whatsapp, r.template_name].forEach(function(v){
+        var td = document.createElement('td'); td.textContent = v || '-'; tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    body.appendChild(tbl);
+  });
+}
+function msgCloseLog(){ document.getElementById('msg-log-modal').style.display = 'none'; }
+
+// ---- Reminders ----
+function _msgPopulateReminderTemplateSelect(){
+  var sel = document.getElementById('msg-rem-tpl'); if (!sel) return;
+  sel.innerHTML = '';
+  sel.appendChild(new Option('\u0627\u062E\u062A\u0631 \u0642\u0627\u0644\u0628\u0627\u064B', ''));
+  _msgTemplates.forEach(function(t){ sel.appendChild(new Option((t.name || '') + ' (' + (t.category || '') + ')', String(t.id))); });
+}
+function msgOpenReminders(){
+  _msgPopulateReminderTemplateSelect();
+  _msgPopulateGroupSelects();
+  _msgLoadReminders();
+  document.getElementById('msg-rem-modal').style.display = 'block';
+}
+function msgCloseReminders(){ document.getElementById('msg-rem-modal').style.display = 'none'; }
+function _msgLoadReminders(){
+  return fetch('/api/message-reminders',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    _msgReminders = (d && d.reminders) || [];
+    _msgRenderReminders();
+  });
+}
+function _msgRenderReminders(){
+  var wrap = document.getElementById('msg-rem-list'); wrap.innerHTML = '';
+  if (!_msgReminders.length) {
+    var e = document.createElement('div'); e.className = 'msg-empty'; e.textContent = '\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u0630\u0643\u064A\u0631\u0627\u062A \u0645\u062C\u062F\u0648\u0644\u0629'; wrap.appendChild(e); return;
+  }
+  _msgReminders.forEach(function(r){
+    var row = document.createElement('div'); row.className = 'msg-rem-row';
+    var tplName = '';
+    for (var i=0; i<_msgTemplates.length; i++) {
+      if (String(_msgTemplates[i].id) === String(r.template_id)) { tplName = _msgTemplates[i].name; break; }
+    }
+    var left = document.createElement('div');
+    var main = document.createElement('div'); main.className = 'mrr-main'; main.textContent = r.name || '-'; left.appendChild(main);
+    var meta = document.createElement('div'); meta.className = 'mrr-meta';
+    meta.textContent = _MSG_DAY_NAMES[r.day_of_week || 0] + ' · ' + (r.time_of_day || '') + ' · ' + (tplName || '?') + ' · ' + (r.group_name || '');
+    left.appendChild(meta);
+    row.appendChild(left);
+    var del = document.createElement('button'); del.type='button'; del.className='msg-rem-del'; del.textContent = '\u062D\u0630\u0641';
+    del.addEventListener('click', function(){ _msgDeleteReminder(r.id); });
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+}
+function msgSaveReminder(){
+  var body = {
+    name: (document.getElementById('msg-rem-name').value || '').trim(),
+    day_of_week: parseInt(document.getElementById('msg-rem-day').value || '0', 10),
+    time_of_day: (document.getElementById('msg-rem-time').value || '').trim(),
+    template_id: parseInt(document.getElementById('msg-rem-tpl').value || '0', 10),
+    group_name: document.getElementById('msg-rem-group').value || ''
+  };
+  if (!body.name || !body.time_of_day || !body.template_id || !body.group_name) return;
+  fetch('/api/message-reminders', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok) {
+        ['msg-rem-name','msg-rem-time','msg-rem-group'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value=''; });
+        _msgLoadReminders();
+      }
+    });
+  _msgRequestNotificationPermission();
+}
+function _msgDeleteReminder(id){
+  if (!confirm('\u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u062A\u0630\u0643\u064A\u0631\u061F')) return;
+  fetch('/api/message-reminders/' + id, { method:'DELETE', credentials:'include' })
+    .then(function(){ _msgLoadReminders(); });
+}
+
+// ---- Scheduler ----
+function _msgRequestNotificationPermission(){
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission === 'default') { try { Notification.requestPermission(); } catch(e){} }
+}
+function msgStartScheduler(){
+  if (_msgSchedulerStarted) return;
+  _msgSchedulerStarted = true;
+  _msgRequestNotificationPermission();
+  // Initial load of reminders + templates even if composer hasn't been opened.
+  fetch('/api/message-reminders',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){ _msgReminders = (d && d.reminders) || []; }).catch(function(){});
+  fetch('/api/message-templates',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){ _msgTemplates = (d && d.templates) || []; }).catch(function(){});
+  _msgCheckReminders();
+  setInterval(_msgCheckReminders, 30 * 1000);
+  // Reload list every 10 min so edits in another tab propagate.
+  setInterval(function(){
+    fetch('/api/message-reminders',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){ _msgReminders = (d && d.reminders) || []; }).catch(function(){});
+    fetch('/api/message-templates',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){ _msgTemplates = (d && d.templates) || []; }).catch(function(){});
+  }, 10 * 60 * 1000);
+}
+function _msgCheckReminders(){
+  if (!_msgReminders.length) return;
+  var now = new Date();
+  var day = now.getDay();
+  var mins = now.getHours() * 60 + now.getMinutes();
+  var todayKey = now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
+  _msgReminders.forEach(function(r){
+    if (!r || r.enabled === 0) return;
+    if (parseInt(r.day_of_week, 10) !== day) return;
+    var tparts = (r.time_of_day || '').split(':');
+    var rMin = parseInt(tparts[0] || '0', 10) * 60 + parseInt(tparts[1] || '0', 10);
+    if (mins < rMin) return;
+    // Only fire within 5 minutes of the target to avoid spamming on late loads.
+    if (mins - rMin > 5) return;
+    var storageKey = 'msg_rem_' + r.id + '_' + todayKey;
+    if (localStorage.getItem(storageKey)) return;
+    localStorage.setItem(storageKey, '1');
+    _msgFireReminder(r);
+  });
+}
+function _msgFireReminder(r){
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'granted') { _msgRequestNotificationPermission(); return; }
+  var body = '\u0631\u0633\u0627\u0644\u0629 \u062C\u062F\u064A\u062F\u0629: ' + (r.name || '') + ' · ' + (r.group_name || '');
+  try {
+    var n = new Notification('\u062A\u0630\u0643\u064A\u0631 \u0645\u0650\u0646 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0633\u0627\u0626\u0644', { body: body, tag: 'msg-rem-' + r.id });
+    n.onclick = function(){
+      try { window.focus(); } catch(e){}
+      msgOpen();
+      var tpl = null;
+      for (var i=0; i<_msgTemplates.length; i++) {
+        if (String(_msgTemplates[i].id) === String(r.template_id)) { tpl = _msgTemplates[i]; break; }
+      }
+      if (tpl) _msgLoadTemplate(tpl); else msgShowComposer();
+      var gsel = document.getElementById('msg-group');
+      if (gsel && r.group_name) { gsel.value = r.group_name; msgRenderStudents(); }
+      try { n.close(); } catch(e){}
+    };
+  } catch(e) {}
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msgStartScheduler);
+else msgStartScheduler();
 </script>
 
 <div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:20px auto;border-radius:14px;max-width:99%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4B3; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:160px;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label><input type="date" id="pm-date" onchange="pmSetDay()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:0.95rem;"></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x64A;&#x648;&#x645;</label><input type="text" id="pm-day" readonly style="padding:7px 12px;border-radius:8px;border:1.5px solid #ccc;background:#f0f0f0;min-width:90px;font-size:0.95rem;"></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x628;&#x62D;&#x62B;</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645;..." style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:170px;font-size:0.95rem;"></div></div></div><div style="overflow-x:auto;"><table id="pm-tbl" style="border-collapse:collapse;width:100%;min-width:400px;font-size:0.76rem;"><thead><tr style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;text-align:center;"><th rowspan="2" style="padding:8px 14px;border:1px solid #9b6fd4;position:sticky;right:0;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);z-index:2;min-width:140px;">&#x627;&#x644;&#x627;&#x633;&#x645;</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 1</th></tr><tr style="background:#ede7f6;color:#4a148c;text-align:center;"><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th></tr></thead><tbody id="pm-tbody"></tbody></table></div></div></div>
@@ -6136,6 +6571,102 @@ def api_payments_group():
             row["inst_"+str(p[0])] = {"inst_type": p[1], "price": p[2], "paid": p[3]}
         result.append(row)
     return jsonify(result)
+
+@app.route('/api/message-templates', methods=['GET'])
+@login_required
+def api_message_templates_list():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, name, category, content, created_at FROM message_templates ORDER BY category, name"
+    ).fetchall()
+    return jsonify({"templates": [dict(r) for r in rows]})
+
+@app.route('/api/message-templates', methods=['POST'])
+@login_required
+def api_message_templates_add():
+    d = request.get_json() or {}
+    name = (d.get('name') or '').strip()
+    category = (d.get('category') or '').strip()
+    content = d.get('content') or ''
+    if not name or not content:
+        return jsonify({"ok": False, "error": "missing name or content"}), 400
+    db = get_db()
+    db.execute(
+        "INSERT INTO message_templates(name, category, content) VALUES(?,?,?)",
+        (name, category, content)
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/message-templates/<int:tid>', methods=['DELETE'])
+@login_required
+def api_message_templates_delete(tid):
+    db = get_db()
+    db.execute("DELETE FROM message_templates WHERE id=?", (tid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/message-log', methods=['GET'])
+@login_required
+def api_message_log_list():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, student_name, student_whatsapp, template_name, sent_at FROM message_log ORDER BY sent_at DESC LIMIT 500"
+    ).fetchall()
+    return jsonify({"log": [dict(r) for r in rows]})
+
+@app.route('/api/message-log', methods=['POST'])
+@login_required
+def api_message_log_add():
+    d = request.get_json() or {}
+    db = get_db()
+    db.execute(
+        "INSERT INTO message_log(student_name, student_whatsapp, template_name) VALUES(?,?,?)",
+        (d.get('student_name') or '', d.get('student_whatsapp') or '', d.get('template_name') or '')
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/message-reminders', methods=['GET'])
+@login_required
+def api_message_reminders_list():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, name, day_of_week, time_of_day, template_id, group_name, enabled FROM message_reminders ORDER BY day_of_week, time_of_day"
+    ).fetchall()
+    return jsonify({"reminders": [dict(r) for r in rows]})
+
+@app.route('/api/message-reminders', methods=['POST'])
+@login_required
+def api_message_reminders_add():
+    d = request.get_json() or {}
+    name = (d.get('name') or '').strip()
+    day = d.get('day_of_week')
+    tod = (d.get('time_of_day') or '').strip()
+    template_id = d.get('template_id')
+    group_name = (d.get('group_name') or '').strip()
+    if not name or day is None or not tod or not template_id or not group_name:
+        return jsonify({"ok": False, "error": "missing fields"}), 400
+    try:
+        day_i = int(day)
+        template_i = int(template_id)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "bad types"}), 400
+    db = get_db()
+    db.execute(
+        "INSERT INTO message_reminders(name, day_of_week, time_of_day, template_id, group_name) VALUES(?,?,?,?,?)",
+        (name, day_i, tod, template_i, group_name)
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/message-reminders/<int:rid>', methods=['DELETE'])
+@login_required
+def api_message_reminders_delete(rid):
+    db = get_db()
+    db.execute("DELETE FROM message_reminders WHERE id=?", (rid,))
+    db.commit()
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
