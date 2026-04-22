@@ -212,6 +212,7 @@ def init_db():
         level_course TEXT,
         last_reached TEXT,
         study_time TEXT,
+        study_days TEXT,
         ramadan_time TEXT,
         online_time TEXT,
         group_link TEXT,
@@ -361,6 +362,7 @@ if True:
         level_course TEXT,
         last_reached TEXT,
         study_time TEXT,
+        study_days TEXT,
         ramadan_time TEXT,
         online_time TEXT,
         group_link TEXT,
@@ -430,6 +432,7 @@ if True:
         ("hours_online_only", "TEXT"),
         ("hours_all_online", "TEXT"),
         ("total_required_hours", "TEXT"),
+        ("study_days", "TEXT"),
     ]
     group_existing = [row[1] for row in db2.execute("PRAGMA table_info(student_groups)").fetchall()]
     for col, coltype in new_group_cols:
@@ -437,7 +440,7 @@ if True:
             db2.execute("ALTER TABLE student_groups ADD COLUMN " + col + " " + coltype)
     # One-time cleanup: drop obsolete columns that were added in earlier deploys.
     drop_group_cols = [
-        "student_count","study_days","online_days","online_time_ramadan",
+        "student_count","online_days","online_time_ramadan",
         "sessions_total_auto","sessions_nonramadan_auto","sessions_ramadan_auto","sessions_online_auto",
     ]
     group_existing = [row[1] for row in db2.execute("PRAGMA table_info(student_groups)").fetchall()]
@@ -801,6 +804,11 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</div>
       <div class="dh-action-desc">&#x628;&#x62D;&#x62B; &#x633;&#x631;&#x64A;&#x639; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;</div>
     </button>
+    <button class="dh-action-card dh-a-green" onclick="msgOpen()">
+      <div class="dh-action-icon">&#x1F4E9;</div>
+      <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
+      <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
+    </button>
   </div>
 </div>
 
@@ -1107,6 +1115,195 @@ function srSave(){
       }
     })
     .catch(function(){ alert('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644'); });
+}
+</script>
+
+<style>
+.msg-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;}
+.msg-box{background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);}
+.msg-header{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+.msg-header-title{color:#fff;font-size:1.2rem;font-weight:bold;display:flex;align-items:center;gap:8px;}
+.msg-header .msg-close{color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;background:none;border:none;padding:0;}
+.msg-body{padding:18px 22px;max-height:78vh;overflow:auto;}
+.msg-hub-card{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:14px;cursor:pointer;width:100%;text-align:right;font-family:inherit;box-shadow:0 4px 14px rgba(0,137,123,.18);transition:transform .15s,box-shadow .15s;}
+.msg-hub-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,137,123,.28);}
+.msg-hub-card .msg-hub-icon{font-size:30px;}
+.msg-hub-card .msg-hub-title{font-size:1.05rem;font-weight:800;}
+.msg-hub-card .msg-hub-desc{font-size:.82rem;opacity:.92;margin-top:2px;}
+.msg-back{background:#ede7f6;color:#4a148c;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;}
+.msg-back:hover{background:#d1c4e9;}
+.msg-label{display:block;font-weight:700;color:#4a148c;margin:14px 0 6px;font-size:.95rem;}
+.msg-textarea{width:100%;min-height:130px;padding:11px 13px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.97rem;background:#faf7ff;font-family:inherit;direction:rtl;resize:vertical;outline:none;}
+.msg-textarea:focus{border-color:#6B3FA0;background:#fff;}
+.msg-vars{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.msg-var{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .1s;}
+.msg-var:hover{transform:translateY(-1px);}
+.msg-select{width:100%;padding:10px 12px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.95rem;background:#faf7ff;outline:none;font-family:inherit;}
+.msg-select:focus{border-color:#6B3FA0;background:#fff;}
+.msg-student-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.msg-student-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f5f0ff;border:1px solid #e1d3f7;border-radius:10px;gap:10px;}
+.msg-student-name{font-weight:700;color:#4a148c;font-size:.96rem;}
+.msg-wa{background:linear-gradient(135deg,#128C7E,#25D366);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-family:inherit;}
+.msg-wa:hover{filter:brightness(1.05);}
+.msg-wa-disabled{background:#bdbdbd;cursor:not-allowed;pointer-events:none;}
+.msg-empty{padding:14px;color:#888;text-align:center;font-size:.92rem;}
+</style>
+<div id="msg-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header">
+      <span class="msg-header-title">&#x1F4E9; &#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</span>
+      <button class="msg-close" onclick="msgClose()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <div id="msg-hub">
+        <button type="button" class="msg-hub-card" onclick="msgShowComposer()">
+          <span class="msg-hub-icon">&#x1F551;</span>
+          <span style="flex:1;">
+            <span class="msg-hub-title" style="display:block;">&#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x648;&#x642;&#x62A; &#x648;&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</span>
+            <span class="msg-hub-desc" style="display:block;">&#x642;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x644;&#x629; &#x644;&#x625;&#x628;&#x644;&#x627;&#x63A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x628;&#x648;&#x642;&#x62A; &#x648;&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</span>
+          </span>
+          <span style="font-size:22px;">&#x276E;</span>
+        </button>
+      </div>
+      <div id="msg-composer" style="display:none;">
+        <button type="button" class="msg-back" onclick="msgShowHub()">&#x276F; &#x631;&#x62C;&#x648;&#x639;</button>
+        <label class="msg-label" for="msg-text">&#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label>
+        <textarea id="msg-text" class="msg-textarea" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x642;&#x627;&#x644;&#x628; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;&#x2026;"></textarea>
+        <div class="msg-vars">
+          <button type="button" class="msg-var" onclick="msgInsertVar('name')">&#x1F464; &#x627;&#x644;&#x627;&#x633;&#x645;</button>
+          <button type="button" class="msg-var" onclick="msgInsertVar('time')">&#x1F551; &#x627;&#x644;&#x648;&#x642;&#x62A;</button>
+          <button type="button" class="msg-var" onclick="msgInsertVar('days')">&#x1F4C5; &#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</button>
+        </div>
+        <label class="msg-label" for="msg-group">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
+        <select id="msg-group" class="msg-select" onchange="msgRenderStudents()">
+          <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option>
+        </select>
+        <label class="msg-label" id="msg-students-label" style="display:none;">&#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</label>
+        <div id="msg-students" class="msg-student-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var _msgGroups = [];
+var _msgStudentsByGroup = {};
+var _msgLoaded = false;
+function msgOpen(){
+  document.getElementById('msg-modal').style.display='block';
+  msgShowHub();
+  if (_msgLoaded) return;
+  _msgLoaded = true;
+  Promise.all([
+    fetch('/api/groups',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/students',{credentials:'include'}).then(function(r){return r.json();})
+  ]).then(function(res){
+    _msgGroups = (res[0] && res[0].groups) ? res[0].groups : [];
+    var students = (res[1] && res[1].students) ? res[1].students : [];
+    _msgStudentsByGroup = {};
+    for (var i=0; i<students.length; i++) {
+      var s = students[i];
+      var g = (s.group_name_student || '').trim();
+      if (!g) continue;
+      if (!_msgStudentsByGroup[g]) _msgStudentsByGroup[g] = [];
+      _msgStudentsByGroup[g].push(s);
+    }
+    var sel = document.getElementById('msg-group');
+    var seen = {};
+    for (var j=0; j<_msgGroups.length; j++) {
+      var name = (_msgGroups[j].group_name || '').trim();
+      if (!name || seen[name]) continue;
+      seen[name] = 1;
+      var opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    }
+  }).catch(function(){ _msgLoaded = false; });
+}
+function msgClose(){ document.getElementById('msg-modal').style.display='none'; }
+function msgShowHub(){
+  document.getElementById('msg-hub').style.display='block';
+  document.getElementById('msg-composer').style.display='none';
+}
+function msgShowComposer(){
+  document.getElementById('msg-hub').style.display='none';
+  document.getElementById('msg-composer').style.display='block';
+}
+function msgInsertVar(kind){
+  var map = { name:'{\u0627\u0633\u0645}', time:'{\u0648\u0642\u062A}', days:'{\u0623\u064A\u0627\u0645}' };
+  var token = map[kind]; if (!token) return;
+  var ta = document.getElementById('msg-text');
+  var start = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+  var end = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
+  ta.value = ta.value.substring(0, start) + token + ta.value.substring(end);
+  var pos = start + token.length;
+  ta.focus();
+  try { ta.setSelectionRange(pos, pos); } catch(e){}
+}
+function _msgFindGroup(name){
+  for (var i=0; i<_msgGroups.length; i++) {
+    if ((_msgGroups[i].group_name || '') === name) return _msgGroups[i];
+  }
+  return null;
+}
+function _msgCleanPhone(raw){
+  var digits = String(raw || '').replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  if (digits.indexOf('00') === 0) digits = digits.substring(2);
+  if (digits.length === 8) digits = '973' + digits;
+  return digits;
+}
+function _msgFill(tpl, student, group){
+  var name = (student && student.student_name) || '';
+  var time = (group && group.study_time) || '';
+  var days = (group && group.study_days) || '';
+  return String(tpl || '')
+    .replace(/\{\u0627\u0633\u0645\}/g, name)
+    .replace(/\{\u0648\u0642\u062A\}/g, time)
+    .replace(/\{\u0623\u064A\u0627\u0645\}/g, days);
+}
+function _msgEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function msgRenderStudents(){
+  var sel = document.getElementById('msg-group');
+  var gname = sel.value;
+  var wrap = document.getElementById('msg-students');
+  var lbl = document.getElementById('msg-students-label');
+  if (!gname) { wrap.innerHTML=''; lbl.style.display='none'; return; }
+  lbl.style.display='block';
+  var students = _msgStudentsByGroup[gname] || [];
+  if (!students.length) {
+    wrap.innerHTML = '<div class="msg-empty">\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</div>';
+    return;
+  }
+  var html = '';
+  for (var i=0; i<students.length; i++) {
+    var s = students[i];
+    var phone = _msgCleanPhone(s.whatsapp);
+    var name = _msgEsc(s.student_name || '-');
+    if (phone) {
+      html += '<div class="msg-student-row"><span class="msg-student-name">'+name+'</span>'
+           +  '<button type="button" class="msg-wa" data-sid="'+s.id+'" onclick="msgOpenWa('+s.id+',\''+gname.replace(/'/g,"\\'")+'\')">'
+           +  '\u0648\u0627\u062A\u0633\u0627\u0628</button></div>';
+    } else {
+      html += '<div class="msg-student-row"><span class="msg-student-name">'+name+'</span>'
+           +  '<span class="msg-wa msg-wa-disabled">\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645</span></div>';
+    }
+  }
+  wrap.innerHTML = html;
+}
+function msgOpenWa(sid, gname){
+  var students = _msgStudentsByGroup[gname] || [];
+  var student = null;
+  for (var i=0; i<students.length; i++) { if (String(students[i].id) === String(sid)) { student = students[i]; break; } }
+  if (!student) return;
+  var phone = _msgCleanPhone(student.whatsapp);
+  if (!phone) return;
+  var group = _msgFindGroup(gname);
+  var tpl = document.getElementById('msg-text').value || '';
+  var text = _msgFill(tpl, student, group);
+  var url = 'https://wa.me/' + phone + (text ? ('?text=' + encodeURIComponent(text)) : '');
+  window.open(url, '_blank');
 }
 </script>
 
