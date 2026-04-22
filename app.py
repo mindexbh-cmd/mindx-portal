@@ -1187,6 +1187,36 @@ function srSave(){
 .msg-abs-sent{font-size:.82rem;color:#2E7D32;font-weight:700;margin-inline-end:6px;}
 .msg-abs-count-absent{color:#c0392b;}
 .msg-abs-count-late{color:#E65100;}
+.msg-abs-alert{margin:10px 0 14px;padding:14px 18px;border-radius:12px;font-weight:700;font-size:1rem;display:flex;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:background .25s,color .25s,border-color .25s;}
+.msg-abs-alert.alert-warn{background:linear-gradient(135deg,#ffebee,#ffcdd2);color:#b71c1c;border:1.5px solid #ef9a9a;}
+.msg-abs-alert.alert-ok{background:linear-gradient(135deg,#e8f5e9,#c8e6c9);color:#1b5e20;border:1.5px solid #81c784;}
+.msg-abs-alert.alert-info{background:linear-gradient(135deg,#f3e5f5,#e1bee7);color:#4a148c;border:1.5px solid #b39ddb;}
+.msg-abs-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#faf7ff;border:1px solid #e1d3f7;border-radius:12px;}
+.msg-abs-spacer{flex:1;}
+.msg-abs-filter{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:1.5px solid #d1c4e9;background:#fff;color:#4a148c;font-family:inherit;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.msg-abs-filter:hover{background:#ede7f6;}
+.msg-abs-filter.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(107,63,160,.28);}
+.msg-abs-filter-count{display:inline-block;min-width:22px;padding:1px 7px;border-radius:12px;background:rgba(0,0,0,.1);color:inherit;font-weight:800;font-size:.78rem;text-align:center;}
+.msg-abs-filter.active .msg-abs-filter-count{background:rgba(255,255,255,.25);}
+.msg-abs-section{margin-top:14px;}
+.msg-abs-section-title{display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#4a148c;font-size:1rem;margin:0 0 8px;border-bottom:2px dashed #d1c4e9;padding-bottom:6px;}
+.msg-abs-section-count{background:#ede7f6;color:#4a148c;border-radius:12px;padding:2px 10px;font-size:.85rem;font-weight:800;}
+.msg-abs-card-list{display:flex;flex-direction:column;gap:10px;min-height:10px;}
+.msg-abs-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#fff;border:1px solid #e1d3f7;border-inline-start:4px solid #c0392b;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:opacity .3s ease, transform .3s ease, max-height .3s ease, background .2s, border-color .2s;opacity:1;transform:translateX(0);max-height:180px;overflow:hidden;}
+.msg-abs-card.status-late{border-inline-start-color:#E65100;}
+.msg-abs-card.is-sent{background:#f3fbf4;border-color:#c8e6c9;border-inline-start-color:#2E7D32;}
+.msg-abs-card.leaving{opacity:0;transform:translateX(-40px);max-height:0;padding-top:0;padding-bottom:0;margin-top:-10px;border-width:0;}
+.msg-abs-card.arriving{opacity:0;transform:translateY(-10px);}
+.msg-abs-card-left{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;}
+.msg-abs-card-name{font-weight:800;color:#4a148c;font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.msg-abs-card-meta{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#6a5494;flex-wrap:wrap;}
+.msg-abs-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:10px;font-weight:700;font-size:.74rem;}
+.msg-abs-badge-absent{background:#ffebee;color:#c0392b;}
+.msg-abs-badge-late{background:#fff3e0;color:#E65100;}
+.msg-abs-card-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.msg-abs-sent-badge{font-size:.78rem;color:#2E7D32;font-weight:700;white-space:nowrap;}
+.msg-abs-last{font-size:.74rem;color:#888;white-space:nowrap;}
+
 
 .msg-cat-header{font-weight:800;color:#4a148c;margin:14px 0 8px;font-size:1rem;border-bottom:1.5px dashed #d1c4e9;padding-bottom:5px;}
 .msg-tpl-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;}
@@ -1403,20 +1433,37 @@ function srSave(){
           </select>
         </div>
       </div>
-      <div id="msg-abs-status" class="msg-empty" style="display:none;"></div>
-      <div id="msg-abs-absent-wrap" style="display:none;">
-        <div class="msg-abs-section-head">
-          <div class="msg-cat-header">&#x1F6AB; <span class="msg-abs-count-absent">&#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x648;&#x646;</span> (<span id="msg-abs-absent-count">0</span>)</div>
-          <button type="button" class="msg-bulk" onclick="msgAbsenceBulk('absent')">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644; - &#x63A;&#x627;&#x626;&#x628;&#x648;&#x646;</button>
-        </div>
-        <div id="msg-abs-absent-list" class="msg-student-list"></div>
+      <div id="msg-abs-alert" class="msg-abs-alert" style="display:none;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x648;&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x644;&#x639;&#x631;&#x636; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</div>
+      <div id="msg-abs-filters" class="msg-abs-filters" style="display:none;">
+        <button type="button" class="msg-abs-filter active" data-filter="unsent" onclick="msgAbsenceSetFilter('unsent')">
+          &#x1F534; <span>&#x628;&#x62F;&#x648;&#x646; &#x631;&#x633;&#x627;&#x644;&#x629;</span>
+          <span class="msg-abs-filter-count" id="msg-abs-fc-unsent">0</span>
+        </button>
+        <button type="button" class="msg-abs-filter" data-filter="sent" onclick="msgAbsenceSetFilter('sent')">
+          &#x2705; <span>&#x62A;&#x645; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</span>
+          <span class="msg-abs-filter-count" id="msg-abs-fc-sent">0</span>
+        </button>
+        <button type="button" class="msg-abs-filter" data-filter="all" onclick="msgAbsenceSetFilter('all')">
+          &#x1F4CB; <span>&#x627;&#x644;&#x643;&#x644;</span>
+          <span class="msg-abs-filter-count" id="msg-abs-fc-all">0</span>
+        </button>
+        <span class="msg-abs-spacer"></span>
+        <button type="button" id="msg-abs-bulk-btn" class="msg-bulk" onclick="msgAbsenceBulk()">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644;</button>
       </div>
-      <div id="msg-abs-late-wrap" style="display:none;">
-        <div class="msg-abs-section-head">
-          <div class="msg-cat-header">&#x23F0; <span class="msg-abs-count-late">&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646;</span> (<span id="msg-abs-late-count">0</span>)</div>
-          <button type="button" class="msg-bulk" onclick="msgAbsenceBulk('late')">&#x1F680; &#x641;&#x62A;&#x62D; &#x627;&#x644;&#x643;&#x644; - &#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646;</button>
+      <div id="msg-abs-status" class="msg-empty" style="display:none;"></div>
+      <div id="msg-abs-section-unsent" class="msg-abs-section" style="display:none;">
+        <div class="msg-abs-section-title">
+          <span>&#x1F534; &#x628;&#x62D;&#x627;&#x62C;&#x629; &#x625;&#x644;&#x649; &#x631;&#x633;&#x627;&#x644;&#x629;</span>
+          <span class="msg-abs-section-count" id="msg-abs-unsent-count">0</span>
         </div>
-        <div id="msg-abs-late-list" class="msg-student-list"></div>
+        <div id="msg-abs-unsent-list" class="msg-abs-card-list"></div>
+      </div>
+      <div id="msg-abs-section-sent" class="msg-abs-section" style="display:none;">
+        <div class="msg-abs-section-title">
+          <span>&#x2705; &#x62A;&#x645; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</span>
+          <span class="msg-abs-section-count" id="msg-abs-sent-count">0</span>
+        </div>
+        <div id="msg-abs-sent-list" class="msg-abs-card-list"></div>
       </div>
     </div>
   </div>
@@ -1906,11 +1953,9 @@ function _msgFireReminder(r){
 }
 
 var _msgAbsenceRows = [];
-var _msgAbsenceLoadedGroups = false;
+var _msgAbsenceFilter = 'unsent';
 function msgOpenAbsence(){
   document.getElementById('msg-abs-modal').style.display = 'block';
-  // Always refresh the group list on open — attendance data changes often
-  // and the dropdown has to stay aligned with what's actually in the table.
   _msgAbsencePopulateGroups();
   var d = document.getElementById('msg-abs-date');
   if (!d.value) {
@@ -1919,135 +1964,259 @@ function msgOpenAbsence(){
     var day = String(now.getDate()).padStart(2,'0');
     d.value = now.getFullYear()+'-'+m+'-'+day;
   }
+  _msgAbsenceSetFilterButton('unsent');
+  _msgAbsenceFilter = 'unsent';
+  if (document.getElementById('msg-abs-group').value) msgAbsenceLoad();
+  else _msgAbsenceResetView('\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629');
 }
 function msgCloseAbsence(){ document.getElementById('msg-abs-modal').style.display = 'none'; }
+function _msgAbsenceResetView(message){
+  var alert = document.getElementById('msg-abs-alert'); alert.style.display = 'none';
+  document.getElementById('msg-abs-filters').style.display = 'none';
+  document.getElementById('msg-abs-section-unsent').style.display = 'none';
+  document.getElementById('msg-abs-section-sent').style.display = 'none';
+  var status = document.getElementById('msg-abs-status');
+  if (message) { status.style.display = 'block'; status.textContent = message; }
+  else { status.style.display = 'none'; }
+}
 function _msgAbsencePopulateGroups(){
   var sel = document.getElementById('msg-abs-group'); if (!sel) return;
   var previous = sel.value;
   var placeholder = sel.options[0];
-  // Source from /api/attendance/groups — the DISTINCT group names that
-  // actually appear in the attendance table. Using /api/groups instead
-  // would list student_groups entries that may have no attendance data.
   fetch('/api/attendance/groups',{credentials:'include'}).then(function(r){ return r.json(); }).then(function(data){
     sel.innerHTML = ''; if (placeholder) sel.appendChild(placeholder);
-    var names = Array.isArray(data) ? data : [];
-    names.forEach(function(n){
+    (Array.isArray(data) ? data : []).forEach(function(n){
       n = (n || '').trim(); if (!n) return;
       sel.appendChild(new Option(n, n));
     });
     if (previous) {
       for (var i=0; i<sel.options.length; i++) { if (sel.options[i].value === previous) { sel.value = previous; break; } }
     }
-    _msgAbsenceLoadedGroups = true;
-  }).catch(function(){ _msgAbsenceLoadedGroups = false; });
+  }).catch(function(){});
 }
 function msgAbsenceLoad(){
   var d = document.getElementById('msg-abs-date').value;
   var g = document.getElementById('msg-abs-group').value;
-  var status = document.getElementById('msg-abs-status');
-  var absW = document.getElementById('msg-abs-absent-wrap');
-  var lateW = document.getElementById('msg-abs-late-wrap');
-  absW.style.display = 'none'; lateW.style.display = 'none';
-  if (!d || !g) {
-    status.style.display = 'block';
-    status.textContent = '\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629';
-    return;
-  }
-  status.style.display = 'block';
-  status.textContent = 'جاري التحميل...';
+  if (!d || !g) { _msgAbsenceResetView('\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629'); return; }
+  _msgAbsenceResetView('\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...');
   fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(d) + '&group=' + encodeURIComponent(g), { credentials:'include' })
     .then(function(r){ return r.json(); })
     .then(function(data){
-      _msgAbsenceRows = (data && data.rows) || [];
-      if (!_msgAbsenceRows.length) {
-        status.style.display = 'block';
-        status.textContent = '\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u063A\u064A\u0627\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645';
-        return;
-      }
-      status.style.display = 'none';
+      var rows = (data && data.rows) || [];
+      // Keep only الغائب / المتأخر rows — we don't message حاضر / معتذر.
+      _msgAbsenceRows = rows.filter(function(r){ var s = (r.status||'').trim(); return s === '\u063A\u0627\u0626\u0628' || s === '\u0645\u062A\u0623\u062E\u0631'; });
+      if (!_msgAbsenceRows.length) { _msgAbsenceResetView('\u0644\u0627 \u062A\u0648\u062C\u062F \u0633\u062C\u0644\u0627\u062A \u063A\u064A\u0627\u0628 \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645'); return; }
+      document.getElementById('msg-abs-status').style.display = 'none';
+      document.getElementById('msg-abs-filters').style.display = 'flex';
       _msgAbsenceRender();
     })
-    .catch(function(){ status.style.display = 'block'; status.textContent = '\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644'; });
+    .catch(function(){ _msgAbsenceResetView('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644'); });
 }
-function _msgAbsenceRender(){
-  var absList = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === '\u063A\u0627\u0626\u0628'; });
-  var lateList = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === '\u0645\u062A\u0623\u062E\u0631'; });
-  _msgAbsenceRenderSection('absent', absList);
-  _msgAbsenceRenderSection('late', lateList);
-}
-function _msgAbsenceRenderSection(kind, rows){
-  var wrap = document.getElementById('msg-abs-' + kind + '-wrap');
-  var list = document.getElementById('msg-abs-' + kind + '-list');
-  var count = document.getElementById('msg-abs-' + kind + '-count');
-  list.innerHTML = '';
-  count.textContent = rows.length;
-  wrap.style.display = 'block';
-  if (!rows.length) {
-    var e = document.createElement('div'); e.className = 'msg-empty';
-    e.textContent = kind === 'absent' ? '\u0644\u0627 \u064A\u0648\u062C\u062F \u063A\u0627\u0626\u0628\u0648\u0646' : '\u0644\u0627 \u064A\u0648\u062C\u062F \u0645\u062A\u0623\u062E\u0631\u0648\u0646';
-    list.appendChild(e); return;
-  }
-  rows.forEach(function(r){
-    var row = document.createElement('div'); row.className = 'msg-student-row';
-    row.dataset.attId = String(r.id);
-    var left = document.createElement('span'); left.className = 'msg-student-name';
-    left.textContent = r.student_name || '-';
-    row.appendChild(left);
-    var right = document.createElement('span'); right.style.display = 'flex'; right.style.alignItems = 'center';
-    var sent = document.createElement('span'); sent.className = 'msg-abs-sent';
-    sent.textContent = (r.message_status === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644') ? ('✓ \u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644') : '';
-    right.appendChild(sent);
-    var phone = _msgCleanPhone(r.whatsapp);
-    if (phone) {
-      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'msg-wa';
-      btn.textContent = '\u0648\u0627\u062A\u0633\u0627\u0628';
-      btn.addEventListener('click', (function(rec, k){ return function(){ _msgAbsenceOpenWa(rec, k); }; })(r, kind));
-      right.appendChild(btn);
-    } else {
-      var sp = document.createElement('span'); sp.className = 'msg-wa msg-wa-disabled'; sp.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645'; right.appendChild(sp);
-    }
-    row.appendChild(right);
-    list.appendChild(row);
+function _msgAbsenceIsSent(r){ return (r.message_status || '').trim() === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644'; }
+function _msgAbsenceStatusKind(r){ return ((r.status || '').trim() === '\u0645\u062A\u0623\u062E\u0631') ? 'late' : 'absent'; }
+function _msgAbsenceSortRows(rows){
+  // Unsent first, then sent. Within each group, absent-first, then late, then by name.
+  return rows.slice().sort(function(a,b){
+    var sa = _msgAbsenceIsSent(a) ? 1 : 0;
+    var sb = _msgAbsenceIsSent(b) ? 1 : 0;
+    if (sa !== sb) return sa - sb;
+    var ka = _msgAbsenceStatusKind(a); var kb = _msgAbsenceStatusKind(b);
+    if (ka !== kb) return ka === 'absent' ? -1 : 1;
+    return (a.student_name || '').localeCompare(b.student_name || '');
   });
 }
-function _msgAbsenceMessage(row, kind){
+function _msgAbsenceRender(){
+  var sorted = _msgAbsenceSortRows(_msgAbsenceRows);
+  var unsentList = document.getElementById('msg-abs-unsent-list');
+  var sentList = document.getElementById('msg-abs-sent-list');
+  unsentList.innerHTML = ''; sentList.innerHTML = '';
+  var nUnsentAbs = 0, nUnsentLate = 0, nSent = 0;
+  sorted.forEach(function(r){
+    var card = _msgAbsenceBuildCard(r);
+    if (_msgAbsenceIsSent(r)) { sentList.appendChild(card); nSent++; }
+    else { unsentList.appendChild(card); if (_msgAbsenceStatusKind(r) === 'late') nUnsentLate++; else nUnsentAbs++; }
+  });
+  _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent);
+  _msgAbsenceApplyFilter();
+}
+function _msgAbsenceBuildCard(r){
+  var card = document.createElement('div');
+  card.className = 'msg-abs-card';
+  card.dataset.attId = String(r.id);
+  card.dataset.sent = _msgAbsenceIsSent(r) ? '1' : '0';
+  card.dataset.kind = _msgAbsenceStatusKind(r);
+  if (card.dataset.kind === 'late') card.classList.add('status-late');
+  if (card.dataset.sent === '1') card.classList.add('is-sent');
+  var left = document.createElement('div'); left.className = 'msg-abs-card-left';
+  var nameEl = document.createElement('div'); nameEl.className = 'msg-abs-card-name';
+  nameEl.textContent = r.student_name || '-';
+  left.appendChild(nameEl);
+  var meta = document.createElement('div'); meta.className = 'msg-abs-card-meta';
+  var badge = document.createElement('span');
+  badge.className = 'msg-abs-badge msg-abs-badge-' + card.dataset.kind;
+  badge.textContent = card.dataset.kind === 'late' ? '\u0645\u062A\u0623\u062E\u0631' : '\u063A\u0627\u0626\u0628';
+  meta.appendChild(badge);
+  var last = document.createElement('span'); last.className = 'msg-abs-last';
+  var ls = r.last_sent || '';
+  last.textContent = ls ? ('\u0622\u062E\u0631 \u0625\u0631\u0633\u0627\u0644: ' + _msgAbsenceFormatDate(ls)) : '\u0644\u0645 \u064A\u064F\u0631\u0633\u0644 \u0628\u0639\u062F';
+  meta.appendChild(last);
+  left.appendChild(meta);
+  card.appendChild(left);
+  var right = document.createElement('div'); right.className = 'msg-abs-card-right';
+  var sentBadge = document.createElement('span'); sentBadge.className = 'msg-abs-sent-badge';
+  sentBadge.textContent = card.dataset.sent === '1' ? '\u2713 \u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644' : '';
+  right.appendChild(sentBadge);
+  var phone = _msgCleanPhone(r.whatsapp);
+  if (phone) {
+    var btn = document.createElement('button'); btn.type='button'; btn.className='msg-wa';
+    btn.textContent = '\u0648\u0627\u062A\u0633\u0627\u0628';
+    btn.addEventListener('click', (function(rec){ return function(){ _msgAbsenceOpenWa(rec); }; })(r));
+    right.appendChild(btn);
+  } else {
+    var sp = document.createElement('span'); sp.className='msg-wa msg-wa-disabled'; sp.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645';
+    right.appendChild(sp);
+  }
+  card.appendChild(right);
+  return card;
+}
+function _msgAbsenceFormatDate(raw){
+  // Server returns 'YYYY-MM-DD HH:MM:SS' or an ISO string. Keep the date + HH:MM for brevity.
+  if (!raw) return '';
+  var s = String(raw).replace('T',' ');
+  var m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+  return m ? (m[1] + ' ' + m[2]) : s;
+}
+function _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent){
+  var nUnsent = nUnsentAbs + nUnsentLate;
+  document.getElementById('msg-abs-unsent-count').textContent = nUnsent;
+  document.getElementById('msg-abs-sent-count').textContent = nSent;
+  document.getElementById('msg-abs-fc-unsent').textContent = nUnsent;
+  document.getElementById('msg-abs-fc-sent').textContent = nSent;
+  document.getElementById('msg-abs-fc-all').textContent = nUnsent + nSent;
+  var alert = document.getElementById('msg-abs-alert');
+  alert.style.display = 'flex';
+  alert.className = 'msg-abs-alert';
+  if (nUnsent === 0) {
+    alert.classList.add('alert-ok');
+    alert.innerHTML = '&#x2705; <span>' + '\u0643\u0644 \u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u062A\u0645 \u0625\u0631\u0633\u0627\u0644\u0647\u0627 \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645' + '</span>';
+  } else {
+    alert.classList.add('alert-warn');
+    alert.innerHTML = '&#x1F534; <span><b>' + nUnsentAbs + '</b>' + ' \u063A\u0627\u0626\u0628\u064A\u0646 \u0648 ' + '<b>' + nUnsentLate + '</b>' + ' \u0645\u062A\u0623\u062E\u0631\u064A\u0646 \u0628\u062F\u0648\u0646 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u064A\u0648\u0645' + '</span>';
+  }
+}
+function _msgAbsenceSetFilterButton(filter){
+  var btns = document.querySelectorAll('.msg-abs-filter');
+  btns.forEach(function(b){ b.classList.toggle('active', b.dataset.filter === filter); });
+}
+function msgAbsenceSetFilter(filter){
+  _msgAbsenceFilter = filter;
+  _msgAbsenceSetFilterButton(filter);
+  _msgAbsenceApplyFilter();
+}
+function _msgAbsenceApplyFilter(){
+  var unsent = document.getElementById('msg-abs-section-unsent');
+  var sent = document.getElementById('msg-abs-section-sent');
+  var f = _msgAbsenceFilter;
+  var showUnsent = (f === 'unsent' || f === 'all');
+  var showSent   = (f === 'sent'   || f === 'all');
+  // Hide entire section only if it has zero cards; otherwise the header
+  // stays visible so the count remains in view.
+  var uHas = !!document.querySelector('#msg-abs-unsent-list .msg-abs-card');
+  var sHas = !!document.querySelector('#msg-abs-sent-list .msg-abs-card');
+  unsent.style.display = (showUnsent && uHas) ? 'block' : 'none';
+  sent.style.display   = (showSent   && sHas) ? 'block' : 'none';
+  var bulk = document.getElementById('msg-abs-bulk-btn');
+  // Bulk send only makes sense on the unsent side; hide it otherwise.
+  bulk.style.display = (f !== 'sent' && uHas) ? 'inline-flex' : 'none';
+  // When the filter has nothing to show (e.g. unsent view but everyone
+  // already received their message), surface a friendly status line.
+  var status = document.getElementById('msg-abs-status');
+  if (!uHas && !sHas) { status.style.display = 'block'; status.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629'; return; }
+  if (f === 'unsent' && !uHas) { status.style.display = 'block'; status.textContent = '\u0643\u0644 \u0627\u0644\u0631\u0633\u0627\u0626\u0644 \u062A\u0645 \u0625\u0631\u0633\u0627\u0644\u0647\u0627'; return; }
+  if (f === 'sent'   && !sHas) { status.style.display = 'block'; status.textContent = '\u0644\u0645 \u064A\u062A\u0645 \u0625\u0631\u0633\u0627\u0644 \u0623\u064A \u0631\u0633\u0627\u0644\u0629 \u0628\u0639\u062F'; return; }
+  status.style.display = 'none';
+}
+function _msgAbsenceMessage(row){
+  var kind = _msgAbsenceStatusKind(row);
   var name = row.student_name || '';
   if (kind === 'late') return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u062A\u0623\u062E\u0631/\u062A \u0639\u0646 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u064A\u0648\u0645';
   return '\u0646\u0641\u064A\u062F\u0643\u0645 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u0643\u0627\u0646/\u062A \u063A\u0627\u0626\u0628\u0627\u064B/\u0629 \u0627\u0644\u064A\u0648\u0645';
 }
-function _msgAbsenceTemplateName(kind){
-  return kind === 'late' ? '\u062A\u0623\u062E\u064A\u0631' : '\u063A\u064A\u0627\u0628';
+function _msgAbsenceTemplateName(row){
+  return _msgAbsenceStatusKind(row) === 'late' ? '\u062A\u0623\u062E\u064A\u0631' : '\u063A\u064A\u0627\u0628';
+}
+function _msgAbsenceLogSend(row, phone){
+  var body = { student_name: row.student_name || '', student_whatsapp: phone || (row.whatsapp || ''), template_name: _msgAbsenceTemplateName(row) };
+  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) }).catch(function(){});
 }
 function _msgAbsenceMarkSent(row){
   if (!row || !row.id) return;
-  row.message_status = '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644';
-  var rowEl = document.querySelector('.msg-student-row[data-att-id="' + row.id + '"]');
-  if (rowEl) { var badge = rowEl.querySelector('.msg-abs-sent'); if (badge) badge.textContent = '✓ \u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644'; }
   fetch('/api/attendance/' + row.id + '/mark-sent', { method:'POST', credentials:'include' }).catch(function(){});
 }
-function _msgAbsenceLog(row, kind){
-  var body = { student_name: row.student_name || '', student_whatsapp: _msgCleanPhone(row.whatsapp) || (row.whatsapp || ''), template_name: _msgAbsenceTemplateName(kind) };
-  fetch('/api/message-log', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) }).catch(function(){});
+function _msgAbsenceTransitionToSent(row){
+  var card = document.querySelector('.msg-abs-card[data-att-id="' + row.id + '"]');
+  if (!card || card.dataset.sent === '1') return;
+  // Phase 1: fade + slide out of its current spot.
+  card.classList.add('leaving');
+  setTimeout(function(){
+    // Update local row state.
+    row.message_status = '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644';
+    row.last_sent = _msgAbsenceNowString();
+    // Rebuild the card so badges / meta reflect the new state.
+    var fresh = _msgAbsenceBuildCard(row);
+    fresh.classList.add('arriving');
+    var sentList = document.getElementById('msg-abs-sent-list');
+    sentList.appendChild(fresh);
+    card.parentNode && card.parentNode.removeChild(card);
+    // Recompute counts/alert.
+    var nUnsentAbs = 0, nUnsentLate = 0, nSent = 0;
+    _msgAbsenceRows.forEach(function(r){
+      if (_msgAbsenceIsSent(r)) nSent++;
+      else if (_msgAbsenceStatusKind(r) === 'late') nUnsentLate++;
+      else nUnsentAbs++;
+    });
+    _msgAbsenceUpdateSummary(nUnsentAbs, nUnsentLate, nSent);
+    _msgAbsenceApplyFilter();
+    // Phase 2: fade in on the new side.
+    requestAnimationFrame(function(){ fresh.classList.remove('arriving'); });
+  }, 320);
 }
-function _msgAbsenceOpenWa(row, kind){
+function _msgAbsenceNowString(){
+  var d = new Date();
+  function p(n){ return String(n).padStart(2,'0'); }
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function _msgAbsenceOpenWa(row){
   var phone = _msgCleanPhone(row.whatsapp); if (!phone) return;
-  var text = _msgAbsenceMessage(row, kind);
+  var text = _msgAbsenceMessage(row);
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
-  _msgAbsenceLog(row, kind);
+  _msgAbsenceLogSend(row, phone);
   _msgAbsenceMarkSent(row);
+  _msgAbsenceTransitionToSent(row);
 }
-function msgAbsenceBulk(kind){
-  var statusVal = kind === 'late' ? '\u0645\u062A\u0623\u062E\u0631' : '\u063A\u0627\u0626\u0628';
-  var targets = _msgAbsenceRows.filter(function(r){ return (r.status || '').trim() === statusVal && _msgCleanPhone(r.whatsapp); });
-  if (!targets.length) { alert('\u0644\u0627 \u064A\u0648\u062C\u062F \u0623\u064A \u0637\u0627\u0644\u0628 \u0628\u0631\u0642\u0645 \u0648\u0627\u062A\u0633\u0627\u0628 \u0635\u0627\u0644\u062D'); return; }
+function _msgAbsenceVisibleTargets(){
+  // Only open links for rows visible under the current filter AND still
+  // unsent AND carrying a valid phone.
+  var f = _msgAbsenceFilter;
+  return _msgAbsenceRows.filter(function(r){
+    if (_msgAbsenceIsSent(r)) return false; // never bulk-send to already-sent
+    if (!_msgCleanPhone(r.whatsapp)) return false;
+    if (f === 'sent') return false;
+    return true; // 'unsent' and 'all' both include unsent rows
+  });
+}
+function msgAbsenceBulk(){
+  var targets = _msgAbsenceVisibleTargets();
+  if (!targets.length) { alert('\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0645\u0637\u0627\u0628\u0642\u0648\u0646 \u0644\u0644\u0641\u0644\u062A\u0631 \u0627\u0644\u062D\u0627\u0644\u064A'); return; }
   if (targets.length > 1 && !confirm('\u0633\u064A\u062A\u0645 \u0641\u062A\u062D \u0639\u062F\u0629 \u0646\u0648\u0627\u0641\u0630 \u0648\u0627\u062A\u0633\u0627\u0628 \u2014 \u0647\u0644 \u062A\u0631\u064A\u062F \u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629\u061F')) return;
   targets.forEach(function(row, idx){
     setTimeout(function(){
       var phone = _msgCleanPhone(row.whatsapp);
-      var text = _msgAbsenceMessage(row, kind);
+      var text = _msgAbsenceMessage(row);
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
-      _msgAbsenceLog(row, kind);
+      _msgAbsenceLogSend(row, phone);
       _msgAbsenceMarkSent(row);
+      _msgAbsenceTransitionToSent(row);
     }, idx * 400);
   });
 }
@@ -5775,9 +5944,14 @@ def api_attendance_by_date_group():
     db = get_db()
     rows = db.execute(
         """SELECT a.id, a.attendance_date, a.group_name, a.student_name, a.status,
-                  a.message_status, s.whatsapp
+                  a.message_status, s.whatsapp, ml.last_sent
              FROM attendance a
              LEFT JOIN students s ON s.student_name = a.student_name
+             LEFT JOIN (
+                 SELECT student_name, MAX(sent_at) AS last_sent
+                   FROM message_log
+                  GROUP BY student_name
+             ) ml ON ml.student_name = a.student_name
             WHERE a.attendance_date=? AND a.group_name=?
             ORDER BY a.student_name""",
         (date, group)
