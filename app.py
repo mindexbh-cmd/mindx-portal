@@ -1138,6 +1138,10 @@ function srSave(){
 .msg-vars{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
 .msg-var{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .1s;}
 .msg-var:hover{transform:translateY(-1px);}
+.msg-var-custom{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);}
+.msg-picker{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+.msg-picker-field{flex:1;min-width:180px;}
+.msg-picker-field .msg-label{margin-top:6px;}
 .msg-select{width:100%;padding:10px 12px;border:1.5px solid #b39ddb;border-radius:10px;font-size:.95rem;background:#faf7ff;outline:none;font-family:inherit;}
 .msg-select:focus{border-color:#6B3FA0;background:#fff;}
 .msg-student-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
@@ -1173,6 +1177,21 @@ function srSave(){
           <button type="button" class="msg-var" onclick="msgInsertVar('name')">&#x1F464; &#x627;&#x644;&#x627;&#x633;&#x645;</button>
           <button type="button" class="msg-var" onclick="msgInsertVar('time')">&#x1F551; &#x627;&#x644;&#x648;&#x642;&#x62A;</button>
           <button type="button" class="msg-var" onclick="msgInsertVar('days')">&#x1F4C5; &#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</button>
+          <button type="button" class="msg-var msg-var-custom" onclick="msgInsertCustomVar()">&#x2728; &#x645;&#x62A;&#x63A;&#x64A;&#x631; &#x633;</button>
+        </div>
+        <div class="msg-picker">
+          <div class="msg-picker-field">
+            <label class="msg-label" for="msg-table">&#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
+            <select id="msg-table" class="msg-select" onchange="msgOnTableChange()">
+              <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &mdash;</option>
+              <option value="students">&#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</option>
+              <option value="groups">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</option>
+            </select>
+          </div>
+          <div class="msg-picker-field">
+            <label class="msg-label" for="msg-col">&#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;</label>
+            <select id="msg-col" class="msg-select"><option value="">&mdash;</option></select>
+          </div>
         </div>
         <label class="msg-label" for="msg-group">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
         <select id="msg-group" class="msg-select" onchange="msgRenderStudents()">
@@ -1187,6 +1206,7 @@ function srSave(){
 <script>
 var _msgGroups = [];
 var _msgStudentsByGroup = {};
+var _msgTableColumns = { students: [], groups: [] };
 var _msgLoaded = false;
 function msgOpen(){
   document.getElementById('msg-modal').style.display='block';
@@ -1195,7 +1215,9 @@ function msgOpen(){
   _msgLoaded = true;
   Promise.all([
     fetch('/api/groups',{credentials:'include'}).then(function(r){return r.json();}),
-    fetch('/api/students',{credentials:'include'}).then(function(r){return r.json();})
+    fetch('/api/students',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/columns',{credentials:'include'}).then(function(r){return r.json();}).catch(function(){return {columns:[]};}),
+    fetch('/api/group-columns',{credentials:'include'}).then(function(r){return r.json();}).catch(function(){return {columns:[]};})
   ]).then(function(res){
     _msgGroups = (res[0] && res[0].groups) ? res[0].groups : [];
     var students = (res[1] && res[1].students) ? res[1].students : [];
@@ -1207,6 +1229,8 @@ function msgOpen(){
       if (!_msgStudentsByGroup[g]) _msgStudentsByGroup[g] = [];
       _msgStudentsByGroup[g].push(s);
     }
+    _msgTableColumns.students = _msgBuildColumnList((res[2] && res[2].columns) || [], students[0]);
+    _msgTableColumns.groups   = _msgBuildColumnList((res[3] && res[3].columns) || [], _msgGroups[0]);
     var sel = document.getElementById('msg-group');
     var seen = {};
     for (var j=0; j<_msgGroups.length; j++) {
@@ -1228,9 +1252,7 @@ function msgShowComposer(){
   document.getElementById('msg-hub').style.display='none';
   document.getElementById('msg-composer').style.display='block';
 }
-function msgInsertVar(kind){
-  var map = { name:'{\u0627\u0633\u0645}', time:'{\u0648\u0642\u062A}', days:'{\u0623\u064A\u0627\u0645}' };
-  var token = map[kind]; if (!token) return;
+function _msgInsertAtCursor(token){
   var ta = document.getElementById('msg-text');
   var start = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
   var end = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
@@ -1238,6 +1260,49 @@ function msgInsertVar(kind){
   var pos = start + token.length;
   ta.focus();
   try { ta.setSelectionRange(pos, pos); } catch(e){}
+}
+function msgInsertVar(kind){
+  var map = { name:'{\u0627\u0633\u0645}', time:'{\u0648\u0642\u062A}', days:'{\u0623\u064A\u0627\u0645}' };
+  if (map[kind]) _msgInsertAtCursor(map[kind]);
+}
+function msgInsertCustomVar(){
+  var t = document.getElementById('msg-table').value;
+  var c = document.getElementById('msg-col').value;
+  if (!t || !c) return;
+  _msgInsertAtCursor('{' + t + ':' + c + '}');
+}
+function _msgDecodeEntities(s){
+  var d = document.createElement('textarea');
+  d.innerHTML = String(s == null ? '' : s);
+  return d.value;
+}
+function _msgBuildColumnList(labelRows, sampleRow){
+  var keys = [];
+  var seen = {};
+  labelRows.forEach(function(r){
+    if (!r || !r.col_key) return;
+    seen[r.col_key] = 1;
+    keys.push({ key: r.col_key, label: _msgDecodeEntities(r.col_label || r.col_key) });
+  });
+  if (sampleRow) {
+    Object.keys(sampleRow).forEach(function(k){
+      if (seen[k] || k === 'id' || k === 'created_at') return;
+      keys.push({ key: k, label: k });
+    });
+  }
+  return keys;
+}
+function msgOnTableChange(){
+  var t = document.getElementById('msg-table').value;
+  var sel = document.getElementById('msg-col');
+  sel.innerHTML = '<option value="">—</option>';
+  var cols = _msgTableColumns[t] || [];
+  cols.forEach(function(c){
+    var opt = document.createElement('option');
+    opt.value = c.key;
+    opt.textContent = c.label + ' (' + c.key + ')';
+    sel.appendChild(opt);
+  });
 }
 function _msgFindGroup(name){
   for (var i=0; i<_msgGroups.length; i++) {
@@ -1256,48 +1321,61 @@ function _msgFill(tpl, student, group){
   var name = (student && student.student_name) || '';
   var time = (group && group.study_time) || '';
   var days = (group && group.study_days) || '';
-  return String(tpl || '')
+  var text = String(tpl || '')
     .replace(/\{\u0627\u0633\u0645\}/g, name)
     .replace(/\{\u0648\u0642\u062A\}/g, time)
     .replace(/\{\u0623\u064A\u0627\u0645\}/g, days);
-}
-function _msgEsc(s){
-  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  text = text.replace(/\{(students|groups):([A-Za-z0-9_]+)\}/g, function(_m, table, col){
+    var src = table === 'students' ? student : group;
+    if (!src) return '';
+    var v = src[col];
+    return (v == null) ? '' : String(v);
+  });
+  return text;
 }
 function msgRenderStudents(){
-  var sel = document.getElementById('msg-group');
-  var gname = sel.value;
+  var gname = document.getElementById('msg-group').value;
   var wrap = document.getElementById('msg-students');
   var lbl = document.getElementById('msg-students-label');
-  if (!gname) { wrap.innerHTML=''; lbl.style.display='none'; return; }
-  lbl.style.display='block';
+  wrap.innerHTML = '';
+  if (!gname) { lbl.style.display = 'none'; return; }
+  lbl.style.display = 'block';
   var students = _msgStudentsByGroup[gname] || [];
   if (!students.length) {
-    wrap.innerHTML = '<div class="msg-empty">\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</div>';
+    var empty = document.createElement('div');
+    empty.className = 'msg-empty';
+    empty.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629';
+    wrap.appendChild(empty);
     return;
   }
-  var html = '';
-  for (var i=0; i<students.length; i++) {
-    var s = students[i];
+  students.forEach(function(s){
+    var row = document.createElement('div');
+    row.className = 'msg-student-row';
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'msg-student-name';
+    nameSpan.textContent = s.student_name || '-';
+    row.appendChild(nameSpan);
     var phone = _msgCleanPhone(s.whatsapp);
-    var name = _msgEsc(s.student_name || '-');
     if (phone) {
-      html += '<div class="msg-student-row"><span class="msg-student-name">'+name+'</span>'
-           +  '<button type="button" class="msg-wa" data-sid="'+s.id+'" onclick="msgOpenWa('+s.id+',\''+gname.replace(/'/g,"\\'")+'\')">'
-           +  '\u0648\u0627\u062A\u0633\u0627\u0628</button></div>';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'msg-wa';
+      btn.textContent = '\u0648\u0627\u062A\u0633\u0627\u0628';
+      btn.addEventListener('click', (function(student, groupName){
+        return function(){ _msgOpenWa(student, groupName); };
+      })(s, gname));
+      row.appendChild(btn);
     } else {
-      html += '<div class="msg-student-row"><span class="msg-student-name">'+name+'</span>'
-           +  '<span class="msg-wa msg-wa-disabled">\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645</span></div>';
+      var span = document.createElement('span');
+      span.className = 'msg-wa msg-wa-disabled';
+      span.textContent = '\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645';
+      row.appendChild(span);
     }
-  }
-  wrap.innerHTML = html;
+    wrap.appendChild(row);
+  });
 }
-function msgOpenWa(sid, gname){
-  var students = _msgStudentsByGroup[gname] || [];
-  var student = null;
-  for (var i=0; i<students.length; i++) { if (String(students[i].id) === String(sid)) { student = students[i]; break; } }
-  if (!student) return;
-  var phone = _msgCleanPhone(student.whatsapp);
+function _msgOpenWa(student, gname){
+  var phone = _msgCleanPhone(student && student.whatsapp);
   if (!phone) return;
   var group = _msgFindGroup(gname);
   var tpl = document.getElementById('msg-text').value || '';
