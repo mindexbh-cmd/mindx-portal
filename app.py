@@ -1909,24 +1909,37 @@ var _msgAbsenceRows = [];
 var _msgAbsenceLoadedGroups = false;
 function msgOpenAbsence(){
   document.getElementById('msg-abs-modal').style.display = 'block';
-  if (!_msgAbsenceLoadedGroups) { _msgAbsencePopulateGroups(); }
-  // default date to today if not already chosen
+  // Always refresh the group list on open — attendance data changes often
+  // and the dropdown has to stay aligned with what's actually in the table.
+  _msgAbsencePopulateGroups();
   var d = document.getElementById('msg-abs-date');
-  if (!d.value) { var now = new Date(); var m = String(now.getMonth()+1).padStart(2,'0'); var day = String(now.getDate()).padStart(2,'0'); d.value = now.getFullYear()+'-'+m+'-'+day; }
+  if (!d.value) {
+    var now = new Date();
+    var m = String(now.getMonth()+1).padStart(2,'0');
+    var day = String(now.getDate()).padStart(2,'0');
+    d.value = now.getFullYear()+'-'+m+'-'+day;
+  }
 }
 function msgCloseAbsence(){ document.getElementById('msg-abs-modal').style.display = 'none'; }
 function _msgAbsencePopulateGroups(){
   var sel = document.getElementById('msg-abs-group'); if (!sel) return;
-  // Preserve the current empty option then append unique group names.
+  var previous = sel.value;
   var placeholder = sel.options[0];
-  sel.innerHTML = ''; if (placeholder) sel.appendChild(placeholder);
-  var seen = {};
-  for (var i=0; i<_msgGroups.length; i++) {
-    var n = (_msgGroups[i].group_name || '').trim();
-    if (!n || seen[n]) continue; seen[n] = 1;
-    sel.appendChild(new Option(n, n));
-  }
-  _msgAbsenceLoadedGroups = true;
+  // Source from /api/attendance/groups — the DISTINCT group names that
+  // actually appear in the attendance table. Using /api/groups instead
+  // would list student_groups entries that may have no attendance data.
+  fetch('/api/attendance/groups',{credentials:'include'}).then(function(r){ return r.json(); }).then(function(data){
+    sel.innerHTML = ''; if (placeholder) sel.appendChild(placeholder);
+    var names = Array.isArray(data) ? data : [];
+    names.forEach(function(n){
+      n = (n || '').trim(); if (!n) return;
+      sel.appendChild(new Option(n, n));
+    });
+    if (previous) {
+      for (var i=0; i<sel.options.length; i++) { if (sel.options[i].value === previous) { sel.value = previous; break; } }
+    }
+    _msgAbsenceLoadedGroups = true;
+  }).catch(function(){ _msgAbsenceLoadedGroups = false; });
 }
 function msgAbsenceLoad(){
   var d = document.getElementById('msg-abs-date').value;
