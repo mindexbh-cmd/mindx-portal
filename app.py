@@ -4237,11 +4237,40 @@ function renderTaqseet() {
     applyFreezeToTable('taqseet');
     return;
   }
-  var fields = ['taqseet_method','student_name','course_amount','num_installments',
+  var baseFields = ['taqseet_method','student_name','course_amount','num_installments',
     'inst1','paid1','date1','inst2','paid2','date2','inst3','paid3','date3','inst4','paid4','date4',
     'inst5','paid5','date5','inst6','paid6','date6','inst7','paid7','date7','inst8','paid8','date8',
     'inst9','paid9','date9','inst10','paid10','date10','inst11','paid11','date11','inst12','paid12','date12',
     'study_hours','start_date'];
+  // Detect extra columns (auto-created via Excel import) present in the data
+  // but not in the static header. Append them after the baseline columns so
+  // they show up in the UI.
+  var seen = {id:1, created_at:1};
+  baseFields.forEach(function(f){ seen[f] = 1; });
+  var extraFields = [];
+  allTaqseet.forEach(function(r){
+    Object.keys(r).forEach(function(k){
+      if(!seen[k]){ seen[k] = 1; extraFields.push(k); }
+    });
+  });
+  var fields = baseFields.concat(extraFields);
+  // If extras exist, append matching <th> cells to the thead (idempotent).
+  if(extraFields.length){
+    var thead = document.querySelector('#taqseetTable thead tr');
+    if(thead){
+      var existingKeys = {};
+      thead.querySelectorAll('th[data-col]').forEach(function(th){ existingKeys[th.dataset.col] = 1; });
+      var actionsTh = thead.lastElementChild;
+      extraFields.forEach(function(k){
+        if(existingKeys[k]) return;
+        var th = document.createElement('th');
+        th.dataset.col = k;
+        th.style.cssText = 'padding:10px 8px;white-space:nowrap;min-width:110px;';
+        th.textContent = k;
+        thead.insertBefore(th, actionsTh);
+      });
+    }
+  }
   tbody.innerHTML = allTaqseet.map(function(r, i) {
     var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
     var cells = fields.map(function(f) {
@@ -5820,7 +5849,39 @@ var IMPORT_DEFS = {
       {key:"course_amount", ar:"\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629"},
       {key:"num_installments", ar:"\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637"},
       {key:"study_hours", ar:"\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062F\u0631\u0627\u0633\u0629"},
-      {key:"start_date", ar:"\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0628\u062F\u0621"}
+      {key:"start_date", ar:"\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0628\u062F\u0621"},
+      {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
+      {key:"personal_id", ar:"\u0627\u0644\u0631\u0642\u0645"},
+      {key:"registration_status", ar:"\u062D\u0627\u0644\u0629 \u0627\u0644\u062A\u0633\u062C\u064A\u0644"},
+      {key:"course_amount", ar:"\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0627\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u0633\u062A\u062D\u0642"},
+      {key:"course_amount", ar:"\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u0633\u062A\u062D\u0642"},
+      {key:"inst1", ar:"\u0627\u0644\u0642\u0633\u0637 1"},
+      {key:"inst2", ar:"\u0627\u0644\u0642\u0633\u0637 2"},
+      {key:"inst3", ar:"\u0627\u0644\u0642\u0633\u0637 3"},
+      {key:"inst4", ar:"\u0627\u0644\u0642\u0633\u0637 4"},
+      {key:"inst5", ar:"\u0627\u0644\u0642\u0633\u0637 5"},
+      {key:"inst6", ar:"\u0627\u0644\u0642\u0633\u0637 6"},
+      {key:"inst7", ar:"\u0627\u0644\u0642\u0633\u0637 7"},
+      {key:"inst8", ar:"\u0627\u0644\u0642\u0633\u0637 8"},
+      {key:"inst9", ar:"\u0627\u0644\u0642\u0633\u0637 9"},
+      {key:"inst10", ar:"\u0627\u0644\u0642\u0633\u0637 10"},
+      {key:"inst11", ar:"\u0627\u0644\u0642\u0633\u0637 11"},
+      {key:"inst12", ar:"\u0627\u0644\u0642\u0633\u0637 12"},
+      {key:"msg1", ar:"\u0627\u0644\u0642\u0633\u0637 1 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg2", ar:"\u0627\u0644\u0642\u0633\u0637 2 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg3", ar:"\u0627\u0644\u0642\u0633\u0637 3 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg4", ar:"\u0627\u0644\u0642\u0633\u0637 4 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg5", ar:"\u0627\u0644\u0642\u0633\u0637 5 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg6", ar:"\u0627\u0644\u0642\u0633\u0637 6 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg7", ar:"\u0627\u0644\u0642\u0633\u0637 7 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg8", ar:"\u0627\u0644\u0642\u0633\u0637 8 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg9", ar:"\u0627\u0644\u0642\u0633\u0637 9 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg10", ar:"\u0627\u0644\u0642\u0633\u0637 10 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg11", ar:"\u0627\u0644\u0642\u0633\u0637 11 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"msg12", ar:"\u0627\u0644\u0642\u0633\u0637 12 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"total_paid", ar:"\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639"},
+      {key:"total_remaining", ar:"\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062A\u0628\u0642\u064A"},
+      {key:"payment_status", ar:"\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0627\u062A"},
     ]
   },
   payment_log: {
@@ -6000,7 +6061,11 @@ function importGenericFromExcel() {
   var statusEl = document.getElementById('genExcelStatus');
   btn.disabled = true;
   btn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F...";
-  fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table: tbl, rows: mapped})})
+  // auto_create lets the backend ALTER TABLE to add new columns that appear
+  // in the Excel file but don't exist yet in the taqseet schema.
+  var body = {table: tbl, rows: mapped};
+  if (tbl === 'taqseet') body.auto_create = true;
+  fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){ return r.json(); })
     .then(function(d){
       btn.disabled = false;
@@ -7537,24 +7602,16 @@ def api_taqseet_post():
 @app.route('/api/taqseet/<int:row_id>', methods=['PUT'])
 @login_required
 def api_taqseet_put(row_id):
-    d = request.get_json()
+    d = request.get_json() or {}
     db = get_db()
-    db.execute("""UPDATE taqseet SET
-        taqseet_method=?, student_name=?, course_amount=?, num_installments=?,
-        inst1=?, paid1=?, date1=?, inst2=?, paid2=?, date2=?, inst3=?, paid3=?, date3=?, inst4=?, paid4=?, date4=?,
-        inst5=?, paid5=?, date5=?, inst6=?, paid6=?, date6=?, inst7=?, paid7=?, date7=?, inst8=?, paid8=?, date8=?,
-        inst9=?, paid9=?, date9=?, inst10=?, paid10=?, date10=?, inst11=?, paid11=?, date11=?, inst12=?, paid12=?, date12=?,
-        study_hours=?, start_date=?
-        WHERE id=?""",
-    (d.get('taqseet_method',''), d.get('student_name',''), d.get('course_amount',''),
-     d.get('num_installments',''),
-     d.get('inst1',''), d.get('paid1',''), d.get('date1',''), d.get('inst2',''), d.get('paid2',''), d.get('date2',''),
-     d.get('inst3',''), d.get('paid3',''), d.get('date3',''), d.get('inst4',''), d.get('paid4',''), d.get('date4',''),
-     d.get('inst5',''), d.get('paid5',''), d.get('date5',''), d.get('inst6',''), d.get('paid6',''), d.get('date6',''),
-     d.get('inst7',''), d.get('paid7',''), d.get('date7',''), d.get('inst8',''), d.get('paid8',''), d.get('date8',''),
-     d.get('inst9',''), d.get('paid9',''), d.get('date9',''), d.get('inst10',''), d.get('paid10',''), d.get('date10',''),
-     d.get('inst11',''), d.get('paid11',''), d.get('date11',''), d.get('inst12',''), d.get('paid12',''), d.get('date12',''),
-     d.get('study_hours',''), d.get('start_date',''), row_id))
+    # Reflect live schema so columns auto-added via Excel import also persist.
+    cols = [r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()]
+    writable = [c for c in cols if c != "id" and c in d]
+    if not writable:
+        return jsonify({"ok": True})
+    set_clause = ",".join([c + "=?" for c in writable])
+    values = tuple(d.get(c, '') for c in writable) + (row_id,)
+    db.execute("UPDATE taqseet SET " + set_clause + " WHERE id=?", values)
     db.commit()
     return jsonify({"ok": True})
 
@@ -7678,15 +7735,37 @@ def api_import():
     d = request.get_json() or {}
     table = d.get('table', '')
     rows = d.get('rows', [])
+    auto_create = bool(d.get('auto_create', False))
     fields = IMPORT_TABLE_FIELDS.get(table)
     if not fields:
         return jsonify({"ok": False, "error": "unknown table"}), 400
     db = get_db()
-    # Filter to columns that actually exist in the live table schema.
-    # Prevents every row from failing when the hardcoded list drifts from
-    # the deployed DB (e.g. a column was never migrated, or was dropped via the UI).
     live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
-    fields = [f for f in fields if f in live_cols]
+
+    if auto_create:
+        # Gather all keys appearing in incoming rows, plus the whitelisted fields,
+        # then ALTER TABLE for any safe key that isn't already a column.
+        # Safe-key rule: 1-63 chars of [A-Za-z0-9_] starting with a letter/underscore.
+        import re as _re_local
+        safe_rx = _re_local.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+        incoming = set()
+        for r in rows:
+            if isinstance(r, dict):
+                incoming.update(r.keys())
+        candidates = set(fields) | {k for k in incoming if safe_rx.match(k or '')}
+        missing = candidates - live_cols - {"id"}
+        for col in sorted(missing):
+            try:
+                db.execute("ALTER TABLE " + table + " ADD COLUMN " + col + " TEXT")
+                live_cols.add(col)
+            except Exception:
+                pass
+        db.commit()
+        # Use every candidate that now exists as a live column.
+        fields = [c for c in candidates if c in live_cols]
+    else:
+        fields = [f for f in fields if f in live_cols]
+
     if not fields:
         return jsonify({"ok": False, "error": "no matching columns in table " + table}), 400
     imported = 0
@@ -7711,6 +7790,7 @@ def api_import():
     return jsonify({
         "ok": True, "imported": imported, "ignored": ignored,
         "errors": errors, "received": len(rows), "last_error": last_error,
+        "fields_used": fields,
     })
 
 @app.route('/api/attendance/sessions', methods=['GET'])
