@@ -364,6 +364,10 @@ def init_db():
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS taqseet_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT)""")
     db.commit()
     db.close()
 
@@ -657,6 +661,10 @@ if True:
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS taqseet_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT)""")
     if "paylog_labels_v1" not in applied:
         seed_paylog_labels = [
             ("student_name", "&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;", 1),
@@ -4220,10 +4228,15 @@ function applyFreezeFromModal(){
 // \u2500\u2500\u2500 Taqseet (Payment Plans) Table \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var allTaqseet = null;
 var editingTaqseetId = null;
+var taqseetLabels = {};  // col_key -> Arabic label for dynamically-added columns
 
 function loadTaqseet() {
-  fetch('/api/taqseet').then(function(r){return r.json();}).then(function(data){
-    allTaqseet = data;
+  Promise.all([
+    fetch('/api/taqseet').then(function(r){return r.json();}),
+    fetch('/api/taqseet-labels').then(function(r){return r.ok ? r.json() : {};}).catch(function(){return {};})
+  ]).then(function(res){
+    allTaqseet = res[0] || [];
+    taqseetLabels = res[1] || {};
     document.getElementById('taqseetCount').textContent = allTaqseet.length;
     renderTaqseet();
   });
@@ -4266,7 +4279,7 @@ function renderTaqseet() {
         var th = document.createElement('th');
         th.dataset.col = k;
         th.style.cssText = 'padding:10px 8px;white-space:nowrap;min-width:110px;';
-        th.textContent = k;
+        th.textContent = (taqseetLabels && taqseetLabels[k]) || k;
         thead.insertBefore(th, actionsTh);
       });
     }
@@ -6038,15 +6051,42 @@ function _arNorm(s){
     .replace(/\s+/g,' ')
     .trim();
 }
-function mapGenericRow(headers, row, defs) {
+function _genColKey(raw) {
+  // Generate a deterministic, safe column identifier from an arbitrary
+  // (often Arabic) header string. ASCII slug if possible, otherwise a
+  // DJB2 hash of the normalized text prefixed with "xcol_".
+  var s = String(raw==null?'':raw);
+  var slug = s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  if (/^[a-z_][a-z0-9_]{0,63}$/.test(slug)) return slug;
+  var norm = _arNorm(s);
+  var h = 5381;
+  for (var i=0; i<norm.length; i++){ h = ((h<<5) + h + norm.charCodeAt(i)) >>> 0; }
+  return 'xcol_' + h.toString(36);
+}
+function mapGenericRow(headers, row, defs, opts) {
+  // opts: { allowAutoCreate: bool, labelMap: {key->label} out-param }
+  opts = opts || {};
   var result = {};
   for(var i=0; i<headers.length; i++){
-    var h = _arNorm(headers[i]); if(!h) continue;
+    var rawHdr = headers[i];
+    var h = _arNorm(rawHdr); if(!h) continue;       // skip empty headers
+    var matched = false;
     for(var j=0; j<defs.fields.length; j++){
       var f = defs.fields[j];
       if(h === f.key || h === _arNorm(f.ar)){
         result[f.key] = String(row[i]==null?'':row[i]);
+        if (opts.labelMap && !opts.labelMap[f.key]) {
+          opts.labelMap[f.key] = String(rawHdr||'').trim() || f.ar;
+        }
+        matched = true;
         break;
+      }
+    }
+    if (!matched && opts.allowAutoCreate) {
+      var k = _genColKey(rawHdr);
+      if (k) {
+        result[k] = String(row[i]==null?'':row[i]);
+        if (opts.labelMap) opts.labelMap[k] = String(rawHdr||'').trim();
       }
     }
   }
@@ -6056,15 +6096,19 @@ function importGenericFromExcel() {
   var tbl = document.getElementById('genExcelTable').value;
   var defs = IMPORT_DEFS[tbl];
   if(!defs || !genExcelRows.length) return;
-  var mapped = genExcelRows.map(function(r){ return mapGenericRow(genExcelHeaders, r, defs); });
+  var allowAutoCreate = (tbl === 'taqseet');
+  var labelMap = {};
+  var mapped = genExcelRows.map(function(r){
+    return mapGenericRow(genExcelHeaders, r, defs, {allowAutoCreate: allowAutoCreate, labelMap: labelMap});
+  });
   var btn = document.getElementById('genExcelImportBtn');
   var statusEl = document.getElementById('genExcelStatus');
   btn.disabled = true;
   btn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F...";
-  // auto_create lets the backend ALTER TABLE to add new columns that appear
-  // in the Excel file but don't exist yet in the taqseet schema.
+  // For taqseet: let the backend ALTER TABLE to add any Excel-header keys that
+  // aren't already columns, and persist the Arabic labels so they render.
   var body = {table: tbl, rows: mapped};
-  if (tbl === 'taqseet') body.auto_create = true;
+  if (allowAutoCreate) { body.auto_create = true; body.column_labels = labelMap; }
   fetch('/api/import', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -7623,6 +7667,16 @@ def api_taqseet_delete(row_id):
     db.commit()
     return jsonify({"ok": True})
 
+@app.route('/api/taqseet-labels', methods=['GET'])
+@login_required
+def api_taqseet_labels_get():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT col_key,col_label FROM taqseet_col_labels").fetchall()
+        return jsonify({r[0]: r[1] for r in rows})
+    except Exception:
+        return jsonify({})
+
 
 @app.route('/api/payments/<int:student_id>/<int:inst_num>', methods=['PUT'])
 @login_required
@@ -7736,6 +7790,7 @@ def api_import():
     table = d.get('table', '')
     rows = d.get('rows', [])
     auto_create = bool(d.get('auto_create', False))
+    column_labels = d.get('column_labels') or {}
     fields = IMPORT_TABLE_FIELDS.get(table)
     if not fields:
         return jsonify({"ok": False, "error": "unknown table"}), 400
@@ -7763,6 +7818,24 @@ def api_import():
         db.commit()
         # Use every candidate that now exists as a live column.
         fields = [c for c in candidates if c in live_cols]
+        # Persist column labels for taqseet so Arabic headers survive and
+        # render correctly for auto-created columns.
+        if table == 'taqseet' and isinstance(column_labels, dict) and column_labels:
+            try:
+                for key, label in column_labels.items():
+                    if not key or not isinstance(key, str) or not safe_rx.match(key):
+                        continue
+                    lbl = str(label or '').strip()
+                    if not lbl:
+                        continue
+                    db.execute(
+                        "INSERT INTO taqseet_col_labels(col_key,col_label) VALUES(?,?) "
+                        "ON CONFLICT(col_key) DO UPDATE SET col_label=EXCLUDED.col_label",
+                        (key, lbl),
+                    )
+                db.commit()
+            except Exception:
+                pass
     else:
         fields = [f for f in fields if f in live_cols]
 
