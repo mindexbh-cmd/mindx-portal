@@ -368,6 +368,29 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
         col_label TEXT)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS evaluations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        form_fill_date TEXT,
+        group_name TEXT,
+        student_name TEXT,
+        class_participation TEXT,
+        general_behavior TEXT,
+        behavior_notes TEXT,
+        reading TEXT,
+        dictation TEXT,
+        term_meanings TEXT,
+        conversation TEXT,
+        expression TEXT,
+        grammar TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS eval_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
     db.commit()
     db.close()
 
@@ -665,6 +688,54 @@ if True:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
         col_label TEXT)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS evaluations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        form_fill_date TEXT,
+        group_name TEXT,
+        student_name TEXT,
+        class_participation TEXT,
+        general_behavior TEXT,
+        behavior_notes TEXT,
+        reading TEXT,
+        dictation TEXT,
+        term_meanings TEXT,
+        conversation TEXT,
+        expression TEXT,
+        grammar TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS eval_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    if "eval_labels_v1" not in applied:
+        seed_eval_labels = [
+            ("form_fill_date",      "&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x645;&#x644;&#x621; &#x627;&#x644;&#x625;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629;", 1),
+            ("group_name",          "&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;", 2),
+            ("student_name",        "&#x627;&#x644;&#x627;&#x633;&#x645;", 3),
+            ("class_participation", "&#x627;&#x644;&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x62F;&#x627;&#x62E;&#x644; &#x627;&#x644;&#x635;&#x641;", 4),
+            ("general_behavior",    "&#x627;&#x644;&#x633;&#x644;&#x648;&#x643; &#x627;&#x644;&#x639;&#x627;&#x645;", 5),
+            ("behavior_notes",      "&#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x633;&#x644;&#x648;&#x643;", 6),
+            ("reading",             "&#x627;&#x644;&#x642;&#x631;&#x627;&#x621;&#x629;", 7),
+            ("dictation",           "&#x627;&#x644;&#x625;&#x645;&#x644;&#x627;&#x621;", 8),
+            ("term_meanings",       "&#x645;&#x639;&#x627;&#x646;&#x64A; &#x627;&#x644;&#x645;&#x635;&#x637;&#x644;&#x62D;&#x627;&#x62A;", 9),
+            ("conversation",        "&#x627;&#x644;&#x645;&#x62D;&#x627;&#x62F;&#x62B;&#x629;", 10),
+            ("expression",          "&#x627;&#x644;&#x62A;&#x639;&#x628;&#x64A;&#x631;", 11),
+            ("grammar",             "&#x627;&#x644;&#x642;&#x648;&#x627;&#x639;&#x62F;", 12),
+            ("notes",               "&#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A;", 13),
+        ]
+        for key, label, order in seed_eval_labels:
+            try:
+                db2.execute("INSERT INTO eval_col_labels(col_key,col_label,col_order) VALUES(?,?,?)", (key, label, order))
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("eval_labels_v1",))
+        except Exception:
+            pass
     if "paylog_labels_v1" not in applied:
         seed_paylog_labels = [
             ("student_name", "&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;", 1),
@@ -3338,6 +3409,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     <a class="db-nav-btn" href="#sec-taqseet" data-target="sec-taqseet" onclick="dbNavGo(event,'sec-taqseet')">&#x1F4CB; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</a>
     <a class="db-nav-btn orange" href="#sec-attendance" data-target="sec-attendance" onclick="dbNavGo(event,'sec-attendance')">&#x1F4C5; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</a>
     <a class="db-nav-btn teal" href="#sec-paylog" data-target="sec-paylog" onclick="dbNavGo(event,'sec-paylog')">&#x1F4B0; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</a>
+    <a class="db-nav-btn blue" href="#sec-evals" data-target="sec-evals" onclick="dbNavGo(event,'sec-evals')">&#x1F4DD; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</a>
     <span id="dbNavCustom"></span>
   </div>
   <div class="db-section" id="sec-students">
@@ -3566,6 +3638,41 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     </table>
   </div>
 </div>
+<!-- ===== EVALUATIONS TABLE SECTION ===== -->
+<div class="db-section" id="sec-evals">
+  <div class="db-section-title" style="color:#1565C0;">&#x1F4DD; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</div>
+  <div class="stats">
+    <div class="stat-card" style="border-top:3px solid #1976D2;">
+      <span class="stat-num" id="evalsTotalCount" style="color:#1976D2;">0</span>
+      <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x633;&#x62C;&#x644;&#x627;&#x62A;</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1976D2,#42A5F5);" onclick="openAddEvalModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('evaluations')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openEvalTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('evals')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
+    <button id="bulkDelBtn_evals" class="btn-bulk-del" onclick="_bulkDelete('evalsBody',function(id){return '/api/evaluations/'+id;},loadEvaluations,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="evalsSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;..." oninput="filterEvalsTable()">
+    <button class="btn-search" style="background:#1976D2;" onclick="filterEvalsTable()">&#x628;&#x62D;&#x62B;</button>
+  </div>
+  <div class="table-wrap">
+    <table style="min-width:1400px;">
+      <thead>
+        <tr id="evalsTheadRow" style="background:linear-gradient(135deg,#1565C0,#1976D2);">
+          <th class="bulk-col"><input type="checkbox" id="selectAll_evals" class="bulk-cb" onclick="_bulkSelectAll('evalsBody','selectAll_evals','bulkDelBtn_evals',this.checked)"></th>
+          <th>#</th>
+          <th>&#x625;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>
+        </tr>
+      </thead>
+      <tbody id="evalsBody">
+        <tr><td colspan="3" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -3762,6 +3869,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
         <option value="attendance">&#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</option>
         <option value="taqseet">&#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</option>
         <option value="payment_log">&#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</option>
+        <option value="evaluations">&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</option>
       </select>
     </div>
     <div id="genExcelFileRow" style="display:none;text-align:center;margin:14px 0;">
@@ -3986,6 +4094,74 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 </div>
 </div>
 </div>
+<!-- EVALUATIONS ADD/EDIT MODAL -->
+<div class="modal-bg" id="evalModal">
+  <div class="modal" style="border-top:4px solid #1976D2;max-width:720px;">
+    <h2 id="evalModalTitle" style="color:#1565C0;">&#x1F4DD; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62A;&#x642;&#x64A;&#x64A;&#x645;</h2>
+    <input type="hidden" id="evalEditId">
+    <div class="form-grid">
+      <div class="field"><label style="color:#1565C0;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x645;&#x644;&#x621; &#x627;&#x644;&#x625;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629;</label><input type="date" id="ev_form_fill_date" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><input id="ev_group_name" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x627;&#x633;&#x645; *</label><input id="ev_student_name" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x62F;&#x627;&#x62E;&#x644; &#x627;&#x644;&#x635;&#x641;</label><input id="ev_class_participation" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643; &#x627;&#x644;&#x639;&#x627;&#x645;</label><input id="ev_general_behavior" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field full"><label style="color:#1565C0;">&#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x633;&#x644;&#x648;&#x643;</label><input id="ev_behavior_notes" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x642;&#x631;&#x627;&#x621;&#x629;</label><input id="ev_reading" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x625;&#x645;&#x644;&#x627;&#x621;</label><input id="ev_dictation" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x645;&#x639;&#x627;&#x646;&#x64A; &#x627;&#x644;&#x645;&#x635;&#x637;&#x644;&#x62D;&#x627;&#x62A;</label><input id="ev_term_meanings" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x645;&#x62D;&#x627;&#x62F;&#x62B;&#x629;</label><input id="ev_conversation" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x62A;&#x639;&#x628;&#x64A;&#x631;</label><input id="ev_expression" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field"><label style="color:#1565C0;">&#x627;&#x644;&#x642;&#x648;&#x627;&#x639;&#x62F;</label><input id="ev_grammar" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+      <div class="field full"><label style="color:#1565C0;">&#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A;</label><input id="ev_notes" style="border-color:#bbdefb;background:#f0f7ff;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" style="background:linear-gradient(135deg,#1976D2,#1565C0);" onclick="saveEval()">&#x62D;&#x641;&#x638;</button>
+      <button class="btn-cancel" style="background:#e3f2fd;color:#1565C0;" onclick="closeEvalModal()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+    </div>
+  </div>
+</div>
+<!-- EVALUATIONS TABLE EDIT MODAL -->
+<div class="modal-bg" id="evalTableEditModal">
+<div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
+<h2 style="color:#E55A2B;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</h2>
+<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e3f2fd;padding-bottom:10px;">
+<button id="evtab-add-col" onclick="switchEvalTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
+<button id="evtab-del-col" onclick="switchEvalTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e3f2fd;color:#1565C0;font-weight:700;cursor:pointer;font-size:13px;">&#10060; &#x62D;&#x630;&#x641; &#x639;&#x645;&#x648;&#x62F;</button>
+<button id="evtab-edit-col" onclick="switchEvalTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e3f2fd;color:#1565C0;font-weight:700;cursor:pointer;font-size:13px;">&#9998; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x639;&#x646;&#x648;&#x627;&#x646;</button>
+</div>
+<div id="evpanel-add-col">
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x627;&#x644;&#x62C;&#x62F;&#x64A;&#x62F; *</label><input id="ev_new_col_label" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#x645;&#x648;&#x642;&#x639; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;</label>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+<select id="ev_new_col_position" onchange="toggleEvalPositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
+<option value="end">&#x641;&#x64A; &#x627;&#x644;&#x646;&#x647;&#x627;&#x64A;&#x629;</option>
+<option value="start">&#x641;&#x64A; &#x627;&#x644;&#x628;&#x62F;&#x627;&#x64A;&#x629;</option>
+<option value="after">&#x628;&#x639;&#x62F; &#x639;&#x645;&#x648;&#x62F;:</option>
+</select>
+<select id="ev_new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#8212;</option></select>
+</div></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addEvalColumn()">&#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
+</div></div>
+<div id="evpanel-del-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x644;&#x644;&#x62D;&#x630;&#x641; *</label>
+<select id="ev_del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x639;&#x645;&#x648;&#x62F; &#8212;</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">&#9888; &#x62A;&#x62D;&#x630;&#x64A;&#x631;: &#x62D;&#x630;&#x641; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x64A;&#x62D;&#x630;&#x641; &#x62C;&#x645;&#x64A;&#x639; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x647;. &#x644;&#x627; &#x64A;&#x645;&#x643;&#x646; &#x627;&#x644;&#x62A;&#x631;&#x627;&#x62C;&#x639;.</div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:#e53935;" onclick="deleteEvalColumn()">&#x62D;&#x630;&#x641; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;</button>
+</div></div>
+<div id="evpanel-edit-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#1565C0;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; *</label>
+<select id="ev_edit_col_key" onchange="fillEvalEditLabel()" style="width:100%;padding:10px;border:1.5px solid #bbdefb;border-radius:9px;font-size:14px;background:#f0f7ff;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x639;&#x645;&#x648;&#x62F; &#8212;</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#1565C0;">&#x627;&#x644;&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x64A;&#x62F; *</label><input id="ev_edit_col_label" style="width:100%;padding:10px;border:1.5px solid #bbdefb;border-radius:9px;font-size:14px;background:#f0f7ff;"></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#1976D2,#1565C0);" onclick="updateEvalColumnLabel()">&#x62D;&#x641;&#x638; &#x627;&#x644;&#x639;&#x646;&#x648;&#x627;&#x646;</button>
+</div></div>
+<div class="modal-actions" style="margin-top:18px;justify-content:center;">
+<button class="btn-cancel" style="background:#e3f2fd;color:#1565C0;" onclick="closeEvalTableEditModal()">&#x625;&#x63A;&#x644;&#x627;&#x642;</button>
+</div>
+</div>
+</div>
 <!-- PAYMENT LOG ADD/EDIT MODAL -->
 <div class="modal-bg" id="paylogModal">
   <div class="modal" style="border-top:4px solid #00897B;max-width:600px;">
@@ -4154,7 +4330,7 @@ function _freezeTableForKey(tableKey){
     var tbody = document.getElementById('ctbody_' + tid);
     return tbody ? tbody.closest('table') : null;
   }
-  var tbodyIds = { students:'studentsBody', groups:'groupsBody2', taqseet:'taqseetBody', attendance:'attendanceBody', paylog:'paylogBody' };
+  var tbodyIds = { students:'studentsBody', groups:'groupsBody2', taqseet:'taqseetBody', attendance:'attendanceBody', paylog:'paylogBody', evals:'evalsBody' };
   var tbody = document.getElementById(tbodyIds[tableKey]);
   return tbody ? tbody.closest('table') : null;
 }
@@ -4934,6 +5110,172 @@ function updatePaylogColumnLabel(){
     });
 }
 loadPaymentLog();
+
+// --- Evaluations (\u0627\u0644\u062a\u0642\u064a\u064a\u0645\u0627\u062a) ---
+var allEvals = [];
+var allEvalColumns = [];
+function loadEvaluations() {
+  Promise.all([
+    fetch('/api/evaluations',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/eval-columns',{credentials:'include'}).then(function(r){return r.json();})
+  ]).then(function(res){
+    allEvals = res[0].rows || [];
+    allEvalColumns = res[1].columns || [];
+    buildEvalsHeader();
+    renderEvalsTable(allEvals);
+    var c = document.getElementById('evalsTotalCount'); if(c) c.textContent = allEvals.length;
+    applyFreezeToTable('evals');
+  }).catch(function(){});
+}
+function buildEvalsHeader(){
+  var thead = document.getElementById('evalsTheadRow');
+  if(!thead) return;
+  var html = '<th class="bulk-col"><input type="checkbox" id="selectAll_evals" class="bulk-cb" onclick="_bulkSelectAll(\\'evalsBody\\',\\'selectAll_evals\\',\\'bulkDelBtn_evals\\',this.checked)"></th><th>#</th>';
+  for(var i=0;i<allEvalColumns.length;i++){ html += '<th>'+allEvalColumns[i].col_label+'</th>'; }
+  html += '<th>\u0625\u062c\u0631\u0627\u0621\u0627\u062a</th>';
+  thead.innerHTML = html;
+}
+function renderEvalsTable(list){
+  var body = document.getElementById('evalsBody'); if(!body) return;
+  var colCount = allEvalColumns.length + 3;
+  if(!list || !list.length){
+    body.innerHTML = '<tr><td colspan="'+colCount+'" class="no-data">\u0644\u0627 \u062a\u0648\u062c\u062f \u062a\u0642\u064a\u064a\u0645\u0627\u062a</td></tr>';
+    _bulkUpdate('evalsBody','selectAll_evals','bulkDelBtn_evals');
+    applyFreezeToTable('evals');
+    return;
+  }
+  var html = '';
+  for(var i=0;i<list.length;i++){
+    var r = list[i];
+    html += '<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+r.id+'" onclick="_bulkUpdate(\\'evalsBody\\',\\'selectAll_evals\\',\\'bulkDelBtn_evals\\')"></td><td>'+(i+1)+'</td>';
+    for(var j=0;j<allEvalColumns.length;j++){
+      var key = allEvalColumns[j].col_key;
+      var val = r[key];
+      if(key==='student_name'){ html += '<td style="font-weight:600;color:#1565C0;text-align:right;">'+(val||'-')+'</td>'; }
+      else { html += '<td>'+(val==null||val===''?'-':val)+'</td>'; }
+    }
+    html += '<td><button class="action-btn btn-edit" style="color:#1565C0;" onclick="openEvalEdit('+r.id+')">\u062a\u0639\u062f\u064a\u0644</button><button class="action-btn btn-del" onclick="askEvalDelete('+r.id+')">\u062d\u0630\u0641</button></td></tr>';
+  }
+  body.innerHTML = html;
+  applyFreezeToTable('evals');
+}
+function filterEvalsTable(){
+  var q = (document.getElementById('evalsSearchInput').value || '').toLowerCase();
+  if(!q){ renderEvalsTable(allEvals); return; }
+  renderEvalsTable(allEvals.filter(function(r){
+    return (String(r.student_name||'').toLowerCase().indexOf(q) > -1) ||
+           (String(r.group_name||'').toLowerCase().indexOf(q) > -1);
+  }));
+}
+var EV_IDS = ['form_fill_date','group_name','student_name','class_participation','general_behavior','behavior_notes','reading','dictation','term_meanings','conversation','expression','grammar','notes'];
+function evClearForm(){
+  for(var i=0;i<EV_IDS.length;i++){ var el=document.getElementById('ev_'+EV_IDS[i]); if(el) el.value=''; }
+  document.getElementById('evalEditId').value = '';
+}
+function openAddEvalModal(){ evClearForm(); document.getElementById('evalModalTitle').textContent='\u1f4dd \u0625\u0636\u0627\u0641\u0629 \u062a\u0642\u064a\u064a\u0645'; document.getElementById('evalModal').classList.add('open'); }
+function openEvalEdit(id){
+  var r = null;
+  for(var i=0;i<allEvals.length;i++){ if(allEvals[i].id===id){ r = allEvals[i]; break; } }
+  if(!r) return;
+  document.getElementById('evalEditId').value = id;
+  document.getElementById('evalModalTitle').textContent = '\u270e \u062a\u0639\u062f\u064a\u0644 \u062a\u0642\u064a\u064a\u0645';
+  for(var i=0;i<EV_IDS.length;i++){ var el=document.getElementById('ev_'+EV_IDS[i]); if(el) el.value = r[EV_IDS[i]] || ''; }
+  document.getElementById('evalModal').classList.add('open');
+}
+function closeEvalModal(){ document.getElementById('evalModal').classList.remove('open'); }
+function saveEval(){
+  var editId = document.getElementById('evalEditId').value;
+  var body = {};
+  for(var i=0;i<EV_IDS.length;i++){ var el=document.getElementById('ev_'+EV_IDS[i]); if(el) body[EV_IDS[i]] = el.value.trim(); }
+  if(!body.student_name){ showToast('\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628','#e53935'); return; }
+  var url = editId ? '/api/evaluations/'+editId : '/api/evaluations';
+  var method = editId ? 'PUT' : 'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closeEvalModal(); showToast(editId?'\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0633\u062c\u0644':'\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0633\u062c\u0644','#1976D2'); loadEvaluations(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function askEvalDelete(id){
+  if(!confirm('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0633\u062c\u0644\u061f')) return;
+  fetch('/api/evaluations/'+id,{method:'DELETE',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935'); loadEvaluations(); }
+    else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  });
+}
+// ---- Evaluations column management ----
+function openEvalTableEditModal(){
+  var delSel = document.getElementById('ev_del_col_key');
+  var editSel = document.getElementById('ev_edit_col_key');
+  var afterSel = document.getElementById('ev_new_col_after');
+  delSel.innerHTML = '<option value=""></option>';
+  editSel.innerHTML = '<option value=""></option>';
+  afterSel.innerHTML = '<option value=""></option>';
+  for(var i=0;i<allEvalColumns.length;i++){
+    var c = allEvalColumns[i];
+    delSel.innerHTML  += '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+    editSel.innerHTML += '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+    afterSel.innerHTML+= '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+  }
+  document.getElementById('ev_new_col_label').value = '';
+  document.getElementById('ev_new_col_position').value = 'end';
+  toggleEvalPositionCol();
+  switchEvalTab('add-col');
+  document.getElementById('evalTableEditModal').classList.add('open');
+}
+function closeEvalTableEditModal(){ document.getElementById('evalTableEditModal').classList.remove('open'); }
+function switchEvalTab(tab){
+  var tabs = ['add-col','del-col','edit-col'];
+  for(var i=0;i<tabs.length;i++){
+    var b = document.getElementById('evtab-'+tabs[i]);
+    var p = document.getElementById('evpanel-'+tabs[i]);
+    if(tabs[i]===tab){ if(b){ b.style.background='#FF6B35'; b.style.color='#fff'; } if(p) p.style.display='block'; }
+    else { if(b){ b.style.background='#e3f2fd'; b.style.color='#1565C0'; } if(p) p.style.display='none'; }
+  }
+}
+function toggleEvalPositionCol(){
+  var pos = document.getElementById('ev_new_col_position').value;
+  document.getElementById('ev_new_col_after').style.display = (pos==='after') ? 'inline-block' : 'none';
+}
+function fillEvalEditLabel(){
+  var key = document.getElementById('ev_edit_col_key').value;
+  var c = null;
+  for(var i=0;i<allEvalColumns.length;i++){ if(allEvalColumns[i].col_key===key){ c = allEvalColumns[i]; break; } }
+  document.getElementById('ev_edit_col_label').value = c ? c.col_label : '';
+}
+function addEvalColumn(){
+  var label = document.getElementById('ev_new_col_label').value.trim();
+  if(!label){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  var key = label.replace(/\s+/g,'_').toLowerCase().replace(/[^a-z0-9_]/g,'');
+  if(!/^[a-z_][a-z0-9_]*$/.test(key)){ key = 'col_' + Date.now(); }
+  var position = document.getElementById('ev_new_col_position').value;
+  var after_col = document.getElementById('ev_new_col_after').value;
+  fetch('/api/eval-columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_key:key,col_label:label,position:position,after_col:after_col})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closeEvalTableEditModal(); showToast('\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0645\u0648\u062f','#1976D2'); loadEvaluations(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+function deleteEvalColumn(){
+  var key = document.getElementById('ev_del_col_key').value;
+  if(!key){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  fetch('/api/eval-columns/'+encodeURIComponent(key),{method:'DELETE',credentials:'include'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closeEvalTableEditModal(); showToast('\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062f','#e53935'); loadEvaluations(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+function updateEvalColumnLabel(){
+  var key = document.getElementById('ev_edit_col_key').value;
+  var label = document.getElementById('ev_edit_col_label').value.trim();
+  if(!key || !label){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  fetch('/api/eval-columns/'+encodeURIComponent(key),{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closeEvalTableEditModal(); showToast('\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646','#1976D2'); loadEvaluations(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+loadEvaluations();
 
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -5910,6 +6252,26 @@ var IMPORT_DEFS = {
       {key:"paid", ar:"\u0627\u0644\u0645\u062f\u0641\u0648\u0639"},
       {key:"remaining", ar:"\u0627\u0644\u0645\u062a\u0628\u0642\u064a"}
     ]
+  },
+  evaluations: {
+    title: "\u0627\u0644\u062a\u0642\u064a\u064a\u0645\u0627\u062a",
+    refresh: "loadEvaluations",
+    fields: [
+      {key:"form_fill_date", ar:"\u062a\u0627\u0631\u064a\u062e \u0645\u0644\u0621 \u0627\u0644\u0625\u0633\u062a\u0645\u0627\u0631\u0629"},
+      {key:"group_name", ar:"\u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629"},
+      {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
+      {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
+      {key:"class_participation", ar:"\u0627\u0644\u0645\u0634\u0627\u0631\u0643\u0629 \u062f\u0627\u062e\u0644 \u0627\u0644\u0635\u0641"},
+      {key:"general_behavior", ar:"\u0627\u0644\u0633\u0644\u0648\u0643 \u0627\u0644\u0639\u0627\u0645"},
+      {key:"behavior_notes", ar:"\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0639\u0644\u0649 \u0627\u0644\u0633\u0644\u0648\u0643"},
+      {key:"reading", ar:"\u0627\u0644\u0642\u0631\u0627\u0621\u0629"},
+      {key:"dictation", ar:"\u0627\u0644\u0625\u0645\u0644\u0627\u0621"},
+      {key:"term_meanings", ar:"\u0645\u0639\u0627\u0646\u064a \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a"},
+      {key:"conversation", ar:"\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629"},
+      {key:"expression", ar:"\u0627\u0644\u062a\u0639\u0628\u064a\u0631"},
+      {key:"grammar", ar:"\u0627\u0644\u0642\u0648\u0627\u0639\u062f"},
+      {key:"notes", ar:"\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a"}
+    ]
   }
 };
 var genExcelRows = [];
@@ -6751,6 +7113,140 @@ def api_paylog_columns_update(col_key):
     db = get_db()
     try:
         db.execute("UPDATE paylog_col_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+
+# --- Evaluations (التقييمات) ---------------------------------------------
+
+def _evaluations_writable_cols(db):
+    cols = [r[1] for r in db.execute("PRAGMA table_info(evaluations)").fetchall()]
+    return [c for c in cols if c not in ("id", "created_at")]
+
+@app.route("/api/evaluations", methods=["GET"])
+@login_required
+def api_evaluations_get():
+    db = get_db()
+    rows = db.execute("SELECT * FROM evaluations ORDER BY id DESC").fetchall()
+    return jsonify({"rows": [dict(r) for r in rows]})
+
+@app.route("/api/evaluations", methods=["POST"])
+@login_required
+def api_evaluations_add():
+    d = request.get_json() or {}
+    db = get_db()
+    try:
+        cols = _evaluations_writable_cols(db)
+        placeholders = ",".join(["?"] * len(cols))
+        values = tuple(d.get(c) for c in cols)
+        db.execute("INSERT INTO evaluations (" + ",".join(cols) + ") VALUES (" + placeholders + ")", values)
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/evaluations/<int:rid>", methods=["PUT"])
+@login_required
+def api_evaluations_update(rid):
+    d = request.get_json() or {}
+    db = get_db()
+    try:
+        cols = [c for c in _evaluations_writable_cols(db) if c in d]
+        if not cols:
+            return jsonify({"ok": True})
+        set_clause = ",".join([c + "=?" for c in cols])
+        values = tuple(d.get(c) for c in cols) + (rid,)
+        db.execute("UPDATE evaluations SET " + set_clause + " WHERE id=?", values)
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/evaluations/<int:rid>", methods=["DELETE"])
+@login_required
+def api_evaluations_delete(rid):
+    try:
+        db = get_db()
+        db.execute("DELETE FROM evaluations WHERE id=?", (rid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/eval-columns", methods=["GET"])
+@login_required
+def api_eval_columns_get():
+    db = get_db()
+    rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM eval_col_labels ORDER BY col_order").fetchall()
+    return jsonify({"columns": [dict(r) for r in rows]})
+
+@app.route("/api/eval-columns", methods=["POST"])
+@login_required
+def api_eval_columns_add():
+    d = request.get_json()
+    col_key = d.get("col_key","").strip().replace(" ","_").lower()
+    col_label = d.get("col_label","").strip()
+    position = d.get("position","end")
+    after_col = d.get("after_col","")
+    if not col_key or not col_label:
+        return jsonify({"ok":False,"error":"missing data"}),400
+    safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
+    if not safe_key or safe_key != col_key:
+        return jsonify({"ok":False,"error":"invalid column name"}),400
+    db = get_db()
+    try:
+        all_cols = db.execute("SELECT col_key,col_order FROM eval_col_labels ORDER BY col_order").fetchall()
+        if position == "start":
+            new_order = 0
+            for row in all_cols:
+                db.execute("UPDATE eval_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+        elif position == "after" and after_col:
+            after_row = db.execute("SELECT col_order FROM eval_col_labels WHERE col_key=?", (after_col,)).fetchone()
+            if after_row:
+                new_order = after_row[0] + 1
+                for row in all_cols:
+                    if row[1] >= new_order:
+                        db.execute("UPDATE eval_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+            else:
+                max_order = db.execute("SELECT MAX(col_order) FROM eval_col_labels").fetchone()[0] or 0
+                new_order = max_order + 1
+        else:
+            max_order = db.execute("SELECT MAX(col_order) FROM eval_col_labels").fetchone()[0] or 0
+            new_order = max_order + 1
+        db.execute("INSERT INTO eval_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,new_order))
+        db.execute("ALTER TABLE evaluations ADD COLUMN "+col_key+" TEXT")
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/eval-columns/<col_key>", methods=["DELETE"])
+@login_required
+def api_eval_columns_delete(col_key):
+    safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
+    if not safe_key or safe_key != col_key:
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
+    db = get_db()
+    try:
+        db.execute('ALTER TABLE evaluations DROP COLUMN "' + safe_key + '"')
+    except Exception:
+        pass
+    db.execute("DELETE FROM eval_col_labels WHERE col_key=?", (col_key,))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/eval-columns/<col_key>", methods=["PUT"])
+@login_required
+def api_eval_columns_update(col_key):
+    d = request.get_json()
+    new_label = d.get("col_label","").strip()
+    if not new_label:
+        return jsonify({"ok":False,"error":"missing label"}),400
+    db = get_db()
+    try:
+        db.execute("UPDATE eval_col_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
         db.commit()
         return jsonify({"ok":True})
     except Exception as ex:
@@ -7773,6 +8269,11 @@ IMPORT_TABLE_FIELDS = {
         "student_name","group_name","pay_date","day_name",
         "inst_type","price","paid","remaining",
     ],
+    "evaluations": [
+        "form_fill_date","group_name","student_name","class_participation",
+        "general_behavior","behavior_notes","reading","dictation",
+        "term_meanings","conversation","expression","grammar","notes",
+    ],
 }
 
 IMPORT_TABLE_SQL = {
@@ -7781,6 +8282,7 @@ IMPORT_TABLE_SQL = {
     "attendance": "INSERT INTO attendance",
     "taqseet": "INSERT INTO taqseet",
     "payment_log": "INSERT INTO payment_log",
+    "evaluations": "INSERT INTO evaluations",
 }
 
 @app.route('/api/import', methods=['POST'])
