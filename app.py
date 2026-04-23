@@ -7093,9 +7093,17 @@ def api_import():
     if not fields:
         return jsonify({"ok": False, "error": "unknown table"}), 400
     db = get_db()
+    # Filter to columns that actually exist in the live table schema.
+    # Prevents every row from failing when the hardcoded list drifts from
+    # the deployed DB (e.g. a column was never migrated, or was dropped via the UI).
+    live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
+    fields = [f for f in fields if f in live_cols]
+    if not fields:
+        return jsonify({"ok": False, "error": "no matching columns in table " + table}), 400
     imported = 0
     ignored = 0
     errors = 0
+    last_error = ""
     cols = ",".join(fields)
     placeholders = ",".join(["?"] * len(fields))
     sql = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
@@ -7107,10 +7115,14 @@ def api_import():
                 imported += 1
             else:
                 ignored += 1
-        except Exception:
+        except Exception as ex:
             errors += 1
+            last_error = str(ex)
     db.commit()
-    return jsonify({"ok": True, "imported": imported, "ignored": ignored, "errors": errors, "received": len(rows)})
+    return jsonify({
+        "ok": True, "imported": imported, "ignored": ignored,
+        "errors": errors, "received": len(rows), "last_error": last_error,
+    })
 
 @app.route('/api/attendance/sessions', methods=['GET'])
 @login_required
