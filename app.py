@@ -3423,8 +3423,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   <div class="db-section-title" style="color:#6c3fa0;">&#128203; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
-    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-    <button onclick="openTaqseetColModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#10133; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
+    <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641;</button>
+    <button onclick="openGenericExcelModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button>
     <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
     <button onclick="openFreezeModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
     <button id="bulkDelBtn_taqseet" class="btn-bulk-del" style="padding:8px 16px;font-size:13px;" onclick="_bulkDelete('taqseetBody',function(id){return '/api/taqseet/'+id;},loadTaqseet,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
@@ -4376,12 +4376,32 @@ function deleteTaqseet(id) {
   });
 }
 
-function openTaqseetColModal() {
-  showToast('&#x645;&#x64A;&#x632;&#x629; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F; &#x645;&#x62E;&#x635;&#x635; &#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x637;&#x648;&#x64A;&#x631;', '#FF6B35');
-}
-
 function openTaqseetEditModal() {
-  showToast('&#x645;&#x64A;&#x632;&#x629; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x637;&#x648;&#x64A;&#x631;', '#9C27B0');
+  // The taqseet schema columns are fixed; individual cells are edited inline
+  // by clicking them (contenteditable). This modal surfaces that fact plus
+  // the bulk-clear action so the "edit table" button does something useful.
+  var m = document.getElementById('taqseetEditHelpModal');
+  if (m) { m.classList.add('open'); return; }
+  m = document.createElement('div');
+  m.id = 'taqseetEditHelpModal';
+  m.className = 'modal-bg open';
+  m.innerHTML =
+    '<div class="modal" style="border-top:4px solid #9C27B0;max-width:540px;">' +
+      '<h2 style="color:#6c3fa0;">⚙ تعديل جدول التقسيط</h2>' +
+      '<ul style="line-height:1.9;padding-right:20px;font-size:14px;color:#333;">' +
+        '<li>لتعديل أي خلية: اضغط عليها مباشرةً في الجدول واكتب القيمة الجديدة، ثم انتقل إلى خلية أخرى ليتم الحفظ تلقائياً.</li>' +
+        '<li>عدد الأقساط يُحسب تلقائياً من خلايا الأقساط ولا يُعدَّل يدوياً.</li>' +
+        '<li>لإضافة صف جديد: اضغط زر «إضافة صف».</li>' +
+        '<li>لاستيراد بيانات من Excel: اضغط زر «إضافة بيانات من Excel».</li>' +
+        '<li>لحذف صف: حدّده بالمربّع واضغط «حذف المحدّد»، أو استخدم زر «حذف» في آخر الصف.</li>' +
+      '</ul>' +
+      '<div class="modal-actions"><button class="btn-cancel" style="background:#e1bee7;color:#6c3fa0;" onclick="closeTaqseetEditModal()">حسناً</button></div>' +
+    '</div>';
+  document.body.appendChild(m);
+}
+function closeTaqseetEditModal() {
+  var m = document.getElementById('taqseetEditHelpModal');
+  if (m) m.classList.remove('open');
 }
 // &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 
