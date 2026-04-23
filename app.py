@@ -4677,7 +4677,7 @@ function loadPaymentLog(){
 function buildPaylogHeader(){
   var thead = document.getElementById('paylogTheadRow');
   if(!thead) return;
-  var html = '<th class="bulk-col"><input type="checkbox" id="selectAll_paylog" class="bulk-cb" onclick="_bulkSelectAll(\'paylogBody\',\'selectAll_paylog\',\'bulkDelBtn_paylog\',this.checked)"></th><th>#</th>';
+  var html = '<th class="bulk-col"><input type="checkbox" id="selectAll_paylog" class="bulk-cb" onclick="_bulkSelectAll(\\'paylogBody\\',\\'selectAll_paylog\\',\\'bulkDelBtn_paylog\\',this.checked)"></th><th>#</th>';
   for(var i=0;i<allPaylogColumns.length;i++){ html += '<th>'+allPaylogColumns[i].col_label+'</th>'; }
   html += '<th>\u0625\u062c\u0631\u0627\u0621\u0627\u062a</th>';
   thead.innerHTML = html;
@@ -4703,7 +4703,7 @@ function renderPaylogTable(list){
   var html = '';
   for(var i=0;i<list.length;i++){
     var r = list[i];
-    html += '<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+r.id+'" onclick="_bulkUpdate(\'paylogBody\',\'selectAll_paylog\',\'bulkDelBtn_paylog\')"></td><td>'+(i+1)+'</td>';
+    html += '<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+r.id+'" onclick="_bulkUpdate(\\'paylogBody\\',\\'selectAll_paylog\\',\\'bulkDelBtn_paylog\\')"></td><td>'+(i+1)+'</td>';
     for(var j=0;j<allPaylogColumns.length;j++){
       var key = allPaylogColumns[j].col_key;
       var val = r[key];
