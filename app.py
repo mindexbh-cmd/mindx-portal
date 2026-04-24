@@ -3825,7 +3825,7 @@ function checkAndLoad(group, date) {
         currentMode = 'exists';
         existingRecords = {};
         for(var i=0; i<data.records.length; i++) {
-          existingRecords[data.records[i].student_name] = data.records[i];
+          _indexAttRecord(existingRecords, data.records[i]);
         }
         showAlert('exists', '\u26a0\ufe0f \u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u063a\u064a\u0627\u0628 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0645\u0633\u0628\u0642\u0627\u064b. \u064a\u0645\u0643\u0646\u0643 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0623\u062f\u0646\u0627\u0647.');
         document.getElementById('btnSaveLabel').textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a';
@@ -3880,11 +3880,69 @@ function onStatusChange(sel) {
   }
 }
 
+// Multi-key lookup helpers for attendance records.
+//
+// Imported rows and manually-entered rows share group_name + attendance_date
+// but may disagree on student_name: an Excel may carry trailing whitespace,
+// an alternate Arabic spelling, or a completely different romanisation. The
+// roster (from /api/groups-students) and the attendance rows both carry
+// personal_id though, so we index every record under three keys — exact
+// name, normalised name, personal_id — and look up each roster student by
+// whichever key hits first. That is what "match by name OR by student ID"
+// means in practice.
+function _attNormalizeName(s) {
+  if (!s) return '';
+  return String(s).toLowerCase()
+    .replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627')   // alef family -> alef
+    .replace(/\u0629/g, '\u0647')                         // teh marbouta -> heh
+    .replace(/\u0649/g, '\u064A')                         // alef maksura -> yeh
+    .replace(/[\u064B-\u065F]/g, '')                      // tashkeel
+    .replace(/\s+/g, ' ')                                  // collapse whitespace runs
+    .trim();
+}
+function _indexAttRecord(map, rec) {
+  if (!rec) return;
+  var name = (rec.student_name || '').toString().trim();
+  var pid  = (rec.personal_id  || '').toString().trim();
+  if (name) {
+    if (!map['n:' + name])                         map['n:' + name] = rec;
+    var norm = _attNormalizeName(name);
+    if (norm && !map['w:' + norm])                 map['w:' + norm] = rec;
+  }
+  if (pid && !map['p:' + pid])                     map['p:' + pid] = rec;
+}
+function _attAddStatusKeys(statusMap, msgMap, rec) {
+  if (!rec) return;
+  var name = (rec.student_name || '').toString().trim();
+  var pid  = (rec.personal_id  || '').toString().trim();
+  var st   = rec.status || '';
+  var ms   = rec.message_status || '';
+  if (name) {
+    statusMap['n:' + name] = st; msgMap['n:' + name] = ms;
+    var norm = _attNormalizeName(name);
+    if (norm) { statusMap['w:' + norm] = st; msgMap['w:' + norm] = ms; }
+  }
+  if (pid) { statusMap['p:' + pid] = st; msgMap['p:' + pid] = ms; }
+}
+function _attLookup(map, name, pid) {
+  if (!map) return '';
+  name = (name || '').toString().trim();
+  pid  = (pid  || '').toString().trim();
+  if (name && map['n:' + name] != null) return map['n:' + name];
+  if (name) {
+    var norm = _attNormalizeName(name);
+    if (norm && map['w:' + norm] != null) return map['w:' + norm];
+  }
+  if (pid && map['p:' + pid] != null) return map['p:' + pid];
+  return '';
+}
+
 function renderTable(students, existingList, stats) {
   stats = stats || {};
   var statusMap = {}; var msgStatusMap = {};
   for(var i=0; i<existingList.length; i++) {
-    statusMap[existingList[i].student_name] = existingList[i].status || ''; msgStatusMap[existingList[i].student_name] = existingList[i].message_status || '';
+    var _r = existingList[i];
+    _attAddStatusKeys(statusMap, msgStatusMap, _r);
   }
 
   var html = '';
@@ -3893,7 +3951,9 @@ function renderTable(students, existingList, stats) {
   } else {
     for(var i=0; i<students.length; i++) {
       var name = students[i].student_name || '-';
-      var savedStatus = statusMap[name] || ''; var savedMsgStatus = msgStatusMap[name] || '';
+      var pid  = (students[i].personal_id || '').toString();
+      var savedStatus    = _attLookup(statusMap,    name, pid);
+      var savedMsgStatus = _attLookup(msgStatusMap, name, pid);
       var cssClass = 'status-select';
       if(savedStatus === '\u062d\u0627\u0636\u0631') cssClass += ' present';
       else if(savedStatus === '\u063a\u0627\u0626\u0628') cssClass += ' absent';
@@ -3902,7 +3962,7 @@ function renderTable(students, existingList, stats) {
       html += '<tr>';
       html += '<td>' + (i+1) + '</td>';
       html += '<td class="student-name-cell">' + name + '</td>';
-      html += '<td><select class="' + cssClass + '" data-name="' + name.replace(/"/g, '&quot;') + '" onchange="onStatusChange(this)">';
+      html += '<td><select class="' + cssClass + '" data-name="' + name.replace(/"/g, '&quot;') + '" data-pid="' + pid.replace(/"/g, '&quot;') + '" onchange="onStatusChange(this)">';
       html += '<option value="">&#8212; \u0627\u062e\u062a\u0631 &#8212;</option>';
       html += '<option value="\u062d\u0627\u0636\u0631"' + (savedStatus==='\u062d\u0627\u0636\u0631'?' selected':'') + '>\u062d\u0627\u0636\u0631</option>';
       html += '<option value="\u063a\u0627\u0626\u0628"' + (savedStatus==='\u063a\u0627\u0626\u0628'?' selected':'') + '>\u063a\u0627\u0626\u0628</option>';
@@ -3965,20 +4025,25 @@ function saveAllAttendance() {
     var name = sel.getAttribute('data-name');
     var status = sel.value;
     if(!name) return;
+    var pid = sel.getAttribute('data-pid') || '';
 
-    if(currentMode === 'exists' && existingRecords[name]) {
-      // Update existing record
-      updates.push({ id: existingRecords[name].id, status: status,
-        attendance_date: existingRecords[name].attendance_date,
-        day_name: existingRecords[name].day_name,
-        group_name: existingRecords[name].group_name,
-        student_name: existingRecords[name].student_name,
-        contact_number: existingRecords[name].contact_number || '',
-        message: existingRecords[name].message || '',
-        message_status: (tr.querySelector('.sent-check') && tr.querySelector('.sent-check').checked) ? '1' : (existingRecords[name].message_status || ''),
-        study_status: existingRecords[name].study_status || ''
+    var existing = (currentMode === 'exists') ? _attLookup(existingRecords, name, pid) : null;
+    if (existing) {
+      // Update existing record (manual entry or imported).
+      updates.push({ id: existing.id, status: status,
+        attendance_date: existing.attendance_date,
+        day_name: existing.day_name,
+        group_name: existing.group_name,
+        student_name: existing.student_name,
+        contact_number: existing.contact_number || '',
+        message: existing.message || '',
+        message_status: (tr.querySelector('.sent-check') && tr.querySelector('.sent-check').checked) ? '1' : (existing.message_status || ''),
+        study_status: existing.study_status || ''
       });
-    } else if(currentMode === 'new') {
+    } else {
+      // Either mode==='new', or a student on the roster has no match in
+      // existingRecords (e.g. a new student added after the import).
+      // Either way, insert a fresh row.
       saves.push({ attendance_date: date, day_name: dayName,
         group_name: group, student_name: name,
         contact_number: '', status: status, message: '', message_status: '', study_status: '' });
@@ -9384,6 +9449,35 @@ def api_groups_students():
         groups[gname] = [dict(s) for s in students]
     return jsonify(groups)
 
+def _att_normalize_ar(s):
+    """Loose Arabic string normalisation used to match imported roster names
+    against attendance rows: trim, collapse whitespace runs, lowercase,
+    fold alef/yeh/teh-marbouta variants, drop tashkeel."""
+    if not s:
+        return ""
+    s = str(s).strip().lower()
+    # alef family -> bare alef
+    for ch in ("أ", "إ", "آ", "ٱ"):
+        s = s.replace(ch, "ا")
+    s = s.replace("ة", "ه")  # teh marbouta -> heh
+    s = s.replace("ى", "ي")  # alef maksura -> yeh
+    out = []
+    prev_space = False
+    for ch in s:
+        c = ord(ch)
+        if 0x064B <= c <= 0x065F:   # strip tashkeel
+            continue
+        if ch.isspace():
+            if prev_space:
+                continue
+            prev_space = True
+            out.append(" ")
+        else:
+            prev_space = False
+            out.append(ch)
+    return "".join(out).strip()
+
+
 @app.route("/api/attendance/check", methods=["GET"])
 @login_required
 def api_attendance_check():
@@ -9392,11 +9486,53 @@ def api_attendance_check():
     if not group_name or not att_date:
         return jsonify({"exists": False, "records": []})
     db = get_db()
+
+    # Match on trimmed values so a trailing space in imported data does not
+    # hide an otherwise-identical record.
     rows = db.execute(
-        "SELECT * FROM attendance WHERE group_name=? AND attendance_date=? ORDER BY id ASC",
-        (group_name, att_date)
+        "SELECT * FROM attendance "
+        "WHERE TRIM(group_name)=TRIM(?) AND TRIM(attendance_date)=TRIM(?) "
+        "ORDER BY id ASC",
+        (group_name, att_date),
     ).fetchall()
-    return jsonify({"exists": len(rows) > 0, "records": [dict(r) for r in rows]})
+    records = [dict(r) for r in rows]
+
+    # Enrich each record with personal_id looked up from the students table,
+    # first by exact name inside the group, then by normalised-name fallback.
+    student_rows = db.execute(
+        "SELECT student_name, personal_id FROM students "
+        "WHERE TRIM(group_name_student)=TRIM(?)",
+        (group_name,),
+    ).fetchall()
+    name_to_pid = {}
+    norm_to_pid = {}
+    for s in student_rows:
+        nm = (s["student_name"] or "").strip()
+        pid = (s["personal_id"] or "").strip() if "personal_id" in s.keys() else ""
+        if not nm:
+            continue
+        if pid:
+            name_to_pid.setdefault(nm, pid)
+            norm_to_pid.setdefault(_att_normalize_ar(nm), pid)
+    # Fallback scan across all students when a group-local match fails.
+    if records:
+        all_rows = db.execute(
+            "SELECT student_name, personal_id FROM students"
+        ).fetchall()
+        for s in all_rows:
+            nm = (s["student_name"] or "").strip()
+            pid = (s["personal_id"] or "").strip() if "personal_id" in s.keys() else ""
+            if nm and pid:
+                name_to_pid.setdefault(nm, pid)
+                norm_to_pid.setdefault(_att_normalize_ar(nm), pid)
+
+    for rec in records:
+        nm = (rec.get("student_name") or "").strip()
+        pid = name_to_pid.get(nm) or norm_to_pid.get(_att_normalize_ar(nm), "")
+        rec["personal_id"] = pid
+        rec["student_name_norm"] = _att_normalize_ar(nm)
+
+    return jsonify({"exists": len(records) > 0, "records": records})
 
 @app.route("/api/dashboard/stats", methods=["GET"])
 @login_required
