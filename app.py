@@ -463,6 +463,7 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'groups_column', 'عمود المجموعة', 'group_name'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('students', 'active_column', 'عمود حالة النشاط', 'registration_term2_2026'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('students', 'active_value',  'قيمة الطالب النشط', 'تم التسجيل'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'math_keyword',  'كلمة تعريف مجموعة الرياضيات', 'ريض'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_table', 'جدول الطلاب', 'students'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'groups_table', 'جدول المجموعات', 'student_groups'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'attendance_table', 'جدول الغياب', 'attendance'))
@@ -1248,6 +1249,17 @@ if True:
                 ('students', 'active_value', 'قيمة الطالب النشط', 'تم التسجيل'),
             )
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_active_v1",))
+            db2.commit()
+        except Exception:
+            pass
+    if "dashboard_math_kw_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ('dashboard', 'math_keyword', 'كلمة تعريف مجموعة الرياضيات', 'ريض'),
+            )
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("dashboard_math_kw_v1",))
             db2.commit()
         except Exception:
             pass
@@ -6564,7 +6576,12 @@ const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/col
 const sData=await sRes.json(); const cData=await cRes.json();
 allStudents=sData.students||[]; allColumns=cData.columns||[]; allTaqseetData=await tRes.json(); populateTaqseetDropdowns();
 renderTable(allStudents);
-document.getElementById('totalCount').textContent=allStudents.length;
+/* Count only ACTIVE students here — inactive ones still appear in the
+   table + the search modal, but the stat badge on the database page
+   reflects the same "registered for term 2" count the dashboard uses. */
+var _activeTotal = 0;
+for (var _i=0; _i<allStudents.length; _i++){ if (allStudents[_i].is_active !== false) _activeTotal++; }
+document.getElementById('totalCount').textContent=_activeTotal;
 buildTableHeader();
 applyFreezeToTable('students');
 }
@@ -11357,10 +11374,47 @@ def api_dashboard_stats():
         sql = "SELECT COUNT(DISTINCT id) FROM " + students_tbl + " WHERE " + where
         return _safe_int(sql, tuple(params))
 
-    english_students = _count_any(subject_cand, english_kws)
-    math_students    = _count_any(subject_cand, math_kws)
+    # Per spec: simple group-column-based classification instead of
+    # keyword-over-multiple-columns guessing.
+    #   English = active + group_name_student non-empty + NOT LIKE %math_keyword%
+    #   Math    = active + group_name_student LIKE %math_keyword%
+    # Active column + value flow through settings already. The math
+    # keyword is configurable too so an admin can rename the math
+    # group prefix without touching code.
+    math_kw = (get_setting("dashboard", "math_keyword", "ريض") or "ريض").strip()
+    if not math_kw:
+        math_kw = "ريض"
+    math_pattern = "%" + math_kw + "%"
 
-    groups = _safe_int("SELECT COUNT(*) FROM " + groups_tbl)
+    english_students = 0
+    math_students    = 0
+    if group_col in student_cols_all and _is_safe_ident(group_col):
+        base = (_act_frag + " AND ") if _act_frag else ""
+        base_params = [_act_val] if _act_frag else []
+        eng_sql = ("SELECT COUNT(*) FROM " + students_tbl + " WHERE " + base +
+                   group_col + " IS NOT NULL AND TRIM(" + group_col + ") <> '' "
+                   "AND " + group_col + " NOT LIKE ?")
+        english_students = _safe_int(eng_sql, tuple(base_params + [math_pattern]))
+        math_sql = ("SELECT COUNT(*) FROM " + students_tbl + " WHERE " + base +
+                    group_col + " LIKE ?")
+        math_students = _safe_int(math_sql, tuple(base_params + [math_pattern]))
+
+    # Per spec: "عدد المجموعات" = distinct active-student groups
+    # (from the students table), not raw row count of student_groups.
+    groups = 0
+    if group_col in student_cols_all and _is_safe_ident(group_col):
+        g_base  = (_act_frag + " AND ") if _act_frag else ""
+        g_params = [_act_val] if _act_frag else []
+        groups = _safe_int(
+            "SELECT COUNT(DISTINCT " + group_col + ") FROM " + students_tbl +
+            " WHERE " + g_base + group_col + " IS NOT NULL "
+            "AND TRIM(" + group_col + ") <> ''",
+            tuple(g_params),
+        )
+    else:
+        # Fallback to the original behaviour if the group column isn't
+        # available on the students table for some reason.
+        groups = _safe_int("SELECT COUNT(*) FROM " + groups_tbl)
 
     # Teachers = union of distinct names across students and groups tables.
     teacher_names = set()
