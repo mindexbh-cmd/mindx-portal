@@ -68,6 +68,20 @@ Any SQL string that interpolates a value from `get_setting` MUST pass it through
 
 Row-level `DELETE` (individual user-initiated deletes, e.g. one student, one attendance record, one template) is fine and required for the app's features. The rule is about never losing **other** users' rows through a code change.
 
+## Schema sync (SYNC RULE)
+
+**SYNC RULE:** The تعديل الجدول modal and the table display must always use the same data source — `/api/table/<tid>/schema` (or the older `/api/custom-table/<tid>/columns` alias, which is a superset). After any column operation, always call `window.refreshTable(tid)` to update both. Never maintain separate column lists.
+
+Canonical helpers:
+- **Server:** `_compute_table_schema(tid)` in `app.py` is the one place that computes "the ordered list of columns for a table". Reads `PRAGMA table_info(<live_table>)` for built-ins or `custom_table_cols` for numeric tids, joins with `*_col_labels` for display names / types, and orders by `col_order` with the live-schema position as a tie-breaker. Every endpoint that returns columns — `/api/custom-table/<tid>/columns`, `/api/table/<tid>/schema`, and the `updated_schema` echo on every mutation route — goes through this helper.
+- **Client:** `window.refreshTable(tid)` in `/mx-helpers.js` clears `_MX_COLKEY_CACHE`, fires the page-level reloader via `TABLE_REFRESH_HOOKS` (so tbody re-renders from fresh data), and — if the UTEM modal is currently open for the same tid — re-opens it to pick up the fresh schema. Call this after **every** successful add / delete / rename / reorder / type-change.
+
+Mutation endpoints return `updated_schema` alongside `ok:true`, so a caller can skip a round-trip if it wants to. The client side currently just calls `refreshTable`, which is one fetch; using `updated_schema` as an optimisation is optional.
+
+**Do not** — in any new code —
+- hardcode a column-name list in a renderer (taqseet's `baseFields` is the lingering pre-SYNC-RULE example; replace it when touching that area).
+- fetch `/api/custom-table/<tid>/columns` directly from a mutation success handler; call `refreshTable(tid)` instead so the UTEM modal and the tbody stay in lock-step.
+
 ## Excel import pipeline
 
 **IMPORT RULE:** When implementing or modifying any Excel import for any table, always check ALL pages, dropdowns, buttons, and statistics that reference that table and ensure imported data appears correctly everywhere immediately after import.

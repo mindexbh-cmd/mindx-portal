@@ -9901,41 +9901,140 @@ def api_settings_columns(table_name):
 
 
 
-@app.route('/api/custom-table/<tid>/columns', methods=['GET'])
-@login_required
-def api_unified_columns_get(tid):
+def _compute_table_schema(tid):
+    """Single source of truth for a table's column schema. Returns a list
+    of dicts, each with col_key / col_label / col_type / col_options /
+    col_order, ordered primarily by the persisted col_order and falling
+    back to the live information_schema position — so the تعديل الجدول
+    modal and the actual table header render in the same order.
+
+    The SYNC RULE in CLAUDE.md makes every caller (modal, table
+    renderer, column operations) route through this helper instead of
+    maintaining its own column list.
+    """
     db_table, labels_table = _resolve_table(tid)
     if not db_table:
-        return jsonify({"ok": False, "error": "table not found"}), 404
+        return None, None
     db = get_db()
-    live_cols = [r[1] for r in db.execute("PRAGMA table_info(" + db_table + ")").fetchall()]
+    tid_str = str(tid or "").strip()
+    if tid_str.isdigit():
+        # Custom table — schema lives in custom_table_cols, not
+        # information_schema.columns. Order directly by col_order.
+        try:
+            table_id = int(tid_str)
+            rows = db.execute(
+                "SELECT col_key, col_label, col_type, col_options, col_order "
+                "FROM custom_table_cols WHERE table_id=? "
+                "ORDER BY col_order NULLS LAST, id",
+                (table_id,),
+            ).fetchall()
+        except Exception:
+            rows = []
+        out = []
+        for idx, r in enumerate(rows, start=1):
+            out.append({
+                "col_key": r[0],
+                "col_label": _decode_arabic_entities(r[1]) or BUILT_IN_COLUMN_LABELS.get(r[0]) or r[0],
+                "col_type": (r[2] or "نص").strip(),
+                "col_options": r[3] or "",
+                "col_order": r[4] if r[4] is not None else idx,
+            })
+        return out, db_table
+
+    # Built-in table — start from the live SQL columns, join labels/types.
+    try:
+        live_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(" + db_table + ")"
+        ).fetchall()]
+    except Exception:
+        live_cols = []
     live_cols = [c for c in live_cols if c not in ("id", "created_at")]
-    label_map = {}
-    type_map = {}
-    options_map = {}
+    label_map, type_map, options_map, order_map = {}, {}, {}, {}
     if labels_table:
         try:
             rows = db.execute(
-                "SELECT col_key, col_label, col_type, col_options FROM " + labels_table
+                "SELECT col_key, col_label, col_type, col_options, col_order FROM " + labels_table
             ).fetchall()
             for r in rows:
-                label_map[r[0]] = r[1]
-                type_map[r[0]] = r[2] or "نص"
-                options_map[r[0]] = r[3] or ""
+                label_map[r[0]]  = r[1]
+                type_map[r[0]]   = r[2] or "نص"
+                options_map[r[0]]= r[3] or ""
+                order_map[r[0]]  = r[4] if r[4] is not None else 0
         except Exception:
             try:
-                for r in db.execute("SELECT col_key, col_label FROM " + labels_table).fetchall():
+                for r in db.execute(
+                    "SELECT col_key, col_label FROM " + labels_table
+                ).fetchall():
                     label_map[r[0]] = r[1]
             except Exception:
                 pass
     default_type = "نص"
-    out = [{
-        "col_key": c,
-        "col_label": _decode_arabic_entities(label_map.get(c)) or BUILT_IN_COLUMN_LABELS.get(c) or c,
-        "col_type": type_map.get(c, default_type),
-        "col_options": options_map.get(c, ""),
-    } for c in live_cols]
-    return jsonify({"ok": True, "columns": out, "db_table": db_table, "db_table_label": _table_display_label(db_table)})
+    # Stable sort: col_order asc, then the original live_cols position
+    # so columns without a saved order stay where they are.
+    indexed = list(enumerate(live_cols))
+    indexed.sort(key=lambda x: (
+        order_map.get(x[1], 10_000_000),   # un-ordered cols go to the end
+        x[0],                              # preserve information_schema order as tie-breaker
+    ))
+    out = []
+    for rank, (_, c) in enumerate(indexed, start=1):
+        out.append({
+            "col_key": c,
+            "col_label": _decode_arabic_entities(label_map.get(c)) or BUILT_IN_COLUMN_LABELS.get(c) or c,
+            "col_type": type_map.get(c, default_type),
+            "col_options": options_map.get(c, ""),
+            "col_order": order_map.get(c, rank),
+        })
+    return out, db_table
+
+
+@app.route('/api/custom-table/<tid>/columns', methods=['GET'])
+@login_required
+def api_unified_columns_get(tid):
+    out, db_table = _compute_table_schema(tid)
+    if out is None:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    return jsonify({
+        "ok": True, "columns": out,
+        "db_table": db_table,
+        "db_table_label": _table_display_label(db_table),
+    })
+
+
+# ── Single-source-of-truth schema endpoint ────────────────────────────
+# Spec: GET /api/table/<name>/schema returns
+#   [{internal_name, display_name, col_type, col_options, col_order}]
+# Both the تعديل الجدول modal and the page-level table renderer are
+# expected to drive off this endpoint (SYNC RULE in CLAUDE.md). The
+# internal/display field names mirror the spec exactly; col_key /
+# col_label are also included so existing call sites don't break.
+@app.route('/api/table/<tid>/schema', methods=['GET'])
+@login_required
+def api_table_schema(tid):
+    out, db_table = _compute_table_schema(tid)
+    if out is None:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    spec = [{
+        "internal_name": c["col_key"],
+        "display_name":  c["col_label"],
+        "col_type":      c["col_type"],
+        "col_options":   c["col_options"],
+        "col_order":     c["col_order"],
+        # Aliases retained for backwards-compat with the existing modal:
+        "col_key":       c["col_key"],
+        "col_label":     c["col_label"],
+    } for c in out]
+    return jsonify({
+        "ok": True, "table": db_table, "schema": spec,
+        "db_table_label": _table_display_label(db_table),
+    })
+
+
+def _schema_payload(tid):
+    """Tiny helper so mutation endpoints can cheaply echo the new
+    schema alongside their normal ok payload."""
+    out, _ = _compute_table_schema(tid)
+    return out or []
 
 
 def _derive_unique_col_key(col_label, existing_cols):
@@ -10064,7 +10163,8 @@ def api_unified_add_column(tid):
 
         _upsert_label()
     db.commit()
-    return jsonify({"ok": True, "col_key": col_key_raw, "col_label": col_label})
+    return jsonify({"ok": True, "col_key": col_key_raw, "col_label": col_label,
+                    "updated_schema": _schema_payload(tid)})
 
 
 @app.route('/api/custom-table/<tid>/rename-column', methods=['PATCH'])
@@ -10145,7 +10245,7 @@ def api_unified_rename_column(tid):
                 except Exception:
                     pass
         db.commit()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "updated_schema": _schema_payload(tid)})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
@@ -10229,7 +10329,8 @@ def api_unified_reorder_columns(tid):
             except Exception:
                 continue
     db.commit()
-    return jsonify({"ok": True, "updated": updated, "received": len(new_order)})
+    return jsonify({"ok": True, "updated": updated, "received": len(new_order),
+                    "updated_schema": _schema_payload(tid)})
 
 
 @app.route('/api/custom-table/<tid>/column-type', methods=['PATCH'])
@@ -10261,7 +10362,7 @@ def api_unified_set_column_type(tid):
                 (col_key, col_key, max_order + 1, col_type_val, col_options_val),
             )
         db.commit()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "updated_schema": _schema_payload(tid)})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
@@ -10413,7 +10514,8 @@ def api_unified_delete_column(tid, col_name):
                 "ok": False,
                 "error": "custom_table_cols row still present after delete",
             }), 500
-        return jsonify({"ok": True, "col_key": col_name, "rows_scrubbed": scrubbed})
+        return jsonify({"ok": True, "col_key": col_name, "rows_scrubbed": scrubbed,
+                        "updated_schema": _schema_payload(tid)})
 
     # ---- 2b) BUILT-IN path: confirm the column is a real SQL column ----
     try:
@@ -10517,7 +10619,8 @@ def api_unified_delete_column(tid, col_name):
         pass
 
     db.commit()
-    return jsonify({"ok": True, "col_key": col_name})
+    return jsonify({"ok": True, "col_key": col_name,
+                    "updated_schema": _schema_payload(tid)})
 
 
 @app.route('/api/custom-table/<tid>/rename', methods=['PATCH'])
@@ -13686,6 +13789,34 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     return m ? m[1] : null;
   }
   var _MX_COLKEY_CACHE = {};   /* tid -> {label → col_key} */
+
+  /* ------------------------------------------------------------------
+   * SYNC RULE: the تعديل الجدول modal and the live table must always
+   * render off the same schema. After every column operation (add,
+   * delete, rename, reorder, type change), call window.refreshTable(tid):
+   *   - clears the col-key cache so the next label→key lookup is fresh
+   *   - fires the page-level reloader (loadStudents / loadGroups2 / …)
+   *     to re-render tbody + thead from server data
+   *   - if the UTEM modal is currently open for this tid, re-fetches
+   *     /api/custom-table/<tid>/columns and repaints its column list
+   * It's a no-op if no matching tid can be resolved, so it's safe to
+   * invoke on every success callback.
+   * ---------------------------------------------------------------- */
+  window.refreshTable = function(tid){
+    if (!tid) return;
+    try { delete _MX_COLKEY_CACHE[tid]; } catch(e){}
+    _mxTriggerReload(tid);
+    try {
+      // Refresh the UTEM modal if it's currently open for this tid.
+      var modal = document.getElementById('universalTableEditModal');
+      if (modal && modal.classList.contains('open') &&
+          typeof window._utemTableKey !== 'undefined' &&
+          String(window._utemTableKey) === String(tid) &&
+          typeof window.openUniversalTableEditModal === 'function') {
+        window.openUniversalTableEditModal(window._utemTableKey);
+      }
+    } catch(e){}
+  };
   function _mxResolveColKey(tid, label, cb){
     label = (label || '').replace(/\s+/g, ' ').trim();
     if (!tid || !label) { cb(null); return; }
@@ -13766,14 +13897,13 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
           .then(function(d){
             if (d && d.ok){
               if (typeof window.mxToast === 'function') window.mxToast('تم حذف العمود بنجاح', 'success');
-              delete _MX_COLKEY_CACHE[tid];
-              /* Always strip the <th> + every <td> at this index. Some
-                 tables (taqseet in particular) have a hardcoded thead,
-                 so a successful DB drop wouldn't otherwise remove the
-                 now-orphan header cell. After the surgical removal we
-                 STILL call the page reloader so row data is refreshed. */
+              /* Strip the <th> + every <td> at this index so tables with
+                 a hardcoded thead (taqseet) don't show an orphan header,
+                 then invoke the SYNC-RULE refresher — re-renders tbody
+                 and, if the UTEM modal is open for this tid, repaints
+                 its column list from the authoritative schema. */
               _mxRemoveColumnFromDom(table, colIdx);
-              _mxTriggerReload(tid);
+              window.refreshTable(tid);
             } else {
               /* Ghost-column case: the server couldn't find the column
                  in the schema, the label table, the built-in labels,
@@ -13907,6 +14037,10 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
                 it.th.classList.add('mx-col-flash');
                 setTimeout(function(){ it.th.classList.remove('mx-col-flash'); }, 700);
               });
+              /* SYNC RULE: refresh both tbody and the UTEM modal (if
+                 open) so the new col_order is mirrored across both
+                 surfaces immediately. */
+              window.refreshTable(tid);
             } else {
               if (typeof window.mxToast === 'function')
                 window.mxToast((res && res.error) || 'تعذّر حفظ الترتيب', 'error');
