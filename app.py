@@ -372,6 +372,27 @@ def init_db():
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
         is_visible INTEGER DEFAULT 1)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS payment_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_name TEXT,
+        registration_status TEXT,
+        course_amount TEXT,
+        inst1 TEXT, msg1 TEXT,
+        inst2 TEXT, msg2 TEXT,
+        inst3 TEXT, msg3 TEXT,
+        inst4 TEXT, msg4 TEXT,
+        inst5 TEXT, msg5 TEXT,
+        total_paid TEXT,
+        total_remaining TEXT,
+        payment_status TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS paylog_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
     db.commit()
     db.close()
 
@@ -707,6 +728,55 @@ if True:
                 pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("eval_labels_v1",))
+        except Exception:
+            pass
+    db2.execute("""CREATE TABLE IF NOT EXISTS payment_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_name TEXT,
+        registration_status TEXT,
+        course_amount TEXT,
+        inst1 TEXT, msg1 TEXT,
+        inst2 TEXT, msg2 TEXT,
+        inst3 TEXT, msg3 TEXT,
+        inst4 TEXT, msg4 TEXT,
+        inst5 TEXT, msg5 TEXT,
+        total_paid TEXT,
+        total_remaining TEXT,
+        payment_status TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS paylog_col_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        col_key TEXT UNIQUE,
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1)""")
+    if "paylog_labels_v2" not in applied:
+        seed_paylog_labels = [
+            ("student_name",        "&#x627;&#x644;&#x627;&#x633;&#x645;", 1),
+            ("registration_status", "&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x633;&#x62C;&#x64A;&#x644;", 2),
+            ("course_amount",       "&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;", 3),
+            ("inst1",               "&#x627;&#x644;&#x642;&#x633;&#x637; 1", 4),
+            ("msg1",                "&#x627;&#x644;&#x642;&#x633;&#x637; 1 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;", 5),
+            ("inst2",               "&#x627;&#x644;&#x642;&#x633;&#x637; 2", 6),
+            ("msg2",                "&#x627;&#x644;&#x642;&#x633;&#x637; 2 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;", 7),
+            ("inst3",               "&#x627;&#x644;&#x642;&#x633;&#x637; 3", 8),
+            ("msg3",                "&#x627;&#x644;&#x642;&#x633;&#x637; 3 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;", 9),
+            ("inst4",               "&#x627;&#x644;&#x642;&#x633;&#x637; 4", 10),
+            ("msg4",                "&#x627;&#x644;&#x642;&#x633;&#x637; 4 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;", 11),
+            ("inst5",               "&#x627;&#x644;&#x642;&#x633;&#x637; 5", 12),
+            ("msg5",                "&#x627;&#x644;&#x642;&#x633;&#x637; 5 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;", 13),
+            ("total_paid",          "&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;", 14),
+            ("total_remaining",     "&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;", 15),
+            ("payment_status",      "&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;", 16),
+        ]
+        for key, label, order in seed_paylog_labels:
+            try:
+                db2.execute("INSERT INTO paylog_col_labels(col_key,col_label,col_order) VALUES(?,?,?)", (key, label, order))
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("paylog_labels_v2",))
         except Exception:
             pass
     db2.commit()
@@ -3362,6 +3432,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     <a class="db-nav-btn" href="#sec-taqseet" data-target="sec-taqseet" onclick="dbNavGo(event,'sec-taqseet')">&#x1F4CB; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</a>
     <a class="db-nav-btn orange" href="#sec-attendance" data-target="sec-attendance" onclick="dbNavGo(event,'sec-attendance')">&#x1F4C5; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</a>
     <a class="db-nav-btn blue" href="#sec-evals" data-target="sec-evals" onclick="dbNavGo(event,'sec-evals')">&#x1F4DD; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</a>
+    <a class="db-nav-btn teal" href="#sec-paylog" data-target="sec-paylog" onclick="dbNavGo(event,'sec-paylog')">&#x1F4B0; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</a>
     <span id="dbNavCustom"></span>
   </div>
   <div class="db-section" id="sec-students">
@@ -3590,6 +3661,41 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     </table>
   </div>
 </div>
+<!-- ===== PAYMENT LOG TABLE SECTION ===== -->
+<div class="db-section" id="sec-paylog">
+  <div class="db-section-title" style="color:#00695C;">&#x1F4B0; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</div>
+  <div class="stats">
+    <div class="stat-card" style="border-top:3px solid #00897B;">
+      <span class="stat-num" id="paylogTotalCount" style="color:#00897B;">0</span>
+      <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x633;&#x62C;&#x644;&#x627;&#x62A;</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="openAddPaylogModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('payment_log')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openPaylogTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('paylog')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
+    <button id="bulkDelBtn_paylog" class="btn-bulk-del" onclick="_bulkDelete('paylogBody',function(id){return '/api/payment-log/'+id;},loadPaymentLog,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="paylogSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;..." oninput="filterPaylogTable()">
+    <button class="btn-search" style="background:#00897B;" onclick="filterPaylogTable()">&#x628;&#x62D;&#x62B;</button>
+  </div>
+  <div class="table-wrap">
+    <table style="min-width:1600px;">
+      <thead>
+        <tr id="paylogTheadRow" style="background:linear-gradient(135deg,#00695C,#00897B);">
+          <th class="bulk-col"><input type="checkbox" id="selectAll_paylog" class="bulk-cb" onclick="_bulkSelectAll('paylogBody','selectAll_paylog','bulkDelBtn_paylog',this.checked)"></th>
+          <th>#</th>
+          <th>&#x625;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>
+        </tr>
+      </thead>
+      <tbody id="paylogBody">
+        <tr><td colspan="3" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x633;&#x62C;&#x644;&#x627;&#x62A; &#x62F;&#x641;&#x639;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </div>
 <div class="modal-bg" id="modal">
   <div class="modal">
@@ -3786,6 +3892,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
         <option value="attendance">&#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</option>
         <option value="taqseet">&#x62C;&#x62F;&#x648;&#x644; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</option>
         <option value="evaluations">&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</option>
+        <option value="payment_log">&#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</option>
       </select>
     </div>
     <div id="genExcelFileRow" style="display:none;text-align:center;margin:14px 0;">
@@ -4010,6 +4117,77 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 </div>
 </div>
 </div>
+<!-- PAYMENT LOG ADD/EDIT MODAL -->
+<div class="modal-bg" id="paylogModal">
+  <div class="modal" style="border-top:4px solid #00897B;max-width:720px;">
+    <h2 id="paylogModalTitle" style="color:#00695C;">&#x1F4B0; &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644; &#x62F;&#x641;&#x639;</h2>
+    <input type="hidden" id="paylogEditId">
+    <div class="form-grid">
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x627;&#x633;&#x645; *</label><input id="pl_student_name" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x633;&#x62C;&#x64A;&#x644;</label><input id="pl_registration_status" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</label><input id="pl_course_amount" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 1</label><input id="pl_inst1" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 1 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label><input id="pl_msg1" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 2</label><input id="pl_inst2" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 2 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label><input id="pl_msg2" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 3</label><input id="pl_inst3" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 3 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label><input id="pl_msg3" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 4</label><input id="pl_inst4" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 4 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label><input id="pl_msg4" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 5</label><input id="pl_inst5" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x642;&#x633;&#x637; 5 &#x644;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;</label><input id="pl_msg5" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</label><input id="pl_total_paid" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</label><input id="pl_total_remaining" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+      <div class="field"><label style="color:#00695C;">&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</label><input id="pl_payment_status" style="border-color:#b2dfdb;background:#f0fdfb;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" style="background:linear-gradient(135deg,#00897B,#00695C);" onclick="savePaylog()">&#x62D;&#x641;&#x638;</button>
+      <button class="btn-cancel" style="background:#e0f2f1;color:#00695C;" onclick="closePaylogModal()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+    </div>
+  </div>
+</div>
+<!-- PAYMENT LOG TABLE EDIT MODAL -->
+<div class="modal-bg" id="paylogTableEditModal">
+<div class="modal" style="border-top:4px solid #FF6B35;max-width:560px;">
+<h2 style="color:#E55A2B;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62C;&#x62F;&#x648;&#x644; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</h2>
+<div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e0f2f1;padding-bottom:10px;">
+<button id="pltab-add-col" onclick="switchPaylogTab('add-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#FF6B35;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
+<button id="pltab-del-col" onclick="switchPaylogTab('del-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f2f1;color:#00695C;font-weight:700;cursor:pointer;font-size:13px;">&#10060; &#x62D;&#x630;&#x641; &#x639;&#x645;&#x648;&#x62F;</button>
+<button id="pltab-edit-col" onclick="switchPaylogTab('edit-col')" style="padding:8px 16px;border-radius:8px;border:none;background:#e0f2f1;color:#00695C;font-weight:700;cursor:pointer;font-size:13px;">&#9998; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x639;&#x646;&#x648;&#x627;&#x646;</button>
+</div>
+<div id="plpanel-add-col">
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x627;&#x644;&#x62C;&#x62F;&#x64A;&#x62F; *</label><input id="pl_new_col_label" style="width:100%;padding:10px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;"></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#E55A2B;">&#x645;&#x648;&#x642;&#x639; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;</label>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+<select id="pl_new_col_position" onchange="togglePaylogPositionCol()" style="padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:0 0 auto;">
+<option value="end">&#x641;&#x64A; &#x627;&#x644;&#x646;&#x647;&#x627;&#x64A;&#x629;</option>
+<option value="start">&#x641;&#x64A; &#x627;&#x644;&#x628;&#x62F;&#x627;&#x64A;&#x629;</option>
+<option value="after">&#x628;&#x639;&#x62F; &#x639;&#x645;&#x648;&#x62F;:</option>
+</select>
+<select id="pl_new_col_after" style="display:none;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;font-size:14px;background:#fff9f7;flex:1;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#8212;</option></select>
+</div></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="addPaylogColumn()">&#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F;</button>
+</div></div>
+<div id="plpanel-del-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#e53935;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x644;&#x644;&#x62D;&#x630;&#x641; *</label>
+<select id="pl_del_col_key" style="width:100%;padding:10px;border:1.5px solid #fce4ec;border-radius:9px;font-size:14px;background:#fff9f9;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x639;&#x645;&#x648;&#x62F; &#8212;</option></select></div>
+<div style="background:#fff3f3;border-radius:8px;padding:10px;font-size:12px;color:#c62828;margin-bottom:12px;">&#9888; &#x62A;&#x62D;&#x630;&#x64A;&#x631;: &#x62D;&#x630;&#x641; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; &#x64A;&#x62D;&#x630;&#x641; &#x62C;&#x645;&#x64A;&#x639; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x647;. &#x644;&#x627; &#x64A;&#x645;&#x643;&#x646; &#x627;&#x644;&#x62A;&#x631;&#x627;&#x62C;&#x639;.</div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:#e53935;" onclick="deletePaylogColumn()">&#x62D;&#x630;&#x641; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;</button>
+</div></div>
+<div id="plpanel-edit-col" style="display:none;">
+<div class="field" style="margin-bottom:14px;"><label style="color:#00695C;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F; *</label>
+<select id="pl_edit_col_key" onchange="fillPaylogEditLabel()" style="width:100%;padding:10px;border:1.5px solid #b2dfdb;border-radius:9px;font-size:14px;background:#f0fdfb;"><option value="">&#8212; &#x627;&#x62E;&#x62A;&#x631; &#x639;&#x645;&#x648;&#x62F; &#8212;</option></select></div>
+<div class="field" style="margin-bottom:14px;"><label style="color:#00695C;">&#x627;&#x644;&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x64A;&#x62F; *</label><input id="pl_edit_col_label" style="width:100%;padding:10px;border:1.5px solid #b2dfdb;border-radius:9px;font-size:14px;background:#f0fdfb;"></div>
+<div class="modal-actions" style="justify-content:flex-start;margin-top:10px;">
+<button class="btn-save" style="background:linear-gradient(135deg,#00897B,#00695C);" onclick="updatePaylogColumnLabel()">&#x62D;&#x641;&#x638; &#x627;&#x644;&#x639;&#x646;&#x648;&#x627;&#x646;</button>
+</div></div>
+<div class="modal-actions" style="margin-top:18px;justify-content:center;">
+<button class="btn-cancel" style="background:#e0f2f1;color:#00695C;" onclick="closePaylogTableEditModal()">&#x625;&#x63A;&#x644;&#x627;&#x642;</button>
+</div>
+</div>
+</div>
 <!-- EVALUATIONS ADD/EDIT MODAL -->
 <div class="modal-bg" id="evalModal">
   <div class="modal" style="border-top:4px solid #1976D2;max-width:720px;">
@@ -4183,7 +4361,7 @@ function _freezeTableForKey(tableKey){
     var tbody = document.getElementById('ctbody_' + tid);
     return tbody ? tbody.closest('table') : null;
   }
-  var tbodyIds = { students:'studentsBody', groups:'groupsBody2', taqseet:'taqseetBody', attendance:'attendanceBody', evals:'evalsBody' };
+  var tbodyIds = { students:'studentsBody', groups:'groupsBody2', taqseet:'taqseetBody', attendance:'attendanceBody', evals:'evalsBody', paylog:'paylogBody' };
   var tbody = document.getElementById(tbodyIds[tableKey]);
   return tbody ? tbody.closest('table') : null;
 }
@@ -4916,6 +5094,171 @@ function updateEvalColumnLabel(){
     });
 }
 loadEvaluations();
+
+// --- Payment Log (\u0633\u062c\u0644 \u0627\u0644\u062f\u0641\u0639) ---
+var allPaylog = [];
+var allPaylogColumns = [];
+function loadPaymentLog() {
+  Promise.all([
+    fetch('/api/payment-log',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/paylog-columns',{credentials:'include'}).then(function(r){return r.json();})
+  ]).then(function(res){
+    allPaylog = res[0].rows || [];
+    allPaylogColumns = res[1].columns || [];
+    buildPaylogHeader();
+    renderPaylogTable(allPaylog);
+    var c = document.getElementById('paylogTotalCount'); if(c) c.textContent = allPaylog.length;
+    applyFreezeToTable('paylog');
+  }).catch(function(){});
+}
+function buildPaylogHeader(){
+  var thead = document.getElementById('paylogTheadRow');
+  if(!thead) return;
+  var html = '<th class="bulk-col"><input type="checkbox" id="selectAll_paylog" class="bulk-cb" onclick="_bulkSelectAll(\\'paylogBody\\',\\'selectAll_paylog\\',\\'bulkDelBtn_paylog\\',this.checked)"></th><th>#</th>';
+  for(var i=0;i<allPaylogColumns.length;i++){ html += '<th>'+allPaylogColumns[i].col_label+'</th>'; }
+  html += '<th>\u0625\u062c\u0631\u0627\u0621\u0627\u062a</th>';
+  thead.innerHTML = html;
+}
+function renderPaylogTable(list){
+  var body = document.getElementById('paylogBody'); if(!body) return;
+  var colCount = allPaylogColumns.length + 3;
+  if(!list || !list.length){
+    body.innerHTML = '<tr><td colspan="'+colCount+'" class="no-data">\u0644\u0627 \u062a\u0648\u062c\u062f \u0633\u062c\u0644\u0627\u062a \u062f\u0641\u0639</td></tr>';
+    _bulkUpdate('paylogBody','selectAll_paylog','bulkDelBtn_paylog');
+    applyFreezeToTable('paylog');
+    return;
+  }
+  var html = '';
+  for(var i=0;i<list.length;i++){
+    var r = list[i];
+    html += '<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+r.id+'" onclick="_bulkUpdate(\\'paylogBody\\',\\'selectAll_paylog\\',\\'bulkDelBtn_paylog\\')"></td><td>'+(i+1)+'</td>';
+    for(var j=0;j<allPaylogColumns.length;j++){
+      var key = allPaylogColumns[j].col_key;
+      var val = r[key];
+      if(key==='student_name'){ html += '<td style="font-weight:600;color:#00695C;text-align:right;">'+(val||'-')+'</td>'; }
+      else { html += '<td>'+(val==null||val===''?'-':val)+'</td>'; }
+    }
+    html += '<td><button class="action-btn btn-edit" style="color:#00695C;" onclick="openPaylogEdit('+r.id+')">\u062a\u0639\u062f\u064a\u0644</button><button class="action-btn btn-del" onclick="askPaylogDelete('+r.id+')">\u062d\u0630\u0641</button></td></tr>';
+  }
+  body.innerHTML = html;
+  applyFreezeToTable('paylog');
+}
+function filterPaylogTable(){
+  var q = (document.getElementById('paylogSearchInput').value || '').toLowerCase();
+  if(!q){ renderPaylogTable(allPaylog); return; }
+  renderPaylogTable(allPaylog.filter(function(r){
+    return String(r.student_name||'').toLowerCase().indexOf(q) > -1;
+  }));
+}
+var PL_IDS = ['student_name','registration_status','course_amount','inst1','msg1','inst2','msg2','inst3','msg3','inst4','msg4','inst5','msg5','total_paid','total_remaining','payment_status'];
+function plClearForm(){
+  for(var i=0;i<PL_IDS.length;i++){ var el=document.getElementById('pl_'+PL_IDS[i]); if(el) el.value=''; }
+  document.getElementById('paylogEditId').value = '';
+}
+function openAddPaylogModal(){ plClearForm(); document.getElementById('paylogModalTitle').textContent='\u1f4b0 \u0625\u0636\u0627\u0641\u0629 \u0633\u062c\u0644 \u062f\u0641\u0639'; document.getElementById('paylogModal').classList.add('open'); }
+function openPaylogEdit(id){
+  var r = null;
+  for(var i=0;i<allPaylog.length;i++){ if(allPaylog[i].id===id){ r = allPaylog[i]; break; } }
+  if(!r) return;
+  document.getElementById('paylogEditId').value = id;
+  document.getElementById('paylogModalTitle').textContent = '\u270e \u062a\u0639\u062f\u064a\u0644 \u0633\u062c\u0644 \u062f\u0641\u0639';
+  for(var i=0;i<PL_IDS.length;i++){ var el=document.getElementById('pl_'+PL_IDS[i]); if(el) el.value = r[PL_IDS[i]] || ''; }
+  document.getElementById('paylogModal').classList.add('open');
+}
+function closePaylogModal(){ document.getElementById('paylogModal').classList.remove('open'); }
+function savePaylog(){
+  var editId = document.getElementById('paylogEditId').value;
+  var body = {};
+  for(var i=0;i<PL_IDS.length;i++){ var el=document.getElementById('pl_'+PL_IDS[i]); if(el) body[PL_IDS[i]] = el.value.trim(); }
+  if(!body.student_name){ showToast('\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628','#e53935'); return; }
+  var url = editId ? '/api/payment-log/'+editId : '/api/payment-log';
+  var method = editId ? 'PUT' : 'POST';
+  fetch(url,{method:method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closePaylogModal(); showToast(editId?'\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0633\u062c\u0644':'\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0633\u062c\u0644','#00897B'); loadPaymentLog(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function askPaylogDelete(id){
+  if(!confirm('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0633\u062c\u0644\u061f')) return;
+  fetch('/api/payment-log/'+id,{method:'DELETE',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935'); loadPaymentLog(); }
+    else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  });
+}
+function openPaylogTableEditModal(){
+  var delSel = document.getElementById('pl_del_col_key');
+  var editSel = document.getElementById('pl_edit_col_key');
+  var afterSel = document.getElementById('pl_new_col_after');
+  delSel.innerHTML = '<option value=""></option>';
+  editSel.innerHTML = '<option value=""></option>';
+  afterSel.innerHTML = '<option value=""></option>';
+  for(var i=0;i<allPaylogColumns.length;i++){
+    var c = allPaylogColumns[i];
+    delSel.innerHTML  += '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+    editSel.innerHTML += '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+    afterSel.innerHTML+= '<option value="'+c.col_key+'">'+c.col_label+'</option>';
+  }
+  document.getElementById('pl_new_col_label').value = '';
+  document.getElementById('pl_new_col_position').value = 'end';
+  togglePaylogPositionCol();
+  switchPaylogTab('add-col');
+  document.getElementById('paylogTableEditModal').classList.add('open');
+}
+function closePaylogTableEditModal(){ document.getElementById('paylogTableEditModal').classList.remove('open'); }
+function switchPaylogTab(tab){
+  var tabs = ['add-col','del-col','edit-col'];
+  for(var i=0;i<tabs.length;i++){
+    var b = document.getElementById('pltab-'+tabs[i]);
+    var p = document.getElementById('plpanel-'+tabs[i]);
+    if(tabs[i]===tab){ if(b){ b.style.background='#FF6B35'; b.style.color='#fff'; } if(p) p.style.display='block'; }
+    else { if(b){ b.style.background='#e0f2f1'; b.style.color='#00695C'; } if(p) p.style.display='none'; }
+  }
+}
+function togglePaylogPositionCol(){
+  var pos = document.getElementById('pl_new_col_position').value;
+  document.getElementById('pl_new_col_after').style.display = (pos==='after') ? 'inline-block' : 'none';
+}
+function fillPaylogEditLabel(){
+  var key = document.getElementById('pl_edit_col_key').value;
+  var c = null;
+  for(var i=0;i<allPaylogColumns.length;i++){ if(allPaylogColumns[i].col_key===key){ c = allPaylogColumns[i]; break; } }
+  document.getElementById('pl_edit_col_label').value = c ? c.col_label : '';
+}
+function addPaylogColumn(){
+  var label = document.getElementById('pl_new_col_label').value.trim();
+  if(!label){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  var key = label.replace(/\s+/g,'_').toLowerCase().replace(/[^a-z0-9_]/g,'');
+  if(!/^[a-z_][a-z0-9_]*$/.test(key)){ key = 'col_' + Date.now(); }
+  var position = document.getElementById('pl_new_col_position').value;
+  var after_col = document.getElementById('pl_new_col_after').value;
+  fetch('/api/paylog-columns',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_key:key,col_label:label,position:position,after_col:after_col})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closePaylogTableEditModal(); showToast('\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0645\u0648\u062f','#00897B'); loadPaymentLog(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+function deletePaylogColumn(){
+  var key = document.getElementById('pl_del_col_key').value;
+  if(!key){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  fetch('/api/paylog-columns/'+encodeURIComponent(key),{method:'DELETE',credentials:'include'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closePaylogTableEditModal(); showToast('\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062f','#e53935'); loadPaymentLog(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+function updatePaylogColumnLabel(){
+  var key = document.getElementById('pl_edit_col_key').value;
+  var label = document.getElementById('pl_edit_col_label').value.trim();
+  if(!key || !label){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+  fetch('/api/paylog-columns/'+encodeURIComponent(key),{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({col_label:label})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){ closePaylogTableEditModal(); showToast('\u062a\u0645 \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646','#00897B'); loadPaymentLog(); }
+      else { showToast(d.error||'\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    });
+}
+loadPaymentLog();
+
 
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -5898,6 +6241,28 @@ var IMPORT_DEFS = {
       {key:"grammar", ar:"\u0627\u0644\u0642\u0648\u0627\u0639\u062f"},
       {key:"notes", ar:"\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a"}
     ]
+  },
+  payment_log: {
+    title: "\u0633\u062c\u0644 \u0627\u0644\u062f\u0641\u0639",
+    refresh: "loadPaymentLog",
+    fields: [
+      {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
+      {key:"registration_status", ar:"\u062d\u0627\u0644\u0629 \u0627\u0644\u062a\u0633\u062c\u064a\u0644"},
+      {key:"course_amount", ar:"\u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0648\u0631\u0629"},
+      {key:"inst1", ar:"\u0627\u0644\u0642\u0633\u0637 1"},
+      {key:"msg1", ar:"\u0627\u0644\u0642\u0633\u0637 1 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"inst2", ar:"\u0627\u0644\u0642\u0633\u0637 2"},
+      {key:"msg2", ar:"\u0627\u0644\u0642\u0633\u0637 2 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"inst3", ar:"\u0627\u0644\u0642\u0633\u0637 3"},
+      {key:"msg3", ar:"\u0627\u0644\u0642\u0633\u0637 3 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"inst4", ar:"\u0627\u0644\u0642\u0633\u0637 4"},
+      {key:"msg4", ar:"\u0627\u0644\u0642\u0633\u0637 4 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"inst5", ar:"\u0627\u0644\u0642\u0633\u0637 5"},
+      {key:"msg5", ar:"\u0627\u0644\u0642\u0633\u0637 5 \u0644\u0644\u0631\u0633\u0627\u0644\u0629"},
+      {key:"total_paid", ar:"\u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u062f\u0641\u0648\u0639"},
+      {key:"total_remaining", ar:"\u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u062a\u0628\u0642\u064a"},
+      {key:"payment_status", ar:"\u062d\u0627\u0644\u0629 \u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a"}
+    ]
   }
 };
 var genExcelRows = [];
@@ -6607,6 +6972,140 @@ def api_group_columns_update(col_key):
     db = get_db()
     try:
         db.execute("UPDATE group_col_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+
+# --- Payment Log (سجل الدفع) ---------------------------------------------
+
+def _payment_log_writable_cols(db):
+    cols = [r[1] for r in db.execute("PRAGMA table_info(payment_log)").fetchall()]
+    return [c for c in cols if c not in ("id", "created_at")]
+
+@app.route("/api/payment-log", methods=["GET"])
+@login_required
+def api_payment_log_get():
+    db = get_db()
+    rows = db.execute("SELECT * FROM payment_log ORDER BY id DESC").fetchall()
+    return jsonify({"rows": [dict(r) for r in rows]})
+
+@app.route("/api/payment-log", methods=["POST"])
+@login_required
+def api_payment_log_add():
+    d = request.get_json() or {}
+    db = get_db()
+    try:
+        cols = _payment_log_writable_cols(db)
+        placeholders = ",".join(["?"] * len(cols))
+        values = tuple(d.get(c) for c in cols)
+        db.execute("INSERT INTO payment_log (" + ",".join(cols) + ") VALUES (" + placeholders + ")", values)
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/payment-log/<int:rid>", methods=["PUT"])
+@login_required
+def api_payment_log_update(rid):
+    d = request.get_json() or {}
+    db = get_db()
+    try:
+        cols = [c for c in _payment_log_writable_cols(db) if c in d]
+        if not cols:
+            return jsonify({"ok": True})
+        set_clause = ",".join([c + "=?" for c in cols])
+        values = tuple(d.get(c) for c in cols) + (rid,)
+        db.execute("UPDATE payment_log SET " + set_clause + " WHERE id=?", values)
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/payment-log/<int:rid>", methods=["DELETE"])
+@login_required
+def api_payment_log_delete(rid):
+    try:
+        db = get_db()
+        db.execute("DELETE FROM payment_log WHERE id=?", (rid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+@app.route("/api/paylog-columns", methods=["GET"])
+@login_required
+def api_paylog_columns_get():
+    db = get_db()
+    rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM paylog_col_labels ORDER BY col_order").fetchall()
+    return jsonify({"columns": [dict(r) for r in rows]})
+
+@app.route("/api/paylog-columns", methods=["POST"])
+@login_required
+def api_paylog_columns_add():
+    d = request.get_json()
+    col_key = d.get("col_key","").strip().replace(" ","_").lower()
+    col_label = d.get("col_label","").strip()
+    position = d.get("position","end")
+    after_col = d.get("after_col","")
+    if not col_key or not col_label:
+        return jsonify({"ok":False,"error":"missing data"}),400
+    safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
+    if not safe_key or safe_key != col_key:
+        return jsonify({"ok":False,"error":"invalid column name"}),400
+    db = get_db()
+    try:
+        all_cols = db.execute("SELECT col_key,col_order FROM paylog_col_labels ORDER BY col_order").fetchall()
+        if position == "start":
+            new_order = 0
+            for row in all_cols:
+                db.execute("UPDATE paylog_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+        elif position == "after" and after_col:
+            after_row = db.execute("SELECT col_order FROM paylog_col_labels WHERE col_key=?", (after_col,)).fetchone()
+            if after_row:
+                new_order = after_row[0] + 1
+                for row in all_cols:
+                    if row[1] >= new_order:
+                        db.execute("UPDATE paylog_col_labels SET col_order=col_order+1 WHERE col_key=?", (row[0],))
+            else:
+                max_order = db.execute("SELECT MAX(col_order) FROM paylog_col_labels").fetchone()[0] or 0
+                new_order = max_order + 1
+        else:
+            max_order = db.execute("SELECT MAX(col_order) FROM paylog_col_labels").fetchone()[0] or 0
+            new_order = max_order + 1
+        db.execute("INSERT INTO paylog_col_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,new_order))
+        db.execute("ALTER TABLE payment_log ADD COLUMN "+col_key+" TEXT")
+        db.commit()
+        return jsonify({"ok":True})
+    except Exception as ex:
+        return jsonify({"ok":False,"error":str(ex)}),400
+
+@app.route("/api/paylog-columns/<col_key>", methods=["DELETE"])
+@login_required
+def api_paylog_columns_delete(col_key):
+    safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
+    if not safe_key or safe_key != col_key:
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
+    db = get_db()
+    try:
+        db.execute('ALTER TABLE payment_log DROP COLUMN "' + safe_key + '"')
+    except Exception:
+        pass
+    db.execute("DELETE FROM paylog_col_labels WHERE col_key=?", (col_key,))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/paylog-columns/<col_key>", methods=["PUT"])
+@login_required
+def api_paylog_columns_update(col_key):
+    d = request.get_json()
+    new_label = d.get("col_label","").strip()
+    if not new_label:
+        return jsonify({"ok":False,"error":"missing label"}),400
+    db = get_db()
+    try:
+        db.execute("UPDATE paylog_col_labels SET col_label=? WHERE col_key=?",(new_label,col_key))
         db.commit()
         return jsonify({"ok":True})
     except Exception as ex:
@@ -7720,6 +8219,11 @@ IMPORT_TABLE_FIELDS = {
         "general_behavior","behavior_notes","reading","dictation",
         "term_meanings","conversation","expression","grammar","notes",
     ],
+    "payment_log": [
+        "student_name","registration_status","course_amount",
+        "inst1","msg1","inst2","msg2","inst3","msg3","inst4","msg4","inst5","msg5",
+        "total_paid","total_remaining","payment_status",
+    ],
 }
 
 IMPORT_TABLE_SQL = {
@@ -7728,6 +8232,7 @@ IMPORT_TABLE_SQL = {
     "attendance": "INSERT INTO attendance",
     "taqseet": "INSERT INTO taqseet",
     "evaluations": "INSERT INTO evaluations",
+    "payment_log": "INSERT INTO payment_log",
 }
 
 @app.route('/api/import', methods=['POST'])
