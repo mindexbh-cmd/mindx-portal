@@ -6396,8 +6396,11 @@ function _arNorm(s){
   var t = String(s==null?'':s).replace(/^\uFEFF/,'');
   try { t = t.normalize('NFKD'); } catch(e) {}
   return t
+    .toLowerCase()
     .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g,'')
     .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g,'')
+    .replace(/\u0640/g,'')
+    .replace(/[\u00A0\u1680\u180E\u2000-\u200A\u202F\u205F\u3000]/g,' ')
     .replace(/[\u0623\u0625\u0622\u0671]/g,'\u0627')
     .replace(/\u0629/g,'\u0647')
     .replace(/\u0649/g,'\u064A')
@@ -6453,6 +6456,13 @@ function importGenericFromExcel() {
   var labelMap = {};
   var mapped = genExcelRows.map(function(r){
     return mapGenericRow(genExcelHeaders, r, defs, {allowAutoCreate: allowAutoCreate, labelMap: labelMap});
+  }).filter(function(obj){
+    // Skip rows where every cell is empty. Partial rows (even with just one field
+    // populated) pass through — this is what the user expects for sparse data.
+    for (var k in obj) {
+      if (obj[k] != null && String(obj[k]).trim() !== '') return true;
+    }
+    return false;
   });
   var btn = document.getElementById('genExcelImportBtn');
   var statusEl = document.getElementById('genExcelStatus');
@@ -8301,8 +8311,17 @@ def api_import():
     placeholders = ",".join(["?"] * len(fields))
     sql = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
     for r in rows:
+        if not isinstance(r, dict):
+            ignored += 1
+            continue
+        values = tuple(str(r.get(f, "") or "") for f in fields)
+        # Skip rows where every value is empty/whitespace — belt-and-suspenders
+        # alongside the frontend filter. Any field with at least one non-empty
+        # character qualifies (e.g. just الاسم populated).
+        if not any(v.strip() for v in values):
+            ignored += 1
+            continue
         try:
-            values = tuple(str(r.get(f, "") or "") for f in fields)
             cur = db.execute(sql, values)
             if cur.rowcount > 0:
                 imported += 1
