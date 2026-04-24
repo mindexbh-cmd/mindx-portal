@@ -356,7 +356,11 @@ def init_db():
     db.execute("""CREATE TABLE IF NOT EXISTS taqseet_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
-        col_label TEXT)""")
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS evaluations(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         form_fill_date TEXT,
@@ -812,7 +816,11 @@ if True:
     db2.execute("""CREATE TABLE IF NOT EXISTS taqseet_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
-        col_label TEXT)""")
+        col_label TEXT,
+        col_order INTEGER DEFAULT 0,
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db2.execute("""CREATE TABLE IF NOT EXISTS evaluations(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         form_fill_date TEXT,
@@ -934,6 +942,25 @@ if True:
         except Exception:
             pass
         db2.commit()
+
+    # taqseet_col_labels originally shipped with only (id, col_key, col_label).
+    # Add col_order / col_type / col_options so the add-column INSERT — which
+    # specifies all five — stops failing silently and leaving rows un-stored.
+    if "taqseet_labels_schema_v1" not in applied:
+        try:
+            _tc = [r[1] for r in db2.execute("PRAGMA table_info(taqseet_col_labels)").fetchall()]
+            if "col_order" not in _tc:
+                db2.execute("ALTER TABLE taqseet_col_labels ADD COLUMN col_order INTEGER DEFAULT 0")
+            if "is_visible" not in _tc:
+                db2.execute("ALTER TABLE taqseet_col_labels ADD COLUMN is_visible INTEGER DEFAULT 1")
+            if "col_type" not in _tc:
+                db2.execute("ALTER TABLE taqseet_col_labels ADD COLUMN col_type TEXT DEFAULT 'نص'")
+            if "col_options" not in _tc:
+                db2.execute("ALTER TABLE taqseet_col_labels ADD COLUMN col_options TEXT DEFAULT ''")
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("taqseet_labels_schema_v1",))
+            db2.commit()
+        except Exception:
+            pass
 
     # Settings table — lets admins remap table/column references without code edits.
     db2.execute("""CREATE TABLE IF NOT EXISTS settings(
@@ -9597,6 +9624,43 @@ def api_unified_columns_get(tid):
     return jsonify({"ok": True, "columns": out, "db_table": db_table, "db_table_label": _table_display_label(db_table)})
 
 
+def _derive_unique_col_key(col_label, existing_cols):
+    """Produce a unique ASCII column key from a user-entered label.
+
+    The label is the USER-FACING Arabic string (shown everywhere in the
+    UI). The key is an internal DB identifier the user never sees.
+
+    Rules:
+      - Lowercase the label, replace spaces with underscore.
+      - Keep only ASCII alnum + underscore.
+      - If nothing alphanumeric remains (e.g. a purely Arabic label like
+        "اسم الكتاب", which would strip to bare "_"), fall back to
+        "col_<unix-ms mod 1e10>".
+      - If the derived key starts with a digit, prefix with "col_".
+      - If the derived key already exists in the table, append "_2",
+        "_3", … until unique.
+    """
+    base = (col_label or "").lower().replace(" ", "_")
+    base = "".join(ch for ch in base if ch.isascii() and (ch.isalnum() or ch == "_"))
+    has_alnum = any(ch.isascii() and ch.isalnum() for ch in base)
+    if not has_alnum:
+        base = "col_" + str(int(__import__('time').time() * 1000) % 10_000_000_000)
+    elif base[0].isdigit():
+        base = "col_" + base
+    # Clamp length so ALTER TABLE doesn't fail on DBs with an identifier cap.
+    base = base[:60]
+    if not _is_safe_ident(base):
+        base = "col_" + str(int(__import__('time').time() * 1000) % 10_000_000_000)
+    if base not in existing_cols:
+        return base
+    for i in range(2, 500):
+        cand = (base + "_" + str(i))[:63]
+        if cand not in existing_cols and _is_safe_ident(cand):
+            return cand
+    # Absolute fallback with nanosecond timestamp.
+    return "col_" + str(int(__import__('time').time_ns()) % (10 ** 14))
+
+
 @app.route('/api/custom-table/<tid>/add-column', methods=['POST'])
 @login_required
 def api_unified_add_column(tid):
@@ -9605,55 +9669,88 @@ def api_unified_add_column(tid):
     col_label = (d.get("col_label") or "").strip()
     if not col_label:
         return jsonify({"ok": False, "error": "col_label required"}), 400
-    if not col_key_raw:
-        # Derive a safe key from the label. Arabic chars pass Python's .isalnum()
-        # but fail the ASCII-only _is_safe_ident regex below, so restrict to
-        # ASCII here. Pure-Arabic labels fall back to "col_<timestamp>".
-        col_key_raw = col_label.lower().replace(" ", "_")
-        col_key_raw = "".join(ch for ch in col_key_raw if ch.isascii() and (ch.isalnum() or ch == "_"))
-        if not col_key_raw or col_key_raw[0].isdigit():
-            col_key_raw = "col_" + str(int(__import__('time').time() * 1000) % 10000000)
-    if not _is_safe_ident(col_key_raw):
-        return jsonify({"ok": False, "error": "invalid column name"}), 400
     db_table, labels_table = _resolve_table(tid)
     if not db_table:
         return jsonify({"ok": False, "error": "table not found"}), 404
     db = get_db()
+    # Resolve the final column key BEFORE we ALTER TABLE: the derivation
+    # now collision-checks against the live schema so an Arabic-only label
+    # never lands as "_" and every add produces a distinct column.
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + db_table + ")").fetchall()}
+    except Exception:
+        live_cols = set()
+    if col_key_raw:
+        # Caller forced a specific key: must be safe, must not collide.
+        if not _is_safe_ident(col_key_raw):
+            return jsonify({"ok": False, "error": "invalid column name"}), 400
+        if col_key_raw in live_cols:
+            return jsonify({"ok": False, "error": "column already exists"}), 400
+    else:
+        col_key_raw = _derive_unique_col_key(col_label, live_cols)
+    if not _is_safe_ident(col_key_raw):
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
     try:
         db.execute('ALTER TABLE "' + db_table + '" ADD COLUMN "' + col_key_raw + '" TEXT')
-    except Exception as ex:
-        # column may already exist — don't fail
+    except Exception:
+        # column may already exist — continue; the label write below still
+        # needs to run so the Arabic display name is registered.
         pass
     col_type_val = (d.get("col_type") or "نص").strip()
     col_options_val = (d.get("col_options") or "").strip()
     if labels_table:
+        # Walk the schema once so we pick the widest INSERT that will succeed
+        # AND so we never silently drop the Arabic label on a narrow table
+        # like the original taqseet_col_labels (id, col_key, col_label).
         try:
-            max_order = db.execute("SELECT MAX(col_order) FROM " + labels_table).fetchone()[0] or 0
-            # Try insert with the new typed columns; fall back for pre-migration DBs.
-            try:
-                db.execute(
-                    "INSERT INTO " + labels_table + "(col_key, col_label, col_order, col_type, col_options) VALUES(?,?,?,?,?)",
-                    (col_key_raw, col_label, max_order + 1, col_type_val, col_options_val),
-                )
-            except Exception:
-                db.execute(
-                    "INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
-                    (col_key_raw, col_label, max_order + 1),
-                )
+            lbl_cols = {r[1] for r in db.execute(
+                "PRAGMA table_info(" + labels_table + ")"
+            ).fetchall()}
         except Exception:
+            lbl_cols = set()
+        has_order = "col_order" in lbl_cols
+        has_type  = "col_type"  in lbl_cols
+        has_opts  = "col_options" in lbl_cols
+        max_order = 0
+        if has_order:
+            try:
+                max_order = db.execute(
+                    "SELECT MAX(col_order) FROM " + labels_table
+                ).fetchone()[0] or 0
+            except Exception:
+                max_order = 0
+
+        def _upsert_label():
+            cols, vals = ["col_key", "col_label"], [col_key_raw, col_label]
+            if has_order: cols.append("col_order");   vals.append(max_order + 1)
+            if has_type:  cols.append("col_type");    vals.append(col_type_val)
+            if has_opts:  cols.append("col_options"); vals.append(col_options_val)
+            placeholders = ",".join(["?"] * len(vals))
             try:
                 db.execute(
-                    "UPDATE " + labels_table + " SET col_label=?, col_type=?, col_options=? WHERE col_key=?",
-                    (col_label, col_type_val, col_options_val, col_key_raw),
+                    "INSERT INTO " + labels_table + "(" + ",".join(cols) + ") VALUES(" + placeholders + ")",
+                    tuple(vals),
                 )
+                return True
             except Exception:
-                try:
-                    db.execute("UPDATE " + labels_table + " SET col_label=? WHERE col_key=?",
-                               (col_label, col_key_raw))
-                except Exception:
-                    pass
+                pass
+            # Row already exists — UPDATE whatever columns we do have.
+            set_cols, set_vals = ["col_label=?"], [col_label]
+            if has_type:  set_cols.append("col_type=?");    set_vals.append(col_type_val)
+            if has_opts:  set_cols.append("col_options=?"); set_vals.append(col_options_val)
+            set_vals.append(col_key_raw)
+            try:
+                db.execute(
+                    "UPDATE " + labels_table + " SET " + ",".join(set_cols) + " WHERE col_key=?",
+                    tuple(set_vals),
+                )
+                return True
+            except Exception:
+                return False
+
+        _upsert_label()
     db.commit()
-    return jsonify({"ok": True, "col_key": col_key_raw})
+    return jsonify({"ok": True, "col_key": col_key_raw, "col_label": col_label})
 
 
 @app.route('/api/custom-table/<tid>/rename-column', methods=['PATCH'])
