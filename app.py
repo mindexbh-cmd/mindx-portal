@@ -10150,6 +10150,88 @@ def api_unified_rename_column(tid):
         return jsonify({"ok": False, "error": str(ex)}), 400
 
 
+@app.route('/api/custom-table/<tid>/reorder-columns', methods=['PATCH'])
+@login_required
+def api_unified_reorder_columns(tid):
+    """Persist a new column order for the given table.
+
+    Body: {"columns": ["internal_name_1", "internal_name_2", ...]}
+
+    col_order is already present on every *_col_labels table (seeded by
+    init_db + earlier migrations) and on custom_table_cols. For custom
+    tables (numeric tid), we update custom_table_cols; for built-in
+    tables we update the per-table labels table. Only safe-identifier
+    col_keys are accepted. Unknown col_keys are silently skipped.
+    """
+    d = request.get_json() or {}
+    new_order = d.get("columns") or []
+    if not isinstance(new_order, list):
+        return jsonify({"ok": False, "error": "columns must be a list"}), 400
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    updated = 0
+    tid_str = str(tid or "").strip()
+    if tid_str.isdigit():
+        try:
+            table_id = int(tid_str)
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid custom table id"}), 400
+        for i, col_key in enumerate(new_order, start=1):
+            ck = (col_key or "").strip()
+            if not ck or not _is_safe_ident(ck):
+                continue
+            try:
+                cur = db.execute(
+                    "UPDATE custom_table_cols SET col_order=? WHERE table_id=? AND col_key=?",
+                    (i, table_id, ck),
+                )
+                if cur.rowcount:
+                    updated += 1
+            except Exception:
+                continue
+    else:
+        if not labels_table:
+            return jsonify({"ok": False, "error": "table has no labels table"}), 400
+        # Ensure col_order exists (defensive — every *_col_labels already
+        # has it, but if someone added a new label table in the future
+        # without col_order, fail fast rather than write to a ghost column).
+        try:
+            lbl_cols = {r[1] for r in db.execute(
+                "PRAGMA table_info(" + labels_table + ")"
+            ).fetchall()}
+        except Exception:
+            lbl_cols = set()
+        if "col_order" not in lbl_cols:
+            return jsonify({"ok": False, "error": "labels table missing col_order"}), 400
+        for i, col_key in enumerate(new_order, start=1):
+            ck = (col_key or "").strip()
+            if not ck or not _is_safe_ident(ck):
+                continue
+            try:
+                # Update existing row; insert a placeholder row if none
+                # exists yet (e.g. a built-in column that never got a
+                # labels_table row — col_label falls back to col_key).
+                cur = db.execute(
+                    "UPDATE " + labels_table + " SET col_order=? WHERE col_key=?",
+                    (i, ck),
+                )
+                if cur.rowcount == 0:
+                    try:
+                        db.execute(
+                            "INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
+                            (ck, ck, i),
+                        )
+                    except Exception:
+                        pass
+                updated += 1
+            except Exception:
+                continue
+    db.commit()
+    return jsonify({"ok": True, "updated": updated, "received": len(new_order)})
+
+
 @app.route('/api/custom-table/<tid>/column-type', methods=['PATCH'])
 @login_required
 def api_unified_set_column_type(tid):
@@ -13011,6 +13093,16 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     'th:hover .mx-col-del-btn{opacity:1;}',
     '.mx-col-del-btn:hover{background:#e74c3c !important;color:#fff !important;opacity:1 !important;box-shadow:0 0 0 2px rgba(231,76,60,.35);}',
     '@media (pointer:coarse){.mx-col-del-btn{opacity:.65;}}',
+    /* Drag handle ⠿ for column reordering. */
+    '.mx-drag-handle{display:inline-block;opacity:.45;cursor:grab;font-size:13px;line-height:1;padding:0 4px;margin-left:2px;color:inherit;user-select:none;transition:opacity .15s ease;}',
+    'th:hover .mx-drag-handle{opacity:1;}',
+    '.mx-drag-handle:active{cursor:grabbing;}',
+    'th.mx-dragging{opacity:.45 !important;background:#cfd8dc !important;}',
+    'th.mx-col-flash{animation:mxColFlash .65s ease;}',
+    '@keyframes mxColFlash{0%,100%{background:inherit;}50%{background:rgba(46,125,50,.35);}}',
+    '.mx-drop-indicator{position:absolute;width:3px;background:#2196F3;box-shadow:0 0 8px #2196F3;pointer-events:none;z-index:1000;display:none;border-radius:2px;}',
+    '.mx-drop-indicator.show{display:block;}',
+    '@media (pointer:coarse){.mx-drag-handle{opacity:.75;}}',
     '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
     '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
     '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
@@ -13719,6 +13811,175 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     }
   }
 
+  /* ==================================================================
+   * Column drag-and-drop reordering.
+   * Wire a ⠿ drag-handle span on every header cell; HTML5 drag-and-drop
+   * reorders the thead + the matching <td> in every tbody row, then
+   * PATCHes /api/custom-table/<tid>/reorder-columns so the order sticks
+   * for tables whose renderers respect col_order.
+   * ================================================================== */
+  var _mxDragState = null;    /* {table, srcTh, srcIdx} while a drag is in flight */
+  var _mxDropIndicator = null;
+  function _mxEnsureDropIndicator(){
+    if (_mxDropIndicator) return _mxDropIndicator;
+    _mxDropIndicator = document.createElement('div');
+    _mxDropIndicator.className = 'mx-drop-indicator';
+    document.body.appendChild(_mxDropIndicator);
+    return _mxDropIndicator;
+  }
+  function _mxHideDropIndicator(){
+    if (_mxDropIndicator) _mxDropIndicator.classList.remove('show');
+  }
+  function _mxShowDropIndicatorAt(rect, leftSide){
+    var ind = _mxEnsureDropIndicator();
+    ind.classList.add('show');
+    ind.style.top    = (rect.top + window.scrollY) + 'px';
+    ind.style.height = rect.height + 'px';
+    ind.style.left   = ((leftSide ? rect.left : rect.right) + window.scrollX - 1) + 'px';
+  }
+  function _mxSwapTableColumn(table, fromIdx, toIdx){
+    /* Move every row's cell at fromIdx to toIdx. Works for thead and tbody. */
+    if (fromIdx === toIdx) return;
+    var allRows = table.querySelectorAll('thead tr, tbody tr');
+    for (var r=0; r<allRows.length; r++){
+      var row = allRows[r];
+      var kids = row.children;
+      if (fromIdx >= kids.length || toIdx > kids.length) continue;
+      var moving = kids[fromIdx];
+      if (!moving) continue;
+      if (toIdx > fromIdx){
+        /* Insert before the element that's one past the target slot. */
+        var target = kids[toIdx];
+        row.insertBefore(moving, target ? target.nextSibling : null);
+      } else {
+        row.insertBefore(moving, kids[toIdx]);
+      }
+    }
+  }
+  function _mxCollectCurrentColumnOrder(table){
+    /* Read the ordered list of display labels straight from the live DOM,
+       resolve each to a col_key via the cached column map. */
+    var labels = [];
+    var ths = table.querySelectorAll('thead tr th');
+    for (var i=0; i<ths.length; i++){
+      var th = ths[i];
+      if (th.classList.contains('bulk-col')) continue;
+      var clone = th.cloneNode(true);
+      clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle').forEach(function(n){ n.remove(); });
+      var lbl = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!lbl) continue;
+      if (/^(إجراءات|actions|Actions)$/.test(lbl) || lbl === '#') continue;
+      labels.push({th: th, label: lbl});
+    }
+    return labels;
+  }
+  function _mxPersistReorder(table, tid){
+    /* Collect the live column order, resolve each label to a col_key via
+       /api/custom-table/<tid>/columns, then PATCH the server. */
+    var current = _mxCollectCurrentColumnOrder(table);
+    fetch('/api/custom-table/' + encodeURIComponent(tid) + '/columns', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        var labelToKey = {};
+        (d.columns || []).forEach(function(c){
+          var lbl = (c.col_label || '').replace(/\s+/g, ' ').trim();
+          if (lbl) labelToKey[lbl] = c.col_key;
+          labelToKey[c.col_key] = c.col_key;
+        });
+        var keys = [];
+        current.forEach(function(it){
+          var k = labelToKey[it.label];
+          if (k) keys.push(k);
+        });
+        if (!keys.length) return;
+        fetch('/api/custom-table/' + encodeURIComponent(tid) + '/reorder-columns', {
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body: JSON.stringify({columns: keys})
+        }).then(function(r){ return r.json(); })
+          .then(function(res){
+            if (res && res.ok){
+              if (typeof window.mxToast === 'function') window.mxToast('تم تغيير ترتيب الأعمدة', 'success');
+              /* Brief green flash on every reordered header. */
+              current.forEach(function(it){
+                it.th.classList.add('mx-col-flash');
+                setTimeout(function(){ it.th.classList.remove('mx-col-flash'); }, 700);
+              });
+            } else {
+              if (typeof window.mxToast === 'function')
+                window.mxToast((res && res.error) || 'تعذّر حفظ الترتيب', 'error');
+            }
+          })
+          .catch(function(){
+            if (typeof window.mxToast === 'function') window.mxToast('خطأ في حفظ الترتيب', 'error');
+          });
+      });
+  }
+  function _mxWireDragHandle(handle, th, table){
+    handle.addEventListener('dragstart', function(ev){
+      var kids = th.parentNode.children;
+      var idx = Array.prototype.indexOf.call(kids, th);
+      _mxDragState = {table: table, srcTh: th, srcIdx: idx};
+      th.classList.add('mx-dragging');
+      try {
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', 'mx-col');
+      } catch(e){}
+    });
+    handle.addEventListener('dragend', function(){
+      if (_mxDragState && _mxDragState.srcTh) _mxDragState.srcTh.classList.remove('mx-dragging');
+      _mxDragState = null;
+      _mxHideDropIndicator();
+    });
+    /* Each <th> becomes a drop target. Wire on the parent th so ANY
+       hover over the header reacts, including cells with no handle
+       yet (edge during rapid DnD). */
+    th.addEventListener('dragover', function(ev){
+      if (!_mxDragState || _mxDragState.table !== table) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      var rect = th.getBoundingClientRect();
+      /* Drop position = before this <th> if the pointer is on its
+         leading (right in RTL) half, else after. */
+      var rtl = getComputedStyle(th).direction === 'rtl' || document.documentElement.dir === 'rtl';
+      var midX = rect.left + rect.width / 2;
+      var before;
+      if (rtl) before = ev.clientX > midX;
+      else     before = ev.clientX < midX;
+      _mxShowDropIndicatorAt(rect, before);
+    });
+    th.addEventListener('dragleave', function(){
+      /* Don't hide aggressively — dragover on the next target will update. */
+    });
+    th.addEventListener('drop', function(ev){
+      if (!_mxDragState || _mxDragState.table !== table) return;
+      ev.preventDefault();
+      var destTh = th;
+      if (destTh === _mxDragState.srcTh) { _mxHideDropIndicator(); return; }
+      var kids  = destTh.parentNode.children;
+      var destIdx = Array.prototype.indexOf.call(kids, destTh);
+      var srcIdx  = Array.prototype.indexOf.call(kids, _mxDragState.srcTh);
+      if (srcIdx < 0 || destIdx < 0) { _mxHideDropIndicator(); return; }
+      var rect = destTh.getBoundingClientRect();
+      var rtl  = getComputedStyle(destTh).direction === 'rtl' || document.documentElement.dir === 'rtl';
+      var midX = rect.left + rect.width / 2;
+      var before;
+      if (rtl) before = ev.clientX > midX;
+      else     before = ev.clientX < midX;
+      /* Compute the final target index after pulling the src out. */
+      var target = before ? destIdx : destIdx + 1;
+      if (srcIdx < target) target -= 1;
+      _mxSwapTableColumn(table, srcIdx, target);
+      _mxHideDropIndicator();
+      _mxDragState.srcTh.classList.remove('mx-dragging');
+      _mxDragState = null;
+      var tid = _mxResolveTid(table);
+      if (tid) _mxPersistReorder(table, tid);
+    });
+  }
+
   function wireColumnFilters(){
     // Any table inside a wrapper marked .table-wrap / .att-table-wrap /
     // #taqseetWrap (or .db-section / .custom-table-section for tables
@@ -13742,9 +14003,21 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
         var th = ths[i];
         if (th.classList.contains('bulk-col')) continue;
         // Skip columns whose content is purely action buttons.
-        var txt = (th.textContent || '').replace(/🔽|✕/g, '').trim();
+        var txt = (th.textContent || '').replace(/🔽|✕|⠿/g, '').trim();
         var isSkipCol = /^(إجراءات|actions|Actions)$/.test(txt) || txt === '#';
         var currentLabel = txt || '';   /* snapshot of the label text at wire time */
+        // --- Drag handle ⠿ for column reordering ---
+        if (!th.querySelector('.mx-drag-handle') && !isSkipCol){
+          var dh = document.createElement('span');
+          dh.className = 'mx-drag-handle';
+          dh.title = 'اسحب لإعادة الترتيب';
+          dh.textContent = '⠿';
+          dh.setAttribute('draggable', 'true');
+          dh.dataset.colDisplay = currentLabel;
+          _mxWireDragHandle(dh, th, table);
+          // Insert as the first child so it's always at the start of the th.
+          th.insertBefore(dh, th.firstChild);
+        }
         // --- Filter button ---
         if (!th.querySelector('.mx-filter-btn') && !isSkipCol){
           var fbtn = document.createElement('button');
