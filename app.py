@@ -1257,6 +1257,44 @@ if True:
     # <input type="date"> sends. Normalize every row here once, tagged
     # `att_normalize_v1`. The prod DB was also migrated out-of-band, and
     # that INSERT is gated by ON CONFLICT so re-running is harmless.
+    # Ghost-label sweep: drop any *_col_labels row whose col_key no
+    # longer exists on the real table. Without this, a column that's
+    # been DROPped (either manually via SQL or via the app's UTEM
+    # modal) leaves its Arabic label behind, which then renders as a
+    # "ghost" header — and any ✕ click on that header fails with
+    # "invalid column name" because neither the label nor the schema
+    # can resolve the col_key.
+    if "ghost_labels_sweep_v1" not in applied:
+        try:
+            for _tbl, _lbl in [
+                ("students",       "column_labels"),
+                ("student_groups", "group_col_labels"),
+                ("attendance",     "att_col_labels"),
+                ("evaluations",    "eval_col_labels"),
+                ("payment_log",    "paylog_col_labels"),
+                ("taqseet",        "taqseet_col_labels"),
+            ]:
+                try:
+                    live = [r[1] for r in db2.execute(
+                        "PRAGMA table_info(" + _tbl + ")"
+                    ).fetchall()]
+                except Exception:
+                    live = []
+                if not live:
+                    continue
+                placeholders = ",".join(["?"] * len(live))
+                try:
+                    db2.execute(
+                        "DELETE FROM " + _lbl + " WHERE col_key NOT IN (" + placeholders + ")",
+                        tuple(live),
+                    )
+                except Exception:
+                    pass
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("ghost_labels_sweep_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     if "students_active_v1" not in applied:
         try:
             db2.execute(
@@ -13629,12 +13667,32 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
             if (d && d.ok){
               if (typeof window.mxToast === 'function') window.mxToast('تم حذف العمود بنجاح', 'success');
               delete _MX_COLKEY_CACHE[tid];
-              /* Refresh the table contents; fall back to surgical DOM
-                 removal if the page has no named reloader. */
-              if (!_mxTriggerReload(tid)) _mxRemoveColumnFromDom(table, colIdx);
+              /* Always strip the <th> + every <td> at this index. Some
+                 tables (taqseet in particular) have a hardcoded thead,
+                 so a successful DB drop wouldn't otherwise remove the
+                 now-orphan header cell. After the surgical removal we
+                 STILL call the page reloader so row data is refreshed. */
+              _mxRemoveColumnFromDom(table, colIdx);
+              _mxTriggerReload(tid);
             } else {
-              if (typeof window.mxToast === 'function')
-                window.mxToast((d && d.error) || 'تعذّر حذف العمود', 'error');
+              /* Ghost-column case: the server couldn't find the column
+                 in the schema, the label table, the built-in labels,
+                 or information_schema. That means there IS no such
+                 column anywhere on the server — the <th> the user
+                 clicked is a stale DOM artefact. Clean it up locally
+                 so the ghost goes away instead of failing forever. */
+              var err = (d && d.error) || '';
+              var isInvalidCol = err.indexOf('invalid column name') >= 0 ||
+                                 err.indexOf('column not found') >= 0;
+              if (isInvalidCol){
+                _mxRemoveColumnFromDom(table, colIdx);
+                delete _MX_COLKEY_CACHE[tid];
+                if (typeof window.mxToast === 'function')
+                  window.mxToast('تم تنظيف عمود قديم — لم يكن موجوداً فعلياً', 'info');
+              } else {
+                if (typeof window.mxToast === 'function')
+                  window.mxToast(err || 'تعذّر حذف العمود', 'error');
+              }
             }
           }).catch(function(){
             if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
