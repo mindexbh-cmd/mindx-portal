@@ -1821,7 +1821,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   </div>
 </div>
 
-<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;"><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="ss-group" onchange="ssOnGroupChange()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;font-weight:600;color:#3e2723;"></select></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
+<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;"><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="ss-group" onchange="ssOnGroupChange()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;font-weight:600;color:#3e2723;"></select></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div><div><button onclick="ssOpenAllGroups()" style="background:linear-gradient(135deg,#6A1B9A,#AB47BC);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;white-space:nowrap;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</button></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
 
 <div id="sd-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:560px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(21,101,192,0.25);"><div style="background:linear-gradient(135deg,#1565C0,#1E88E5);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('sd-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#e3f2fd;border-bottom:1px solid #bbdefb;"><label style="display:block;font-weight:bold;color:#0d47a1;margin-bottom:6px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sd-group" onchange="sdLoadDates()" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #1E88E5;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div id="sd-body" style="padding:14px 20px;max-height:55vh;overflow:auto;font-size:0.95rem;color:#333;"></div><div id="sd-footer" style="padding:12px 20px;border-top:1px solid #eee;text-align:center;display:none;"><button id="sd-save" onclick="sdSave()" style="padding:10px 36px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">&#x62D;&#x641;&#x638;</button></div></div></div>
 
@@ -1855,13 +1855,43 @@ function _ssFmtH(v){
   if(Math.abs(n-Math.round(n))<0.01) return String(Math.round(n));
   return n.toFixed(1);
 }
-function _ssPct(p){ var n=parseFloat(p||0); return (isFinite(n)?n:0) + "%"; }
+/* Render minutes as "X ساعة Y دقيقة" per the spec. */
+function _ssFmtMin(m){
+  m = parseInt(m||0, 10);
+  if (!m || m < 0) return '0 دقيقة';
+  var h = Math.floor(m/60), r = m%60, out = '';
+  if (h) out += h + ' ساعة';
+  if (r) out += (out?' ':'') + r + ' دقيقة';
+  return out || '0 دقيقة';
+}
+/* Compact "HH:MM" for the all-groups table. */
+function _ssFmtHHMM(m){
+  m = parseInt(m||0, 10);
+  if (!m || m < 0) return '0:00';
+  var h = Math.floor(m/60), r = m%60;
+  return h + ':' + (r < 10 ? '0'+r : r);
+}
 function _ssRateColor(p){
-  var n=parseFloat(p||0);
+  var n = parseFloat(p||0);
   if (n >= 90) return '#2E7D32';
   if (n >= 75) return '#F9A825';
   if (n >= 50) return '#EF6C00';
   return '#c62828';
+}
+function _ssTableHead(){
+  return ''
+    + '<thead>'
+    +   '<tr style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;">'
+    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">اسم الطالب</th>'
+    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">المجموعة</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">إجمالي الحصص</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">إجمالي الساعات</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">حضر (عدد / ساعات)</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">غاب (عدد / ساعات)</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">متأخر</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">نسبة الحضور</th>'
+    +   '</tr>'
+    + '</thead>';
 }
 function _ssRow(r){
   var rate = parseFloat(r.rate_pct||0);
@@ -1871,31 +1901,18 @@ function _ssRow(r){
     +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;font-weight:700;color:#3e2723;text-align:right;">' + (r.student_name||'') + '</td>'
     +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;color:#5d4037;font-size:0.88rem;">' + (r.group_name||'') + '</td>'
     +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:#1565C0;">' + (r.total_sessions||0) + '</td>'
-    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#2E7D32;">' + (r.present||0) + '</td>'
-    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#c62828;">' + (r.absent||0) + '</td>'
-    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#E65100;">' + (r.late||0) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#1565C0;font-size:0.85rem;">' + _ssFmtMin(r.hours_total_min) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#2E7D32;font-size:0.85rem;">' + (r.present||0) + ' <span style="color:#888;">&nbsp;/&nbsp;</span> ' + _ssFmtMin(r.hours_present_min) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#c62828;font-size:0.85rem;">' + (r.absent||0) + ' <span style="color:#888;">&nbsp;/&nbsp;</span> ' + _ssFmtMin(r.hours_absent_min) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#E65100;font-size:0.85rem;">' + (r.late||0) + '</td>'
     +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:' + color + ';">' + rate.toFixed(1) + '%</td>'
     + '</tr>';
-}
-function _ssTableHead(){
-  return ''
-    + '<thead>'
-    +   '<tr style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;">'
-    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628</th>'
-    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</th>'
-    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635</th>'
-    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u062D\u0636\u0631</th>'
-    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u063A\u0627\u0628</th>'
-    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0645\u062A\u0623\u062E\u0631</th>'
-    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0646\u0633\u0628\u0629 \u0627\u0644\u062D\u0636\u0648\u0631</th>'
-    +   '</tr>'
-    + '</thead>';
 }
 function _ssRenderStudents(list, headerHtml){
   var body = document.getElementById('ss-body');
   var html = headerHtml || '';
   if (!list || !list.length){
-    html += '<div style="padding:24px;text-align:center;color:#888;font-weight:700;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A</div>';
+    html += '<div style="padding:24px;text-align:center;color:#888;font-weight:700;">لا توجد بيانات</div>';
     body.innerHTML = html;
     return;
   }
@@ -1907,22 +1924,48 @@ function _ssRenderStudents(list, headerHtml){
   html += '</tbody></table></div>';
   body.innerHTML = html;
 }
+/* Rich student-search card. Used when the fuzzy search returns matches. */
+function _ssRenderStudentCards(list){
+  var body = document.getElementById('ss-body');
+  if (!list || !list.length){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;font-weight:700;">لم يتم العثور على الطالب</div>';
+    return;
+  }
+  var html = '<div style="background:linear-gradient(135deg,#e1f5fe,#b3e5fc);border:1px solid #81d4fa;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:700;color:#01579B;">ὐD نتائج البحث: ' + list.length + ' طالب</div>';
+  list.forEach(function(r){
+    var rate = parseFloat(r.rate_pct||0);
+    var color = _ssRateColor(rate);
+    html += '<div style="background:#fff;border:2px solid #ffcc80;border-radius:14px;padding:14px 18px;margin-bottom:12px;box-shadow:0 2px 8px rgba(230,81,0,0.08);">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #ffcc80;">';
+    html +=   '<div style="font-weight:800;color:#3e2723;font-size:1.1rem;">Ἱ3 ' + (r.student_name||'') + '</div>';
+    html +=   '<div style="font-weight:700;color:' + color + ';font-size:1.1rem;">' + rate.toFixed(1) + '%</div>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;font-size:0.92rem;">';
+    html +=   '<div style="background:#f3e5f5;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">المجموعة</div><div style="font-weight:700;color:#6A1B9A;">' + (r.group_name||'—') + '</div></div>';
+    html +=   '<div style="background:#e3f2fd;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">إجمالي الحصص</div><div style="font-weight:800;color:#1565C0;">' + (r.total_sessions||0) + '</div></div>';
+    html +=   '<div style="background:#e8f5e9;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">إجمالي الساعات</div><div style="font-weight:800;color:#2E7D32;">' + _ssFmtMin(r.hours_total_min) + '</div></div>';
+    html +=   '<div style="background:#e8f5e9;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">حضر</div><div style="font-weight:700;color:#2E7D32;">' + (r.present||0) + ' — ' + _ssFmtMin(r.hours_present_min) + '</div></div>';
+    html +=   '<div style="background:#fce4ec;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">غاب</div><div style="font-weight:700;color:#c62828;">' + (r.absent||0) + ' — ' + _ssFmtMin(r.hours_absent_min) + '</div></div>';
+    html +=   '<div style="background:#fff3e0;border-radius:8px;padding:8px 10px;"><div style="color:#777;font-size:0.78rem;">متأخر</div><div style="font-weight:700;color:#E65100;">' + (r.late||0) + '</div></div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  body.innerHTML = html;
+}
 function ssOpen(){
   document.getElementById('ss-modal').style.display='block';
   var body = document.getElementById('ss-body');
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
-  // Fetch group list for the dropdown
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
   fetch('/api/attendance/summary?view=init').then(function(r){return r.json();}).then(function(d){
     var sel = document.getElementById('ss-group');
     sel.innerHTML = '';
-    var o0 = new Option('\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u2014', '');
-    var oAll = new Option('\u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A', '__all__');
-    sel.appendChild(o0); sel.appendChild(oAll);
+    sel.appendChild(new Option('— اختر مجموعة —', ''));
+    sel.appendChild(new Option('جميع المجموعات', '__all__'));
     (d.groups || []).forEach(function(g){ sel.appendChild(new Option(g, g)); });
     document.getElementById('ss-search').value = '';
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
   }).catch(function(){
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644</div>';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">خطأ في التحميل</div>';
   });
 }
 function ssOnGroupChange(){
@@ -1930,17 +1973,18 @@ function ssOnGroupChange(){
   var body = document.getElementById('ss-body');
   document.getElementById('ss-search').value = '';
   if (!v){
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
     return;
   }
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
   if (v === '__all__'){
     fetch('/api/attendance/summary?view=all').then(function(r){return r.json();}).then(function(d){
       var header = ''
         + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
-        +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">\u1F4CA \u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A</div>'
-        +   '<div style="color:#5d4037;font-weight:700;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635 (DISTINCT): <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
-        +   '<div style="color:#5d4037;font-weight:700;">\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0628\u0629: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
+        +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">ὌA جميع المجموعات</div>'
+        +   '<div style="color:#5d4037;font-weight:700;">إجمالي الحصص: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
+        +   '<div style="color:#5d4037;font-weight:700;">إجمالي الساعات: <span style="color:#2E7D32;">' + _ssFmtMin(d.total_minutes) + '</span></div>'
+        +   '<div style="color:#5d4037;font-weight:700;">عدد الطلبة: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
         + '</div>';
       _ssRenderStudents(d.students, header);
     });
@@ -1950,8 +1994,9 @@ function ssOnGroupChange(){
     var header = ''
       + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
       +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">' + (d.group_name||'') + '</div>'
-      +   '<div style="color:#5d4037;font-weight:700;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
-      +   '<div style="color:#5d4037;font-weight:700;">\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0628\u0629: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
+      +   '<div style="color:#5d4037;font-weight:700;">إجمالي الحصص: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
+      +   '<div style="color:#5d4037;font-weight:700;">إجمالي الساعات: <span style="color:#2E7D32;">' + _ssFmtMin(d.total_minutes) + '</span></div>'
+      +   '<div style="color:#5d4037;font-weight:700;">عدد الطلبة: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
       + '</div>';
     _ssRenderStudents(d.students, header);
   });
@@ -1967,21 +2012,130 @@ function _ssDoSearch(){
   if (!q){
     var gv = document.getElementById('ss-group').value;
     if (gv) { ssOnGroupChange(); return; }
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
     return;
   }
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u0628\u062D\u062B...</div>';
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري البحث...</div>';
   fetch('/api/attendance/summary?view=student&q=' + encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){
-    var matches = d.matches || [];
-    if (!matches.length){
-      body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;font-weight:700;">\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0637\u0627\u0644\u0628</div>';
-      return;
+    _ssRenderStudentCards(d.matches || []);
+  });
+}
+
+/* =======================================================================
+ * All-groups summary: sortable table + XLSX export
+ * ======================================================================= */
+var _ssAllGroups = { rows: [], overall: null, sortKey: 'group_name', sortDir: 1 };
+
+function ssOpenAllGroups(){
+  document.getElementById('ss-modal').style.display = 'block';
+  document.getElementById('ss-search').value = '';
+  var sel = document.getElementById('ss-group');
+  if (sel && sel.options.length) sel.selectedIndex = 0;
+  var body = document.getElementById('ss-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
+  fetch('/api/attendance/summary?view=all_groups').then(function(r){return r.json();}).then(function(d){
+    _ssAllGroups.rows    = (d.groups || []).slice();
+    _ssAllGroups.overall = d.overall || null;
+    _ssAllGroups.sortKey = 'group_name';
+    _ssAllGroups.sortDir = 1;
+    _ssRenderAllGroups();
+  }).catch(function(){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">خطأ في التحميل</div>';
+  });
+}
+function _ssSort(key){
+  if (_ssAllGroups.sortKey === key) { _ssAllGroups.sortDir *= -1; }
+  else { _ssAllGroups.sortKey = key; _ssAllGroups.sortDir = 1; }
+  _ssRenderAllGroups();
+}
+function _ssArrow(key){
+  if (_ssAllGroups.sortKey !== key) return '';
+  return _ssAllGroups.sortDir > 0 ? ' ▲' : ' ▼';
+}
+function _ssRenderAllGroups(){
+  var body = document.getElementById('ss-body');
+  var rows = _ssAllGroups.rows.slice();
+  var k = _ssAllGroups.sortKey, d = _ssAllGroups.sortDir;
+  rows.sort(function(a, b){
+    var va = a[k], vb = b[k];
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * d;
+    return String(va||'').localeCompare(String(vb||''), 'ar') * d;
+  });
+  var html = ''
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
+    +   '<div style="font-weight:800;color:#E65100;font-size:1.1rem;">ὌA ملخص جميع المجموعات</div>'
+    +   '<button onclick="ssExportAllGroups()" style="background:linear-gradient(135deg,#1B5E20,#43A047);color:#fff;border:none;padding:8px 18px;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;">὎5 تصدير Excel</button>'
+    + '</div>'
+    + '<div style="overflow:auto;border:1px solid #ffe0b2;border-radius:10px;">'
+    + '<table style="width:100%;border-collapse:collapse;background:#fff;">'
+    +   '<thead>'
+    +     '<tr style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;cursor:pointer;">'
+    +       '<th onclick="_ssSort(\'group_name\')" style="padding:10px 12px;text-align:right;font-size:0.9rem;">المجموعة' + _ssArrow('group_name') + '</th>'
+    +       '<th onclick="_ssSort(\'total_sessions\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الحصص' + _ssArrow('total_sessions') + '</th>'
+    +       '<th onclick="_ssSort(\'total_minutes\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">إجمالي الساعات' + _ssArrow('total_minutes') + '</th>'
+    +       '<th onclick="_ssSort(\'students_count\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الطلبة' + _ssArrow('students_count') + '</th>'
+    +       '<th onclick="_ssSort(\'avg_attendance_rate\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">متوسط الحضور %' + _ssArrow('avg_attendance_rate') + '</th>'
+    +     '</tr>'
+    +   '</thead>'
+    +   '<tbody>';
+  rows.forEach(function(r){
+    var color = _ssRateColor(r.avg_attendance_rate);
+    html += '<tr>'
+      +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;font-weight:700;color:#3e2723;text-align:right;">' + (r.group_name||'') + '</td>'
+      +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#1565C0;">' + (r.total_sessions||0) + '</td>'
+      +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#2E7D32;">' + _ssFmtHHMM(r.total_minutes) + '</td>'
+      +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#6A1B9A;">' + (r.students_count||0) + '</td>'
+      +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:' + color + ';">' + (r.avg_attendance_rate||0).toFixed(1) + '%</td>'
+      + '</tr>';
+  });
+  if (_ssAllGroups.overall){
+    var o = _ssAllGroups.overall;
+    var color = _ssRateColor(o.avg_attendance_rate);
+    html += '<tr style="background:#fff3e0;font-weight:800;">'
+      +   '<td style="padding:10px 12px;color:#E65100;text-align:right;">إجمالي كل المجموعات</td>'
+      +   '<td style="padding:10px 12px;text-align:center;color:#1565C0;">' + (o.total_sessions||0) + '</td>'
+      +   '<td style="padding:10px 12px;text-align:center;color:#2E7D32;">' + _ssFmtHHMM(o.total_minutes) + '</td>'
+      +   '<td style="padding:10px 12px;text-align:center;color:#6A1B9A;">' + (o.students_count||0) + '</td>'
+      +   '<td style="padding:10px 12px;text-align:center;color:' + color + ';">' + (o.avg_attendance_rate||0).toFixed(1) + '%</td>'
+      + '</tr>';
+  }
+  html += '</tbody></table></div>';
+  body.innerHTML = html;
+}
+function _ssLoadXLSX(cb){
+  if (window.XLSX) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+  s.onload  = cb;
+  s.onerror = function(){ alert('فشل تحميل مكتبة Excel'); };
+  document.head.appendChild(s);
+}
+function ssExportAllGroups(){
+  _ssLoadXLSX(function(){
+    var header = ['المجموعة', 'عدد الحصص', 'إجمالي الساعات', 'عدد الطلبة', 'متوسط الحضور %'];
+    var aoa = [header];
+    _ssAllGroups.rows.forEach(function(r){
+      aoa.push([
+        r.group_name || '',
+        r.total_sessions || 0,
+        _ssFmtHHMM(r.total_minutes),
+        r.students_count || 0,
+        r.avg_attendance_rate || 0
+      ]);
+    });
+    if (_ssAllGroups.overall){
+      var o = _ssAllGroups.overall;
+      aoa.push([
+        'إجمالي كل المجموعات',
+        o.total_sessions || 0, _ssFmtHHMM(o.total_minutes),
+        o.students_count || 0, o.avg_attendance_rate || 0
+      ]);
     }
-    var header = ''
-      + '<div style="background:linear-gradient(135deg,#e1f5fe,#b3e5fc);border:1px solid #81d4fa;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-weight:700;color:#01579B;">'
-      +   '\u1F50D \u0646\u062A\u0627\u0626\u062C \u0627\u0644\u0628\u062D\u062B: ' + matches.length + ' \u0637\u0627\u0644\u0628'
-      + '</div>';
-    _ssRenderStudents(matches, header);
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:28},{wch:12},{wch:14},{wch:12},{wch:16}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ملخص المجموعات');
+    XLSX.writeFile(wb, 'groups_summary.xlsx');
   });
 }
 function sdOpen(){
@@ -9952,13 +10106,18 @@ def api_attendance_student_stats():
 @app.route("/api/attendance/summary", methods=["GET"])
 @login_required
 def api_attendance_summary():
-    """Unified attendance-summary endpoint powering the ملخص الحصص modal.
+    """Unified attendance-summary endpoint for the ملخص الحصص modal.
 
-    All counts obey ATTENDANCE RULE:
-      - total_sessions per student = COUNT(DISTINCT (date, group)) where
-        student_name = X (covers every group the student ever attended).
-      - total_sessions per group   = COUNT(DISTINCT date) where group = X.
-      - attendance_rate = (attended + late) / total_sessions * 100.
+    Joins attendance rows with session_durations on (group_name,
+    attendance_date → session_date) to compute hours alongside counts.
+
+    ATTENDANCE RULE:
+      - total_sessions per student = COUNT(DISTINCT (date, group))
+      - total_sessions per group   = COUNT(DISTINCT date)
+      - attendance_rate = (attended + late) / total_sessions * 100
+      - hours_total_min   = sum of duration over all of the student's sessions
+      - hours_present_min = sum where status in (حاضر, متأخر)
+      - hours_absent_min  = sum where status = غائب
     """
     view = (request.args.get("view") or "").strip().lower()
     db = get_db()
@@ -9968,6 +10127,20 @@ def api_attendance_summary():
 
     def _rate(attended, late, total):
         return round((attended + late) / total * 100, 1) if total else 0.0
+
+    # Pre-build a (group, normalised date) -> duration_minutes map so we
+    # can look up each attendance row in O(1).
+    def _load_duration_map():
+        try:
+            rows = db.execute("SELECT group_name, session_date, duration_minutes FROM session_durations").fetchall()
+            m = {}
+            for r in rows:
+                g = (r[0] or "").strip()
+                d = _att_normalize_date(r[1])
+                m[(g, d)] = int(r[2] or 0)
+            return m
+        except Exception:
+            return {}
 
     if view == "init" or view == "":
         rows = db.execute(
@@ -9986,7 +10159,9 @@ def api_attendance_summary():
             "WHERE TRIM(group_name)=TRIM(?) AND student_name IS NOT NULL AND student_name<>\'\'",
             (gname,)
         ).fetchall()
+        dur_map = _load_duration_map()
         group_sessions = set()
+        group_total_minutes = 0
         per_student = {}
         for r in rows:
             d = _att_normalize_date(r["attendance_date"])
@@ -9996,15 +10171,28 @@ def api_attendance_summary():
                 continue
             group_sessions.add(d)
             s = per_student.setdefault(n, {
-                "student_name": n, "present": 0, "absent": 0, "late": 0, "_dates": set(),
+                "student_name": n, "present": 0, "absent": 0, "late": 0,
+                "_dates": set(), "_counted_dur": set(),
+                "hours_total_min": 0, "hours_present_min": 0, "hours_absent_min": 0,
             })
             s["_dates"].add(d)
+            dur = dur_map.get((gname.strip(), d), 0)
+            if (d,) not in s["_counted_dur"]:
+                s["_counted_dur"].add((d,))
+                s["hours_total_min"] += dur
+                if st == PRESENT or st == LATE:
+                    s["hours_present_min"] += dur
+                elif st == ABSENT:
+                    s["hours_absent_min"] += dur
             if st == PRESENT:
                 s["present"] += 1
             elif st == ABSENT:
                 s["absent"] += 1
             elif st == LATE:
                 s["late"] += 1
+        # Group total_minutes = sum of duration_minutes over its distinct dates
+        for d in group_sessions:
+            group_total_minutes += dur_map.get((gname.strip(), d), 0)
         students = []
         for n in sorted(per_student.keys()):
             s = per_student[n]
@@ -10013,25 +10201,25 @@ def api_attendance_summary():
                 "student_name": n,
                 "group_name": gname,
                 "total_sessions": total,
-                "present": s["present"],
-                "absent":  s["absent"],
-                "late":    s["late"],
+                "present": s["present"], "absent": s["absent"], "late": s["late"],
                 "rate_pct": _rate(s["present"], s["late"], total),
+                "hours_total_min":   s["hours_total_min"],
+                "hours_present_min": s["hours_present_min"],
+                "hours_absent_min":  s["hours_absent_min"],
             })
         return jsonify({
             "group_name": gname,
             "total_sessions": len(group_sessions),
+            "total_minutes": group_total_minutes,
             "students": students,
         })
 
     if view == "all":
-        # Aggregated across every group. total_sessions per student is
-        # DISTINCT (date, group) so each session counts once even when a
-        # student is registered in multiple groups.
         rows = db.execute(
             "SELECT attendance_date, group_name, student_name, status FROM attendance "
             "WHERE student_name IS NOT NULL AND student_name<>\'\'"
         ).fetchall()
+        dur_map = _load_duration_map()
         per_student = {}
         global_sessions = set()
         for r in rows:
@@ -10044,11 +10232,21 @@ def api_attendance_summary():
             global_sessions.add((d, g))
             s = per_student.setdefault(n, {
                 "student_name": n, "present": 0, "absent": 0, "late": 0,
-                "_dg": set(), "_groups": set(),
+                "_dg": set(), "_groups": set(), "_counted_dur": set(),
+                "hours_total_min": 0, "hours_present_min": 0, "hours_absent_min": 0,
             })
             s["_dg"].add((d, g))
             if g:
                 s["_groups"].add(g)
+            key = (g, d)
+            dur = dur_map.get(key, 0)
+            if key not in s["_counted_dur"]:
+                s["_counted_dur"].add(key)
+                s["hours_total_min"] += dur
+                if st == PRESENT or st == LATE:
+                    s["hours_present_min"] += dur
+                elif st == ABSENT:
+                    s["hours_absent_min"] += dur
             if st == PRESENT:
                 s["present"] += 1
             elif st == ABSENT:
@@ -10063,13 +10261,18 @@ def api_attendance_summary():
                 "student_name": n,
                 "group_name": ", ".join(sorted(s["_groups"])) or "",
                 "total_sessions": total,
-                "present": s["present"],
-                "absent":  s["absent"],
-                "late":    s["late"],
+                "present": s["present"], "absent": s["absent"], "late": s["late"],
                 "rate_pct": _rate(s["present"], s["late"], total),
+                "hours_total_min":   s["hours_total_min"],
+                "hours_present_min": s["hours_present_min"],
+                "hours_absent_min":  s["hours_absent_min"],
             })
+        # Total minutes across every distinct (date, group) in attendance.
+        # dur_map keys are (group, date); global_sessions stores (date, group).
+        total_minutes = sum(dur_map.get((g, d), 0) for (d, g) in global_sessions)
         return jsonify({
             "total_sessions": len(global_sessions),
+            "total_minutes": total_minutes,
             "students": students,
         })
 
@@ -10082,7 +10285,8 @@ def api_attendance_summary():
             "SELECT attendance_date, group_name, student_name, status FROM attendance "
             "WHERE student_name IS NOT NULL AND student_name<>\'\'"
         ).fetchall()
-        matches_map = {}  # key=normalised name -> bucket
+        dur_map = _load_duration_map()
+        matches_map = {}
         for r in rows:
             n = (r["student_name"] or "").strip()
             if not n:
@@ -10095,13 +10299,22 @@ def api_attendance_summary():
             st = (r["status"] or "").strip()
             bucket = matches_map.setdefault(n_norm, {
                 "student_name": n,
-                "_dg": set(),
-                "_groups": set(),
+                "_dg": set(), "_groups": set(), "_counted_dur": set(),
                 "present": 0, "absent": 0, "late": 0,
+                "hours_total_min": 0, "hours_present_min": 0, "hours_absent_min": 0,
             })
             bucket["_dg"].add((d, g))
             if g:
                 bucket["_groups"].add(g)
+            key = (g, d)
+            dur = dur_map.get(key, 0)
+            if key not in bucket["_counted_dur"]:
+                bucket["_counted_dur"].add(key)
+                bucket["hours_total_min"] += dur
+                if st == PRESENT or st == LATE:
+                    bucket["hours_present_min"] += dur
+                elif st == ABSENT:
+                    bucket["hours_absent_min"] += dur
             if st == PRESENT:
                 bucket["present"] += 1
             elif st == ABSENT:
@@ -10115,15 +10328,86 @@ def api_attendance_summary():
                 "student_name": bucket["student_name"],
                 "group_name": ", ".join(sorted(bucket["_groups"])) or "",
                 "total_sessions": total,
-                "present": bucket["present"],
-                "absent":  bucket["absent"],
-                "late":    bucket["late"],
+                "present": bucket["present"], "absent": bucket["absent"], "late": bucket["late"],
                 "rate_pct": _rate(bucket["present"], bucket["late"], total),
+                "hours_total_min":   bucket["hours_total_min"],
+                "hours_present_min": bucket["hours_present_min"],
+                "hours_absent_min":  bucket["hours_absent_min"],
             })
         matches.sort(key=lambda m: (-m["total_sessions"], m["student_name"]))
         return jsonify({"matches": matches})
 
+    if view == "all_groups":
+        # One row per group: sessions, total duration, distinct students,
+        # and the mean of per-student attendance_rate inside that group.
+        rows = db.execute(
+            "SELECT attendance_date, group_name, student_name, status FROM attendance "
+            "WHERE group_name IS NOT NULL AND group_name<>\'\'"
+        ).fetchall()
+        dur_map = _load_duration_map()
+        per_group = {}
+        for r in rows:
+            g = (r["group_name"] or "").strip()
+            if not g:
+                continue
+            d = _att_normalize_date(r["attendance_date"])
+            n = (r["student_name"] or "").strip()
+            st = (r["status"] or "").strip()
+            gb = per_group.setdefault(g, {
+                "group_name": g,
+                "_dates": set(), "_students": {}, "total_minutes": 0,
+                "_counted_dur": set(),
+            })
+            gb["_dates"].add(d)
+            if (g, d) not in gb["_counted_dur"]:
+                gb["_counted_dur"].add((g, d))
+                gb["total_minutes"] += dur_map.get((g, d), 0)
+            if n:
+                sb = gb["_students"].setdefault(n, {"present":0,"absent":0,"late":0,"_dates":set()})
+                sb["_dates"].add(d)
+                if st == PRESENT:
+                    sb["present"] += 1
+                elif st == ABSENT:
+                    sb["absent"] += 1
+                elif st == LATE:
+                    sb["late"] += 1
+        groups = []
+        total_sessions_all = 0
+        total_minutes_all  = 0
+        student_rates_all  = []
+        all_students_set   = set()
+        for g in sorted(per_group.keys()):
+            gb = per_group[g]
+            sessions = len(gb["_dates"])
+            mins     = gb["total_minutes"]
+            students_n = len(gb["_students"])
+            rates = []
+            for sname, sb in gb["_students"].items():
+                t = len(sb["_dates"])
+                r_pct = _rate(sb["present"], sb["late"], t)
+                rates.append(r_pct)
+                student_rates_all.append(r_pct)
+                all_students_set.add(sname)
+            avg_rate = round(sum(rates)/len(rates), 1) if rates else 0.0
+            groups.append({
+                "group_name": g,
+                "total_sessions": sessions,
+                "total_minutes": mins,
+                "students_count": students_n,
+                "avg_attendance_rate": avg_rate,
+            })
+            total_sessions_all += sessions
+            total_minutes_all  += mins
+        overall = {
+            "total_sessions": total_sessions_all,
+            "total_minutes":  total_minutes_all,
+            "students_count": len(all_students_set),
+            "avg_attendance_rate": round(sum(student_rates_all)/len(student_rates_all), 1) if student_rates_all else 0.0,
+        }
+        return jsonify({"groups": groups, "overall": overall})
+
     return jsonify({"ok": False, "error": "unknown view"}), 400
+
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
