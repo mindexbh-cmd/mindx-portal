@@ -6457,16 +6457,23 @@ function importGenericFromExcel() {
   if(!defs || !genExcelRows.length) return;
   var allowAutoCreate = (tbl === 'taqseet');
   var labelMap = {};
-  var mapped = genExcelRows.map(function(r){
-    return mapGenericRow(genExcelHeaders, r, defs, {allowAutoCreate: allowAutoCreate, labelMap: labelMap});
-  }).filter(function(obj){
-    // Skip rows where every cell is empty. Partial rows (even with just one field
-    // populated) pass through — this is what the user expects for sparse data.
-    for (var k in obj) {
-      if (obj[k] != null && String(obj[k]).trim() !== '') return true;
+  // Preserve Excel row order exactly: iterate top-to-bottom with a plain for
+  // loop, skip only rows where every raw cell is empty. Rows with any
+  // non-empty cell pass through even if the mapping yields an empty dict
+  // (no matching header — we still want the row represented).
+  var mapped = [];
+  for (var _i = 0; _i < genExcelRows.length; _i++) {
+    var _raw = genExcelRows[_i];
+    var _hasAny = false;
+    if (_raw && _raw.length) {
+      for (var _j = 0; _j < _raw.length; _j++) {
+        var _c = _raw[_j];
+        if (_c != null && String(_c).trim() !== '') { _hasAny = true; break; }
+      }
     }
-    return false;
-  });
+    if (!_hasAny) continue;
+    mapped.push(mapGenericRow(genExcelHeaders, _raw, defs, {allowAutoCreate: allowAutoCreate, labelMap: labelMap}));
+  }
   var btn = document.getElementById('genExcelImportBtn');
   var statusEl = document.getElementById('genExcelStatus');
   btn.disabled = true;
@@ -8313,20 +8320,27 @@ def api_import():
     cols = ",".join(fields)
     placeholders = ",".join(["?"] * len(fields))
     sql = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
+    # Iterate rows in the exact order the frontend sent them (which is Excel
+    # top-to-bottom). No sorting, no shuffling — every INSERT happens in
+    # sequence so auto-increment ids reflect Excel position.
     for r in rows:
         if not isinstance(r, dict):
             ignored += 1
             continue
-        values_list = [str(r.get(f, "") or "") for f in fields]
-        # Skip rows where every value is empty/whitespace — belt-and-suspenders
-        # alongside the frontend filter. Any field with at least one non-empty
-        # character qualifies (e.g. just الاسم populated).
-        if not any(v.strip() for v in values_list):
+        # Skip only fully-empty dicts — i.e. rows where every value in the
+        # payload is empty/None. Any one non-empty value (in any field, mapped
+        # or not) means the row has data and must be imported.
+        has_any = any(
+            v is not None and str(v).strip() != ''
+            for v in r.values()
+        )
+        if not has_any:
             ignored += 1
             continue
+        values_list = [str(r.get(f, "") or "") for f in fields]
         # Convert empty personal_id -> NULL so UNIQUE(personal_id) on students
-        # doesn't reject every row beyond the first one with a blank ID.
-        # UNIQUE treats NULL as distinct in both SQLite and Postgres.
+        # doesn't reject every row beyond the first blank-ID one. UNIQUE
+        # treats NULL as distinct in both SQLite and Postgres.
         for i, f in enumerate(fields):
             if f == "personal_id" and not values_list[i].strip():
                 values_list[i] = None
