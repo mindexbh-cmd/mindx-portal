@@ -55,6 +55,25 @@ The helper API:
 
 Any SQL string that interpolates a value from `get_setting` MUST pass it through `_is_safe_ident(...)` and fall back to the hardcoded default on failure — `get_setting` does not do that validation itself.
 
+## Excel import pipeline
+
+**IMPORT RULE:** When implementing or modifying any Excel import for any table, always check ALL pages, dropdowns, buttons, and statistics that reference that table and ensure imported data appears correctly everywhere immediately after import.
+
+Every table on the database page imports via `POST /api/import` with body `{table, rows, auto_create?, column_labels?}`. The endpoint:
+
+- Whitespace-folds every text value (strip + collapse internal runs) via `_import_normalize_value()`.
+- Maps attendance `status` values to canonical Arabic: `غياب→غائب`, `تأخير→متأخر`, `حضور→حاضر`, plus the English variants `absent/late/present`. See `STATUS_REMAP`.
+- Validates typed columns (نص / رقم / تاريخ / نعم-لا / قائمة منسدلة / تقييم) from the corresponding `*_col_labels` table via `_import_coerce_by_type()`. Invalid values are skipped with a reason.
+- Upserts on natural keys declared in `IMPORT_TABLE_KEYS`: `students.personal_id`, `student_groups.group_name`, `attendance(group_name, attendance_date, student_name)`, `taqseet(taqseet_method, student_name)`, `evaluations(form_fill_date, group_name, student_name)`, `payment_log.personal_id`. When every key column is non-empty AND a matching row exists, the non-key columns are UPDATED (only where the incoming value is non-empty, so blanks never overwrite existing data). Otherwise INSERT.
+- Returns `{ok, table, inserted, updated, skipped, errors, received, skip_reasons[], last_error, fields_used[]}` — the clients display a toast with those counts and dispatch a `mx-imported` CustomEvent.
+
+**When adding a new importable table:**
+1. Add its field list to `IMPORT_TABLE_FIELDS` and its INSERT skeleton to `IMPORT_TABLE_SQL`.
+2. Declare the natural key tuple in `IMPORT_TABLE_KEYS` (omit to disable upsert — only safe for custom-tables where the user owns identity).
+3. If the table has typed columns, register its labels table in `IMPORT_LABEL_TABLES` so type validation kicks in.
+4. Add the refresh-hook names (e.g. `loadXxx`) to `TABLE_REFRESH_HOOKS` inside `MX_HELPERS_JS` so a successful import immediately repopulates the current page.
+5. If any **other** page references this table (dropdowns, stats, dashboards), verify those pages pull live from their API endpoint (not a cached JS global). Cross-page refresh is unnecessary because each page refetches on load; the rule exists to prevent stale in-page caches.
+
 ## Working with Arabic text
 
 The UI is Arabic, RTL (`<html lang="ar" dir="rtl">`). Arabic strings in Python source are stored as HTML numeric entities (`&#x627;` etc.) inside the HTML blobs, and as `\uXXXX` JS escapes inside inline `<script>` blocks. This is deliberate — see commit `74b87ac` ("replace mojibake Arabic strings with Unicode escapes"). Do not paste raw Arabic into `app.py`; it gets mangled on Windows/Render round-trips. When adding new UI strings, use the existing escape style of the surrounding block.

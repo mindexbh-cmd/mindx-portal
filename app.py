@@ -7171,24 +7171,36 @@ function importAttendanceFromExcel() {
     fields.forEach(function(f,i){ obj[f] = String(row[i]||''); });
     return obj;
   });
-  var done = 0;
-  var total = batch.length;
   var statusEl = document.getElementById('attendanceExcelStatus');
-  function sendNext(idx) {
-    if(idx >= total) {
-      statusEl.textContent = '\u062A\u0645 \u0627\u0633\u062A\u064A\u0631\u0627\u062F ' + done + ' \u0633\u062C\u0644 \u0628\u0646\u062C\u0627\u062D!';
-      loadAttendance();
+  statusEl.textContent = '\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F...';
+  // Route attendance imports through the same /api/import endpoint every
+  // other table uses — that gives us upsert on (group,date,name), status
+  // remap (\u063A\u064A\u0627\u0628 \u2192 \u063A\u0627\u0626\u0628, etc.), and a detailed counters payload
+  // including updated vs inserted.
+  fetch('/api/import', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({table: 'attendance', rows: batch})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d && d.ok) {
+      var ins = d.inserted || 0, upd = d.updated || 0, skp = d.skipped || 0, err = d.errors || 0;
+      var parts = ['\u062A\u0645 \u0627\u0644\u0625\u062F\u0631\u0627\u062C: ' + ins];
+      if (upd) parts.push('\u062A\u062D\u062F\u064A\u062B: ' + upd);
+      if (skp) parts.push('\u062A\u062C\u0627\u0647\u0644: ' + skp);
+      if (err) parts.push('\u062E\u0637\u0623: ' + err);
+      statusEl.textContent = parts.join(' \u2014 ');
+      try { window.dispatchEvent(new CustomEvent('mx-imported', {detail: d})); } catch(e) {}
+      if (typeof loadAttendance === 'function') loadAttendance();
       setTimeout(closeAttendanceExcelModal, 1500);
-      return;
+    } else {
+      statusEl.textContent = '\u062E\u0637\u0623: ' + ((d && d.error) || '');
     }
-    fetch('/api/attendance', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(batch[idx])})
-      .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok) done++;
-        statusEl.textContent = '\u062C\u0627\u0631\u064A \u0627\u0644\u0627\u0633\u062A\u064A\u0631\u0627\u062F... ' + (idx+1) + ' / ' + total;
-        sendNext(idx+1);
-      }).catch(function(){ sendNext(idx+1); });
-  }
-  sendNext(0);
+  })
+  .catch(function(){
+    statusEl.textContent = '\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644';
+  });
 }
 
 // Generic Excel Import
@@ -7569,14 +7581,19 @@ function importGenericFromExcel() {
       btn.disabled = false;
       btn.textContent = "\u0627\u0633\u062A\u064A\u0631\u0627\u062F";
       if(d && d.ok){
-        var ins = d.imported || 0, ign = d.ignored || 0, err = d.errors || 0;
+        var ins = (d.inserted != null ? d.inserted : (d.imported || 0));
+        var upd = d.updated || 0;
+        var skp = (d.skipped != null ? d.skipped : (d.ignored || 0));
+        var err = d.errors || 0;
         var parts = ["\u062A\u0645 \u0627\u0644\u0625\u062F\u0631\u0627\u062C: " + ins];
-        if(ign) parts.push("\u0645\u062A\u062C\u0627\u0647\u0644: " + ign);
+        if(upd) parts.push("\u062A\u062D\u062F\u064A\u062B: " + upd);
+        if(skp) parts.push("\u062A\u062C\u0627\u0647\u0644: " + skp);
         if(err) parts.push("\u062E\u0637\u0623: " + err);
         statusEl.textContent = parts.join(" \u2014 ");
+        try { window.dispatchEvent(new CustomEvent('mx-imported', {detail: d})); } catch(e) {}
         if(defs.refresh && typeof window[defs.refresh] === 'function') { try { window[defs.refresh](); } catch(e) {} }
         if(typeof showToast === 'function') showToast(parts.join(" \u2014 "));
-        if(ins > 0 && ign === 0 && err === 0) {
+        if(ins + upd > 0 && skp === 0 && err === 0) {
           setTimeout(closeGenericExcelModal, 1200);
         }
       } else {
@@ -9844,8 +9861,132 @@ IMPORT_TABLE_FIELDS = {
     ],
 }
 
+# Natural unique key(s) per table used to decide insert-vs-update during
+# Excel import. When every key column in an incoming row is non-empty AND
+# matches an existing row, UPDATE the non-key columns. Otherwise INSERT.
+IMPORT_TABLE_KEYS = {
+    "students":       ["personal_id"],
+    "student_groups": ["group_name"],
+    "attendance":     ["group_name", "attendance_date", "student_name"],
+    "taqseet":        ["taqseet_method", "student_name"],
+    "evaluations":    ["form_fill_date", "group_name", "student_name"],
+    "payment_log":    ["personal_id"],
+}
+
+# Label table each data table stores its column types in. Column types come
+# from the /settings-configured typed-column system (نص / رقم / تاريخ / ...).
+IMPORT_LABEL_TABLES = {
+    "students":       "column_labels",
+    "student_groups": "group_col_labels",
+    "attendance":     "att_col_labels",
+    "evaluations":    "eval_col_labels",
+    "payment_log":    "paylog_col_labels",
+    "taqseet":        "taqseet_col_labels",
+}
+
+# Canonical attendance status values. Any incoming variant folds to the
+# canonical form so the dashboard, per-student stats, and reporting all
+# count the row correctly regardless of how the Excel spelt it.
+STATUS_REMAP = {
+    "غياب":  "غائب",
+    "تأخير": "متأخر",
+    "حضور":  "حاضر",
+    # Also fold common whitespace/casing variants users paste in.
+    "absent":  "غائب",
+    "late":    "متأخر",
+    "present": "حاضر",
+}
+
+
+def _import_fold_whitespace(s):
+    """Collapse leading/trailing + internal whitespace runs to a single
+    space. Applied to every incoming text value so Excel cells that got an
+    extra tab or NBSP don't break downstream equality checks."""
+    if s is None:
+        return ""
+    s = str(s).replace(" ", " ").replace("\t", " ")
+    if not s.strip():
+        return ""
+    return " ".join(s.split())
+
+
+def _import_normalize_value(table, field, value):
+    s = _import_fold_whitespace(value)
+    if not s:
+        return s
+    if table == "attendance" and field == "status":
+        # Fold canonical Arabic status variants (exact match or lowercased).
+        s_key = s.strip()
+        if s_key in STATUS_REMAP:
+            return STATUS_REMAP[s_key]
+        low = s_key.lower()
+        if low in STATUS_REMAP:
+            return STATUS_REMAP[low]
+    return s
+
+
+def _import_get_col_types(table):
+    """Return {col_key: col_type} from the label table that tracks the data
+    table's typed columns. Empty dict on any error — validation is best-effort
+    and never blocks an import when the schema is absent."""
+    lbl = IMPORT_LABEL_TABLES.get(table)
+    if not lbl:
+        return {}
+    try:
+        db = get_db()
+        rows = db.execute(
+            "SELECT col_key, col_type FROM " + lbl
+        ).fetchall()
+        out = {}
+        for r in rows:
+            k = r[0] if hasattr(r, "__getitem__") else None
+            t = r[1] if hasattr(r, "__getitem__") else None
+            if k:
+                out[k] = (t or "").strip()
+        return out
+    except Exception:
+        return {}
+
+
+def _import_coerce_by_type(value, col_type):
+    """Return (ok, coerced_value, reason). Best-effort coercion based on the
+    typed-column setting. Unknown/empty types always pass through unchanged."""
+    if value is None or value == "":
+        return True, value, ""
+    t = (col_type or "").strip()
+    if not t or t == "نص":
+        return True, value, ""
+    if t == "رقم":
+        s = str(value).strip().replace(",", ".")
+        # Accept "1.5", "1", "-2.3". Reject anything else.
+        try:
+            float(s)
+            return True, s, ""
+        except Exception:
+            return False, value, "ليس رقمًا"
+    if t == "تاريخ":
+        import re as _re_local
+        s = str(value).strip()
+        if _re_local.match(r"^\d{4}-\d{1,2}-\d{1,2}", s):
+            return True, s[:10], ""
+        m = _re_local.match(r"^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$", s)
+        if m:
+            d, mo, y = m.group(1), m.group(2), m.group(3)
+            return True, "%s-%s-%s" % (y, mo.zfill(2), d.zfill(2)), ""
+        return False, value, "تنسيق تاريخ غير صالح"
+    if t == "نعم/لا":
+        s = str(value).strip().lower()
+        if s in ("1", "true", "yes", "y", "نعم"):
+            return True, "1", ""
+        if s in ("0", "false", "no", "n", "لا", ""):
+            return True, "0", ""
+        return False, value, "قيمة منطقية غير صالحة"
+    # قائمة منسدلة and تقييم etc. — accept as text.
+    return True, value, ""
+
+
 IMPORT_TABLE_SQL = {
-    "students": "INSERT OR IGNORE INTO students",
+    "students": "INSERT INTO students",
     "student_groups": "INSERT INTO student_groups",
     "attendance": "INSERT INTO attendance",
     "taqseet": "INSERT INTO taqseet",
@@ -9856,6 +9997,23 @@ IMPORT_TABLE_SQL = {
 @app.route('/api/import', methods=['POST'])
 @login_required
 def api_import():
+    """Generic Excel-import endpoint used by every table on the database page.
+
+    Behaviour:
+      - Every incoming text value is whitespace-folded.
+      - Attendance status values are mapped to canonical Arabic
+        (غياب→غائب, تأخير→متأخر, حضور→حاضر) so downstream matching works.
+      - If all natural-key columns (IMPORT_TABLE_KEYS[table]) are non-empty
+        and an existing row has the same key tuple, the row is UPDATED
+        (non-key columns only, and only where the incoming value is non-empty
+        so we don't overwrite existing data with blanks).
+      - Otherwise the row is INSERTED.
+      - Typed columns (نص/رقم/تاريخ/نعم-لا) are validated; on failure the
+        row is skipped with a reason added to skip_reasons.
+
+    Response includes: inserted, updated, skipped, errors, received,
+    skip_reasons (up to 20), last_error, fields_used.
+    """
     d = request.get_json() or {}
     table = d.get('table', '')
     rows = d.get('rows', [])
@@ -9868,9 +10026,6 @@ def api_import():
     live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
 
     if auto_create:
-        # Gather all keys appearing in incoming rows, plus the whitelisted fields,
-        # then ALTER TABLE for any safe key that isn't already a column.
-        # Safe-key rule: 1-63 chars of [A-Za-z0-9_] starting with a letter/underscore.
         import re as _re_local
         safe_rx = _re_local.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
         incoming = set()
@@ -9886,10 +10041,7 @@ def api_import():
             except Exception:
                 pass
         db.commit()
-        # Use every candidate that now exists as a live column.
         fields = [c for c in candidates if c in live_cols]
-        # Persist column labels for taqseet so Arabic headers survive and
-        # render correctly for auto-created columns.
         if table == 'taqseet' and isinstance(column_labels, dict) and column_labels:
             try:
                 for key, label in column_labels.items():
@@ -9911,52 +10063,115 @@ def api_import():
 
     if not fields:
         return jsonify({"ok": False, "error": "no matching columns in table " + table}), 400
-    imported = 0
-    ignored = 0
-    errors = 0
+
+    key_cols = [k for k in IMPORT_TABLE_KEYS.get(table, []) if k in live_cols and _is_safe_ident(k)]
+    col_types = _import_get_col_types(table)
+
+    inserted = 0
+    updated  = 0
+    skipped  = 0
+    errors   = 0
+    skip_reasons = []   # up to 20 entries
     last_error = ""
+
     cols = ",".join(fields)
     placeholders = ",".join(["?"] * len(fields))
-    sql = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
-    # Iterate rows in the exact order the frontend sent them (which is Excel
-    # top-to-bottom). No sorting, no shuffling — every INSERT happens in
-    # sequence so auto-increment ids reflect Excel position.
-    for r in rows:
+    sql_insert = IMPORT_TABLE_SQL[table] + " (" + cols + ") VALUES (" + placeholders + ")"
+
+    def _remember_skip(idx, reason):
+        if len(skip_reasons) < 20:
+            skip_reasons.append({"row": idx + 1, "reason": reason})
+
+    for idx, r in enumerate(rows):
         if not isinstance(r, dict):
-            ignored += 1
+            skipped += 1
+            _remember_skip(idx, "row is not an object")
             continue
-        # Skip only fully-empty dicts — i.e. rows where every value in the
-        # payload is empty/None. Any one non-empty value (in any field, mapped
-        # or not) means the row has data and must be imported.
-        has_any = any(
-            v is not None and str(v).strip() != ''
-            for v in r.values()
-        )
+        norm = {}
+        for f in fields:
+            norm[f] = _import_normalize_value(table, f, r.get(f))
+        has_any = any(v for v in norm.values())
         if not has_any:
-            ignored += 1
+            skipped += 1
+            _remember_skip(idx, "empty row")
             continue
-        values_list = [str(r.get(f, "") or "") for f in fields]
-        # Convert empty personal_id -> NULL so UNIQUE(personal_id) on students
-        # doesn't reject every row beyond the first blank-ID one. UNIQUE
-        # treats NULL as distinct in both SQLite and Postgres.
-        for i, f in enumerate(fields):
-            if f == "personal_id" and not values_list[i].strip():
-                values_list[i] = None
-        values = tuple(values_list)
+
+        # Typed-column validation.
+        bad_type_reason = ""
+        for f in fields:
+            t = col_types.get(f, "")
+            if not t:
+                continue
+            ok, coerced, why = _import_coerce_by_type(norm[f], t)
+            if not ok:
+                bad_type_reason = f + ": " + why
+                break
+            norm[f] = coerced
+        if bad_type_reason:
+            skipped += 1
+            _remember_skip(idx, bad_type_reason)
+            continue
+
+        # Upsert: if every key column is non-empty AND a row with that tuple
+        # exists, UPDATE non-key columns; else INSERT.
+        existing_id = None
+        if key_cols and all((norm.get(k) or "").strip() for k in key_cols):
+            where = " AND ".join([k + "=?" for k in key_cols])
+            try:
+                row = db.execute(
+                    "SELECT id FROM " + table + " WHERE " + where,
+                    tuple(norm[k] for k in key_cols),
+                ).fetchone()
+                if row:
+                    existing_id = row[0] if not hasattr(row, "keys") else row["id"]
+            except Exception:
+                existing_id = None
+
         try:
-            cur = db.execute(sql, values)
-            if cur.rowcount > 0:
-                imported += 1
+            if existing_id:
+                set_cols = [f for f in fields if f not in key_cols and (norm.get(f) or "").strip()]
+                if not set_cols:
+                    skipped += 1
+                    _remember_skip(idx, "duplicate key with no new data")
+                    continue
+                sql_up = ("UPDATE " + table + " SET " +
+                          ",".join([c + "=?" for c in set_cols]) +
+                          " WHERE id=?")
+                db.execute(sql_up, tuple([norm[c] for c in set_cols] + [existing_id]))
+                updated += 1
             else:
-                ignored += 1
+                values = [norm.get(f, "") for f in fields]
+                # Empty personal_id -> NULL so UNIQUE(personal_id) treats
+                # blank-ID rows as distinct. Only matters for students here.
+                for i2, f in enumerate(fields):
+                    if f == "personal_id" and not (values[i2] or "").strip():
+                        values[i2] = None
+                cur = db.execute(sql_insert, tuple(values))
+                if cur.rowcount > 0:
+                    inserted += 1
+                else:
+                    skipped += 1
+                    _remember_skip(idx, "insert suppressed (UNIQUE?)")
         except Exception as ex:
             errors += 1
             last_error = str(ex)
+            _remember_skip(idx, "error: " + last_error[:80])
+
     db.commit()
     return jsonify({
-        "ok": True, "imported": imported, "ignored": ignored,
-        "errors": errors, "received": len(rows), "last_error": last_error,
+        "ok": True,
+        "table": table,
+        "inserted": inserted,
+        "updated":  updated,
+        "skipped":  skipped,
+        "errors":   errors,
+        "received": len(rows),
+        "skip_reasons": skip_reasons,
+        "last_error": last_error,
         "fields_used": fields,
+        # Backwards-compat aliases (existing front-end reads d.imported/d.ignored).
+        "imported": inserted,
+        "ignored":  skipped,
     })
 
 @app.route('/api/attendance/sessions', methods=['GET'])
@@ -10550,6 +10765,45 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       }
     });
   }
+
+  /* Global post-import refresh hook.
+     The server returns {table, inserted, updated, skipped, errors, ...} and
+     both the generic Excel modal and the attendance modal dispatch a
+     `mx-imported` custom event on window. Pages that want to react call
+     window.mxOnImport(table, fn). This helper also:
+       - fires any <page>_refresh functions matching the imported table
+       - shows a summary toast via mxToast
+  */
+  var TABLE_REFRESH_HOOKS = {
+    'students':       ['loadStudents'],
+    'student_groups': ['loadGroups2', 'loadGroups'],
+    'attendance':     ['loadAttendance', 'loadGroups', 'loadAttendanceGroups'],
+    'taqseet':        ['loadTaqseet'],
+    'evaluations':    ['loadEvals', 'loadEvaluations'],
+    'payment_log':    ['loadPaylog', 'loadPaymentLog']
+  };
+  window.mxOnImport = function(table, fn){
+    window.addEventListener('mx-imported', function(ev){
+      var d = (ev && ev.detail) || {};
+      if (!table || d.table === table) {
+        try { fn(d); } catch(e){}
+      }
+    });
+  };
+  window.addEventListener('mx-imported', function(ev){
+    var d = (ev && ev.detail) || {};
+    var hooks = TABLE_REFRESH_HOOKS[d.table] || [];
+    for (var i=0; i<hooks.length; i++){
+      var fn = window[hooks[i]];
+      if (typeof fn === 'function') { try { fn(); } catch(e){} }
+    }
+    var ins = d.inserted || 0, upd = d.updated || 0, skp = d.skipped || 0, err = d.errors || 0;
+    var parts = ['✅ ' + (d.table || 'import') + ' — أُدرج: ' + ins];
+    if (upd) parts.push('محدّث: ' + upd);
+    if (skp) parts.push('متجاهل: ' + skp);
+    if (err) parts.push('أخطاء: ' + err);
+    if (typeof window.mxToast === 'function') window.mxToast(parts.join(' — '), err ? 'error' : 'success');
+  });
 
   function init(){
     scanButtons();
