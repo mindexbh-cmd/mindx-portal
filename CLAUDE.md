@@ -55,6 +55,19 @@ The helper API:
 
 Any SQL string that interpolates a value from `get_setting` MUST pass it through `_is_safe_ident(...)` and fall back to the hardcoded default on failure — `get_setting` does not do that validation itself.
 
+## Data safety (CRITICAL DATA SAFETY RULE)
+
+**NEVER** use `DROP TABLE`, `DELETE FROM <whole-table>`, or `TRUNCATE` on any user-data table in `app.py`. Every deployment must leave existing rows 100% intact.
+
+- `init_db()` is gated by `if not os.path.exists(DB_PATH)` for SQLite and by `USE_PG` branching for Postgres; it only runs full `CREATE TABLE` + seed on a truly empty DB. Existing DBs go through the `else` branch, which must use **`CREATE TABLE IF NOT EXISTS`** and **`ALTER TABLE ... ADD COLUMN`** only — never `DROP`, never `DELETE`, never `TRUNCATE`.
+- Seeding default rows (users, settings, label rows) must be gated by an emptiness check or an `ON CONFLICT DO NOTHING` clause — never blind inserts that duplicate or wipe data.
+- Gate every destructive migration behind a `schema_migrations` tag **plus** verify the tag actually persists (see next bullet). If it doesn't, the "one-shot" runs forever.
+- **Postgres INSERT-through-wrapper caveat (fixed in commit after dd36a0c):** `_PgConnection.execute` auto-appends `RETURNING id` to every `INSERT`. Tables without an `id` column (e.g. `schema_migrations` with `tag TEXT PRIMARY KEY`) raise an `UndefinedColumn` error that the migration's `try/except` swallows silently, so the tag never gets saved and the "one-shot" migration runs on every boot. The wrapper now consults `_NO_ID_COLUMN_TABLES` to skip the auto-RETURNING for those tables. If you add another id-less table, **append it to that set** or migrations gated by its tags will re-run forever.
+- After any migration edit, eyeball prod `schema_migrations` (`SELECT tag FROM schema_migrations ORDER BY tag`) to make sure the tags you expect are persisted.
+- The destructive `drop_paylog_v1` migration that used to wipe `payment_log` has been removed from the code. The tag is still seeded on prod to be defensive — never re-add a `DROP TABLE` guarded only by a migration tag for a user-data table.
+
+Row-level `DELETE` (individual user-initiated deletes, e.g. one student, one attendance record, one template) is fine and required for the app's features. The rule is about never losing **other** users' rows through a code change.
+
 ## Excel import pipeline
 
 **IMPORT RULE:** When implementing or modifying any Excel import for any table, always check ALL pages, dropdowns, buttons, and statistics that reference that table and ensure imported data appears correctly everywhere immediately after import.

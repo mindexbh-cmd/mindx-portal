@@ -108,19 +108,36 @@ class _PgConnection:
         self._last_insert_id = None
         self.row_factory = None  # Unused; present for API compatibility.
 
+    # Tables that deliberately have no "id" column. The auto-RETURNING
+    # rewrite below would otherwise turn every INSERT into these tables
+    # into a Postgres error ("column id does not exist"), which the
+    # migration blocks swallow silently — the tag never gets persisted
+    # and the migration re-runs on every boot. In the case of
+    # drop_paylog_v1 that meant payment_log was being dropped on every
+    # single deploy. Guarding the RETURNING rewrite fixes every
+    # migration tag at once.
+    _NO_ID_COLUMN_TABLES = {"schema_migrations"}
+
     def execute(self, sql, params=()):
         if _re.search(r"\blast_insert_rowid\s*\(", sql, _re.I):
             return _StaticCursor([_Row([self._last_insert_id], ["last_insert_rowid"])])
         translated = _pg_translate(sql)
         is_insert = bool(_re.match(r"\s*INSERT\s+INTO\s", translated, _re.I))
-        if is_insert and "RETURNING" not in translated.upper():
+        skip_returning = False
+        if is_insert:
+            m = _re.match(r"\s*INSERT\s+INTO\s+([\"\w.]+)", translated, _re.I)
+            if m:
+                tbl = m.group(1).replace('"', '').split('.')[-1].lower()
+                if tbl in _PgConnection._NO_ID_COLUMN_TABLES:
+                    skip_returning = True
+        if is_insert and not skip_returning and "RETURNING" not in translated.upper():
             translated = translated.rstrip().rstrip(";") + " RETURNING id"
         cur = self._conn.cursor()
         if params:
             cur.execute(translated, tuple(params))
         else:
             cur.execute(translated)
-        if is_insert:
+        if is_insert and not skip_returning:
             try:
                 row = cur.fetchone()
                 if row is not None:
@@ -805,17 +822,21 @@ if True:
         session_type TEXT DEFAULT '',
         UNIQUE(group_name, session_date)
     )""")
-    # One-shot: drop the old payment_log feature. Guarded so it only runs once.
-    if "drop_paylog_v1" not in applied:
-        try: db2.execute("DROP TABLE IF EXISTS payment_log")
-        except Exception: pass
-        try: db2.execute("DROP TABLE IF EXISTS paylog_col_labels")
-        except Exception: pass
-        try: db2.execute("DELETE FROM schema_migrations WHERE tag = ?", ("paylog_labels_v1",))
-        except Exception: pass
-        try: db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("drop_paylog_v1",))
-        except Exception: pass
-        db2.commit()
+    # -------------------------------------------------------------------
+    # REMOVED: drop_paylog_v1 migration
+    # -------------------------------------------------------------------
+    # The payment_log feature was previously removed and re-added. The
+    # old drop_paylog_v1 migration here used to `DROP TABLE IF EXISTS
+    # payment_log` "once". In practice, the _PgConnection wrapper was
+    # auto-appending `RETURNING id` to every INSERT, and
+    # schema_migrations has no id column, so the "mark this migration
+    # applied" INSERT was silently failing and the DROP ran on every
+    # single deploy — wiping every paylog row any user had entered
+    # (see commits leading to dd36a0c, diagnostic verified live).
+    # The wrapper is now fixed (see _NO_ID_COLUMN_TABLES above). The
+    # migration block itself is now deleted outright — payment_log is
+    # an active table and must NEVER be dropped again. (CRITICAL DATA
+    # SAFETY RULE — see CLAUDE.md.)
     db2.execute("""CREATE TABLE IF NOT EXISTS taqseet_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
