@@ -1712,6 +1712,44 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 .srm-cancel{padding:10px 24px;background:#eceff1;color:#455A64;border:none;border-radius:10px;font-weight:600;cursor:pointer;}
 .srm-pct-bar{height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:4px;}
 .srm-pct-bar-inner{height:100%;background:#4DB6AC;}
+
+/* ---- Student-search edit protection ---- */
+.srm-field .srm-lock{font-size:0.9em;margin-right:4px;color:#9e9e9e;}
+.srm-field.edit .srm-lock{color:#2E7D32;}
+.srm-readonly{background:#eceff1 !important;color:#455A64;cursor:not-allowed;border-color:#cfd8dc !important;}
+.srm-edit-banner{display:none;background:linear-gradient(135deg,#fffde7,#fff59d);border:1.5px dashed #f57f17;color:#795548;padding:10px 14px;border-radius:10px;margin:0 18px 8px 18px;font-weight:700;text-align:center;}
+.srm-edit-banner.show{display:block;}
+.srm-btn-edit{padding:10px 28px;background:#e67e22;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.srm-btn-edit:hover{background:#d35400;}
+.srm-btn-save{padding:10px 28px;background:#27ae60;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.srm-btn-save:hover{background:#229954;}
+.srm-btn-cancel-edit{padding:10px 24px;background:#e74c3c;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.srm-btn-cancel-edit:hover{background:#c0392b;}
+.srm-btn-delete{padding:10px 24px;background:#8e44ad;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.srm-btn-delete:hover{background:#6c3483;}
+/* Typed-confirmation modal */
+.srm-type-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100001;align-items:center;justify-content:center;direction:rtl;}
+.srm-type-bg.open{display:flex;}
+.srm-type-box{background:#fff;border-radius:14px;padding:26px 28px;max-width:440px;width:92%;box-shadow:0 14px 44px rgba(0,0,0,.3);text-align:center;}
+.srm-type-box h3{color:#c62828;font-size:1.1rem;font-weight:800;margin-bottom:10px;}
+.srm-type-box p{color:#555;font-size:0.92rem;margin-bottom:12px;}
+.srm-type-expected{display:block;background:#fce4ec;border:1px dashed #e57373;color:#b71c1c;font-weight:800;padding:8px;border-radius:8px;margin-bottom:12px;}
+.srm-type-input{width:100%;padding:10px 12px;border:2px solid #e74c3c;border-radius:9px;font-size:0.95rem;direction:rtl;margin-bottom:14px;}
+.srm-type-actions{display:flex;gap:10px;justify-content:center;}
+/* Change-log review modal */
+.srm-log-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100001;align-items:center;justify-content:center;direction:rtl;}
+.srm-log-bg.open{display:flex;}
+.srm-log-box{background:#fff;border-radius:14px;max-width:560px;width:94%;max-height:80vh;overflow:auto;box-shadow:0 14px 44px rgba(0,0,0,.3);}
+.srm-log-head{background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;padding:14px 20px;font-weight:800;font-size:1.05rem;}
+.srm-log-body{padding:14px 20px;color:#333;}
+.srm-log-item{padding:8px 10px;border-bottom:1px dashed #eee;font-size:0.92rem;}
+.srm-log-item .srm-log-field{font-weight:800;color:#E65100;}
+.srm-log-item .srm-log-from{color:#c62828;text-decoration:line-through;margin:0 4px;}
+.srm-log-item .srm-log-to{color:#2E7D32;font-weight:700;margin:0 4px;}
+.srm-log-actions{padding:12px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:center;background:#fff9f2;}
+.srm-auto-lock-banner{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#455a64;color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:0.92rem;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:100002;}
+.srm-auto-lock-banner.show{display:block;}
+
 </style>
 </head>
 <body>
@@ -2277,95 +2315,348 @@ function srPick(sid){
     _srRenderCard(d);
   });
 }
-function _srField(id, label, value, readonly){
+function _srField(id, label, value){
   var v = value == null ? '' : String(value);
   v = v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  return '<div class="srm-field"><label>'+label+'</label><input id="'+id+'" value="'+v+'"'+(readonly?' readonly class="srm-readonly"':'')+'></div>';
+  // Fields ALWAYS render as disabled inputs in view mode. Edit mode flips
+  // the disabled flag + replaces the lock icon via _srApplyMode().
+  return '<div class="srm-field"><label><span class="srm-lock">🔒</span>'+label+'</label>'
+       + '<input id="'+id+'" data-sr="'+id+'" value="'+v+'" class="srm-readonly" disabled></div>';
+}
+var _srMode = 'view';
+var _srOriginal = {};
+var _srIdleTimer = null;
+var _srAutoLockMs = 120000; /* 2 minutes of inactivity → auto-exit edit */
+var _SR_FIELD_IDS = ['personal_id','student_name','whatsapp','class_name','group_name_student','group_online','old_new_2026','registration_term2_2026','teacher_2026','books_received','final_result','level_reached_2026','suitable_level_2026','mother_phone','father_phone','other_phone','residence','home_address','road','complex_name','installment_type','installment1','installment2','installment3','installment4','installment5'];
+var _SR_FIELD_LABELS = {
+  personal_id: 'الرقم الشخصي',
+  student_name: 'اسم الطالب',
+  whatsapp: 'الواتساب',
+  class_name: 'الصف',
+  group_name_student: 'المجموعة',
+  group_online: 'المجموعة (أونلاين)',
+  old_new_2026: 'قديم/جديد 2026',
+  registration_term2_2026: 'تسجيل الفصل الثاني 2026',
+  teacher_2026: 'المدرس 2026',
+  books_received: 'استلام الكتب',
+  final_result: 'النتيجة النهائية',
+  level_reached_2026: 'إلى أين وصل 2026',
+  suitable_level_2026: 'مناسب للمستوى 2026؟',
+  mother_phone: 'هاتف الأم',
+  father_phone: 'هاتف الأب',
+  other_phone: 'هاتف آخر',
+  residence: 'مكان السكن',
+  home_address: 'العنوان',
+  road: 'الطريق',
+  complex_name: 'المجمع',
+  installment_type: 'نوع التقسيط',
+  installment1: 'القسط 1',
+  installment2: 'القسط 2',
+  installment3: 'القسط 3',
+  installment4: 'القسط 4',
+  installment5: 'القسط 5'
+};
+function _srCurrentValues(){
+  var out = {};
+  _SR_FIELD_IDS.forEach(function(k){
+    var el = document.getElementById('sr_'+k);
+    if (el) out[k] = el.value;
+  });
+  return out;
+}
+function _srApplyMode(){
+  var fields = document.querySelectorAll('#sr-details .srm-field');
+  for (var i=0; i<fields.length; i++){
+    var inp = fields[i].querySelector('input');
+    var lock = fields[i].querySelector('.srm-lock');
+    if (!inp) continue;
+    if (_srMode === 'edit'){
+      fields[i].classList.add('edit');
+      inp.removeAttribute('disabled');
+      inp.classList.remove('srm-readonly');
+      if (lock) lock.textContent = '🔓';
+    } else {
+      fields[i].classList.remove('edit');
+      inp.setAttribute('disabled','disabled');
+      inp.classList.add('srm-readonly');
+      if (lock) lock.textContent = '🔒';
+    }
+  }
+  var banner = document.getElementById('sr-edit-banner');
+  if (banner) banner.classList.toggle('show', _srMode === 'edit');
+  _srRenderActions();
+}
+function _srRenderActions(){
+  var box = document.getElementById('sr-actions');
+  if (!box) return;
+  if (_srMode === 'edit'){
+    box.innerHTML =
+        '<button class="srm-btn-save" onclick="_srTrySave()">💾 حفظ التغييرات</button>'
+      + '<button class="srm-btn-cancel-edit" onclick="_srExitEditMode(true)">❌ إلغاء التعديل</button>'
+      + '<button class="srm-btn-delete" onclick="_srTryDelete()">🗑 حذف الطالب</button>';
+  } else {
+    box.innerHTML =
+        '<button class="srm-btn-edit" onclick="_srEnterEditMode()">✏ تعديل بيانات الطالب</button>'
+      + '<button class="srm-cancel" onclick="srClose()">إغلاق</button>';
+  }
+}
+function _srResetIdle(){
+  if (_srIdleTimer) clearTimeout(_srIdleTimer);
+  if (_srMode !== 'edit') return;
+  _srIdleTimer = setTimeout(function(){
+    if (_srMode !== 'edit') return;
+    _srExitEditMode(false);
+    var b = document.getElementById('srm-auto-lock');
+    if (b){
+      b.classList.add('show');
+      setTimeout(function(){ b.classList.remove('show'); }, 3200);
+    }
+  }, _srAutoLockMs);
+}
+function _srWireIdleInputs(){
+  _SR_FIELD_IDS.forEach(function(k){
+    var el = document.getElementById('sr_'+k);
+    if (el && !el._srWired){
+      el._srWired = true;
+      el.addEventListener('input', _srResetIdle);
+    }
+  });
+}
+function _srEnterEditMode(){
+  if (_srMode === 'edit') return;
+  if (!_srCurrentId) return;
+  var sName = (_srOriginal.student_name || '—');
+  if (typeof window.mxConfirm === 'function'){
+    window.mxConfirm({
+      title: '⚠ تنبيه: أنت على وشك تعديل بيانات الطالب',
+      message: sName + '\n\nهل أنت متأكد؟',
+      yesText: 'نعم، متأكد',
+      noText:  'إلغاء'
+    }, function(){
+      _srMode = 'edit';
+      _srApplyMode();
+      _srWireIdleInputs();
+      _srResetIdle();
+      var first = document.getElementById('sr_student_name');
+      if (first) first.focus();
+    });
+  } else {
+    if (!confirm('⚠ هل أنت متأكد من تعديل بيانات الطالب ' + sName + '؟')) return;
+    _srMode = 'edit'; _srApplyMode(); _srWireIdleInputs(); _srResetIdle();
+  }
+}
+function _srExitEditMode(rollback){
+  if (_srMode !== 'edit') return;
+  if (rollback){
+    _SR_FIELD_IDS.forEach(function(k){
+      var el = document.getElementById('sr_'+k);
+      if (el) el.value = _srOriginal[k] != null ? _srOriginal[k] : '';
+    });
+  }
+  _srMode = 'view';
+  if (_srIdleTimer){ clearTimeout(_srIdleTimer); _srIdleTimer = null; }
+  _srApplyMode();
+}
+function _srComputeDiff(){
+  var current = _srCurrentValues();
+  var diffs = [];
+  _SR_FIELD_IDS.forEach(function(k){
+    var a = _srOriginal[k] != null ? String(_srOriginal[k]) : '';
+    var b = current[k]      != null ? String(current[k])      : '';
+    if (a !== b){
+      diffs.push({field:k, label: _SR_FIELD_LABELS[k] || k, from:a, to:b});
+    }
+  });
+  return diffs;
+}
+function _srTrySave(){
+  var diffs = _srComputeDiff();
+  if (!diffs.length){
+    if (typeof window.mxToast === 'function') window.mxToast('لا توجد تغييرات للحفظ', 'info');
+    else alert('لا توجد تغييرات');
+    return;
+  }
+  var body = document.getElementById('srm-log-body');
+  var html = '<p style="margin-bottom:8px;font-weight:700;color:#E65100;">تم تعديل ' + diffs.length + ' حقل:</p>';
+  diffs.forEach(function(d){
+    html += '<div class="srm-log-item">'
+         +    '<span class="srm-log-field">' + d.label + '</span>: '
+         +    'تم تغيير من <span class="srm-log-from">' + (d.from ? _srEsc(d.from) : '—') + '</span>'
+         +    'إلى <span class="srm-log-to">' + (d.to ? _srEsc(d.to) : '—') + '</span>'
+         +  '</div>';
+  });
+  html += '<p style="margin-top:10px;color:#555;font-size:0.9rem;">هل أنت متأكد من حفظ هذه التغييرات؟ سيتم تحديث بيانات الطالب في قاعدة البيانات.</p>';
+  body.innerHTML = html;
+  var modal = document.getElementById('srm-log-modal');
+  modal.classList.add('open');
+  document.getElementById('srm-log-yes').onclick = function(){
+    modal.classList.remove('open');
+    _srDoSave(diffs);
+  };
+  document.getElementById('srm-log-no').onclick = function(){
+    modal.classList.remove('open');
+  };
+}
+function _srEsc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _srDoSave(diffs){
+  var body = {};
+  diffs.forEach(function(d){ body[d.field] = d.to; });
+  fetch('/api/students/'+_srCurrentId, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok){
+        if (typeof window.mxToast === 'function') window.mxToast('تم تحديث بيانات الطالب بنجاح', 'success');
+        _srMode = 'view';
+        srPick(_srCurrentId);
+        fetch('/api/students').then(function(r){return r.json();}).then(function(data){ _srStudents = data.students || []; });
+      } else {
+        if (typeof window.mxToast === 'function') window.mxToast(d.error || 'حدث خطأ', 'error');
+        else alert(d.error || 'حدث خطأ');
+      }
+    })
+    .catch(function(){
+      if (typeof window.mxToast === 'function') window.mxToast('حدث خطأ في الاتصال', 'error');
+      else alert('حدث خطأ في الاتصال');
+    });
+}
+function _srTryDelete(){
+  if (!_srCurrentId) return;
+  var sName = _srOriginal.student_name || '';
+  function step1(){
+    window.mxConfirm({
+      title: 'هل تريد حذف بيانات هذا الطالب؟',
+      message: sName,
+      yesText: 'متابعة',
+      noText:  'إلغاء'
+    }, step2);
+  }
+  function step2(){
+    window.mxConfirm({
+      title: '⚠ تحذير: هذا الإجراء لا يمكن التراجع عنه',
+      message: 'هل أنت متأكد تماماً من حذف ' + sName + '؟',
+      yesText: 'نعم، متأكد تماماً',
+      noText:  'إلغاء'
+    }, step3);
+  }
+  function step3(){
+    var m = document.getElementById('srm-type-modal');
+    var inp = document.getElementById('srm-type-input');
+    var expected = document.getElementById('srm-type-expected');
+    document.getElementById('srm-type-title').textContent = '⚠ اكتب اسم الطالب للتأكيد';
+    document.getElementById('srm-type-msg').textContent = 'اكتب الاسم تماماً كما هو أدناه، ثم اضغط "تأكيد الحذف".';
+    expected.textContent = sName;
+    inp.value = '';
+    m.classList.add('open');
+    setTimeout(function(){ inp.focus(); }, 50);
+    document.getElementById('srm-type-yes').onclick = function(){
+      if ((inp.value || '').trim() === (sName || '').trim()){
+        m.classList.remove('open');
+        _srDoDelete();
+      } else {
+        inp.style.background = '#ffebee';
+        setTimeout(function(){ inp.style.background = ''; }, 900);
+      }
+    };
+    document.getElementById('srm-type-no').onclick = function(){
+      m.classList.remove('open');
+    };
+  }
+  if (typeof window.mxConfirm === 'function') step1();
+  else {
+    if (!confirm('هل تريد حذف ' + sName + '؟')) return;
+    if (!confirm('⚠ لا يمكن التراجع. متأكد؟')) return;
+    var typed = prompt('اكتب اسم الطالب للتأكيد:');
+    if ((typed||'').trim() === (sName||'').trim()) _srDoDelete();
+  }
+}
+function _srDoDelete(){
+  fetch('/api/students/'+_srCurrentId, { method:'DELETE', credentials:'include' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok){
+        if (typeof window.mxToast === 'function') window.mxToast('تم حذف بيانات الطالب', 'success');
+        _srCurrentId = null;
+        document.getElementById('sr-details').innerHTML = '';
+        fetch('/api/students').then(function(r){return r.json();}).then(function(data){ _srStudents = data.students || []; });
+      } else {
+        if (typeof window.mxToast === 'function') window.mxToast(d.error || 'تعذّر الحذف', 'error');
+        else alert(d.error || 'تعذّر الحذف');
+      }
+    })
+    .catch(function(){
+      if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
+    });
 }
 function _srRenderCard(d){
   var s = d.student || {};
   var att = d.attendance || {};
   var tot = d.payment_totals || {};
+  // Reset state each time a new student is picked.
+  _srMode = 'view';
+  _srOriginal = {};
+  _SR_FIELD_IDS.forEach(function(k){ _srOriginal[k] = (s[k] != null ? String(s[k]) : ''); });
+  if (_srIdleTimer){ clearTimeout(_srIdleTimer); _srIdleTimer = null; }
+
   var html = '<div class="srm-card">';
+  html += '<div id="sr-edit-banner" class="srm-edit-banner">⚠ أنت في وضع التعديل — تأكد من صحة البيانات قبل الحفظ</div>';
   // BASIC
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F464 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u0629</div><div class="srm-grid">';
-  html += _srField('sr_personal_id','\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A', s.personal_id);
-  html += _srField('sr_student_name','\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628', s.student_name);
-  html += _srField('sr_whatsapp','\u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628', s.whatsapp);
-  html += _srField('sr_class_name','\u0627\u0644\u0635\u0641', s.class_name);
-  html += _srField('sr_group_name_student','\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629', s.group_name_student);
-  html += _srField('sr_group_online','\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)', s.group_online);
-  html += _srField('sr_old_new_2026','\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026', s.old_new_2026);
-  html += _srField('sr_registration_term2_2026','\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026', s.registration_term2_2026);
-  html += _srField('sr_teacher_2026','\u0627\u0644\u0645\u062F\u0631\u0633 2026', s.teacher_2026);
-  html += _srField('sr_books_received','\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0643\u062A\u0628', s.books_received);
-  html += _srField('sr_final_result','\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629', s.final_result);
-  html += _srField('sr_level_reached_2026','\u0627\u0644\u0649 \u0627\u064A\u0646 \u0648\u0635\u0644 2026', s.level_reached_2026);
-  html += _srField('sr_suitable_level_2026','\u0645\u0646\u0627\u0633\u0628 \u0644\u0644\u0645\u0633\u062A\u0648\u0649 2026\u061F', s.suitable_level_2026);
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F464 البيانات الأساسية</div><div class="srm-grid">';
+  html += _srField('sr_personal_id','الرقم الشخصي', s.personal_id);
+  html += _srField('sr_student_name','اسم الطالب', s.student_name);
+  html += _srField('sr_whatsapp','الواتساب', s.whatsapp);
+  html += _srField('sr_class_name','الصف', s.class_name);
+  html += _srField('sr_group_name_student','المجموعة', s.group_name_student);
+  html += _srField('sr_group_online','المجموعة (الاونلاين)', s.group_online);
+  html += _srField('sr_old_new_2026','قديم جديد 2026', s.old_new_2026);
+  html += _srField('sr_registration_term2_2026','تسجيل الفصل الثاني 2026', s.registration_term2_2026);
+  html += _srField('sr_teacher_2026','المدرس 2026', s.teacher_2026);
+  html += _srField('sr_books_received','استلام الكتب', s.books_received);
+  html += _srField('sr_final_result','النتيجة النهائية', s.final_result);
+  html += _srField('sr_level_reached_2026','إلى أين وصل 2026', s.level_reached_2026);
+  html += _srField('sr_suitable_level_2026','مناسب للمستوى 2026؟', s.suitable_level_2026);
   html += '</div></div>';
   // CONTACT
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4DE \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0648\u0627\u0644\u0633\u0643\u0646</div><div class="srm-grid">';
-  html += _srField('sr_mother_phone','\u0647\u0627\u062A\u0641 \u0627\u0644\u0623\u0645', s.mother_phone);
-  html += _srField('sr_father_phone','\u0647\u0627\u062A\u0641 \u0627\u0644\u0623\u0628', s.father_phone);
-  html += _srField('sr_other_phone','\u0647\u0627\u062A\u0641 \u0622\u062E\u0631', s.other_phone);
-  html += _srField('sr_residence','\u0645\u0643\u0627\u0646 \u0627\u0644\u0633\u0643\u0646', s.residence);
-  html += _srField('sr_home_address','\u0627\u0644\u0639\u0646\u0648\u0627\u0646', s.home_address);
-  html += _srField('sr_road','\u0627\u0644\u0637\u0631\u064A\u0642', s.road);
-  html += _srField('sr_complex_name','\u0627\u0644\u0645\u062C\u0645\u0639', s.complex_name);
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4DE الاتصال والسكن</div><div class="srm-grid">';
+  html += _srField('sr_mother_phone','هاتف الأم', s.mother_phone);
+  html += _srField('sr_father_phone','هاتف الأب', s.father_phone);
+  html += _srField('sr_other_phone','هاتف آخر', s.other_phone);
+  html += _srField('sr_residence','مكان السكن', s.residence);
+  html += _srField('sr_home_address','العنوان', s.home_address);
+  html += _srField('sr_road','الطريق', s.road);
+  html += _srField('sr_complex_name','المجمع', s.complex_name);
   html += '</div></div>';
   // PAYMENTS
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B3 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u062F\u0641\u0639</div><div class="srm-grid">';
-  html += _srField('sr_installment_type','\u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637', s.installment_type);
-  html += _srField('sr_installment1','\u0627\u0644\u0642\u0633\u0637 1', s.installment1);
-  html += _srField('sr_installment2','\u0627\u0644\u0642\u0633\u0637 2', s.installment2);
-  html += _srField('sr_installment3','\u0627\u0644\u0642\u0633\u0637 3', s.installment3);
-  html += _srField('sr_installment4','\u0627\u0644\u0642\u0633\u0637 4', s.installment4);
-  html += _srField('sr_installment5','\u0627\u0644\u0642\u0633\u0637 5', s.installment5);
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B3 تفاصيل الدفع</div><div class="srm-grid">';
+  html += _srField('sr_installment_type','نوع التقسيط', s.installment_type);
+  html += _srField('sr_installment1','القسط 1', s.installment1);
+  html += _srField('sr_installment2','القسط 2', s.installment2);
+  html += _srField('sr_installment3','القسط 3', s.installment3);
+  html += _srField('sr_installment4','القسط 4', s.installment4);
+  html += _srField('sr_installment5','القسط 5', s.installment5);
   html += '</div>';
   html += '<div class="srm-totals">'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.paid||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0645\u062F\u0641\u0648\u0639</div></div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.price||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A</div></div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.remaining||0)+'</div><div class="srm-stat-lbl">\u0627\u0644\u0645\u062A\u0628\u0642\u064A</div></div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.paid||0)+'</div><div class="srm-stat-lbl">المدفوع</div></div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.price||0)+'</div><div class="srm-stat-lbl">السعر الإجمالي</div></div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.remaining||0)+'</div><div class="srm-stat-lbl">المتبقي</div></div>'
        + '</div></div>';
   // ATTENDANCE
   var pct = function(v){ return (v||0)+'%'; };
   var bar = function(v){ return '<div class="srm-pct-bar"><div class="srm-pct-bar-inner" style="width:'+(Math.min(100,v||0))+'%"></div></div>'; };
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4C5 \u0625\u062D\u0635\u0627\u0626\u064A\u0627\u062A \u0627\u0644\u062D\u0636\u0648\u0631 ('+att.total+' \u062C\u0644\u0633\u0629)</div>';
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4C5 إحصائيات الحضور ('+(att.total||0)+' جلسة)</div>';
   html += '<div class="srm-totals">'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.present_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u062D\u0636\u0648\u0631 ('+att.present+')</div>'+bar(att.present_rate)+'</div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u063A\u064A\u0627\u0628 ('+att.absent+')</div>'+bar(att.absent_rate)+'</div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">\u0646\u0633\u0628\u0629 \u0627\u0644\u062A\u0623\u062E\u064A\u0631 ('+att.late+')</div>'+bar(att.late_rate)+'</div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.present_rate)+'</div><div class="srm-stat-lbl">نسبة الحضور ('+(att.present||0)+')</div>'+bar(att.present_rate)+'</div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">نسبة الغياب ('+(att.absent||0)+')</div>'+bar(att.absent_rate)+'</div>'
+       +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">نسبة التأخير ('+(att.late||0)+')</div>'+bar(att.late_rate)+'</div>'
        + '</div></div>';
   // ACTIONS
-  html += '<div class="srm-actions">'
-       +  '<button class="srm-save" onclick="srSave()">\U0001F4BE \u062D\u0641\u0638</button>'
-       +  '<button class="srm-cancel" onclick="srClose()">\u0625\u063A\u0644\u0627\u0642</button>'
-       +  '</div>';
+  html += '<div class="srm-actions" id="sr-actions"></div>';
   html += '</div>';
   document.getElementById('sr-details').innerHTML = html;
+  _srApplyMode();
 }
-function srSave(){
-  if (!_srCurrentId) return;
-  var ids = ['personal_id','student_name','whatsapp','class_name','group_name_student','group_online','old_new_2026','registration_term2_2026','teacher_2026','books_received','final_result','level_reached_2026','suitable_level_2026','mother_phone','father_phone','other_phone','residence','home_address','road','complex_name','installment_type','installment1','installment2','installment3','installment4','installment5'];
-  var body = {};
-  for (var i=0; i<ids.length; i++) {
-    var el = document.getElementById('sr_'+ids[i]);
-    if (el) body[ids[i]] = el.value;
-  }
-  fetch('/api/students/'+_srCurrentId, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.ok) {
-        // Refresh the card with the latest details.
-        srPick(_srCurrentId);
-        // Also refresh our local students cache so the result list stays accurate.
-        fetch('/api/students').then(function(r){return r.json();}).then(function(data){ _srStudents = data.students || []; });
-      } else {
-        alert(d.error || '\u062D\u062F\u062B \u062E\u0637\u0623');
-      }
-    })
-    .catch(function(){ alert('\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644'); });
-}
+function srSave(){ _srTrySave(); }  /* backward-compat shim */
 </script>
 
 <style>
@@ -3762,6 +4053,7 @@ function pmFilter(){
   document.querySelectorAll("#pm-tbody tr").forEach(function(tr){var n=_norm((tr.dataset.name||"").toLowerCase());tr.style.display=n.includes(q)?"":"none";});
 }
 </script>
+<div id="srm-type-modal" class="srm-type-bg"><div class="srm-type-box"><h3 id="srm-type-title">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</h3><p id="srm-type-msg"></p><span class="srm-type-expected" id="srm-type-expected"></span><input class="srm-type-input" id="srm-type-input" type="text" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x643;&#x645;&#x627; &#x647;&#x648;"><div class="srm-type-actions"><button class="srm-btn-delete" id="srm-type-yes">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</button><button class="srm-btn-cancel-edit" id="srm-type-no">&#x625;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div id="srm-log-modal" class="srm-log-bg"><div class="srm-log-box"><div class="srm-log-head">&#x1F4CB; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x63A;&#x64A;&#x64A;&#x631;&#x627;&#x62A; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x641;&#x638;</div><div class="srm-log-body" id="srm-log-body"></div><div class="srm-log-actions"><button class="srm-btn-save" id="srm-log-yes">&#x646;&#x639;&#x645;&#x60C; &#x627;&#x62D;&#x641;&#x638;</button><button class="srm-btn-cancel-edit" id="srm-log-no">&#x631;&#x627;&#x62C;&#x639; &#x645;&#x631;&#x629; &#x623;&#x62E;&#x631;&#x649;</button></div></div></div><div id="srm-auto-lock" class="srm-auto-lock-banner">&#x1F6AB; &#x62A;&#x645; &#x625;&#x644;&#x63A;&#x627;&#x621; &#x627;&#x644;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x628;&#x633;&#x628;&#x628; &#x639;&#x62F;&#x645; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;</div>
 </body>
 </html>"""
 ATTENDANCE_HTML = """<!DOCTYPE html>
