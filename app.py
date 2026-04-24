@@ -10128,18 +10128,23 @@ def api_unified_set_column_type(tid):
 @app.route('/api/custom-table/<tid>/delete-column/<col_name>', methods=['DELETE'])
 @login_required
 def api_unified_delete_column(tid, col_name):
-    """Drop a column from a table and clean up its label row.
+    """Drop a column and clean up its label row. The route forks at the
+    start based on tid:
 
-    Sequence (per spec):
-      1. Resolve col_name to an internal safe identifier — if the client
-         sent an Arabic display label, look it up in labels_table.
-      2. Confirm the column actually exists in the live schema.
-      3. Snapshot + delete the label row.
-      4. Run ALTER TABLE … DROP COLUMN. If it raises, re-insert the
-         snapshotted label row (our best approximation of a rollback
-         since the psycopg2 connection runs in autocommit) and return
-         the DB error so the UI can surface it.
+      * numeric tid → CUSTOM table. Backed by custom_table_cols +
+        custom_table_rows (row_data JSON). There is no SQL column to
+        drop; we delete the row in custom_table_cols AND strip the
+        key from every row_data JSON blob.
+
+      * string tid → BUILT-IN table (students, student_groups, etc.).
+        A real SQL table. Run ALTER TABLE DROP COLUMN, with label
+        snapshot + rollback if the ALTER fails.
+
+    Both paths return ok:True only after the column is CONFIRMED gone.
     """
+    tid_str = str(tid or "").strip()
+    is_custom = tid_str.isdigit()
+
     db_table, labels_table = _resolve_table(tid)
     if not db_table:
         return jsonify({"ok": False, "error": "table not found"}), 404
@@ -10199,23 +10204,106 @@ def api_unified_delete_column(tid, col_name):
             }), 400
         col_name = resolved
 
-    # ---- 2) Confirm the column exists on the live table ----
+    # ---- 2a) CUSTOM-TABLE path ----
+    # These live in custom_table_cols (schema) + custom_table_rows
+    # (row_data JSON). Delete the col_key row then scrub the key from
+    # every row_data blob. No ALTER TABLE — db_table is virtual.
+    if is_custom:
+        try:
+            table_id = int(tid_str)
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid custom table id"}), 400
+        row = db.execute(
+            "SELECT id, col_label, col_order, col_type, col_options "
+            "FROM custom_table_cols WHERE table_id=? AND col_key=?",
+            (table_id, col_name),
+        ).fetchone()
+        if not row:
+            return jsonify({
+                "ok": False,
+                "error": "column not found in custom_table_cols",
+                "col_key": col_name,
+            }), 404
+        try:
+            db.execute(
+                "DELETE FROM custom_table_cols WHERE table_id=? AND col_key=?",
+                (table_id, col_name),
+            )
+        except Exception as ex:
+            return jsonify({"ok": False, "error": "could not delete column definition: " + str(ex)}), 500
+        # Strip the key from every row_data JSON. Do this BEFORE committing
+        # anywhere sensitive because if JSON parsing throws we still want
+        # the cols row gone.
+        import json as _json
+        try:
+            rows = db.execute(
+                "SELECT id, row_data FROM custom_table_rows WHERE table_id=?",
+                (table_id,),
+            ).fetchall()
+            scrubbed = 0
+            for r in rows:
+                rid = r[0]
+                raw = r[1] or "{}"
+                try:
+                    data = _json.loads(raw) if isinstance(raw, str) else dict(raw or {})
+                except Exception:
+                    data = {}
+                if col_name in data:
+                    data.pop(col_name, None)
+                    db.execute(
+                        "UPDATE custom_table_rows SET row_data=? WHERE id=?",
+                        (_json.dumps(data, ensure_ascii=False), rid),
+                    )
+                    scrubbed += 1
+            db.commit()
+        except Exception as ex:
+            return jsonify({
+                "ok": False,
+                "error": "column definition removed but row scrub failed: " + str(ex),
+                "col_key": col_name,
+            }), 500
+        # Confirm the column definition is really gone.
+        still_there = db.execute(
+            "SELECT 1 FROM custom_table_cols WHERE table_id=? AND col_key=?",
+            (table_id, col_name),
+        ).fetchone()
+        if still_there:
+            return jsonify({
+                "ok": False,
+                "error": "custom_table_cols row still present after delete",
+            }), 500
+        return jsonify({"ok": True, "col_key": col_name, "rows_scrubbed": scrubbed})
+
+    # ---- 2b) BUILT-IN path: confirm the column is a real SQL column ----
     try:
         live_cols = {r[1] for r in db.execute(
             "PRAGMA table_info(" + db_table + ")"
         ).fetchall()}
     except Exception as ex:
         return jsonify({"ok": False, "error": "could not read schema: " + str(ex)}), 500
+    if not live_cols:
+        # Empty schema read — either the table doesn't exist or the
+        # PG translator hit a case it can't handle. Refuse rather than
+        # silently succeeding; a genuine empty table has at least `id`.
+        return jsonify({
+            "ok": False,
+            "error": "could not read schema (no columns reported)",
+            "table": db_table,
+        }), 500
     if col_name not in live_cols:
-        # Already gone — treat as success but make sure no stale label row
-        # remains that would otherwise re-appear as a ghost column.
+        # Genuinely absent — clean up any stale label row but report
+        # the outcome clearly rather than faking a success.
         if labels_table:
             try:
                 db.execute("DELETE FROM " + labels_table + " WHERE col_key=?", (col_name,))
             except Exception:
                 pass
         db.commit()
-        return jsonify({"ok": True, "col_key": col_name, "note": "column already absent"})
+        return jsonify({
+            "ok": True,
+            "col_key": col_name,
+            "note": "column was not present in the table schema",
+        })
 
     # ---- 3) Snapshot + delete label row ----
     label_snapshot = None
