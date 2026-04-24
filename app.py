@@ -406,6 +406,42 @@ def init_db():
         is_visible INTEGER DEFAULT 1,
         col_type TEXT DEFAULT 'نص',
         col_options TEXT DEFAULT '')""")
+    db.execute("""CREATE TABLE IF NOT EXISTS settings(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page TEXT NOT NULL,
+        component TEXT NOT NULL,
+        label TEXT NOT NULL,
+        value TEXT DEFAULT '',
+        value_type TEXT DEFAULT 'table_column',
+        UNIQUE(page, component)
+    )""")
+    # Seed default settings only if table is empty.
+    try:
+        if db.execute("SELECT COUNT(*) FROM settings").fetchone()[0] == 0:
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'groups_table', 'جدول المجموعات', 'student_groups'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'groups_column', 'عمود اسم المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'students_table', 'جدول الطلاب', 'students'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_name_column', 'عمود اسم الطالب', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_phone_column', 'عمود رقم الواتساب', 'whatsapp'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'groups_table', 'جدول المجموعات', 'student_groups'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'groups_column', 'عمود المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'students_table', 'جدول الطلاب', 'students'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'name_column', 'عمود الاسم', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'phone_column', 'عمود الواتساب', 'whatsapp'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'table', 'جدول الدفع', 'taqseet'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'name_column', 'عمود الاسم', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'amount_column', 'عمود المبلغ', 'course_amount'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'groups_table', 'جدول المجموعات', 'student_groups'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'groups_column', 'عمود المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_table', 'جدول الطلاب', 'students'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'groups_table', 'جدول المجموعات', 'student_groups'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'attendance_table', 'جدول الغياب', 'attendance'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'payment_table', 'جدول الدفع', 'taqseet'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('database', 'visible_tables', 'الجداول الظاهرة', 'all'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'table', 'جدول المجموعات', 'student_groups'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'))
+    except Exception:
+        pass
     db.commit()
     db.close()
 
@@ -825,8 +861,239 @@ if True:
             pass
         db2.commit()
 
+    # Settings table — lets admins remap table/column references without code edits.
+    db2.execute("""CREATE TABLE IF NOT EXISTS settings(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page TEXT NOT NULL,
+        component TEXT NOT NULL,
+        label TEXT NOT NULL,
+        value TEXT DEFAULT '',
+        value_type TEXT DEFAULT 'table_column',
+        UNIQUE(page, component)
+    )""")
+    if "settings_seed_v1" not in applied:
+        _seed = [
+            ('attendance', 'groups_table', 'جدول المجموعات', 'student_groups'),
+            ('attendance', 'groups_column', 'عمود اسم المجموعة', 'group_name'),
+            ('attendance', 'students_table', 'جدول الطلاب', 'students'),
+            ('attendance', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('attendance', 'student_phone_column', 'عمود رقم الواتساب', 'whatsapp'),
+            ('messaging', 'groups_table', 'جدول المجموعات', 'student_groups'),
+            ('messaging', 'groups_column', 'عمود المجموعة', 'group_name'),
+            ('messaging', 'students_table', 'جدول الطلاب', 'students'),
+            ('messaging', 'name_column', 'عمود الاسم', 'student_name'),
+            ('messaging', 'phone_column', 'عمود الواتساب', 'whatsapp'),
+            ('payment', 'table', 'جدول الدفع', 'taqseet'),
+            ('payment', 'name_column', 'عمود الاسم', 'student_name'),
+            ('payment', 'amount_column', 'عمود المبلغ', 'course_amount'),
+            ('payment', 'groups_table', 'جدول المجموعات', 'student_groups'),
+            ('payment', 'groups_column', 'عمود المجموعة', 'group_name'),
+            ('dashboard', 'students_table', 'جدول الطلاب', 'students'),
+            ('dashboard', 'groups_table', 'جدول المجموعات', 'student_groups'),
+            ('dashboard', 'attendance_table', 'جدول الغياب', 'attendance'),
+            ('dashboard', 'payment_table', 'جدول الدفع', 'taqseet'),
+            ('database', 'visible_tables', 'الجداول الظاهرة', 'all'),
+            ('groups', 'table', 'جدول المجموعات', 'student_groups'),
+            ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'),
+        ]
+        for _p, _c, _lbl, _v in _seed:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                    "ON CONFLICT(page,component) DO NOTHING",
+                    (_p, _c, _lbl, _v),
+                )
+            except Exception:
+                try:
+                    db2.execute(
+                        "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                        (_p, _c, _lbl, _v),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("settings_seed_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     db2.commit()
     db2.close()
+
+SETTINGS_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الإعدادات — Mindex</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:linear-gradient(135deg,#e3f2fd,#ede7f6);min-height:100vh;padding:20px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 24px;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(107,63,160,0.25);}
+.topbar h1{font-size:1.4rem;}
+.topbar a{color:#fff;background:rgba(255,255,255,0.2);padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:700;}
+.main{max-width:1100px;margin:0 auto;}
+.page-block{background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
+.page-block h2{color:#6B3FA0;border-bottom:2px solid #ede7f6;padding-bottom:8px;margin-bottom:14px;font-size:1.15rem;}
+.row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5;flex-wrap:wrap;}
+.row:last-child{border-bottom:none;}
+.row-label{min-width:180px;font-weight:700;color:#333;}
+.row-value{flex:1;min-width:200px;}
+.row select, .row input{padding:8px 12px;border:1.5px solid #bbdefb;border-radius:9px;font-size:14px;background:#f0f7ff;min-width:160px;}
+.row button{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:8px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:14px;}
+.row button:hover{opacity:0.9;}
+.row button:disabled{background:#b0bec5;cursor:default;}
+.tag{background:#ede7f6;color:#6B3FA0;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700;}
+.loading{text-align:center;color:#999;padding:40px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>⚙ الإعدادات العامة</h1>
+  <a href="/settings" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:11px 22px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;margin-left:8px;display:inline-block;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard">← الرئيسية</a>
+</div>
+<div class="main">
+  <div id="settingsContainer" class="loading">جاري التحميل...</div>
+</div>
+<script>
+var ALL_TABLES = [];
+var PAGE_TITLES = {
+  attendance: '📅 الغياب',
+  messaging:  '✉ الرسائل',
+  payment:    '💰 الدفع',
+  dashboard:  '📊 الداشبورد',
+  database:   '🗄 قاعدة البيانات',
+  groups:     '👥 المجموعات'
+};
+
+function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function loadAll() {
+  Promise.all([
+    fetch('/api/settings/tables',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/settings',{credentials:'include'}).then(function(r){return r.json();})
+  ]).then(function(res){
+    ALL_TABLES = (res[0].tables || []);
+    renderAll(res[1].settings || {});
+  }).catch(function(){
+    document.getElementById('settingsContainer').textContent = 'خطأ في التحميل';
+  });
+}
+
+function renderAll(settingsByPage) {
+  var html = '';
+  var pageKeys = Object.keys(PAGE_TITLES).concat(Object.keys(settingsByPage).filter(function(k){ return !(k in PAGE_TITLES); }));
+  var seen = {};
+  pageKeys.forEach(function(p){
+    if (seen[p]) return; seen[p] = true;
+    var items = settingsByPage[p] || [];
+    html += '<div class="page-block"><h2>' + (PAGE_TITLES[p] || p) + '</h2>';
+    if (!items.length) {
+      html += '<p style="color:#999;padding:8px;">لا توجد إعدادات لهذه الصفحة بعد.</p>';
+    } else {
+      items.forEach(function(s, idx){
+        var rid = 'set_' + p + '_' + s.component;
+        html += '<div class="row" id="' + rid + '">';
+        html += '<div class="row-label">' + s.label + '</div>';
+        html += '<div class="row-value">';
+        // Table dropdown — for all settings, user picks from the live table list.
+        html += '<select data-role="tbl" onchange="_onTblChange(this)">';
+        html += '<option value="">— اختر جدول —</option>';
+        html += '<option value="all"' + (s.value === 'all' ? ' selected' : '') + '>الكل</option>';
+        for (var i=0;i<ALL_TABLES.length;i++){
+          var t = ALL_TABLES[i];
+          html += '<option value="' + escAttr(t) + '"' + (s.value === t ? ' selected' : '') + '>' + t + '</option>';
+        }
+        html += '</select>';
+        // If the component key contains "column", we also show a column dropdown next to it.
+        // The column dropdown reflects the columns of the currently-selected table; but because
+        // a setting holds a single value, the value here IS the current column selection when
+        // this component is a column one. Otherwise the column dropdown is hidden.
+        var isCol = s.component.indexOf('column') >= 0 || s.component.endsWith('_col');
+        html += '<select data-role="col" style="' + (isCol?'':'display:none;') + '"><option value="">— اختر عمود —</option></select>';
+        html += '</div>';
+        html += '<div class="tag">' + s.component + '</div>';
+        html += '<button onclick="_save(this,\\'' + p + '\\',\\'' + s.component + '\\',' + (isCol ? '1' : '0') + ')">💾 حفظ</button>';
+        html += '<span class="_status" style="color:#43A047;font-size:13px;margin-right:6px;"></span>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+  });
+  document.getElementById('settingsContainer').className = '';
+  document.getElementById('settingsContainer').innerHTML = html;
+  // After render, for each column-type setting, fetch its current table's columns
+  // and preselect the column value.
+  for (var p2 in settingsByPage) {
+    (settingsByPage[p2] || []).forEach(function(s){
+      if (s.component.indexOf('column') < 0 && !s.component.endsWith('_col')) return;
+      // The value of a column setting IS the column name; the corresponding
+      // "table" selection for this dropdown is… the related table setting.
+      // Heuristic: find a sibling setting whose component ends in 'table'.
+      var siblings = settingsByPage[p2] || [];
+      var tblValue = null;
+      // Pair 'X_column' with 'X_table' if present; else with the first 'table' component.
+      var prefix = s.component.replace(/_column$/, '').replace(/_col$/, '');
+      var paired = siblings.find(function(x){ return x.component === prefix + '_table'; })
+                || siblings.find(function(x){ return x.component === 'table'; })
+                || siblings.find(function(x){ return x.component.indexOf('table') >= 0; });
+      if (paired) tblValue = paired.value;
+      var rid = 'set_' + p2 + '_' + s.component;
+      var row = document.getElementById(rid);
+      if (!row) return;
+      var tblSel = row.querySelector('select[data-role=tbl]');
+      var colSel = row.querySelector('select[data-role=col]');
+      if (tblSel && tblValue) tblSel.value = tblValue;
+      if (tblSel && colSel) _fetchCols(tblSel.value, colSel, s.value);
+    });
+  }
+}
+
+function _onTblChange(sel) {
+  var row = sel.closest('.row');
+  var colSel = row.querySelector('select[data-role=col]');
+  if (!colSel) return;
+  _fetchCols(sel.value, colSel, '');
+}
+function _fetchCols(tbl, colSel, preselect) {
+  if (!tbl || tbl === 'all') { colSel.innerHTML = '<option value="">—</option>'; return; }
+  fetch('/api/settings/columns/' + encodeURIComponent(tbl), {credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var cols = d.columns || [];
+      var html = '<option value="">— اختر عمود —</option>';
+      for (var i=0;i<cols.length;i++){
+        var c = cols[i];
+        var sel = (preselect && c === preselect) ? ' selected' : '';
+        html += '<option value="' + escAttr(c) + '"' + sel + '>' + c + '</option>';
+      }
+      colSel.innerHTML = html;
+    });
+}
+function _save(btn, page, component, isCol) {
+  var row = btn.closest('.row');
+  var tblSel = row.querySelector('select[data-role=tbl]');
+  var colSel = row.querySelector('select[data-role=col]');
+  var value = isCol ? (colSel.value || '') : (tblSel.value || '');
+  btn.disabled = true;
+  fetch('/api/settings', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({page: page, component: component, value: value})
+  }).then(function(r){return r.json();}).then(function(d){
+    btn.disabled = false;
+    var st = row.querySelector('._status');
+    if (st) { st.textContent = d.ok ? '✓' : (d.error || 'خطأ'); st.style.color = d.ok ? '#43A047' : '#c62828';
+              setTimeout(function(){ st.textContent = ''; }, 1800); }
+  }).catch(function(){ btn.disabled = false; });
+}
+
+loadAll();
+</script>
+</body>
+</html>"""
+
 
 def login_required(f):
     @wraps(f)
@@ -978,6 +1245,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
   <div class="dh-topbar-right">
     <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
+    <a href="/settings" class="dh-logout" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
     <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
   </div>
 </div>
@@ -2860,7 +3128,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 <body>
 <div class="topbar">
   <h1>&#128197; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</h1>
-  <a href="/dashboard" class="btn-back">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
+  <a href="/settings" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:11px 22px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;margin-left:8px;display:inline-block;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-back">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
 </div>
 <div class="main">
   <div class="card">
@@ -3461,7 +3729,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 <body>
 <div class="topbar">
   <h1>&#x627;&#x644;&#x635;&#x641;&#x62D;&#x629; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629; &#x644;&#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</h1>
-  <a href="/dashboard" class="btn-home">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
+  <a href="/settings" class="btn-home" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-home">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
 </div>
 <div class="main">
   <div class="page-title-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -7495,6 +7763,126 @@ def _is_safe_ident(s):
     return bool(s and _re.match(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$', s))
 
 
+# ─── Dynamic Configuration System ─────────────────────────────────────────
+# Reads settings rows to remap table/column references across the app.
+# Never raises — falls back to the caller-provided default if the settings
+# row is missing or the DB is in an incomplete state.
+def get_setting(page, component, default=''):
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM settings WHERE page=? AND component=?",
+            (page, component),
+        ).fetchone()
+        if row is None:
+            return default
+        v = row[0] if hasattr(row, '__getitem__') else None
+        if v is None or v == '':
+            return default
+        return v
+    except Exception:
+        return default
+
+
+def get_all_tables():
+    """List every user-visible table in the live DB."""
+    try:
+        db = get_db()
+        if USE_PG:
+            rows = db.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE' "
+                "ORDER BY table_name"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+def get_table_columns(table_name):
+    """List every column in the given table. Safe-name validated."""
+    if not _is_safe_ident(table_name):
+        return []
+    try:
+        db = get_db()
+        rows = db.execute("PRAGMA table_info(" + table_name + ")").fetchall()
+        return [r[1] for r in rows]
+    except Exception:
+        return []
+
+
+@app.route('/api/settings', methods=['GET'])
+@login_required
+def api_settings_get():
+    try:
+        db = get_db()
+        rows = db.execute(
+            "SELECT page, component, label, value, value_type FROM settings "
+            "ORDER BY page, id"
+        ).fetchall()
+        by_page = {}
+        for r in rows:
+            p = r[0] if hasattr(r, '__getitem__') else ''
+            by_page.setdefault(p, []).append({
+                "page": r[0],
+                "component": r[1],
+                "label": r[2],
+                "value": r[3] or '',
+                "value_type": r[4] or 'table_column',
+            })
+        return jsonify({"ok": True, "settings": by_page})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/settings', methods=['PATCH'])
+@login_required
+def api_settings_patch():
+    d = request.get_json() or {}
+    page = (d.get('page') or '').strip()
+    component = (d.get('component') or '').strip()
+    value = d.get('value')
+    value = '' if value is None else str(value).strip()
+    if not page or not component:
+        return jsonify({"ok": False, "error": "page and component required"}), 400
+    try:
+        db = get_db()
+        cur = db.execute(
+            "UPDATE settings SET value=? WHERE page=? AND component=?",
+            (value, page, component),
+        )
+        if cur.rowcount == 0:
+            # Create if missing — label uses component name as fallback.
+            db.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                (page, component, component, value),
+            )
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/settings/tables', methods=['GET'])
+@login_required
+def api_settings_tables():
+    return jsonify({"ok": True, "tables": get_all_tables()})
+
+
+@app.route('/api/settings/columns/<table_name>', methods=['GET'])
+@login_required
+def api_settings_columns(table_name):
+    if not _is_safe_ident(table_name):
+        return jsonify({"ok": False, "error": "invalid table name"}), 400
+    return jsonify({"ok": True, "columns": get_table_columns(table_name)})
+
+
+
 @app.route('/api/custom-table/<tid>/columns', methods=['GET'])
 @login_required
 def api_unified_columns_get(tid):
@@ -8969,11 +9357,16 @@ def api_attendance_sessions():
 @app.route('/api/attendance/groups', methods=['GET'])
 @login_required
 def api_attendance_groups():
+    # Configurable via /settings → attendance.groups_table / groups_column.
+    tbl = get_setting('attendance', 'groups_table', 'attendance')
+    col = get_setting('attendance', 'groups_column', 'group_name')
+    if not _is_safe_ident(tbl) or not _is_safe_ident(col):
+        tbl, col = 'attendance', 'group_name'
     db = get_db()
     rows = db.execute(
-        "SELECT DISTINCT group_name FROM attendance "
-        "WHERE group_name IS NOT NULL AND group_name != '' "
-        "ORDER BY group_name"
+        "SELECT DISTINCT " + col + " FROM " + tbl + " "
+        "WHERE " + col + " IS NOT NULL AND " + col + " != '' "
+        "ORDER BY " + col
     ).fetchall()
     return jsonify([r[0] for r in rows])
 
@@ -9253,6 +9646,13 @@ def api_message_reminders_delete(rid):
     db.execute("DELETE FROM message_reminders WHERE id=?", (rid,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.route('/settings')
+@login_required
+def settings_page():
+    return SETTINGS_HTML
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

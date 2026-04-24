@@ -35,6 +35,26 @@ When adding a column, you must update **both** branches: the `CREATE TABLE` in `
 
 **Route layout.** `/` renders login and clears session; `/login` (POST) authenticates; `/dashboard`, `/database`, `/attendance`, `/groups` return their respective HTML blobs. All data endpoints are under `/api/*` and return JSON. See lines ~3026–4103 for the full route table.
 
+## Dynamic Configuration System
+
+**CRITICAL RULE:** Any new feature, button, dropdown, or page that references a table name or column name MUST:
+1. Read the reference via `get_setting(page, component, default)` with a sensible fallback default.
+2. Add its configuration entry to the `settings` table seed (both `init_db()` and the `settings_seed_v1` migration in the else branch) and — if applicable — surface it on the `/settings` page.
+3. Never hardcode table or column names directly in routes or HTML that serves data.
+
+This rule has no exceptions. The `settings` table stores `(page, component, label, value, value_type)` and is seeded on a fresh DB; the `/api/settings` endpoints read/write it and the `/settings` page is the admin UI.
+
+The helper API:
+- `get_setting(page, component, default)` — never raises; returns `default` on any error.
+- `get_all_tables()` — lists every `public` Postgres table (or `sqlite_master` table, locally).
+- `get_table_columns(table_name)` — `PRAGMA table_info` wrapper (safe-ident validated).
+- `GET /api/settings` — all settings grouped by page.
+- `PATCH /api/settings` — body `{page, component, value}` upserts one row.
+- `GET /api/settings/tables` — table list for the UI.
+- `GET /api/settings/columns/<table_name>` — columns for the dependent dropdown.
+
+Any SQL string that interpolates a value from `get_setting` MUST pass it through `_is_safe_ident(...)` and fall back to the hardcoded default on failure — `get_setting` does not do that validation itself.
+
 ## Working with Arabic text
 
 The UI is Arabic, RTL (`<html lang="ar" dir="rtl">`). Arabic strings in Python source are stored as HTML numeric entities (`&#x627;` etc.) inside the HTML blobs, and as `\uXXXX` JS escapes inside inline `<script>` blocks. This is deliberate — see commit `74b87ac` ("replace mojibake Arabic strings with Unicode escapes"). Do not paste raw Arabic into `app.py`; it gets mangled on Windows/Render round-trips. When adding new UI strings, use the existing escape style of the surrounding block.
