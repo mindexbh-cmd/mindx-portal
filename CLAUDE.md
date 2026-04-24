@@ -92,6 +92,30 @@ When adding any code that reads or writes `attendance.*`:
 3. Never compare dates with plain `=` — either normalise both sides first or use the loose filter-in-Python pattern shown in `api_attendance_check`.
 4. Status values must be canonical: `حاضر`, `غائب`, `متأخر`. Use `STATUS_REMAP` to fold imports.
 
+## Display labels (LABELS RULE)
+
+**LABELS RULE:** Users must NEVER see internal DB names. Always use Arabic display labels in UI. Internal names are only used in backend queries. Every new column or table must have an Arabic display name registered in the labels system.
+
+Label lookup precedence (all go through helpers in `app.py`):
+1. **Tables** — `_table_display_label(name)` reads `table_labels.tbl_label` first, then falls back to `BUILT_IN_TABLE_LABELS`, then the raw name.
+2. **Columns** — `_column_label_map(table)` merges the per-table `*_col_labels.col_label` row (for tables listed in `_LABELS_TABLE_FOR`) over `BUILT_IN_COLUMN_LABELS`, then the raw column name.
+3. **Entity decoding** — legacy rows stored labels as HTML numeric entities (`&#x627;...`). `_decode_arabic_entities()` unescapes them so `_esc()` on the JS side doesn't double-encode the `&`.
+
+Endpoints that now return `{name, label}` pairs instead of bare strings:
+- `GET /api/settings/tables` — table dropdowns in `/settings`.
+- `GET /api/settings/columns/<table_name>` — column dropdowns in `/settings`.
+- `GET /api/custom-table/<tid>/columns` — تعديل الجدول modal. Also returns `db_table_label` alongside `db_table`.
+
+**When adding a new table:**
+1. Add a row to `table_labels` (both `init_db()` seed and the `table_labels_seed_v1` migration block in the else-branch — same dual-write pattern as any other table).
+2. If the table has typed columns, also seed Arabic `col_label` rows in the corresponding `*_col_labels` table; otherwise append fallback entries to `BUILT_IN_COLUMN_LABELS` so every column renders Arabic in /settings and تعديل الجدول on day one.
+
+**When adding a new column:**
+1. Register a label via the per-table labels table (e.g. `INSERT INTO column_labels(col_key, col_label, ...)`) or add it to `BUILT_IN_COLUMN_LABELS`.
+2. Keep the internal name ASCII/snake_case; Arabic goes into the label column only.
+
+Never concatenate a raw column/table name into user-visible HTML. Route it through one of the helpers.
+
 ## Working with Arabic text
 
 The UI is Arabic, RTL (`<html lang="ar" dir="rtl">`). Arabic strings in Python source are stored as HTML numeric entities (`&#x627;` etc.) inside the HTML blobs, and as `\uXXXX` JS escapes inside inline `<script>` blocks. This is deliberate — see commit `74b87ac` ("replace mojibake Arabic strings with Unicode escapes"). Do not paste raw Arabic into `app.py`; it gets mangled on Windows/Render round-trips. When adding new UI strings, use the existing escape style of the surrounding block.

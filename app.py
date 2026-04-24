@@ -398,6 +398,10 @@ def init_db():
         payment_status TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS table_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tbl_name TEXT UNIQUE,
+        tbl_label TEXT)""")
     db.execute("""CREATE TABLE IF NOT EXISTS paylog_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
@@ -406,6 +410,26 @@ def init_db():
         is_visible INTEGER DEFAULT 1,
         col_type TEXT DEFAULT 'نص',
         col_options TEXT DEFAULT '')""")
+    # Seed built-in Arabic table labels on a fresh DB.
+    for _tn, _tl in [
+        ("students",         "قاعدة بيانات الطلبة"),
+        ("student_groups",   "المجموعات"),
+        ("attendance",       "سجل الغياب"),
+        ("taqseet",          "جدول التقسيط"),
+        ("evaluations",      "التقييمات"),
+        ("payment_log",      "سجل الدفع"),
+        ("student_payments", "دفعات الطلبة"),
+        ("session_durations","مدة الحصص"),
+        ("message_templates","قوالب الرسائل"),
+        ("message_log",      "سجل الرسائل"),
+        ("message_reminders","تذكيرات الرسائل"),
+        ("users",            "المستخدمون"),
+        ("settings",         "الإعدادات"),
+    ]:
+        try:
+            db.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)", (_tn, _tl))
+        except Exception:
+            pass
     db.execute("""CREATE TABLE IF NOT EXISTS settings(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         page TEXT NOT NULL,
@@ -1091,6 +1115,47 @@ if True:
             pass
         db2.commit()
 
+    # Ensure table_labels table exists for every DB, then seed built-in
+    # display names so the settings page / تعديل الجدول modal never shows
+    # raw DB identifiers like "students" or "group_name_student".
+    db2.execute("""CREATE TABLE IF NOT EXISTS table_labels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tbl_name TEXT UNIQUE,
+        tbl_label TEXT)""")
+    if "table_labels_seed_v1" not in applied:
+        built_in_tbl_labels = [
+            ("students",         "قاعدة بيانات الطلبة"),
+            ("student_groups",   "المجموعات"),
+            ("attendance",       "سجل الغياب"),
+            ("taqseet",          "جدول التقسيط"),
+            ("evaluations",      "التقييمات"),
+            ("payment_log",      "سجل الدفع"),
+            ("student_payments", "دفعات الطلبة"),
+            ("session_durations","مدة الحصص"),
+            ("message_templates","قوالب الرسائل"),
+            ("message_log",      "سجل الرسائل"),
+            ("message_reminders","تذكيرات الرسائل"),
+            ("users",            "المستخدمون"),
+            ("settings",         "الإعدادات"),
+        ]
+        for n, lbl in built_in_tbl_labels:
+            try:
+                db2.execute(
+                    "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                    "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                    (n, lbl),
+                )
+            except Exception:
+                try:
+                    db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)", (n, lbl))
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("table_labels_seed_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # ── Attendance data normalization (one-shot) ─────────────────────
     # Legacy imports wrote attendance_date as "31/1-2026م", "9/2/2026م",
     # and similar, so the attendance page never matched the ISO date the
@@ -1394,9 +1459,10 @@ function renderPage(page){
     right += '<option value="">— جدول —</option>';
     right += '<option value="all"' + (s.value === 'all' ? ' selected' : '') + '>الكل</option>';
     for (var ti=0; ti<ALL_TABLES.length; ti++){
-      var tn = ALL_TABLES[ti];
+      var tn = ALL_TABLES[ti].name;
+      var tl = ALL_TABLES[ti].label || tn;
       var sel = (!isCol && s.value === tn) ? ' selected' : '';
-      right += '<option value="' + escAttr(tn) + '"' + sel + '>' + tn + '</option>';
+      right += '<option value="' + escAttr(tn) + '"' + sel + '>' + tl + '</option>';
     }
     right += '</select>';
     if (isCol){
@@ -1458,8 +1524,10 @@ function fillCols(colSel, cols, preselect){
   var html = '<option value="">— عمود —</option>';
   for (var i=0;i<cols.length;i++){
     var c = cols[i];
-    var sel = (preselect && c === preselect) ? ' selected' : '';
-    html += '<option value="' + escAttr(c) + '"' + sel + '>' + c + '</option>';
+    var n = (c && typeof c === 'object') ? c.name  : String(c);
+    var l = (c && typeof c === 'object') ? (c.label || c.name) : String(c);
+    var sel = (preselect && n === preselect) ? ' selected' : '';
+    html += '<option value="' + escAttr(n) + '"' + sel + '>' + l + '</option>';
   }
   colSel.innerHTML = html;
 }
@@ -9159,10 +9227,212 @@ def api_settings_patch():
         return jsonify({"ok": False, "error": str(ex)}), 400
 
 
+# ─── Arabic display labels for tables / columns ─────────────────────
+# LABELS RULE (see CLAUDE.md): users must NEVER see internal DB names
+# like "students" or "group_name_student" in any dropdown, form, or
+# table-edit modal. Every surface that renders a table or column name
+# pulls its display label from table_labels / the per-table *_col_labels
+# table, falling back to these built-in dicts, and only finally to the
+# raw identifier.
+
+BUILT_IN_TABLE_LABELS = {
+    "students":          "قاعدة بيانات الطلبة",
+    "student_groups":    "المجموعات",
+    "attendance":        "سجل الغياب",
+    "taqseet":           "جدول التقسيط",
+    "evaluations":       "التقييمات",
+    "payment_log":       "سجل الدفع",
+    "student_payments":  "دفعات الطلبة",
+    "session_durations": "مدة الحصص",
+    "message_templates": "قوالب الرسائل",
+    "message_log":       "سجل الرسائل",
+    "message_reminders": "تذكيرات الرسائل",
+    "users":             "المستخدمون",
+    "settings":          "الإعدادات",
+    "schema_migrations": "سجل الترقيات",
+    "table_labels":      "تسميات الجداول",
+    "column_labels":     "تسميات أعمدة الطلبة",
+    "group_col_labels":  "تسميات أعمدة المجموعات",
+    "att_col_labels":    "تسميات أعمدة الغياب",
+    "eval_col_labels":   "تسميات أعمدة التقييمات",
+    "paylog_col_labels": "تسميات أعمدة سجل الدفع",
+    "taqseet_col_labels":"تسميات أعمدة التقسيط",
+    "custom_tables":     "الجداول المخصّصة",
+    "custom_table_cols": "أعمدة الجداول المخصّصة",
+    "custom_table_rows": "صفوف الجداول المخصّصة",
+}
+
+# Common column identifier → Arabic label. Used for tables that have no
+# dedicated *_col_labels row. Specific-column entries from the per-table
+# labels table always win over this fallback.
+BUILT_IN_COLUMN_LABELS = {
+    "id":                "المعرّف",
+    "created_at":        "تاريخ الإنشاء",
+    "personal_id":       "الرقم الشخصي",
+    "student_name":      "اسم الطالب",
+    "student_whatsapp":  "واتساب الطالب",
+    "whatsapp":          "هاتف الواتساب",
+    "phone":             "الهاتف",
+    "mother_phone":      "هاتف الأم",
+    "father_phone":      "هاتف الأب",
+    "other_phone":       "هاتف آخر",
+    "class_name":        "الصف",
+    "teacher_name":      "اسم المدرّس",
+    "teacher_2026":      "المدرّس 2026",
+    "group_name":        "المجموعة",
+    "group_name_student":"مجموعة الطالب",
+    "group_online":      "المجموعة (أونلاين)",
+    "group_link":        "رابط المجموعة",
+    "level_course":      "المستوى / المقرر",
+    "last_reached":      "آخر نقطة تم الوصول لها",
+    "study_time":        "وقت الدراسة",
+    "study_days":        "أيام الدراسة",
+    "ramadan_time":      "توقيت رمضان",
+    "online_time":       "توقيت الأونلاين",
+    "session_duration":  "مدة الحصة",
+    "session_date":      "تاريخ الجلسة",
+    "duration_minutes":  "المدة بالدقائق",
+    "session_type":      "نوع الحصة",
+    "attendance_date":   "تاريخ الغياب",
+    "day_name":          "اليوم",
+    "status":            "الحالة",
+    "contact_number":    "رقم التواصل",
+    "message":           "الرسالة",
+    "message_status":    "حالة الرسالة",
+    "study_status":      "حالة الدراسة",
+    "course_amount":     "مبلغ الدورة",
+    "num_installments":  "عدد الأقساط",
+    "taqseet_method":    "طريقة التقسيط",
+    "installment_type":  "نوع التقسيط",
+    "total_paid":        "المدفوع",
+    "total_remaining":   "المتبقي",
+    "payment_status":    "حالة الدفع",
+    "registration_status":"حالة التسجيل",
+    "start_date":        "تاريخ البداية",
+    "study_hours":       "ساعات الدراسة",
+    "total_required_hours":"إجمالي الساعات المستحقة",
+    "form_fill_date":    "تاريخ التقييم",
+    "class_participation":"المشاركة الصفية",
+    "general_behavior":  "السلوك العام",
+    "behavior_notes":    "ملاحظات السلوك",
+    "reading":           "القراءة",
+    "dictation":         "الإملاء",
+    "term_meanings":     "معاني المصطلحات",
+    "conversation":      "المحادثة",
+    "expression":        "التعبير",
+    "grammar":           "القواعد",
+    "notes":             "ملاحظات",
+    "name":              "الاسم",
+    "category":          "التصنيف",
+    "content":           "المحتوى",
+    "template_name":     "اسم القالب",
+    "sent_at":           "وقت الإرسال",
+    "username":          "اسم المستخدم",
+    "password":          "كلمة المرور",
+    "role":              "الصلاحية",
+    "page":              "الصفحة",
+    "component":         "المكوّن",
+    "label":             "التسمية",
+    "value":             "القيمة",
+    "value_type":        "نوع القيمة",
+    "tbl_name":          "اسم الجدول",
+    "tbl_label":         "تسمية الجدول",
+    "col_key":           "مفتاح العمود",
+    "col_label":         "تسمية العمود",
+    "col_order":         "ترتيب العمود",
+    "col_type":          "نوع العمود",
+    "col_options":       "خيارات العمود",
+    "is_visible":        "مرئي",
+    "applied_at":        "تاريخ التطبيق",
+    "tag":               "الوسم",
+    "student_id":        "معرّف الطالب",
+    "inst_num":          "رقم القسط",
+    "price":             "السعر",
+    "paid":              "المدفوع",
+    "level_reached_2026":"إلى أين وصل 2026",
+    "suitable_level_2026":"مناسب للمستوى 2026",
+    "books_received":    "استلام الكتب",
+    "final_result":      "النتيجة النهائية",
+    "residence":         "مكان السكن",
+    "home_address":      "عنوان المنزل",
+    "road":              "الطريق",
+    "complex_name":      "المجمع",
+    "old_new_2026":      "قديم/جديد 2026",
+    "registration_term2_2026":"تسجيل الفصل الثاني 2026",
+}
+
+_LABELS_TABLE_FOR = {
+    "students":      "column_labels",
+    "student_groups":"group_col_labels",
+    "attendance":    "att_col_labels",
+    "evaluations":   "eval_col_labels",
+    "payment_log":   "paylog_col_labels",
+    "taqseet":       "taqseet_col_labels",
+}
+
+def _decode_arabic_entities(s):
+    """Convert HTML numeric entities like "&#x627;" to raw Arabic.
+    Labels seeded earlier in the project were stored as entity-encoded
+    strings; the UI now wants raw characters so _esc() doesn't double-
+    encode the leading `&`."""
+    if not s or "&#" not in s:
+        return s
+    try:
+        import html as _html
+        return _html.unescape(s)
+    except Exception:
+        return s
+
+def _table_display_label(name):
+    """Return the Arabic display label for a table, or the raw name."""
+    if not name:
+        return name
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT tbl_label FROM table_labels WHERE tbl_name=?", (name,)
+        ).fetchone()
+        if row and row[0]:
+            return _decode_arabic_entities(row[0])
+    except Exception:
+        pass
+    return BUILT_IN_TABLE_LABELS.get(name, name)
+
+def _column_label_map(table):
+    """Return {col_key: col_label} for every column of the given table.
+
+    Precedence: per-table labels table → BUILT_IN_COLUMN_LABELS → identity."""
+    out = {}
+    if not table or not _is_safe_ident(table):
+        return out
+    try:
+        cols = get_table_columns(table)
+    except Exception:
+        cols = []
+    for c in cols:
+        out[c] = BUILT_IN_COLUMN_LABELS.get(c, c)
+    lbl_tbl = _LABELS_TABLE_FOR.get(table)
+    if lbl_tbl:
+        try:
+            db = get_db()
+            rows = db.execute(
+                "SELECT col_key, col_label FROM " + lbl_tbl
+            ).fetchall()
+            for r in rows:
+                k = r[0]; v = _decode_arabic_entities(r[1])
+                if k and v:
+                    out[k] = v
+        except Exception:
+            pass
+    return out
+
+
 @app.route('/api/settings/tables', methods=['GET'])
 @login_required
 def api_settings_tables():
-    return jsonify({"ok": True, "tables": get_all_tables()})
+    names = get_all_tables()
+    tables = [{"name": n, "label": _table_display_label(n)} for n in names]
+    return jsonify({"ok": True, "tables": tables})
 
 
 @app.route('/api/settings/columns/<table_name>', methods=['GET'])
@@ -9170,7 +9440,10 @@ def api_settings_tables():
 def api_settings_columns(table_name):
     if not _is_safe_ident(table_name):
         return jsonify({"ok": False, "error": "invalid table name"}), 400
-    return jsonify({"ok": True, "columns": get_table_columns(table_name)})
+    cols = get_table_columns(table_name)
+    lbl_map = _column_label_map(table_name)
+    out = [{"name": c, "label": lbl_map.get(c, c)} for c in cols]
+    return jsonify({"ok": True, "columns": out})
 
 
 
@@ -9204,11 +9477,11 @@ def api_unified_columns_get(tid):
     default_type = "نص"
     out = [{
         "col_key": c,
-        "col_label": label_map.get(c) or c,
+        "col_label": _decode_arabic_entities(label_map.get(c)) or BUILT_IN_COLUMN_LABELS.get(c) or c,
         "col_type": type_map.get(c, default_type),
         "col_options": options_map.get(c, ""),
     } for c in live_cols]
-    return jsonify({"ok": True, "columns": out, "db_table": db_table})
+    return jsonify({"ok": True, "columns": out, "db_table": db_table, "db_table_label": _table_display_label(db_table)})
 
 
 @app.route('/api/custom-table/<tid>/add-column', methods=['POST'])
