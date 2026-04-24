@@ -13649,8 +13649,13 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     }
   }
 
-  function _mxHandleColumnDelete(table, colIdx, th){
-    var label = _mxGetColumnLabel(table, colIdx);
+  function _mxHandleColumnDelete(table, colIdx, th, btn){
+    /* Prefer the label stored on the button at wire time (data-col-
+       display). Fall back to reading the <th> label in the current
+       DOM if the button lacks it for any reason. Never derive the
+       label from a captured index — that's exactly the source of the
+       "✕ on column N actually deletes column M" bug. */
+    var label = (btn && btn.dataset && btn.dataset.colDisplay) || _mxGetColumnLabel(table, colIdx);
     var tid = _mxResolveTid(table);
     if (!tid){
       if (typeof window.mxToast === 'function') window.mxToast('تعذّر تحديد الجدول', 'error');
@@ -13658,7 +13663,10 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     }
     function doDelete(){
       _mxResolveColKey(tid, label, function(colKey){
-        var keyForDelete = colKey || label;  /* server falls back to label→key lookup */
+        /* Cache the internal name on the button itself so the next time
+           the user interacts with this column we don't re-query /columns. */
+        if (btn && colKey) btn.dataset.colInternal = colKey;
+        var keyForDelete = (btn && btn.dataset && btn.dataset.colInternal) || colKey || label;
         fetch('/api/custom-table/' + encodeURIComponent(tid) +
               '/delete-column/' + encodeURIComponent(keyForDelete), {
           method:'DELETE', credentials:'include'
@@ -13733,10 +13741,10 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       for (var i=0; i<ths.length; i++){
         var th = ths[i];
         if (th.classList.contains('bulk-col')) continue;
-        // Skip columns whose content is purely action buttons
-        // (identify by checking for an "إجراءات / Actions" heading).
+        // Skip columns whose content is purely action buttons.
         var txt = (th.textContent || '').replace(/🔽|✕/g, '').trim();
         var isSkipCol = /^(إجراءات|actions|Actions)$/.test(txt) || txt === '#';
+        var currentLabel = txt || '';   /* snapshot of the label text at wire time */
         // --- Filter button ---
         if (!th.querySelector('.mx-filter-btn') && !isSkipCol){
           var fbtn = document.createElement('button');
@@ -13744,13 +13752,20 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
           fbtn.className = 'mx-filter-btn';
           fbtn.title = 'فلتر';
           fbtn.textContent = '🔽';
-          fbtn.setAttribute('data-col-idx', i);
-          (function(tableRef, idxCap, btnRef){
-            btnRef.addEventListener('click', function(ev){
-              ev.stopPropagation();
-              _mxOpenFilterPanel(tableRef, idxCap, btnRef);
-            });
-          })(table, i, fbtn);
+          fbtn.dataset.colDisplay = currentLabel;
+          /* No captured index: resolved from the live DOM at click time
+             so column removals don't cause subsequent buttons to point
+             at the wrong column. */
+          fbtn.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            var btn = ev.currentTarget;
+            var thEl = btn.closest('th');
+            if (!thEl || !thEl.parentNode) return;
+            var tableEl = thEl.closest('table');
+            if (!tableEl) return;
+            var liveIdx = Array.prototype.indexOf.call(thEl.parentNode.children, thEl);
+            _mxOpenFilterPanel(tableEl, liveIdx, btn);
+          });
           th.appendChild(fbtn);
         }
         // --- Delete ✕ button (hover-reveal) ---
@@ -13760,14 +13775,23 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
           dbtn.className = 'mx-col-del-btn';
           dbtn.title = 'حذف العمود';
           dbtn.textContent = '✕';
-          dbtn.setAttribute('data-col-idx', i);
-          (function(tableRef, idxCap, thRef, btnRef){
-            btnRef.addEventListener('click', function(ev){
-              ev.stopPropagation();
-              ev.preventDefault();
-              _mxHandleColumnDelete(tableRef, idxCap, thRef);
-            });
-          })(table, i, th, dbtn);
+          // The spec calls for self-describing delete buttons. Each one
+          // knows its own display label; the internal col_key stays
+          // nullable until the resolve ladder fills it in on click.
+          dbtn.dataset.colDisplay = currentLabel;
+          dbtn.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            ev.preventDefault();
+            var btn = ev.currentTarget;
+            var thEl = btn.closest('th');
+            if (!thEl || !thEl.parentNode) return;
+            var tableEl = thEl.closest('table');
+            if (!tableEl) return;
+            /* Compute the CURRENT index of this <th> among its siblings
+               so prior column removals don't drift the target. */
+            var liveIdx = Array.prototype.indexOf.call(thEl.parentNode.children, thEl);
+            _mxHandleColumnDelete(tableEl, liveIdx, thEl, btn);
+          });
           th.appendChild(dbtn);
         }
       }
