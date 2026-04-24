@@ -74,6 +74,24 @@ Every table on the database page imports via `POST /api/import` with body `{tabl
 4. Add the refresh-hook names (e.g. `loadXxx`) to `TABLE_REFRESH_HOOKS` inside `MX_HELPERS_JS` so a successful import immediately repopulates the current page.
 5. If any **other** page references this table (dropdowns, stats, dashboards), verify those pages pull live from their API endpoint (not a cached JS global). Cross-page refresh is unnecessary because each page refetches on load; the rule exists to prevent stale in-page caches.
 
+## Attendance data format (ATTENDANCE RULE)
+
+**ATTENDANCE RULE:** All attendance records must store dates as `YYYY-MM-DD`, group names and student names must be stripped of extra spaces. The attendance page must use normalized comparison (whitespace-tolerant trim) when loading records, never exact string match.
+
+Root bug this rule prevents: the DB briefly shipped with dates written as `31/1-2026م` / `9/2/2026م` (Arabic era suffix, mixed separators). The `<input type="date">` in the attendance page always sends ISO `YYYY-MM-DD`, so the existing `WHERE attendance_date = ?` matched zero rows and the page showed blank dropdowns on groups that clearly had imported data.
+
+Guardrails now in place:
+- `_att_normalize_date(s)` — accepts every historic format (`D/M/YYYY`, `D/M-YYYYم`, `Y/M/D`, `DD-MM-YYYY`, etc.) and returns ISO `YYYY-MM-DD`.
+- `_import_normalize_value` routes any field in `DATE_FIELD_NAMES` through `_att_normalize_date`, so no future Excel row can re-introduce the problem.
+- `/api/attendance/check` fetches every row matching the trimmed group name, then filters by normalised date on the Python side. Legacy values written by a path that bypassed import still resolve correctly.
+- `att_normalize_v1` migration (in the else-branch of schema management, gated by `schema_migrations.tag`) rewrites every existing row's `attendance_date`, `group_name`, `student_name`, and `status` on first boot after deploy.
+
+When adding any code that reads or writes `attendance.*`:
+1. Store dates via `_att_normalize_date(value)`.
+2. Store group/student names via `" ".join(name.split())` (strip + collapse whitespace).
+3. Never compare dates with plain `=` — either normalise both sides first or use the loose filter-in-Python pattern shown in `api_attendance_check`.
+4. Status values must be canonical: `حاضر`, `غائب`, `متأخر`. Use `STATUS_REMAP` to fold imports.
+
 ## Working with Arabic text
 
 The UI is Arabic, RTL (`<html lang="ar" dir="rtl">`). Arabic strings in Python source are stored as HTML numeric entities (`&#x627;` etc.) inside the HTML blobs, and as `\uXXXX` JS escapes inside inline `<script>` blocks. This is deliberate — see commit `74b87ac` ("replace mojibake Arabic strings with Unicode escapes"). Do not paste raw Arabic into `app.py`; it gets mangled on Windows/Render round-trips. When adding new UI strings, use the existing escape style of the surrounding block.

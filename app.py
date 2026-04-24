@@ -1091,6 +1091,61 @@ if True:
             pass
         db2.commit()
 
+    # ── Attendance data normalization (one-shot) ─────────────────────
+    # Legacy imports wrote attendance_date as "31/1-2026م", "9/2/2026م",
+    # and similar, so the attendance page never matched the ISO date the
+    # <input type="date"> sends. Normalize every row here once, tagged
+    # `att_normalize_v1`. The prod DB was also migrated out-of-band, and
+    # that INSERT is gated by ON CONFLICT so re-running is harmless.
+    if "att_normalize_v1" not in applied:
+        try:
+            import re as _re_att
+            _STATUS_REMAP_MIG = {
+                "غياب":  "غائب",   # غياب  -> غائب
+                "تأخير": "متأخر", # تأخير -> متأخر
+                "حضور":  "حاضر",   # حضور  -> حاضر
+                "absent":  "غائب",
+                "late":    "متأخر",
+                "present": "حاضر",
+            }
+            def _mig_date(s):
+                if not s: return ""
+                s = str(s).strip()
+                if not s: return ""
+                nums = _re_att.findall(r"\d+", s)
+                if len(nums) < 3: return s
+                if len(nums[0]) == 4:
+                    y, m, d = nums[0], nums[1], nums[2]
+                elif len(nums[-1]) == 4:
+                    d, m, y = nums[0], nums[1], nums[-1]
+                else:
+                    d, m, y = nums[0], nums[1], nums[2]
+                    if len(y) == 2:
+                        y = ("20" + y) if int(y) < 70 else ("19" + y)
+                try:
+                    iy, im, id_ = int(y), int(m), int(d)
+                    if not (1 <= im <= 12 and 1 <= id_ <= 31): return s
+                    return "%04d-%02d-%02d" % (iy, im, id_)
+                except Exception:
+                    return s
+            rows = db2.execute("SELECT id, attendance_date, group_name, student_name, status FROM attendance").fetchall()
+            for r in rows:
+                rid = r[0]; d = r[1] or ""; g = r[2] or ""; n = r[3] or ""; st = r[4] or ""
+                new_d = _mig_date(d)
+                new_g = " ".join(g.split())
+                new_n = " ".join(n.split())
+                new_st_raw = st.strip()
+                new_st = _STATUS_REMAP_MIG.get(new_st_raw, new_st_raw)
+                if new_d != d or new_g != g or new_n != n or new_st != st:
+                    db2.execute(
+                        "UPDATE attendance SET attendance_date=?, group_name=?, student_name=?, status=? WHERE id=?",
+                        (new_d, new_g, new_n, new_st, rid)
+                    )
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("att_normalize_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     db2.commit()
     db2.close()
 
@@ -9466,6 +9521,44 @@ def api_groups_students():
         groups[gname] = [dict(s) for s in students]
     return jsonify(groups)
 
+def _att_normalize_date(s):
+    """Normalise any date representation the app has ever stored to ISO
+    YYYY-MM-DD. Handles:
+      - already ISO: "2026-04-01"
+      - D/M/YYYY:   "9/2/2026"
+      - mixed sep:  "31/1-2026" (slash then dash)
+      - D-M-YYYY:   "09-02-2026"
+      - Y/M/D:      "2026/02/09"
+      - trailing Arabic era marker like "م" or Latin punctuation
+    Any value the parser cannot interpret is returned unchanged so we
+    never lose data on a surprise format; use _att_normalize_ar on free
+    text."""
+    import re as _re_local
+    if not s:
+        return ""
+    s = str(s).strip()
+    if not s:
+        return ""
+    nums = _re_local.findall(r"\d+", s)
+    if len(nums) < 3:
+        return s
+    if len(nums[0]) == 4:
+        y, m, d = nums[0], nums[1], nums[2]
+    elif len(nums[-1]) == 4:
+        d, m, y = nums[0], nums[1], nums[-1]
+    else:
+        d, m, y = nums[0], nums[1], nums[2]
+        if len(y) == 2:
+            y = ("20" + y) if int(y) < 70 else ("19" + y)
+    try:
+        iy, im, id_ = int(y), int(m), int(d)
+        if not (1 <= im <= 12 and 1 <= id_ <= 31):
+            return s
+        return "%04d-%02d-%02d" % (iy, im, id_)
+    except Exception:
+        return s
+
+
 def _att_normalize_ar(s):
     """Loose Arabic string normalisation used to match imported roster names
     against attendance rows: trim, collapse whitespace runs, lowercase,
@@ -9504,15 +9597,20 @@ def api_attendance_check():
         return jsonify({"exists": False, "records": []})
     db = get_db()
 
-    # Match on trimmed values so a trailing space in imported data does not
-    # hide an otherwise-identical record.
-    rows = db.execute(
-        "SELECT * FROM attendance "
-        "WHERE TRIM(group_name)=TRIM(?) AND TRIM(attendance_date)=TRIM(?) "
-        "ORDER BY id ASC",
-        (group_name, att_date),
+    # Loose match: fetch every row for the trimmed group name, then filter
+    # in Python by normalised date + normalised name. This tolerates every
+    # date format the table has ever held (D/M/YYYY, D/M-YYYYم, ISO, ...)
+    # without requiring a full DB rewrite. The one-time migration runs at
+    # start-up, but this still guards against stray legacy values.
+    all_rows = db.execute(
+        "SELECT * FROM attendance WHERE TRIM(group_name)=TRIM(?) ORDER BY id ASC",
+        (group_name,),
     ).fetchall()
-    records = [dict(r) for r in rows]
+    target_date = _att_normalize_date(att_date)
+    records = []
+    for r in all_rows:
+        if _att_normalize_date(r["attendance_date"]) == target_date:
+            records.append(dict(r))
 
     # Enrich each record with personal_id looked up from the students table,
     # first by exact name inside the group, then by normalised-name fallback.
@@ -9910,10 +10008,24 @@ def _import_fold_whitespace(s):
     return " ".join(s.split())
 
 
+# Field names known to hold dates. Any value written to one of these is
+# coerced to ISO YYYY-MM-DD on import so the attendance page (and anything
+# else joining on date) always compares like-for-like.
+DATE_FIELD_NAMES = {
+    "attendance_date", "start_date", "form_fill_date",
+    "date1", "date2", "date3", "date4", "date5", "date6",
+    "date7", "date8", "date9", "date10", "date11", "date12",
+}
+
+
 def _import_normalize_value(table, field, value):
     s = _import_fold_whitespace(value)
     if not s:
         return s
+    if field in DATE_FIELD_NAMES:
+        iso = _att_normalize_date(s)
+        if iso:
+            s = iso
     if table == "attendance" and field == "status":
         # Fold canonical Arabic status variants (exact match or lowercased).
         s_key = s.strip()
