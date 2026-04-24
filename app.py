@@ -12746,6 +12746,11 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     '.mx-filter-btn{background:transparent;border:none;color:inherit;opacity:.55;font-size:10px;cursor:pointer;padding:2px 4px;margin-right:4px;border-radius:4px;vertical-align:middle;transition:opacity .15s ease,background .15s ease;}',
     '.mx-filter-btn:hover{opacity:1;background:rgba(255,255,255,.2);}',
     '.mx-filter-btn.active{opacity:1;color:#fff;background:#2196F3;box-shadow:0 0 0 2px rgba(33,150,243,.35);}',
+    /* Column-delete ✕ button — hidden until the header is hovered. */
+    '.mx-col-del-btn{background:transparent;border:none;color:#ffb3b3;opacity:0;font-size:12px;font-weight:900;cursor:pointer;padding:2px 6px;margin-right:3px;border-radius:4px;vertical-align:middle;transition:opacity .15s ease,background .15s ease,color .15s ease;line-height:1;}',
+    'th:hover .mx-col-del-btn{opacity:1;}',
+    '.mx-col-del-btn:hover{background:#e74c3c !important;color:#fff !important;opacity:1 !important;box-shadow:0 0 0 2px rgba(231,76,60,.35);}',
+    '@media (pointer:coarse){.mx-col-del-btn{opacity:.65;}}',
     '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
     '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
     '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
@@ -13306,6 +13311,121 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       _mxClosePanels();
     });
   }
+  /* Column-delete helpers ─────────────────────────────────────────
+   * Resolve a table to its "tid" (the key used by
+   * /api/custom-table/<tid>/*) by scanning the enclosing section for
+   * any onclick="openUniversalTableEditModal('<tid>')" — works for
+   * built-in ('students', 'groups', 'taqseet', 'attendance',
+   * 'evaluations', 'payment_log') and custom (numeric id) tables
+   * alike, since every section that permits column editing carries
+   * that button.
+   */
+  function _mxResolveTid(table){
+    var section = table.closest('.db-section, .custom-table-section');
+    if (!section) return null;
+    var el = section.querySelector('[onclick*="openUniversalTableEditModal"]');
+    if (!el) return null;
+    var m = (el.getAttribute('onclick') || '').match(/openUniversalTableEditModal\(['"]([^'"]+)['"]\)/);
+    return m ? m[1] : null;
+  }
+  var _MX_COLKEY_CACHE = {};   /* tid -> {label → col_key} */
+  function _mxResolveColKey(tid, label, cb){
+    label = (label || '').replace(/\s+/g, ' ').trim();
+    if (!tid || !label) { cb(null); return; }
+    var cache = _MX_COLKEY_CACHE[tid];
+    if (cache && label in cache) { cb(cache[label]); return; }
+    fetch('/api/custom-table/' + encodeURIComponent(tid) + '/columns', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok || !d.columns) { cb(null); return; }
+        var map = {};
+        d.columns.forEach(function(c){
+          var lbl = (c.col_label || '').replace(/\s+/g, ' ').trim();
+          if (lbl) map[lbl] = c.col_key;
+          map[c.col_key] = c.col_key;   /* allow fallback lookup by key */
+        });
+        _MX_COLKEY_CACHE[tid] = map;
+        cb(map[label] || null);
+      })
+      .catch(function(){ cb(null); });
+  }
+
+  /* Map table key → page-level reload function, to refresh the DOM
+     after a successful column drop. Custom tables have no known
+     loader here, so we remove the column out-of-band below. */
+  var _MX_TABLE_RELOADERS = {
+    'students':       ['loadStudents'],
+    'groups':         ['loadGroups2', 'loadGroups'],
+    'student_groups': ['loadGroups2', 'loadGroups'],
+    'attendance':     ['loadAttendance'],
+    'taqseet':        ['loadTaqseet'],
+    'evaluations':    ['loadEvals', 'loadEvaluations'],
+    'evals':          ['loadEvals', 'loadEvaluations'],
+    'payment_log':    ['loadPaylog', 'loadPaymentLog'],
+    'paylog':         ['loadPaylog', 'loadPaymentLog']
+  };
+  function _mxTriggerReload(tid){
+    var fns = _MX_TABLE_RELOADERS[tid] || [];
+    for (var i=0;i<fns.length;i++){
+      var f = window[fns[i]];
+      if (typeof f === 'function'){ try { f(); return true; } catch(e){} }
+    }
+    return false;
+  }
+  function _mxRemoveColumnFromDom(table, colIdx){
+    /* Rip the <th> and every cell at that index out of the table. A
+       best-effort fallback for custom tables that don't have a named
+       page loader. */
+    var headerRow = table.querySelector('thead tr');
+    if (headerRow && headerRow.children[colIdx]) headerRow.children[colIdx].remove();
+    var rows = table.querySelectorAll('tbody tr');
+    for (var i=0;i<rows.length;i++){
+      if (rows[i].children[colIdx]) rows[i].children[colIdx].remove();
+    }
+  }
+
+  function _mxHandleColumnDelete(table, colIdx, th){
+    var label = _mxGetColumnLabel(table, colIdx);
+    var tid = _mxResolveTid(table);
+    if (!tid){
+      if (typeof window.mxToast === 'function') window.mxToast('تعذّر تحديد الجدول', 'error');
+      return;
+    }
+    function doDelete(){
+      _mxResolveColKey(tid, label, function(colKey){
+        var keyForDelete = colKey || label;  /* server falls back to label→key lookup */
+        fetch('/api/custom-table/' + encodeURIComponent(tid) +
+              '/delete-column/' + encodeURIComponent(keyForDelete), {
+          method:'DELETE', credentials:'include'
+        }).then(function(r){ return r.json(); })
+          .then(function(d){
+            if (d && d.ok){
+              if (typeof window.mxToast === 'function') window.mxToast('تم حذف العمود بنجاح', 'success');
+              delete _MX_COLKEY_CACHE[tid];
+              /* Refresh the table contents; fall back to surgical DOM
+                 removal if the page has no named reloader. */
+              if (!_mxTriggerReload(tid)) _mxRemoveColumnFromDom(table, colIdx);
+            } else {
+              if (typeof window.mxToast === 'function')
+                window.mxToast((d && d.error) || 'تعذّر حذف العمود', 'error');
+            }
+          }).catch(function(){
+            if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
+          });
+      });
+    }
+    if (typeof window.mxConfirm === 'function'){
+      window.mxConfirm({
+        title: 'تأكيد حذف العمود',
+        message: 'هل أنت متأكد من حذف عمود "' + label + '"؟ سيتم حذف جميع البيانات في هذا العمود نهائياً ولا يمكن التراجع.',
+        yesText: 'نعم، احذف',
+        noText:  'إلغاء'
+      }, doDelete);
+    } else {
+      if (confirm('هل أنت متأكد من حذف عمود "' + label + '"؟')) doDelete();
+    }
+  }
+
   function wireColumnFilters(){
     document.querySelectorAll('.table-wrap table, .att-table-wrap table').forEach(function(table){
       var thead = table.querySelector('thead');
@@ -13317,24 +13437,43 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       for (var i=0; i<ths.length; i++){
         var th = ths[i];
         if (th.classList.contains('bulk-col')) continue;
-        if (th.querySelector('.mx-filter-btn')) continue;
         // Skip columns whose content is purely action buttons
         // (identify by checking for an "إجراءات / Actions" heading).
-        var txt = (th.textContent || '').trim();
-        if (/^(إجراءات|actions|Actions)$/.test(txt) || txt === '#') continue;
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mx-filter-btn';
-        btn.title = 'فلتر';
-        btn.textContent = '🔽';
-        btn.setAttribute('data-col-idx', i);
-        (function(tableRef, idxCap, btnRef){
-          btnRef.addEventListener('click', function(ev){
-            ev.stopPropagation();
-            _mxOpenFilterPanel(tableRef, idxCap, btnRef);
-          });
-        })(table, i, btn);
-        th.appendChild(btn);
+        var txt = (th.textContent || '').replace(/🔽|✕/g, '').trim();
+        var isSkipCol = /^(إجراءات|actions|Actions)$/.test(txt) || txt === '#';
+        // --- Filter button ---
+        if (!th.querySelector('.mx-filter-btn') && !isSkipCol){
+          var fbtn = document.createElement('button');
+          fbtn.type = 'button';
+          fbtn.className = 'mx-filter-btn';
+          fbtn.title = 'فلتر';
+          fbtn.textContent = '🔽';
+          fbtn.setAttribute('data-col-idx', i);
+          (function(tableRef, idxCap, btnRef){
+            btnRef.addEventListener('click', function(ev){
+              ev.stopPropagation();
+              _mxOpenFilterPanel(tableRef, idxCap, btnRef);
+            });
+          })(table, i, fbtn);
+          th.appendChild(fbtn);
+        }
+        // --- Delete ✕ button (hover-reveal) ---
+        if (!th.querySelector('.mx-col-del-btn') && !isSkipCol){
+          var dbtn = document.createElement('button');
+          dbtn.type = 'button';
+          dbtn.className = 'mx-col-del-btn';
+          dbtn.title = 'حذف العمود';
+          dbtn.textContent = '✕';
+          dbtn.setAttribute('data-col-idx', i);
+          (function(tableRef, idxCap, thRef, btnRef){
+            btnRef.addEventListener('click', function(ev){
+              ev.stopPropagation();
+              ev.preventDefault();
+              _mxHandleColumnDelete(tableRef, idxCap, thRef);
+            });
+          })(table, i, th, dbtn);
+          th.appendChild(dbtn);
+        }
       }
       _mxMarkHeaderIcons(table);
       // Re-apply any sticky filter state after a table re-render.
