@@ -13200,8 +13200,23 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       if (table._mxFilters) _mxApplyFilters(table);
     });
   }
-  // Close panel on outside click / Escape
-  document.addEventListener('click', function(){ _mxClosePanels(); }, true);
+  // Close panel on outside click / Escape.
+  //
+  // BUG FIX: the previous version registered this listener in the capture
+  // phase, so any click inside the panel closed it *before* the text-
+  // input / checkbox / date-picker could register a focus or change event.
+  // Select checkboxes and text-input clicks became no-ops because the
+  // panel was ripped out of the DOM the instant the user clicked it.
+  //
+  // Now: bubbling phase, skip the close when the target is inside a panel
+  // or on the 🔽 trigger. The button's own click handler still calls
+  // stopPropagation() so opening the panel doesn't immediately close it.
+  document.addEventListener('click', function(ev){
+    var t = ev.target;
+    if (!t) return;
+    if (t.closest && (t.closest('.mx-filter-panel') || t.closest('.mx-filter-btn'))) return;
+    _mxClosePanels();
+  });
   document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') _mxClosePanels(); });
 
   /* Unify existing delete-confirm text so the wording matches spec. */
@@ -13268,13 +13283,18 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 
   if (window.MutationObserver){
     var mo = new MutationObserver(function(muts){
-      var touchedBtn=false, touchedTable=false, touchedSearch=false, touchedConfirm=false, touchedTbody=false;
+      var touchedBtn=false, touchedTable=false, touchedSearch=false, touchedConfirm=false, touchedTbody=false, touchedThead=false;
       for (var i=0;i<muts.length;i++){
         var m = muts[i];
         // When a tbody's rows change (common — every table re-renders via
         // innerHTML), re-wire column filters so new row content picks up
-        // the inferred column type and any sticky state re-applies.
-        if (m.target && m.target.tagName === 'TBODY') touchedTbody = true;
+        // the inferred column type and any sticky state re-applies. Same
+        // when a thead rebuilds (evaluations + paylog fetch their header
+        // labels from /api/*-columns after DOMContentLoaded).
+        if (m.target){
+          if (m.target.tagName === 'TBODY') touchedTbody = true;
+          if (m.target.tagName === 'THEAD' || m.target.tagName === 'TR') touchedThead = true;
+        }
         for (var j=0;j<m.addedNodes.length;j++){
           var n = m.addedNodes[j];
           if (!n || n.nodeType !== 1) continue;
@@ -13284,6 +13304,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
             if (n.matches('.search-bar') || n.matches('input') || (n.querySelector && n.querySelector('.search-bar input'))) touchedSearch = true;
             if (n.matches('.confirm-box') || (n.querySelector && n.querySelector('.confirm-box'))) touchedConfirm = true;
             if (n.matches('tr') || (n.querySelector && n.querySelector('tr'))) touchedTbody = true;
+            if (n.matches('th') || (n.querySelector && n.querySelector('th'))) touchedThead = true;
           }
         }
       }
@@ -13291,7 +13312,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       if (touchedTable) addColumnCounts();
       if (touchedSearch) wireTableSearches();
       if (touchedConfirm) unifyConfirmText();
-      if (touchedTable || touchedTbody) wireColumnFilters();
+      if (touchedTable || touchedTbody || touchedThead) wireColumnFilters();
     });
     mo.observe(document.body, { childList:true, subtree:true });
   }
