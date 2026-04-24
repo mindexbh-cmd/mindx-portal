@@ -375,6 +375,7 @@ def init_db():
     db.execute("""CREATE TABLE IF NOT EXISTS payment_log(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_name TEXT,
+        personal_id TEXT,
         registration_status TEXT,
         course_amount TEXT,
         inst1 TEXT, msg1 TEXT,
@@ -733,6 +734,7 @@ if True:
     db2.execute("""CREATE TABLE IF NOT EXISTS payment_log(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_name TEXT,
+        personal_id TEXT,
         registration_status TEXT,
         course_amount TEXT,
         inst1 TEXT, msg1 TEXT,
@@ -6247,6 +6249,7 @@ var IMPORT_DEFS = {
     refresh: "loadPaymentLog",
     fields: [
       {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
+      {key:"personal_id", ar:"الرقم"},
       {key:"registration_status", ar:"\u062d\u0627\u0644\u0629 \u0627\u0644\u062a\u0633\u062c\u064a\u0644"},
       {key:"course_amount", ar:"\u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0648\u0631\u0629"},
       {key:"inst1", ar:"\u0627\u0644\u0642\u0633\u0637 1"},
@@ -8230,7 +8233,7 @@ IMPORT_TABLE_FIELDS = {
         "term_meanings","conversation","expression","grammar","notes",
     ],
     "payment_log": [
-        "student_name","registration_status","course_amount",
+        "student_name","personal_id","registration_status","course_amount",
         "inst1","msg1","inst2","msg2","inst3","msg3","inst4","msg4","inst5","msg5",
         "total_paid","total_remaining","payment_status",
     ],
@@ -8314,13 +8317,20 @@ def api_import():
         if not isinstance(r, dict):
             ignored += 1
             continue
-        values = tuple(str(r.get(f, "") or "") for f in fields)
+        values_list = [str(r.get(f, "") or "") for f in fields]
         # Skip rows where every value is empty/whitespace — belt-and-suspenders
         # alongside the frontend filter. Any field with at least one non-empty
         # character qualifies (e.g. just الاسم populated).
-        if not any(v.strip() for v in values):
+        if not any(v.strip() for v in values_list):
             ignored += 1
             continue
+        # Convert empty personal_id -> NULL so UNIQUE(personal_id) on students
+        # doesn't reject every row beyond the first one with a blank ID.
+        # UNIQUE treats NULL as distinct in both SQLite and Postgres.
+        for i, f in enumerate(fields):
+            if f == "personal_id" and not values_list[i].strip():
+                values_list[i] = None
+        values = tuple(values_list)
         try:
             cur = db.execute(sql, values)
             if cur.rowcount > 0:
