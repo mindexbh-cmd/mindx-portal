@@ -2954,6 +2954,69 @@ function _srRenderCard(d){
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">نسبة الغياب ('+(att.absent||0)+')</div>'+bar(att.absent_rate)+'</div>'
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">نسبة التأخير ('+(att.late||0)+')</div>'+bar(att.late_rate)+'</div>'
        + '</div></div>';
+  // PAYLOG (سجل الدفع) — a row from payment_log matched to this student.
+  // Rendered read-only; see api_student_details for the lookup order.
+  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B0 سجل الدفع</div>';
+  var pl = d.paylog;
+  if (!pl) {
+    html += '<div style="padding:14px;text-align:center;color:#888;font-weight:600;background:#f8f9fa;border-radius:8px;">لا يوجد سجل دفع لهذا الطالب</div>';
+  } else {
+    var remainNum = parseFloat(pl.total_remaining) || 0;
+    var remainColor = remainNum > 0 ? '#c62828' : '#2E7D32';
+    var paidColor = '#2E7D32';
+    function _plCell(lbl, val, style){
+      var v = (val === '' || val == null) ? '—' : _srEsc(String(val));
+      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;">' +
+             '<div style="color:#777;font-size:0.78rem;">' + lbl + '</div>' +
+             '<div style="font-weight:800;' + (style || 'color:#455A64;') + '">' + v + '</div>' +
+             '</div>';
+    }
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;font-size:0.9rem;">';
+    html += _plCell('حالة التسجيل', pl.registration_status, 'color:#6A1B9A;');
+    html += _plCell('مبلغ الدورة', pl.course_amount, 'color:#1565C0;');
+    html += _plCell('حالة المدفوعات', pl.payment_status, 'color:#E65100;');
+    html += '</div>';
+    // Installments table
+    html += '<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:10px;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">';
+    html += '<thead><tr style="background:#e3f2fd;color:#0d47a1;">' +
+            '<th style="padding:7px 10px;text-align:right;">القسط</th>' +
+            '<th style="padding:7px 10px;text-align:right;">المبلغ</th>' +
+            '<th style="padding:7px 10px;text-align:right;">الحالة</th>' +
+            '</tr></thead><tbody>';
+    (pl.installments || []).forEach(function(it){
+      var amt = (it.amount === '' || it.amount == null) ? '—' : _srEsc(String(it.amount));
+      var stRaw = (it.status || '').toString().trim();
+      var stHtml;
+      if (!stRaw) {
+        stHtml = '<span style="color:#999;">—</span>';
+      } else if (stRaw === 'تم الدفع' || stRaw.indexOf('دفع') >= 0 && stRaw.indexOf('لم') < 0) {
+        stHtml = '<span style="background:#e8f5e9;color:#2E7D32;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
+      } else if (stRaw.indexOf('معف') >= 0) {
+        stHtml = '<span style="background:#fff3e0;color:#E65100;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
+      } else {
+        stHtml = '<span style="background:#fce4ec;color:#c62828;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
+      }
+      html += '<tr style="border-top:1px solid #f0f0f0;">' +
+              '<td style="padding:7px 10px;font-weight:700;color:#37474F;">القسط ' + (it.num||'') + '</td>' +
+              '<td style="padding:7px 10px;color:#1565C0;font-weight:700;">' + amt + '</td>' +
+              '<td style="padding:7px 10px;">' + stHtml + '</td>' +
+              '</tr>';
+    });
+    html += '</tbody></table></div>';
+    // Totals row with spec-mandated colors (paid always green, remaining red>0 green=0)
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">';
+    html += '<div style="background:#e8f5e9;border:2px solid #a5d6a7;border-radius:10px;padding:10px 14px;text-align:center;">' +
+            '<div style="color:#555;font-size:0.82rem;">المبلغ المدفوع</div>' +
+            '<div style="font-weight:800;font-size:1.15rem;color:' + paidColor + ';">' + _srEsc(String(pl.total_paid || '0')) + '</div>' +
+            '</div>';
+    html += '<div style="background:' + (remainNum > 0 ? '#fce4ec' : '#e8f5e9') + ';border:2px solid ' + (remainNum > 0 ? '#f48fb1' : '#a5d6a7') + ';border-radius:10px;padding:10px 14px;text-align:center;">' +
+            '<div style="color:#555;font-size:0.82rem;">المبلغ المتبقي</div>' +
+            '<div style="font-weight:800;font-size:1.15rem;color:' + remainColor + ';">' + _srEsc(String(pl.total_remaining || '0')) + '</div>' +
+            '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
   // ACTIONS
   html += '<div class="srm-actions" id="sr-actions"></div>';
   html += '</div>';
@@ -8825,6 +8888,65 @@ def api_student_details(sid):
     total_paid = sum(_num(p.get("paid")) for p in payments)
     total_price = sum(_num(p.get("price")) for p in payments)
     remaining = total_price - total_paid
+
+    # ── Paylog record lookup ──────────────────────────────────────
+    # Users asked for the سجل الدفع row matched against this student
+    # (by personal_id first, falling back to name). All table + column
+    # names flow through get_setting so an admin can repoint them
+    # from the /settings page without code changes.
+    def _plcfg(comp, default):
+        v = get_setting('paylog', comp, default)
+        return v if _is_safe_ident(v) else default
+    pl_table   = _plcfg('table',                 'payment_log')
+    pl_name    = _plcfg('student_name_column',   'student_name')
+    pl_pid     = _plcfg('personal_id_column',    'personal_id')
+    pl_amount  = _plcfg('course_amount_column',  'course_amount')
+    pl_paid    = _plcfg('total_paid_column',     'total_paid')
+    pl_remain  = _plcfg('total_remaining_column','total_remaining')
+    pl_status  = _plcfg('status_column',         'payment_status')
+    pl_record = None
+    try:
+        live_pl_cols = set(get_table_columns(pl_table))
+        if live_pl_cols:
+            where_parts, params = [], []
+            pid = (s_dict.get("personal_id") or "").strip()
+            if pid and pl_pid in live_pl_cols:
+                where_parts.append("TRIM(" + pl_pid + ") = ?")
+                params.append(pid)
+            name = (s_dict.get("student_name") or "").strip()
+            if name and pl_name in live_pl_cols:
+                where_parts.append("TRIM(" + pl_name + ") = ?")
+                params.append(name)
+            if where_parts:
+                sql = ("SELECT * FROM " + pl_table + " WHERE " +
+                       " OR ".join(where_parts) + " LIMIT 1")
+                row = db.execute(sql, tuple(params)).fetchone()
+                if row:
+                    pl_record = dict(row)
+    except Exception:
+        pl_record = None
+
+    paylog_payload = None
+    if pl_record:
+        # Normalize into the shape the client renders. The 5 installment
+        # slots follow the paylog schema's inst1..inst5 / msg1..msg5
+        # columns; kept out of get_setting because they're a convention,
+        # not user-configurable table mappings.
+        installments = []
+        for n in range(1, 6):
+            installments.append({
+                "num":    n,
+                "amount": pl_record.get("inst" + str(n)) or "",
+                "status": pl_record.get("msg"  + str(n)) or "",
+            })
+        paylog_payload = {
+            "registration_status": pl_record.get("registration_status") or "",
+            "course_amount":       pl_record.get(pl_amount) or "",
+            "total_paid":          pl_record.get(pl_paid)   or "",
+            "total_remaining":     pl_record.get(pl_remain) or "",
+            "payment_status":      pl_record.get(pl_status) or "",
+            "installments":        installments,
+        }
     # Attendance rollup by student_name. Status labels match what the
     # attendance modal writes: حاضر / غائب / متأخر / معتذر.
     STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
@@ -8864,6 +8986,7 @@ def api_student_details(sid):
             "absent_rate":  _pct(absent),
             "late_rate":    _pct(late),
         },
+        "paylog": paylog_payload,
     })
 
 @app.route("/api/students/bulk", methods=["POST"])
