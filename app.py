@@ -1156,6 +1156,50 @@ if True:
             pass
         db2.commit()
 
+    # Seed Arabic labels for taqseet's numbered columns (inst1..inst12,
+    # paid1..paid12, date1..date12) and the handful of misc fields so the
+    # تعديل الجدول modal renders Arabic for every taqseet column.
+    if "taqseet_labels_seed_v1" not in applied:
+        try:
+            rows_taq = [
+                ("taqseet_method",   "طريقة التقسيط",     1),
+                ("student_name",     "اسم الطالب",         2),
+                ("course_amount",    "مبلغ الدورة",        3),
+                ("num_installments", "عدد الأقساط",       4),
+                ("study_hours",      "ساعات الدراسة",     200),
+                ("start_date",       "تاريخ بدء الدورة",  201),
+            ]
+            for n in range(1, 13):
+                base = 5 + (n - 1) * 3
+                rows_taq.append(("inst" + str(n),  "القسط " + str(n),         base))
+                rows_taq.append(("paid" + str(n),  "المبلغ المدفوع " + str(n), base + 1))
+                rows_taq.append(("date" + str(n),  "تاريخ الاستحقاق " + str(n), base + 2))
+            for key, label, order in rows_taq:
+                try:
+                    db2.execute(
+                        "INSERT INTO taqseet_col_labels(col_key, col_label, col_order) "
+                        "VALUES(?,?,?) "
+                        "ON CONFLICT(col_key) DO UPDATE SET col_label=EXCLUDED.col_label",
+                        (key, label, order),
+                    )
+                except Exception:
+                    try:
+                        cur = db2.execute(
+                            "UPDATE taqseet_col_labels SET col_label=? WHERE col_key=?",
+                            (label, key),
+                        )
+                        if cur.rowcount == 0:
+                            db2.execute(
+                                "INSERT INTO taqseet_col_labels(col_key, col_label, col_order) VALUES(?,?,?)",
+                                (key, label, order),
+                            )
+                    except Exception:
+                        pass
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("taqseet_labels_seed_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     # ── Attendance data normalization (one-shot) ─────────────────────
     # Legacy imports wrote attendance_date as "31/1-2026م", "9/2/2026م",
     # and similar, so the attendance page never matched the ISO date the
@@ -6675,41 +6719,80 @@ function utemClose(){ document.getElementById('universalTableEditModal').classLi
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function _utemRenderColumns(){
   var body = document.getElementById('utemColumnsBody');
-  if(!_utemColumns.length){ body.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0639\u0645\u062f\u0629</div>'; return; }
+  if(!_utemColumns.length){ body.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">لا توجد أعمدة</div>'; return; }
   var html = '';
   for(var i=0;i<_utemColumns.length;i++){
     var c = _utemColumns[i];
     var key = c.col_key;
     var lbl = c.col_label;
-    var tp  = c.col_type || '\u0646\u0635';
+    var tp  = c.col_type || 'نص';
     var opts = c.col_options || '';
-    var keyQ = key.replace(/"/g,'&quot;');
+    var keyAttr = _esc(key);
     if (_utemEditingKey === key) {
-      html += '<div class="utem-col-row" data-key="' + keyQ + '">' +
-        '<input class="utem-col-input" id="utemRenameInput_' + keyQ + '" value="' + _esc(lbl) + '"/>' +
-        '<button class="utem-col-btn ok" onclick="_utemCommitRename(\\'+keyQ+\\')">&#x2713;</button>' +
-        '<button class="utem-col-btn cancel" onclick="_utemCancelRename()">&#x2715;</button>' +
+      html += '<div class="utem-col-row" data-key="' + keyAttr + '">' +
+        '<input class="utem-col-input" id="utemRenameInput_' + keyAttr + '" value="' + _esc(lbl) + '"/>' +
+        '<button class="utem-col-btn ok" data-utem-action="commit" data-col-key="' + keyAttr + '">&#x2713;</button>' +
+        '<button class="utem-col-btn cancel" data-utem-action="cancel">&#x2715;</button>' +
       '</div>';
     } else {
       var optsHtml = '';
-      if (tp === '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629') {
-        optsHtml = '<input class="utem-col-opts" id="utemOpts_' + keyQ + '" placeholder="\u062e\u064a\u0627\u0631\u0627\u062a \u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629 \u0645\u062b\u0627\u0644: \u0646\u0639\u0645,\u0644\u0627,\u0631\u0628\u0645\u0627" value="' + _esc(opts) + '" onblur="_utemSaveType(\\'+keyQ+\\')" style="max-width:180px;padding:5px 8px;border:1.2px solid #ddd;border-radius:6px;font-size:12px;" />';
+      if (tp === 'قائمة منسدلة') {
+        optsHtml = '<input class="utem-col-opts" id="utemOpts_' + keyAttr + '" data-col-key="' + keyAttr + '" placeholder="خيارات مفصولة بفاصلة مثال: نعم,لا,ربما" value="' + _esc(opts) + '" data-utem-action="save-type-blur" style="max-width:180px;padding:5px 8px;border:1.2px solid #ddd;border-radius:6px;font-size:12px;" />';
       }
-      html += '<div class="utem-col-row" data-key="' + keyQ + '">' +
+      html += '<div class="utem-col-row" data-key="' + keyAttr + '">' +
         '<span class="utem-col-label">' + _esc(lbl) + '</span>' +
-        '<select class="utem-col-type" id="utemType_' + keyQ + '" onchange="_utemSaveType(\\'+keyQ+\\')" style="padding:5px 8px;border-radius:6px;border:1.2px solid #ddd;font-size:12px;">' + _utemTypeOptions(tp) + '</select>' +
+        '<select class="utem-col-type" id="utemType_' + keyAttr + '" data-col-key="' + keyAttr + '" data-utem-action="save-type" style="padding:5px 8px;border-radius:6px;border:1.2px solid #ddd;font-size:12px;">' + _utemTypeOptions(tp) + '</select>' +
         optsHtml +
-        '<button class="utem-col-btn" title="\u0625\u0639\u0627\u062f\u0629 \u062a\u0633\u0645\u064a\u0629" onclick="_utemStartRename(\\'+keyQ+\\')">&#x270F;</button>' +
-        '<button class="utem-col-btn del" title="\u062d\u0630\u0641" onclick="_utemDeleteColumn(\\'+keyQ+\\')">&#x1F5D1;</button>' +
+        '<button class="utem-col-btn" title="إعادة تسمية" data-utem-action="start-rename" data-col-key="' + keyAttr + '">&#x270F;</button>' +
+        '<button class="utem-col-btn del" title="حذف" data-utem-action="delete" data-col-key="' + keyAttr + '" data-col-label="' + _esc(lbl) + '">&#x1F5D1;</button>' +
       '</div>';
     }
   }
   body.innerHTML = html;
+  _utemWireBodyDelegation();
   if (_utemEditingKey) {
     var el = document.getElementById('utemRenameInput_' + _utemEditingKey);
     if (el) { el.focus(); el.select(); }
   }
 }
+
+function _utemWireBodyDelegation(){
+  var body = document.getElementById('utemColumnsBody');
+  if (!body || body._utemWired) return;
+  body._utemWired = true;
+  body.addEventListener('click', function(ev){
+    var t = ev.target.closest('[data-utem-action]');
+    if (!t || t.tagName === 'SELECT' || t.tagName === 'INPUT') return;
+    var action = t.getAttribute('data-utem-action');
+    var key = t.getAttribute('data-col-key') || '';
+    if (action === 'start-rename') { _utemStartRename(key); }
+    else if (action === 'cancel')  { _utemCancelRename(); }
+    else if (action === 'commit')  { _utemCommitRename(key); }
+    else if (action === 'delete')  {
+      var label = t.getAttribute('data-col-label') || key;
+      _utemDeleteColumn(key, label);
+    }
+  });
+  body.addEventListener('change', function(ev){
+    var t = ev.target;
+    if (!t || t.tagName !== 'SELECT') return;
+    var action = t.getAttribute('data-utem-action');
+    if (action === 'save-type') {
+      var key = t.getAttribute('data-col-key') || '';
+      _utemSaveType(key);
+    }
+  });
+  body.addEventListener('blur', function(ev){
+    var t = ev.target;
+    if (!t || t.tagName !== 'INPUT') return;
+    var action = t.getAttribute('data-utem-action');
+    if (action === 'save-type-blur') {
+      var key = t.getAttribute('data-col-key') || '';
+      _utemSaveType(key);
+    }
+  }, true);
+}
+
 function _utemStartRename(key){ _utemEditingKey = key; _utemRenderColumns(); }
 function _utemCancelRename(){ _utemEditingKey = null; _utemRenderColumns(); }
 function _utemCommitRename(key){
@@ -6725,14 +6808,34 @@ function _utemCommitRename(key){
     else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
   }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
 }
-function _utemDeleteColumn(key){
-  if(!confirm('\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f\u061f \u0633\u064a\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062f')) return;
-  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/delete-column/' + encodeURIComponent(key), {
-    method:'DELETE', credentials:'include'
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){ showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935'); openUniversalTableEditModal(_utemTableKey); _utemReload(); }
-    else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
-  }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+function _utemDeleteColumn(key, label){
+  label = label || key;
+  function doDelete(){
+    fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/delete-column/' + encodeURIComponent(key), {
+      method:'DELETE', credentials:'include'
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.ok){
+        if (typeof window.mxToast === 'function') window.mxToast('تم حذف العمود: ' + label, 'success');
+        else showToast('تم الحذف','#e53935');
+        openUniversalTableEditModal(_utemTableKey);
+        _utemReload();
+      } else {
+        if (typeof window.mxToast === 'function') window.mxToast(d.error || 'حدث خطأ', 'error');
+        else showToast(d.error || 'حدث خطأ','#e53935');
+      }
+    }).catch(function(){ showToast('حدث خطأ','#e53935'); });
+  }
+  if (typeof window.mxConfirm === 'function') {
+    window.mxConfirm({
+      title: 'تأكيد حذف العمود',
+      message: 'هل تريد حذف العمود "' + label + '"؟ سيتم حذف جميع البيانات في هذا العمود ولا يمكن التراجع عن هذا الإجراء.',
+      yesText: 'نعم، احذف',
+      noText:  'إلغاء'
+    }, doDelete);
+  } else {
+    if (!confirm('هل أنت متأكد؟ سيتم حذف جميع البيانات في عمود "' + label + '"')) return;
+    doDelete();
+  }
 }
 function _utemSaveType(key){
   var selEl = document.getElementById('utemType_' + key);
@@ -9094,7 +9197,7 @@ _TABLE_MAP = {
     "evals":          ("evaluations",     "eval_col_labels"),
     "payment_log":    ("payment_log",     "paylog_col_labels"),
     "paylog":         ("payment_log",     "paylog_col_labels"),
-    "taqseet":        ("taqseet",         None),  # taqseet has no label table
+    "taqseet":        ("taqseet",         "taqseet_col_labels"),
 }
 
 def _resolve_table(tid):
@@ -9361,6 +9464,16 @@ BUILT_IN_COLUMN_LABELS = {
     "registration_term2_2026":"تسجيل الفصل الثاني 2026",
 }
 
+# taqseet has 36 numbered columns (inst1..inst12, paid1..paid12, date1..date12)
+# that don't fit cleanly into a flat dict literal. Populate them
+# programmatically so every taqseet column renders Arabic in /settings and
+# تعديل الجدول even on a fresh DB where the taqseet_labels_seed_v1
+# migration hasn't run yet.
+for _n in range(1, 13):
+    BUILT_IN_COLUMN_LABELS["inst" + str(_n)] = "القسط " + str(_n)
+    BUILT_IN_COLUMN_LABELS["paid" + str(_n)] = "المبلغ المدفوع " + str(_n)
+    BUILT_IN_COLUMN_LABELS["date" + str(_n)] = "تاريخ الاستحقاق " + str(_n)
+
 _LABELS_TABLE_FOR = {
     "students":      "column_labels",
     "student_groups":"group_col_labels",
@@ -9556,6 +9669,23 @@ def api_unified_rename_column(tid):
     if not db_table:
         return jsonify({"ok": False, "error": "table not found"}), 404
     db = get_db()
+    # If old_key isn't a safe identifier, treat it as an Arabic display
+    # label and resolve the real internal col_key via the labels table.
+    if not _is_safe_ident(old_key):
+        resolved = None
+        if labels_table:
+            try:
+                row = db.execute(
+                    "SELECT col_key FROM " + labels_table + " WHERE col_label=?",
+                    (old_key,),
+                ).fetchone()
+                if row and row[0] and _is_safe_ident(row[0]):
+                    resolved = row[0]
+            except Exception:
+                pass
+        if not resolved:
+            return jsonify({"ok": False, "error": "invalid column name"}), 400
+        old_key = resolved
     try:
         if new_key and new_key != old_key:
             if not _is_safe_ident(new_key):
@@ -9624,13 +9754,28 @@ def api_unified_set_column_type(tid):
 @app.route('/api/custom-table/<tid>/delete-column/<col_name>', methods=['DELETE'])
 @login_required
 def api_unified_delete_column(tid, col_name):
-    if not _is_safe_ident(col_name):
-        return jsonify({"ok": False, "error": "invalid column name"}), 400
     db_table, labels_table = _resolve_table(tid)
     if not db_table:
         return jsonify({"ok": False, "error": "table not found"}), 404
     db = get_db()
-    # Drop the DB column (best-effort: may not exist if schema is out of sync)
+    # The client always sends the internal col_key but we defend against an
+    # Arabic display name sneaking in by looking it up in the labels table.
+    if not _is_safe_ident(col_name):
+        resolved = None
+        if labels_table:
+            try:
+                row = db.execute(
+                    "SELECT col_key FROM " + labels_table + " WHERE col_label=?",
+                    (col_name,),
+                ).fetchone()
+                if row and row[0] and _is_safe_ident(row[0]):
+                    resolved = row[0]
+            except Exception:
+                pass
+        if not resolved:
+            return jsonify({"ok": False, "error": "invalid column name"}), 400
+        col_name = resolved
+    # Drop the DB column (best-effort: may not exist if schema is out of sync).
     try:
         db.execute('ALTER TABLE "' + db_table + '" DROP COLUMN "' + col_name + '"')
     except Exception:
@@ -9642,7 +9787,7 @@ def api_unified_delete_column(tid, col_name):
         except Exception:
             pass
     db.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "col_key": col_name})
 
 
 @app.route('/api/custom-table/<tid>/rename', methods=['PATCH'])
