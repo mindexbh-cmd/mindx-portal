@@ -2108,11 +2108,11 @@ function _ssRenderAllGroups(){
     + '<table style="width:100%;border-collapse:collapse;background:#fff;">'
     +   '<thead>'
     +     '<tr style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;cursor:pointer;">'
-    +       '<th onclick="_ssSort(\'group_name\')" style="padding:10px 12px;text-align:right;font-size:0.9rem;">المجموعة' + _ssArrow('group_name') + '</th>'
-    +       '<th onclick="_ssSort(\'total_sessions\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الحصص' + _ssArrow('total_sessions') + '</th>'
-    +       '<th onclick="_ssSort(\'total_minutes\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">إجمالي الساعات' + _ssArrow('total_minutes') + '</th>'
-    +       '<th onclick="_ssSort(\'students_count\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الطلبة' + _ssArrow('students_count') + '</th>'
-    +       '<th onclick="_ssSort(\'avg_attendance_rate\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">متوسط الحضور %' + _ssArrow('avg_attendance_rate') + '</th>'
+    +       '<th onclick="_ssSort(\\'group_name\\')" style="padding:10px 12px;text-align:right;font-size:0.9rem;">المجموعة' + _ssArrow('group_name') + '</th>'
+    +       '<th onclick="_ssSort(\\'total_sessions\\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الحصص' + _ssArrow('total_sessions') + '</th>'
+    +       '<th onclick="_ssSort(\\'total_minutes\\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">إجمالي الساعات' + _ssArrow('total_minutes') + '</th>'
+    +       '<th onclick="_ssSort(\\'students_count\\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">عدد الطلبة' + _ssArrow('students_count') + '</th>'
+    +       '<th onclick="_ssSort(\\'avg_attendance_rate\\')" style="padding:10px 12px;text-align:center;font-size:0.9rem;">متوسط الحضور %' + _ssArrow('avg_attendance_rate') + '</th>'
     +     '</tr>'
     +   '</thead>'
     +   '<tbody>';
@@ -2429,7 +2429,7 @@ function _srEnterEditMode(){
   if (typeof window.mxConfirm === 'function'){
     window.mxConfirm({
       title: '⚠ تنبيه: أنت على وشك تعديل بيانات الطالب',
-      message: sName + '\n\nهل أنت متأكد؟',
+      message: sName + '\\n\\nهل أنت متأكد؟',
       yesText: 'نعم، متأكد',
       noText:  'إلغاء'
     }, function(){
