@@ -12468,6 +12468,25 @@ def settings_page():
 MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 (function(){
   var css = [
+    /* Column-filter system (applies to every .table-wrap table) */
+    '.mx-filter-btn{background:transparent;border:none;color:inherit;opacity:.55;font-size:10px;cursor:pointer;padding:2px 4px;margin-right:4px;border-radius:4px;vertical-align:middle;transition:opacity .15s ease,background .15s ease;}',
+    '.mx-filter-btn:hover{opacity:1;background:rgba(255,255,255,.2);}',
+    '.mx-filter-btn.active{opacity:1;color:#fff;background:#2196F3;box-shadow:0 0 0 2px rgba(33,150,243,.35);}',
+    '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
+    '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
+    '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
+    '.mx-filter-panel input[type=text],.mx-filter-panel input[type=number],.mx-filter-panel input[type=date]{width:100%;padding:6px 10px;border:1.3px solid #90caf9;border-radius:7px;font-size:13px;background:#fafafa;direction:rtl;margin-bottom:6px;}',
+    '.mx-filter-panel input:focus{background:#fff;outline:none;border-color:#1976D2;}',
+    '.mx-filter-panel .mx-f-clear{margin-top:8px;width:100%;padding:7px;background:#eceff1;color:#455a64;border:none;border-radius:7px;font-weight:700;cursor:pointer;font-size:12.5px;}',
+    '.mx-filter-panel .mx-f-clear:hover{background:#cfd8dc;}',
+    '.mx-filter-banner{background:linear-gradient(135deg,#e3f2fd,#bbdefb);border:1.5px solid #64b5f6;border-radius:10px;padding:8px 12px;margin:0 0 10px 0;display:none;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;}',
+    '.mx-filter-banner.show{display:flex;}',
+    '.mx-filter-banner .mx-fb-count{font-weight:800;color:#0d47a1;margin-left:auto;}',
+    '.mx-filter-banner .mx-fb-clear-all{background:#e53935;color:#fff;border:none;padding:5px 12px;border-radius:999px;font-weight:700;cursor:pointer;font-size:12px;}',
+    '.mx-filter-banner .mx-fb-tag{background:#fff;border:1px solid #90caf9;color:#0d47a1;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:5px;}',
+    '.mx-filter-banner .mx-fb-tag .mx-fb-x{cursor:pointer;color:#c62828;font-weight:900;}',
+    '.mx-row-count{font-size:12px;color:#555;font-weight:700;margin-bottom:6px;}',
+
     /* P2: button bar wrap */
     '.db-section > div[style*="display:flex"],.custom-table-section > div[style*="display:flex"],.db-section > div[style*="display: flex"],.custom-table-section > div[style*="display: flex"],.db-nav{flex-wrap:wrap !important;row-gap:10px !important;}',
     '.db-section > div[style*="display:flex"] > *,.custom-table-section > div[style*="display:flex"] > *{flex-shrink:0;}',
@@ -12727,6 +12746,331 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     upd();
   }
 
+  /* ========================================================================
+   * Column filter system — adds a 🔽 button above every column header in
+   * every .table-wrap table. Inference picks a filter UI per column type:
+   *    text / number / date / select / yesno / rating.
+   * State lives on each table element (table._mxFilters), so re-renders
+   * (innerHTML = ...) drop state gracefully and the next MutationObserver
+   * pass re-wires headers. Active filters cause the 🔽 to turn blue, and
+   * a banner above the table lists each filter as a removable chip with
+   * "عرض X من أصل Y صف" and a "مسح الكل" button.
+   * ====================================================================== */
+  function _mxColInferType(tbody, idx){
+    var rows = tbody.querySelectorAll('tr');
+    var vals = [];
+    for (var i=0; i<rows.length && vals.length<50; i++){
+      if (rows[i].classList.contains('mx-no-results')) continue;
+      var cell = rows[i].children[idx];
+      if (!cell) continue;
+      var t = (cell.textContent || '').trim();
+      if (t && t !== '—' && t !== '-') vals.push(t);
+    }
+    if (!vals.length) return 'text';
+    var allNum = vals.every(function(v){ return /^-?\d+(\.\d+)?$/.test(v); });
+    if (allNum) {
+      var nums = vals.map(parseFloat);
+      var inRating = nums.every(function(n){ return n >= 1 && n <= 10; });
+      if (inRating) return 'rating';
+      return 'number';
+    }
+    var allDate = vals.every(function(v){ return /^\d{4}-\d{1,2}-\d{1,2}/.test(v); });
+    if (allDate) return 'date';
+    var uniqueSet = {};
+    vals.forEach(function(v){ uniqueSet[v] = 1; });
+    var uniques = Object.keys(uniqueSet);
+    if (uniques.length === 2 && uniques.every(function(v){ return v==='نعم' || v==='لا'; })) return 'yesno';
+    if (uniques.length >= 2 && uniques.length <= 10) return 'select';
+    return 'text';
+  }
+  function _mxGetUniqueValues(tbody, idx){
+    var rows = tbody.querySelectorAll('tr');
+    var seen = {}; var out = [];
+    for (var i=0; i<rows.length; i++){
+      if (rows[i].classList.contains('mx-no-results')) continue;
+      var cell = rows[i].children[idx];
+      if (!cell) continue;
+      var t = (cell.textContent || '').trim();
+      if (t && !seen[t]) { seen[t] = 1; out.push(t); }
+    }
+    out.sort();
+    return out;
+  }
+  function _mxGetColumnLabel(table, idx){
+    var th = table.querySelectorAll('thead tr th')[idx];
+    if (!th) return 'عمود';
+    var clone = th.cloneNode(true);
+    clone.querySelectorAll('.mx-filter-btn').forEach(function(b){ b.remove(); });
+    return (clone.textContent || '').trim() || 'عمود';
+  }
+  function _mxApplyFilters(table){
+    var filters = table._mxFilters || {};
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll('tr');
+    var total = 0, shown = 0;
+    for (var i=0; i<rows.length; i++){
+      var tr = rows[i];
+      if (tr.classList.contains('mx-no-results')) { tr.style.display = 'none'; continue; }
+      total++;
+      var keep = true;
+      for (var idxStr in filters){
+        if (!keep) break;
+        var f = filters[idxStr];
+        if (!f) continue;
+        var idx = Number(idxStr);
+        var cell = tr.children[idx];
+        var val = cell ? (cell.textContent || '').trim() : '';
+        if (f.type === 'text' && f.text){
+          if (val.toLowerCase().indexOf(f.text.toLowerCase()) < 0) keep = false;
+        } else if (f.type === 'number' || f.type === 'rating'){
+          var n = parseFloat(val);
+          if (isNaN(n)) { keep = false; }
+          else {
+            if (f.min !== '' && f.min != null && n < parseFloat(f.min)) keep = false;
+            if (f.max !== '' && f.max != null && n > parseFloat(f.max)) keep = false;
+          }
+        } else if (f.type === 'date'){
+          if (f.from && val < f.from) keep = false;
+          if (f.to   && val > f.to  ) keep = false;
+        } else if (f.type === 'select' && f.values && f.values.length){
+          if (f.values.indexOf(val) < 0) keep = false;
+        } else if (f.type === 'yesno'){
+          var allowed = [];
+          if (f.yes) allowed.push('نعم');
+          if (f.no)  allowed.push('لا');
+          if (allowed.length && allowed.indexOf(val) < 0) keep = false;
+        }
+      }
+      tr.style.display = keep ? '' : 'none';
+      if (keep) shown++;
+    }
+    _mxRenderFilterBanner(table, shown, total);
+  }
+  function _mxRenderFilterBanner(table, shown, total){
+    var wrap = table.closest('.table-wrap, .att-table-wrap') || table.parentNode;
+    if (!wrap) return;
+    var banner = wrap.previousElementSibling;
+    if (!banner || !banner.classList || !banner.classList.contains('mx-filter-banner')){
+      banner = document.createElement('div');
+      banner.className = 'mx-filter-banner';
+      wrap.parentNode.insertBefore(banner, wrap);
+    }
+    var filters = table._mxFilters || {};
+    var active = Object.keys(filters).filter(function(k){
+      var f = filters[k];
+      if (!f) return false;
+      if (f.type === 'text')   return !!f.text;
+      if (f.type === 'number' || f.type === 'rating') return (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null);
+      if (f.type === 'date')   return !!(f.from || f.to);
+      if (f.type === 'select') return !!(f.values && f.values.length);
+      if (f.type === 'yesno')  return !!(f.yes || f.no);
+      return false;
+    });
+    if (!active.length){
+      banner.classList.remove('show');
+      banner.innerHTML = '';
+      // Still update the count row above the table (if rendered).
+      _mxUpdateRowCount(wrap, shown, total, false);
+      return;
+    }
+    banner.classList.add('show');
+    var html = '<span style="font-weight:800;color:#0d47a1;">الفلاتر النشطة (' + active.length + ')</span>';
+    active.forEach(function(idxStr){
+      var f = filters[idxStr];
+      var lbl = _mxGetColumnLabel(table, Number(idxStr));
+      var summary = '';
+      if (f.type === 'text')   summary = f.text;
+      else if (f.type === 'number' || f.type === 'rating') summary = ((f.min!=null&&f.min!==''?f.min:'…') + ' → ' + (f.max!=null&&f.max!==''?f.max:'…'));
+      else if (f.type === 'date') summary = ((f.from||'…') + ' → ' + (f.to||'…'));
+      else if (f.type === 'select') summary = (f.values || []).join(', ');
+      else if (f.type === 'yesno') summary = [f.yes?'نعم':null, f.no?'لا':null].filter(Boolean).join(', ');
+      html += '<span class="mx-fb-tag" data-col="' + idxStr + '">' + lbl + ': ' + _mxEsc(summary) + ' <span class="mx-fb-x" data-col="' + idxStr + '">✕</span></span>';
+    });
+    html += '<span class="mx-fb-count">عرض ' + shown + ' من أصل ' + total + ' صف</span>';
+    html += '<button class="mx-fb-clear-all" type="button">مسح الكل</button>';
+    banner.innerHTML = html;
+    banner.querySelectorAll('.mx-fb-x').forEach(function(x){
+      x.addEventListener('click', function(){
+        delete table._mxFilters[x.getAttribute('data-col')];
+        _mxMarkHeaderIcons(table);
+        _mxApplyFilters(table);
+      });
+    });
+    var clearAll = banner.querySelector('.mx-fb-clear-all');
+    if (clearAll) clearAll.addEventListener('click', function(){
+      table._mxFilters = {};
+      _mxMarkHeaderIcons(table);
+      _mxApplyFilters(table);
+    });
+    _mxUpdateRowCount(wrap, shown, total, true);
+  }
+  function _mxUpdateRowCount(wrap, shown, total, active){
+    var counter = wrap.previousElementSibling;
+    // Re-find; wrap.previousElementSibling is the banner now.
+    var row = wrap.parentNode.querySelector(':scope > .mx-row-count');
+    if (!row){
+      row = document.createElement('div');
+      row.className = 'mx-row-count';
+      wrap.parentNode.insertBefore(row, wrap);
+    }
+    if (active){
+      row.textContent = 'عرض ' + shown + ' من أصل ' + total + ' صف';
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  }
+  function _mxEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function _mxMarkHeaderIcons(table){
+    var filters = table._mxFilters || {};
+    var ths = table.querySelectorAll('thead tr th');
+    for (var i=0; i<ths.length; i++){
+      var btn = ths[i].querySelector('.mx-filter-btn');
+      if (!btn) continue;
+      var f = filters[String(i)];
+      var active = false;
+      if (f){
+        if (f.type === 'text')   active = !!f.text;
+        else if (f.type === 'number' || f.type === 'rating') active = (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null);
+        else if (f.type === 'date') active = !!(f.from || f.to);
+        else if (f.type === 'select') active = !!(f.values && f.values.length);
+        else if (f.type === 'yesno') active = !!(f.yes || f.no);
+      }
+      btn.classList[active ? 'add' : 'remove']('active');
+    }
+  }
+  function _mxClosePanels(){
+    document.querySelectorAll('.mx-filter-panel').forEach(function(p){ p.remove(); });
+  }
+  function _mxOpenFilterPanel(table, idx, btn){
+    _mxClosePanels();
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var type = _mxColInferType(tbody, idx);
+    var filters = table._mxFilters || (table._mxFilters = {});
+    var current = filters[String(idx)] || {type: type};
+    if (current.type !== type && !(current.type==='rating' && type==='number')){
+      current = {type: type};
+    }
+    var lbl = _mxGetColumnLabel(table, idx);
+    var panel = document.createElement('div');
+    panel.className = 'mx-filter-panel';
+    var body = '<h4>🔽 ' + _mxEsc(lbl) + '</h4>';
+    if (type === 'text'){
+      body += '<input class="mx-f-text" type="text" placeholder="ابحث في هذا العمود..." value="' + _mxEsc(current.text || '') + '"/>';
+    } else if (type === 'number'){
+      body += '<label>من: <input class="mx-f-min" type="number" step="any" value="' + _mxEsc(current.min == null ? '' : current.min) + '"/></label>';
+      body += '<label>إلى: <input class="mx-f-max" type="number" step="any" value="' + _mxEsc(current.max == null ? '' : current.max) + '"/></label>';
+    } else if (type === 'rating'){
+      body += '<label>من (1-10): <input class="mx-f-min" type="number" min="1" max="10" step="1" value="' + _mxEsc(current.min == null ? '' : current.min) + '"/></label>';
+      body += '<label>إلى (1-10): <input class="mx-f-max" type="number" min="1" max="10" step="1" value="' + _mxEsc(current.max == null ? '' : current.max) + '"/></label>';
+    } else if (type === 'date'){
+      body += '<label>من تاريخ: <input class="mx-f-from" type="date" value="' + _mxEsc(current.from || '') + '"/></label>';
+      body += '<label>إلى تاريخ: <input class="mx-f-to" type="date" value="' + _mxEsc(current.to || '') + '"/></label>';
+    } else if (type === 'select'){
+      var values = _mxGetUniqueValues(tbody, idx);
+      var checkedSet = {};
+      (current.values || []).forEach(function(v){ checkedSet[v] = 1; });
+      if (!values.length){
+        body += '<div style="color:#999;">لا توجد قيم</div>';
+      } else {
+        body += '<div style="max-height:200px;overflow:auto;">';
+        values.forEach(function(v){
+          body += '<label><input type="checkbox" class="mx-f-check" value="' + _mxEsc(v) + '"' + (checkedSet[v] ? ' checked' : '') + '/> ' + _mxEsc(v) + '</label>';
+        });
+        body += '</div>';
+      }
+    } else if (type === 'yesno'){
+      body += '<label><input type="checkbox" class="mx-f-yes"' + (current.yes ? ' checked' : '') + '/> نعم</label>';
+      body += '<label><input type="checkbox" class="mx-f-no"'  + (current.no  ? ' checked' : '') + '/> لا</label>';
+    }
+    body += '<button class="mx-f-clear" type="button">مسح الفلتر</button>';
+    panel.innerHTML = body;
+    document.body.appendChild(panel);
+    // Position below the button (viewport coords).
+    var r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    panel.style.left = Math.max(4, (r.left + window.scrollX - 100)) + 'px';
+    // Prevent click-outside closing when clicking inside panel
+    panel.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    // Commit helper
+    function commit(){
+      var f = {type: type};
+      if (type === 'text'){
+        f.text = (panel.querySelector('.mx-f-text').value || '').trim();
+      } else if (type === 'number' || type === 'rating'){
+        var mn = panel.querySelector('.mx-f-min').value;
+        var mx = panel.querySelector('.mx-f-max').value;
+        f.min = mn;
+        f.max = mx;
+      } else if (type === 'date'){
+        f.from = panel.querySelector('.mx-f-from').value;
+        f.to   = panel.querySelector('.mx-f-to').value;
+      } else if (type === 'select'){
+        var checks = panel.querySelectorAll('.mx-f-check:checked');
+        var arr = [];
+        for (var i=0; i<checks.length; i++) arr.push(checks[i].value);
+        f.values = arr;
+      } else if (type === 'yesno'){
+        f.yes = panel.querySelector('.mx-f-yes').checked;
+        f.no  = panel.querySelector('.mx-f-no').checked;
+      }
+      filters[String(idx)] = f;
+      _mxMarkHeaderIcons(table);
+      _mxApplyFilters(table);
+    }
+    panel.querySelectorAll('input').forEach(function(inp){
+      var ev = (inp.type === 'checkbox') ? 'change' : 'input';
+      inp.addEventListener(ev, commit);
+    });
+    var clearBtn = panel.querySelector('.mx-f-clear');
+    if (clearBtn) clearBtn.addEventListener('click', function(){
+      delete filters[String(idx)];
+      _mxMarkHeaderIcons(table);
+      _mxApplyFilters(table);
+      _mxClosePanels();
+    });
+  }
+  function wireColumnFilters(){
+    document.querySelectorAll('.table-wrap table, .att-table-wrap table').forEach(function(table){
+      var thead = table.querySelector('thead');
+      var tbody = table.querySelector('tbody');
+      if (!thead || !tbody) return;
+      var headerRow = thead.querySelector('tr');
+      if (!headerRow) return;
+      var ths = headerRow.children;
+      for (var i=0; i<ths.length; i++){
+        var th = ths[i];
+        if (th.classList.contains('bulk-col')) continue;
+        if (th.querySelector('.mx-filter-btn')) continue;
+        // Skip columns whose content is purely action buttons
+        // (identify by checking for an "إجراءات / Actions" heading).
+        var txt = (th.textContent || '').trim();
+        if (/^(إجراءات|actions|Actions)$/.test(txt) || txt === '#') continue;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mx-filter-btn';
+        btn.title = 'فلتر';
+        btn.textContent = '🔽';
+        btn.setAttribute('data-col-idx', i);
+        (function(tableRef, idxCap, btnRef){
+          btnRef.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            _mxOpenFilterPanel(tableRef, idxCap, btnRef);
+          });
+        })(table, i, btn);
+        th.appendChild(btn);
+      }
+      _mxMarkHeaderIcons(table);
+      // Re-apply any sticky filter state after a table re-render.
+      if (table._mxFilters) _mxApplyFilters(table);
+    });
+  }
+  // Close panel on outside click / Escape
+  document.addEventListener('click', function(){ _mxClosePanels(); }, true);
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') _mxClosePanels(); });
+
   /* Unify existing delete-confirm text so the wording matches spec. */
   function unifyConfirmText(){
     document.querySelectorAll('.confirm-box h3').forEach(function(h){
@@ -12784,15 +13128,20 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     wireTableSearches();
     wireAttendanceIntro();
     unifyConfirmText();
+    wireColumnFilters();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
   if (window.MutationObserver){
     var mo = new MutationObserver(function(muts){
-      var touchedBtn=false, touchedTable=false, touchedSearch=false, touchedConfirm=false;
+      var touchedBtn=false, touchedTable=false, touchedSearch=false, touchedConfirm=false, touchedTbody=false;
       for (var i=0;i<muts.length;i++){
         var m = muts[i];
+        // When a tbody's rows change (common — every table re-renders via
+        // innerHTML), re-wire column filters so new row content picks up
+        // the inferred column type and any sticky state re-applies.
+        if (m.target && m.target.tagName === 'TBODY') touchedTbody = true;
         for (var j=0;j<m.addedNodes.length;j++){
           var n = m.addedNodes[j];
           if (!n || n.nodeType !== 1) continue;
@@ -12801,6 +13150,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
             if (n.matches('.table-wrap') || (n.querySelector && n.querySelector('.table-wrap, .att-table-wrap'))) touchedTable = true;
             if (n.matches('.search-bar') || n.matches('input') || (n.querySelector && n.querySelector('.search-bar input'))) touchedSearch = true;
             if (n.matches('.confirm-box') || (n.querySelector && n.querySelector('.confirm-box'))) touchedConfirm = true;
+            if (n.matches('tr') || (n.querySelector && n.querySelector('tr'))) touchedTbody = true;
           }
         }
       }
@@ -12808,6 +13158,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       if (touchedTable) addColumnCounts();
       if (touchedSearch) wireTableSearches();
       if (touchedConfirm) unifyConfirmText();
+      if (touchedTable || touchedTbody) wireColumnFilters();
     });
     mo.observe(document.body, { childList:true, subtree:true });
   }
