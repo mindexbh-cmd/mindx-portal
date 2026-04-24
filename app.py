@@ -9851,12 +9851,24 @@ def api_unified_set_column_type(tid):
 @app.route('/api/custom-table/<tid>/delete-column/<col_name>', methods=['DELETE'])
 @login_required
 def api_unified_delete_column(tid, col_name):
+    """Drop a column from a table and clean up its label row.
+
+    Sequence (per spec):
+      1. Resolve col_name to an internal safe identifier — if the client
+         sent an Arabic display label, look it up in labels_table.
+      2. Confirm the column actually exists in the live schema.
+      3. Snapshot + delete the label row.
+      4. Run ALTER TABLE … DROP COLUMN. If it raises, re-insert the
+         snapshotted label row (our best approximation of a rollback
+         since the psycopg2 connection runs in autocommit) and return
+         the DB error so the UI can surface it.
+    """
     db_table, labels_table = _resolve_table(tid)
     if not db_table:
         return jsonify({"ok": False, "error": "table not found"}), 404
     db = get_db()
-    # The client always sends the internal col_key but we defend against an
-    # Arabic display name sneaking in by looking it up in the labels table.
+
+    # ---- 1) Resolve col_name to an internal safe identifier ----
     if not _is_safe_ident(col_name):
         resolved = None
         if labels_table:
@@ -9872,17 +9884,95 @@ def api_unified_delete_column(tid, col_name):
         if not resolved:
             return jsonify({"ok": False, "error": "invalid column name"}), 400
         col_name = resolved
-    # Drop the DB column (best-effort: may not exist if schema is out of sync).
+
+    # ---- 2) Confirm the column exists on the live table ----
     try:
-        db.execute('ALTER TABLE "' + db_table + '" DROP COLUMN "' + col_name + '"')
-    except Exception:
-        pass
-    # Remove the label entry
+        live_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(" + db_table + ")"
+        ).fetchall()}
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "could not read schema: " + str(ex)}), 500
+    if col_name not in live_cols:
+        # Already gone — treat as success but make sure no stale label row
+        # remains that would otherwise re-appear as a ghost column.
+        if labels_table:
+            try:
+                db.execute("DELETE FROM " + labels_table + " WHERE col_key=?", (col_name,))
+            except Exception:
+                pass
+        db.commit()
+        return jsonify({"ok": True, "col_key": col_name, "note": "column already absent"})
+
+    # ---- 3) Snapshot + delete label row ----
+    label_snapshot = None
     if labels_table:
         try:
-            db.execute("DELETE FROM " + labels_table + " WHERE col_key=?", (col_name,))
+            lbl_cols = [r[1] for r in db.execute(
+                "PRAGMA table_info(" + labels_table + ")"
+            ).fetchall()]
+            if "col_key" in lbl_cols:
+                select_cols = [c for c in lbl_cols if c != "id"]
+                row = db.execute(
+                    "SELECT " + ",".join(select_cols) + " FROM " + labels_table + " WHERE col_key=?",
+                    (col_name,),
+                ).fetchone()
+                if row:
+                    # Row may be a sqlite3.Row / psycopg2 row — pull by index.
+                    label_snapshot = (select_cols, [row[i] for i in range(len(select_cols))])
+                db.execute(
+                    "DELETE FROM " + labels_table + " WHERE col_key=?",
+                    (col_name,),
+                )
         except Exception:
-            pass
+            pass  # No labels table or no row — nothing to snapshot.
+
+    # ---- 4) Run ALTER TABLE DROP COLUMN ----
+    try:
+        db.execute('ALTER TABLE "' + db_table + '" DROP COLUMN "' + col_name + '"')
+    except Exception as ex:
+        # Roll back the label deletion by re-inserting the snapshot.
+        if label_snapshot is not None and labels_table:
+            cols, vals = label_snapshot
+            try:
+                db.execute(
+                    "INSERT INTO " + labels_table + "(" + ",".join(cols) + ") "
+                    "VALUES(" + ",".join(["?"] * len(cols)) + ")",
+                    tuple(vals),
+                )
+            except Exception:
+                pass
+        return jsonify({
+            "ok": False,
+            "error": "could not drop column from database: " + str(ex),
+            "col_key": col_name,
+        }), 500
+
+    # ---- 5) Confirm the column is really gone (catch silent Postgres no-ops) ----
+    try:
+        after_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(" + db_table + ")"
+        ).fetchall()}
+        if col_name in after_cols:
+            # The ALTER reported success but the column is still there (shouldn't
+            # happen, but guard against a driver quirk). Restore the label and error.
+            if label_snapshot is not None and labels_table:
+                cols, vals = label_snapshot
+                try:
+                    db.execute(
+                        "INSERT INTO " + labels_table + "(" + ",".join(cols) + ") "
+                        "VALUES(" + ",".join(["?"] * len(cols)) + ")",
+                        tuple(vals),
+                    )
+                except Exception:
+                    pass
+            return jsonify({
+                "ok": False,
+                "error": "column still present after DROP — database did not accept the change",
+                "col_key": col_name,
+            }), 500
+    except Exception:
+        pass
+
     db.commit()
     return jsonify({"ok": True, "col_key": col_name})
 
