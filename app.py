@@ -440,6 +440,56 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('database', 'visible_tables', 'الجداول الظاهرة', 'all'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'table', 'جدول المجموعات', 'student_groups'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'day_column', 'عمود اليوم', 'day_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'status_column', 'عمود الحالة', 'status'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'message_column', 'عمود الرسالة', 'message'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'message_status_column', 'عمود حالة الرسالة', 'message_status'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'study_status_column', 'عمود حالة الدراسة', 'study_status'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'templates_table', 'جدول قوالب الرسائل', 'message_templates'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'templates_name_column', 'عمود اسم القالب', 'name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'templates_category_column', 'عمود تصنيف القالب', 'category'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'templates_content_column', 'عمود نص القالب', 'content'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'log_table', 'جدول سجل الرسائل', 'message_log'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'log_student_column', 'عمود الطالب في السجل', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'log_whatsapp_column', 'عمود واتساب السجل', 'student_whatsapp'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'log_template_column', 'عمود قالب السجل', 'template_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'reminders_table', 'جدول التذكيرات', 'message_reminders'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('messaging', 'student_id_column', 'عمود الرقم الشخصي', 'personal_id'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'num_installments_column', 'عمود عدد الأقساط', 'num_installments'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_class_column', 'عمود صف الطالب', 'class_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_result_column', 'عمود نتيجة الطالب', 'final_result'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_teacher_column', 'عمود مدرس الطالب', 'teacher_2026'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_subject_column', 'عمود مادة الطالب', 'class_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'attendance_status_column', 'عمود حالة الغياب', 'status'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'teacher_column', 'عمود اسم المدرس', 'teacher_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'level_column', 'عمود المستوى', 'level_course'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'study_time_column', 'عمود وقت الدراسة', 'study_time'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'link_column', 'عمود رابط المجموعة', 'group_link'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'table', 'جدول التقييمات', 'evaluations'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'student_name_column', 'عمود اسم الطالب', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'group_column', 'عمود المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'date_column', 'عمود تاريخ التقييم', 'form_fill_date'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'reading_column', 'عمود القراءة', 'reading'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'dictation_column', 'عمود الإملاء', 'dictation'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'conversation_column', 'عمود المحادثة', 'conversation'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'expression_column', 'عمود التعبير', 'expression'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('evaluations', 'grammar_column', 'عمود القواعد', 'grammar'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'table', 'جدول سجل الدفع', 'payment_log'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'student_name_column', 'عمود اسم الطالب', 'student_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'personal_id_column', 'عمود الرقم', 'personal_id'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'course_amount_column', 'عمود مبلغ الدورة', 'course_amount'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'total_paid_column', 'عمود المدفوع', 'total_paid'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'total_remaining_column', 'عمود المتبقي', 'total_remaining'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'status_column', 'عمود حالة الدفع', 'payment_status'))
     except Exception:
         pass
     db.commit()
@@ -895,6 +945,56 @@ if True:
             ('database', 'visible_tables', 'الجداول الظاهرة', 'all'),
             ('groups', 'table', 'جدول المجموعات', 'student_groups'),
             ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'),
+            ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'),
+            ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'),
+            ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'),
+            ('attendance', 'day_column', 'عمود اليوم', 'day_name'),
+            ('attendance', 'status_column', 'عمود الحالة', 'status'),
+            ('attendance', 'message_column', 'عمود الرسالة', 'message'),
+            ('attendance', 'message_status_column', 'عمود حالة الرسالة', 'message_status'),
+            ('attendance', 'study_status_column', 'عمود حالة الدراسة', 'study_status'),
+            ('messaging', 'templates_table', 'جدول قوالب الرسائل', 'message_templates'),
+            ('messaging', 'templates_name_column', 'عمود اسم القالب', 'name'),
+            ('messaging', 'templates_category_column', 'عمود تصنيف القالب', 'category'),
+            ('messaging', 'templates_content_column', 'عمود نص القالب', 'content'),
+            ('messaging', 'log_table', 'جدول سجل الرسائل', 'message_log'),
+            ('messaging', 'log_student_column', 'عمود الطالب في السجل', 'student_name'),
+            ('messaging', 'log_whatsapp_column', 'عمود واتساب السجل', 'student_whatsapp'),
+            ('messaging', 'log_template_column', 'عمود قالب السجل', 'template_name'),
+            ('messaging', 'reminders_table', 'جدول التذكيرات', 'message_reminders'),
+            ('messaging', 'student_id_column', 'عمود الرقم الشخصي', 'personal_id'),
+            ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'),
+            ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'),
+            ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'),
+            ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'),
+            ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'),
+            ('payment', 'num_installments_column', 'عمود عدد الأقساط', 'num_installments'),
+            ('dashboard', 'students_class_column', 'عمود صف الطالب', 'class_name'),
+            ('dashboard', 'students_result_column', 'عمود نتيجة الطالب', 'final_result'),
+            ('dashboard', 'students_teacher_column', 'عمود مدرس الطالب', 'teacher_2026'),
+            ('dashboard', 'students_subject_column', 'عمود مادة الطالب', 'class_name'),
+            ('dashboard', 'attendance_status_column', 'عمود حالة الغياب', 'status'),
+            ('groups', 'teacher_column', 'عمود اسم المدرس', 'teacher_name'),
+            ('groups', 'level_column', 'عمود المستوى', 'level_course'),
+            ('groups', 'study_time_column', 'عمود وقت الدراسة', 'study_time'),
+            ('groups', 'link_column', 'عمود رابط المجموعة', 'group_link'),
+            ('evaluations', 'table', 'جدول التقييمات', 'evaluations'),
+            ('evaluations', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('evaluations', 'group_column', 'عمود المجموعة', 'group_name'),
+            ('evaluations', 'date_column', 'عمود تاريخ التقييم', 'form_fill_date'),
+            ('evaluations', 'reading_column', 'عمود القراءة', 'reading'),
+            ('evaluations', 'dictation_column', 'عمود الإملاء', 'dictation'),
+            ('evaluations', 'conversation_column', 'عمود المحادثة', 'conversation'),
+            ('evaluations', 'expression_column', 'عمود التعبير', 'expression'),
+            ('evaluations', 'grammar_column', 'عمود القواعد', 'grammar'),
+            ('paylog', 'table', 'جدول سجل الدفع', 'payment_log'),
+            ('paylog', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('paylog', 'personal_id_column', 'عمود الرقم', 'personal_id'),
+            ('paylog', 'course_amount_column', 'عمود مبلغ الدورة', 'course_amount'),
+            ('paylog', 'total_paid_column', 'عمود المدفوع', 'total_paid'),
+            ('paylog', 'total_remaining_column', 'عمود المتبقي', 'total_remaining'),
+            ('paylog', 'status_column', 'عمود حالة الدفع', 'payment_status'),
         ]
         for _p, _c, _lbl, _v in _seed:
             try:
@@ -913,6 +1013,80 @@ if True:
                     pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("settings_seed_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
+    if "settings_seed_v2" not in applied:
+        _seed_v2 = [
+            ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'),
+            ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'),
+            ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'),
+            ('attendance', 'day_column', 'عمود اليوم', 'day_name'),
+            ('attendance', 'status_column', 'عمود الحالة', 'status'),
+            ('attendance', 'message_column', 'عمود الرسالة', 'message'),
+            ('attendance', 'message_status_column', 'عمود حالة الرسالة', 'message_status'),
+            ('attendance', 'study_status_column', 'عمود حالة الدراسة', 'study_status'),
+            ('messaging', 'templates_table', 'جدول قوالب الرسائل', 'message_templates'),
+            ('messaging', 'templates_name_column', 'عمود اسم القالب', 'name'),
+            ('messaging', 'templates_category_column', 'عمود تصنيف القالب', 'category'),
+            ('messaging', 'templates_content_column', 'عمود نص القالب', 'content'),
+            ('messaging', 'log_table', 'جدول سجل الرسائل', 'message_log'),
+            ('messaging', 'log_student_column', 'عمود الطالب في السجل', 'student_name'),
+            ('messaging', 'log_whatsapp_column', 'عمود واتساب السجل', 'student_whatsapp'),
+            ('messaging', 'log_template_column', 'عمود قالب السجل', 'template_name'),
+            ('messaging', 'reminders_table', 'جدول التذكيرات', 'message_reminders'),
+            ('messaging', 'student_id_column', 'عمود الرقم الشخصي', 'personal_id'),
+            ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'),
+            ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'),
+            ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'),
+            ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'),
+            ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'),
+            ('payment', 'num_installments_column', 'عمود عدد الأقساط', 'num_installments'),
+            ('dashboard', 'students_class_column', 'عمود صف الطالب', 'class_name'),
+            ('dashboard', 'students_result_column', 'عمود نتيجة الطالب', 'final_result'),
+            ('dashboard', 'students_teacher_column', 'عمود مدرس الطالب', 'teacher_2026'),
+            ('dashboard', 'students_subject_column', 'عمود مادة الطالب', 'class_name'),
+            ('dashboard', 'attendance_status_column', 'عمود حالة الغياب', 'status'),
+            ('groups', 'teacher_column', 'عمود اسم المدرس', 'teacher_name'),
+            ('groups', 'level_column', 'عمود المستوى', 'level_course'),
+            ('groups', 'study_time_column', 'عمود وقت الدراسة', 'study_time'),
+            ('groups', 'link_column', 'عمود رابط المجموعة', 'group_link'),
+            ('evaluations', 'table', 'جدول التقييمات', 'evaluations'),
+            ('evaluations', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('evaluations', 'group_column', 'عمود المجموعة', 'group_name'),
+            ('evaluations', 'date_column', 'عمود تاريخ التقييم', 'form_fill_date'),
+            ('evaluations', 'reading_column', 'عمود القراءة', 'reading'),
+            ('evaluations', 'dictation_column', 'عمود الإملاء', 'dictation'),
+            ('evaluations', 'conversation_column', 'عمود المحادثة', 'conversation'),
+            ('evaluations', 'expression_column', 'عمود التعبير', 'expression'),
+            ('evaluations', 'grammar_column', 'عمود القواعد', 'grammar'),
+            ('paylog', 'table', 'جدول سجل الدفع', 'payment_log'),
+            ('paylog', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
+            ('paylog', 'personal_id_column', 'عمود الرقم', 'personal_id'),
+            ('paylog', 'course_amount_column', 'عمود مبلغ الدورة', 'course_amount'),
+            ('paylog', 'total_paid_column', 'عمود المدفوع', 'total_paid'),
+            ('paylog', 'total_remaining_column', 'عمود المتبقي', 'total_remaining'),
+            ('paylog', 'status_column', 'عمود حالة الدفع', 'payment_status'),
+        ]
+        for _p, _c, _lbl, _v in _seed_v2:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                    "ON CONFLICT(page,component) DO NOTHING",
+                    (_p, _c, _lbl, _v),
+                )
+            except Exception:
+                try:
+                    db2.execute(
+                        "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                        (_p, _c, _lbl, _v),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("settings_seed_v2",))
         except Exception:
             pass
         db2.commit()
