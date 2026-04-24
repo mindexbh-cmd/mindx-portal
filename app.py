@@ -3445,8 +3445,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('students')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal('students')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+  <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('students')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('students')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;..." oninput="filterTable()">
     <button class="btn-search" onclick="filterTable()">&#x628;&#x62D;&#x62B;</button>
@@ -3501,7 +3501,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('student_groups')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openGroupTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('groups')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00BCD4,#0097A7);" onclick="openAddGroupModal2()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('student_groups')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal('groups')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('groups')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('groups')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button id="bulkDelBtn_groups" class="btn-bulk-del" onclick="_bulkDelete('groupsBody2',function(id){return '/api/groups/'+id;},loadGroups2,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="cleanupEmptyGroups()">&#x1F9F9; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x641;&#x627;&#x631;&#x63A;&#x629;</button></div>
   <div class="search-bar">
     <input type="text" id="groupSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x623;&#x648; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;..." oninput="filterGroupTable2()">
     <button class="btn-search" style="background:#0097A7;" onclick="filterGroupTable2()">&#x628;&#x62D;&#x62B;</button>
@@ -3529,9 +3529,9 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
     <span id="taqseetCount" style="background:#6c3fa0;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;">0</span>
     <button onclick="openAddTaqseet()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#43; &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641;</button>
-    <button onclick="openGenericExcelModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button onclick="openGenericExcelModal()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#3F51B5,#5C6BC0);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" style="padding:8px 16px;font-size:13px;" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-    <button onclick="openTaqseetEditModal()" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-    <button onclick="openFreezeModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button>
+    <button onclick="openGenericExcelModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button onclick="openGenericExcelModal()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#3F51B5,#5C6BC0);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" style="padding:8px 16px;font-size:13px;" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button onclick="openUniversalTableEditModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:#9C27B0;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button onclick="openFreezeModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('taqseet')">&#x1F50D; &#x628;&#x62D;&#x62B;</button>
     <button id="bulkDelBtn_taqseet" class="btn-bulk-del" style="padding:8px 16px;font-size:13px;" onclick="_bulkDelete('taqseetBody',function(id){return '/api/taqseet/'+id;},loadTaqseet,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
   <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
@@ -3599,8 +3599,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
   <button class="btn-add" style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);" onclick="openAttendanceAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button><button class="btn-add" style="background:linear-gradient(135deg,#388E3C,#66BB6A);" onclick="openAttendanceExcelModal()">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openAttendanceTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-  <button class="btn-add" style="background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('attendance')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#E65100,#FFA726);" onclick="openUniversalTableEditModal('attendance')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+  <button class="btn-add" style="background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('attendance')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('attendance')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
   <button id="bulkDelBtn_attendance" class="btn-bulk-del" onclick="_bulkDelete('attendanceBody',function(id){return '/api/attendance/'+id;},loadAttendance,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
     <input type="text" id="attendanceSearchInput" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x641;&#x64A; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;..." oninput="filterAttendanceTable()">
@@ -3640,8 +3640,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
     <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1976D2,#42A5F5);" onclick="openAddEvalModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
     <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('evaluations')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openEvalTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('evals')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal('evaluations')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('evals')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('evals')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
     <button id="bulkDelBtn_evals" class="btn-bulk-del" onclick="_bulkDelete('evalsBody',function(id){return '/api/evaluations/'+id;},loadEvaluations,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
   <div class="search-bar">
@@ -3675,8 +3675,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
     <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="openAddPaylogModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x633;&#x62C;&#x644;</button>
     <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openGenericExcelModal('payment_log')">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button>
-    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openPaylogTableEditModal()">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
-    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('paylog')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal('payment_log')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
+    <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('paylog')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('paylog')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
     <button id="bulkDelBtn_paylog" class="btn-bulk-del" onclick="_bulkDelete('paylogBody',function(id){return '/api/payment-log/'+id;},loadPaymentLog,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x633;&#x62C;&#x644;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
   <div class="search-bar">
@@ -3884,7 +3884,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 <!-- GENERIC EXCEL IMPORT MODAL -->
 <div class="modal-bg" id="genExcelModal">
   <div class="modal" style="border-top:4px solid #3F51B5;max-width:520px;">
-    <h2 style="color:#3F51B5;">&#x1F4E5; &#x625;&#x636;&#x627;&#x641;&#x629; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x645;&#x646; Excel</h2>
+    <h2 style="color:#3F51B5;">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</h2>
     <div style="margin-bottom:14px;">
       <label style="display:block;font-size:13px;color:#3F51B5;font-weight:600;margin-bottom:6px;">&#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
       <select id="genExcelTable" onchange="onGenExcelTableChange()" style="width:100%;padding:10px;border:1.5px solid #C5CAE9;border-radius:9px;font-size:14px;background:#fafafa;">
@@ -4145,6 +4145,42 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     <div class="modal-actions">
       <button class="btn-save" style="background:linear-gradient(135deg,#00897B,#00695C);" onclick="savePaylog()">&#x62D;&#x641;&#x638;</button>
       <button class="btn-cancel" style="background:#e0f2f1;color:#00695C;" onclick="closePaylogModal()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+    </div>
+  </div>
+</div>
+<!-- UNIVERSAL TABLE EDIT MODAL -->
+<style>
+.utem-col-row{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #eee;}
+.utem-col-row:last-child{border-bottom:none;}
+.utem-col-label{flex:1;font-size:14px;color:#333;}
+.utem-col-input{flex:1;padding:6px 10px;border:1.5px solid #90CAF9;border-radius:7px;font-size:14px;}
+.utem-col-btn{background:none;border:1px solid #ddd;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:14px;transition:all .15s;}
+.utem-col-btn:hover{background:#f5f5f5;}
+.utem-col-btn.ok{background:#43A047;color:#fff;border-color:#43A047;}
+.utem-col-btn.cancel{background:#e0e0e0;}
+.utem-col-btn.del{color:#e53935;}
+.utem-col-btn.del:hover{background:#ffebee;}
+.utem-cols-body{max-height:45vh;overflow-y:auto;border:1px solid #e8e8e8;border-radius:10px;padding:4px;background:#fafafa;margin:10px 0;}
+</style>
+<div class="modal-bg" id="universalTableEditModal">
+  <div class="modal" style="max-width:680px;border-top:4px solid #1976D2;">
+    <h2 id="utemTitle" style="color:#1565C0;">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</h2>
+    <div class="field" style="margin-bottom:12px;">
+      <label style="color:#1565C0;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</label>
+      <input id="utemTableName" style="width:100%;padding:9px 12px;border:1.5px solid #bbdefb;border-radius:9px;background:#f0f7ff;" />
+    </div>
+    <div style="font-weight:700;color:#1565C0;margin-top:8px;">&#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;</div>
+    <div id="utemColumnsBody" class="utem-cols-body"></div>
+    <div class="field" style="margin-bottom:12px;display:flex;gap:8px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label style="color:#FF6B35;">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F; &#x62C;&#x62F;&#x64A;&#x62F;</label>
+        <input id="utemNewColLabel" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A;" style="width:100%;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;background:#fff9f7;"/>
+      </div>
+      <button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="utemAddColumn()">&#x625;&#x636;&#x627;&#x641;&#x629;</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" style="background:linear-gradient(135deg,#1976D2,#1565C0);" onclick="utemSave()">&#x1F4BE; &#x62D;&#x641;&#x638;</button>
+      <button class="btn-cancel" style="background:#e3f2fd;color:#1565C0;" onclick="utemClose()">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
     </div>
   </div>
 </div>
@@ -4928,6 +4964,135 @@ function confirmGroupDelete2(){
   }).catch(function(){closeGroupConfirm2();});
 }
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
+// --- Universal Table Edit Modal ---
+var _utemTableKey = null;
+var _utemColumns = [];
+var _utemEditingKey = null;  // col_key currently being inline-renamed
+
+// Map a frontend table key to a data-loader function that refreshes the main table.
+var _UTEM_LOADERS = {
+  students: 'loadStudents',
+  groups: 'loadGroups2', student_groups: 'loadGroups2',
+  taqseet: 'loadTaqseet',
+  attendance: 'loadAttendance',
+  evaluations: 'loadEvaluations', evals: 'loadEvaluations',
+  payment_log: 'loadPaymentLog', paylog: 'loadPaymentLog'
+};
+function _utemReload(){ var fn = window[_UTEM_LOADERS[_utemTableKey]]; if(typeof fn === 'function') fn(); }
+
+function openUniversalTableEditModal(tableKey){
+  _utemTableKey = tableKey;
+  _utemEditingKey = null;
+  fetch('/api/custom-table/' + encodeURIComponent(tableKey) + '/columns', {credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.ok){ showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); return; }
+      _utemColumns = d.columns || [];
+      document.getElementById('utemTableName').value = d.db_table || tableKey;
+      _utemRenderColumns();
+      document.getElementById('universalTableEditModal').classList.add('open');
+    })
+    .catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function utemClose(){ document.getElementById('universalTableEditModal').classList.remove('open'); }
+function _utemRenderColumns(){
+  var body = document.getElementById('utemColumnsBody');
+  if(!_utemColumns.length){ body.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0639\u0645\u062f\u0629</div>'; return; }
+  var html = '';
+  for(var i=0;i<_utemColumns.length;i++){
+    var c = _utemColumns[i];
+    var key = c.col_key;
+    var lbl = c.col_label;
+    if (_utemEditingKey === key) {
+      html += '<div class="utem-col-row" data-key="' + key + '">' +
+        '<input class="utem-col-input" id="utemRenameInput_' + key + '" value="' + (lbl||'').replace(/"/g,'&quot;') + '"/>' +
+        '<button class="utem-col-btn ok" onclick="_utemCommitRename(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">\u0645\u0648\u0627\u0641\u0642</button>' +
+        '<button class="utem-col-btn cancel" onclick="_utemCancelRename()">\u0625\u0644\u063a\u0627\u0621</button>' +
+      '</div>';
+    } else {
+      html += '<div class="utem-col-row" data-key="' + key + '">' +
+        '<span class="utem-col-label">' + (lbl||key) + '</span>' +
+        '<button class="utem-col-btn" title="\u0625\u0639\u0627\u062f\u0629 \u062a\u0633\u0645\u064a\u0629" onclick="_utemStartRename(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">&#x270F;</button>' +
+        '<button class="utem-col-btn del" title="\u062d\u0630\u0641" onclick="_utemDeleteColumn(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">&#x1F5D1;</button>' +
+      '</div>';
+    }
+  }
+  body.innerHTML = html;
+  // autofocus the active input if any
+  if (_utemEditingKey) {
+    var el = document.getElementById('utemRenameInput_' + _utemEditingKey);
+    if (el) { el.focus(); el.select(); }
+  }
+}
+function _utemStartRename(key){ _utemEditingKey = key; _utemRenderColumns(); }
+function _utemCancelRename(){ _utemEditingKey = null; _utemRenderColumns(); }
+function _utemCommitRename(key){
+  var inp = document.getElementById('utemRenameInput_' + key);
+  if(!inp) return;
+  var newLabel = inp.value.trim();
+  if(!newLabel){ showToast('\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628','#e53935'); return; }
+  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/rename-column', {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({old_name: key, new_label: newLabel})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      _utemEditingKey = null;
+      showToast('\u062a\u0645 \u0627\u0644\u062a\u0639\u062f\u064a\u0644','#1976D2');
+      openUniversalTableEditModal(_utemTableKey);
+      _utemReload();
+    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function _utemDeleteColumn(key){
+  if(!confirm('\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062f\u061f \u0633\u064a\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0641\u064a\u0647')) return;
+  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/delete-column/' + encodeURIComponent(key), {
+    method:'DELETE', credentials:'include'
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935');
+      openUniversalTableEditModal(_utemTableKey);
+      _utemReload();
+    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function utemAddColumn(){
+  var inp = document.getElementById('utemNewColLabel');
+  var label = inp.value.trim();
+  if(!label){ showToast('\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628','#e53935'); return; }
+  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/add-column', {
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({col_label: label})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      inp.value = '';
+      showToast('\u062a\u0645 \u0627\u0644\u0625\u0636\u0627\u0641\u0629','#00897B');
+      openUniversalTableEditModal(_utemTableKey);
+      _utemReload();
+    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
+}
+function utemSave(){
+  var nm = document.getElementById('utemTableName').value.trim();
+  if(!nm){ utemClose(); return; }
+  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/rename', {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({new_label: nm, new_name: nm})
+  }).then(function(r){return r.json();}).then(function(d){
+    utemClose();
+    showToast('\u062a\u0645 \u0627\u0644\u062d\u0641\u0638','#1976D2');
+    _utemReload();
+  }).catch(function(){ utemClose(); });
+}
+// Search-button helper: focus the table's search input.
+function utemFocusSearch(tableKey){
+  var ids = {students:'searchInput', groups:'groupSearchInput', student_groups:'groupSearchInput',
+             taqseet:null, attendance:'attendanceSearchInput',
+             evaluations:'evalsSearchInput', evals:'evalsSearchInput',
+             payment_log:'paylogSearchInput', paylog:'paylogSearchInput'};
+  var id = ids[tableKey];
+  if(id){ var el = document.getElementById(id); if(el){ el.focus(); el.scrollIntoView({behavior:'smooth',block:'center'}); } }
+}
+
 var studentExcelData=[];function openStudentExcelModal(){studentExcelData=[];document.getElementById("studentExcelFile").value="";document.getElementById("studentExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("studentExcelPreview").style.display="none";document.getElementById("studentExcelImportBtn").style.display="none";document.getElementById("studentExcelModal").classList.add("open");}function closeStudentExcelModal(){document.getElementById("studentExcelModal").classList.remove("open");}document.addEventListener("DOMContentLoaded",function(){var sf=document.getElementById("studentExcelFile");if(sf){sf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("studentExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({personal_id:(cols[0]||"").trim(),student_name:(cols[1]||"").trim(),whatsapp:(cols[2]||"").trim(),final_result:(cols[3]||"").trim(),level_reached_2026:(cols[4]||"").trim(),teacher_2026:(cols[5]||"").trim(),mother_phone:(cols[6]||"").trim(),father_phone:(cols[7]||"").trim(),other_phone:(cols[8]||"").trim(),residence:(cols[9]||"").trim(),home_address:(cols[10]||"").trim(),road:(cols[11]||"").trim(),complex_name:(cols[12]||"").trim()});}studentExcelData=parsed;document.getElementById("studentExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x637;&#x627;&#x644;&#x628;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("studentExcelPreview").style.display="block";document.getElementById("studentExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}var gf=document.getElementById("groupExcelFile");if(gf){gf.addEventListener("change",function(e){var file=e.target.files[0];if(!file)return;document.getElementById("groupExcelFileName").textContent=file.name;var reader=new FileReader();reader.onload=function(ev){var data=ev.target.result;var rows=data.split(String.fromCharCode(10)).filter(function(r){return r.trim()!="";});if(rows.length<2){showToast("&#x627;&#x644;&#x645;&#x644;&#x641; &#x641;&#x627;&#x631;&#x63A;","#e53935");return;}var sep=rows[0].indexOf(String.fromCharCode(9))>-1?"\t":",",parsed=[];for(var i=1;i<rows.length;i++){var cols=rows[i].split(sep);if(cols.length<2)continue;parsed.push({group_name:(cols[0]||"").trim(),teacher_name:(cols[1]||"").trim(),level_course:(cols[2]||"").trim(),last_reached:(cols[3]||"").trim(),study_time:(cols[4]||"").trim(),ramadan_time:(cols[5]||"").trim(),online_time:(cols[6]||"").trim(),group_link:(cols[7]||"").trim(),session_duration:(cols[8]||"").trim()});}groupExcelData=parsed;document.getElementById("groupExcelCount").textContent="&#x62A;&#x645; &#x642;&#x631;&#x627;&#x621;&#x629; "+parsed.length+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;. &#x627;&#x636;&#x63A;&#x637; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.";document.getElementById("groupExcelPreview").style.display="block";document.getElementById("groupExcelImportBtn").style.display="inline-block";};reader.readAsText(file,"UTF-8");});}});function importStudentsFromExcel(){if(!studentExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("studentExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/students/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:studentExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeStudentExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x637;&#x627;&#x644;&#x628; &#x628;&#x646;&#x62C;&#x627;&#x62D;");loadStudents();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}var groupExcelData=[];function openGroupExcelModal(){groupExcelData=[];document.getElementById("groupExcelFile").value="";document.getElementById("groupExcelFileName").textContent="&#x644;&#x645; &#x64A;&#x62A;&#x645; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;";document.getElementById("groupExcelPreview").style.display="none";document.getElementById("groupExcelImportBtn").style.display="none";document.getElementById("groupExcelModal").classList.add("open");}function closeGroupExcelModal(){document.getElementById("groupExcelModal").classList.remove("open");}function importGroupsFromExcel(){if(!groupExcelData.length){showToast("&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;","#e53935");return;}var btn=document.getElementById("groupExcelImportBtn");btn.disabled=true;btn.textContent="&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;...";fetch("/api/groups/bulk",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({rows:groupExcelData})}).then(function(r){return r.text();}).then(function(txt){var data;try{data=JSON.parse(txt);}catch(e){showToast("&#x627;&#x646;&#x62A;&#x647;&#x62A; &#x627;&#x644;&#x62C;&#x644;&#x633;&#x629;&#x60C; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x62E;&#x648;&#x644; &#x645;&#x62C;&#x62F;&#x62F;&#x627;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";return;}if(data.ok){closeGroupExcelModal();showToast("&#x62A;&#x645; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; "+data.imported+" &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x628;&#x646;&#x62C;&#x627;&#x62D;","#00BCD4");loadGroups2();}else{showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;","#e53935");}btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";}).catch(function(){showToast("&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;","#e53935");btn.disabled=false;btn.textContent="&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;";});}
 loadGroups2();
 
@@ -7130,6 +7295,202 @@ def api_paylog_columns_update(col_key):
         return jsonify({"ok":True})
     except Exception as ex:
         return jsonify({"ok":False,"error":str(ex)}),400
+
+
+# --- Unified Table Management (works for all tables) ---------------------
+
+# Maps a frontend table key to (db_table_name, labels_table_name_or_None).
+# Also accepts numeric ids for entries in custom_tables.
+_TABLE_MAP = {
+    "students":       ("students",        "column_labels"),
+    "groups":         ("student_groups",  "group_col_labels"),
+    "student_groups": ("student_groups",  "group_col_labels"),
+    "attendance":     ("attendance",      "att_col_labels"),
+    "evaluations":    ("evaluations",     "eval_col_labels"),
+    "evals":          ("evaluations",     "eval_col_labels"),
+    "payment_log":    ("payment_log",     "paylog_col_labels"),
+    "paylog":         ("payment_log",     "paylog_col_labels"),
+    "taqseet":        ("taqseet",         None),  # taqseet has no label table
+}
+
+def _resolve_table(tid):
+    """Return (db_table, labels_table) for a table identifier.
+
+    tid can be either a built-in table key (e.g. 'students', 'payment_log')
+    or a stringified numeric id that points at a row in custom_tables.
+    Returns (None, None) if not found.
+    """
+    tid_str = str(tid or "").strip()
+    if tid_str.isdigit():
+        db = get_db()
+        try:
+            row = db.execute("SELECT tbl_name FROM custom_tables WHERE id=?", (int(tid_str),)).fetchone()
+            if row:
+                return (row[0], None)
+        except Exception:
+            return (None, None)
+        return (None, None)
+    return _TABLE_MAP.get(tid_str, (None, None))
+
+
+def _is_safe_ident(s):
+    import re as _re
+    return bool(s and _re.match(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$', s))
+
+
+@app.route('/api/custom-table/<tid>/columns', methods=['GET'])
+@login_required
+def api_unified_columns_get(tid):
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    live_cols = [r[1] for r in db.execute("PRAGMA table_info(" + db_table + ")").fetchall()]
+    live_cols = [c for c in live_cols if c not in ("id", "created_at")]
+    label_map = {}
+    if labels_table:
+        try:
+            for r in db.execute("SELECT col_key, col_label FROM " + labels_table).fetchall():
+                label_map[r[0]] = r[1]
+        except Exception:
+            pass
+    # Preserve the column order reported by the live schema.
+    out = [{"col_key": c, "col_label": label_map.get(c) or c} for c in live_cols]
+    # Table-level label: for custom tables, use tbl_name; for built-in, leave blank.
+    return jsonify({"ok": True, "columns": out, "db_table": db_table})
+
+
+@app.route('/api/custom-table/<tid>/add-column', methods=['POST'])
+@login_required
+def api_unified_add_column(tid):
+    d = request.get_json() or {}
+    col_key_raw = (d.get("col_key") or "").strip()
+    col_label = (d.get("col_label") or "").strip()
+    if not col_label:
+        return jsonify({"ok": False, "error": "col_label required"}), 400
+    if not col_key_raw:
+        # derive a safe key from the label
+        col_key_raw = col_label.lower().replace(" ", "_")
+        col_key_raw = "".join(ch for ch in col_key_raw if ch.isalnum() or ch == "_")
+        if not col_key_raw or col_key_raw[0].isdigit():
+            col_key_raw = "col_" + str(int(__import__('time').time() * 1000) % 10000000)
+    if not _is_safe_ident(col_key_raw):
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    try:
+        db.execute('ALTER TABLE "' + db_table + '" ADD COLUMN "' + col_key_raw + '" TEXT')
+    except Exception as ex:
+        # column may already exist — don't fail
+        pass
+    if labels_table:
+        try:
+            max_order = db.execute("SELECT MAX(col_order) FROM " + labels_table).fetchone()[0] or 0
+            db.execute("INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
+                       (col_key_raw, col_label, max_order + 1))
+        except Exception:
+            try:
+                db.execute("UPDATE " + labels_table + " SET col_label=? WHERE col_key=?", (col_label, col_key_raw))
+            except Exception:
+                pass
+    db.commit()
+    return jsonify({"ok": True, "col_key": col_key_raw})
+
+
+@app.route('/api/custom-table/<tid>/rename-column', methods=['PATCH'])
+@login_required
+def api_unified_rename_column(tid):
+    d = request.get_json() or {}
+    old_key = (d.get("old_name") or d.get("col_key") or "").strip()
+    new_label = (d.get("new_label") or d.get("col_label") or "").strip()
+    new_key = (d.get("new_key") or "").strip()  # optional schema-level rename
+    if not old_key or not new_label:
+        return jsonify({"ok": False, "error": "old_name and new_label required"}), 400
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    try:
+        if new_key and new_key != old_key:
+            if not _is_safe_ident(new_key):
+                return jsonify({"ok": False, "error": "invalid new_key"}), 400
+            try:
+                db.execute('ALTER TABLE "' + db_table + '" RENAME COLUMN "' + old_key + '" TO "' + new_key + '"')
+            except Exception as ex:
+                return jsonify({"ok": False, "error": "rename column failed: " + str(ex)}), 400
+            if labels_table:
+                try:
+                    db.execute("UPDATE " + labels_table + " SET col_key=?, col_label=? WHERE col_key=?",
+                               (new_key, new_label, old_key))
+                except Exception:
+                    pass
+        else:
+            if labels_table:
+                try:
+                    cur = db.execute("UPDATE " + labels_table + " SET col_label=? WHERE col_key=?",
+                                     (new_label, old_key))
+                    if cur.rowcount == 0:
+                        max_order = db.execute("SELECT MAX(col_order) FROM " + labels_table).fetchone()[0] or 0
+                        db.execute("INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
+                                   (old_key, new_label, max_order + 1))
+                except Exception:
+                    pass
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/custom-table/<tid>/delete-column/<col_name>', methods=['DELETE'])
+@login_required
+def api_unified_delete_column(tid, col_name):
+    if not _is_safe_ident(col_name):
+        return jsonify({"ok": False, "error": "invalid column name"}), 400
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    # Drop the DB column (best-effort: may not exist if schema is out of sync)
+    try:
+        db.execute('ALTER TABLE "' + db_table + '" DROP COLUMN "' + col_name + '"')
+    except Exception:
+        pass
+    # Remove the label entry
+    if labels_table:
+        try:
+            db.execute("DELETE FROM " + labels_table + " WHERE col_key=?", (col_name,))
+        except Exception:
+            pass
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route('/api/custom-table/<tid>/rename', methods=['PATCH'])
+@login_required
+def api_unified_rename_table(tid):
+    d = request.get_json() or {}
+    new_name = (d.get("new_name") or "").strip()
+    new_label = (d.get("new_label") or "").strip()
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    db = get_db()
+    # For custom tables (numeric id), actually ALTER TABLE RENAME.
+    if str(tid).isdigit() and new_name:
+        if not _is_safe_ident(new_name):
+            return jsonify({"ok": False, "error": "invalid table name"}), 400
+        try:
+            db.execute('ALTER TABLE "' + db_table + '" RENAME TO "' + new_name + '"')
+            db.execute("UPDATE custom_tables SET tbl_name=? WHERE id=?", (new_name, int(tid)))
+            db.commit()
+            return jsonify({"ok": True, "new_name": new_name})
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 400
+    # For built-in tables: no-op (names are fixed). Accept the request so the
+    # unified modal can call this endpoint uniformly.
+    return jsonify({"ok": True, "new_label": new_label})
 
 
 # --- Evaluations (التقييمات) ---------------------------------------------
