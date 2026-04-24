@@ -8905,24 +8905,69 @@ def api_student_details(sid):
     pl_remain  = _plcfg('total_remaining_column','total_remaining')
     pl_status  = _plcfg('status_column',         'payment_status')
     pl_record = None
+    # Ladder of lookup attempts. Stops on first hit. Covers the common
+    # failure modes the user reported: extra whitespace, internal
+    # whitespace runs, one side has the name but the other doesn't have
+    # a personal_id, Arabic prefix/suffix differences.
     try:
         live_pl_cols = set(get_table_columns(pl_table))
         if live_pl_cols:
-            where_parts, params = [], []
-            pid = (s_dict.get("personal_id") or "").strip()
-            if pid and pl_pid in live_pl_cols:
-                where_parts.append("TRIM(" + pl_pid + ") = ?")
-                params.append(pid)
-            name = (s_dict.get("student_name") or "").strip()
-            if name and pl_name in live_pl_cols:
-                where_parts.append("TRIM(" + pl_name + ") = ?")
-                params.append(name)
-            if where_parts:
-                sql = ("SELECT * FROM " + pl_table + " WHERE " +
-                       " OR ".join(where_parts) + " LIMIT 1")
-                row = db.execute(sql, tuple(params)).fetchone()
-                if row:
-                    pl_record = dict(row)
+            pid_raw  = (s_dict.get("personal_id") or "").strip()
+            name_raw = (s_dict.get("student_name") or "").strip()
+            name_collapsed = " ".join(name_raw.split())  # collapse whitespace runs
+            attempts = []
+            if pid_raw and pl_pid in live_pl_cols:
+                attempts.append((
+                    "TRIM(" + pl_pid + ") = ?",
+                    (pid_raw,),
+                ))
+            if name_collapsed and pl_name in live_pl_cols:
+                # Exact trim match
+                attempts.append((
+                    "TRIM(" + pl_name + ") = ?",
+                    (name_collapsed,),
+                ))
+                # Fuzzy contains in either direction — covers cases where
+                # one table stores the family name and the other has the
+                # full four-part name.
+                attempts.append((
+                    "TRIM(" + pl_name + ") LIKE ?",
+                    ("%" + name_collapsed + "%",),
+                ))
+                attempts.append((
+                    "? LIKE '%' || TRIM(" + pl_name + ") || '%'",
+                    (name_collapsed,),
+                ))
+            for where, params in attempts:
+                try:
+                    row = db.execute(
+                        "SELECT * FROM " + pl_table + " WHERE " + where + " LIMIT 1",
+                        params,
+                    ).fetchone()
+                    if row:
+                        pl_record = dict(row)
+                        break
+                except Exception:
+                    continue
+            # Final fallback: if still no hit, scan every paylog row and
+            # compare names via _att_normalize_ar, which folds alef/yeh/
+            # teh-marbouta variants, drops tashkeel, and — crucially —
+            # collapses internal whitespace runs that SQL TRIM() leaves
+            # behind. Table is small (hundreds of rows), so cost is fine.
+            if pl_record is None and name_collapsed and pl_name in live_pl_cols:
+                try:
+                    target = _att_normalize_ar(name_collapsed)
+                    if target:
+                        rows = db.execute("SELECT * FROM " + pl_table).fetchall()
+                        for r in rows:
+                            other = _att_normalize_ar((r[pl_name] or "").strip())
+                            if not other:
+                                continue
+                            if other == target or target in other or other in target:
+                                pl_record = dict(r)
+                                break
+                except Exception:
+                    pass
     except Exception:
         pl_record = None
 
