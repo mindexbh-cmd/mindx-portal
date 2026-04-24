@@ -6654,7 +6654,7 @@ def database():
 @login_required
 def api_students_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM students ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM students ORDER BY id ASC").fetchall()
     return jsonify({"students": [dict(r) for r in rows]})
 
 @app.route("/api/students", methods=["POST"])
@@ -7001,7 +7001,7 @@ def _payment_log_writable_cols(db):
 @login_required
 def api_payment_log_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM payment_log ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM payment_log ORDER BY id ASC").fetchall()
     return jsonify({"rows": [dict(r) for r in rows]})
 
 @app.route("/api/payment-log", methods=["POST"])
@@ -7135,7 +7135,7 @@ def _evaluations_writable_cols(db):
 @login_required
 def api_evaluations_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM evaluations ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM evaluations ORDER BY id ASC").fetchall()
     return jsonify({"rows": [dict(r) for r in rows]})
 
 @app.route("/api/evaluations", methods=["POST"])
@@ -7263,7 +7263,7 @@ def api_eval_columns_update(col_key):
 @login_required
 def api_attendance_get():
     db = get_db()
-    rows = db.execute("SELECT * FROM attendance ORDER BY id DESC").fetchall()
+    rows = db.execute("SELECT * FROM attendance ORDER BY id ASC").fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route('/api/attendance', methods=['POST'])
