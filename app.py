@@ -5349,7 +5349,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     <button onclick="openFreezeModal('taqseet')" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;font-weight:700;cursor:pointer;font-size:13px;">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('taqseet')">&#x1F50D; &#x628;&#x62D;&#x62B;</button>
     <button id="bulkDelBtn_taqseet" class="btn-bulk-del" style="padding:8px 16px;font-size:13px;" onclick="_bulkDelete('taqseetBody',function(id){return '/api/taqseet/'+id;},loadTaqseet,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x635;&#x641;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
   </div>
-  <div id="taqseetWrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
+  <div id="taqseetWrap" class="table-wrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
     <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
       <thead>
         <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
@@ -13491,7 +13491,18 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   }
 
   function wireColumnFilters(){
-    document.querySelectorAll('.table-wrap table, .att-table-wrap table').forEach(function(table){
+    // Any table inside a wrapper marked .table-wrap / .att-table-wrap /
+    // #taqseetWrap (or .db-section / .custom-table-section for tables
+    // that forgot the wrapper class entirely). Deduped via a Set so the
+    // same table never gets processed twice.
+    var seen = new Set();
+    var nodes = document.querySelectorAll(
+      '.table-wrap table, .att-table-wrap table, #taqseetWrap table, ' +
+      '.db-section table, .custom-table-section table'
+    );
+    nodes.forEach(function(table){
+      if (seen.has(table)) return;
+      seen.add(table);
       var thead = table.querySelector('thead');
       var tbody = table.querySelector('tbody');
       if (!thead || !tbody) return;
