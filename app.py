@@ -1821,7 +1821,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   </div>
 </div>
 
-<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:780px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
+<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;"><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="ss-group" onchange="ssOnGroupChange()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;font-weight:600;color:#3e2723;"></select></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
 
 <div id="sd-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:560px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(21,101,192,0.25);"><div style="background:linear-gradient(135deg,#1565C0,#1E88E5);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('sd-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#e3f2fd;border-bottom:1px solid #bbdefb;"><label style="display:block;font-weight:bold;color:#0d47a1;margin-bottom:6px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sd-group" onchange="sdLoadDates()" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #1E88E5;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div id="sd-body" style="padding:14px 20px;max-height:55vh;overflow:auto;font-size:0.95rem;color:#333;"></div><div id="sd-footer" style="padding:12px 20px;border-top:1px solid #eee;text-align:center;display:none;"><button id="sd-save" onclick="sdSave()" style="padding:10px 36px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">&#x62D;&#x641;&#x638;</button></div></div></div>
 
@@ -1855,34 +1855,134 @@ function _ssFmtH(v){
   if(Math.abs(n-Math.round(n))<0.01) return String(Math.round(n));
   return n.toFixed(1);
 }
+function _ssPct(p){ var n=parseFloat(p||0); return (isFinite(n)?n:0) + "%"; }
+function _ssRateColor(p){
+  var n=parseFloat(p||0);
+  if (n >= 90) return '#2E7D32';
+  if (n >= 75) return '#F9A825';
+  if (n >= 50) return '#EF6C00';
+  return '#c62828';
+}
+function _ssRow(r){
+  var rate = parseFloat(r.rate_pct||0);
+  var color = _ssRateColor(rate);
+  return ''
+    + '<tr>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;font-weight:700;color:#3e2723;text-align:right;">' + (r.student_name||'') + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;color:#5d4037;font-size:0.88rem;">' + (r.group_name||'') + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:#1565C0;">' + (r.total_sessions||0) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#2E7D32;">' + (r.present||0) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#c62828;">' + (r.absent||0) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:700;color:#E65100;">' + (r.late||0) + '</td>'
+    +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:' + color + ';">' + rate.toFixed(1) + '%</td>'
+    + '</tr>';
+}
+function _ssTableHead(){
+  return ''
+    + '<thead>'
+    +   '<tr style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;">'
+    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628</th>'
+    +     '<th style="padding:10px 12px;text-align:right;font-size:0.85rem;">\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u062D\u0636\u0631</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u063A\u0627\u0628</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0645\u062A\u0623\u062E\u0631</th>'
+    +     '<th style="padding:10px 12px;text-align:center;font-size:0.85rem;">\u0646\u0633\u0628\u0629 \u0627\u0644\u062D\u0636\u0648\u0631</th>'
+    +   '</tr>'
+    + '</thead>';
+}
+function _ssRenderStudents(list, headerHtml){
+  var body = document.getElementById('ss-body');
+  var html = headerHtml || '';
+  if (!list || !list.length){
+    html += '<div style="padding:24px;text-align:center;color:#888;font-weight:700;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A</div>';
+    body.innerHTML = html;
+    return;
+  }
+  html += '<div style="overflow:auto;border:1px solid #ffe0b2;border-radius:10px;">';
+  html += '<table style="width:100%;border-collapse:collapse;background:#fff;">';
+  html += _ssTableHead();
+  html += '<tbody>';
+  list.forEach(function(r){ html += _ssRow(r); });
+  html += '</tbody></table></div>';
+  body.innerHTML = html;
+}
 function ssOpen(){
-  document.getElementById("ss-modal").style.display="block";
-  var body=document.getElementById("ss-body");
-  body.innerHTML="\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...";
-  fetch("/api/session-summary").then(r=>r.json()).then(function(rows){
-    if(!rows||!rows.length){body.innerHTML="\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u062C\u0645\u0648\u0639\u0627\u062A";return;}
-    var html="";
-    rows.forEach(function(r){
-      var pct=parseFloat(r.completion_pct||0);
-      var barColor=pct>=100?"#2E7D32":(pct>=50?"#F9A825":"#E65100");
-      var remColor=(parseFloat(r.remaining_hours||0)<0)?"#c62828":"#2E7D32";
-      html+="<div style='margin-bottom:14px;padding:12px 14px;background:#fff8f0;border:1px solid #ffe0b2;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);'>"
-          + "<div style='font-weight:800;color:#4a148c;font-size:1.05rem;margin-bottom:8px;border-bottom:1px dashed #ffcc80;padding-bottom:6px;'>"+(r.group_name||"")+"</div>"
-          + "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;font-size:0.92rem;'>"
-          +   "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:7px 9px;'><div style='color:#777;font-size:0.8rem;'>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u0633\u062A\u062D\u0642\u0629</div><div style='font-weight:800;color:#1565C0;'>"+_ssFmtH(r.required_hours)+" \u0633\u0627\u0639\u0629</div></div>"
-          +   "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:7px 9px;'><div style='color:#777;font-size:0.8rem;'>\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u062D\u0636\u0648\u0631</div><div style='font-weight:800;color:#2E7D32;'>"+_ssFmtH(r.present_hours)+" \u0633\u0627\u0639\u0629</div></div>"
-          +   "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:7px 9px;'><div style='color:#777;font-size:0.8rem;'>\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0623\u0648\u0646\u0644\u0627\u064A\u0646</div><div style='font-weight:800;color:#6A1B9A;'>"+_ssFmtH(r.online_hours)+" \u0633\u0627\u0639\u0629</div></div>"
-          +   "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:7px 9px;'><div style='color:#777;font-size:0.8rem;'>\u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0645\u0623\u062E\u0648\u0630\u0629</div><div style='font-weight:800;color:#E65100;'>"+_ssFmtH(r.total_hours)+" \u0633\u0627\u0639\u0629</div></div>"
-          +   "<div style='background:#fff;border:1px solid #eee;border-radius:8px;padding:7px 9px;'><div style='color:#777;font-size:0.8rem;'>\u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629</div><div style='font-weight:800;color:"+remColor+";'>"+_ssFmtH(r.remaining_hours)+" \u0633\u0627\u0639\u0629</div></div>"
-          + "</div>"
-          + "<div style='background:#eee;border-radius:8px;overflow:hidden;height:16px;position:relative;'>"
-          +   "<div style='background:"+barColor+";height:100%;width:"+pct+"%;transition:width 0.4s;'></div>"
-          +   "<div style='position:absolute;top:0;right:0;left:0;text-align:center;font-size:0.8rem;font-weight:700;color:#222;line-height:16px;'>"+pct+"%</div>"
-          + "</div>"
-          + "</div>";
+  document.getElementById('ss-modal').style.display='block';
+  var body = document.getElementById('ss-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
+  // Fetch group list for the dropdown
+  fetch('/api/attendance/summary?view=init').then(function(r){return r.json();}).then(function(d){
+    var sel = document.getElementById('ss-group');
+    sel.innerHTML = '';
+    var o0 = new Option('\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u2014', '');
+    var oAll = new Option('\u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A', '__all__');
+    sel.appendChild(o0); sel.appendChild(oAll);
+    (d.groups || []).forEach(function(g){ sel.appendChild(new Option(g, g)); });
+    document.getElementById('ss-search').value = '';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+  }).catch(function(){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644</div>';
+  });
+}
+function ssOnGroupChange(){
+  var v = document.getElementById('ss-group').value;
+  var body = document.getElementById('ss-body');
+  document.getElementById('ss-search').value = '';
+  if (!v){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+    return;
+  }
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
+  if (v === '__all__'){
+    fetch('/api/attendance/summary?view=all').then(function(r){return r.json();}).then(function(d){
+      var header = ''
+        + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+        +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">\u1F4CA \u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A</div>'
+        +   '<div style="color:#5d4037;font-weight:700;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635 (DISTINCT): <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
+        +   '<div style="color:#5d4037;font-weight:700;">\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0628\u0629: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
+        + '</div>';
+      _ssRenderStudents(d.students, header);
     });
-    body.innerHTML=html;
-  }).catch(function(){body.innerHTML="\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644";});
+    return;
+  }
+  fetch('/api/attendance/summary?view=group&group=' + encodeURIComponent(v)).then(function(r){return r.json();}).then(function(d){
+    var header = ''
+      + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+      +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">' + (d.group_name||'') + '</div>'
+      +   '<div style="color:#5d4037;font-weight:700;">\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u062D\u0635\u0635: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
+      +   '<div style="color:#5d4037;font-weight:700;">\u0639\u062F\u062F \u0627\u0644\u0637\u0644\u0628\u0629: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
+      + '</div>';
+    _ssRenderStudents(d.students, header);
+  });
+}
+var _ssSearchTimer = null;
+function ssOnSearch(){
+  clearTimeout(_ssSearchTimer);
+  _ssSearchTimer = setTimeout(_ssDoSearch, 320);
+}
+function _ssDoSearch(){
+  var q = (document.getElementById('ss-search').value || '').trim();
+  var body = document.getElementById('ss-body');
+  if (!q){
+    var gv = document.getElementById('ss-group').value;
+    if (gv) { ssOnGroupChange(); return; }
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">\u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0645\u0644\u062E\u0635</div>';
+    return;
+  }
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">\u062C\u0627\u0631\u064A \u0627\u0644\u0628\u062D\u062B...</div>';
+  fetch('/api/attendance/summary?view=student&q=' + encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){
+    var matches = d.matches || [];
+    if (!matches.length){
+      body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;font-weight:700;">\u0644\u0645 \u064A\u062A\u0645 \u0627\u0644\u0639\u062B\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0637\u0627\u0644\u0628</div>';
+      return;
+    }
+    var header = ''
+      + '<div style="background:linear-gradient(135deg,#e1f5fe,#b3e5fc);border:1px solid #81d4fa;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-weight:700;color:#01579B;">'
+      +   '\u1F50D \u0646\u062A\u0627\u0626\u062C \u0627\u0644\u0628\u062D\u062B: ' + matches.length + ' \u0637\u0627\u0644\u0628'
+      + '</div>';
+    _ssRenderStudents(matches, header);
+  });
 }
 function sdOpen(){
   document.getElementById("sd-modal").style.display="block";
@@ -9774,7 +9874,12 @@ def api_dashboard_stats():
             "SELECT COUNT(*) FROM " + attendance_tbl + " WHERE " + status_col + " IN (?,?)",
             (STATUS_ABSENT, STATUS_LATE),
         )
-        attendance_rate = round(present_att / total_att * 100, 1) if total_att else 0.0
+        late_att = _safe_int(
+            "SELECT COUNT(*) FROM " + attendance_tbl + " WHERE " + status_col + "=?",
+            (STATUS_LATE,),
+        )
+        # ATTENDANCE RULE: late counts as attended.
+        attendance_rate = round((present_att + late_att) / total_att * 100, 1) if total_att else 0.0
 
     return jsonify({
         "ok": True,
@@ -9791,39 +9896,234 @@ def api_dashboard_stats():
 @app.route("/api/attendance/student-stats", methods=["GET"])
 @login_required
 def api_attendance_student_stats():
+    """Per-student attendance stats.
+
+    ATTENDANCE RULE: total_sessions is the count of *distinct*
+    (attendance_date, group_name) pairs the student appears in — not a
+    raw row count — so duplicate imports don't double-count. The
+    attendance_rate formula is (attended + late) / total_sessions * 100
+    (late students were physically present, just late).
+    """
     group_name = request.args.get("group", "").strip()
     db = get_db()
     if group_name:
         rows = db.execute(
-            "SELECT student_name, status FROM attendance "
-            "WHERE group_name=? AND student_name IS NOT NULL AND student_name<>''",
+            "SELECT student_name, attendance_date, group_name, status FROM attendance "
+            "WHERE group_name=? AND student_name IS NOT NULL AND student_name<>\'\'",
             (group_name,)
         ).fetchall()
     else:
         rows = db.execute(
-            "SELECT student_name, status FROM attendance "
-            "WHERE student_name IS NOT NULL AND student_name<>''"
+            "SELECT student_name, attendance_date, group_name, status FROM attendance "
+            "WHERE student_name IS NOT NULL AND student_name<>\'\'"
         ).fetchall()
     STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
     STATUS_ABSENT  = "\u063A\u0627\u0626\u0628"
     STATUS_LATE    = "\u0645\u062A\u0623\u062E\u0631"
+    # per-student sessions set and status counters
     stats = {}
     for r in rows:
         name = r["student_name"]
         if not name:
             continue
-        s = stats.setdefault(name, {"present": 0, "absent": 0, "late": 0, "total": 0})
-        s["total"] += 1
+        d = _att_normalize_date(r["attendance_date"])
+        g = (r["group_name"] or "").strip()
+        bucket = stats.setdefault(name, {
+            "present": 0, "absent": 0, "late": 0, "total": 0, "_sessions": set(),
+        })
+        bucket["_sessions"].add((d, g))
         st = (r["status"] or "").strip()
         if st == STATUS_PRESENT:
-            s["present"] += 1
+            bucket["present"] += 1
         elif st == STATUS_ABSENT:
-            s["absent"] += 1
+            bucket["absent"] += 1
         elif st == STATUS_LATE:
-            s["late"] += 1
+            bucket["late"] += 1
+    out = {}
     for name, s in stats.items():
-        s["pct"] = round(s["present"] / s["total"] * 100, 1) if s["total"] else 0.0
-    return jsonify({"ok": True, "stats": stats})
+        total = len(s["_sessions"])
+        s["total"] = total
+        s["pct"] = round((s["present"] + s["late"]) / total * 100, 1) if total else 0.0
+        s.pop("_sessions", None)
+        out[name] = s
+    return jsonify({"ok": True, "stats": out})
+
+
+@app.route("/api/attendance/summary", methods=["GET"])
+@login_required
+def api_attendance_summary():
+    """Unified attendance-summary endpoint powering the ملخص الحصص modal.
+
+    All counts obey ATTENDANCE RULE:
+      - total_sessions per student = COUNT(DISTINCT (date, group)) where
+        student_name = X (covers every group the student ever attended).
+      - total_sessions per group   = COUNT(DISTINCT date) where group = X.
+      - attendance_rate = (attended + late) / total_sessions * 100.
+    """
+    view = (request.args.get("view") or "").strip().lower()
+    db = get_db()
+    PRESENT = "حاضر"
+    ABSENT  = "غائب"
+    LATE    = "متأخر"
+
+    def _rate(attended, late, total):
+        return round((attended + late) / total * 100, 1) if total else 0.0
+
+    if view == "init" or view == "":
+        rows = db.execute(
+            "SELECT DISTINCT group_name FROM attendance "
+            "WHERE group_name IS NOT NULL AND group_name <> \'\' "
+            "ORDER BY group_name"
+        ).fetchall()
+        return jsonify({"groups": [r[0] for r in rows]})
+
+    if view == "group":
+        gname = (request.args.get("group") or "").strip()
+        if not gname:
+            return jsonify({"ok": False, "error": "group required"}), 400
+        rows = db.execute(
+            "SELECT attendance_date, student_name, status FROM attendance "
+            "WHERE TRIM(group_name)=TRIM(?) AND student_name IS NOT NULL AND student_name<>\'\'",
+            (gname,)
+        ).fetchall()
+        group_sessions = set()
+        per_student = {}
+        for r in rows:
+            d = _att_normalize_date(r["attendance_date"])
+            n = (r["student_name"] or "").strip()
+            st = (r["status"] or "").strip()
+            if not n:
+                continue
+            group_sessions.add(d)
+            s = per_student.setdefault(n, {
+                "student_name": n, "present": 0, "absent": 0, "late": 0, "_dates": set(),
+            })
+            s["_dates"].add(d)
+            if st == PRESENT:
+                s["present"] += 1
+            elif st == ABSENT:
+                s["absent"] += 1
+            elif st == LATE:
+                s["late"] += 1
+        students = []
+        for n in sorted(per_student.keys()):
+            s = per_student[n]
+            total = len(s["_dates"])
+            students.append({
+                "student_name": n,
+                "group_name": gname,
+                "total_sessions": total,
+                "present": s["present"],
+                "absent":  s["absent"],
+                "late":    s["late"],
+                "rate_pct": _rate(s["present"], s["late"], total),
+            })
+        return jsonify({
+            "group_name": gname,
+            "total_sessions": len(group_sessions),
+            "students": students,
+        })
+
+    if view == "all":
+        # Aggregated across every group. total_sessions per student is
+        # DISTINCT (date, group) so each session counts once even when a
+        # student is registered in multiple groups.
+        rows = db.execute(
+            "SELECT attendance_date, group_name, student_name, status FROM attendance "
+            "WHERE student_name IS NOT NULL AND student_name<>\'\'"
+        ).fetchall()
+        per_student = {}
+        global_sessions = set()
+        for r in rows:
+            d = _att_normalize_date(r["attendance_date"])
+            g = (r["group_name"] or "").strip()
+            n = (r["student_name"] or "").strip()
+            st = (r["status"] or "").strip()
+            if not n:
+                continue
+            global_sessions.add((d, g))
+            s = per_student.setdefault(n, {
+                "student_name": n, "present": 0, "absent": 0, "late": 0,
+                "_dg": set(), "_groups": set(),
+            })
+            s["_dg"].add((d, g))
+            if g:
+                s["_groups"].add(g)
+            if st == PRESENT:
+                s["present"] += 1
+            elif st == ABSENT:
+                s["absent"] += 1
+            elif st == LATE:
+                s["late"] += 1
+        students = []
+        for n in sorted(per_student.keys()):
+            s = per_student[n]
+            total = len(s["_dg"])
+            students.append({
+                "student_name": n,
+                "group_name": ", ".join(sorted(s["_groups"])) or "",
+                "total_sessions": total,
+                "present": s["present"],
+                "absent":  s["absent"],
+                "late":    s["late"],
+                "rate_pct": _rate(s["present"], s["late"], total),
+            })
+        return jsonify({
+            "total_sessions": len(global_sessions),
+            "students": students,
+        })
+
+    if view == "student":
+        q_raw = (request.args.get("q") or "").strip()
+        if not q_raw:
+            return jsonify({"ok": False, "error": "q required"}), 400
+        q_norm = _att_normalize_ar(q_raw)
+        rows = db.execute(
+            "SELECT attendance_date, group_name, student_name, status FROM attendance "
+            "WHERE student_name IS NOT NULL AND student_name<>\'\'"
+        ).fetchall()
+        matches_map = {}  # key=normalised name -> bucket
+        for r in rows:
+            n = (r["student_name"] or "").strip()
+            if not n:
+                continue
+            n_norm = _att_normalize_ar(n)
+            if q_norm not in n_norm:
+                continue
+            d = _att_normalize_date(r["attendance_date"])
+            g = (r["group_name"] or "").strip()
+            st = (r["status"] or "").strip()
+            bucket = matches_map.setdefault(n_norm, {
+                "student_name": n,
+                "_dg": set(),
+                "_groups": set(),
+                "present": 0, "absent": 0, "late": 0,
+            })
+            bucket["_dg"].add((d, g))
+            if g:
+                bucket["_groups"].add(g)
+            if st == PRESENT:
+                bucket["present"] += 1
+            elif st == ABSENT:
+                bucket["absent"] += 1
+            elif st == LATE:
+                bucket["late"] += 1
+        matches = []
+        for bucket in matches_map.values():
+            total = len(bucket["_dg"])
+            matches.append({
+                "student_name": bucket["student_name"],
+                "group_name": ", ".join(sorted(bucket["_groups"])) or "",
+                "total_sessions": total,
+                "present": bucket["present"],
+                "absent":  bucket["absent"],
+                "late":    bucket["late"],
+                "rate_pct": _rate(bucket["present"], bucket["late"], total),
+            })
+        matches.sort(key=lambda m: (-m["total_sessions"], m["student_name"]))
+        return jsonify({"matches": matches})
+
+    return jsonify({"ok": False, "error": "unknown view"}), 400
 
 @app.route("/api/logout", methods=["POST", "GET"])
 def api_logout():
