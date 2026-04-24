@@ -228,13 +228,17 @@ def init_db():
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
 
     db.execute("""CREATE TABLE IF NOT EXISTS attendance(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,7 +256,9 @@ def init_db():
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -262,7 +268,9 @@ def init_db():
         table_id INTEGER,
         col_key TEXT,
         col_label TEXT,
-        col_order INTEGER DEFAULT 0)""")
+        col_order INTEGER DEFAULT 0,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS custom_table_rows(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_id INTEGER,
@@ -371,7 +379,9 @@ def init_db():
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS payment_log(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_name TEXT,
@@ -393,7 +403,9 @@ def init_db():
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db.commit()
     db.close()
 
@@ -452,13 +464,17 @@ if True:
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db2.execute("""CREATE TABLE IF NOT EXISTS group_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     # Seed default column labels if empty
     if db2.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
@@ -600,7 +616,9 @@ if True:
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db2.execute("""CREATE TABLE IF NOT EXISTS custom_tables(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -610,7 +628,9 @@ if True:
         table_id INTEGER,
         col_key TEXT,
         col_label TEXT,
-        col_order INTEGER DEFAULT 0)""")
+        col_order INTEGER DEFAULT 0,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     db2.execute("""CREATE TABLE IF NOT EXISTS custom_table_rows(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         table_id INTEGER,
@@ -705,7 +725,9 @@ if True:
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     if "eval_labels_v1" not in applied:
         seed_eval_labels = [
             ("form_fill_date",      "&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x645;&#x644;&#x621; &#x627;&#x644;&#x625;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629;", 1),
@@ -752,7 +774,9 @@ if True:
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     if "paylog_labels_v2" not in applied:
         seed_paylog_labels = [
             ("student_name",        "&#x627;&#x644;&#x627;&#x633;&#x645;", 1),
@@ -781,6 +805,26 @@ if True:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("paylog_labels_v2",))
         except Exception:
             pass
+    # Ensure col_type and col_options exist on every label-bearing table
+    # (supports typed cells added later via the UI). Runs once per DB thanks
+    # to the migration marker below.
+    if "col_types_v1" not in applied:
+        for _lbltbl in ("column_labels", "group_col_labels", "att_col_labels",
+                        "eval_col_labels", "paylog_col_labels", "custom_table_cols"):
+            try:
+                _cols = [r[1] for r in db2.execute("PRAGMA table_info(" + _lbltbl + ")").fetchall()]
+                if "col_type" not in _cols:
+                    db2.execute("ALTER TABLE " + _lbltbl + " ADD COLUMN col_type TEXT DEFAULT 'نص'")
+                if "col_options" not in _cols:
+                    db2.execute("ALTER TABLE " + _lbltbl + " ADD COLUMN col_options TEXT DEFAULT ''")
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("col_types_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     db2.commit()
     db2.close()
 
@@ -4171,12 +4215,17 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
     </div>
     <div style="font-weight:700;color:#1565C0;margin-top:8px;">&#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;</div>
     <div id="utemColumnsBody" class="utem-cols-body"></div>
-    <div class="field" style="margin-bottom:12px;display:flex;gap:8px;align-items:flex-end;">
-      <div style="flex:1;">
-        <label style="color:#FF6B35;">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F; &#x62C;&#x62F;&#x64A;&#x62F;</label>
-        <input id="utemNewColLabel" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x645;&#x644;&#x627;&#x62D;&#x638;&#x627;&#x62A;" style="width:100%;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;background:#fff9f7;"/>
+    <div class="field" style="margin-bottom:6px;padding-top:10px;border-top:1px solid #eee;">
+      <label style="color:#FF6B35;font-weight:700;">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x639;&#x645;&#x648;&#x62F; &#x62C;&#x62F;&#x64A;&#x62F;</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+        <input id="utemNewColLabel" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x639;&#x645;&#x648;&#x62F;" style="flex:1;min-width:160px;padding:9px 12px;border:1.5px solid #ffd4c2;border-radius:9px;background:#fff9f7;"/>
+        <select id="utemNewColType" onchange="_utemToggleNewOptionsArea()" style="padding:9px 10px;border:1.5px solid #ffd4c2;border-radius:9px;background:#fff9f7;font-size:13px;"></select>
+        <button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="utemAddColumn()">&#x625;&#x636;&#x627;&#x641;&#x629;</button>
       </div>
-      <button class="btn-save" style="background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="utemAddColumn()">&#x625;&#x636;&#x627;&#x641;&#x629;</button>
+      <div id="utemNewOptsWrap" style="display:none;margin-top:8px;">
+        <label style="color:#FF6B35;font-size:12px;">&#x62E;&#x64A;&#x627;&#x631;&#x627;&#x62A; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x627;&#x644;&#x645;&#x646;&#x633;&#x62F;&#x644;&#x629; (&#x645;&#x641;&#x635;&#x648;&#x644;&#x629; &#x628;&#x641;&#x627;&#x635;&#x644;&#x629;)</label>
+        <textarea id="utemNewColOpts" rows="2" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x646;&#x639;&#x645;,&#x644;&#x627;,&#x631;&#x628;&#x645;&#x627;" style="width:100%;padding:8px 10px;border:1.5px solid #ffd4c2;border-radius:9px;background:#fff9f7;font-size:13px;"></textarea>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-save" style="background:linear-gradient(135deg,#1976D2,#1565C0);" onclick="utemSave()">&#x1F4BE; &#x62D;&#x641;&#x638;</button>
@@ -4965,11 +5014,15 @@ function confirmGroupDelete2(){
 }
 function closeGroupConfirm2(){document.getElementById('groupConfirmModal2').classList.remove('open');}
 // --- Universal Table Edit Modal ---
+// Shared edit-table modal used by every table (built-in + custom).
+// Renders a per-column row with: label | type selector | options (if dropdown)
+// | rename button | delete button. Plus an "add column" form at the bottom
+// and a table-rename input at the top.
+
 var _utemTableKey = null;
 var _utemColumns = [];
-var _utemEditingKey = null;  // col_key currently being inline-renamed
+var _utemEditingKey = null;
 
-// Map a frontend table key to a data-loader function that refreshes the main table.
 var _UTEM_LOADERS = {
   students: 'loadStudents',
   groups: 'loadGroups2', student_groups: 'loadGroups2',
@@ -4979,6 +5032,18 @@ var _UTEM_LOADERS = {
   payment_log: 'loadPaymentLog', paylog: 'loadPaymentLog'
 };
 function _utemReload(){ var fn = window[_UTEM_LOADERS[_utemTableKey]]; if(typeof fn === 'function') fn(); }
+
+var UTEM_TYPES = ['\u0646\u0635','\u0631\u0642\u0645','\u062a\u0627\u0631\u064a\u062e','\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629','\u0646\u0639\u0645/\u0644\u0627','\u062a\u0642\u064a\u064a\u0645'];
+
+function _utemTypeOptions(selected){
+  var html = '';
+  for (var i=0;i<UTEM_TYPES.length;i++){
+    var t = UTEM_TYPES[i];
+    var sel = (t === selected) ? ' selected' : '';
+    html += '<option value="' + t + '"' + sel + '>' + t + '</option>';
+  }
+  return html;
+}
 
 function openUniversalTableEditModal(tableKey){
   _utemTableKey = tableKey;
@@ -4990,11 +5055,14 @@ function openUniversalTableEditModal(tableKey){
       _utemColumns = d.columns || [];
       document.getElementById('utemTableName').value = d.db_table || tableKey;
       _utemRenderColumns();
+      document.getElementById('utemNewColType').innerHTML = _utemTypeOptions('\u0646\u0635');
+      _utemToggleNewOptionsArea();
       document.getElementById('universalTableEditModal').classList.add('open');
     })
     .catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
 }
 function utemClose(){ document.getElementById('universalTableEditModal').classList.remove('open'); }
+function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 function _utemRenderColumns(){
   var body = document.getElementById('utemColumnsBody');
   if(!_utemColumns.length){ body.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0639\u0645\u062f\u0629</div>'; return; }
@@ -5003,22 +5071,30 @@ function _utemRenderColumns(){
     var c = _utemColumns[i];
     var key = c.col_key;
     var lbl = c.col_label;
+    var tp  = c.col_type || '\u0646\u0635';
+    var opts = c.col_options || '';
+    var keyQ = key.replace(/"/g,'&quot;');
     if (_utemEditingKey === key) {
-      html += '<div class="utem-col-row" data-key="' + key + '">' +
-        '<input class="utem-col-input" id="utemRenameInput_' + key + '" value="' + (lbl||'').replace(/"/g,'&quot;') + '"/>' +
-        '<button class="utem-col-btn ok" onclick="_utemCommitRename(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">\u0645\u0648\u0627\u0641\u0642</button>' +
-        '<button class="utem-col-btn cancel" onclick="_utemCancelRename()">\u0625\u0644\u063a\u0627\u0621</button>' +
+      html += '<div class="utem-col-row" data-key="' + keyQ + '">' +
+        '<input class="utem-col-input" id="utemRenameInput_' + keyQ + '" value="' + _esc(lbl) + '"/>' +
+        '<button class="utem-col-btn ok" onclick="_utemCommitRename(\\'+keyQ+\\')">&#x2713;</button>' +
+        '<button class="utem-col-btn cancel" onclick="_utemCancelRename()">&#x2715;</button>' +
       '</div>';
     } else {
-      html += '<div class="utem-col-row" data-key="' + key + '">' +
-        '<span class="utem-col-label">' + (lbl||key) + '</span>' +
-        '<button class="utem-col-btn" title="\u0625\u0639\u0627\u062f\u0629 \u062a\u0633\u0645\u064a\u0629" onclick="_utemStartRename(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">&#x270F;</button>' +
-        '<button class="utem-col-btn del" title="\u062d\u0630\u0641" onclick="_utemDeleteColumn(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')">&#x1F5D1;</button>' +
+      var optsHtml = '';
+      if (tp === '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629') {
+        optsHtml = '<input class="utem-col-opts" id="utemOpts_' + keyQ + '" placeholder="\u062e\u064a\u0627\u0631\u0627\u062a \u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629 \u0645\u062b\u0627\u0644: \u0646\u0639\u0645,\u0644\u0627,\u0631\u0628\u0645\u0627" value="' + _esc(opts) + '" onblur="_utemSaveType(\\'+keyQ+\\')" style="max-width:180px;padding:5px 8px;border:1.2px solid #ddd;border-radius:6px;font-size:12px;" />';
+      }
+      html += '<div class="utem-col-row" data-key="' + keyQ + '">' +
+        '<span class="utem-col-label">' + _esc(lbl) + '</span>' +
+        '<select class="utem-col-type" id="utemType_' + keyQ + '" onchange="_utemSaveType(\\'+keyQ+\\')" style="padding:5px 8px;border-radius:6px;border:1.2px solid #ddd;font-size:12px;">' + _utemTypeOptions(tp) + '</select>' +
+        optsHtml +
+        '<button class="utem-col-btn" title="\u0625\u0639\u0627\u062f\u0629 \u062a\u0633\u0645\u064a\u0629" onclick="_utemStartRename(\\'+keyQ+\\')">&#x270F;</button>' +
+        '<button class="utem-col-btn del" title="\u062d\u0630\u0641" onclick="_utemDeleteColumn(\\'+keyQ+\\')">&#x1F5D1;</button>' +
       '</div>';
     }
   }
   body.innerHTML = html;
-  // autofocus the active input if any
   if (_utemEditingKey) {
     var el = document.getElementById('utemRenameInput_' + _utemEditingKey);
     if (el) { el.focus(); el.select(); }
@@ -5035,40 +5111,52 @@ function _utemCommitRename(key){
     method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
     body: JSON.stringify({old_name: key, new_label: newLabel})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){
-      _utemEditingKey = null;
-      showToast('\u062a\u0645 \u0627\u0644\u062a\u0639\u062f\u064a\u0644','#1976D2');
-      openUniversalTableEditModal(_utemTableKey);
-      _utemReload();
-    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    if(d.ok){ _utemEditingKey = null; showToast('\u062a\u0645 \u0627\u0644\u062a\u0639\u062f\u064a\u0644','#1976D2'); openUniversalTableEditModal(_utemTableKey); _utemReload(); }
+    else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
   }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
 }
 function _utemDeleteColumn(key){
-  if(!confirm('\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062f\u061f \u0633\u064a\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0641\u064a\u0647')) return;
+  if(!confirm('\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f\u061f \u0633\u064a\u062a\u0645 \u062d\u0630\u0641 \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0639\u0645\u0648\u062f')) return;
   fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/delete-column/' + encodeURIComponent(key), {
     method:'DELETE', credentials:'include'
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){
-      showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935');
-      openUniversalTableEditModal(_utemTableKey);
-      _utemReload();
-    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    if(d.ok){ showToast('\u062a\u0645 \u0627\u0644\u062d\u0630\u0641','#e53935'); openUniversalTableEditModal(_utemTableKey); _utemReload(); }
+    else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
   }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
 }
+function _utemSaveType(key){
+  var selEl = document.getElementById('utemType_' + key);
+  var optEl = document.getElementById('utemOpts_' + key);
+  var tp = selEl ? selEl.value : '\u0646\u0635';
+  var opts = optEl ? optEl.value : '';
+  fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/column-type', {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({col_key: key, col_type: tp, col_options: opts})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){ openUniversalTableEditModal(_utemTableKey); _utemReload(); }
+    else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+  });
+}
+function _utemToggleNewOptionsArea(){
+  var tp = document.getElementById('utemNewColType').value;
+  var area = document.getElementById('utemNewOptsWrap');
+  if (area) area.style.display = (tp === '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629') ? 'block' : 'none';
+}
 function utemAddColumn(){
-  var inp = document.getElementById('utemNewColLabel');
-  var label = inp.value.trim();
+  var lblEl = document.getElementById('utemNewColLabel');
+  var tpEl  = document.getElementById('utemNewColType');
+  var optsEl= document.getElementById('utemNewColOpts');
+  var label = lblEl.value.trim();
   if(!label){ showToast('\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628','#e53935'); return; }
+  var tp = tpEl.value || '\u0646\u0635';
+  var opts = optsEl ? optsEl.value.trim() : '';
   fetch('/api/custom-table/' + encodeURIComponent(_utemTableKey) + '/add-column', {
     method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-    body: JSON.stringify({col_label: label})
+    body: JSON.stringify({col_label: label, col_type: tp, col_options: opts})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){
-      inp.value = '';
-      showToast('\u062a\u0645 \u0627\u0644\u0625\u0636\u0627\u0641\u0629','#00897B');
-      openUniversalTableEditModal(_utemTableKey);
-      _utemReload();
-    } else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
+    if(d.ok){ lblEl.value=''; if(optsEl) optsEl.value=''; tpEl.value='\u0646\u0635'; _utemToggleNewOptionsArea();
+              showToast('\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629','#00897B'); openUniversalTableEditModal(_utemTableKey); _utemReload(); }
+    else { showToast(d.error || '\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); }
   }).catch(function(){ showToast('\u062d\u062f\u062b \u062e\u0637\u0623','#e53935'); });
 }
 function utemSave(){
@@ -5078,11 +5166,78 @@ function utemSave(){
     method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
     body: JSON.stringify({new_label: nm, new_name: nm})
   }).then(function(r){return r.json();}).then(function(d){
-    utemClose();
-    showToast('\u062a\u0645 \u0627\u0644\u062d\u0641\u0638','#1976D2');
-    _utemReload();
+    utemClose(); showToast('\u062a\u0645 \u0627\u0644\u062d\u0641\u0638','#1976D2'); _utemReload();
   }).catch(function(){ utemClose(); });
 }
+
+// ─── Typed cell rendering (Part 3) ─────────────────────────────────────
+// Used by future custom-table renders; exposed globally so any table may opt in.
+function renderCell(value, colType, colOptions, rowId, fieldKey) {
+  var v = (value == null) ? '' : String(value);
+  var esc = _esc(v);
+  var type = colType || '\u0646\u0635';
+  var idAttr = rowId != null ? (' data-id="' + rowId + '"') : '';
+  var fAttr  = fieldKey ? (' data-field="' + fieldKey + '"') : '';
+  var base = idAttr + fAttr + ' class="cell-input"';
+  switch (type) {
+    case '\u0631\u0642\u0645':
+      return '<input type="number" value="' + esc + '"' + base + '>';
+    case '\u062a\u0627\u0631\u064a\u062e':
+      return '<input type="date" value="' + esc + '"' + base + '>';
+    case '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629':
+      var opts = String(colOptions||'').split(',').map(function(o){return o.trim();}).filter(function(o){return o.length;});
+      var html = '<select' + base + '><option value=""></option>';
+      for (var i=0;i<opts.length;i++){ var s = (opts[i] === v) ? ' selected' : ''; html += '<option' + s + '>' + _esc(opts[i]) + '</option>'; }
+      return html + '</select>';
+    case '\u0646\u0639\u0645/\u0644\u0627':
+      var ch = (v === '1' || v === 'true' || v === '\u0646\u0639\u0645') ? ' checked' : '';
+      return '<input type="checkbox"' + ch + base + '>';
+    case '\u062a\u0642\u064a\u064a\u0645':
+      return '<input type="number" min="1" max="10" value="' + esc + '"' + base + '>';
+    default:
+      return '<input type="text" value="' + esc + '"' + base + '>';
+  }
+}
+
+// ─── Shared toolbar (Part 1) ───────────────────────────────────────────
+// Produces the canonical 6-button toolbar HTML for any table. Future tables
+// (custom or built-in) just need to have their container-id populated via
+// renderToolbar(tableKey, containerId, opts).
+// opts: { addRowFn, tbodyId, refreshFn, deleteMsg, extraButtons }
+function renderToolbar(tableKey, containerId, opts) {
+  opts = opts || {};
+  var c = document.getElementById(containerId);
+  if (!c) return;
+  var addFn = opts.addRowFn;
+  if (!addFn) {
+    var defaultAdd = { students:'openAddModal', groups:'openAddGroupModal2', student_groups:'openAddGroupModal2',
+                       taqseet:'openAddTaqseet', attendance:'openAttendanceAddModal',
+                       evaluations:'openAddEvalModal', evals:'openAddEvalModal',
+                       payment_log:'openAddPaylogModal', paylog:'openAddPaylogModal' };
+    addFn = defaultAdd[tableKey] || 'openUniversalAddRow';
+  }
+  var tbodyId = opts.tbodyId || (
+    { students:'studentsBody', groups:'groupsBody2', student_groups:'groupsBody2',
+      taqseet:'taqseetBody', attendance:'attendanceBody',
+      evaluations:'evalsBody', evals:'evalsBody',
+      payment_log:'paylogBody', paylog:'paylogBody' }[tableKey] || (tableKey + 'Body')
+  );
+  var refreshFn = opts.refreshFn || _UTEM_LOADERS[tableKey] || ('load_' + tableKey);
+  var delMsg = opts.deleteMsg || '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 {n} \u0639\u0646\u0635\u0631\u061f';
+  var html = ''
+    + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1976D2,#42A5F5);" onclick="'+addFn+'()">&#x2795; \u0625\u0636\u0627\u0641\u0629 \u0635\u0641</button>'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal(\\'+tableKey+\\')">&#9881; \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u062c\u062f\u0648\u0644</button>'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal(\\'+tableKey+\\')">&#x1F4E5; \u0627\u0633\u062a\u064a\u0631\u0627\u062f Excel</button>'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#c0392b,#e74c3c);" onclick="openDeleteTableModal()">&#x1F5D1; \u062d\u0630\u0641 \u0627\u0644\u062c\u062f\u0648\u0644</button>'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal(\\'+tableKey+\\')">&#x1F4CC; \u062a\u062c\u0645\u064a\u062f</button>'
+    + '<button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch(\\'+tableKey+\\')">&#x1F50D; \u0628\u062d\u062b</button>'
+    + '<button id="bulkDelBtn_'+tableKey+'" class="btn-bulk-del" onclick="_bulkDelete(\\'+tbodyId+\\',function(id){return \\'/api/'+tableKey+'/\\'+id;},'+refreshFn+',\\'+delMsg+\\')">&#x1F5D1; \u062d\u0630\u0641 \u0627\u0644\u0645\u062d\u062f\u062f</button>'
+    + (opts.extraButtons || '')
+    + '</div>';
+  c.innerHTML = html;
+}
+
 // Search-button helper: focus the table's search input.
 function utemFocusSearch(tableKey){
   var ids = {students:'searchInput', groups:'groupSearchInput', student_groups:'groupSearchInput',
@@ -6999,7 +7154,9 @@ def api_columns_get():
         col_key TEXT UNIQUE,
         col_label TEXT,
         col_order INTEGER DEFAULT 0,
-        is_visible INTEGER DEFAULT 1)""")
+        is_visible INTEGER DEFAULT 1,
+        col_type TEXT DEFAULT 'نص',
+        col_options TEXT DEFAULT '')""")
     if db.execute("SELECT COUNT(*) FROM column_labels").fetchone()[0] == 0:
         default_cols = [
             ("personal_id","&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;",1),("student_name","&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;",2),("whatsapp","&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x627;&#x644;&#x645;&#x639;&#x62A;&#x645;&#x62F;",3),
@@ -7348,15 +7505,30 @@ def api_unified_columns_get(tid):
     live_cols = [r[1] for r in db.execute("PRAGMA table_info(" + db_table + ")").fetchall()]
     live_cols = [c for c in live_cols if c not in ("id", "created_at")]
     label_map = {}
+    type_map = {}
+    options_map = {}
     if labels_table:
         try:
-            for r in db.execute("SELECT col_key, col_label FROM " + labels_table).fetchall():
+            rows = db.execute(
+                "SELECT col_key, col_label, col_type, col_options FROM " + labels_table
+            ).fetchall()
+            for r in rows:
                 label_map[r[0]] = r[1]
+                type_map[r[0]] = r[2] or "نص"
+                options_map[r[0]] = r[3] or ""
         except Exception:
-            pass
-    # Preserve the column order reported by the live schema.
-    out = [{"col_key": c, "col_label": label_map.get(c) or c} for c in live_cols]
-    # Table-level label: for custom tables, use tbl_name; for built-in, leave blank.
+            try:
+                for r in db.execute("SELECT col_key, col_label FROM " + labels_table).fetchall():
+                    label_map[r[0]] = r[1]
+            except Exception:
+                pass
+    default_type = "نص"
+    out = [{
+        "col_key": c,
+        "col_label": label_map.get(c) or c,
+        "col_type": type_map.get(c, default_type),
+        "col_options": options_map.get(c, ""),
+    } for c in live_cols]
     return jsonify({"ok": True, "columns": out, "db_table": db_table})
 
 
@@ -7369,9 +7541,11 @@ def api_unified_add_column(tid):
     if not col_label:
         return jsonify({"ok": False, "error": "col_label required"}), 400
     if not col_key_raw:
-        # derive a safe key from the label
+        # Derive a safe key from the label. Arabic chars pass Python's .isalnum()
+        # but fail the ASCII-only _is_safe_ident regex below, so restrict to
+        # ASCII here. Pure-Arabic labels fall back to "col_<timestamp>".
         col_key_raw = col_label.lower().replace(" ", "_")
-        col_key_raw = "".join(ch for ch in col_key_raw if ch.isalnum() or ch == "_")
+        col_key_raw = "".join(ch for ch in col_key_raw if ch.isascii() and (ch.isalnum() or ch == "_"))
         if not col_key_raw or col_key_raw[0].isdigit():
             col_key_raw = "col_" + str(int(__import__('time').time() * 1000) % 10000000)
     if not _is_safe_ident(col_key_raw):
@@ -7385,16 +7559,34 @@ def api_unified_add_column(tid):
     except Exception as ex:
         # column may already exist — don't fail
         pass
+    col_type_val = (d.get("col_type") or "نص").strip()
+    col_options_val = (d.get("col_options") or "").strip()
     if labels_table:
         try:
             max_order = db.execute("SELECT MAX(col_order) FROM " + labels_table).fetchone()[0] or 0
-            db.execute("INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
-                       (col_key_raw, col_label, max_order + 1))
+            # Try insert with the new typed columns; fall back for pre-migration DBs.
+            try:
+                db.execute(
+                    "INSERT INTO " + labels_table + "(col_key, col_label, col_order, col_type, col_options) VALUES(?,?,?,?,?)",
+                    (col_key_raw, col_label, max_order + 1, col_type_val, col_options_val),
+                )
+            except Exception:
+                db.execute(
+                    "INSERT INTO " + labels_table + "(col_key, col_label, col_order) VALUES(?,?,?)",
+                    (col_key_raw, col_label, max_order + 1),
+                )
         except Exception:
             try:
-                db.execute("UPDATE " + labels_table + " SET col_label=? WHERE col_key=?", (col_label, col_key_raw))
+                db.execute(
+                    "UPDATE " + labels_table + " SET col_label=?, col_type=?, col_options=? WHERE col_key=?",
+                    (col_label, col_type_val, col_options_val, col_key_raw),
+                )
             except Exception:
-                pass
+                try:
+                    db.execute("UPDATE " + labels_table + " SET col_label=? WHERE col_key=?",
+                               (col_label, col_key_raw))
+                except Exception:
+                    pass
     db.commit()
     return jsonify({"ok": True, "col_key": col_key_raw})
 
@@ -7437,6 +7629,40 @@ def api_unified_rename_column(tid):
                                    (old_key, new_label, max_order + 1))
                 except Exception:
                     pass
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/custom-table/<tid>/column-type', methods=['PATCH'])
+@login_required
+def api_unified_set_column_type(tid):
+    d = request.get_json() or {}
+    col_key = (d.get("col_key") or "").strip()
+    col_type_val = (d.get("col_type") or "نص").strip()
+    col_options_val = (d.get("col_options") or "").strip()
+    if not col_key:
+        return jsonify({"ok": False, "error": "col_key required"}), 400
+    db_table, labels_table = _resolve_table(tid)
+    if not db_table:
+        return jsonify({"ok": False, "error": "table not found"}), 404
+    if not labels_table:
+        # Tables without a labels table (taqseet) cannot store col_type.
+        return jsonify({"ok": False, "error": "table does not support column types"}), 400
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE " + labels_table + " SET col_type=?, col_options=? WHERE col_key=?",
+            (col_type_val, col_options_val, col_key),
+        )
+        if cur.rowcount == 0:
+            # Row didn't exist — create it so the type sticks.
+            max_order = db.execute("SELECT MAX(col_order) FROM " + labels_table).fetchone()[0] or 0
+            db.execute(
+                "INSERT INTO " + labels_table + "(col_key, col_label, col_order, col_type, col_options) VALUES(?,?,?,?,?)",
+                (col_key, col_key, max_order + 1, col_type_val, col_options_val),
+            )
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
