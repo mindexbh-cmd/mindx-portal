@@ -12468,6 +12468,139 @@ def settings_page():
 MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 (function(){
   var css = [
+    /* ================================================================
+     * MOBILE RESPONSIVENESS
+     * Applied globally so every page/modal collapses gracefully on
+     * phones. Uses !important to override the inline styles scattered
+     * across HOME_HTML / DATABASE_HTML / ATTENDANCE_HTML without having
+     * to touch each one. 768px = tablet; 480px = phone.
+     * ================================================================ */
+    '@media (max-width:768px){',
+      'html,body{overflow-x:hidden;}',
+      'body{padding:10px !important;}',
+
+      /* Topbar / navbar: wrap links under the title, shrink padding */
+      '.topbar,.dh-topbar{padding:10px 14px !important;flex-wrap:wrap !important;gap:8px !important;}',
+      '.topbar h1,.dh-topbar-title{font-size:1rem !important;line-height:1.2 !important;flex:1 1 100%;min-width:0;}',
+      '.topbar-links{gap:6px !important;flex-wrap:wrap !important;}',
+      '.topbar a,.btn-home,.btn-back{padding:10px 12px !important;font-size:12px !important;min-height:40px;display:inline-flex;align-items:center;}',
+
+      /* Dashboard stats + actions — 2-col on tablet */
+      '.dh-stats{grid-template-columns:repeat(2,1fr) !important;}',
+      '.dh-actions{grid-template-columns:1fr 1fr !important;gap:10px !important;}',
+      '.dh-stat-card{padding:12px !important;}',
+      '.dh-stat-num{font-size:1.6rem !important;}',
+      '.dh-action-card{padding:14px !important;min-height:auto !important;font-size:14px !important;}',
+      '.dh-action-title{font-size:14px !important;}',
+      '.dh-action-desc{font-size:11px !important;}',
+
+      /* Database page main container */
+      '.main{padding:12px 10px !important;}',
+      '.page-title{font-size:17px !important;}',
+      '.db-nav{padding:8px !important;gap:6px !important;overflow-x:auto;flex-wrap:nowrap !important;}',
+      '.db-nav-btn{font-size:12px !important;padding:7px 12px !important;min-height:40px;white-space:nowrap;}',
+      '.db-section,.custom-table-section{padding:12px !important;margin-bottom:16px !important;}',
+      '.db-section-title{font-size:15px !important;}',
+
+      /* Action bars already wrap via existing rule — tighten buttons */
+      '.btn-add,.btn-save,.btn-cancel,.btn-delete-table,.btn-bulk-del,.btn-search,.action-btn{min-height:44px;padding:10px 14px !important;font-size:13px !important;}',
+      '.mx-btn-add,.mx-btn-edit,.mx-btn-delete,.mx-btn-import,.mx-btn-freeze,.mx-btn-search{min-height:44px;font-size:13px !important;}',
+
+      /* Tables — horizontal scroll only inside the wrap, compact cells */
+      '.table-wrap,.att-table-wrap{max-height:65vh !important;}',
+      'table th,table td{padding:8px 6px !important;font-size:12px !important;}',
+      '.mx-filter-btn{font-size:11px !important;padding:1px 3px !important;}',
+      '.stats{gap:8px !important;flex-wrap:wrap !important;}',
+      '.stat-card{min-width:100px !important;padding:10px 14px !important;}',
+      '.stat-num{font-size:22px !important;}',
+
+      /* Modals → full-screen on narrow widths */
+      '.modal-bg,.confirm-bg,.mx-confirm-bg,.srm-type-bg,.srm-log-bg{align-items:stretch !important;}',
+      '.modal,.confirm-box,.mx-confirm-box,.srm-type-box,.srm-log-box{max-width:100% !important;width:100% !important;min-height:auto !important;border-radius:0 !important;margin:0 !important;}',
+      '#sr-modal > div,#ss-modal > div,#sd-modal > div,#ss-modal > div > div,#pay-modal > div,.msg-modal > div,.msg-box{max-width:100% !important;width:100% !important;min-height:100vh !important;border-radius:0 !important;margin:0 !important;}',
+      '.form-grid,.srm-grid{grid-template-columns:1fr !important;gap:10px !important;}',
+      '.srm-totals{grid-template-columns:1fr !important;}',
+
+      /* Form controls — comfortable for touch */
+      'input[type=text],input[type=number],input[type=date],input[type=email],input[type=password],input[type=tel],textarea,select{min-height:44px !important;font-size:14px !important;}',
+      '.field input,.field select{font-size:14px !important;}',
+      '.search-bar{flex-direction:column !important;gap:6px !important;}',
+      '.search-bar input{width:100% !important;}',
+      '.search-bar button{width:100% !important;}',
+
+      /* Attendance page: stack controls, sticky save footer */
+      '.controls-row{flex-direction:column !important;align-items:stretch !important;gap:10px !important;}',
+      '.controls-row > *{width:100% !important;}',
+      'select.group-select,input.date-input{width:100% !important;min-height:44px !important;}',
+      '.att-footer-btns{position:sticky !important;bottom:0 !important;background:#fff !important;padding:12px !important;z-index:50 !important;box-shadow:0 -4px 16px rgba(0,0,0,.12) !important;flex-direction:column !important;gap:8px !important;margin:16px -10px -10px !important;}',
+      '.att-footer-btns button,.btn-save-all,.btn-cancel-att{width:100% !important;justify-content:center;}',
+
+      /* ملخص الحصص modal: controls stack, multi-picker full width */
+      '#ss-modal > div > div[style*="grid-template-columns"]{grid-template-columns:1fr !important;}',
+      '.ss-groups-panel{max-width:calc(100vw - 20px) !important;left:10px !important;right:10px !important;}',
+
+      /* Student search: single-column sections */
+      '.srm-card .srm-section{padding:12px 14px !important;}',
+      '.srm-actions{flex-direction:column !important;gap:8px !important;}',
+      '.srm-actions button{width:100% !important;}',
+
+      /* Payment modal header controls stack */
+      '#pay-modal div[style*="display:flex"][style*="flex-wrap"]{gap:10px !important;}',
+      '#pay-modal select,#pay-modal input{min-width:0 !important;width:100% !important;}',
+
+      /* Login box */
+      '.box{width:95% !important;max-width:95% !important;padding:28px 22px !important;}',
+
+      /* Column filter panel — stay inside viewport */
+      '.mx-filter-panel{max-width:calc(100vw - 20px) !important;min-width:0 !important;}',
+      '.mx-filter-banner{font-size:12px !important;padding:7px 10px !important;}',
+      '.mx-filter-banner .mx-fb-tag{font-size:11px !important;}',
+
+      /* Toast */
+      '.mx-toast{max-width:90vw !important;font-size:13px !important;padding:11px 18px !important;}',
+
+      /* Settings two-panel layout collapses to single column on narrow */
+      '.workspace{grid-template-columns:1fr !important;gap:10px !important;}',
+      '.tabs{padding:6px !important;gap:4px !important;}',
+      '.tab{padding:7px 10px !important;font-size:12.5px !important;}',
+
+      /* Touch target spacing inside button groups */
+      '.modal-actions{flex-direction:column !important;gap:8px !important;}',
+      '.modal-actions button{width:100% !important;}',
+
+      /* Generic Excel/import modal */
+      '#genericExcelModal > div,#attendanceExcelModal > div,#freezeModal > div,#universalTableEditModal > div{max-width:100% !important;width:100% !important;min-height:100vh !important;border-radius:0 !important;margin:0 !important;}',
+    '}',
+
+    /* ================================================================
+     * PHONE (≤480px) — tighter grids, smaller fonts
+     * ================================================================ */
+    '@media (max-width:480px){',
+      '.dh-stats{grid-template-columns:1fr 1fr !important;}',
+      '.dh-actions{grid-template-columns:1fr !important;}',
+      '.dh-stat-num{font-size:1.4rem !important;}',
+      '.dh-stat-label{font-size:12px !important;}',
+      '.topbar h1,.dh-topbar-title{font-size:0.92rem !important;}',
+      '.topbar a,.btn-home,.btn-back{font-size:11px !important;padding:8px 10px !important;}',
+      '.page-title{font-size:15px !important;}',
+      '.db-section-title{font-size:14px !important;}',
+      'table th,table td{padding:7px 5px !important;font-size:11.5px !important;}',
+      '.stat-card{min-width:90px !important;}',
+      '.stat-num{font-size:20px !important;}',
+      '.stat-label{font-size:10.5px !important;}',
+      '.srm-stat-num{font-size:1.1em !important;}',
+      '.srm-stat-lbl{font-size:0.72em !important;}',
+      /* Column filter panel even narrower */
+      '.mx-filter-panel{font-size:12px !important;}',
+      '.mx-filter-panel label{font-size:12px !important;}',
+    '}',
+
+    /* Global touch-target minimum (applies on all sizes, not just mobile) */
+    '@media (pointer:coarse){',
+      'button,a.btn-home,a.btn-back,.action-btn,.dh-action-card,.db-nav-btn{min-height:44px;}',
+      'input[type=checkbox],input[type=radio]{min-width:18px;min-height:18px;}',
+    '}',
+
     /* Column-filter system (applies to every .table-wrap table) */
     '.mx-filter-btn{background:transparent;border:none;color:inherit;opacity:.55;font-size:10px;cursor:pointer;padding:2px 4px;margin-right:4px;border-radius:4px;vertical-align:middle;transition:opacity .15s ease,background .15s ease;}',
     '.mx-filter-btn:hover{opacity:1;background:rgba(255,255,255,.2);}',
