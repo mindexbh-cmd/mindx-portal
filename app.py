@@ -1099,168 +1099,413 @@ SETTINGS_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>الإعدادات — Mindex</title>
+<title>&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A; &#x645;&#x631;&#x626;&#x64A;&#x629; &#x2014; Mindex</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-body{background:linear-gradient(135deg,#e3f2fd,#ede7f6);min-height:100vh;padding:20px;}
-.topbar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 24px;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(107,63,160,0.25);}
-.topbar h1{font-size:1.4rem;}
-.topbar a{color:#fff;background:rgba(255,255,255,0.2);padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:700;}
-.main{max-width:1100px;margin:0 auto;}
-.page-block{background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
-.page-block h2{color:#6B3FA0;border-bottom:2px solid #ede7f6;padding-bottom:8px;margin-bottom:14px;font-size:1.15rem;}
-.row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5;flex-wrap:wrap;}
-.row:last-child{border-bottom:none;}
-.row-label{min-width:180px;font-weight:700;color:#333;}
-.row-value{flex:1;min-width:200px;}
-.row select, .row input{padding:8px 12px;border:1.5px solid #bbdefb;border-radius:9px;font-size:14px;background:#f0f7ff;min-width:160px;}
-.row button{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:8px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:14px;}
-.row button:hover{opacity:0.9;}
-.row button:disabled{background:#b0bec5;cursor:default;}
-.tag{background:#ede7f6;color:#6B3FA0;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700;}
-.loading{text-align:center;color:#999;padding:40px;}
+body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:100vh;padding:18px;color:#1f2937;}
+.topbar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 22px;border-radius:14px;margin-bottom:16px;box-shadow:0 6px 18px rgba(107,63,160,0.25);}
+.topbar h1{font-size:1.35rem;letter-spacing:.3px;}
+.topbar-links{display:flex;gap:8px;}
+.topbar a{color:#fff;background:rgba(255,255,255,0.18);padding:8px 16px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;}
+.topbar a:hover{background:rgba(255,255,255,0.3);}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;background:#fff;padding:8px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.04);margin-bottom:14px;}
+.tab{padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;color:#555;background:#f4f4f8;border:2px solid transparent;transition:all .18s ease;user-select:none;}
+.tab:hover{background:#eceff5;}
+.tab.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(107,63,160,0.3);}
+.workspace{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;min-height:540px;}
+@media(max-width:1000px){.workspace{grid-template-columns:1fr;}}
+.panel{background:#fff;border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,0.05);position:relative;overflow:hidden;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1.5px dashed #eceff5;}
+.panel-title{font-size:1.05rem;font-weight:800;color:#4a2e87;display:flex;align-items:center;gap:6px;}
+.panel-sub{font-size:12px;color:#888;}
+.watermark{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-size:5.5rem;font-weight:900;color:rgba(107,63,160,0.045);pointer-events:none;letter-spacing:6px;user-select:none;}
+/* Preview mockup layout */
+.preview-canvas{position:relative;border:2px solid #eef0f7;border-radius:14px;padding:14px;background:linear-gradient(180deg,#fcfcff,#f5f6fc);min-height:460px;}
+.mock-header{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:10px 14px;border-radius:10px;font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;box-shadow:0 3px 8px rgba(107,63,160,0.2);}
+.mock-zone{background:#fff;border:1.5px solid #e7ebf2;border-radius:12px;padding:12px;margin-bottom:12px;position:relative;}
+.mock-zone-label{position:absolute;top:-10px;right:12px;background:#fff;padding:0 8px;font-size:12px;font-weight:700;color:#6B3FA0;}
+.mock-zone-body{display:flex;flex-wrap:wrap;gap:8px;min-height:42px;align-items:center;padding:4px 2px;}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;box-shadow:0 2px 6px rgba(0,0,0,0.1);user-select:none;border:2px solid rgba(255,255,255,0.6);}
+.badge:hover{transform:translateY(-2px);}
+.badge .num{background:rgba(255,255,255,0.3);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:900;}
+.badge .text{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.badge.hl, .card.hl{animation:pulse 1.1s ease-in-out infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(107,63,160,0.45);}70%{box-shadow:0 0 0 10px rgba(107,63,160,0);}100%{box-shadow:0 0 0 0 rgba(107,63,160,0);}}
+/* Settings cards */
+.cards{display:flex;flex-direction:column;gap:10px;max-height:72vh;overflow-y:auto;padding-left:4px;}
+.cards::-webkit-scrollbar{width:8px;}
+.cards::-webkit-scrollbar-thumb{background:#d0c7e8;border-radius:8px;}
+.card{background:#fff;border:2px solid #eceff5;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;transition:all .18s ease;cursor:pointer;}
+.card:hover{border-color:#b39ddb;box-shadow:0 4px 10px rgba(107,63,160,0.1);}
+.card-num{flex:0 0 34px;height:34px;border-radius:10px;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.card-body{flex:1;min-width:0;}
+.card-label{font-size:13.5px;font-weight:700;color:#333;margin-bottom:2px;display:flex;align-items:center;gap:6px;}
+.card-comp{font-size:11px;color:#999;font-family:monospace;}
+.card-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+.card select{padding:7px 10px;border:1.5px solid #d7dae0;border-radius:8px;font-size:13px;background:#fafbff;min-width:140px;max-width:200px;}
+.card select:focus{outline:none;border-color:#8B5CC8;}
+.card .check{color:#43A047;font-weight:900;font-size:13px;opacity:0;transition:opacity .2s ease;}
+.card .check.show{opacity:1;}
+.empty{text-align:center;color:#999;padding:40px 20px;font-size:15px;}
+.loading-full{text-align:center;color:#999;padding:60px 20px;font-size:16px;font-weight:700;}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:#43A047;color:#fff;padding:11px 22px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 6px 20px rgba(67,160,71,0.35);opacity:0;transition:all .25s ease;pointer-events:none;z-index:999;}
+.toast.err{background:#e53935;box-shadow:0 6px 20px rgba(229,57,53,0.35);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* Color groups */
+.col-tbl{background:linear-gradient(135deg,#1976D2,#42A5F5);}
+.col-name{background:linear-gradient(135deg,#388E3C,#66BB6A);}
+.col-phone{background:linear-gradient(135deg,#F57C00,#FFB74D);}
+.col-group{background:linear-gradient(135deg,#7B1FA2,#BA68C8);}
+.col-amount{background:linear-gradient(135deg,#C62828,#EF5350);}
+.col-date{background:linear-gradient(135deg,#00838F,#4DD0E1);}
+.col-status{background:linear-gradient(135deg,#C2185B,#F06292);}
+.col-install{background:linear-gradient(135deg,#5D4037,#A1887F);}
+.col-other{background:linear-gradient(135deg,#455A64,#78909C);}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;font-size:11.5px;}
+.legend-item{display:inline-flex;align-items:center;gap:5px;background:#f6f7fb;padding:4px 10px;border-radius:999px;color:#555;font-weight:700;}
+.legend-dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <h1>⚙ الإعدادات العامة</h1>
-  <a href="/settings" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:11px 22px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;margin-left:8px;display:inline-block;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard">← الرئيسية</a>
+  <h1>&#x2699; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A; &#x645;&#x631;&#x626;&#x64A;&#x629; &#x2014; &#x631;&#x628;&#x637; &#x627;&#x644;&#x62C;&#x62F;&#x627;&#x648;&#x644; &#x648;&#x627;&#x644;&#x623;&#x639;&#x645;&#x62F;&#x629;</h1>
+  <div class="topbar-links">
+    <a href="/dashboard">&#x2190; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
+  </div>
 </div>
-<div class="main">
-  <div id="settingsContainer" class="loading">جاري التحميل...</div>
-</div>
+<div id="tabs" class="tabs"></div>
+<div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
+<div id="toast" class="toast"></div>
 <script>
-var ALL_TABLES = [];
-var PAGE_TITLES = {
-  attendance: '📅 الغياب',
-  messaging:  '✉ الرسائل',
-  payment:    '💰 الدفع',
-  dashboard:  '📊 الداشبورد',
-  database:   '🗄 قاعدة البيانات',
-  groups:     '👥 المجموعات'
+/* ---------------- color helpers ---------------- */
+function colorFor(component) {
+  var c = (component || '').toLowerCase();
+  if (c === 'table' || c.endsWith('_table')) return 'col-tbl';
+  if (c.indexOf('phone') >= 0 || c.indexOf('whatsapp') >= 0) return 'col-phone';
+  if (c.indexOf('amount') >= 0 || c === 'paid_amount_column' || c.indexOf('paid_column') >= 0 || c.indexOf('remaining') >= 0 || c === 'total_paid_column' || c === 'total_remaining_column') return 'col-amount';
+  if (c.indexOf('group') >= 0) return 'col-group';
+  if (c.indexOf('name_column') >= 0 || c === 'student_name_column' || c === 'log_student_column' || c === 'templates_name_column') return 'col-name';
+  if (c.indexOf('date') >= 0 || c === 'day_column' || c === 'form_fill_date') return 'col-date';
+  if (c.indexOf('status') >= 0) return 'col-status';
+  if (c.indexOf('installment') >= 0 || c.indexOf('taqseet') >= 0) return 'col-install';
+  return 'col-other';
+}
+/* ---------------- page schema ---------------- */
+var PAGE_META = {
+  attendance:  {title:'صفحة الغياب',           icon:'📅', zones:['فلاتر وجداول','أعمدة جدول الغياب']},
+  messaging:   {title:'صفحة الرسائل',     icon:'💬', zones:['جداول الرسائل','أعمدة الرسائل']},
+  payment:     {title:'صفحة الدفع',                   icon:'💰', zones:['جداول الدفع','أعمدة الدفع']},
+  dashboard:   {title:'الداشبورد',                    icon:'🏠', zones:['جداول الداشبورد','أعمدة الداشبورد']},
+  database:    {title:'قاعدة البيانات', icon:'🗄', zones:['إعدادات العرض']},
+  groups:      {title:'صفحة المجموعات', icon:'👥', zones:['جداول المجموعات','أعمدة المجموعات']},
+  evaluations: {title:'صفحة التقييمات', icon:'⭐',       zones:['جداول التقييمات','أعمدة التقييمات']},
+  paylog:      {title:'سجل الدفع',                          icon:'📜', zones:['جداول سجل الدفع','أعمدة سجل الدفع']}
 };
+var PAGE_ORDER = ['attendance','messaging','payment','dashboard','database','groups','evaluations','paylog'];
 
+var ALL_TABLES = [];
+var SETTINGS = {};
+var CURRENT_PAGE = 'attendance';
+var COLUMN_CACHE = {}; /* table -> [cols] */
+
+/* ---------------- utilities ---------------- */
 function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function isColumnComponent(comp){ return comp.indexOf('column') >= 0 || comp.endsWith('_col'); }
+function isTableComponent(comp){ return comp === 'table' || comp.endsWith('_table') || comp === 'visible_tables'; }
+function pairedTableFor(comp, items){
+  if (!isColumnComponent(comp)) return null;
+  var prefix = comp.replace(/_column$/,'').replace(/_col$/,'');
+  var cand = [prefix + '_table', 'table'];
+  for (var i=0;i<cand.length;i++){
+    var x = items.find(function(s){ return s.component === cand[i]; });
+    if (x) return x;
+  }
+  /* fallbacks by prefix match */
+  var first = items.find(function(s){ return isTableComponent(s.component); });
+  return first || null;
+}
 
+/* ---------------- loading ---------------- */
 function loadAll() {
   Promise.all([
     fetch('/api/settings/tables',{credentials:'include'}).then(function(r){return r.json();}),
     fetch('/api/settings',{credentials:'include'}).then(function(r){return r.json();})
   ]).then(function(res){
     ALL_TABLES = (res[0].tables || []);
-    renderAll(res[1].settings || {});
+    SETTINGS = res[1].settings || {};
+    buildTabs();
+    renderPage(CURRENT_PAGE);
   }).catch(function(){
-    document.getElementById('settingsContainer').textContent = 'خطأ في التحميل';
+    document.getElementById('workspace').textContent = 'خطأ في التحميل';
   });
 }
 
-function renderAll(settingsByPage) {
+/* ---------------- tabs ---------------- */
+function buildTabs(){
+  var tabs = document.getElementById('tabs');
+  var keys = PAGE_ORDER.slice();
+  /* any pages in SETTINGS not in PAGE_ORDER go to the end */
+  Object.keys(SETTINGS).forEach(function(k){ if (keys.indexOf(k) < 0) keys.push(k); });
   var html = '';
-  var pageKeys = Object.keys(PAGE_TITLES).concat(Object.keys(settingsByPage).filter(function(k){ return !(k in PAGE_TITLES); }));
-  var seen = {};
-  pageKeys.forEach(function(p){
-    if (seen[p]) return; seen[p] = true;
-    var items = settingsByPage[p] || [];
-    html += '<div class="page-block"><h2>' + (PAGE_TITLES[p] || p) + '</h2>';
-    if (!items.length) {
-      html += '<p style="color:#999;padding:8px;">لا توجد إعدادات لهذه الصفحة بعد.</p>';
-    } else {
-      items.forEach(function(s, idx){
-        var rid = 'set_' + p + '_' + s.component;
-        html += '<div class="row" id="' + rid + '">';
-        html += '<div class="row-label">' + s.label + '</div>';
-        html += '<div class="row-value">';
-        // Table dropdown — for all settings, user picks from the live table list.
-        html += '<select data-role="tbl" onchange="_onTblChange(this)">';
-        html += '<option value="">— اختر جدول —</option>';
-        html += '<option value="all"' + (s.value === 'all' ? ' selected' : '') + '>الكل</option>';
-        for (var i=0;i<ALL_TABLES.length;i++){
-          var t = ALL_TABLES[i];
-          html += '<option value="' + escAttr(t) + '"' + (s.value === t ? ' selected' : '') + '>' + t + '</option>';
-        }
-        html += '</select>';
-        // If the component key contains "column", we also show a column dropdown next to it.
-        // The column dropdown reflects the columns of the currently-selected table; but because
-        // a setting holds a single value, the value here IS the current column selection when
-        // this component is a column one. Otherwise the column dropdown is hidden.
-        var isCol = s.component.indexOf('column') >= 0 || s.component.endsWith('_col');
-        html += '<select data-role="col" style="' + (isCol?'':'display:none;') + '"><option value="">— اختر عمود —</option></select>';
-        html += '</div>';
-        html += '<div class="tag">' + s.component + '</div>';
-        html += '<button onclick="_save(this,\\'' + p + '\\',\\'' + s.component + '\\',' + (isCol ? '1' : '0') + ')">💾 حفظ</button>';
-        html += '<span class="_status" style="color:#43A047;font-size:13px;margin-right:6px;"></span>';
-        html += '</div>';
-      });
-    }
+  keys.forEach(function(k){
+    var meta = PAGE_META[k] || {title:k, icon:'⚙'};
+    var count = (SETTINGS[k] || []).length;
+    html += '<div class="tab' + (k === CURRENT_PAGE ? ' active' : '') + '" data-tab="' + escAttr(k) + '">';
+    html += meta.icon + ' ' + meta.title + ' <span style="opacity:.7;font-weight:600;">(' + count + ')</span>';
     html += '</div>';
   });
-  document.getElementById('settingsContainer').className = '';
-  document.getElementById('settingsContainer').innerHTML = html;
-  // After render, for each column-type setting, fetch its current table's columns
-  // and preselect the column value.
-  for (var p2 in settingsByPage) {
-    (settingsByPage[p2] || []).forEach(function(s){
-      if (s.component.indexOf('column') < 0 && !s.component.endsWith('_col')) return;
-      // The value of a column setting IS the column name; the corresponding
-      // "table" selection for this dropdown is… the related table setting.
-      // Heuristic: find a sibling setting whose component ends in 'table'.
-      var siblings = settingsByPage[p2] || [];
-      var tblValue = null;
-      // Pair 'X_column' with 'X_table' if present; else with the first 'table' component.
-      var prefix = s.component.replace(/_column$/, '').replace(/_col$/, '');
-      var paired = siblings.find(function(x){ return x.component === prefix + '_table'; })
-                || siblings.find(function(x){ return x.component === 'table'; })
-                || siblings.find(function(x){ return x.component.indexOf('table') >= 0; });
-      if (paired) tblValue = paired.value;
-      var rid = 'set_' + p2 + '_' + s.component;
-      var row = document.getElementById(rid);
-      if (!row) return;
-      var tblSel = row.querySelector('select[data-role=tbl]');
-      var colSel = row.querySelector('select[data-role=col]');
-      if (tblSel && tblValue) tblSel.value = tblValue;
-      if (tblSel && colSel) _fetchCols(tblSel.value, colSel, s.value);
-    });
-  }
+  tabs.innerHTML = html;
+  tabs.addEventListener('click', function(e){
+    var t = e.target.closest('.tab');
+    if (!t) return;
+    var k = t.getAttribute('data-tab');
+    if (k === CURRENT_PAGE) return;
+    CURRENT_PAGE = k;
+    buildTabs();
+    renderPage(k);
+  });
 }
 
-function _onTblChange(sel) {
-  var row = sel.closest('.row');
-  var colSel = row.querySelector('select[data-role=col]');
-  if (!colSel) return;
-  _fetchCols(sel.value, colSel, '');
+/* ---------------- page render ---------------- */
+function renderPage(page){
+  var ws = document.getElementById('workspace');
+  ws.className = '';
+  var items = SETTINGS[page] || [];
+  if (!items.length){
+    ws.innerHTML = '<div class="panel"><div class="empty">لا توجد إعدادات لهذه الصفحة.</div></div>';
+    return;
+  }
+  var meta = PAGE_META[page] || {title:page, icon:'⚙', zones:['جداول','أعمدة']};
+  /* Split items: tables in zone 0, columns in zone 1 */
+  var zoneItems = [[], []];
+  items.forEach(function(s){
+    if (isTableComponent(s.component)) zoneItems[0].push(s);
+    else zoneItems[1].push(s);
+  });
+  /* number ALL items globally so badge number matches card number */
+  var numbered = [];
+  zoneItems[0].forEach(function(s){ numbered.push(s); });
+  zoneItems[1].forEach(function(s){ numbered.push(s); });
+
+  /* ----- left: preview ----- */
+  var left = '';
+  left += '<div class="watermark">معاينة</div>';
+  left += '<div class="panel-head"><div class="panel-title">' + meta.icon + ' ' + meta.title + '</div><div class="panel-sub">' + items.length + ' إعداد</div></div>';
+  left += '<div class="legend">';
+  left += '<span class="legend-item"><span class="legend-dot col-tbl"></span>جدول</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-name"></span>اسم</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-phone"></span>هاتف</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-group"></span>مجموعة</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-amount"></span>مبلغ</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-date"></span>تاريخ</span>';
+  left += '<span class="legend-item"><span class="legend-dot col-status"></span>حالة</span>';
+  left += '</div>';
+  left += '<div class="preview-canvas">';
+  left += '<div class="mock-header"><span>' + meta.icon + ' ' + meta.title + '</span><span style="font-size:12px;opacity:.8;">&#x645;&#x639;&#x627;&#x64A;&#x646;&#x629; &#x62D;&#x64A;&#x629;</span></div>';
+
+  var globalIdx = 0;
+  for (var z=0; z<zoneItems.length; z++){
+    if (!zoneItems[z].length) continue;
+    var zname = (meta.zones && meta.zones[z]) || ('منطقة ' + (z+1));
+    left += '<div class="mock-zone"><div class="mock-zone-label">' + zname + '</div><div class="mock-zone-body">';
+    zoneItems[z].forEach(function(s){
+      globalIdx++;
+      var color = colorFor(s.component);
+      left += '<span class="badge ' + color + '" data-component="' + escAttr(s.component) + '">';
+      left += '<span class="num">' + globalIdx + '</span>';
+      left += '<span class="text">' + s.label + '</span>';
+      left += '</span>';
+    });
+    left += '</div></div>';
+  }
+  left += '</div>'; /* preview-canvas */
+
+  /* ----- right: settings cards ----- */
+  var right = '';
+  right += '<div class="panel-head"><div class="panel-title">⚙ الإعدادات</div><div class="panel-sub">اختر الجدول أو العمود المناسب</div></div>';
+  right += '<div class="cards" id="cardsList">';
+  numbered.forEach(function(s, i){
+    var num = i + 1;
+    var color = colorFor(s.component);
+    var isCol = isColumnComponent(s.component);
+    right += '<div class="card" data-component="' + escAttr(s.component) + '">';
+    right += '<div class="card-num ' + color + '">' + num + '</div>';
+    right += '<div class="card-body">';
+    right += '<div class="card-label">' + s.label + '<span class="check" id="chk_' + escAttr(s.component) + '">&#x2713;</span></div>';
+    right += '<div class="card-comp">' + s.component + '</div>';
+    right += '<div class="card-controls">';
+    /* table dropdown (always) */
+    right += '<select data-role="tbl" data-component="' + escAttr(s.component) + '">';
+    right += '<option value="">— جدول —</option>';
+    right += '<option value="all"' + (s.value === 'all' ? ' selected' : '') + '>الكل</option>';
+    for (var ti=0; ti<ALL_TABLES.length; ti++){
+      var tn = ALL_TABLES[ti];
+      var sel = (!isCol && s.value === tn) ? ' selected' : '';
+      right += '<option value="' + escAttr(tn) + '"' + sel + '>' + tn + '</option>';
+    }
+    right += '</select>';
+    if (isCol){
+      right += '<select data-role="col" data-component="' + escAttr(s.component) + '">';
+      right += '<option value="">— عمود —</option>';
+      right += '</select>';
+    }
+    right += '</div>';
+    right += '</div>';
+    right += '</div>';
+  });
+  right += '</div>';
+
+  ws.innerHTML = '<div class="panel" id="leftPanel">' + left + '</div><div class="panel" id="rightPanel">' + right + '</div>';
+  ws.className = 'workspace';
+
+  /* hydrate dropdowns for column-type settings */
+  numbered.forEach(function(s){
+    if (!isColumnComponent(s.component)) return;
+    var paired = pairedTableFor(s.component, items);
+    var card = document.querySelector('.card[data-component="' + cssEscape(s.component) + '"]');
+    if (!card) return;
+    var tblSel = card.querySelector('select[data-role="tbl"]');
+    var colSel = card.querySelector('select[data-role="col"]');
+    var tblValue = paired ? (paired.value || '') : '';
+    if (tblSel && tblValue){
+      /* Preselect the paired table if available in options */
+      for (var i=0;i<tblSel.options.length;i++){
+        if (tblSel.options[i].value === tblValue){ tblSel.selectedIndex = i; break; }
+      }
+    }
+    if (tblSel && colSel){
+      fetchCols(tblSel.value, colSel, s.value);
+    }
+  });
+
+  wireInteractions();
 }
-function _fetchCols(tbl, colSel, preselect) {
-  if (!tbl || tbl === 'all') { colSel.innerHTML = '<option value="">—</option>'; return; }
+
+/* ---------------- columns fetch ---------------- */
+function fetchCols(tbl, colSel, preselect){
+  if (!tbl || tbl === 'all'){
+    colSel.innerHTML = '<option value="">— عمود —</option>';
+    return;
+  }
+  if (COLUMN_CACHE[tbl]){
+    fillCols(colSel, COLUMN_CACHE[tbl], preselect);
+    return;
+  }
   fetch('/api/settings/columns/' + encodeURIComponent(tbl), {credentials:'include'})
     .then(function(r){return r.json();})
     .then(function(d){
       var cols = d.columns || [];
-      var html = '<option value="">— اختر عمود —</option>';
-      for (var i=0;i<cols.length;i++){
-        var c = cols[i];
-        var sel = (preselect && c === preselect) ? ' selected' : '';
-        html += '<option value="' + escAttr(c) + '"' + sel + '>' + c + '</option>';
-      }
-      colSel.innerHTML = html;
+      COLUMN_CACHE[tbl] = cols;
+      fillCols(colSel, cols, preselect);
     });
 }
-function _save(btn, page, component, isCol) {
-  var row = btn.closest('.row');
-  var tblSel = row.querySelector('select[data-role=tbl]');
-  var colSel = row.querySelector('select[data-role=col]');
-  var value = isCol ? (colSel.value || '') : (tblSel.value || '');
-  btn.disabled = true;
+function fillCols(colSel, cols, preselect){
+  var html = '<option value="">— عمود —</option>';
+  for (var i=0;i<cols.length;i++){
+    var c = cols[i];
+    var sel = (preselect && c === preselect) ? ' selected' : '';
+    html += '<option value="' + escAttr(c) + '"' + sel + '>' + c + '</option>';
+  }
+  colSel.innerHTML = html;
+}
+
+/* component keys are always ASCII identifiers (letters/digits/underscore), */
+/* so no CSS escaping is needed for [data-component="..."] selectors. */
+function cssEscape(s){ return String(s); }
+
+/* ---------------- interactions ---------------- */
+function wireInteractions(){
+  /* hover bidirectional highlight + click-to-jump */
+  var ws = document.getElementById('workspace');
+  ws.addEventListener('mouseover', function(e){
+    var t = e.target.closest('[data-component]');
+    if (!t) return;
+    setHighlight(t.getAttribute('data-component'), true);
+  });
+  ws.addEventListener('mouseout', function(e){
+    var t = e.target.closest('[data-component]');
+    if (!t) return;
+    setHighlight(t.getAttribute('data-component'), false);
+  });
+  ws.addEventListener('click', function(e){
+    var b = e.target.closest('.badge');
+    if (b){
+      var comp = b.getAttribute('data-component');
+      var card = document.querySelector('.card[data-component="' + cssEscape(comp) + '"]');
+      if (card){
+        card.scrollIntoView({behavior:'smooth', block:'center'});
+        card.classList.add('hl');
+        setTimeout(function(){ card.classList.remove('hl'); }, 1500);
+      }
+    }
+  });
+
+  /* change handlers on selects: auto-save */
+  ws.addEventListener('change', function(e){
+    var sel = e.target;
+    if (!sel || sel.tagName !== 'SELECT') return;
+    var role = sel.getAttribute('data-role');
+    var comp = sel.getAttribute('data-component');
+    if (!comp) return;
+    var card = sel.closest('.card');
+    if (!card) return;
+    if (role === 'tbl'){
+      if (isColumnComponent(comp)){
+        /* table changed; repopulate columns, don't save yet */
+        var colSel = card.querySelector('select[data-role="col"]');
+        if (colSel){ fetchCols(sel.value, colSel, ''); }
+      } else {
+        /* plain table setting: save the table value */
+        saveSetting(CURRENT_PAGE, comp, sel.value, card);
+      }
+    } else if (role === 'col'){
+      saveSetting(CURRENT_PAGE, comp, sel.value, card);
+    }
+  });
+}
+
+function setHighlight(comp, on){
+  var sel = '[data-component="' + cssEscape(comp) + '"]';
+  var els = document.querySelectorAll(sel);
+  for (var i=0;i<els.length;i++){
+    if (on) els[i].classList.add('hl');
+    else els[i].classList.remove('hl');
+  }
+}
+
+/* ---------------- save ---------------- */
+function saveSetting(page, component, value, card){
   fetch('/api/settings', {
-    method: 'PATCH',
-    headers: {'Content-Type':'application/json'},
-    credentials: 'include',
-    body: JSON.stringify({page: page, component: component, value: value})
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({page:page, component:component, value:value})
   }).then(function(r){return r.json();}).then(function(d){
-    btn.disabled = false;
-    var st = row.querySelector('._status');
-    if (st) { st.textContent = d.ok ? '✓' : (d.error || 'خطأ'); st.style.color = d.ok ? '#43A047' : '#c62828';
-              setTimeout(function(){ st.textContent = ''; }, 1800); }
-  }).catch(function(){ btn.disabled = false; });
+    if (d.ok){
+      /* update local cache */
+      var arr = SETTINGS[page] || [];
+      for (var i=0;i<arr.length;i++){ if (arr[i].component === component){ arr[i].value = value; break; } }
+      /* check animation on card */
+      var chk = card.querySelector('.check');
+      if (chk){
+        chk.classList.add('show');
+        setTimeout(function(){ chk.classList.remove('show'); }, 1600);
+      }
+      toast('تم الحفظ ✓', false);
+    } else {
+      toast((d.error || 'خطأ'), true);
+    }
+  }).catch(function(){ toast('خطأ في الاتصال', true); });
+}
+
+/* ---------------- toast ---------------- */
+var toastTimer = null;
+function toast(msg, isErr){
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isErr ? ' err' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.className = 'toast' + (isErr ? ' err' : ''); }, 1800);
 }
 
 loadAll();
