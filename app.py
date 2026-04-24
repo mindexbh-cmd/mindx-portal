@@ -10005,21 +10005,43 @@ def api_unified_rename_column(tid):
         return jsonify({"ok": False, "error": "table not found"}), 404
     db = get_db()
     # If old_key isn't a safe identifier, treat it as an Arabic display
-    # label and resolve the real internal col_key via the labels table.
+    # label and resolve via the same ladder as delete-column: normalised
+    # labels_table lookup → BUILT_IN_COLUMN_LABELS reverse → schema scan.
     if not _is_safe_ident(old_key):
+        def _norm_lbl(s):
+            s = "" if s is None else str(s)
+            s = _decode_arabic_entities(s)
+            return " ".join(s.split())
+        target = _norm_lbl(old_key)
         resolved = None
-        if labels_table:
+        if labels_table and target:
             try:
-                row = db.execute(
-                    "SELECT col_key FROM " + labels_table + " WHERE col_label=?",
-                    (old_key,),
-                ).fetchone()
-                if row and row[0] and _is_safe_ident(row[0]):
-                    resolved = row[0]
+                for r in db.execute(
+                    "SELECT col_key, col_label FROM " + labels_table
+                ).fetchall():
+                    if r[0] and _is_safe_ident(r[0]) and _norm_lbl(r[1]) == target:
+                        resolved = r[0]; break
+            except Exception:
+                pass
+        if not resolved and target:
+            for _k, _v in BUILT_IN_COLUMN_LABELS.items():
+                if _norm_lbl(_v) == target and _is_safe_ident(_k):
+                    resolved = _k; break
+        if not resolved:
+            try:
+                for r in db.execute(
+                    "PRAGMA table_info(" + db_table + ")"
+                ).fetchall():
+                    if _norm_lbl(r[1]) == target and _is_safe_ident(r[1]):
+                        resolved = r[1]; break
             except Exception:
                 pass
         if not resolved:
-            return jsonify({"ok": False, "error": "invalid column name"}), 400
+            return jsonify({
+                "ok": False, "error": "invalid column name",
+                "received": old_key,
+                "hint": "could not map display label to an internal column identifier",
+            }), 400
         old_key = resolved
     try:
         if new_key and new_key != old_key:
@@ -10107,20 +10129,57 @@ def api_unified_delete_column(tid, col_name):
     db = get_db()
 
     # ---- 1) Resolve col_name to an internal safe identifier ----
+    # Multi-stage Arabic-label → internal-key lookup. The client SHOULD
+    # always pass the internal key via /mx-helpers.js, but we guard
+    # against label leakage by running the same ladder the paylog
+    # lookup uses: normalise whitespace, decode HTML entities, fuzzy
+    # match against the labels table, then the built-in dict, then
+    # information_schema as a last resort.
+    def _norm_label(s):
+        s = "" if s is None else str(s)
+        s = _decode_arabic_entities(s)
+        return " ".join(s.split())
     if not _is_safe_ident(col_name):
+        target = _norm_label(col_name)
         resolved = None
-        if labels_table:
+        # (a) labels_table.col_label exact match (normalised both sides)
+        if labels_table and target:
             try:
-                row = db.execute(
-                    "SELECT col_key FROM " + labels_table + " WHERE col_label=?",
-                    (col_name,),
-                ).fetchone()
-                if row and row[0] and _is_safe_ident(row[0]):
-                    resolved = row[0]
+                rows = db.execute(
+                    "SELECT col_key, col_label FROM " + labels_table
+                ).fetchall()
+                for r in rows:
+                    if r[0] and _is_safe_ident(r[0]) and _norm_label(r[1]) == target:
+                        resolved = r[0]; break
+            except Exception:
+                pass
+        # (b) BUILT_IN_COLUMN_LABELS reverse lookup — covers rows that
+        # never got a row in labels_table but have a hard-coded Arabic
+        # display name (e.g. the numbered taqseet columns).
+        if not resolved and target:
+            for k, v in BUILT_IN_COLUMN_LABELS.items():
+                if _norm_label(v) == target and _is_safe_ident(k):
+                    resolved = k; break
+        # (c) information_schema scan — catch the edge case where a
+        # column's internal name is literally the Arabic target (not a
+        # safe ident by our regex but technically present in the DB).
+        if not resolved:
+            try:
+                for r in db.execute(
+                    "PRAGMA table_info(" + db_table + ")"
+                ).fetchall():
+                    name = r[1]
+                    if _norm_label(name) == target and _is_safe_ident(name):
+                        resolved = name; break
             except Exception:
                 pass
         if not resolved:
-            return jsonify({"ok": False, "error": "invalid column name"}), 400
+            return jsonify({
+                "ok": False,
+                "error": "invalid column name",
+                "received": col_name,
+                "hint": "could not map display label to an internal column identifier",
+            }), 400
         col_name = resolved
 
     # ---- 2) Confirm the column exists on the live table ----
@@ -13079,8 +13138,13 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     var th = table.querySelectorAll('thead tr th')[idx];
     if (!th) return 'عمود';
     var clone = th.cloneNode(true);
-    clone.querySelectorAll('.mx-filter-btn').forEach(function(b){ b.remove(); });
-    return (clone.textContent || '').trim() || 'عمود';
+    // Strip every chrome button we add so the label reflects only the
+    // real column name. Omitting .mx-col-del-btn here was the root
+    // cause of the ✕-button "invalid column name" error — the ✕ text
+    // bled into the label, no map key matched it, and the server fell
+    // through to the safe-ident check.
+    clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn').forEach(function(b){ b.remove(); });
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim() || 'عمود';
   }
   function _mxApplyFilters(table){
     var filters = table._mxFilters || {};
