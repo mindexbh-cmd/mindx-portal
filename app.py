@@ -461,6 +461,8 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'amount_column', 'عمود المبلغ', 'course_amount'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'groups_table', 'جدول المجموعات', 'student_groups'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'groups_column', 'عمود المجموعة', 'group_name'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('students', 'active_column', 'عمود حالة النشاط', 'registration_term2_2026'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('students', 'active_value',  'قيمة الطالب النشط', 'تم التسجيل'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'students_table', 'جدول الطلاب', 'students'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'groups_table', 'جدول المجموعات', 'student_groups'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('dashboard', 'attendance_table', 'جدول الغياب', 'attendance'))
@@ -1233,6 +1235,23 @@ if True:
     # <input type="date"> sends. Normalize every row here once, tagged
     # `att_normalize_v1`. The prod DB was also migrated out-of-band, and
     # that INSERT is gated by ON CONFLICT so re-running is harmless.
+    if "students_active_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ('students', 'active_column', 'عمود حالة النشاط', 'registration_term2_2026'),
+            )
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ('students', 'active_value', 'قيمة الطالب النشط', 'تم التسجيل'),
+            )
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_active_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     if "att_normalize_v1" not in applied:
         try:
             import re as _re_att
@@ -2595,14 +2614,22 @@ function srFilter(){
     var score = Math.max(scoreName, scorePid);
     if (score > 0) scored.push({ s: s, score: score });
   }
-  scored.sort(function(a,b){ return b.score - a.score; });
+  scored.sort(function(a,b){
+    var ad = (a.s && a.s.is_active === false) ? 1 : 0;
+    var bd = (b.s && b.s.is_active === false) ? 1 : 0;
+    if (ad !== bd) return ad - bd;  // active first
+    return b.score - a.score;
+  });
   scored = scored.slice(0, 10);
   if (!scored.length) { results.innerHTML = '<div style="padding:12px;color:#888;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0646\u062A\u0627\u0626\u062C</div>'; return; }
   var html = '';
   for (var i=0; i<scored.length; i++) {
     var s = scored[i].s;
+    var _inactBadge = (s.is_active === false)
+      ? ' <span style="background:#fce4ec;color:#c62828;font-size:0.7em;padding:1px 7px;border-radius:999px;font-weight:700;margin-right:6px;vertical-align:middle;">\u063A\u064A\u0631 \u0646\u0634\u0637</span>'
+      : '';
     html += '<div class="srm-result" onclick="srPick('+s.id+')">'
-         +  '<div class="srm-result-name">'+(s.student_name||'-')+'</div>'
+         +  '<div class="srm-result-name">'+(s.student_name||'-')+_inactBadge+'</div>'
          +  '<div class="srm-result-meta">\u0631\u0642\u0645: '+(s.personal_id||'-')
          +  (s.class_name?(' &middot; \u0627\u0644\u0635\u0641: '+s.class_name):'')
          +  (s.group_name_student?(' &middot; \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629: '+s.group_name_student):'')
@@ -8800,9 +8827,24 @@ def database():
 @app.route("/api/students", methods=["GET"])
 @login_required
 def api_students_get():
+    """Every student, each row annotated with `is_active` so the
+    student-search modal can rank active matches first while still
+    finding inactive ones."""
     db = get_db()
+    act_col = (get_setting("students", "active_column", "registration_term2_2026") or "").strip()
+    act_val = (get_setting("students", "active_value",  "تم التسجيل") or "").strip()
+    act_col = act_col if _is_safe_ident(act_col) else ""
     rows = db.execute("SELECT * FROM students ORDER BY id ASC").fetchall()
-    return jsonify({"students": [dict(r) for r in rows]})
+    out = []
+    for r in rows:
+        d = dict(r)
+        if act_col:
+            v = (d.get(act_col) or "").strip() if isinstance(d.get(act_col), str) else d.get(act_col)
+            d["is_active"] = (str(v or "").strip() == act_val)
+        else:
+            d["is_active"] = True
+        out.append(d)
+    return jsonify({"students": out})
 
 @app.route("/api/students", methods=["POST"])
 @login_required
@@ -9733,6 +9775,34 @@ def _column_label_map(table):
         except Exception:
             pass
     return out
+
+
+def _active_students_filter():
+    """Return (sql_fragment, param) for an "active student" WHERE clause.
+
+    Both the filter column and the value the column should match for a
+    student to count as ACTIVE flow through get_setting(), so they can
+    be changed from /settings without touching code:
+
+      settings.students.active_column   default "registration_term2_2026"
+      settings.students.active_value    default "تم التسجيل"
+
+    If the configured column isn't a safe identifier or isn't on the
+    live students table, this returns (None, None) and callers should
+    skip the filter (i.e. count every student).
+    """
+    col = (get_setting("students", "active_column", "registration_term2_2026") or "").strip()
+    val = (get_setting("students", "active_value",  "تم التسجيل") or "").strip()
+    if not col or not val or not _is_safe_ident(col):
+        return None, None
+    try:
+        live = set(get_table_columns("students"))
+        if col not in live:
+            return None, None
+    except Exception:
+        return None, None
+    # Tolerate leading/trailing whitespace that imports sometimes leave in.
+    return "TRIM(" + col + ") = ?", val
 
 
 @app.route('/api/settings/tables', methods=['GET'])
@@ -11006,19 +11076,36 @@ def api_groups_cleanup_empty():
 @app.route("/api/groups-students", methods=["GET"])
 @login_required
 def api_groups_students():
+    """Group → student roster. By default, only ACTIVE students are
+    returned. Pass ?include_inactive=1 to get every student regardless
+    of registration status."""
     db = get_db()
-    rows = db.execute(
-        "SELECT DISTINCT group_name_student FROM students WHERE group_name_student IS NOT NULL AND group_name_student != '' ORDER BY group_name_student"
-    ).fetchall()
-    groups = {}
+    include_inactive = (request.args.get("include_inactive") or "") in ("1", "true", "yes")
+    act_frag, act_val = _active_students_filter()
+
+    groups_sql = ("SELECT DISTINCT group_name_student FROM students "
+                  "WHERE group_name_student IS NOT NULL AND group_name_student <> ''")
+    students_sql = ("SELECT id, student_name, personal_id, whatsapp FROM students "
+                    "WHERE group_name_student = ?")
+    params_for_student = []
+    if act_frag and not include_inactive:
+        groups_sql += " AND " + act_frag
+        students_sql += " AND " + act_frag
+        params_for_student = [act_val]
+    groups_sql += " ORDER BY group_name_student"
+    students_sql += " ORDER BY student_name"
+
+    if act_frag and not include_inactive:
+        rows = db.execute(groups_sql, (act_val,)).fetchall()
+    else:
+        rows = db.execute(groups_sql).fetchall()
+
+    out = {}
     for row in rows:
         gname = row[0]
-        students = db.execute(
-            "SELECT id, student_name, personal_id, whatsapp FROM students WHERE group_name_student=? ORDER BY student_name",
-            (gname,)
-        ).fetchall()
-        groups[gname] = [dict(s) for s in students]
-    return jsonify(groups)
+        students = db.execute(students_sql, tuple([gname] + params_for_student)).fetchall()
+        out[gname] = [dict(s) for s in students]
+    return jsonify(out)
 
 def _att_normalize_date(s):
     """Normalise any date representation the app has ever stored to ISO
@@ -11190,6 +11277,11 @@ def api_dashboard_stats():
                    "رياضيات",
                    "رياضي"]
 
+    # Per user request: english/math student counts reflect ACTIVE students
+    # only (registration_term2_2026 = "تم التسجيل" by default, configurable
+    # via settings → students.active_column / active_value).
+    _act_frag, _act_val = _active_students_filter()
+
     def _count_any(cols, keywords):
         if not cols or not keywords:
             return 0
@@ -11199,7 +11291,11 @@ def api_dashboard_stats():
             for col in cols:
                 clauses.append("lower(COALESCE(" + col + ",'')) LIKE ?")
                 params.append(pattern)
-        sql = "SELECT COUNT(DISTINCT id) FROM " + students_tbl + " WHERE " + " OR ".join(clauses)
+        where = "(" + " OR ".join(clauses) + ")"
+        if _act_frag:
+            where = "(" + _act_frag + ") AND " + where
+            params = [_act_val] + params
+        sql = "SELECT COUNT(DISTINCT id) FROM " + students_tbl + " WHERE " + where
         return _safe_int(sql, tuple(params))
 
     english_students = _count_any(subject_cand, english_kws)
