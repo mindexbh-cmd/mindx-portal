@@ -1712,6 +1712,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 .srm-cancel{padding:10px 24px;background:#eceff1;color:#455A64;border:none;border-radius:10px;font-weight:600;cursor:pointer;}
 .srm-pct-bar{height:6px;background:#eee;border-radius:3px;overflow:hidden;margin-top:4px;}
 .srm-pct-bar-inner{height:100%;background:#4DB6AC;}
+.ss-groups-trigger{width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;font-weight:600;color:#3e2723;cursor:pointer;text-align:right;}.ss-groups-trigger:hover{background:#fff8f0;}.ss-groups-trigger.open{border-color:#E65100;box-shadow:0 0 0 3px rgba(230,81,0,0.15);}.ss-groups-panel{position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;border:1.5px solid #FB8C00;border-radius:10px;box-shadow:0 6px 18px rgba(230,81,0,0.2);z-index:1000;padding:10px;max-height:320px;overflow:auto;}.ss-groups-search{width:100%;padding:7px 10px;border:1px solid #ffcc80;border-radius:7px;font-size:0.88rem;margin-bottom:8px;direction:rtl;}.ss-groups-all-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff3e0;border:1px dashed #FB8C00;border-radius:8px;font-weight:800;color:#E65100;cursor:pointer;margin-bottom:8px;user-select:none;}.ss-groups-list{display:flex;flex-direction:column;gap:4px;}.ss-groups-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;user-select:none;font-size:0.92rem;color:#3e2723;}.ss-groups-item:hover{background:#fff8f0;}.ss-groups-item input{accent-color:#E65100;cursor:pointer;}.ss-groups-empty{padding:14px;text-align:center;color:#999;font-size:0.88rem;}
 
 /* ---- Student-search edit protection ---- */
 .srm-field .srm-lock{font-size:0.9em;margin-right:4px;color:#9e9e9e;}
@@ -1859,7 +1860,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   </div>
 </div>
 
-<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;"><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="ss-group" onchange="ssOnGroupChange()" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;font-weight:600;color:#3e2723;"></select></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div><div><button onclick="ssOpenAllGroups()" style="background:linear-gradient(135deg,#6A1B9A,#AB47BC);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;white-space:nowrap;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</button></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
+<div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;"><div style="position:relative;"><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</label><button type="button" id="ss-groups-btn" class="ss-groups-trigger">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x2014;</button><div id="ss-groups-panel" class="ss-groups-panel" style="display:none;"><input id="ss-groups-search" class="ss-groups-search" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;..."><label class="ss-groups-all-row"><input type="checkbox" id="ss-groups-all"> &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</label><div id="ss-groups-list" class="ss-groups-list"></div></div></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div><div><button onclick="ssOpenAllGroups()" style="background:linear-gradient(135deg,#6A1B9A,#AB47BC);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;white-space:nowrap;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</button></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
 
 <div id="sd-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:560px;width:92%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(21,101,192,0.25);"><div style="background:linear-gradient(135deg,#1565C0,#1E88E5);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x23F1;&#xFE0F; &#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('sd-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#e3f2fd;border-bottom:1px solid #bbdefb;"><label style="display:block;font-weight:bold;color:#0d47a1;margin-bottom:6px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sd-group" onchange="sdLoadDates()" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid #1E88E5;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div id="sd-body" style="padding:14px 20px;max-height:55vh;overflow:auto;font-size:0.95rem;color:#333;"></div><div id="sd-footer" style="padding:12px 20px;border-top:1px solid #eee;text-align:center;display:none;"><button id="sd-save" onclick="sdSave()" style="padding:10px 36px;background:linear-gradient(135deg,#1565C0,#1E88E5);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">&#x62D;&#x641;&#x638;</button></div></div></div>
 
@@ -1990,55 +1991,217 @@ function _ssRenderStudentCards(list){
   });
   body.innerHTML = html;
 }
-function ssOpen(){
-  document.getElementById('ss-modal').style.display='block';
+var _ssAvailableGroups = [];
+var _ssSelectedSet = {};
+var _ssLoadTimer = null;
+
+function _ssUpdateTriggerLabel(){
+  var btn = document.getElementById('ss-groups-btn');
+  if (!btn) return;
+  var keys = Object.keys(_ssSelectedSet);
+  var count = keys.length;
+  var total = _ssAvailableGroups.length;
+  if (!count){
+    btn.textContent = '— اختر مجموعة —';
+  } else if (count === total && total > 0){
+    btn.textContent = 'جميع المجموعات (' + total + ')';
+  } else if (count === 1){
+    btn.textContent = keys[0];
+  } else {
+    var preview = keys.slice(0, 2).join('، ');
+    btn.textContent = count + ' مجموعات: ' + preview + (count > 2 ? '…' : '');
+  }
+}
+
+function _ssUpdateAllCheckboxState(){
+  var master = document.getElementById('ss-groups-all');
+  if (!master) return;
+  var count = Object.keys(_ssSelectedSet).length;
+  var total = _ssAvailableGroups.length;
+  master.indeterminate = count > 0 && count < total;
+  master.checked = count > 0 && count === total;
+}
+
+function _ssPopulateGroupsList(filterStr){
+  var list = document.getElementById('ss-groups-list');
+  if (!list) return;
+  var q = (filterStr || '').trim().toLowerCase();
+  var frag = document.createDocumentFragment();
+  var shown = 0;
+  _ssAvailableGroups.forEach(function(g){
+    if (q && g.toLowerCase().indexOf(q) < 0) return;
+    shown++;
+    var row = document.createElement('label');
+    row.className = 'ss-groups-item';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.group = g;
+    cb.checked = !!_ssSelectedSet[g];
+    cb.addEventListener('change', function(){
+      if (cb.checked) _ssSelectedSet[g] = 1;
+      else delete _ssSelectedSet[g];
+      _ssUpdateTriggerLabel();
+      _ssUpdateAllCheckboxState();
+      _ssScheduleLoad();
+    });
+    var txt = document.createElement('span');
+    txt.textContent = g;
+    row.appendChild(cb);
+    row.appendChild(txt);
+    frag.appendChild(row);
+  });
+  list.innerHTML = '';
+  if (!shown){
+    var empty = document.createElement('div');
+    empty.className = 'ss-groups-empty';
+    empty.textContent = 'لا توجد مجموعات مطابقة';
+    list.appendChild(empty);
+  } else {
+    list.appendChild(frag);
+  }
+}
+
+function _ssGroupsOpenPanel(){
+  var p = document.getElementById('ss-groups-panel');
+  var b = document.getElementById('ss-groups-btn');
+  if (!p || !b) return;
+  p.style.display = 'block';
+  b.classList.add('open');
+  var s = document.getElementById('ss-groups-search');
+  if (s){ s.value = ''; _ssPopulateGroupsList(''); setTimeout(function(){ s.focus(); }, 30); }
+}
+
+function _ssGroupsClosePanel(){
+  var p = document.getElementById('ss-groups-panel');
+  var b = document.getElementById('ss-groups-btn');
+  if (!p || !b) return;
+  p.style.display = 'none';
+  b.classList.remove('open');
+}
+
+function _ssGroupsTogglePanel(){
+  var p = document.getElementById('ss-groups-panel');
+  if (!p) return;
+  if (p.style.display === 'block') _ssGroupsClosePanel();
+  else _ssGroupsOpenPanel();
+}
+
+function _ssDocClickClose(ev){
+  var p = document.getElementById('ss-groups-panel');
+  var b = document.getElementById('ss-groups-btn');
+  if (!p || !b) return;
+  if (p.style.display !== 'block') return;
+  if (p.contains(ev.target) || b.contains(ev.target)) return;
+  _ssGroupsClosePanel();
+}
+
+function _ssScheduleLoad(){
+  clearTimeout(_ssLoadTimer);
+  _ssLoadTimer = setTimeout(_ssLoadSelection, 220);
+}
+
+function _ssSelectedList(){
+  return Object.keys(_ssSelectedSet);
+}
+
+function _ssLoadSelection(){
+  var selected = _ssSelectedList();
   var body = document.getElementById('ss-body');
-  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
-  fetch('/api/attendance/summary?view=init').then(function(r){return r.json();}).then(function(d){
-    var sel = document.getElementById('ss-group');
-    sel.innerHTML = '';
-    sel.appendChild(new Option('— اختر مجموعة —', ''));
-    sel.appendChild(new Option('جميع المجموعات', '__all__'));
-    (d.groups || []).forEach(function(g){ sel.appendChild(new Option(g, g)); });
-    document.getElementById('ss-search').value = '';
+  // Clear any active student-search text so results don't mix.
+  var qInp = document.getElementById('ss-search');
+  if (qInp) qInp.value = '';
+  if (!selected.length){
     body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
+    return;
+  }
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
+  var qs = selected.map(function(g){ return 'g=' + encodeURIComponent(g); }).join('&');
+  fetch('/api/attendance/summary?view=groups&' + qs).then(function(r){ return r.json(); }).then(function(d){
+    var total = _ssAvailableGroups.length;
+    var label, chips;
+    if (selected.length === 1){
+      label = selected[0];
+    } else if (selected.length === total && total > 0){
+      label = 'جميع المجموعات (' + total + ')';
+    } else {
+      label = selected.length + ' مجموعات';
+    }
+    chips = selected.join('، ');
+    var header = ''
+      + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:12px;padding:14px 18px;margin-bottom:12px;">'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #ffcc80;">'
+      +     '<div style="font-weight:800;color:#E65100;font-size:1.05rem;">📊 ' + label + '</div>'
+      +     '<div style="color:#5d4037;font-weight:700;font-size:0.9rem;">المجموعات المختارة: <span style="color:#6A1B9A;">' + chips + '</span></div>'
+      +   '</div>'
+      +   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;font-size:0.92rem;">'
+      +     '<div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;"><div style="color:#777;font-size:0.78rem;">إجمالي الحصص</div><div style="font-weight:800;color:#1565C0;">' + (d.total_sessions||0) + '</div></div>'
+      +     '<div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;"><div style="color:#777;font-size:0.78rem;">إجمالي الساعات</div><div style="font-weight:800;color:#2E7D32;">' + _ssFmtMin(d.total_minutes) + '</div></div>'
+      +     '<div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;"><div style="color:#777;font-size:0.78rem;">عدد الطلبة</div><div style="font-weight:800;color:#6A1B9A;">' + (d.students_count || (d.students||[]).length || 0) + '</div></div>'
+      +     '<div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;"><div style="color:#777;font-size:0.78rem;">متوسط نسبة الحضور</div><div style="font-weight:800;color:' + _ssRateColor(d.avg_attendance_rate || 0) + ';">' + ((d.avg_attendance_rate || 0).toFixed ? (d.avg_attendance_rate||0).toFixed(1) : (d.avg_attendance_rate||0)) + '%</div></div>'
+      +   '</div>'
+      + '</div>';
+    _ssRenderStudents(d.students, header);
   }).catch(function(){
     body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">خطأ في التحميل</div>';
   });
 }
-function ssOnGroupChange(){
-  var v = document.getElementById('ss-group').value;
+
+function ssOpen(){
+  document.getElementById('ss-modal').style.display = 'block';
   var body = document.getElementById('ss-body');
-  document.getElementById('ss-search').value = '';
-  if (!v){
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
-    return;
-  }
   body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
-  if (v === '__all__'){
-    fetch('/api/attendance/summary?view=all').then(function(r){return r.json();}).then(function(d){
-      var header = ''
-        + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
-        +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">ὌA جميع المجموعات</div>'
-        +   '<div style="color:#5d4037;font-weight:700;">إجمالي الحصص: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
-        +   '<div style="color:#5d4037;font-weight:700;">إجمالي الساعات: <span style="color:#2E7D32;">' + _ssFmtMin(d.total_minutes) + '</span></div>'
-        +   '<div style="color:#5d4037;font-weight:700;">عدد الطلبة: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
-        + '</div>';
-      _ssRenderStudents(d.students, header);
-    });
-    return;
-  }
-  fetch('/api/attendance/summary?view=group&group=' + encodeURIComponent(v)).then(function(r){return r.json();}).then(function(d){
-    var header = ''
-      + '<div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
-      +   '<div style="font-weight:800;color:#E65100;font-size:1.02rem;">' + (d.group_name||'') + '</div>'
-      +   '<div style="color:#5d4037;font-weight:700;">إجمالي الحصص: <span style="color:#1565C0;">' + (d.total_sessions||0) + '</span></div>'
-      +   '<div style="color:#5d4037;font-weight:700;">إجمالي الساعات: <span style="color:#2E7D32;">' + _ssFmtMin(d.total_minutes) + '</span></div>'
-      +   '<div style="color:#5d4037;font-weight:700;">عدد الطلبة: <span style="color:#6A1B9A;">' + ((d.students||[]).length) + '</span></div>'
-      + '</div>';
-    _ssRenderStudents(d.students, header);
+  fetch('/api/attendance/summary?view=init').then(function(r){ return r.json(); }).then(function(d){
+    _ssAvailableGroups = d.groups || [];
+    _ssSelectedSet = {};
+    _ssPopulateGroupsList('');
+    _ssUpdateTriggerLabel();
+    _ssUpdateAllCheckboxState();
+    document.getElementById('ss-search').value = '';
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-weight:600;">اختر مجموعة لعرض الملخص</div>';
+    _ssWireGroupsPicker();
+  }).catch(function(){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">خطأ في التحميل</div>';
   });
 }
+
+/* Back-compat shim: other dashboard cards used to call ssOnGroupChange. */
+function ssOnGroupChange(){ _ssLoadSelection(); }
+
+function _ssWireGroupsPicker(){
+  var btn = document.getElementById('ss-groups-btn');
+  if (btn && !btn._wired){
+    btn._wired = true;
+    btn.addEventListener('click', function(ev){ ev.stopPropagation(); _ssGroupsTogglePanel(); });
+  }
+  var master = document.getElementById('ss-groups-all');
+  if (master && !master._wired){
+    master._wired = true;
+    master.addEventListener('change', function(){
+      if (master.checked){
+        _ssSelectedSet = {};
+        _ssAvailableGroups.forEach(function(g){ _ssSelectedSet[g] = 1; });
+      } else {
+        _ssSelectedSet = {};
+      }
+      _ssPopulateGroupsList(document.getElementById('ss-groups-search').value || '');
+      _ssUpdateTriggerLabel();
+      _ssScheduleLoad();
+    });
+  }
+  var sInp = document.getElementById('ss-groups-search');
+  if (sInp && !sInp._wired){
+    sInp._wired = true;
+    sInp.addEventListener('input', function(){ _ssPopulateGroupsList(sInp.value); });
+    sInp.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape'){ _ssGroupsClosePanel(); }
+    });
+  }
+  if (!document._ssClickWired){
+    document._ssClickWired = true;
+    document.addEventListener('click', _ssDocClickClose);
+  }
+}
+
 var _ssSearchTimer = null;
 function ssOnSearch(){
   clearTimeout(_ssSearchTimer);
@@ -2067,8 +2230,10 @@ var _ssAllGroups = { rows: [], overall: null, sortKey: 'group_name', sortDir: 1 
 function ssOpenAllGroups(){
   document.getElementById('ss-modal').style.display = 'block';
   document.getElementById('ss-search').value = '';
-  var sel = document.getElementById('ss-group');
-  if (sel && sel.options.length) sel.selectedIndex = 0;
+  _ssSelectedSet = {};
+  if (typeof _ssUpdateTriggerLabel === "function") _ssUpdateTriggerLabel();
+  if (typeof _ssUpdateAllCheckboxState === "function") _ssUpdateAllCheckboxState();
+  if (typeof _ssPopulateGroupsList === "function") _ssPopulateGroupsList("");
   var body = document.getElementById('ss-body');
   body.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">جاري التحميل...</div>';
   fetch('/api/attendance/summary?view=all_groups').then(function(r){return r.json();}).then(function(d){
@@ -10456,6 +10621,83 @@ def api_attendance_summary():
             "ORDER BY group_name"
         ).fetchall()
         return jsonify({"groups": [r[0] for r in rows]})
+
+    if view == "groups":
+        raw = request.args.getlist("g") or []
+        # Tolerate comma-separated fallback: ?g=A,B,C
+        if len(raw) == 1 and "," in raw[0]:
+            raw = raw[0].split(",")
+        gnames = [g.strip() for g in raw if (g and g.strip())]
+        if not gnames:
+            return jsonify({"ok": False, "error": "at least one group required"}), 400
+        placeholders = ",".join(["?"] * len(gnames))
+        sql = (
+            "SELECT attendance_date, group_name, student_name, status FROM attendance "
+            "WHERE TRIM(group_name) IN (" + placeholders + ") "
+            "AND student_name IS NOT NULL AND student_name<>\'\'"
+        )
+        rows = db.execute(sql, tuple(gnames)).fetchall()
+        dur_map = _load_duration_map()
+        per_student = {}
+        sessions = set()   # distinct (date, group) pairs across selected groups
+        for r in rows:
+            d = _att_normalize_date(r["attendance_date"])
+            g = (r["group_name"] or "").strip()
+            n = (r["student_name"] or "").strip()
+            st = (r["status"] or "").strip()
+            if not n:
+                continue
+            sessions.add((d, g))
+            s = per_student.setdefault(n, {
+                "student_name": n, "present": 0, "absent": 0, "late": 0,
+                "_dg": set(), "_groups": set(), "_counted_dur": set(),
+                "hours_total_min": 0, "hours_present_min": 0, "hours_absent_min": 0,
+            })
+            s["_dg"].add((d, g))
+            if g:
+                s["_groups"].add(g)
+            key = (g, d)
+            dur = dur_map.get(key, 0)
+            if key not in s["_counted_dur"]:
+                s["_counted_dur"].add(key)
+                s["hours_total_min"] += dur
+                if st == PRESENT or st == LATE:
+                    s["hours_present_min"] += dur
+                elif st == ABSENT:
+                    s["hours_absent_min"] += dur
+            if st == PRESENT:
+                s["present"] += 1
+            elif st == ABSENT:
+                s["absent"] += 1
+            elif st == LATE:
+                s["late"] += 1
+        students = []
+        rates = []
+        for n in sorted(per_student.keys()):
+            s = per_student[n]
+            total = len(s["_dg"])
+            r_pct = _rate(s["present"], s["late"], total)
+            rates.append(r_pct)
+            students.append({
+                "student_name": n,
+                "group_name": ", ".join(sorted(s["_groups"])) or "",
+                "total_sessions": total,
+                "present": s["present"], "absent": s["absent"], "late": s["late"],
+                "rate_pct": r_pct,
+                "hours_total_min":   s["hours_total_min"],
+                "hours_present_min": s["hours_present_min"],
+                "hours_absent_min":  s["hours_absent_min"],
+            })
+        total_minutes = sum(dur_map.get((g, d), 0) for (d, g) in sessions)
+        avg_rate = round(sum(rates) / len(rates), 1) if rates else 0.0
+        return jsonify({
+            "groups": gnames,
+            "total_sessions": len(sessions),
+            "total_minutes": total_minutes,
+            "students_count": len(per_student),
+            "avg_attendance_rate": avg_rate,
+            "students": students,
+        })
 
     if view == "group":
         gname = (request.args.get("group") or "").strip()
