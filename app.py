@@ -1,4 +1,4 @@
-from flask import Flask, request, session, redirect, g, jsonify
+from flask import Flask, request, session, redirect, g, jsonify, Response
 import sqlite3, hashlib, os, json, re as _re
 from functools import wraps
 
@@ -3550,6 +3550,15 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
   <a href="/settings" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:11px 22px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;margin-left:8px;display:inline-block;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-back">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
 </div>
 <div class="main">
+  <div id="attInstrCard">
+    <div class="att-intro-title">&#x1F4CB; &#x62E;&#x637;&#x648;&#x627;&#x62A; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
+    <ol>
+      <li>1&#8419; &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</li>
+      <li>2&#8419; &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</li>
+      <li>3&#8419; &#x633;&#x62C;&#x644; &#x62D;&#x636;&#x648;&#x631; &#x623;&#x648; &#x63A;&#x64A;&#x627;&#x628; &#x643;&#x644; &#x637;&#x627;&#x644;&#x628;</li>
+      <li>4&#8419; &#x627;&#x636;&#x63A;&#x637; &#x62D;&#x641;&#x638;</li>
+    </ol>
+  </div>
   <div class="card">
     <div class="controls-row">
       <div class="ctrl-group">
@@ -9393,70 +9402,129 @@ def api_attendance_check():
 @login_required
 def api_dashboard_stats():
     db = get_db()
-    def _count_any(cols, keywords, table="students"):
-        if not keywords: return 0
+
+    def _cfg(page, comp, default):
+        v = get_setting(page, comp, default)
+        return v if _is_safe_ident(v) else default
+
+    def _safe_int(sql, params=()):
+        try:
+            row = db.execute(sql, params).fetchone()
+            return (row[0] if row else 0) or 0
+        except Exception:
+            return 0
+
+    students_tbl      = _cfg("dashboard", "students_table", "students")
+    groups_tbl        = _cfg("dashboard", "groups_table", "student_groups")
+    attendance_tbl    = _cfg("dashboard", "attendance_table", "attendance")
+    subject_col       = _cfg("dashboard", "students_subject_column", "class_name")
+    class_col         = _cfg("dashboard", "students_class_column", "class_name")
+    teacher_col       = _cfg("dashboard", "students_teacher_column", "teacher_2026")
+    group_col         = _cfg("attendance", "student_group_column", "group_name_student")
+    status_col        = _cfg("dashboard", "attendance_status_column", "status")
+    level_col         = _cfg("groups", "level_column", "level_course")
+    group_teacher_col = _cfg("groups", "teacher_column", "teacher_name")
+
+    student_cols_all = set(get_table_columns(students_tbl))
+    group_cols_all   = set(get_table_columns(groups_tbl))
+    att_cols_all     = set(get_table_columns(attendance_tbl))
+
+    subject_cand = [c for c in {subject_col, class_col, teacher_col, group_col, "group_online"}
+                    if c and _is_safe_ident(c) and c in student_cols_all]
+
+    english_kws = ["english",
+                   "إنجليزي",
+                   "انجليزي",
+                   "إنجليز"]
+    math_kws    = ["math",
+                   "رياضيات",
+                   "رياضي"]
+
+    def _count_any(cols, keywords):
+        if not cols or not keywords:
+            return 0
         clauses, params = [], []
         for kw in keywords:
             pattern = "%" + kw.lower() + "%"
             for col in cols:
-                clauses.append("lower(" + col + ") LIKE ?")
+                clauses.append("lower(COALESCE(" + col + ",'')) LIKE ?")
                 params.append(pattern)
-        sql = "SELECT COUNT(DISTINCT id) FROM " + table + " WHERE " + " OR ".join(clauses)
+        sql = "SELECT COUNT(DISTINCT id) FROM " + students_tbl + " WHERE " + " OR ".join(clauses)
+        return _safe_int(sql, tuple(params))
+
+    english_students = _count_any(subject_cand, english_kws)
+    math_students    = _count_any(subject_cand, math_kws)
+
+    groups = _safe_int("SELECT COUNT(*) FROM " + groups_tbl)
+
+    # Teachers = union of distinct names across students and groups tables.
+    teacher_names = set()
+    if group_teacher_col in group_cols_all:
         try:
-            return db.execute(sql, tuple(params)).fetchone()[0] or 0
+            for r in db.execute(
+                "SELECT DISTINCT " + group_teacher_col + " FROM " + groups_tbl +
+                " WHERE " + group_teacher_col + " IS NOT NULL AND " + group_teacher_col + "<>''"
+            ).fetchall():
+                v = (r[0] or "").strip()
+                if v:
+                    teacher_names.add(v)
         except Exception:
-            return 0
-    english_kws = ["\u0625\u0646\u062C\u0644\u064A\u0632\u064A", "\u0627\u0646\u062C\u0644\u064A\u0632\u064A", "english"]
-    math_kws    = ["\u0631\u064A\u0627\u0636\u064A\u0627\u062A", "math"]
-    student_cols = ("group_name_student", "class_name", "teacher_2026", "group_online")
-    english_students = _count_any(student_cols, english_kws)
-    math_students    = _count_any(student_cols, math_kws)
-    try:
-        groups = db.execute("SELECT COUNT(*) FROM student_groups").fetchone()[0] or 0
-    except Exception:
-        groups = 0
-    try:
-        teachers = db.execute(
-            "SELECT COUNT(DISTINCT teacher_name) FROM student_groups "
-            "WHERE teacher_name IS NOT NULL AND teacher_name<>''"
-        ).fetchone()[0] or 0
-    except Exception:
-        teachers = 0
-    try:
-        staff = db.execute(
-            "SELECT COUNT(*) FROM users WHERE role IS NOT NULL AND role<>'' "
-            "AND role<>'admin' AND role<>'teacher'"
-        ).fetchone()[0] or 0
-    except Exception:
-        staff = 0
-    try:
-        english_levels = db.execute(
-            "SELECT COUNT(DISTINCT level_course) FROM student_groups "
-            "WHERE level_course IS NOT NULL AND level_course<>'' AND ("
-            "lower(level_course) LIKE ? OR level_course LIKE ? OR level_course LIKE ?)",
-            ("%english%", "%\u0625\u0646\u062C\u0644\u064A\u0632\u064A%", "%\u0627\u0646\u062C\u0644\u064A\u0632\u064A%")
-        ).fetchone()[0] or 0
-    except Exception:
-        english_levels = 0
-    STATUS_PRESENT = "\u062D\u0627\u0636\u0631"
-    STATUS_ABSENT  = "\u063A\u0627\u0626\u0628"
-    STATUS_LATE    = "\u0645\u062A\u0623\u062E\u0631"
-    try:
-        total_att = db.execute(
-            "SELECT COUNT(*) FROM attendance WHERE status IN (?,?,?)",
-            (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE)
-        ).fetchone()[0] or 0
-        present_att = db.execute(
-            "SELECT COUNT(*) FROM attendance WHERE status=?",
-            (STATUS_PRESENT,)
-        ).fetchone()[0] or 0
-        violations = db.execute(
-            "SELECT COUNT(*) FROM attendance WHERE status IN (?,?)",
-            (STATUS_ABSENT, STATUS_LATE)
-        ).fetchone()[0] or 0
-    except Exception:
-        total_att = present_att = violations = 0
-    attendance_rate = round(present_att / total_att * 100, 1) if total_att else 0.0
+            pass
+    if teacher_col in student_cols_all:
+        try:
+            for r in db.execute(
+                "SELECT DISTINCT " + teacher_col + " FROM " + students_tbl +
+                " WHERE " + teacher_col + " IS NOT NULL AND " + teacher_col + "<>''"
+            ).fetchall():
+                v = (r[0] or "").strip()
+                if v:
+                    teacher_names.add(v)
+        except Exception:
+            pass
+    teachers = len(teacher_names)
+
+    # Staff: every user that is not an admin (reception, coordinators, media, etc.).
+    staff = _safe_int(
+        "SELECT COUNT(*) FROM users WHERE role IS NOT NULL AND role<>'' AND role<>'admin'"
+    )
+
+    # English levels: keyword match on the level column, fall back to distinct levels.
+    english_levels = 0
+    if level_col in group_cols_all:
+        english_levels = _safe_int(
+            "SELECT COUNT(DISTINCT " + level_col + ") FROM " + groups_tbl +
+            " WHERE " + level_col + " IS NOT NULL AND " + level_col + "<>'' AND (" +
+            "lower(" + level_col + ") LIKE ? OR " + level_col + " LIKE ? OR " + level_col + " LIKE ?)",
+            ("%english%",
+             "%إنجليزي%",
+             "%انجليزي%")
+        )
+        if english_levels == 0:
+            english_levels = _safe_int(
+                "SELECT COUNT(DISTINCT " + level_col + ") FROM " + groups_tbl +
+                " WHERE " + level_col + " IS NOT NULL AND " + level_col + "<>''"
+            )
+
+    STATUS_PRESENT = "حاضر"
+    STATUS_ABSENT  = "غائب"
+    STATUS_LATE    = "متأخر"
+    attendance_rate = 0.0
+    violations = 0
+    if status_col in att_cols_all:
+        total_att = _safe_int(
+            "SELECT COUNT(*) FROM " + attendance_tbl + " WHERE " + status_col + " IN (?,?,?)",
+            (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE),
+        )
+        present_att = _safe_int(
+            "SELECT COUNT(*) FROM " + attendance_tbl + " WHERE " + status_col + "=?",
+            (STATUS_PRESENT,),
+        )
+        violations = _safe_int(
+            "SELECT COUNT(*) FROM " + attendance_tbl + " WHERE " + status_col + " IN (?,?)",
+            (STATUS_ABSENT, STATUS_LATE),
+        )
+        attendance_rate = round(present_att / total_att * 100, 1) if total_att else 0.0
+
     return jsonify({
         "ok": True,
         "english_students": english_students,
@@ -10072,6 +10140,325 @@ def api_message_reminders_delete(rid):
 def settings_page():
     return SETTINGS_HTML
 
+
+MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
+(function(){
+  var css = [
+    /* P2: button bar wrap */
+    '.db-section > div[style*="display:flex"],.custom-table-section > div[style*="display:flex"],.db-section > div[style*="display: flex"],.custom-table-section > div[style*="display: flex"],.db-nav{flex-wrap:wrap !important;row-gap:10px !important;}',
+    '.db-section > div[style*="display:flex"] > *,.custom-table-section > div[style*="display:flex"] > *{flex-shrink:0;}',
+
+    /* P6: standardized button classes */
+    '.mx-btn-add,button.mx-btn-add{background:#27ae60 !important;background-color:#27ae60 !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-add:hover{background:#229954 !important;}',
+    '.mx-btn-edit,button.mx-btn-edit{background:#e67e22 !important;background-color:#e67e22 !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-edit:hover{background:#d35400 !important;}',
+    '.mx-btn-delete,button.mx-btn-delete{background:#e74c3c !important;background-color:#e74c3c !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-delete:hover{background:#c0392b !important;}',
+    '.mx-btn-import,button.mx-btn-import{background:#2980b9 !important;background-color:#2980b9 !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-import:hover{background:#21618c !important;}',
+    '.mx-btn-freeze,button.mx-btn-freeze{background:#8e44ad !important;background-color:#8e44ad !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-freeze:hover{background:#7d3c98 !important;}',
+    '.mx-btn-search,button.mx-btn-search{background:#2c3e50 !important;background-color:#2c3e50 !important;color:#fff !important;border:none !important;}',
+    '.mx-btn-search:hover{background:#1b2631 !important;}',
+
+    /* P4: scroll UX */
+    '.table-wrap{overflow-x:auto;overflow-y:auto;max-height:75vh;scrollbar-width:thin;scrollbar-color:#c5b3e6 #f5f3ff;background:linear-gradient(to left,#fff,#fff) 0 0/20px 100% no-repeat local,linear-gradient(to left,#fff,#fff) 100% 0/20px 100% no-repeat local,linear-gradient(to right,rgba(107,63,160,.25),rgba(107,63,160,0)) 0 0/14px 100% no-repeat scroll,linear-gradient(to left,rgba(107,63,160,.25),rgba(107,63,160,0)) 100% 0/14px 100% no-repeat scroll,#fff;}',
+    '.table-wrap::-webkit-scrollbar{height:12px;width:10px;}',
+    '.table-wrap::-webkit-scrollbar-track{background:#f5f3ff;border-radius:6px;}',
+    '.table-wrap::-webkit-scrollbar-thumb{background:#c5b3e6;border-radius:6px;}',
+    '.table-wrap::-webkit-scrollbar-thumb:hover{background:#9575CD;}',
+    '.table-wrap thead{position:sticky;top:0;z-index:5;}',
+    '.table-wrap thead tr{box-shadow:0 2px 4px rgba(107,63,160,.15);}',
+    '.mx-col-count{display:inline-block;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;margin:0 0 8px 0;}',
+
+    /* P3: toast + confirm */
+    '.mx-toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(30px);padding:13px 28px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.2);color:#fff;z-index:999999;opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;max-width:90vw;text-align:center;}',
+    '.mx-toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}',
+    '.mx-toast-success{background:#27ae60;}',
+    '.mx-toast-error{background:#e74c3c;}',
+    '.mx-toast-info{background:#2c3e50;}',
+    '.mx-confirm-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:99998;direction:rtl;}',
+    '.mx-confirm-bg.open{display:flex;}',
+    '.mx-confirm-box{background:#fff;border-radius:16px;padding:30px 34px;max-width:420px;width:92%;box-shadow:0 16px 48px rgba(0,0,0,.3);text-align:center;}',
+    '.mx-confirm-icon{font-size:54px;margin-bottom:12px;}',
+    '.mx-confirm-title{font-size:20px;font-weight:800;color:#c62828;margin-bottom:10px;}',
+    '.mx-confirm-msg{color:#555;margin-bottom:22px;font-size:14.5px;line-height:1.5;}',
+    '.mx-confirm-actions{display:flex;gap:10px;justify-content:center;}',
+    '.mx-confirm-yes{background:#e74c3c;color:#fff;border:none;padding:11px 26px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;}',
+    '.mx-confirm-yes:hover{background:#c0392b;}',
+    '.mx-confirm-no{background:#ecf0f1;color:#2c3e50;border:none;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;}',
+    '.mx-confirm-no:hover{background:#d0d7da;}',
+
+    /* P7: search clear */
+    '.mx-search-clear{background:transparent;color:#999;border:none;font-size:18px;padding:0 10px;cursor:pointer;display:none;align-items:center;}',
+    '.mx-search-clear:hover{color:#e74c3c;}',
+    '.mx-search-clear.show{display:inline-flex;}',
+    '.mx-no-results td{text-align:center !important;padding:28px !important;color:#999 !important;font-weight:700 !important;font-size:14px !important;}',
+
+    /* P5: attendance instruction card */
+    '#attInstrCard{background:linear-gradient(135deg,#E0F7FA,#B2EBF2);border:2px dashed #00897B;border-radius:14px;padding:20px 24px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,137,123,.1);}',
+    '#attInstrCard .att-intro-title{font-size:18px;font-weight:800;color:#00695C;margin-bottom:14px;display:flex;align-items:center;gap:8px;}',
+    '#attInstrCard ol{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}',
+    '#attInstrCard li{padding:8px 12px;font-size:14.5px;color:#004D40;font-weight:600;background:rgba(255,255,255,.6);border-radius:10px;display:flex;align-items:center;gap:10px;}',
+    ''
+  ].join('');
+  var st = document.createElement('style');
+  st.textContent = css;
+  (document.head || document.documentElement).appendChild(st);
+
+  /* mxToast */
+  var toastEl=null, toastTimer=null;
+  function getToastEl(){
+    if (!toastEl){
+      toastEl = document.createElement('div');
+      toastEl.className = 'mx-toast';
+      toastEl.id = 'mx-toast';
+      document.body.appendChild(toastEl);
+    }
+    return toastEl;
+  }
+  window.mxToast = function(msg, kind){
+    kind = kind || 'success';
+    var prefix = kind === 'error' ? '❌ ' : (kind === 'info' ? 'ℹ️ ' : '✅ ');
+    var el = getToastEl();
+    el.textContent = prefix + String(msg == null ? '' : msg);
+    el.className = 'mx-toast mx-toast-' + kind + ' show';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.className = 'mx-toast mx-toast-' + kind; }, 3000);
+  };
+
+  /* mxConfirm */
+  var confirmEl=null;
+  function buildConfirm(){
+    confirmEl = document.createElement('div');
+    confirmEl.className = 'mx-confirm-bg';
+    confirmEl.innerHTML =
+      '<div class="mx-confirm-box">' +
+        '<div class="mx-confirm-icon">⚠️</div>' +
+        '<h3 class="mx-confirm-title">هل أنت متأكد من الحذف؟</h3>' +
+        '<p class="mx-confirm-msg">لا يمكن التراجع عن هذا الإجراء</p>' +
+        '<div class="mx-confirm-actions">' +
+          '<button class="mx-confirm-yes" type="button">نعم، احذف</button>' +
+          '<button class="mx-confirm-no"  type="button">إلغاء</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(confirmEl);
+    return confirmEl;
+  }
+  window.mxConfirm = function(opts, onYes, onNo){
+    if (typeof opts === 'string') opts = { title: opts };
+    opts = opts || {};
+    var el = confirmEl || buildConfirm();
+    el.querySelector('.mx-confirm-title').textContent = opts.title || 'هل أنت متأكد من الحذف؟';
+    el.querySelector('.mx-confirm-msg').textContent  = opts.message || 'لا يمكن التراجع عن هذا الإجراء';
+    el.querySelector('.mx-confirm-yes').textContent  = opts.yesText || 'نعم، احذف';
+    el.querySelector('.mx-confirm-no').textContent   = opts.noText  || 'إلغاء';
+    el.classList.add('open');
+    var yes = el.querySelector('.mx-confirm-yes');
+    var no  = el.querySelector('.mx-confirm-no');
+    function cleanup(){ el.classList.remove('open'); yes.onclick = null; no.onclick = null; }
+    yes.onclick = function(){ cleanup(); if (typeof onYes === 'function') onYes(); };
+    no.onclick  = function(){ cleanup(); if (typeof onNo  === 'function') onNo();  };
+  };
+
+  /* Bridge existing showToast to mxToast (color hint -> kind) */
+  window.showToast = function(msg, bg){
+    var kind = 'success';
+    if (typeof bg === 'string'){
+      var low = bg.toLowerCase();
+      if (low.indexOf('e53') >= 0 || low.indexOf('c62') >= 0 || low.indexOf('e74') >= 0 || low.indexOf('error') >= 0 || low.indexOf('f44') >= 0) kind = 'error';
+      else if (low === '#888' || low.indexOf('888') >= 0 || low.indexOf('info') >= 0 || low.indexOf('777') >= 0) kind = 'info';
+    }
+    window.mxToast(msg, kind);
+  };
+
+  /* Button classifier (P6) */
+  var RULES = [
+    { kw: 'حذف',            cls: 'mx-btn-delete' },
+    { kw: 'Excel',                         cls: 'mx-btn-import' },
+    { kw: 'excel',                         cls: 'mx-btn-import' },
+    { kw: 'استيراد', cls: 'mx-btn-import' },
+    { kw: 'تجميد', cls: 'mx-btn-freeze' },
+    { kw: 'بحث',             cls: 'mx-btn-search' },
+    { kw: 'تعديل', cls: 'mx-btn-edit' },
+    { kw: 'إضافة', cls: 'mx-btn-add' },
+    { kw: 'اضافة', cls: 'mx-btn-add' },
+    { kw: 'حفظ',             cls: 'mx-btn-add' }
+  ];
+  function classifyButton(el){
+    if (!el || el.hasAttribute('data-mxb')) return;
+    if (el.classList && (el.classList.contains('db-nav-btn') || el.classList.contains('btn-tab') || el.classList.contains('bulk-cb'))) return;
+    var text = (el.textContent || '').trim();
+    if (!text) return;
+    for (var i=0; i<RULES.length; i++){
+      if (text.indexOf(RULES[i].kw) >= 0){
+        el.classList.add(RULES[i].cls);
+        el.setAttribute('data-mxb', '1');
+        return;
+      }
+    }
+  }
+  function scanButtons(){
+    document.querySelectorAll('button, a.btn-save, a.btn-cancel, a.btn-home, a.btn-back').forEach(classifyButton);
+  }
+
+  /* Column count badges (P4) */
+  function addColumnCounts(){
+    document.querySelectorAll('.table-wrap').forEach(function(wrap){
+      if (wrap.hasAttribute('data-mxcc')) return;
+      var table = wrap.querySelector('table');
+      if (!table) return;
+      var theadRow = table.querySelector('thead tr');
+      if (!theadRow) return;
+      wrap.setAttribute('data-mxcc', '1');
+      var badge = document.createElement('div');
+      badge.className = 'mx-col-count';
+      badge.textContent = 'عدد الأعمدة: ' + theadRow.children.length;
+      wrap.parentNode.insertBefore(badge, wrap);
+    });
+  }
+
+  /* Universal search (P7) */
+  function mxFilterTable(tbody, q){
+    q = (q || '').trim().toLowerCase();
+    var rows = tbody.querySelectorAll('tr');
+    var shown = 0;
+    for (var i=0; i<rows.length; i++){
+      var tr = rows[i];
+      if (tr.classList.contains('mx-no-results')) continue;
+      var text = (tr.textContent || '').toLowerCase();
+      var match = !q || text.indexOf(q) >= 0;
+      tr.style.display = match ? '' : 'none';
+      if (match) shown++;
+    }
+    var empty = tbody.querySelector('tr.mx-no-results');
+    if (q && shown === 0){
+      if (!empty){
+        empty = document.createElement('tr');
+        empty.className = 'mx-no-results';
+        var cols = (tbody.parentNode.querySelector('thead tr') || {}).children || [];
+        var td = document.createElement('td');
+        td.colSpan = cols.length || 20;
+        td.textContent = 'لا توجد نتائج';
+        empty.appendChild(td);
+        tbody.appendChild(empty);
+      } else {
+        empty.style.display = '';
+      }
+    } else if (empty){
+      empty.style.display = 'none';
+    }
+  }
+  window.mxFilterTable = mxFilterTable;
+
+  function wireSearchFor(input){
+    if (!input || input.hasAttribute('data-mxs')) return;
+    var section = input.closest('.db-section, .custom-table-section');
+    var wrap = section ? section.querySelector('.table-wrap') : null;
+    if (!wrap){
+      /* Attendance page uses .att-table-wrap */
+      wrap = (section || document).querySelector('.table-wrap, .att-table-wrap');
+    }
+    if (!wrap) return;
+    var tbody = wrap.querySelector('tbody');
+    if (!tbody) return;
+    input.setAttribute('data-mxs', '1');
+    input.addEventListener('input', function(){
+      setTimeout(function(){ mxFilterTable(tbody, input.value); }, 0);
+    });
+    var wrapSearch = input.parentNode;
+    if (wrapSearch && !wrapSearch.querySelector('.mx-search-clear')){
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'mx-search-clear';
+      clearBtn.innerHTML = '✕';
+      clearBtn.title = 'مسح';
+      clearBtn.onclick = function(){
+        input.value = '';
+        try { input.dispatchEvent(new Event('input', { bubbles:true })); } catch(e){}
+        mxFilterTable(tbody, '');
+        clearBtn.classList.remove('show');
+        input.focus();
+      };
+      input.addEventListener('input', function(){
+        if (input.value) clearBtn.classList.add('show');
+        else clearBtn.classList.remove('show');
+      });
+      wrapSearch.insertBefore(clearBtn, input.nextSibling);
+    }
+  }
+  function wireTableSearches(){
+    document.querySelectorAll('.search-bar input, input[id$="SearchInput"], input#searchInput').forEach(wireSearchFor);
+  }
+
+  /* P5: attendance instruction card show/hide */
+  function wireAttendanceIntro(){
+    var card = document.getElementById('attInstrCard');
+    var sel  = document.getElementById('groupSelect');
+    if (!card || !sel || sel.hasAttribute('data-mxa')) return;
+    sel.setAttribute('data-mxa', '1');
+    function upd(){ card.style.display = sel.value ? 'none' : ''; }
+    sel.addEventListener('change', upd);
+    upd();
+  }
+
+  /* Unify existing delete-confirm text so the wording matches spec. */
+  function unifyConfirmText(){
+    document.querySelectorAll('.confirm-box h3').forEach(function(h){
+      h.textContent = 'هل أنت متأكد من الحذف؟';
+    });
+    document.querySelectorAll('.confirm-box p').forEach(function(p){
+      if ((p.textContent || '').indexOf('لا يمكن التراجع') < 0){
+        p.textContent = 'لا يمكن التراجع عن هذا الإجراء';
+      }
+    });
+  }
+
+  function init(){
+    scanButtons();
+    addColumnCounts();
+    wireTableSearches();
+    wireAttendanceIntro();
+    unifyConfirmText();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  if (window.MutationObserver){
+    var mo = new MutationObserver(function(muts){
+      var touchedBtn=false, touchedTable=false, touchedSearch=false, touchedConfirm=false;
+      for (var i=0;i<muts.length;i++){
+        var m = muts[i];
+        for (var j=0;j<m.addedNodes.length;j++){
+          var n = m.addedNodes[j];
+          if (!n || n.nodeType !== 1) continue;
+          if (n.matches){
+            if (n.matches('button') || (n.querySelector && n.querySelector('button'))) touchedBtn = true;
+            if (n.matches('.table-wrap') || (n.querySelector && n.querySelector('.table-wrap, .att-table-wrap'))) touchedTable = true;
+            if (n.matches('.search-bar') || n.matches('input') || (n.querySelector && n.querySelector('.search-bar input'))) touchedSearch = true;
+            if (n.matches('.confirm-box') || (n.querySelector && n.querySelector('.confirm-box'))) touchedConfirm = true;
+          }
+        }
+      }
+      if (touchedBtn) scanButtons();
+      if (touchedTable) addColumnCounts();
+      if (touchedSearch) wireTableSearches();
+      if (touchedConfirm) unifyConfirmText();
+    });
+    mo.observe(document.body, { childList:true, subtree:true });
+  }
+})();
+'''
+
+@app.route('/mx-helpers.js')
+def mx_helpers_js():
+    return Response(MX_HELPERS_JS, mimetype='application/javascript; charset=utf-8')
+
+for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML', 'SETTINGS_HTML', 'LOGIN_HTML'):
+    _mxh_val = globals().get(_mxh_name)
+    if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
+        globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
