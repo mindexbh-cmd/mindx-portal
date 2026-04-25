@@ -560,6 +560,9 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'installment_source_table', 'جدول مصدر التقسيط', 'taqseet'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'installment_source_value', 'عمود القيمة (المعرّف)', 'id'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'installment_source_label', 'عمود التسمية المعروضة', 'طريقة_التقسيط'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'))
@@ -1102,6 +1105,9 @@ if True:
             ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'),
             ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
             ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'),
+            ('payment', 'installment_source_table', 'جدول مصدر التقسيط', 'taqseet'),
+            ('payment', 'installment_source_value', 'عمود القيمة (المعرّف)', 'id'),
+            ('payment', 'installment_source_label', 'عمود التسمية المعروضة', 'طريقة_التقسيط'),
             ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'),
             ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'),
             ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'),
@@ -1177,6 +1183,9 @@ if True:
             ('payment', 'students_table', 'جدول الطلاب للدفع', 'students'),
             ('payment', 'student_name_column', 'عمود اسم الطالب', 'student_name'),
             ('payment', 'installment_type_column', 'عمود نوع التقسيط', 'installment_type'),
+            ('payment', 'installment_source_table', 'جدول مصدر التقسيط', 'taqseet'),
+            ('payment', 'installment_source_value', 'عمود القيمة (المعرّف)', 'id'),
+            ('payment', 'installment_source_label', 'عمود التسمية المعروضة', 'طريقة_التقسيط'),
             ('payment', 'taqseet_method_column', 'عمود طريقة التقسيط', 'taqseet_method'),
             ('payment', 'paid_amount_column', 'عمود المبلغ المدفوع', 'paid'),
             ('payment', 'payments_table', 'جدول المدفوعات', 'student_payments'),
@@ -7053,22 +7062,71 @@ function closeTaqseetEditModal() {
 let allStudents=[];
 let deleteTargetId=null;
 var allColumns=[];
-function getTaqseetDetail(method){
-  if(!method||!allTaqseetData.length)return '';
-  var t=allTaqseetData.find(function(x){return x.taqseet_method===method;});
-  if(!t)return '';
-  return '&#x637;&#x631;&#x64A;&#x642;&#x629; '+method+' &#x2014; &#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;: '+(t.course_amount||'')+'&#x60C; &#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;: '+(t.num_installments||'')+'&#x60C; &#x627;&#x644;&#x642;&#x633;&#x637; &#x627;&#x644;&#x623;&#x648;&#x644;: '+(t.inst1||'')+'&#x60C; &#x627;&#x644;&#x642;&#x633;&#x637; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A;: '+(t.inst2||'');
+/* Installment-type linkage helpers (v4 schema-aware).
+   Taqseet's primary identifier was renamed in v4 from ASCII
+   `taqseet_method` to Arabic `\u0637\u0631\u064A\u0642\u0629_\u0627\u0644\u062A\u0642\u0633\u064A\u0637`.
+   Reading only the legacy key produced 'undefined' options. */
+function _tqMethodValue(t){
+  if(!t) return '';
+  var v = t['\u0637\u0631\u064A\u0642\u0629_\u0627\u0644\u062A\u0642\u0633\u064A\u0637'];
+  if(v === null || v === undefined || v === '') v = t.taqseet_method;
+  if(v === null || v === undefined) v = t.id;
+  return (v == null) ? '' : String(v);
+}
+function _tqIdValue(t){
+  if(!t) return '';
+  if(t.id !== null && t.id !== undefined) return String(t.id);
+  return _tqMethodValue(t);
+}
+function _tqMatchesStored(t, stored){
+  if(stored === null || stored === undefined) return false;
+  var s = String(stored);
+  return s === _tqIdValue(t) || s === _tqMethodValue(t);
+}
+function _tqOptionLabel(t){
+  if(!t) return '';
+  var meth = _tqMethodValue(t) || _tqIdValue(t);
+  var amt  = t['\u0645\u0628\u0644\u063A_\u0627\u0644\u062F\u0648\u0631\u0629'];
+  if(amt === null || amt === undefined || amt === '') amt = t.course_amount;
+  var nins = t['\u0639\u062F\u062F_\u0627\u0644\u0627\u0642\u0633\u0627\u0637'];
+  if(nins === null || nins === undefined || nins === '') nins = t.num_installments;
+  var label = '\u0637\u0631\u064A\u0642\u0629 ' + meth;
+  if(amt) label += ' \u2014 ' + amt + ' \u062F';
+  if(nins) label += ' \u2014 ' + nins + ' \u0623\u0642\u0633\u0627\u0637';
+  return label;
+}
+function _tqLookup(stored){
+  if(!allTaqseetData || !allTaqseetData.length) return null;
+  for(var i=0; i<allTaqseetData.length; i++){
+    if(_tqMatchesStored(allTaqseetData[i], stored)) return allTaqseetData[i];
+  }
+  return null;
+}
+
+function getTaqseetDetail(stored){
+  if(!stored || !allTaqseetData || !allTaqseetData.length) return '';
+  var t = _tqLookup(stored);
+  if(!t) return '';
+  var meth = _tqMethodValue(t);
+  var amt  = t['\u0645\u0628\u0644\u063A_\u0627\u0644\u062F\u0648\u0631\u0629']; if(amt===null||amt===undefined||amt==='') amt = t.course_amount;
+  var nins = t['\u0639\u062F\u062F_\u0627\u0644\u0627\u0642\u0633\u0627\u0637']; if(nins===null||nins===undefined||nins==='') nins = t.num_installments;
+  var i1   = t['\u0627\u0644\u0642\u0633\u0637_1']; if(i1===null||i1===undefined||i1==='') i1 = t.inst1;
+  var i2   = t['\u0627\u0644\u0642\u0633\u0637_2']; if(i2===null||i2===undefined||i2==='') i2 = t.inst2;
+  return '&#x637;&#x631;&#x64A;&#x642;&#x629; '+meth+' &#x2014; &#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;: '+(amt||'')+'&#x60C; &#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;: '+(nins||'')+'&#x60C; &#x627;&#x644;&#x642;&#x633;&#x637; &#x627;&#x644;&#x623;&#x648;&#x644;: '+(i1||'')+'&#x60C; &#x627;&#x644;&#x642;&#x633;&#x637; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A;: '+(i2||'');
 }
 function populateTaqseetDropdowns(){
+  /* Inline cell selects (.installment-select) — repopulate while
+     preserving the currently-selected stored value. */
   var selects=document.querySelectorAll('.installment-select');
+  if(!allTaqseetData) return;
   selects.forEach(function(sel){
     var curVal=sel.value;
-    while(sel.options.length>1)sel.remove(1);
+    while(sel.options.length>1) sel.remove(1);
     allTaqseetData.forEach(function(t){
       var opt=document.createElement('option');
-      opt.value=t.taqseet_method;
-      opt.text=t.taqseet_method;
-      if(t.taqseet_method===curVal)opt.selected=true;
+      opt.value = _tqIdValue(t);
+      opt.text  = _tqOptionLabel(t);
+      if(_tqMatchesStored(t, curVal)) opt.selected = true;
       sel.appendChild(opt);
     });
   });
@@ -7080,13 +7138,14 @@ function updateInstallmentType(sid,val){
 }
 function populateEditInstallmentSelect(curVal){
   var sel=document.getElementById('f_installment_type');
-  if(!sel)return;
-  while(sel.options.length>1)sel.remove(1);
+  if(!sel) return;
+  while(sel.options.length>1) sel.remove(1);
+  if(!allTaqseetData) return;
   allTaqseetData.forEach(function(t){
     var opt=document.createElement('option');
-    opt.value=t.taqseet_method;
-    opt.text=t.taqseet_method;
-    if(t.taqseet_method===curVal)opt.selected=true;
+    opt.value = _tqIdValue(t);
+    opt.text  = _tqOptionLabel(t);
+    if(_tqMatchesStored(t, curVal)) opt.selected = true;
     sel.appendChild(opt);
   });
   updateEditInstallmentDetail(curVal);
@@ -7143,7 +7202,7 @@ else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
 else if(key==='final_result'){
 var badge=val==='&#x646;&#x627;&#x62C;&#x62D;'?'badge-pass':val==='&#x631;&#x627;&#x633;&#x628;'?'badge-fail':'badge-pend';
 row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option>'+allTaqseetData.map(function(t){return '<option value="'+t.taqseet_method+'"'+(t.taqseet_method===val?' selected="selected"':'')+'>'+t.taqseet_method+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
+}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option>'+allTaqseetData.map(function(t){var iv=_tqIdValue(t); var lbl=_tqOptionLabel(t); var sel=_tqMatchesStored(t,val)?' selected="selected"':''; return '<option value="'+iv+'"'+sel+'>'+lbl+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
@@ -10831,6 +10890,72 @@ def api_messaging_templates_put():
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+# ─── Linked-options API for "linked dropdown" columns ───────────────
+# A column whose col_options string starts with "source:<table>" is
+# a foreign-key-style dropdown: its options come from another table at
+# request time. Front-end calls this endpoint with the source table /
+# value column / label column it wants and gets back a list of
+# {value, label} pairs. Both column names go through quoted-identifier
+# protection so non-ASCII columns like طريقة_التقسيط work.
+@app.route('/api/table/<table_name>/linked-options', methods=['GET'])
+@login_required
+def api_linked_options(table_name):
+    source = (request.args.get('source') or '').strip()
+    val_col = (request.args.get('value') or 'id').strip()
+    lbl_col = (request.args.get('label') or '').strip()
+    if not source:
+        return jsonify({"ok": False, "error": "source is required"}), 400
+    db = get_db()
+    # Verify the source table actually exists.
+    try:
+        if USE_PG:
+            row = db.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name=%s",
+                (source,),
+            ).fetchone()
+        else:
+            row = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (source,),
+            ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "source table not found"}), 404
+    # Verify the requested columns exist on that table.
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + source + ")").fetchall()}
+    except Exception:
+        live_cols = set()
+    if val_col not in live_cols:
+        val_col = 'id' if 'id' in live_cols else (next(iter(live_cols), '') if live_cols else '')
+    if not lbl_col or lbl_col not in live_cols:
+        # Fall back to value column for label if no usable label column.
+        lbl_col = val_col
+    if not val_col:
+        return jsonify({"ok": False, "error": "no usable value column"}), 400
+    # Quote both identifiers (Postgres-safe; SQLite also accepts double-
+    # quoted identifiers).
+    def q(s): return '"' + str(s).replace('"', '""') + '"'
+    try:
+        rows = db.execute(
+            "SELECT " + q(val_col) + " AS v, " + q(lbl_col) + " AS l FROM " + source +
+            " ORDER BY " + q(val_col)
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+    out = []
+    for r in rows:
+        v = r[0] if not hasattr(r, 'keys') else r['v']
+        l = r[1] if not hasattr(r, 'keys') else r['l']
+        if v is None:
+            continue
+        out.append({"value": str(v), "label": ('' if l is None else str(l))})
+    return jsonify({"ok": True, "options": out, "source": source,
+                    "value_column": val_col, "label_column": lbl_col})
 
 
 # ─── Arabic display labels for tables / columns ─────────────────────
