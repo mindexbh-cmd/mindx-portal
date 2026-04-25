@@ -419,6 +419,12 @@ def init_db():
         payment_status TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS backup_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        filename TEXT,
+        bytes_written INTEGER DEFAULT 0,
+        downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -1169,6 +1175,12 @@ if True:
     # Ensure table_labels table exists for every DB, then seed built-in
     # display names so the settings page / تعديل الجدول modal never shows
     # raw DB identifiers like "students" or "group_name_student".
+    db2.execute("""CREATE TABLE IF NOT EXISTS backup_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        filename TEXT,
+        bytes_written INTEGER DEFAULT 0,
+        downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db2.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -1455,7 +1467,7 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
   </div>
 </div>
 <div id="tabs" class="tabs"></div>
-<div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
+<div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x643;&#x627;&#x645;&#x644;&#x629;</button></div><div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
 <div id="toast" class="toast"></div>
 <script>
 /* ---------------- color helpers ---------------- */
@@ -1793,6 +1805,86 @@ function toast(msg, isErr){
 }
 
 loadAll();
+
+(function(){
+  function pad(n){ return n < 10 ? '0' + n : String(n); }
+  function fmtDateStr(s){
+    if (!s) return '';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+           ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function fmtBytes(n){
+    n = Number(n || 0);
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  function refreshLastBackup(){
+    fetch('/api/backup/last', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var el = document.getElementById('backup-last');
+        if (!el) return;
+        if (!d.ok){ el.textContent = 'تعذّر جلب سجل النسخ'; return; }
+        if (!d.last){
+          el.textContent = 'لم يتم إنشاء نسخة احتياطية بعد';
+          return;
+        }
+        var by = d.last.username ? (' — بواسطة ' + d.last.username) : '';
+        var size = d.last.bytes_written ? (' (' + fmtBytes(d.last.bytes_written) + ')') : '';
+        el.textContent = 'آخر نسخة احتياطية: ' + fmtDateStr(d.last.downloaded_at) + by + size;
+      })
+      .catch(function(){
+        var el = document.getElementById('backup-last');
+        if (el) el.textContent = 'تعذّر جلب سجل النسخ';
+      });
+  }
+  var btn = document.getElementById('btn-backup');
+  if (btn){
+    btn.addEventListener('click', function(){
+      var prev = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ جاري إنشاء النسخة الاحتياطية...';
+      fetch('/api/backup/download', {credentials:'include'})
+        .then(function(r){
+          if (!r.ok){
+            return r.json().then(function(d){
+              throw new Error(d && d.error ? d.error : ('HTTP ' + r.status));
+            }, function(){ throw new Error('HTTP ' + r.status); });
+          }
+          var cd = r.headers.get('Content-Disposition') || '';
+          var m = /filename\*=UTF-8''([^;]+)/.exec(cd);
+          var name = m ? decodeURIComponent(m[1])
+                       : 'mindex_backup_' + Date.now() + '.zip';
+          return r.blob().then(function(blob){ return {blob: blob, name: name}; });
+        })
+        .then(function(res){
+          var url = URL.createObjectURL(res.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = res.name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 500);
+          if (typeof window.mxToast === 'function')
+            window.mxToast('تم تنزيل النسخة الاحتياطية بنجاح', 'success');
+          refreshLastBackup();
+        })
+        .catch(function(ex){
+          if (typeof window.mxToast === 'function')
+            window.mxToast('تعذّر إنشاء النسخة الاحتياطية: ' + (ex.message || ex), 'error');
+        })
+        .then(function(){
+          btn.disabled = false;
+          btn.innerHTML = prev;
+        });
+    });
+  }
+  refreshLastBackup();
+})();
 </script>
 </body>
 </html>"""
@@ -9589,6 +9681,287 @@ def get_table_columns(table_name):
         return [r[1] for r in rows]
     except Exception:
         return []
+
+
+@app.route('/api/backup/last', methods=['GET'])
+@login_required
+def api_backup_last():
+    """Return the timestamp of the most recent backup (if any) so the
+    settings page can show "آخر نسخة احتياطية: …"."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT username, filename, bytes_written, downloaded_at "
+            "FROM backup_log ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": True, "last": None})
+        return jsonify({"ok": True, "last": {
+            "username":      row[0],
+            "filename":      row[1],
+            "bytes_written": row[2] or 0,
+            "downloaded_at": str(row[3]) if row[3] is not None else "",
+        }})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/backup/download', methods=['GET'])
+@login_required
+def api_backup_download():
+    """Generate a full backup ZIP in memory and stream it to the client.
+
+    Contents (UTF-8 ZIP filenames, subfolders inside):
+      01_الكودات/                    → app.py, requirements.txt, Procfile,
+                                        render.yaml, runtime.txt (when present)
+      02_قاعدة_البيانات/              → جميع_الجداول.sql + per-table CSV files
+      03_معلومات_النسخة/              → تفاصيل_النسخة_الاحتياطية.txt
+
+    Admin-only. Every download is logged to backup_log so the settings
+    page can surface "last backup" and who did it.
+    """
+    import zipfile, io as _io, csv as _csv, datetime as _dt
+    # Admin role enforcement — the only route in the app that does this.
+    u = session.get("user") or {}
+    if (u.get("role") or "").lower() != "admin":
+        return jsonify({"ok": False, "error": "admin role required"}), 403
+
+    db = get_db()
+
+    # Gather the list of public tables. On PG use information_schema;
+    # on SQLite use sqlite_master.
+    tables = []
+    try:
+        if USE_PG:
+            rows = db.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE' "
+                "ORDER BY table_name"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        tables = [r[0] for r in rows]
+    except Exception:
+        tables = []
+
+    # Label the per-table CSV files. Falls back to the raw internal name.
+    per_table_arabic = {
+        "students":          "قاعدة_بيانات_الطلبة",
+        "student_groups":    "المجموعات",
+        "attendance":        "سجل_الغياب",
+        "taqseet":           "جدول_التقسيط",
+        "evaluations":       "التقييمات",
+        "payment_log":       "سجل_الدفع",
+        "settings":          "الاعدادات",
+        "student_payments":  "دفعات_الطلبة",
+        "session_durations": "مدة_الحصص",
+        "message_templates": "قوالب_الرسائل",
+        "message_log":       "سجل_الرسائل",
+        "message_reminders": "تذكيرات_الرسائل",
+        "users":             "المستخدمون",
+        "table_labels":      "تسميات_الجداول",
+        "column_labels":     "تسميات_أعمدة_الطلبة",
+        "group_col_labels":  "تسميات_أعمدة_المجموعات",
+        "att_col_labels":    "تسميات_أعمدة_الغياب",
+        "eval_col_labels":   "تسميات_أعمدة_التقييمات",
+        "paylog_col_labels": "تسميات_أعمدة_سجل_الدفع",
+        "taqseet_col_labels":"تسميات_أعمدة_التقسيط",
+        "backup_log":        "سجل_النسخ_الاحتياطية",
+        "custom_tables":     "الجداول_المخصصة",
+        "custom_table_cols": "أعمدة_الجداول_المخصصة",
+        "custom_table_rows": "صفوف_الجداول_المخصصة",
+        "schema_migrations": "سجل_الترقيات",
+    }
+
+    # Helper: columns of a table.
+    def _table_columns(t):
+        try:
+            return [r[1] for r in db.execute(
+                "PRAGMA table_info(" + t + ")"
+            ).fetchall()]
+        except Exception:
+            return []
+
+    # Helper: row count.
+    def _row_count(t):
+        try:
+            return int(db.execute("SELECT COUNT(*) FROM " + t).fetchone()[0] or 0)
+        except Exception:
+            return 0
+
+    # Build per-table CSV in memory. Returns (name, bytes).
+    def _csv_for_table(t):
+        cols = _table_columns(t)
+        buf = _io.StringIO()
+        w = _csv.writer(buf)
+        if not cols:
+            return buf.getvalue().encode("utf-8")
+        w.writerow(cols)
+        try:
+            rows = db.execute("SELECT " + ",".join(cols) + " FROM " + t).fetchall()
+            for r in rows:
+                w.writerow([("" if v is None else str(v)) for v in r])
+        except Exception as ex:
+            w.writerow(["-- error reading table: " + str(ex)])
+        # BOM so Excel opens Arabic CSVs without mojibake.
+        return "﻿".encode("utf-8") + buf.getvalue().encode("utf-8")
+
+    # Build a single SQL-ish dump covering every table: CREATE TABLE IF
+    # NOT EXISTS (best-effort from PRAGMA) + parameterless INSERTs. This
+    # isn't a byte-for-byte pg_dump; it's a portable restore aid.
+    def _sql_dump():
+        out = []
+        out.append("-- Mindex backup " + _dt.datetime.utcnow().isoformat() + "Z")
+        out.append("-- This is a portable restore dump (CREATE TABLE IF NOT EXISTS + INSERTs).\n")
+        for t in tables:
+            cols = _table_columns(t)
+            if not cols:
+                out.append("-- skipped " + t + " (no columns)\n")
+                continue
+            # Types via information_schema / PRAGMA. Best-effort — we
+            # just emit TEXT for unknown types so the dump still parses.
+            col_defs = []
+            try:
+                type_rows = db.execute(
+                    "PRAGMA table_info(" + t + ")"
+                ).fetchall()
+                for r in type_rows:
+                    name = r[1]
+                    typ  = (r[2] or "").strip().upper() or "TEXT"
+                    if typ in ("TIMESTAMP WITHOUT TIME ZONE",):
+                        typ = "TIMESTAMP"
+                    col_defs.append('"' + name + '" ' + typ)
+            except Exception:
+                col_defs = ['"' + c + '" TEXT' for c in cols]
+            out.append('CREATE TABLE IF NOT EXISTS "' + t + '"(' + ", ".join(col_defs) + ");")
+            try:
+                rows = db.execute("SELECT " + ",".join(cols) + " FROM " + t).fetchall()
+                for r in rows:
+                    vals = []
+                    for v in r:
+                        if v is None:
+                            vals.append("NULL")
+                        elif isinstance(v, (int, float)):
+                            vals.append(str(v))
+                        else:
+                            s = str(v).replace("'", "''")
+                            vals.append("'" + s + "'")
+                    out.append(
+                        'INSERT INTO "' + t + '"(' +
+                        ",".join('"' + c + '"' for c in cols) +
+                        ") VALUES (" + ",".join(vals) + ");"
+                    )
+            except Exception as ex:
+                out.append("-- error dumping " + t + ": " + str(ex))
+            out.append("")
+        return "\n".join(out).encode("utf-8")
+
+    # Metadata file.
+    def _metadata():
+        now = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+        dbname = "unknown"
+        try:
+            if USE_PG:
+                # Parse out the db name from DATABASE_URL if present.
+                import re as _re_local
+                m = _re_local.search(r"/([^/?]+)(?:\?|$)", DATABASE_URL or "")
+                if m:
+                    dbname = m.group(1)
+            else:
+                dbname = DB_PATH
+        except Exception:
+            pass
+        git_hash = (os.environ.get("RENDER_GIT_COMMIT")
+                    or os.environ.get("GIT_COMMIT")
+                    or "غير معروف")
+        lines = []
+        lines.append("تفاصيل النسخة الاحتياطية — مايندكس")
+        lines.append("=" * 48)
+        lines.append("")
+        lines.append("تاريخ النسخة الاحتياطية: " + now)
+        lines.append("اسم قاعدة البيانات:      " + dbname)
+        lines.append("إصدار البرنامج (git):   " + git_hash)
+        lines.append("عدد الجداول:             " + str(len(tables)))
+        # Specific counts the spec called out.
+        lines.append("عدد الطلاب:              " + str(_row_count("students")))
+        lines.append("عدد سجلات الغياب:        " + str(_row_count("attendance")))
+        lines.append("")
+        lines.append("قائمة الجداول وعدد الصفوف:")
+        lines.append("-" * 48)
+        max_name_len = max((len(t) for t in tables), default=20)
+        for t in tables:
+            arabic = per_table_arabic.get(t, t)
+            n = _row_count(t)
+            lines.append(("  {:<" + str(max_name_len) + "}  ({:>6} rows)  — {}")
+                         .format(t, n, arabic))
+        return "\n".join(lines).encode("utf-8-sig")
+
+    # Read code files from disk — best-effort. On Render these live next
+    # to the web process; if any is missing we just skip it.
+    def _read_code(fname):
+        try:
+            with open(fname, "rb") as f:
+                return f.read()
+        except Exception:
+            return None
+
+    now = _dt.datetime.now()
+    folder = "مايندكس_نسخة_احتياطية_" + now.strftime("%Y-%m-%d_%H-%M")
+
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        # 01_الكودات — keep ASCII filenames for the code files themselves
+        # since that's how they live on disk.
+        code_prefix = folder + "/01_الكودات/"
+        for fn in ("app.py", "requirements.txt", "Procfile", "render.yaml", "runtime.txt"):
+            data = _read_code(fn)
+            if data is not None:
+                z.writestr(code_prefix + fn, data)
+        # 02_قاعدة_البيانات
+        db_prefix = folder + "/02_قاعدة_البيانات/"
+        z.writestr(db_prefix + "جميع_الجداول.sql", _sql_dump())
+        for t in tables:
+            fname = per_table_arabic.get(t, t) + ".csv"
+            z.writestr(db_prefix + fname, _csv_for_table(t))
+        # 03_معلومات_النسخة
+        z.writestr(folder + "/03_معلومات_النسخة/تفاصيل_النسخة_الاحتياطية.txt",
+                   _metadata())
+
+    data = buf.getvalue()
+    buf.close()
+
+    # Log the download so the settings page can show "آخر نسخة احتياطية".
+    try:
+        db.execute(
+            "INSERT INTO backup_log(username, filename, bytes_written) VALUES(?,?,?)",
+            (u.get("username") or "unknown",
+             folder + ".zip",
+             len(data)),
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    # Filename header — UTF-8 encoded per RFC 5987 so Arabic names land
+    # correctly in the download dialog.
+    import urllib.parse as _up
+    utf8_name = folder + ".zip"
+    ascii_fallback = "mindex_backup_" + now.strftime("%Y-%m-%d_%H-%M") + ".zip"
+    cd = (
+        "attachment; filename=\"" + ascii_fallback + "\"; "
+        "filename*=UTF-8''" + _up.quote(utf8_name)
+    )
+    return Response(
+        data,
+        mimetype="application/zip",
+        headers={
+            "Content-Disposition": cd,
+            "Content-Length": str(len(data)),
+        },
+    )
 
 
 @app.route('/api/settings', methods=['GET'])
