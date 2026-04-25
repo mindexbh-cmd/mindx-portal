@@ -5210,7 +5210,16 @@ function previewMsgTemplate(){
   var absentTxt = _attRenderTemplate(document.getElementById("tplAbsent").value || "", ctx);
   var lateTxt   = _attRenderTemplate(document.getElementById("tplLate").value   || "", ctx);
   var box = document.getElementById("tplPreviewBox");
-  box.textContent = "\u1F6AB \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u063A\u0627\u0626\u0628 \u2014 \u0645\u0639\u0627\u064A\u0646\u0629 \u0644\u0640 \"" + sampleName + "\"\n----------\n" + absentTxt + "\n\n\u23F1 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0645\u062A\u0623\u062E\u0631 \u2014 \u0645\u0639\u0627\u064A\u0646\u0629 \u0644\u0640 \"" + sampleName + "\"\n----------\n" + lateTxt;
+  /* SINGLE-quoted JS strings here so embedded double quotes don't need
+     backslash-escaping. The previous version used double quotes with \"
+     escapes, but those live inside ATTENDANCE_HTML — a Python triple-
+     quoted string — where Python collapsed every \" to a bare " before
+     the JS ever reached the browser. The result was a JS syntax error
+     ('Unexpected string') that aborted the whole inline script, so
+     loadGroups() never fired and the groups dropdown stayed empty. */
+  var _NL = String.fromCharCode(10);
+  var _sep = _NL + '----------' + _NL;
+  box.textContent = '\u26D4 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u063A\u0627\u0626\u0628 \u2014 ' + sampleName + _sep + absentTxt + _NL + _NL + '\u23F1 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0645\u062A\u0623\u062E\u0631 \u2014 ' + sampleName + _sep + lateTxt;
   box.style.display = "block";
 }
 function resetMsgTemplatesToDefaults(){
