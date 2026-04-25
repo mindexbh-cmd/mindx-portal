@@ -539,7 +539,8 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'table', 'جدول المجموعات', 'student_groups'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'))
-            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_group_column', 'عمود المجموعة الحضورية', 'group_name_student'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'student_online_group_column', 'عمود المجموعة الأونلاين', 'group_online'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'day_column', 'عمود اليوم', 'day_name'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('attendance', 'status_column', 'عمود الحالة', 'status'))
@@ -1080,7 +1081,8 @@ if True:
             ('groups', 'table', 'جدول المجموعات', 'student_groups'),
             ('groups', 'name_column', 'عمود اسم المجموعة', 'group_name'),
             ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'),
-            ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'),
+            ('attendance', 'student_group_column', 'عمود المجموعة الحضورية', 'group_name_student'),
+            ('attendance', 'student_online_group_column', 'عمود المجموعة الأونلاين', 'group_online'),
             ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'),
             ('attendance', 'day_column', 'عمود اليوم', 'day_name'),
             ('attendance', 'status_column', 'عمود الحالة', 'status'),
@@ -1154,7 +1156,8 @@ if True:
     if "settings_seed_v2" not in applied:
         _seed_v2 = [
             ('attendance', 'attendance_table', 'جدول الغياب', 'attendance'),
-            ('attendance', 'student_group_column', 'عمود مجموعة الطالب', 'group_name_student'),
+            ('attendance', 'student_group_column', 'عمود المجموعة الحضورية', 'group_name_student'),
+            ('attendance', 'student_online_group_column', 'عمود المجموعة الأونلاين', 'group_online'),
             ('attendance', 'date_column', 'عمود التاريخ', 'attendance_date'),
             ('attendance', 'day_column', 'عمود اليوم', 'day_name'),
             ('attendance', 'status_column', 'عمود الحالة', 'status'),
@@ -12281,34 +12284,75 @@ def api_groups_cleanup_empty():
 @app.route("/api/groups-students", methods=["GET"])
 @login_required
 def api_groups_students():
-    """Group → student roster. By default, only ACTIVE students are
-    returned. Pass ?include_inactive=1 to get every student regardless
-    of registration status."""
+    """Group → student roster. The dropdown is populated from BOTH the
+    in-person group column AND the online group column on `students`,
+    UNION-ed and sorted, so an online-only group shows up in the list.
+    Both column names are configurable via the settings table:
+        attendance.student_group_column       (default: group_name_student)
+        attendance.student_online_group_column (default: group_online)
+
+    By default only ACTIVE students contribute. Pass ?include_inactive=1
+    to count every student regardless of registration status."""
     db = get_db()
     include_inactive = (request.args.get("include_inactive") or "") in ("1", "true", "yes")
     act_frag, act_val = _active_students_filter()
 
-    groups_sql = ("SELECT DISTINCT group_name_student FROM students "
-                  "WHERE group_name_student IS NOT NULL AND group_name_student <> ''")
-    students_sql = ("SELECT id, student_name, personal_id, whatsapp FROM students "
-                    "WHERE group_name_student = ?")
-    params_for_student = []
+    # Resolve configurable column names with _is_safe_ident validation
+    # (the helper itself is unvalidated by design — see CLAUDE.md).
+    in_person_col = get_setting('attendance', 'student_group_column', 'group_name_student')
+    online_col    = get_setting('attendance', 'student_online_group_column', 'group_online')
+    if not _is_safe_ident(in_person_col):
+        in_person_col = 'group_name_student'
+    if not _is_safe_ident(online_col):
+        online_col = 'group_online'
+
+    # Verify the columns actually exist; if either is missing fall back
+    # to the in-person column alone so a misconfigured DB still works.
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live_cols = set()
+    has_online = (online_col in live_cols) and (online_col != in_person_col)
+
+    def _q_distinct(col):
+        sql = ('SELECT DISTINCT "' + col + '" FROM students '
+               'WHERE "' + col + '" IS NOT NULL AND "' + col + '" <> \'\'')
+        params = ()
+        if act_frag and not include_inactive:
+            sql += " AND " + act_frag
+            params = (act_val,)
+        return db.execute(sql, params).fetchall()
+
+    group_set = set()
+    for r in _q_distinct(in_person_col):
+        if r[0]: group_set.add(r[0])
+    if has_online:
+        for r in _q_distinct(online_col):
+            if r[0]: group_set.add(r[0])
+
+    groups_sorted = sorted(group_set)
+
+    # Fetch the per-group student list once per group. Match a student to
+    # a group if EITHER the in-person OR the online column matches.
+    if has_online:
+        students_sql = ('SELECT id, student_name, personal_id, whatsapp FROM students '
+                        'WHERE ("' + in_person_col + '" = ? OR "' + online_col + '" = ?)')
+    else:
+        students_sql = ('SELECT id, student_name, personal_id, whatsapp FROM students '
+                        'WHERE "' + in_person_col + '" = ?')
     if act_frag and not include_inactive:
-        groups_sql += " AND " + act_frag
         students_sql += " AND " + act_frag
-        params_for_student = [act_val]
-    groups_sql += " ORDER BY group_name_student"
     students_sql += " ORDER BY student_name"
 
-    if act_frag and not include_inactive:
-        rows = db.execute(groups_sql, (act_val,)).fetchall()
-    else:
-        rows = db.execute(groups_sql).fetchall()
-
     out = {}
-    for row in rows:
-        gname = row[0]
-        students = db.execute(students_sql, tuple([gname] + params_for_student)).fetchall()
+    for gname in groups_sorted:
+        if has_online:
+            params = [gname, gname]
+        else:
+            params = [gname]
+        if act_frag and not include_inactive:
+            params.append(act_val)
+        students = db.execute(students_sql, tuple(params)).fetchall()
         out[gname] = [dict(s) for s in students]
     return jsonify(out)
 
