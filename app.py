@@ -184,7 +184,51 @@ def close_db(e=None):
 def hp(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
+def _data_integrity_log(db):
+    """Boot-time data-integrity probe.
+
+    Print row counts for every user-data table so any unexpected drop
+    is *immediately* visible in the Render deploy log (and in local
+    dev). This is purely observational — it never mutates the DB.
+    Triggered once on import, right after the schema migrations run.
+    """
+    tables = [
+        "students", "student_groups", "attendance", "taqseet",
+        "evaluations", "payment_log",
+        "column_labels", "group_col_labels", "att_col_labels",
+        "taqseet_col_labels", "schema_migrations",
+    ]
+    counts = {}
+    for t in tables:
+        try:
+            row = db.execute("SELECT COUNT(*) FROM " + t).fetchone()
+            counts[t] = int(row[0]) if row else 0
+        except Exception:
+            counts[t] = "?"
+    print("[mindx-data-integrity] row counts:", counts, flush=True)
+    # Loud assertion when a previously-populated table reads back empty.
+    # We can't *prevent* a wipe from another code path, but we can make
+    # the regression scream in logs instead of slipping by unnoticed.
+    danger = [t for t in ("students", "student_groups", "attendance")
+              if isinstance(counts.get(t), int) and counts[t] == 0]
+    if danger:
+        print("[mindx-data-integrity] WARNING: " + ",".join(danger) +
+              " unexpectedly empty at boot", flush=True)
+
+
 def init_db():
+    # ── CRITICAL DATA SAFETY RULE ────────────────────────────────────
+    # This function MUST be idempotent and non-destructive:
+    #   * Every CREATE is `CREATE TABLE IF NOT EXISTS`.
+    #   * Schema upgrades use `ALTER TABLE ... ADD COLUMN` only —
+    #     never DROP COLUMN, never DROP TABLE, never DELETE FROM,
+    #     never TRUNCATE.
+    #   * Default-row seeds are gated either by a `COUNT(*) == 0`
+    #     check or by `ON CONFLICT DO NOTHING` / try-except on UNIQUE
+    #     so re-runs against a populated DB don\'t duplicate or
+    #     overwrite existing rows.
+    # See CLAUDE.md "Data safety" + "Schema sync" sections.
+    # ──────────────────────────────────────────────────────────────────
     db = _new_connection()
     db.execute("""CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY,
@@ -1421,7 +1465,42 @@ if True:
         except Exception:
             pass
 
+    # ── column_labels: backfill any rows that were inserted without
+    # table_name (legacy auto-add behaviour pre-v4 unified schema).
+    # Every row already in column_labels predates the multi-table split
+    # and belongs to the students table — that is the only table whose
+    # labels live in column_labels (other tables use their own
+    # *_col_labels). Idempotent + non-destructive: only updates rows
+    # whose table_name is NULL.
+    try:
+        cl_cols = [r[1] for r in db2.execute("PRAGMA table_info(column_labels)").fetchall()]
+        if 'table_name' in cl_cols:
+            db2.execute(
+                "UPDATE column_labels SET table_name='students' "
+                "WHERE table_name IS NULL OR TRIM(table_name) = ''"
+            )
+            if 'internal_name' in cl_cols:
+                db2.execute(
+                    "UPDATE column_labels SET internal_name=col_key "
+                    "WHERE (internal_name IS NULL OR internal_name='') AND col_key IS NOT NULL"
+                )
+            if 'display_name' in cl_cols:
+                db2.execute(
+                    "UPDATE column_labels SET display_name=col_label "
+                    "WHERE (display_name IS NULL OR display_name='') AND col_label IS NOT NULL"
+                )
+            db2.commit()
+    except Exception:
+        pass
+
     db2.commit()
+
+    # Boot-time data-integrity probe — observation only, never mutates.
+    try:
+        _data_integrity_log(db2)
+    except Exception:
+        pass
+
     db2.close()
 
 SETTINGS_HTML = """<!DOCTYPE html>
