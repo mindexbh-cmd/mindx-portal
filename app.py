@@ -3342,6 +3342,89 @@ function _srDoDelete(){
       if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
     });
 }
+function _srBuildPaymentMethodSection(pd){
+  /* Render the unified "💰 طريقة التقسيط" block. pd is the
+     payment_details payload from /api/students/<sid>/details. */
+  var html = '<div class="srm-section"><div class="srm-section-title">\U0001F4B0 طريقة التقسيط</div>';
+  if (!pd){
+    html += '<div style="padding:14px;text-align:center;color:#888;font-weight:600;background:#f8f9fa;border-radius:8px;">';
+    html += 'لم يتم تحديد طريقة تقسيط لهذا الطالب';
+    html += '</div></div>';
+    return html;
+  }
+  if (!pd.has_plan){
+    html += '<div style="padding:14px;text-align:center;color:#888;font-weight:600;background:#f8f9fa;border-radius:8px;">';
+    html += 'لم يتم تحديد طريقة تقسيط لهذا الطالب';
+    html += '</div></div>';
+    return html;
+  }
+  var dinar = ' دينار';
+  /* Plan summary card. */
+  function _row(lbl, val, color){
+    var v = (val === '' || val == null) ? '—' : _srEsc(String(val));
+    return '<div style="display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px dashed #eee;">' +
+           '<span style="color:#555;font-weight:600;">' + lbl + ':</span>' +
+           '<span style="font-weight:800;color:' + (color || '#37474F') + ';">' + v + '</span>' +
+           '</div>';
+  }
+  html += '<div style="background:#fff;border:1.5px solid #e0d0f8;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:0.9rem;">';
+  html += _row('طريقة التقسيط', 'طريقة ' + (pd.method || pd.method_id || '—'), '#6A1B9A');
+  html += _row('مبلغ الدورة', (pd.course_amount || 0) + dinar, '#1565C0');
+  html += _row('عدد الأقساط', pd.num_installments || 0, '#37474F');
+  if (pd.study_hours) html += _row('عدد ساعات الدراسة', pd.study_hours + ' ساعة', '#37474F');
+  if (pd.start_date)  html += _row('تاريخ بدء الدورة', pd.start_date, '#37474F');
+  if (pd.end_date)    html += _row('تاريخ انتهاء الدورة', pd.end_date, '#37474F');
+  html += '</div>';
+  /* Per-installment list (only those with amount > 0). */
+  html += '<div style="font-weight:800;color:#4A148C;margin:8px 4px 6px;">تفاصيل الأقساط:</div>';
+  if (!pd.installments || !pd.installments.length){
+    html += '<div style="padding:10px;color:#999;text-align:center;">لا توجد أقساط في هذه الخطة</div>';
+  } else {
+    pd.installments.forEach(function(i){
+      var status = i.status_label || 'unpaid';
+      var icon, bg, br;
+      if (status === 'paid')        { icon = '✅'; bg = '#e8f5e9'; br = '#a5d6a7'; }
+      else if (status === 'partial') { icon = '\U0001F7E1'; bg = '#fff8e1'; br = '#ffd54f'; }
+      else if (status === 'exempt')  { icon = '\U0001F535'; bg = '#e3f2fd'; br = '#90caf9'; }
+      else                            { icon = '\U0001F534'; bg = '#ffebee'; br = '#ef9a9a'; }
+      html += '<div style="background:' + bg + ';border:1.5px solid ' + br + ';border-radius:10px;padding:8px 12px;margin-bottom:6px;font-size:0.88rem;">';
+      html += '<div style="font-weight:800;color:#37474F;margin-bottom:4px;">القسط ' + i.n + ' ' + icon + '</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px 14px;color:#444;">';
+      html += '<div>المبلغ المستحق: <b style="color:#1565C0;">' + (i.amount || 0) + dinar + '</b></div>';
+      html += '<div>تاريخ الاستحقاق: <b>' + _srEsc(String(i.due_date || '—')) + '</b></div>';
+      html += '<div>المبلغ المدفوع: <b style="color:#2E7D32;">' + (i.paid || 0) + dinar + '</b></div>';
+      html += '<div>المتبقي: <b style="color:' + (((i.remaining||0) > 0) ? '#c62828' : '#2E7D32') + ';">' + (i.remaining || 0) + dinar + '</b></div>';
+      html += '</div></div>';
+    });
+  }
+  /* Totals card — values come straight from payment_log columns when
+     available (totals_source === 'payment_log'). */
+  if (!pd.has_paylog){
+    html += '<div style="margin-top:8px;padding:10px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:8px;color:#bf360c;font-weight:600;text-align:center;font-size:0.85rem;">';
+    html += '⚠ لا يوجد سجل دفع لهذا الطالب في جدول سجل الدفع';
+    html += '</div>';
+  }
+  var paidNum = parseFloat(pd.total_paid)      || 0;
+  var remNum  = parseFloat(pd.total_remaining) || 0;
+  var tStatus = pd.status || '';
+  var tLabel  = '';
+  var tColor  = '#37474F';
+  if (tStatus === 'paid')         { tLabel = 'مدفوع بالكامل ✅';        tColor = '#2E7D32'; }
+  else if (tStatus === 'partial') { tLabel = 'مدفوع جزئياً \U0001F7E1';     tColor = '#E65100'; }
+  else if (tStatus === 'exempt')  { tLabel = 'معفي \U0001F535';            tColor = '#0D47A1'; }
+  else if (tStatus === 'unpaid')  { tLabel = 'لم يدفع \U0001F534';          tColor = '#c62828'; }
+  html += '<div style="margin-top:10px;padding:12px 14px;background:linear-gradient(135deg,#f3e5f5,#ede7f6);border-radius:10px;">';
+  html += '<div style="font-weight:800;color:#4A148C;margin-bottom:6px;font-size:0.95rem;">الإجمالي:</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;font-size:0.9rem;">';
+  html += '<div>المبلغ المدفوع: <b style="color:#2E7D32;">' + paidNum + dinar + '</b></div>';
+  html += '<div>المبلغ المتبقي: <b style="color:' + (remNum > 0 ? '#c62828' : '#2E7D32') + ';">' + remNum + dinar + '</b></div>';
+  if (tLabel) html += '<div>حالة المدفوعات: <b style="color:' + tColor + ';">' + tLabel + '</b></div>';
+  /* Surface the verbatim paylog status string when present. */
+  if (pd.paylog_status) html += '<div>(payment_log): <b>' + _srEsc(String(pd.paylog_status)) + '</b></div>';
+  html += '</div></div>';
+  html += '</div>';
+  return html;
+}
 function _srRenderCard(d){
   var s = d.student || {};
   var att = d.attendance || {};
@@ -3380,20 +3463,11 @@ function _srRenderCard(d){
   html += _srField('sr_road','الطريق', s.road);
   html += _srField('sr_complex_name','المجمع', s.complex_name);
   html += '</div></div>';
-  // PAYMENTS
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B3 تفاصيل الدفع</div><div class="srm-grid">';
-  html += _srField('sr_installment_type','نوع التقسيط', s.installment_type);
-  html += _srField('sr_installment1','القسط 1', s.installment1);
-  html += _srField('sr_installment2','القسط 2', s.installment2);
-  html += _srField('sr_installment3','القسط 3', s.installment3);
-  html += _srField('sr_installment4','القسط 4', s.installment4);
-  html += _srField('sr_installment5','القسط 5', s.installment5);
-  html += '</div>';
-  html += '<div class="srm-totals">'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.paid||0)+'</div><div class="srm-stat-lbl">المدفوع</div></div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.price||0)+'</div><div class="srm-stat-lbl">السعر الإجمالي</div></div>'
-       +  '<div class="srm-stat"><div class="srm-stat-num">'+(tot.remaining||0)+'</div><div class="srm-stat-lbl">المتبقي</div></div>'
-       + '</div></div>';
+  // PAYMENTS — unified "طريقة التقسيط" section. Combines the student\'s
+  // taqseet plan + per-installment paid/remaining + persisted totals
+  // from payment_log. Replaces the legacy تفاصيل الدفع + سجل الدفع
+  // pair.
+  html += _srBuildPaymentMethodSection(d.payment_details);
   // ATTENDANCE
   var pct = function(v){ return (v||0)+'%'; };
   var bar = function(v){ return '<div class="srm-pct-bar"><div class="srm-pct-bar-inner" style="width:'+(Math.min(100,v||0))+'%"></div></div>'; };
@@ -3403,69 +3477,8 @@ function _srRenderCard(d){
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">نسبة الغياب ('+(att.absent||0)+')</div>'+bar(att.absent_rate)+'</div>'
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">نسبة التأخير ('+(att.late||0)+')</div>'+bar(att.late_rate)+'</div>'
        + '</div></div>';
-  // PAYLOG (سجل الدفع) — a row from payment_log matched to this student.
-  // Rendered read-only; see api_student_details for the lookup order.
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4B0 سجل الدفع</div>';
-  var pl = d.paylog;
-  if (!pl) {
-    html += '<div style="padding:14px;text-align:center;color:#888;font-weight:600;background:#f8f9fa;border-radius:8px;">لا يوجد سجل دفع لهذا الطالب</div>';
-  } else {
-    var remainNum = parseFloat(pl.total_remaining) || 0;
-    var remainColor = remainNum > 0 ? '#c62828' : '#2E7D32';
-    var paidColor = '#2E7D32';
-    function _plCell(lbl, val, style){
-      var v = (val === '' || val == null) ? '—' : _srEsc(String(val));
-      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;">' +
-             '<div style="color:#777;font-size:0.78rem;">' + lbl + '</div>' +
-             '<div style="font-weight:800;' + (style || 'color:#455A64;') + '">' + v + '</div>' +
-             '</div>';
-    }
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;font-size:0.9rem;">';
-    html += _plCell('حالة التسجيل', pl.registration_status, 'color:#6A1B9A;');
-    html += _plCell('مبلغ الدورة', pl.course_amount, 'color:#1565C0;');
-    html += _plCell('حالة المدفوعات', pl.payment_status, 'color:#E65100;');
-    html += '</div>';
-    // Installments table
-    html += '<div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:10px;">';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">';
-    html += '<thead><tr style="background:#e3f2fd;color:#0d47a1;">' +
-            '<th style="padding:7px 10px;text-align:right;">القسط</th>' +
-            '<th style="padding:7px 10px;text-align:right;">المبلغ</th>' +
-            '<th style="padding:7px 10px;text-align:right;">الحالة</th>' +
-            '</tr></thead><tbody>';
-    (pl.installments || []).forEach(function(it){
-      var amt = (it.amount === '' || it.amount == null) ? '—' : _srEsc(String(it.amount));
-      var stRaw = (it.status || '').toString().trim();
-      var stHtml;
-      if (!stRaw) {
-        stHtml = '<span style="color:#999;">—</span>';
-      } else if (stRaw === 'تم الدفع' || stRaw.indexOf('دفع') >= 0 && stRaw.indexOf('لم') < 0) {
-        stHtml = '<span style="background:#e8f5e9;color:#2E7D32;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
-      } else if (stRaw.indexOf('معف') >= 0) {
-        stHtml = '<span style="background:#fff3e0;color:#E65100;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
-      } else {
-        stHtml = '<span style="background:#fce4ec;color:#c62828;padding:2px 10px;border-radius:999px;font-weight:700;">' + _srEsc(stRaw) + '</span>';
-      }
-      html += '<tr style="border-top:1px solid #f0f0f0;">' +
-              '<td style="padding:7px 10px;font-weight:700;color:#37474F;">القسط ' + (it.num||'') + '</td>' +
-              '<td style="padding:7px 10px;color:#1565C0;font-weight:700;">' + amt + '</td>' +
-              '<td style="padding:7px 10px;">' + stHtml + '</td>' +
-              '</tr>';
-    });
-    html += '</tbody></table></div>';
-    // Totals row with spec-mandated colors (paid always green, remaining red>0 green=0)
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">';
-    html += '<div style="background:#e8f5e9;border:2px solid #a5d6a7;border-radius:10px;padding:10px 14px;text-align:center;">' +
-            '<div style="color:#555;font-size:0.82rem;">المبلغ المدفوع</div>' +
-            '<div style="font-weight:800;font-size:1.15rem;color:' + paidColor + ';">' + _srEsc(String(pl.total_paid || '0')) + '</div>' +
-            '</div>';
-    html += '<div style="background:' + (remainNum > 0 ? '#fce4ec' : '#e8f5e9') + ';border:2px solid ' + (remainNum > 0 ? '#f48fb1' : '#a5d6a7') + ';border-radius:10px;padding:10px 14px;text-align:center;">' +
-            '<div style="color:#555;font-size:0.82rem;">المبلغ المتبقي</div>' +
-            '<div style="font-weight:800;font-size:1.15rem;color:' + remainColor + ';">' + _srEsc(String(pl.total_remaining || '0')) + '</div>' +
-            '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
+  // The legacy "سجل الدفع" block has been folded into the new
+  // "💰 طريقة التقسيط" section above (_srBuildPaymentMethodSection).
   // ACTIONS
   html += '<div class="srm-actions" id="sr-actions"></div>';
   html += '</div>';
@@ -9738,6 +9751,73 @@ def api_student_details(sid):
     excused = _count(STATUS_EXCUSED)
     def _pct(n):
         return round(n / total * 100, 1) if total else 0.0
+    # ── Unified طريقة التقسيط payload ─────────────────────────────────
+    # Combines the student's taqseet plan, the per-installment paid /
+    # remaining figures (sourced from payment_log inst1..inst5 with
+    # student_payments fallback for n in 6..12), and the persisted
+    # totals — exactly what the new "💰 طريقة التقسيط" section on the
+    # search page renders. Any failure here is suppressed so the rest
+    # of the response still reaches the caller.
+    payment_details = None
+    try:
+        plan_payload = _payment_compute_plan(db, sid)
+        if plan_payload is not None:
+            insts_filtered = [i for i in plan_payload["plan"]["installments"]
+                              if (i.get("amount") or 0) > 0]
+            for inst in insts_filtered:
+                amt  = float(inst.get("amount") or 0)
+                paid = float(inst.get("paid")   or 0)
+                rem  = float(inst.get("remaining") or 0)
+                tok  = inst.get("status") or ''
+                if tok == 'exempt':
+                    inst_status = 'exempt'
+                elif rem <= 0.005:
+                    inst_status = 'paid'
+                elif paid <= 0.005:
+                    inst_status = 'unpaid'
+                else:
+                    inst_status = 'partial'
+                inst["status_label"] = inst_status
+            payment_details = {
+                "has_plan":        bool(plan_payload["plan"]["num_installments"]),
+                "has_paylog":      bool(plan_payload["plan"].get("paylog_matched")),
+                "method":          plan_payload["plan"]["method"],
+                "method_id":       plan_payload["plan"]["method_id"],
+                "course_amount":   plan_payload["plan"]["course_amount"],
+                "num_installments": plan_payload["plan"]["num_installments"],
+                "installments":    insts_filtered,
+                "total_paid":      plan_payload["plan"]["total_paid"],
+                "total_remaining": plan_payload["plan"]["total_remaining"],
+                "status":          plan_payload["plan"]["status"],
+                "totals_source":   plan_payload["plan"].get("totals_source", "computed"),
+                "study_hours":     '',
+                "start_date":      '',
+                "end_date":        '',
+            }
+            # Pull plan-level extras (study hours, start/end dates) from
+            # the matched taqseet row.
+            try:
+                tq_rows = _payment_load_taqseet_rows(db)
+                tq      = _payment_find_taqseet(tq_rows, s_dict.get('installment_type'))
+                if tq:
+                    extras_select = ('SELECT "عدد_ساعات_الدراسة","تاريخ_بدء_الدورة","تاريخ_انتهاء_الدورة" '
+                                     'FROM taqseet WHERE id=?')
+                    er = db.execute(extras_select, (tq[0],)).fetchone()
+                    if er:
+                        payment_details["study_hours"] = er[0] if er[0] is not None else ''
+                        payment_details["start_date"]  = er[1] if er[1] is not None else ''
+                        payment_details["end_date"]    = er[2] if er[2] is not None else ''
+            except Exception:
+                pass
+            # Carry through the persisted paylog status string + raw
+            # totals so the front-end can show "حالة المدفوعات" verbatim.
+            if pl_record:
+                payment_details["paylog_status"]      = pl_record.get('payment_status') or ''
+                payment_details["paylog_total_paid"]  = pl_record.get('total_paid')
+                payment_details["paylog_total_rem"]   = pl_record.get('total_remaining')
+    except Exception:
+        payment_details = None
+
     return jsonify({
         "ok": True,
         "student": s_dict,
@@ -9758,6 +9838,60 @@ def api_student_details(sid):
             "late_rate":    _pct(late),
         },
         "paylog": paylog_payload,
+        "payment_details": payment_details,
+    })
+
+
+@app.route("/api/student/<sid>/payment-details", methods=["GET"])
+@login_required
+def api_student_payment_details(sid):
+    """Standalone endpoint for the new "💰 طريقة التقسيط" section. Accepts
+    an integer student id OR a name (URL-encoded). Returns
+    {ok, plan, payments, installments} matching the spec."""
+    db = get_db()
+    student_row = None
+    s = str(sid or '').strip()
+    if s.isdigit():
+        student_row = db.execute("SELECT * FROM students WHERE id=?", (int(s),)).fetchone()
+    if not student_row and s:
+        # Fall back to name-based lookup (ILIKE substring).
+        student_row = db.execute(
+            "SELECT * FROM students WHERE TRIM(student_name)=? LIMIT 1", (s,)
+        ).fetchone()
+        if not student_row:
+            student_row = db.execute(
+                "SELECT * FROM students WHERE student_name ILIKE ? LIMIT 1", ('%' + s + '%',)
+            ).fetchone()
+    if not student_row:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    sd = dict(student_row)
+    plan_payload = _payment_compute_plan(db, sd["id"])
+    if plan_payload is None:
+        return jsonify({"ok": False, "error": "could not compute plan"}), 500
+    insts = [i for i in plan_payload["plan"]["installments"]
+             if (i.get("amount") or 0) > 0]
+    paid_pl, pl_dict = _payment_log_paid_for_student(
+        db, sd.get("student_name"), sd.get("personal_id")
+    )
+    return jsonify({
+        "ok": True,
+        "student": {
+            "id": sd["id"],
+            "name": sd.get("student_name"),
+            "installment_type": sd.get("installment_type"),
+        },
+        "plan": {
+            "method":          plan_payload["plan"]["method"],
+            "method_id":       plan_payload["plan"]["method_id"],
+            "course_amount":   plan_payload["plan"]["course_amount"],
+            "num_installments": plan_payload["plan"]["num_installments"],
+            "total_paid":      plan_payload["plan"]["total_paid"],
+            "total_remaining": plan_payload["plan"]["total_remaining"],
+            "status":          plan_payload["plan"]["status"],
+            "totals_source":   plan_payload["plan"].get("totals_source"),
+        },
+        "payments": pl_dict or {},
+        "installments": insts,
     })
 
 @app.route("/api/students/bulk", methods=["POST"])
