@@ -404,6 +404,15 @@ def init_db():
         template_name TEXT,
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS payment_messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        installment_number INTEGER,
+        message_type TEXT,
+        sent_by TEXT,
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     db.execute("""CREATE TABLE IF NOT EXISTS message_reminders(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -864,6 +873,15 @@ if True:
         student_name TEXT,
         student_whatsapp TEXT,
         template_name TEXT,
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS payment_messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        installment_number INTEGER,
+        message_type TEXT,
+        sent_by TEXT,
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
     db2.execute("""CREATE TABLE IF NOT EXISTS message_reminders(
@@ -5925,11 +5943,20 @@ function pmInstChange(sel){
             + 'padding:3px 10px;border-radius:6px;font-weight:800;cursor:pointer;'
             + 'font-size:12px;margin-right:8px;">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</button>';
   }
+  var trackLine = '';
+  if (inst.last_msg_sent_at){
+    var when = String(inst.last_msg_sent_at).substring(0, 16).replace('T', ' ');
+    var by = inst.last_msg_sent_by ? (' \u0628\u0648\u0627\u0633\u0637\u0629 ' + inst.last_msg_sent_by) : '';
+    trackLine = '<div style="grid-column:1/-1;background:#e8f5e9;color:#1b5e20;padding:6px 10px;border-radius:8px;font-weight:700;">\u2705 \u062A\u0645 \u0625\u0631\u0633\u0627\u0644 \u062A\u0630\u0643\u064A\u0631 \u0628\u062A\u0627\u0631\u064A\u062E ' + when + by + '</div>';
+  } else {
+    trackLine = '<div style="grid-column:1/-1;background:#eceff1;color:#546e7a;padding:6px 10px;border-radius:8px;font-weight:700;">\u274C \u0644\u0645 \u064A\u064F\u0631\u0633\u0644 \u062A\u0630\u0643\u064A\u0631 \u0628\u0639\u062F</div>';
+  }
   det.innerHTML = '<div class="pm-detail-grid">'
     + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0633\u062A\u062D\u0642: <b>' + inst.amount + ' \u062F</b></div>'
     + '<div>\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: <b>' + due + '</b></div>'
     + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639 \u0633\u0627\u0628\u0642\u0627\u064B: <b style="color:#1565C0;">' + inst.paid + ' \u062F</b>' + ok + editBtn + '</div>'
     + '<div>\u0627\u0644\u0645\u062A\u0628\u0642\u064A \u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0637: <b style="color:#c62828;">' + inst.remaining + ' \u062F</b></div>'
+    + trackLine
     + '</div>';
   det.classList.add("show");
   amt.disabled = false; amt.max = inst.remaining; amt.value = "";
@@ -6188,6 +6215,22 @@ function _pmEsc(s){
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+var _pmDueSentFilter = 'all';
+
+function _pmDueSetSentFilter(v){
+  _pmDueSentFilter = v || 'all';
+  _pmDueRender();
+}
+
+function _pmDueSentBadge(r){
+  if (r.last_sent_at){
+    var when = String(r.last_sent_at).substring(0, 16).replace('T', ' ');
+    var by = r.last_sent_by ? (' بواسطة ' + r.last_sent_by) : '';
+    return '<span style="background:#e8f5e9;color:#1b5e20;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11.5px;">✅ أُرسل ' + when + by + '</span>';
+  }
+  return '<span style="background:#eceff1;color:#546e7a;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11.5px;">❌ لم يُرسل</span>';
+}
+
 function _pmDueRender(){
   var res = document.getElementById('pm-due-results');
   if (!res) return;
@@ -6195,10 +6238,22 @@ function _pmDueRender(){
     res.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:14px;">— لا يوجد طلاب يطابقون التصفية —</div>';
     return;
   }
+  var f = _pmDueSentFilter || 'all';
+  var rows = _pmDueRows.filter(function(r){
+    if (f === 'sent')   return !!r.last_sent_at;
+    if (f === 'unsent') return !r.last_sent_at;
+    return true;
+  });
   var html = '';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">';
-  html += '<div><label style="font-weight:700;cursor:pointer;font-size:13px;"><input type="checkbox" id="pm-due-all" onchange="_pmDueSelectAll(this.checked)"> تحديد الكل</label> <span style="color:#666;font-size:12.5px;margin-right:10px;">عدد الطلاب: ' + _pmDueRows.length + '</span></div>';
+  html += '<div><label style="font-weight:700;cursor:pointer;font-size:13px;"><input type="checkbox" id="pm-due-all" onchange="_pmDueSelectAll(this.checked)"> تحديد الكل</label> <span style="color:#666;font-size:12.5px;margin-right:10px;">عدد الطلاب: ' + rows.length + ' / ' + _pmDueRows.length + '</span></div>';
   html += '<div style="display:flex;gap:6px;"><button onclick="_pmDueSendSelected()" style="background:#1976D2;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12.5px;">📤 إرسال للمحدد</button><button onclick="_pmDueSendAll()" style="background:#2e7d32;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12.5px;">📨 إرسال للجميع</button></div>';
+  html += '</div>';
+  html += '<div style="background:#fff8e1;border:1px solid #ffe0b2;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">';
+  html += '<span style="font-weight:800;color:#e65100;">حالة التذكير:</span>';
+  html += '<label style="cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-sentf" value="all"' + (f==='all'?' checked':'') + ' onchange="_pmDueSetSentFilter(this.value)"> الكل</label>';
+  html += '<label style="cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-sentf" value="unsent"' + (f==='unsent'?' checked':'') + ' onchange="_pmDueSetSentFilter(this.value)"> لم يُرسل لهم</label>';
+  html += '<label style="cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-sentf" value="sent"' + (f==='sent'?' checked':'') + ' onchange="_pmDueSetSentFilter(this.value)"> تم الإرسال لهم</label>';
   html += '</div>';
   html += '<div style="overflow:auto;max-height:48vh;border:1px solid #eee;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
   html += '<thead style="background:#fff3e0;position:sticky;top:0;"><tr>';
@@ -6210,14 +6265,16 @@ function _pmDueRender(){
   html += '<th style="padding:8px;text-align:center;">المتبقي</th>';
   html += '<th style="padding:8px;text-align:center;">تاريخ الاستحقاق</th>';
   html += '<th style="padding:8px;text-align:center;">الحالة</th>';
+  html += '<th style="padding:8px;text-align:center;">حالة التذكير</th>';
   html += '<th style="padding:8px;text-align:center;">إجراء</th>';
   html += '</tr></thead><tbody>';
-  for (var i=0;i<_pmDueRows.length;i++){
-    var r = _pmDueRows[i];
+  for (var i=0;i<rows.length;i++){
+    var r = rows[i];
+    var origIdx = _pmDueRows.indexOf(r);
     var color = r.due_color || 'green';
     var statusLabel = (color === 'red') ? 'مستحق/متأخر' : (color === 'yellow' ? 'قريب' : 'لاحق');
     html += '<tr class="pm-due-row ' + color + '">';
-    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><input type="checkbox" class="pm-due-cb" data-i="' + i + '"></td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><input type="checkbox" class="pm-due-cb" data-i="' + origIdx + '"></td>';
     html += '<td style="padding:6px;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.name) + '</td>';
     html += '<td style="padding:6px;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.group) + '</td>';
     html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.n) + '</td>';
@@ -6225,8 +6282,12 @@ function _pmDueRender(){
     html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;color:' + (Number(r.remaining||0) > 0 ? '#c62828' : '#1b5e20') + ';font-weight:700;">' + _pmEsc(r.remaining) + '</td>';
     html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;direction:ltr;">' + _pmEsc(r.due_date) + '</td>';
     html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><span class="pm-due-pill ' + color + '">' + statusLabel + '</span></td>';
-    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><button onclick="_pmDueSendOne(' + i + ')" style="background:#25D366;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-weight:800;cursor:pointer;font-size:11.5px;">📲 واتساب</button></td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;">' + _pmDueSentBadge(r) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><button onclick="_pmDueSendOne(' + origIdx + ')" style="background:#25D366;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-weight:800;cursor:pointer;font-size:11.5px;">📲 واتساب</button></td>';
     html += '</tr>';
+  }
+  if (!rows.length){
+    html += '<tr><td colspan="10" style="padding:24px;text-align:center;color:#999;">— لا يوجد طلاب يطابقون فلتر حالة التذكير —</td></tr>';
   }
   html += '</tbody></table></div>';
   res.innerHTML = html;
@@ -6257,12 +6318,20 @@ function _pmDueFillTemplate(tpl, r){
 
 function _pmDueLogSend(rows, message){
   try {
-    fetch('/api/message-log', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
-      body: JSON.stringify({ kind: 'due_reminder', rows: rows, message: message })
-    }).catch(function(){});
+    for (var i=0;i<rows.length;i++){
+      var r = rows[i];
+      fetch('/api/payment-messages', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({
+          student_id:         r.student_id,
+          student_name:       r.name || '',
+          installment_number: r.n,
+          message_type:       'due_reminder'
+        })
+      }).catch(function(){});
+    }
   } catch(e){}
 }
 
@@ -6274,12 +6343,16 @@ function _pmDueSendOne(i){
   var msg = _pmDueFillTemplate(tpl, r);
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
   _pmDueLogSend([{ student_id: r.student_id, name: r.name, group: r.group, n: r.n }], msg);
+  r.last_sent_at = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
+  r.last_sent_by = 'الآن';
+  _pmDueRender();
 }
 
 function _pmDueSendBatch(rows){
   if (!rows.length){ _pmToast('لا يوجد طلاب للإرسال', 'warn'); return; }
   var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
   var sent = 0, skipped = 0, logged = [];
+  var nowStr = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
   for (var i=0;i<rows.length;i++){
     var r = rows[i];
     var phone = _pmDueCleanPhone(r.whatsapp);
@@ -6287,12 +6360,15 @@ function _pmDueSendBatch(rows){
     var msg = _pmDueFillTemplate(tpl, r);
     window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     logged.push({ student_id: r.student_id, name: r.name, group: r.group, n: r.n });
+    r.last_sent_at = nowStr;
+    r.last_sent_by = 'الآن';
     sent++;
   }
   if (logged.length) _pmDueLogSend(logged, '(template)');
   var msgOut = 'تم فتح ' + sent + ' محادثة';
   if (skipped) msgOut += ' ، تخطي ' + skipped + ' (بدون رقم)';
   _pmToast(msgOut, skipped ? 'warn' : 'success');
+  _pmDueRender();
 }
 
 function _pmDueSendSelected(){
@@ -17117,6 +17193,24 @@ def _payment_compute_plan(db, sid):
     except Exception:
         pass
 
+    # Last reminder sent per installment for this student. Newest row wins.
+    last_msg = {}
+    try:
+        for r in db.execute(
+            "SELECT installment_number, sent_at, sent_by FROM payment_messages "
+            "WHERE student_id=? AND installment_number IS NOT NULL "
+            "ORDER BY sent_at DESC",
+            (sid,),
+        ).fetchall():
+            try:
+                k = int(r[0])
+            except Exception:
+                continue
+            if k not in last_msg:
+                last_msg[k] = (str(r[1] or ''), str(r[2] or ''))
+    except Exception:
+        pass
+
     installments = []
     course_amount = 0.0
     has_exempt = False
@@ -17145,6 +17239,7 @@ def _payment_compute_plan(db, sid):
                 paid = float(pl_val)
             else:
                 paid = paid_sp.get(n, 0.0)
+            _msg = last_msg.get(n) or ('', '')
             installments.append({
                 "n":         n,
                 "amount":    amt,
@@ -17154,6 +17249,8 @@ def _payment_compute_plan(db, sid):
                 "status":    inst_status,
                 "token":     paid_token,
                 "source":    'payment_log' if pl_val is not None else 'student_payments',
+                "last_msg_sent_at": _msg[0],
+                "last_msg_sent_by": _msg[1],
             })
             course_amount += amt
     # Per spec: prefer the persisted columns on payment_log when they
@@ -17543,6 +17640,79 @@ def api_payment_student_edit(sid):
     return jsonify(new_plan)
 
 
+@app.route('/api/payment-messages', methods=['POST'])
+@login_required
+def api_payment_messages_add():
+    """Log a payment-reminder send. Body:
+       {student_id?, student_name, installment_number, message_type?}.
+       sent_by is auto-filled from the session user."""
+    d = request.get_json() or {}
+    user = session.get('user') or {}
+    try:
+        sid = int(d.get('student_id') or 0) or None
+    except Exception:
+        sid = None
+    try:
+        n = int(d.get('installment_number') or 0) or None
+    except Exception:
+        n = None
+    sname = (d.get('student_name') or '').strip()
+    mtype = (d.get('message_type') or 'due_reminder').strip()
+    sender = (user.get('username') or 'admin').strip()
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO payment_messages(student_id, student_name, "
+            "installment_number, message_type, sent_by) VALUES(?,?,?,?,?)",
+            (sid, sname, n, mtype, sender),
+        )
+        db.commit()
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return jsonify({"ok": True, "id": new_id})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/payment-messages', methods=['GET'])
+@login_required
+def api_payment_messages_list():
+    """List recent payment-reminder sends. Optional filter by student_id.
+       Returns newest first, capped at 500 rows."""
+    db = get_db()
+    try:
+        sid = int(request.args.get('student_id') or 0) or None
+    except Exception:
+        sid = None
+    try:
+        if sid:
+            rows = db.execute(
+                "SELECT id, student_id, student_name, installment_number, "
+                "message_type, sent_by, sent_at FROM payment_messages "
+                "WHERE student_id=? ORDER BY sent_at DESC LIMIT 500",
+                (sid,),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT id, student_id, student_name, installment_number, "
+                "message_type, sent_by, sent_at FROM payment_messages "
+                "ORDER BY sent_at DESC LIMIT 500"
+            ).fetchall()
+        out = []
+        for r in rows:
+            out.append({
+                "id":                  r[0],
+                "student_id":          r[1],
+                "student_name":        r[2] or '',
+                "installment_number":  r[3],
+                "message_type":        r[4] or '',
+                "sent_by":             r[5] or '',
+                "sent_at":             str(r[6] or ''),
+            })
+        return jsonify({"ok": True, "messages": out})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
 @app.route('/api/payment/due-reminders', methods=['GET'])
 @login_required
 def api_payment_due_reminders():
@@ -17665,6 +17835,8 @@ def api_payment_due_reminders():
                 "due_date":      inst.get("due_date") or '',
                 "due_color":     _color_for(due),
                 "course_amount": plan["plan"]["course_amount"],
+                "last_sent_at":  inst.get("last_msg_sent_at") or '',
+                "last_sent_by":  inst.get("last_msg_sent_by") or '',
             })
     return jsonify({
         "ok":     True,
