@@ -13788,6 +13788,24 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     /* Header-cell flash specifically when ✏ rename succeeds. */
     'th.mx-rename-flash{animation:mxRenameFlash .85s ease;}',
     '@keyframes mxRenameFlash{0%,100%{background:inherit;}40%{background:rgba(46,125,50,.45);}}',
+    /* Cell flash highlight after undo/redo affects a row. */
+    '.mx-undo-flash{animation:mxUndoFlash 1.1s ease;}',
+    '@keyframes mxUndoFlash{0%,100%{background:inherit;}30%{background:rgba(33,150,243,.45);}70%{background:rgba(33,150,243,.18);}}',
+    /* ───────── Undo / Redo toolbar buttons ───────── */
+    '.mx-undo-btn,.mx-redo-btn{padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#546E7A,#78909C);color:#fff;font-weight:700;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:filter .15s ease,opacity .15s ease,transform .15s ease;position:relative;}',
+    '.mx-undo-btn:hover:not([disabled]),.mx-redo-btn:hover:not([disabled]){filter:brightness(1.12);transform:translateY(-1px);}',
+    '.mx-undo-btn[disabled],.mx-redo-btn[disabled]{opacity:.32;cursor:not-allowed;}',
+    '.mx-undo-btn .mx-uc-count,.mx-redo-btn .mx-uc-count{background:rgba(255,255,255,.25);font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;min-width:18px;text-align:center;}',
+    '.mx-undo-btn .mx-uc-caret{font-size:10px;opacity:.85;cursor:pointer;padding:0 3px;}',
+    '.mx-undo-btn .mx-uc-caret:hover{opacity:1;}',
+    /* History panel dropdown anchored under the ↩ button. */
+    '.mx-history-panel{position:absolute;z-index:10090;background:#fff;border:1.5px solid #1976D2;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:6px;min-width:280px;max-width:380px;max-height:340px;overflow:auto;direction:rtl;font-size:13px;color:#222;}',
+    '.mx-history-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin:0 0 6px 0;padding:6px 8px 6px 8px;border-bottom:1px solid #e3f2fd;}',
+    '.mx-history-panel .mx-hp-empty{padding:20px;text-align:center;color:#90a4ae;font-weight:700;}',
+    '.mx-history-panel button.mx-hp-item{display:block;width:100%;text-align:right;background:transparent;border:none;color:#222;padding:8px 10px;border-radius:6px;font-weight:600;font-size:12.5px;cursor:pointer;line-height:1.4;}',
+    '.mx-history-panel button.mx-hp-item:hover{background:#e3f2fd;color:#0d47a1;}',
+    '.mx-history-panel button.mx-hp-item .mx-hp-num{display:inline-block;width:22px;color:#1565C0;font-weight:800;}',
+    '.mx-history-panel button.mx-hp-item .mx-hp-when{display:inline-block;float:left;color:#90a4ae;font-size:11px;font-weight:600;}',
     '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
     '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
     '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
@@ -15369,6 +15387,539 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     });
   }
 
+  /* ==================================================================
+   * Undo / Redo manager
+   * ----------------------------------------------------------------
+   * Per-table-key history, capped at 50 entries. Each action is
+   *   { kind, desc, tid, ts, undo:fn(), redo:fn() }
+   * where undo() and redo() each return Promise<action> (the inverse
+   * action that should be pushed onto the OTHER stack). On a fresh
+   * recording, the future stack is wiped — standard linear-history.
+   * History lives in browser memory only; reload clears it (per spec).
+   *
+   * Actions are recorded by hooking into known mutation endpoints via
+   * a fetch wrapper so every mutation, regardless of which UI surface
+   * triggered it (inline controls, UTEM modal, page-level buttons),
+   * lands in the same stack. Operations the system can't safely
+   * reverse (column delete = data loss, import = bulk inserts with
+   * unknown ids) are still recorded so the user can see them in the
+   * history panel; their undo() shows a friendly "غير قابل للتراجع"
+   * toast instead of silently doing nothing.
+   * ================================================================ */
+  var _MX_UNDO = {};
+  var _MX_UNDO_LIMIT = 50;
+  var _MX_UNDO_SUSPEND = 0;        // > 0 disables recording (used during undo/redo execution)
+  function _mxIsRecording(){ return _MX_UNDO_SUSPEND === 0; }
+  function _mxSuspendRecording(fn){
+    _MX_UNDO_SUSPEND++;
+    var p = Promise.resolve();
+    try { p = Promise.resolve(fn()); } catch(e){ _MX_UNDO_SUSPEND--; throw e; }
+    return p.then(
+      function(v){ _MX_UNDO_SUSPEND--; return v; },
+      function(e){ _MX_UNDO_SUSPEND--; throw e; }
+    );
+  }
+  function _mxUndoState(tid){
+    if (!tid) tid = '__global__';
+    if (!_MX_UNDO[tid]) _MX_UNDO[tid] = {past:[], future:[]};
+    return _MX_UNDO[tid];
+  }
+  function _mxRecord(action){
+    if (!action || !_mxIsRecording()) return;
+    var tid = action.tid || '__global__';
+    var s = _mxUndoState(tid);
+    action.ts = Date.now();
+    s.past.push(action);
+    while (s.past.length > _MX_UNDO_LIMIT) s.past.shift();
+    s.future = [];
+    _mxUpdateUndoUI(tid);
+  }
+  function _mxRelTime(ts){
+    var sec = Math.max(1, Math.round((Date.now() - ts) / 1000));
+    if (sec < 60) return 'الآن';
+    var m = Math.round(sec / 60);
+    if (m < 60) return 'منذ ' + m + ' د';
+    var h = Math.round(m / 60);
+    if (h < 24) return 'منذ ' + h + ' س';
+    return 'منذ يوم';
+  }
+
+  function _mxRunUndo(tid){
+    var s = _mxUndoState(tid);
+    if (!s.past.length) return Promise.resolve();
+    var action = s.past.pop();
+    _mxUpdateUndoUI(tid);
+    return _mxSuspendRecording(function(){
+      return Promise.resolve(action.undo()).then(function(redoAction){
+        s.future.push(redoAction || action);
+        _mxUpdateUndoUI(tid);
+        if (typeof window.mxToast === 'function')
+          window.mxToast('↩ تم التراجع عن: ' + (action.desc || ''), 'success');
+        if (action.tid) window.refreshTable(action.tid);
+        return action;
+      }).catch(function(e){
+        // Restore the action so the user can try again or see it in the panel.
+        s.past.push(action);
+        _mxUpdateUndoUI(tid);
+        if (typeof window.mxToast === 'function')
+          window.mxToast('تعذّر التراجع: ' + (e && e.message || ''), 'error');
+        throw e;
+      });
+    });
+  }
+  function _mxRunRedo(tid){
+    var s = _mxUndoState(tid);
+    if (!s.future.length) return Promise.resolve();
+    var action = s.future.pop();
+    _mxUpdateUndoUI(tid);
+    return _mxSuspendRecording(function(){
+      return Promise.resolve(action.redo()).then(function(undoAction){
+        s.past.push(undoAction || action);
+        _mxUpdateUndoUI(tid);
+        if (typeof window.mxToast === 'function')
+          window.mxToast('↪ تم التقدم: ' + (action.desc || ''), 'success');
+        if (action.tid) window.refreshTable(action.tid);
+        return action;
+      }).catch(function(e){
+        s.future.push(action);
+        _mxUpdateUndoUI(tid);
+        if (typeof window.mxToast === 'function')
+          window.mxToast('تعذّر التقدم: ' + (e && e.message || ''), 'error');
+        throw e;
+      });
+    });
+  }
+  function _mxUndoNotSupported(desc){
+    return function(){
+      if (typeof window.mxToast === 'function')
+        window.mxToast('غير قابل للتراجع تلقائياً: ' + (desc || ''), 'error');
+      return null;
+    };
+  }
+  function _mxFlashRow(tid){
+    /* Best-effort cell flash: highlight the most-recently-updated
+       row in the visible table for `tid`. Resolves the section by
+       finding any element with onclick mentioning the tid. */
+    setTimeout(function(){
+      var el = document.querySelector('[onclick*="openUniversalTableEditModal(\'' + tid + '\')"], [onclick*="openUniversalTableEditModal(\\"' + tid + '\\")"]');
+      if (!el) return;
+      var section = el.closest('.db-section, .custom-table-section');
+      if (!section) return;
+      section.querySelectorAll('tbody tr').forEach(function(tr){
+        tr.classList.add('mx-undo-flash');
+        setTimeout(function(){ tr.classList.remove('mx-undo-flash'); }, 1100);
+      });
+    }, 200);
+  }
+
+  /* ---------- Toolbar button injection ---------- */
+  function _mxBuildUndoBtns(tid){
+    var wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;gap:6px;margin-right:6px;';
+    wrap.dataset.mxUndoTid = tid;
+
+    var u = document.createElement('button');
+    u.type = 'button'; u.className = 'mx-undo-btn'; u.dataset.mxUndoTid = tid;
+    u.innerHTML = '<span>↩</span><span>تراجع</span><span class="mx-uc-count">0</span><span class="mx-uc-caret" title="السجل">▾</span>';
+    u.title = 'تراجع (Ctrl+Z)';
+    u.disabled = true;
+    u.addEventListener('click', function(ev){
+      var caret = ev.target.closest('.mx-uc-caret');
+      if (caret){ ev.stopPropagation(); _mxOpenHistoryPanel(tid, u); return; }
+      _mxRunUndo(tid).then(function(){ _mxFlashRow(tid); });
+    });
+
+    var r = document.createElement('button');
+    r.type = 'button'; r.className = 'mx-redo-btn'; r.dataset.mxUndoTid = tid;
+    r.innerHTML = '<span>↪</span><span>تقدم</span><span class="mx-uc-count">0</span>';
+    r.title = 'تقدم (Ctrl+Y)';
+    r.disabled = true;
+    r.addEventListener('click', function(){
+      _mxRunRedo(tid).then(function(){ _mxFlashRow(tid); });
+    });
+
+    wrap.appendChild(u); wrap.appendChild(r);
+    return wrap;
+  }
+  function _mxUpdateUndoUI(tid){
+    var s = _mxUndoState(tid);
+    var btns = document.querySelectorAll('[data-mx-undo-tid="' + (tid || '__global__').replace(/"/g, '\\"') + '"]');
+    btns.forEach(function(b){
+      if (b.classList.contains('mx-undo-btn')){
+        b.disabled = !s.past.length;
+        var c = b.querySelector('.mx-uc-count'); if (c) c.textContent = s.past.length;
+        var last = s.past.length ? s.past[s.past.length-1] : null;
+        b.title = last ? ('تراجع: ' + last.desc + '  (Ctrl+Z)') : 'تراجع (Ctrl+Z)';
+      } else if (b.classList.contains('mx-redo-btn')){
+        b.disabled = !s.future.length;
+        var c2 = b.querySelector('.mx-uc-count'); if (c2) c2.textContent = s.future.length;
+        var fut = s.future.length ? s.future[s.future.length-1] : null;
+        b.title = fut ? ('تقدم: ' + fut.desc + '  (Ctrl+Y)') : 'تقدم (Ctrl+Y)';
+      }
+    });
+  }
+  function _mxOpenHistoryPanel(tid, anchorBtn){
+    _mxClosePopups();
+    var s = _mxUndoState(tid);
+    var panel = document.createElement('div');
+    panel.className = 'mx-history-panel';
+    panel.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    var html = '<h4>السجل (آخر ' + Math.min(10, s.past.length) + ')</h4>';
+    if (!s.past.length){
+      html += '<div class="mx-hp-empty">لا توجد إجراءات بعد</div>';
+    } else {
+      var slice = s.past.slice(-10).reverse();
+      slice.forEach(function(a, i){
+        html += '<button type="button" class="mx-hp-item" data-back="' + (i + 1) + '">' +
+          '<span class="mx-hp-num">' + (i + 1) + '.</span>' +
+          '<span>' + _mxEsc(a.desc || '(بدون وصف)') + '</span>' +
+          '<span class="mx-hp-when">' + _mxRelTime(a.ts) + '</span>' +
+          '</button>';
+      });
+    }
+    panel.innerHTML = html;
+    _mxAnchorBelow(panel, anchorBtn);
+    _mxOpenPopup = panel;
+    panel.querySelectorAll('.mx-hp-item').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var n = parseInt(btn.dataset.back, 10) || 0;
+        _mxClosePopups();
+        /* Run undo n times sequentially. */
+        var p = Promise.resolve();
+        for (var i=0; i<n; i++){
+          p = p.then(function(){ return _mxRunUndo(tid); });
+        }
+        p.then(function(){ _mxFlashRow(tid); });
+      });
+    });
+  }
+  function _mxInjectUndoButtons(){
+    /* Find every section that exposes openUniversalTableEditModal and
+       inject ↩/↪ buttons next to it. Idempotent: skips sections that
+       already carry the wrap. */
+    var anchors = document.querySelectorAll('[onclick*="openUniversalTableEditModal"]');
+    anchors.forEach(function(el){
+      var m = (el.getAttribute('onclick') || '').match(/openUniversalTableEditModal\(['"]([^'"]+)['"]\)/);
+      if (!m) return;
+      var tid = m[1];
+      var section = el.closest('.db-section, .custom-table-section');
+      if (!section) return;
+      if (section.querySelector('[data-mx-undo-tid="' + tid + '"]')) return;
+      var wrap = _mxBuildUndoBtns(tid);
+      el.parentNode.insertBefore(wrap, el);
+      _mxUpdateUndoUI(tid);
+    });
+  }
+
+  /* ---------- Keyboard shortcuts ---------- */
+  function _mxResolveActiveTid(){
+    /* Prefer the section containing document.activeElement; fall back
+       to the section currently hovered, then the first visible
+       db-section/custom-table-section on the page. */
+    var ae = document.activeElement;
+    var section = ae && ae.closest && ae.closest('.db-section, .custom-table-section');
+    if (!section){
+      section = document.querySelector('.db-section:not([style*="display:none"]), .custom-table-section:not([style*="display:none"])');
+    }
+    if (!section) return null;
+    var btn = section.querySelector('[data-mx-undo-tid]');
+    return btn ? btn.dataset.mxUndoTid : null;
+  }
+  document.addEventListener('keydown', function(ev){
+    var ctrl = ev.ctrlKey || ev.metaKey;
+    if (!ctrl) return;
+    /* Skip if user is typing in a normal text input — Ctrl+Z there
+       should still work for that input's own undo. The exception is
+       contenteditable cells (.editable) — those are table cell edits
+       and the user expects table-level undo there. */
+    var ae = document.activeElement;
+    if (ae){
+      if (ae.tagName === 'INPUT' && ae.type !== 'checkbox' && ae.type !== 'radio') return;
+      if (ae.tagName === 'TEXTAREA') return;
+    }
+    var key = (ev.key || '').toLowerCase();
+    if (key === 'z' && !ev.shiftKey){
+      var tid = _mxResolveActiveTid();
+      if (!tid) return;
+      ev.preventDefault();
+      _mxRunUndo(tid).then(function(){ _mxFlashRow(tid); });
+    } else if (key === 'y' || (key === 'z' && ev.shiftKey)){
+      var tid2 = _mxResolveActiveTid();
+      if (!tid2) return;
+      ev.preventDefault();
+      _mxRunRedo(tid2).then(function(){ _mxFlashRow(tid2); });
+    }
+  });
+
+  /* ==================================================================
+   * Fetch interception — recognises the project's mutation endpoints
+   * and records reversible actions. The wrapper transparently passes
+   * every request through; only POSTs/PATCH/PUT/DELETE on known URL
+   * patterns become recorded actions.
+   * ================================================================ */
+  var _mxOrigFetch = window.fetch.bind(window);
+  function _mxParseTbl(url){
+    /* Returns {kind, tid, ...} for known endpoints; null otherwise. */
+    var u = String(url);
+    var m;
+    m = u.match(/^\/api\/custom-table\/([^\/?#]+)\/(reorder-columns|rename-column|column-type|add-column)(?:[?#].*)?$/);
+    if (m) return {kind: m[2], tid: decodeURIComponent(m[1])};
+    m = u.match(/^\/api\/custom-table\/([^\/?#]+)\/delete-column\/([^\/?#]+)(?:[?#].*)?$/);
+    if (m) return {kind: 'delete-column', tid: decodeURIComponent(m[1]), col: decodeURIComponent(m[2])};
+    /* Built-in row endpoints: /api/<table>/<id> with PUT or DELETE. */
+    m = u.match(/^\/api\/(students|student_groups|groups|attendance|taqseet|evaluations|payment_log|paylog)\/(\d+)(?:[?#].*)?$/);
+    if (m){
+      var t = m[1] === 'groups' ? 'student_groups' : (m[1] === 'paylog' ? 'payment_log' : m[1]);
+      return {kind: 'row-edit', tid: t, row_id: parseInt(m[2], 10)};
+    }
+    /* /api/import is the bulk Excel path. */
+    if (/^\/api\/import(?:[?#]|$)/.test(u)) return {kind: 'import'};
+    return null;
+  }
+  function _mxReadJsonBody(opts){
+    if (!opts || !opts.body) return null;
+    try { return JSON.parse(opts.body); } catch(e){ return null; }
+  }
+
+  window.fetch = function(url, opts){
+    opts = opts || {};
+    var method = (opts.method || 'GET').toUpperCase();
+    if (method === 'GET' || method === 'HEAD' || !_mxIsRecording()){
+      return _mxOrigFetch(url, opts);
+    }
+    var meta = _mxParseTbl(url);
+    if (!meta) return _mxOrigFetch(url, opts);
+    var body = _mxReadJsonBody(opts);
+    var prePromise = Promise.resolve(null);
+
+    /* Capture pre-state for the ops that need it. */
+    if (meta.kind === 'row-edit' && method === 'PUT'){
+      /* Cell edit — fetch current row so we can record old values. */
+      var listUrl = '/api/' + meta.tid;
+      prePromise = _mxOrigFetch(listUrl, {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var rows = Array.isArray(d) ? d : (d && d.rows) || [];
+          for (var i=0; i<rows.length; i++){ if (rows[i].id === meta.row_id) return rows[i]; }
+          return null;
+        }).catch(function(){ return null; });
+    } else if (meta.kind === 'row-edit' && method === 'DELETE'){
+      var listUrl2 = '/api/' + meta.tid;
+      prePromise = _mxOrigFetch(listUrl2, {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var rows = Array.isArray(d) ? d : (d && d.rows) || [];
+          for (var i=0; i<rows.length; i++){ if (rows[i].id === meta.row_id) return rows[i]; }
+          return null;
+        }).catch(function(){ return null; });
+    } else if (meta.kind === 'reorder-columns' && method === 'PATCH'){
+      /* The new key order is in the body; we need the OLD order. */
+      prePromise = _mxColInfoForTable(meta.tid).then(function(info){
+        return info.columns.map(function(c){ return c.col_key; });
+      });
+    } else if (meta.kind === 'rename-column' && method === 'PATCH'){
+      prePromise = _mxColInfoForTable(meta.tid).then(function(info){
+        var ck = body && body.col_key;
+        var col = ck ? info.byKey[ck] : null;
+        return col ? {col_key: ck, old_label: col.col_label, new_label: body.new_label} : null;
+      });
+    } else if (meta.kind === 'column-type' && method === 'PATCH'){
+      prePromise = _mxColInfoForTable(meta.tid).then(function(info){
+        var ck = body && body.col_key;
+        var col = ck ? info.byKey[ck] : null;
+        return col ? {col_key: ck, old_type: col.col_type, old_options: col.col_options, new_type: body.col_type, new_options: body.col_options} : null;
+      });
+    } else if (meta.kind === 'delete-column' && method === 'DELETE'){
+      /* Capture the col_label so an undo can re-create it (but data is
+         lost — the recreated column will be empty). */
+      prePromise = _mxColInfoForTable(meta.tid).then(function(info){
+        var col = info.byKey[meta.col] || null;
+        return col;
+      });
+    }
+
+    return prePromise.then(function(preState){
+      return _mxOrigFetch(url, opts).then(function(res){
+        if (!res.ok) return res;
+        /* Clone so the caller still sees a usable response. */
+        var cloned = res.clone();
+        return cloned.json().catch(function(){ return null; }).then(function(json){
+          try {
+            _mxRecordFromMeta(meta, method, body, preState, json);
+          } catch(e){ /* never break the caller */ }
+          return res;
+        });
+      });
+    });
+  };
+
+  function _mxRecordFromMeta(meta, method, body, preState, resJson){
+    /* Build an action and push it to the right stack. */
+    if (meta.kind === 'row-edit' && method === 'PUT' && preState){
+      var fields = {};
+      Object.keys(body || {}).forEach(function(k){
+        if (k === 'id') return;
+        if (preState[k] !== body[k]) fields[k] = {from: preState[k], to: body[k]};
+      });
+      if (!Object.keys(fields).length) return;
+      var fieldNames = Object.keys(fields).join(', ');
+      _mxRecord({
+        kind: 'cell-edit', tid: meta.tid,
+        desc: 'تعديل خلية: ' + fieldNames,
+        undo: function(){
+          var payload = {};
+          Object.keys(fields).forEach(function(k){ payload[k] = fields[k].from; });
+          return _mxOrigFetch('/api/' + meta.tid + '/' + meta.row_id, {
+            method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify(payload)
+          });
+        },
+        redo: function(){
+          var payload = {};
+          Object.keys(fields).forEach(function(k){ payload[k] = fields[k].to; });
+          return _mxOrigFetch('/api/' + meta.tid + '/' + meta.row_id, {
+            method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify(payload)
+          });
+        }
+      });
+    } else if (meta.kind === 'row-edit' && method === 'DELETE' && preState){
+      var rowSnap = preState;
+      _mxRecord({
+        kind: 'row-delete', tid: meta.tid,
+        desc: 'حذف صف #' + meta.row_id,
+        undo: function(){
+          /* Re-create the row. The new id will differ. */
+          var payload = {};
+          Object.keys(rowSnap).forEach(function(k){ if (k !== 'id') payload[k] = rowSnap[k]; });
+          return _mxOrigFetch('/api/' + meta.tid, {
+            method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify(payload)
+          });
+        },
+        redo: _mxUndoNotSupported('إعادة الحذف')
+      });
+    } else if (meta.kind === 'reorder-columns' && method === 'PATCH' && preState){
+      var newOrder = (body && body.columns) || [];
+      var oldOrder = preState;
+      _mxRecord({
+        kind: 'reorder', tid: meta.tid,
+        desc: 'تغيير ترتيب الأعمدة',
+        undo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/reorder-columns', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({columns: oldOrder})
+          });
+        },
+        redo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/reorder-columns', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({columns: newOrder})
+          });
+        }
+      });
+    } else if (meta.kind === 'rename-column' && method === 'PATCH' && preState){
+      var p = preState;
+      _mxRecord({
+        kind: 'rename', tid: meta.tid,
+        desc: 'تغيير اسم العمود: "' + p.old_label + '" → "' + p.new_label + '"',
+        undo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/rename-column', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_key: p.col_key, new_label: p.old_label})
+          });
+        },
+        redo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/rename-column', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_key: p.col_key, new_label: p.new_label})
+          });
+        }
+      });
+    } else if (meta.kind === 'column-type' && method === 'PATCH' && preState){
+      var pt = preState;
+      _mxRecord({
+        kind: 'col-type', tid: meta.tid,
+        desc: 'تغيير نوع العمود: ' + (pt.old_type || 'نص') + ' → ' + (pt.new_type || 'نص'),
+        undo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/column-type', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_key: pt.col_key, col_type: pt.old_type, col_options: pt.old_options})
+          });
+        },
+        redo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/column-type', {
+            method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_key: pt.col_key, col_type: pt.new_type, col_options: pt.new_options})
+          });
+        }
+      });
+    } else if (meta.kind === 'add-column' && method === 'POST'){
+      var newKey = (resJson && (resJson.col_key || (resJson.column && resJson.column.col_key))) || null;
+      var addedLabel = (body && body.col_label) || '';
+      var addedType  = (body && body.col_type) || 'نص';
+      var addedOpts  = (body && body.col_options) || '';
+      _mxRecord({
+        kind: 'add-col', tid: meta.tid,
+        desc: 'إضافة عمود: ' + addedLabel,
+        undo: function(){
+          if (!newKey){
+            return _mxUndoNotSupported('إضافة عمود — لم يُعَد المفتاح')();
+          }
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/delete-column/' + encodeURIComponent(newKey), {
+            method:'DELETE', credentials:'include'
+          });
+        },
+        redo: function(){
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/add-column', {
+            method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_label: addedLabel, col_type: addedType, col_options: addedOpts})
+          });
+        }
+      });
+    } else if (meta.kind === 'delete-column' && method === 'DELETE'){
+      var p2 = preState || {col_label: meta.col, col_type: 'نص', col_options: ''};
+      _mxRecord({
+        kind: 'del-col', tid: meta.tid,
+        desc: 'حذف عمود: ' + (p2.col_label || meta.col) + ' (البيانات لا يمكن استرجاعها)',
+        undo: function(){
+          /* Best effort — recreate the column with the same label. The
+             actual data is gone. */
+          delete _MX_COLINFO_CACHE[meta.tid];
+          return _mxOrigFetch('/api/custom-table/' + encodeURIComponent(meta.tid) + '/add-column', {
+            method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+            body: JSON.stringify({col_label: p2.col_label, col_type: p2.col_type, col_options: p2.col_options})
+          }).then(function(r){
+            if (typeof window.mxToast === 'function')
+              window.mxToast('تم إعادة إنشاء العمود — لكن البيانات السابقة فُقدت', 'error');
+            return r;
+          });
+        },
+        redo: _mxUndoNotSupported('إعادة الحذف')
+      });
+    } else if (meta.kind === 'import' && method === 'POST'){
+      /* Import is destructive to undo (would need to track every
+         inserted id). Record so the user sees it in the panel; undo
+         is a no-op with a friendly toast. */
+      var importedTbl = (body && body.table) || (resJson && resJson.table) || '';
+      var rcv = (resJson && resJson.received) || 0;
+      _mxRecord({
+        kind: 'import', tid: importedTbl || '__global__',
+        desc: 'استيراد Excel — ' + rcv + ' صف',
+        undo: _mxUndoNotSupported('استيراد Excel'),
+        redo: _mxUndoNotSupported('إعادة الاستيراد')
+      });
+    }
+  }
+
   function wireColumnFilters(){
     // Any table inside a wrapper marked .table-wrap / .att-table-wrap /
     // #taqseetWrap (or .db-section / .custom-table-section for tables
@@ -15597,6 +16148,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     wireAttendanceIntro();
     unifyConfirmText();
     wireColumnFilters();
+    _mxInjectUndoButtons();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
@@ -15633,6 +16185,7 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       if (touchedSearch) wireTableSearches();
       if (touchedConfirm) unifyConfirmText();
       if (touchedTable || touchedTbody || touchedThead) wireColumnFilters();
+      if (touchedBtn || touchedTable) _mxInjectUndoButtons();
     });
     mo.observe(document.body, { childList:true, subtree:true });
   }
