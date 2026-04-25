@@ -5681,9 +5681,24 @@ else msgStartScheduler();
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="overdue" onchange="_pmDueFltChange()"> متأخر عن الاستحقاق</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="manual" onchange="_pmDueFltChange()"> اختيار قسط محدد يدوياً</label>
       </div>
-      <div id="pm-due-manual-row" style="display:none;margin-top:10px;display:none;flex-wrap:wrap;gap:14px;">
-        <div><label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">القسط</label><select id="pm-due-n" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-weight:700;direction:rtl;"><option value="1">القسط 1</option><option value="2">القسط 2</option><option value="3">القسط 3</option><option value="4">القسط 4</option><option value="5">القسط 5</option><option value="6">القسط 6</option><option value="7">القسط 7</option><option value="8">القسط 8</option><option value="9">القسط 9</option><option value="10">القسط 10</option><option value="11">القسط 11</option><option value="12">القسط 12</option></select></div>
-        <div><label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">المجموعة</label><select id="pm-due-group" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;direction:rtl;min-width:160px;"><option value="">جميع المجموعات</option></select></div>
+      <div id="pm-due-extras" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;align-items:flex-end;">
+        <div id="pm-due-manual-row" style="display:none;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">القسط</label>
+          <select id="pm-due-n" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-weight:700;direction:rtl;min-width:120px;">
+            <option value="1">القسط 1</option><option value="2">القسط 2</option>
+            <option value="3">القسط 3</option><option value="4">القسط 4</option>
+            <option value="5">القسط 5</option><option value="6">القسط 6</option>
+            <option value="7">القسط 7</option><option value="8">القسط 8</option>
+            <option value="9">القسط 9</option><option value="10">القسط 10</option>
+            <option value="11">القسط 11</option><option value="12">القسط 12</option>
+          </select>
+        </div>
+        <div id="pm-due-group-row">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">المجموعة</label>
+          <select id="pm-due-group" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;direction:rtl;min-width:200px;">
+            <option value="">جميع المجموعات</option>
+          </select>
+        </div>
       </div>
       <div style="margin-top:12px;"><button onclick="pmDueLoad()" style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;padding:9px 20px;border-radius:9px;font-weight:800;cursor:pointer;font-size:14px;">🔍 عرض الطلاب المستهدفين</button></div>
     </div>
@@ -6081,15 +6096,15 @@ function pmCloseDueReminders(){
 function _pmDueFltChange(){
   var el = document.querySelector('input[name="pm-due-flt"]:checked');
   var f = (el && el.value) || 'today';
-  var manualBox = document.getElementById('pm-due-manual');
-  if (manualBox) manualBox.style.display = (f === 'manual') ? 'flex' : 'none';
+  var manualBox = document.getElementById('pm-due-manual-row');
+  if (manualBox) manualBox.style.display = (f === 'manual') ? 'block' : 'none';
   var daysWrap = document.getElementById('pm-due-days');
   if (daysWrap) daysWrap.disabled = (f !== 'within');
 }
 
 function _pmDueLoadManualOptions(){
   var nSel = document.getElementById('pm-due-n');
-  var gSel = document.getElementById('pm-due-grp');
+  var gSel = document.getElementById('pm-due-group');
   if (nSel && nSel.options.length === 0){
     for (var i=1;i<=12;i++){
       var op = document.createElement('option');
@@ -6099,9 +6114,10 @@ function _pmDueLoadManualOptions(){
   }
   if (gSel){
     var src = document.getElementById('pm-group');
+    var prev = gSel.value;
     gSel.innerHTML = '';
     var opAll = document.createElement('option');
-    opAll.value = ''; opAll.textContent = '— كل المجموعات —';
+    opAll.value = ''; opAll.textContent = 'جميع المجموعات';
     gSel.appendChild(opAll);
     if (src){
       for (var j=0;j<src.options.length;j++){
@@ -6112,6 +6128,7 @@ function _pmDueLoadManualOptions(){
         gSel.appendChild(op2);
       }
     }
+    if (prev) { try { gSel.value = prev; } catch(e){} }
   }
 }
 
@@ -6143,13 +6160,14 @@ function pmDueLoad(){
   var el = document.querySelector('input[name="pm-due-flt"]:checked');
   var f = (el && el.value) || 'today';
   var qs = 'filter=' + encodeURIComponent(f);
+  var grp = (document.getElementById('pm-due-group')||{}).value || '';
+  if (grp) qs += '&group=' + encodeURIComponent(grp);
   if (f === 'within'){
     var d = (document.getElementById('pm-due-days')||{}).value || '3';
     qs += '&days=' + encodeURIComponent(d);
   } else if (f === 'manual'){
     var n = (document.getElementById('pm-due-n')||{}).value || '1';
-    var g = (document.getElementById('pm-due-grp')||{}).value || '';
-    qs += '&n=' + encodeURIComponent(n) + '&group=' + encodeURIComponent(g);
+    qs += '&n=' + encodeURIComponent(n);
   }
   var res = document.getElementById('pm-due-results');
   if (res) res.innerHTML = '<div style="text-align:center;color:#666;padding:24px;">⏳ جارٍ التحميل...</div>';
