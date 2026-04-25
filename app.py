@@ -469,6 +469,21 @@ def init_db():
         filename TEXT,
         bytes_written INTEGER DEFAULT 0,
         downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    # Parent-portal receipt uploads. The parent-side page POSTs an image
+    # blob + optional note; admins triage via /admin/receipts.
+    db.execute("""CREATE TABLE IF NOT EXISTS parent_receipts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        personal_id TEXT,
+        file_data BYTEA,
+        file_mime TEXT,
+        filename TEXT,
+        note TEXT,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'قيد المراجعة',
+        reviewed_by TEXT,
+        reviewed_at DATETIME)""")
     db.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -1276,6 +1291,19 @@ if True:
         filename TEXT,
         bytes_written INTEGER DEFAULT 0,
         downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS parent_receipts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        personal_id TEXT,
+        file_data BYTEA,
+        file_mime TEXT,
+        filename TEXT,
+        note TEXT,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'قيد المراجعة',
+        reviewed_by TEXT,
+        reviewed_at DATETIME)""")
     db2.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -2207,6 +2235,266 @@ ERROR_PLACEHOLDER
 </body>
 </html>"""
 
+# ─── Public parent portal ──────────────────────────────────────────
+# A login-less, mobile-first Arabic page where a parent enters the
+# student\'s personal_id and sees attendance + payment plan + lets
+# them upload a receipt photo. Rate-limited per IP.
+PARENT_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>&#x645;&#x631;&#x643;&#x632; &#x645;&#x627;&#x64A;&#x646;&#x62F;&#x643;&#x633;</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-height:100vh;padding:14px;color:#1f2937;-webkit-tap-highlight-color:transparent;}
+.pp-card{background:#fff;border-radius:18px;padding:18px 16px;box-shadow:0 6px 24px rgba(107,63,160,.15);max-width:640px;margin:0 auto 14px;}
+.pp-hero{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:14px;}
+.pp-hero h1{font-size:1.4rem;font-weight:900;margin-bottom:6px;}
+.pp-hero p{font-size:0.95rem;opacity:.92;}
+.pp-input{width:100%;padding:14px 16px;border:2px solid #b39ddb;border-radius:12px;font-size:1.1rem;font-weight:700;text-align:center;letter-spacing:1px;direction:ltr;background:#fafafa;}
+.pp-input:focus{outline:none;border-color:#6B3FA0;background:#fff;}
+.pp-btn{width:100%;padding:14px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:12px;font-size:1.05rem;font-weight:800;cursor:pointer;margin-top:12px;box-shadow:0 4px 12px rgba(107,63,160,.3);}
+.pp-btn:active{transform:translateY(1px);}
+.pp-btn:disabled{opacity:.5;cursor:not-allowed;}
+.pp-btn-secondary{background:linear-gradient(135deg,#26A69A,#00897B);}
+.pp-error{background:#ffebee;color:#c62828;padding:12px 14px;border-radius:10px;margin-top:10px;font-weight:700;text-align:center;display:none;}
+.pp-error.show{display:block;}
+.pp-section{margin-top:14px;}
+.pp-section h2{font-size:1.05rem;font-weight:800;color:#4a148c;margin-bottom:10px;padding-bottom:8px;border-bottom:2px dashed #e0d0f8;display:flex;align-items:center;gap:8px;}
+.pp-row{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px dashed #f0f0f0;font-size:0.92rem;}
+.pp-row span:first-child{color:#666;font-weight:600;}
+.pp-row span:last-child{color:#222;font-weight:800;}
+.pp-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:6px 0;}
+.pp-stat{background:#f5f3ff;border-radius:10px;padding:10px 8px;text-align:center;}
+.pp-stat-num{font-size:1.4rem;font-weight:900;color:#6B3FA0;}
+.pp-stat-lbl{font-size:0.78rem;color:#666;margin-top:2px;}
+.pp-stat.ok .pp-stat-num{color:#2E7D32;}
+.pp-stat.bad .pp-stat-num{color:#c62828;}
+.pp-stat.warn .pp-stat-num{color:#E65100;}
+.pp-inst{background:#fff;border:1.5px solid #e0d0f8;border-radius:12px;padding:10px 12px;margin-bottom:8px;}
+.pp-inst.paid{background:#e8f5e9;border-color:#a5d6a7;}
+.pp-inst.partial{background:#fff8e1;border-color:#ffd54f;}
+.pp-inst.unpaid{background:#ffebee;border-color:#ef9a9a;}
+.pp-inst.exempt{background:#e3f2fd;border-color:#90caf9;}
+.pp-inst-head{font-weight:800;color:#37474F;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.pp-inst-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:4px 12px;font-size:0.85rem;color:#444;}
+.pp-totals{background:linear-gradient(135deg,#f3e5f5,#ede7f6);border-radius:12px;padding:12px;margin-top:8px;}
+.pp-totals .pp-row{border-bottom-color:#d1c4e9;}
+.pp-empty{padding:14px;background:#fff3e0;border:1.5px solid #ffb74d;border-radius:10px;color:#bf360c;font-weight:700;text-align:center;font-size:0.9rem;}
+.pp-info{padding:14px;background:#f8f9fa;border-radius:10px;color:#888;font-weight:600;text-align:center;font-size:0.9rem;}
+.pp-upload-zone{border:2px dashed #8B5CC8;border-radius:12px;padding:18px 14px;text-align:center;background:#fafafa;cursor:pointer;transition:background .15s;}
+.pp-upload-zone:hover{background:#f5f3ff;}
+.pp-upload-zone.has-file{border-color:#2E7D32;background:#e8f5e9;}
+.pp-upload-zone input[type=file]{display:none;}
+.pp-upload-icon{font-size:2.6rem;margin-bottom:6px;}
+.pp-upload-hint{color:#666;font-size:0.85rem;font-weight:600;}
+.pp-preview{max-width:100%;max-height:240px;border-radius:10px;margin-top:10px;display:none;}
+.pp-preview.show{display:block;margin-left:auto;margin-right:auto;}
+.pp-textarea{width:100%;padding:10px 12px;border:1.5px solid #b39ddb;border-radius:10px;font-size:0.95rem;font-family:inherit;direction:rtl;resize:vertical;min-height:70px;margin-top:10px;background:#fafafa;}
+.pp-textarea:focus{outline:none;border-color:#6B3FA0;background:#fff;}
+.pp-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2E7D32;color:#fff;padding:12px 22px;border-radius:30px;font-weight:700;font-size:0.95rem;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .2s,transform .2s;z-index:999;pointer-events:none;}
+.pp-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.pp-toast.error{background:#c62828;}
+.pp-status-pill{padding:3px 10px;border-radius:999px;font-size:0.78rem;font-weight:800;}
+.pp-status-pill.paid{background:#e8f5e9;color:#1b5e20;}
+.pp-status-pill.partial{background:#fff8e1;color:#e65100;}
+.pp-status-pill.unpaid{background:#ffebee;color:#c62828;}
+.pp-status-pill.exempt{background:#e3f2fd;color:#0d47a1;}
+@media(max-width:480px){
+  .pp-hero h1{font-size:1.2rem;}
+  .pp-hero{padding:18px 14px;}
+  .pp-card{padding:14px 12px;border-radius:14px;}
+}
+</style>
+</head>
+<body>
+<div class="pp-hero">
+  <h1>&#x1F393; &#x645;&#x631;&#x643;&#x632; &#x645;&#x627;&#x64A;&#x646;&#x62F;&#x643;&#x633; &#x644;&#x644;&#x62A;&#x639;&#x644;&#x64A;&#x645; &#x648;&#x627;&#x644;&#x62A;&#x62F;&#x631;&#x64A;&#x628;</h1>
+  <p>&#x628;&#x648;&#x627;&#x628;&#x629; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</p>
+</div>
+
+<div class="pp-card" id="pp-lookup-card">
+  <h2 style="font-size:1.05rem;font-weight:800;color:#4a148c;margin-bottom:10px;text-align:center;">&#x1F50D; &#x627;&#x644;&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</h2>
+  <input id="pp-pid" class="pp-input" type="text" inputmode="numeric" autocomplete="off" placeholder="&#x623;&#x62F;&#x62E;&#x644; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A; &#x644;&#x644;&#x637;&#x627;&#x644;&#x628;">
+  <button class="pp-btn" id="pp-go" onclick="ppLookup()">&#x1F50D; &#x639;&#x631;&#x636; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</button>
+  <div class="pp-error" id="pp-err"></div>
+</div>
+
+<div id="pp-content" style="display:none;">
+  <div class="pp-card pp-section">
+    <h2>&#x1F464; &#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</h2>
+    <div id="pp-info-rows"></div>
+  </div>
+  <div class="pp-card pp-section">
+    <h2>&#x1F4C5; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</h2>
+    <div id="pp-att-grid"></div>
+  </div>
+  <div class="pp-card pp-section">
+    <h2>&#x1F4B0; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</h2>
+    <div id="pp-pay"></div>
+  </div>
+  <div class="pp-card pp-section">
+    <h2>&#x1F4CE; &#x631;&#x641;&#x639; &#x625;&#x64A;&#x635;&#x627;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</h2>
+    <label class="pp-upload-zone" id="pp-upload-zone">
+      <input type="file" id="pp-file" accept="image/*" capture="environment" onchange="ppFileChange(this)">
+      <div class="pp-upload-icon">&#x1F4F7;</div>
+      <div class="pp-upload-hint">&#x627;&#x636;&#x63A;&#x637; &#x644;&#x627;&#x644;&#x62A;&#x642;&#x627;&#x637; &#x635;&#x648;&#x631;&#x629; &#x623;&#x648; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div>
+    </label>
+    <img id="pp-preview" class="pp-preview" alt="">
+    <textarea id="pp-note" class="pp-textarea" placeholder="&#x645;&#x644;&#x627;&#x62D;&#x638;&#x629; (&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631;&#x64A;): &#x631;&#x642;&#x645; &#x627;&#x644;&#x642;&#x633;&#x637;&#x60C; &#x627;&#x644;&#x645;&#x628;&#x644;&#x63A;&#x60C; &#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x62F;&#x641;&#x639;..."></textarea>
+    <button class="pp-btn pp-btn-secondary" id="pp-send-btn" onclick="ppUpload()" disabled>&#x1F4E4; &#x625;&#x631;&#x633;&#x627;&#x644;</button>
+  </div>
+</div>
+
+<div id="pp-toast" class="pp-toast"></div>
+
+<script>
+var _ppStudent = null;
+function _ppToast(msg, kind){
+  var t = document.getElementById('pp-toast');
+  t.className = 'pp-toast' + (kind === 'error' ? ' error' : '');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 4500);
+}
+function _ppErr(msg){
+  var e = document.getElementById('pp-err');
+  e.textContent = msg; e.classList.add('show');
+  setTimeout(function(){ e.classList.remove('show'); }, 6000);
+}
+function _ppFmt(v){ return (v == null || v === '') ? '—' : String(v); }
+function _ppEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+function ppLookup(){
+  var pid = (document.getElementById('pp-pid').value || '').trim();
+  if (!pid){ _ppErr('أدخل الرقم الشخصي'); return; }
+  var btn = document.getElementById('pp-go');
+  btn.disabled = true; var prev = btn.innerHTML;
+  btn.innerHTML = '⏳ جاري البحث...';
+  fetch('/api/parent/lookup', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({personal_id: pid})})
+    .then(function(r){ return r.json().then(function(d){return {status:r.status, data:d};}); })
+    .then(function(o){
+      btn.disabled = false; btn.innerHTML = prev;
+      if (o.status === 429){ _ppErr('تم تجاوز الحد الأعلى للمحاولات. الرجاء المحاولة بعد ساعة.'); return; }
+      if (!o.data.ok){ _ppErr(o.data.error || 'الرقم الشخصي غير صحيح'); return; }
+      _ppRender(o.data);
+    })
+    .catch(function(){ btn.disabled = false; btn.innerHTML = prev; _ppErr('خطأ في الاتصال'); });
+}
+function _ppRender(d){
+  _ppStudent = d.student;
+  var s = d.student || {};
+  var att = d.attendance || {};
+  var pd = d.payment || {};
+  /* Student info */
+  var info = '';
+  function _row(lbl, val){
+    return '<div class="pp-row"><span>' + lbl + '</span><span>' + _ppEsc(_ppFmt(val)) + '</span></div>';
+  }
+  info += _row('اسم الطالب', s.student_name);
+  info += _row('الرقم الشخصي', s.personal_id);
+  info += _row('المجموعة', s.group_name_student || s.group_online);
+  info += _row('الصف', s.class_name);
+  document.getElementById('pp-info-rows').innerHTML = info;
+  /* Attendance */
+  var a = '<div class="pp-stat-grid">';
+  a += '<div class="pp-stat"><div class="pp-stat-num">' + (att.total||0) + '</div><div class="pp-stat-lbl">إجمالي الحصص</div></div>';
+  a += '<div class="pp-stat ok"><div class="pp-stat-num">' + (att.present||0) + '</div><div class="pp-stat-lbl">حضور</div></div>';
+  a += '<div class="pp-stat bad"><div class="pp-stat-num">' + (att.absent||0) + '</div><div class="pp-stat-lbl">غياب</div></div>';
+  a += '<div class="pp-stat warn"><div class="pp-stat-num">' + (att.late||0) + '</div><div class="pp-stat-lbl">تأخير</div></div>';
+  a += '</div>';
+  a += '<div class="pp-row" style="margin-top:8px;"><span>نسبة الحضور</span><span style="color:#2E7D32;">' + (att.present_rate||0) + '%</span></div>';
+  document.getElementById('pp-att-grid').innerHTML = a;
+  /* Payment plan */
+  var p = '';
+  if (!pd.has_plan){
+    p = '<div class="pp-empty">لم يتم تحديد طريقة تقسيط لهذا الطالب</div>';
+  } else {
+    p += '<div style="background:#fff;border:1.5px solid #e0d0f8;border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
+    p += _row('طريقة التقسيط', 'طريقة ' + (pd.method || pd.method_id || '—'));
+    p += _row('مبلغ الدورة', (pd.course_amount || 0) + ' د');
+    p += _row('عدد الأقساط', pd.num_installments || 0);
+    p += '</div>';
+    (pd.installments || []).forEach(function(i){
+      var st = i.status_label || 'unpaid';
+      var ic = (st === 'paid') ? '✅' : (st === 'partial') ? '🟡' : (st === 'exempt') ? '🔵' : '🔴';
+      p += '<div class="pp-inst ' + st + '">';
+      p += '<div class="pp-inst-head"><span>القسط ' + i.n + '</span><span>' + ic + '</span></div>';
+      p += '<div class="pp-inst-grid">';
+      p += '<div>المستحق: <b style="color:#1565C0;">' + (i.amount||0) + ' د</b></div>';
+      p += '<div>التاريخ: <b>' + _ppEsc(_ppFmt(i.due_date)) + '</b></div>';
+      p += '<div>المدفوع: <b style="color:#2E7D32;">' + (i.paid||0) + ' د</b></div>';
+      p += '<div>المتبقي: <b style="color:' + (((i.remaining||0) > 0) ? '#c62828' : '#2E7D32') + ';">' + (i.remaining||0) + ' د</b></div>';
+      p += '</div></div>';
+    });
+    p += '<div class="pp-totals">';
+    p += _row('المبلغ المدفوع', (pd.total_paid||0) + ' د');
+    p += _row('المبلغ المتبقي', (pd.total_remaining||0) + ' د');
+    p += '</div>';
+  }
+  document.getElementById('pp-pay').innerHTML = p;
+  document.getElementById('pp-content').style.display = 'block';
+  /* Smooth scroll to results. */
+  setTimeout(function(){ document.getElementById('pp-content').scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
+}
+function ppFileChange(inp){
+  var f = inp.files && inp.files[0]; var btn = document.getElementById('pp-send-btn');
+  var prev = document.getElementById('pp-preview');
+  var zone = document.getElementById('pp-upload-zone');
+  if (!f){ btn.disabled = true; prev.classList.remove('show'); zone.classList.remove('has-file'); return; }
+  if (f.size > 5 * 1024 * 1024){ _ppToast('الملف أكبر من 5 ميغابايت', 'error'); inp.value = ''; return; }
+  zone.classList.add('has-file');
+  if (/^image\//.test(f.type)){
+    var rd = new FileReader(); rd.onload = function(e){ prev.src = e.target.result; prev.classList.add('show'); }; rd.readAsDataURL(f);
+  }
+  btn.disabled = false;
+}
+function ppUpload(){
+  if (!_ppStudent){ _ppToast('ابحث عن الطالب أولاً', 'error'); return; }
+  var f = document.getElementById('pp-file').files[0]; if (!f) return;
+  var note = document.getElementById('pp-note').value || '';
+  var btn = document.getElementById('pp-send-btn'); var prev = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ جاري الرفع...';
+  var fd = new FormData();
+  fd.append('student_id', _ppStudent.id);
+  fd.append('student_name', _ppStudent.student_name || '');
+  fd.append('personal_id', _ppStudent.personal_id || '');
+  fd.append('note', note);
+  fd.append('file', f);
+  fetch('/api/parent/upload-receipt', {method:'POST', body:fd})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      btn.disabled = false; btn.innerHTML = prev;
+      if (d.ok){
+        _ppToast('✅ تم إرسال الإيصال بنجاح — سيتم مراجعته قريباً');
+        document.getElementById('pp-file').value = '';
+        document.getElementById('pp-note').value = '';
+        document.getElementById('pp-preview').classList.remove('show');
+        document.getElementById('pp-upload-zone').classList.remove('has-file');
+        btn.disabled = true;
+      } else {
+        _ppToast(d.error || 'خطأ في الرفع', 'error');
+      }
+    })
+    .catch(function(){ btn.disabled = false; btn.innerHTML = prev; _ppToast('خطأ في الاتصال', 'error'); });
+}
+/* Auto-trigger lookup if ?id=PERSONAL_ID was passed. */
+(function(){
+  var m = (location.search || '').match(/[?&]id=([^&]+)/);
+  if (m){
+    document.getElementById('pp-pid').value = decodeURIComponent(m[1]);
+    setTimeout(ppLookup, 100);
+  }
+  document.getElementById('pp-pid').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') ppLookup();
+  });
+})();
+</script>
+</body>
+</html>"""
+
 HOME_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -2424,8 +2712,43 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
       <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
+    <a class="dh-action-card" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
+      <div class="dh-action-icon">&#x1F4CE;</div>
+      <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
+      <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x641;&#x639; &#x627;&#x644;&#x645;&#x631;&#x641;&#x648;&#x639;&#x629;</div>
+    </a>
+    <button type="button" class="dh-action-card" onclick="dhCopyParentLink()" style="background:linear-gradient(135deg,#00897B,#26A69A);">
+      <div class="dh-action-icon">&#x1F517;</div>
+      <div class="dh-action-title">&#x646;&#x633;&#x62E; &#x631;&#x627;&#x628;&#x637; &#x628;&#x648;&#x627;&#x628;&#x629; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</div>
+      <div class="dh-action-desc">&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x631;&#x627;&#x628;&#x637; /parent &#x645;&#x639; &#x627;&#x644;&#x623;&#x647;&#x627;&#x644;&#x64A;</div>
+    </button>
   </div>
 </div>
+<script>
+/* Pending-receipts badge: poll /api/admin/receipts/count once on load
+   so the dashboard reflects how much triage is waiting. */
+(function(){
+  fetch('/api/admin/receipts/count', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.pending > 0){
+        var b = document.getElementById('dh-receipts-badge');
+        if (b){ b.textContent = d.pending; b.style.display = 'inline-block'; }
+      }
+    }).catch(function(){});
+})();
+function dhCopyParentLink(){
+  var url = location.protocol + '//' + location.host + '/parent';
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      if (typeof window.mxToast === 'function') window.mxToast('تم نسخ الرابط: ' + url, 'success');
+      else alert('تم نسخ الرابط:\\n' + url);
+    }, function(){ window.prompt('انسخ الرابط يدوياً:', url); });
+  } else {
+    window.prompt('انسخ الرابط يدوياً:', url);
+  }
+}
+</script>
 
 <div id="sr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;">
   <div style="background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
@@ -9779,6 +10102,407 @@ def attendance():
 @login_required
 def database():
     return DATABASE_HTML
+
+
+# ─── Parent portal (public, no login) ──────────────────────────────
+# Rate-limit: 10 lookups per IP per hour. The store is process-local
+# so under multi-worker gunicorn each worker tracks its own counter
+# (acceptable for soft limiting; harden with Redis if abuse seen).
+import threading as _threading
+_PARENT_RATE = {}        # ip -> [timestamps]
+_PARENT_RATE_LOCK = _threading.Lock()
+_PARENT_RATE_WINDOW = 3600
+_PARENT_RATE_MAX = 10
+
+def _parent_rate_check(ip):
+    import time as _time
+    now = _time.time()
+    with _PARENT_RATE_LOCK:
+        hits = _PARENT_RATE.get(ip, [])
+        hits = [t for t in hits if now - t < _PARENT_RATE_WINDOW]
+        if len(hits) >= _PARENT_RATE_MAX:
+            _PARENT_RATE[ip] = hits
+            return False
+        hits.append(now)
+        _PARENT_RATE[ip] = hits
+        return True
+
+@app.route("/parent")
+def parent_portal():
+    return PARENT_HTML
+
+@app.route("/api/parent/lookup", methods=["POST"])
+def api_parent_lookup():
+    """Public — validates personal_id, returns student info,
+    attendance summary, and payment plan. Rate-limited per IP."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '0').split(',')[0].strip()
+    if not _parent_rate_check(ip):
+        return jsonify({"ok": False, "error": "تم تجاوز الحد الأعلى للمحاولات. الرجاء المحاولة لاحقاً."}), 429
+    d = request.get_json() or {}
+    pid = (d.get('personal_id') or '').strip()
+    if not pid:
+        return jsonify({"ok": False, "error": "أدخل الرقم الشخصي"}), 400
+    db = get_db()
+    student = db.execute(
+        "SELECT * FROM students WHERE TRIM(personal_id)=? LIMIT 1", (pid,)
+    ).fetchone()
+    if not student:
+        return jsonify({"ok": False, "error": "الرقم الشخصي غير صحيح"}), 404
+    s = dict(student)
+    sid = s["id"]
+    # Attendance summary by student_name (matches existing flow).
+    sname = s.get("student_name") or ""
+    att_rows = db.execute(
+        "SELECT status FROM attendance WHERE student_name=?", (sname,)
+    ).fetchall() if sname else []
+    total = len(att_rows)
+    def _count(label): return sum(1 for r in att_rows if (r["status"] or "").strip() == label)
+    present = _count("حاضر"); absent = _count("غائب"); late = _count("متأخر")
+    pres_rate = round(present / total * 100, 1) if total else 0.0
+    # Payment plan + per-installment paid/remaining (reuse the helper
+    # from the متابعة الدفع feature). Filter out empty plan slots.
+    pay_payload = {"has_plan": False}
+    try:
+        plan = _payment_compute_plan(db, sid)
+        if plan and plan["plan"]["num_installments"]:
+            insts_filtered = []
+            for inst in plan["plan"]["installments"]:
+                amt = float(inst.get("amount") or 0)
+                if amt <= 0: continue
+                paid = float(inst.get("paid") or 0)
+                rem  = float(inst.get("remaining") or 0)
+                if (inst.get("status") or '') == 'exempt': lab = 'exempt'
+                elif rem <= 0.005: lab = 'paid'
+                elif paid <= 0.005: lab = 'unpaid'
+                else: lab = 'partial'
+                inst["status_label"] = lab
+                insts_filtered.append(inst)
+            pay_payload = {
+                "has_plan":        True,
+                "method":          plan["plan"]["method"],
+                "method_id":       plan["plan"]["method_id"],
+                "course_amount":   plan["plan"]["course_amount"],
+                "num_installments": plan["plan"]["num_installments"],
+                "installments":    insts_filtered,
+                "total_paid":      plan["plan"]["total_paid"],
+                "total_remaining": plan["plan"]["total_remaining"],
+                "status":          plan["plan"]["status"],
+            }
+    except Exception:
+        pass
+    # Strip sensitive fields the parent doesn\'t need to see.
+    safe_student = {
+        "id":                 s.get("id"),
+        "student_name":       s.get("student_name") or "",
+        "personal_id":        s.get("personal_id") or "",
+        "class_name":         s.get("class_name") or "",
+        "group_name_student": s.get("group_name_student") or "",
+        "group_online":       s.get("group_online") or "",
+    }
+    return jsonify({
+        "ok": True,
+        "student":    safe_student,
+        "attendance": {
+            "total": total, "present": present, "absent": absent, "late": late,
+            "present_rate": pres_rate,
+        },
+        "payment": pay_payload,
+    })
+
+# ─── Admin receipts management ─────────────────────────────────────
+ADMIN_RECEIPTS_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:100vh;padding:18px;color:#1f2937;}
+.topbar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 22px;border-radius:14px;margin-bottom:14px;box-shadow:0 6px 18px rgba(107,63,160,0.25);}
+.topbar h1{font-size:1.3rem;}
+.topbar a{color:#fff;background:rgba(255,255,255,.18);padding:7px 14px;border-radius:9px;text-decoration:none;font-weight:700;font-size:13px;}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;background:#fff;padding:8px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:14px;}
+.tab{padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13.5px;color:#555;background:#f4f4f8;border:2px solid transparent;}
+.tab.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+.tab .cnt{background:rgba(0,0,0,.15);padding:2px 8px;border-radius:999px;margin-right:6px;font-size:11.5px;}
+.tab.active .cnt{background:rgba(255,255,255,.3);}
+.list{display:grid;gap:14px;}
+.rec{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 3px 12px rgba(0,0,0,.06);display:grid;grid-template-columns:1fr 220px;gap:14px;align-items:start;}
+@media(max-width:760px){.rec{grid-template-columns:1fr;}}
+.rec-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.rec-head .name{font-weight:800;font-size:1.05rem;color:#4a148c;}
+.rec-head .pid{background:#f5f3ff;padding:3px 10px;border-radius:999px;font-size:12px;color:#6B3FA0;font-weight:700;direction:ltr;}
+.rec-head .time{color:#888;font-size:12px;margin-right:auto;}
+.rec-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}
+.rec-status.pending{background:#fff8e1;color:#e65100;}
+.rec-status.approved{background:#e8f5e9;color:#1b5e20;}
+.rec-status.rejected{background:#ffebee;color:#c62828;}
+.rec-note{background:#f8f9fa;border-radius:8px;padding:8px 12px;color:#444;font-size:0.9rem;margin-bottom:8px;white-space:pre-wrap;}
+.rec-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.rec-btn{padding:8px 14px;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;}
+.rec-btn-ok{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;}
+.rec-btn-no{background:linear-gradient(135deg,#c62828,#e53935);color:#fff;}
+.rec-btn-view{background:#1565C0;color:#fff;}
+.rec-btn:active{transform:translateY(1px);}
+.rec-img{width:100%;max-height:180px;object-fit:cover;border-radius:10px;border:1px solid #ddd;cursor:zoom-in;}
+.rec-pdf{display:flex;align-items:center;justify-content:center;height:180px;background:#f5f3ff;border-radius:10px;border:1px dashed #b39ddb;font-size:1.3rem;font-weight:700;color:#6B3FA0;}
+.empty{padding:50px 20px;text-align:center;color:#888;font-weight:700;background:#fff;border-radius:14px;}
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;}
+.lightbox.show{display:flex;}
+.lightbox img{max-width:96vw;max-height:96vh;border-radius:8px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2E7D32;color:#fff;padding:11px 22px;border-radius:30px;font-weight:700;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:.2s;z-index:10000;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.error{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>&#x1F4CE; &#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</h1>
+  <a href="/dashboard">&#x2190; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
+</div>
+<div class="tabs" id="ar-tabs">
+  <button class="tab active" data-f="pending" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-pending">0</span> &#x1F551; &#x642;&#x64A;&#x62F; &#x627;&#x644;&#x645;&#x631;&#x627;&#x62C;&#x639;&#x629;</button>
+  <button class="tab" data-f="approved" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-approved">0</span> &#x2705; &#x62A;&#x645; &#x627;&#x644;&#x62A;&#x623;&#x643;&#x64A;&#x62F;</button>
+  <button class="tab" data-f="rejected" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-rejected">0</span> &#x274C; &#x645;&#x631;&#x641;&#x648;&#x636;</button>
+  <button class="tab" data-f="all" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-all">0</span> &#x1F4CB; &#x627;&#x644;&#x643;&#x644;</button>
+</div>
+<div id="ar-list" class="list"></div>
+<div id="ar-lightbox" class="lightbox" onclick="this.classList.remove('show')"><img id="ar-lightbox-img" alt=""></div>
+<div id="ar-toast" class="toast"></div>
+<script>
+var _arData = []; var _arFilter = 'pending';
+function _arEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function _arToast(msg, kind){
+  var t = document.getElementById('ar-toast'); t.className = 'toast' + (kind==='error'?' error':'');
+  t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+function _arStatusKey(s){
+  if (s === 'تم التأكيد') return 'approved';
+  if (s === 'مرفوض') return 'rejected';
+  return 'pending';
+}
+function arLoad(){
+  fetch('/api/admin/receipts', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _arData = (d && d.receipts) || [];
+      var c = {pending:0, approved:0, rejected:0, all:_arData.length};
+      _arData.forEach(function(r){ c[_arStatusKey(r.status)] = (c[_arStatusKey(r.status)] || 0) + 1; });
+      document.getElementById('ar-cnt-pending').textContent = c.pending;
+      document.getElementById('ar-cnt-approved').textContent = c.approved;
+      document.getElementById('ar-cnt-rejected').textContent = c.rejected;
+      document.getElementById('ar-cnt-all').textContent = c.all;
+      _arRender();
+    });
+}
+function arSetFilter(btn){
+  document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+  btn.classList.add('active'); _arFilter = btn.dataset.f; _arRender();
+}
+function _arRender(){
+  var rows = (_arFilter === 'all') ? _arData : _arData.filter(function(r){ return _arStatusKey(r.status) === _arFilter; });
+  var box = document.getElementById('ar-list');
+  if (!rows.length){ box.innerHTML = '<div class="empty">لا توجد إيصالات في هذا الفلتر</div>'; return; }
+  box.innerHTML = rows.map(function(r){
+    var sk = _arStatusKey(r.status);
+    var img = '';
+    if ((r.file_mime || '').indexOf('image/') === 0){
+      img = '<img class="rec-img" src="/api/admin/receipts/' + r.id + '/file" onclick="document.getElementById(\\'ar-lightbox-img\\').src=this.src;document.getElementById(\\'ar-lightbox\\').classList.add(\\'show\\')">';
+    } else {
+      img = '<a href="/api/admin/receipts/' + r.id + '/file" target="_blank" class="rec-pdf">📄 عرض الملف</a>';
+    }
+    var actions = '';
+    if (sk === 'pending'){
+      actions =
+        '<button class="rec-btn rec-btn-ok" onclick="arSetStatus(' + r.id + ',\\'تم التأكيد\\')">✅ تأكيد</button>' +
+        '<button class="rec-btn rec-btn-no" onclick="arSetStatus(' + r.id + ',\\'مرفوض\\')">❌ رفض</button>';
+    } else {
+      actions = '<button class="rec-btn" style="background:#eceff1;color:#455a64;" onclick="arSetStatus(' + r.id + ',\\'قيد المراجعة\\')">↺ إعادة للمراجعة</button>';
+    }
+    return '<div class="rec">' +
+      '<div>' +
+        '<div class="rec-head">' +
+          '<span class="name">' + _arEsc(r.student_name||'—') + '</span>' +
+          '<span class="pid">' + _arEsc(r.personal_id||'—') + '</span>' +
+          '<span class="rec-status ' + sk + '">' + _arEsc(r.status||'—') + '</span>' +
+          '<span class="time">' + _arEsc(r.upload_date||'') + '</span>' +
+        '</div>' +
+        (r.note ? '<div class="rec-note">' + _arEsc(r.note) + '</div>' : '') +
+        '<div class="rec-actions">' + actions + '</div>' +
+      '</div>' +
+      '<div>' + img + '</div>' +
+    '</div>';
+  }).join('');
+}
+function arSetStatus(id, st){
+  fetch('/api/admin/receipts/' + id + '/status', {
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({status: st})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (d && d.ok){ _arToast('✅ ' + st); arLoad(); }
+    else _arToast('خطأ', 'error');
+  });
+}
+arLoad();
+</script>
+</body>
+</html>"""
+
+@app.route("/admin/receipts")
+@login_required
+def admin_receipts_page():
+    return ADMIN_RECEIPTS_HTML
+
+@app.route("/api/admin/receipts", methods=["GET"])
+@login_required
+def api_admin_receipts_list():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, student_id, student_name, personal_id, file_mime, "
+            "filename, note, upload_date, status, reviewed_by, reviewed_at "
+            "FROM parent_receipts ORDER BY upload_date DESC LIMIT 500"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = []
+    for r in rows:
+        d = dict(r)
+        # Stringify timestamps for the JSON.
+        for k in ('upload_date', 'reviewed_at'):
+            if d.get(k) is not None and not isinstance(d[k], str):
+                d[k] = str(d[k])
+        out.append(d)
+    return jsonify({"ok": True, "receipts": out})
+
+@app.route("/api/admin/receipts/count", methods=["GET"])
+@login_required
+def api_admin_receipts_count():
+    """Quick count of pending receipts for the dashboard badge."""
+    db = get_db()
+    try:
+        n = db.execute(
+            "SELECT COUNT(*) FROM parent_receipts WHERE status=? OR status IS NULL OR status=''",
+            ('قيد المراجعة',),
+        ).fetchone()[0] or 0
+    except Exception:
+        n = 0
+    return jsonify({"ok": True, "pending": int(n)})
+
+@app.route("/api/admin/receipts/<int:rid>/file", methods=["GET"])
+@login_required
+def api_admin_receipt_file(rid):
+    db = get_db()
+    try:
+        r = db.execute(
+            "SELECT file_data, file_mime, filename FROM parent_receipts WHERE id=?",
+            (rid,),
+        ).fetchone()
+    except Exception:
+        r = None
+    if not r:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    blob = r[0]
+    if blob is None:
+        return jsonify({"ok": False, "error": "no file"}), 404
+    if hasattr(blob, 'tobytes'): blob = blob.tobytes()
+    mime = r[1] or 'application/octet-stream'
+    fname = r[2] or ('receipt-' + str(rid))
+    return Response(bytes(blob), mimetype=mime, headers={
+        "Content-Disposition": 'inline; filename="' + str(fname) + '"',
+        "Content-Length": str(len(blob)),
+    })
+
+@app.route("/api/admin/receipts/<int:rid>/status", methods=["POST"])
+@login_required
+def api_admin_receipt_status(rid):
+    d = request.get_json() or {}
+    st = (d.get('status') or '').strip()
+    if st not in ('قيد المراجعة', 'تم التأكيد', 'مرفوض'):
+        return jsonify({"ok": False, "error": "invalid status"}), 400
+    user = session.get('user') or {}
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE parent_receipts SET status=?, reviewed_by=?, reviewed_at=? WHERE id=?",
+            (st, user.get('username') or 'admin', _datetime_now_str(), rid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+def _datetime_now_str():
+    import datetime as _dt
+    return _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+@app.route("/api/parent/upload-receipt", methods=["POST"])
+def api_parent_upload_receipt():
+    """Public — accepts a multipart upload with an image + note + the
+    student id this parent looked up. Stored in parent_receipts.
+    The same per-IP rate-limit guards this route so a spammer can\'t
+    fill the table even if they don\'t solve a personal_id."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '0').split(',')[0].strip()
+    if not _parent_rate_check(ip):
+        return jsonify({"ok": False, "error": "تم تجاوز الحد الأعلى للمحاولات."}), 429
+    sid_raw = (request.form.get('student_id') or '').strip()
+    sname   = (request.form.get('student_name') or '').strip()
+    pid     = (request.form.get('personal_id') or '').strip()
+    note    = (request.form.get('note') or '').strip()
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"ok": False, "error": "لم يتم اختيار ملف"}), 400
+    try:
+        sid = int(sid_raw) if sid_raw.isdigit() else None
+    except Exception:
+        sid = None
+    # Re-validate the student_id+personal_id pair against the DB so a
+    # caller can\'t POST receipts under a fabricated student.
+    db = get_db()
+    if not sid or not pid:
+        return jsonify({"ok": False, "error": "بيانات الطالب غير مكتملة"}), 400
+    try:
+        check = db.execute(
+            "SELECT student_name FROM students WHERE id=? AND TRIM(personal_id)=?",
+            (sid, pid),
+        ).fetchone()
+    except Exception:
+        check = None
+    if not check:
+        return jsonify({"ok": False, "error": "بيانات الطالب غير صحيحة"}), 400
+    # Cap upload size (the front-end blocks 5MB but defend on server too).
+    blob = f.read(6 * 1024 * 1024 + 1)
+    if len(blob) > 5 * 1024 * 1024:
+        return jsonify({"ok": False, "error": "الملف أكبر من 5 ميغابايت"}), 400
+    mime = f.mimetype or 'application/octet-stream'
+    if not (mime.startswith('image/') or mime == 'application/pdf'):
+        return jsonify({"ok": False, "error": "النوع غير مدعوم — استخدم صورة أو PDF"}), 400
+    try:
+        if USE_PG:
+            import psycopg2 as _ps
+            db.execute(
+                "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                "file_data, file_mime, filename, note, status) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (sid, sname or check[0] or '', pid,
+                 _ps.Binary(blob), mime, f.filename or 'receipt', note,
+                 'قيد المراجعة'),
+            )
+        else:
+            db.execute(
+                "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                "file_data, file_mime, filename, note, status) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (sid, sname or check[0] or '', pid,
+                 blob, mime, f.filename or 'receipt', note,
+                 'قيد المراجعة'),
+            )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
 
 @app.route("/api/students", methods=["GET"])
 @login_required
