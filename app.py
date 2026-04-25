@@ -5644,7 +5644,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث بالاسم</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="ابحث بالاسم..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:200px;font-size:0.95rem;"></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
 /* ── متابعة الدفع — student-card workflow ───────────────────────── */
 function _pmNorm(s){return(s||"").replace(/[\u0623\u0625\u0622\u0671]/g,"\u0627").replace(/\u0629/g,"\u0647").replace(/\u0649/g,"\u064A");}
 var _pmGroupCache = null;     /* {groupName: [{id,name}]} */
@@ -5673,13 +5673,86 @@ function pmOpen(){
     });
   });
 }
-function pmFilter(){
-  var q = _pmNorm(document.getElementById("pm-search").value.toLowerCase());
-  document.querySelectorAll("#pm-cards .pm-card").forEach(function(c){
-    var n = _pmNorm((c.dataset.name || "").toLowerCase());
-    c.style.display = (!q || n.indexOf(q) >= 0) ? "" : "none";
+/* ─── Database-wide student search ─────────────────────────────────
+ * Independent from the group dropdown. Searches /api/students for
+ * fuzzy name OR personal_id matches and renders matching cards.
+ * Triggered on Enter / button click / debounced typing (3+ chars).
+ * Same _pmRenderCard flow as pmLoadGroup so the cards look identical. */
+var _pmAllStudents = null;
+var _pmSearchTimer = null;
+function _pmLoadAllStudents(){
+  if (_pmAllStudents) return Promise.resolve(_pmAllStudents);
+  return fetch("/api/students", {credentials:"include"})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      _pmAllStudents = (d && (d.students || d)) || [];
+      return _pmAllStudents;
+    })
+    .catch(function(){ _pmAllStudents = []; return []; });
+}
+function pmSearchInput(){
+  /* Debounced: search when query >= 3 chars, otherwise fall back to
+     the legacy local-filter behaviour over the currently-loaded
+     group cards. */
+  clearTimeout(_pmSearchTimer);
+  _pmSearchTimer = setTimeout(function(){
+    var q = (document.getElementById("pm-search").value || "").trim();
+    if (q.length >= 3) pmSearchClick();
+    else _pmFilterLocal(q);
+  }, 250);
+}
+function pmSearchClick(){
+  var q = (document.getElementById("pm-search").value || "").trim();
+  if (!q){ _pmFilterLocal(""); return; }
+  var box = document.getElementById("pm-cards");
+  box.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:14px;">⏳ جاري البحث...</div>';
+  _pmLoadAllStudents().then(function(all){
+    var qNorm = _pmNorm(q.toLowerCase());
+    var qDigits = q.replace(/[^0-9]/g, "");
+    var matches = all.filter(function(s){
+      var n   = _pmNorm(String(s.student_name || "").toLowerCase());
+      var pid = String(s.personal_id || "");
+      if (n && n.indexOf(qNorm) >= 0) return true;
+      if (pid && pid.indexOf(q) >= 0) return true;
+      if (qDigits && pid.indexOf(qDigits) >= 0) return true;
+      return false;
+    });
+    if (!matches.length){
+      box.innerHTML = '<div style="text-align:center;color:#c62828;padding:30px;font-size:14px;font-weight:700;">لم يتم العثور على الطالب</div>';
+      return;
+    }
+    /* Render skeleton cards then load each plan, same as group flow. */
+    box.innerHTML = "";
+    _pmStudentRows = matches.slice(0, 100).map(function(s){
+      var c = document.createElement("div");
+      c.className = "pm-card"; c.dataset.sid = s.id; c.dataset.name = s.student_name || "";
+      c.innerHTML =
+        '<div class="pm-card-head"><span>὆4</span><span class="pm-name">' + (s.student_name || "") + '</span><span class="pm-status" style="margin-right:auto;">جاري التحميل...</span></div>'
+        + '<div class="pm-summary-grid pm-loading" style="color:#999;">جاري تحميل خطة التقسيط...</div>';
+      box.appendChild(c);
+      return {sid:s.id, name:s.student_name||"", card:c};
+    });
+    Promise.all(_pmStudentRows.map(function(r){
+      return fetch("/api/payment/student/" + r.sid + "/plan").then(function(x){return x.json();}).catch(function(){return null;});
+    })).then(function(results){
+      results.forEach(function(res, idx){
+        var row = _pmStudentRows[idx];
+        _pmRenderCard(row.card, row.sid, row.name, res);
+      });
+    });
   });
 }
+function _pmFilterLocal(q){
+  var qNorm = _pmNorm(String(q || "").toLowerCase());
+  document.querySelectorAll("#pm-cards .pm-card").forEach(function(c){
+    var n = _pmNorm((c.dataset.name || "").toLowerCase());
+    c.style.display = (!qNorm || n.indexOf(qNorm) >= 0) ? "" : "none";
+  });
+}
+/* Back-compat — kept so any old caller referencing pmFilter still
+   works without a hard error. Same behaviour as the new local
+   filter. */
+function pmFilter(){ _pmFilterLocal(document.getElementById("pm-search").value); }
 function pmLoadGroup(){
   var g = document.getElementById("pm-group").value;
   _pmCurrentGroup = g;
