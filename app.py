@@ -1586,7 +1586,7 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
   </div>
 </div>
 <div id="tabs" class="tabs"></div>
-<div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x643;&#x627;&#x645;&#x644;&#x629;</button></div>
+<div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup-excel" type="button" style="background:#6B3FA0;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4CA; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x643;&#x640; Excel</button><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x646;&#x633;&#x62E;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x646;&#x64A;&#x629; &#x1F512;</button></div>
 <div id="msg-tpl-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;"><div style="font-weight:800;color:#0277BD;font-size:1.05rem;">&#x1F4DD; &#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div><div style="font-size:12px;color:#666;">&#x627;&#x644;&#x645;&#x62A;&#x63A;&#x64A;&#x631;&#x627;&#x62A;: <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x637;&#x627;&#x644;&#x628;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x645;&#x639;&#x644;&#x645;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x648;&#x642;&#x62A;_&#x627;&#x644;&#x62D;&#x635;&#x629;}</code></div></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -1969,9 +1969,59 @@ loadAll();
         if (el) el.textContent = 'تعذّر جلب سجل النسخ';
       });
   }
+  /* Generic download helper used by both backup buttons. */
+  function _downloadBackup(url, button, busyLabel, successLabel, errPrefix, fallbackName){
+    var prev = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = busyLabel;
+    fetch(url, {credentials:'include'})
+      .then(function(r){
+        if (!r.ok){
+          return r.json().then(function(d){
+            throw new Error(d && d.error ? d.error : ('HTTP ' + r.status));
+          }, function(){ throw new Error('HTTP ' + r.status); });
+        }
+        var cd = r.headers.get('Content-Disposition') || '';
+        var m = /filename\*=UTF-8''([^;]+)/.exec(cd);
+        var name = m ? decodeURIComponent(m[1]) : fallbackName;
+        return r.blob().then(function(blob){ return {blob: blob, name: name}; });
+      })
+      .then(function(res){
+        var u = URL.createObjectURL(res.blob);
+        var a = document.createElement('a');
+        a.href = u; a.download = res.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(u); }, 500);
+        if (typeof window.mxToast === 'function') window.mxToast(successLabel, 'success');
+        refreshLastBackup();
+      })
+      .catch(function(ex){
+        if (typeof window.mxToast === 'function')
+          window.mxToast(errPrefix + ': ' + (ex.message || ex), 'error');
+      })
+      .then(function(){
+        button.disabled = false;
+        button.innerHTML = prev;
+      });
+  }
+  var excelBtn = document.getElementById('btn-backup-excel');
+  if (excelBtn){
+    excelBtn.addEventListener('click', function(){
+      _downloadBackup(
+        '/api/backup/excel',
+        excelBtn,
+        '⏳ جاري إنشاء ملف Excel...',
+        'تم تنزيل البيانات كـ Excel',
+        'تعذّر إنشاء ملف Excel',
+        'mindex_data_' + Date.now() + '.xlsx'
+      );
+    });
+  }
   var btn = document.getElementById('btn-backup');
   if (btn){
     btn.addEventListener('click', function(){
+      /* The technical ZIP needs an admin confirmation per spec. */
+      if (!confirm('سيتم تنزيل نسخة تقنية كاملة (كود + قواعد بيانات).\nهل تريد المتابعة؟')) return;
       var prev = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = '⏳ جاري إنشاء النسخة الاحتياطية...';
@@ -10252,7 +10302,7 @@ def api_backup_download():
             return None
 
     now = _dt.datetime.now()
-    folder = "مايندكس_نسخة_احتياطية_" + now.strftime("%Y-%m-%d_%H-%M")
+    folder = "مايندكس_نسخة_تقنية_" + now.strftime("%Y-%m-%d_%H-%M")
 
     buf = _io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -10292,7 +10342,7 @@ def api_backup_download():
     # correctly in the download dialog.
     import urllib.parse as _up
     utf8_name = folder + ".zip"
-    ascii_fallback = "mindex_backup_" + now.strftime("%Y-%m-%d_%H-%M") + ".zip"
+    ascii_fallback = "mindex_technical_" + now.strftime("%Y-%m-%d_%H-%M") + ".zip"
     cd = (
         "attachment; filename=\"" + ascii_fallback + "\"; "
         "filename*=UTF-8''" + _up.quote(utf8_name)
@@ -10300,6 +10350,351 @@ def api_backup_download():
     return Response(
         data,
         mimetype="application/zip",
+        headers={
+            "Content-Disposition": cd,
+            "Content-Length": str(len(data)),
+        },
+    )
+
+
+@app.route('/api/backup/excel', methods=['GET'])
+@login_required
+def api_backup_excel():
+    """Build a styled .xlsx that mirrors what the user sees on the
+    website: every table on its own sheet with Arabic display labels
+    as headers, RTL, alternating row stripes, plus a summary sheet
+    counting rows per table. No password — meant for non-technical
+    users to open in Excel directly. Admin-only, like the ZIP route."""
+    import io as _io, datetime as _dt
+    u = session.get("user") or {}
+    if (u.get("role") or "").lower() != "admin":
+        return jsonify({"ok": False, "error": "admin role required"}), 403
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return jsonify({
+            "ok": False,
+            "error": "openpyxl not installed — add it to requirements.txt and redeploy"
+        }), 500
+
+    db = get_db()
+
+    # Tables to export, in display order. The first 6 match what the
+    # spec calls out by Arabic name; everything else is appended after
+    # so a fresh prod with extra tables still shows them.
+    PRIMARY_ORDER = ["students", "student_groups", "attendance",
+                     "taqseet", "evaluations", "payment_log"]
+    SHEET_LABELS = {
+        "students":          "قاعدة بيانات الطلبة",
+        "student_groups":    "المجموعات",
+        "attendance":        "سجل الغياب",
+        "taqseet":           "جدول التقسيط",
+        "evaluations":       "التقييمات",
+        "payment_log":       "سجل الدفع",
+        "settings":          "الإعدادات",
+        "session_durations": "مدة الحصص",
+        "message_templates": "قوالب الرسائل",
+        "message_log":       "سجل الرسائل",
+        "users":             "المستخدمون",
+    }
+
+    # Discover live tables.
+    try:
+        if USE_PG:
+            rows = db.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE' "
+                "ORDER BY table_name"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        all_tables = [r[0] for r in rows]
+    except Exception:
+        all_tables = []
+
+    # Skip housekeeping / label-only tables — the user wants the
+    # tables that mirror the visible site, not internal metadata.
+    SKIP = {
+        "schema_migrations", "backup_log",
+        "column_labels", "group_col_labels", "att_col_labels",
+        "eval_col_labels", "paylog_col_labels", "taqseet_col_labels",
+        "table_labels", "custom_table_cols", "custom_table_rows",
+        "custom_tables", "student_payments", "message_reminders",
+    }
+    primary  = [t for t in PRIMARY_ORDER if t in all_tables]
+    leftover = sorted(t for t in all_tables if t not in PRIMARY_ORDER and t not in SKIP)
+    export_tables = primary + leftover
+
+    # Discover any custom-tables with stored data and add them too.
+    custom_meta = []
+    if "custom_tables" in all_tables:
+        try:
+            crows = db.execute(
+                "SELECT id, tbl_name FROM custom_tables ORDER BY id"
+            ).fetchall()
+            for cr in crows:
+                custom_meta.append({"id": cr[0], "name": cr[1] or ("جدول_" + str(cr[0]))})
+        except Exception:
+            pass
+
+    # Helper: resolve Arabic table label.
+    def _arabic_table_label(name):
+        if name in SHEET_LABELS:
+            return SHEET_LABELS[name]
+        try:
+            return _table_display_label(name) or name
+        except Exception:
+            return name
+
+    # Excel sheet titles: max 31 chars, no /\?*[]: characters.
+    def _safe_sheet_title(s, used):
+        t = "".join(ch for ch in str(s) if ch not in '/\\?*[]:')
+        t = (t or "Sheet").strip()
+        if len(t) > 31:
+            t = t[:31]
+        base = t
+        n = 2
+        while t in used:
+            suffix = " " + str(n)
+            t = base[: max(1, 31 - len(suffix))] + suffix
+            n += 1
+        used.add(t)
+        return t
+
+    HEADER_FILL = PatternFill(start_color="6C3483", end_color="6C3483", fill_type="solid")
+    ALT_FILL    = PatternFill(start_color="F4ECF7", end_color="F4ECF7", fill_type="solid")
+    HEADER_FONT = Font(name="Tahoma", size=12, bold=True, color="FFFFFF")
+    BODY_FONT   = Font(name="Tahoma", size=11)
+    HEADER_ALIGN = Alignment(horizontal="center", vertical="center",
+                             wrap_text=True, readingOrder=2)
+    BODY_ALIGN   = Alignment(horizontal="right", vertical="center",
+                             wrap_text=False, readingOrder=2)
+    THIN = Side(border_style="thin", color="D5D8DC")
+    BORDER = Border(top=THIN, bottom=THIN, left=THIN, right=THIN)
+
+    def _add_table_sheet(wb, sheet_title, headers, header_keys, row_data, used_titles):
+        """sheet_title: Arabic name. headers: visible Arabic labels.
+        header_keys: internal column names (used to pull from each
+        row dict). row_data: list of dicts."""
+        ws = wb.create_sheet(_safe_sheet_title(sheet_title, used_titles))
+        ws.sheet_view.rightToLeft = True
+        # Row 1: row-number header + the column headers.
+        ws.cell(row=1, column=1, value="#").fill = HEADER_FILL
+        ws.cell(row=1, column=1).font = HEADER_FONT
+        ws.cell(row=1, column=1).alignment = HEADER_ALIGN
+        ws.cell(row=1, column=1).border = BORDER
+        for i, h in enumerate(headers, start=2):
+            c = ws.cell(row=1, column=i, value=str(h))
+            c.fill = HEADER_FILL; c.font = HEADER_FONT
+            c.alignment = HEADER_ALIGN; c.border = BORDER
+        # Body rows.
+        col_widths = [4] + [max(8, min(40, len(str(h or "")) + 2)) for h in headers]
+        for r_idx, row in enumerate(row_data, start=2):
+            stripe = ALT_FILL if (r_idx % 2 == 0) else None
+            num_cell = ws.cell(row=r_idx, column=1, value=r_idx - 1)
+            num_cell.font = BODY_FONT; num_cell.alignment = BODY_ALIGN; num_cell.border = BORDER
+            if stripe: num_cell.fill = stripe
+            for ci, key in enumerate(header_keys, start=2):
+                v = row.get(key) if isinstance(row, dict) else None
+                if v is None:
+                    text = ""
+                else:
+                    text = str(v)
+                cell = ws.cell(row=r_idx, column=ci, value=text)
+                cell.font = BODY_FONT; cell.alignment = BODY_ALIGN; cell.border = BORDER
+                if stripe: cell.fill = stripe
+                w = min(60, max(col_widths[ci - 1], len(text) + 2))
+                if w > col_widths[ci - 1]:
+                    col_widths[ci - 1] = w
+        # Apply column widths.
+        for idx, w in enumerate(col_widths, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = w
+        # Freeze header.
+        ws.freeze_panes = "A2"
+        return ws
+
+    # Build the workbook.
+    wb = Workbook()
+    wb.remove(wb.active)
+    used_titles = set()
+
+    # Summary first.
+    summary_rows = []
+    now_str = _dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+    for t in export_tables:
+        try:
+            n = int(db.execute("SELECT COUNT(*) FROM " + t).fetchone()[0] or 0)
+        except Exception:
+            n = 0
+        summary_rows.append({
+            "table_label": _arabic_table_label(t),
+            "rows":        n,
+            "updated":     now_str,
+        })
+    for cm in custom_meta:
+        try:
+            n = int(db.execute(
+                "SELECT COUNT(*) FROM custom_table_rows WHERE table_id=?", (cm["id"],)
+            ).fetchone()[0] or 0)
+        except Exception:
+            n = 0
+        summary_rows.append({
+            "table_label": cm["name"],
+            "rows":        n,
+            "updated":     now_str,
+        })
+    # Active student count for the header band.
+    try:
+        active = int(db.execute(
+            "SELECT COUNT(*) FROM students WHERE COALESCE(NULLIF(TRIM(registration_term2_2026),''),'') <> ''"
+        ).fetchone()[0] or 0)
+    except Exception:
+        active = 0
+    try:
+        groups_n = int(db.execute("SELECT COUNT(*) FROM student_groups").fetchone()[0] or 0)
+    except Exception:
+        groups_n = 0
+    try:
+        students_total = int(db.execute("SELECT COUNT(*) FROM students").fetchone()[0] or 0)
+    except Exception:
+        students_total = 0
+
+    # Build summary sheet by hand so we can include the top-band stats.
+    ws_sum = wb.create_sheet(_safe_sheet_title("ملخص", used_titles))
+    ws_sum.sheet_view.rightToLeft = True
+    ws_sum.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+    title_cell = ws_sum.cell(row=1, column=1, value="ملخص بيانات مايندكس — " + now_str)
+    title_cell.fill = HEADER_FILL; title_cell.font = Font(name="Tahoma", size=14, bold=True, color="FFFFFF")
+    title_cell.alignment = HEADER_ALIGN
+    ws_sum.row_dimensions[1].height = 28
+    # Top-band summary stats.
+    band = [
+        ("إجمالي الطلاب",     students_total),
+        ("الطلاب النشطون",   active),
+        ("عدد المجموعات",    groups_n),
+    ]
+    for i, (label, val) in enumerate(band):
+        c1 = ws_sum.cell(row=2, column=i + 1, value=label)
+        c1.fill = ALT_FILL; c1.font = Font(name="Tahoma", size=11, bold=True, color="6C3483")
+        c1.alignment = HEADER_ALIGN; c1.border = BORDER
+        c2 = ws_sum.cell(row=3, column=i + 1, value=val)
+        c2.font = Font(name="Tahoma", size=14, bold=True); c2.alignment = HEADER_ALIGN
+        c2.border = BORDER
+    # Per-table rows starting at row 5.
+    headers = ["الجدول", "عدد الصفوف", "آخر تحديث"]
+    for i, h in enumerate(headers, start=1):
+        c = ws_sum.cell(row=5, column=i, value=h)
+        c.fill = HEADER_FILL; c.font = HEADER_FONT
+        c.alignment = HEADER_ALIGN; c.border = BORDER
+    for r_idx, srow in enumerate(summary_rows, start=6):
+        stripe = ALT_FILL if (r_idx % 2 == 0) else None
+        for ci, key in enumerate(["table_label", "rows", "updated"], start=1):
+            cell = ws_sum.cell(row=r_idx, column=ci, value=srow[key])
+            cell.font = BODY_FONT; cell.alignment = BODY_ALIGN; cell.border = BORDER
+            if stripe: cell.fill = stripe
+    ws_sum.column_dimensions["A"].width = 26
+    ws_sum.column_dimensions["B"].width = 14
+    ws_sum.column_dimensions["C"].width = 22
+    ws_sum.freeze_panes = "A6"
+
+    # Per-table sheets.
+    for t in export_tables:
+        try:
+            cols = [r[1] for r in db.execute("PRAGMA table_info(" + t + ")").fetchall()]
+        except Exception:
+            cols = []
+        if not cols:
+            continue
+        # Drop the synthetic id column from view (still lives in the
+        # ZIP CSV for the technical backup).
+        keys = [c for c in cols if c != "id"]
+        try:
+            label_map = _column_label_map(t)
+        except Exception:
+            label_map = {}
+        labels = [label_map.get(k, k) for k in keys]
+        try:
+            rows_iter = db.execute(
+                "SELECT " + ",".join('"' + c + '"' for c in cols) + " FROM " + t
+            ).fetchall()
+        except Exception:
+            rows_iter = []
+        row_dicts = []
+        for row in rows_iter:
+            d = {}
+            for i, c in enumerate(cols):
+                try:
+                    d[c] = row[i]
+                except Exception:
+                    d[c] = None
+            row_dicts.append(d)
+        _add_table_sheet(wb, _arabic_table_label(t), labels, keys, row_dicts, used_titles)
+
+    # Custom-table sheets, if any. Their rows live as JSON in
+    # custom_table_rows.row_data with col_keys per custom_table_cols.
+    for cm in custom_meta:
+        try:
+            crows = db.execute(
+                "SELECT col_key, col_label FROM custom_table_cols "
+                "WHERE table_id=? ORDER BY col_order", (cm["id"],)
+            ).fetchall()
+        except Exception:
+            crows = []
+        keys = [r[0] for r in crows if r[0]]
+        labels = [(_decode_arabic_entities(r[1]) if r[1] else r[0]) for r in crows if r[0]]
+        if not keys:
+            continue
+        try:
+            data_rows = db.execute(
+                "SELECT row_data FROM custom_table_rows WHERE table_id=? ORDER BY id",
+                (cm["id"],),
+            ).fetchall()
+        except Exception:
+            data_rows = []
+        row_dicts = []
+        import json as _json
+        for r in data_rows:
+            try:
+                d = _json.loads(r[0]) if r[0] else {}
+            except Exception:
+                d = {}
+            if isinstance(d, dict):
+                row_dicts.append(d)
+        _add_table_sheet(wb, cm["name"], labels, keys, row_dicts, used_titles)
+
+    # Stream out.
+    buf = _io.BytesIO()
+    wb.save(buf)
+    data = buf.getvalue()
+    buf.close()
+
+    # Log so the settings page can keep showing "آخر نسخة احتياطية".
+    try:
+        db.execute(
+            "INSERT INTO backup_log(username, filename, bytes_written) VALUES(?,?,?)",
+            (u.get("username") or "unknown",
+             "مايندكس_بيانات_" + _dt.datetime.now().strftime("%Y-%m-%d") + ".xlsx",
+             len(data)),
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    import urllib.parse as _up
+    utf8_name    = "مايندكس_بيانات_" + _dt.datetime.now().strftime("%Y-%m-%d") + ".xlsx"
+    ascii_fb     = "mindex_data_" + _dt.datetime.now().strftime("%Y-%m-%d") + ".xlsx"
+    cd = (
+        'attachment; filename="' + ascii_fb + '"; '
+        "filename*=UTF-8''" + _up.quote(utf8_name)
+    )
+    return Response(
+        data,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": cd,
             "Content-Length": str(len(data)),
