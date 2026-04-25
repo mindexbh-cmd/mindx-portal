@@ -305,29 +305,29 @@ def init_db():
             pass
         db.execute("""CREATE TABLE IF NOT EXISTS taqseet(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        taqseet_method TEXT DEFAULT '',
-        course_amount NUMERIC DEFAULT 0,
-        num_installments INTEGER DEFAULT 0,
-        inst1 NUMERIC DEFAULT 0,  date1 TEXT DEFAULT '',
-        inst2 NUMERIC DEFAULT 0,  date2 TEXT DEFAULT '',
-        inst3 NUMERIC DEFAULT 0,  date3 TEXT DEFAULT '',
-        inst4 NUMERIC DEFAULT 0,  date4 TEXT DEFAULT '',
-        inst5 NUMERIC DEFAULT 0,  date5 TEXT DEFAULT '',
-        inst6 NUMERIC DEFAULT 0,  date6 TEXT DEFAULT '',
-        inst7 NUMERIC DEFAULT 0,  date7 TEXT DEFAULT '',
-        inst8 NUMERIC DEFAULT 0,  date8 TEXT DEFAULT '',
-        inst9 NUMERIC DEFAULT 0,  date9 TEXT DEFAULT '',
-        inst10 NUMERIC DEFAULT 0, date10 TEXT DEFAULT '',
-        inst11 NUMERIC DEFAULT 0, date11 TEXT DEFAULT '',
-        inst12 NUMERIC DEFAULT 0, date12 TEXT DEFAULT '',
-        study_hours TEXT DEFAULT '',
-        start_date TEXT DEFAULT '',
-        end_date TEXT DEFAULT ''
+        "طريقة_التقسيط" TEXT,
+        "مبلغ_الدورة" NUMERIC,
+        "عدد_الاقساط" INTEGER,
+        "القسط_1" NUMERIC,  "تاريخ_الاستحقاق_1" TEXT,
+        "القسط_2" NUMERIC,  "تاريخ_الاستحقاق_2" TEXT,
+        "القسط_3" NUMERIC,  "تاريخ_الاستحقاق_3" TEXT,
+        "القسط_4" NUMERIC,  "تاريخ_الاستحقاق_4" TEXT,
+        "القسط_5" NUMERIC,  "تاريخ_الاستحقاق_5" TEXT,
+        "القسط_6" NUMERIC,  "تاريخ_الاستحقاق_6" TEXT,
+        "القسط_7" NUMERIC,  "تاريخ_الاستحقاق_7" TEXT,
+        "القسط_8" NUMERIC,  "تاريخ_الاستحقاق_8" TEXT,
+        "القسط_9" NUMERIC,  "تاريخ_الاستحقاق_9" TEXT,
+        "القسط_10" NUMERIC, "تاريخ_الاستحقاق_10" TEXT,
+        "القسط_11" NUMERIC, "تاريخ_الاستحقاق_11" TEXT,
+        "القسط_12" NUMERIC, "تاريخ_الاستحقاق_12" TEXT,
+        "عدد_ساعات_الدراسة" TEXT,
+        "تاريخ_بدء_الدورة" TEXT,
+        "تاريخ_انتهاء_الدورة" TEXT
     )""")
     # Add 10 default rows to taqseet if empty
     if db.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
         for i in range(1, 11):
-            db.execute("INSERT INTO taqseet (taqseet_method) VALUES (?)", (str(i),))
+            db.execute('INSERT INTO taqseet ("طريقة_التقسيط") VALUES (?)', (str(i),))
         db.commit()
     db.execute("""CREATE TABLE IF NOT EXISTS student_payments(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -799,22 +799,27 @@ if True:
         enabled INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
-    # Ensure taqseet has end_date column (added in v3 rebuild). Existing
-    # paid1..paid12 columns from the legacy schema are intentionally NOT
-    # re-added; the v3 rebuild dropped them. The live prod DB was rebuilt
-    # out-of-band (see schema_migrations tag `taqseet_rebuild_v3`).
-    tq_existing = [row[1] for row in db2.execute("PRAGMA table_info(taqseet)").fetchall()]
-    if "end_date" not in tq_existing:
-        try:
-            db2.execute("ALTER TABLE taqseet ADD COLUMN end_date TEXT DEFAULT ''")
-        except Exception:
-            pass
-    db2.commit()
-    # Add 10 default rows to taqseet if empty
-    if db2.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
-        for i in range(1, 11):
-            db2.execute("INSERT INTO taqseet (taqseet_method) VALUES (?)", (str(i),))
-        db2.commit()
+    # The v4 rebuild renamed every taqseet column to its Arabic identifier
+    # and dropped student_name + paid1..paid12. The live prod DB was
+    # rebuilt out-of-band (see schema_migrations tag
+    # `taqseet_rebuild_v4_arabic_cols`); this code does not attempt the
+    # destructive rename here. We just ensure 10 placeholder rows exist if
+    # the table is empty.
+    try:
+        if db2.execute("SELECT COUNT(*) FROM taqseet").fetchone()[0] == 0:
+            tq_cols = [row[1] for row in db2.execute("PRAGMA table_info(taqseet)").fetchall()]
+            seed_col = 'طريقة_التقسيط' if 'طريقة_التقسيط' in tq_cols else (
+                'taqseet_method' if 'taqseet_method' in tq_cols else None
+            )
+            if seed_col:
+                for i in range(1, 11):
+                    db2.execute(
+                        'INSERT INTO taqseet ("' + seed_col + '") VALUES (?)',
+                        (str(i),),
+                    )
+                db2.commit()
+    except Exception:
+        pass
     db2.execute("""CREATE TABLE IF NOT EXISTS student_payments(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id INTEGER,
@@ -1223,45 +1228,52 @@ if True:
             pass
         db2.commit()
 
-    # Seed Arabic labels for taqseet's numbered columns (inst1..inst12,
-    # date1..date12) and the handful of misc fields so the
-    # تعديل الجدول modal renders Arabic for every taqseet column. The
-    # v3 rebuild dropped paid1..paid12 and student_name; if the legacy
-    # taqseet_labels_seed_v1 ran before, also clean those rows out.
-    if "taqseet_labels_seed_v3" not in applied:
+    # Seed Arabic labels for taqseet's columns (now Arabic-named after the
+    # v4 rebuild). Mirror them into BOTH the unified column_labels (with
+    # table_name='taqseet') AND legacy taqseet_col_labels so existing label
+    # helpers keep working. Idempotent: rows are upserted on (table_name,
+    # internal_name) / col_key.
+    if "taqseet_labels_seed_v4_arabic" not in applied:
+        # Sweep any legacy ASCII rows + paid* / student_name junk.
         try:
             db2.execute(
-                "DELETE FROM taqseet_col_labels WHERE col_key='student_name' "
-                "OR col_key LIKE 'paid%'"
+                "DELETE FROM taqseet_col_labels WHERE col_key IN "
+                "('taqseet_method','course_amount','num_installments',"
+                "'study_hours','start_date','end_date','student_name')"
             )
+            db2.execute("DELETE FROM taqseet_col_labels WHERE col_key LIKE 'paid%'")
+            db2.execute("DELETE FROM taqseet_col_labels WHERE col_key LIKE 'inst_'")
+            db2.execute("DELETE FROM taqseet_col_labels WHERE col_key LIKE 'inst__'")
+            db2.execute("DELETE FROM taqseet_col_labels WHERE col_key LIKE 'date_'")
+            db2.execute("DELETE FROM taqseet_col_labels WHERE col_key LIKE 'date__'")
         except Exception:
             pass
         try:
             rows_taq = [
-                ("taqseet_method",   "طريقة التقسيط",     1),
-                ("course_amount",    "مبلغ الدورة",        2),
-                ("num_installments", "عدد الأقساط",       3),
-                ("study_hours",      "ساعات الدراسة",     200),
-                ("start_date",       "تاريخ بدء الدورة",  201),
-                ("end_date",         "تاريخ نهاية الدورة", 202),
+                ('طريقة_التقسيط',       'طريقة التقسيط',        1),
+                ('مبلغ_الدورة',          'مبلغ الدورة',           2),
+                ('عدد_الاقساط',          'عدد الأقساط',          3),
             ]
             for n in range(1, 13):
                 base = 4 + (n - 1) * 2
-                rows_taq.append(("inst" + str(n),  "القسط " + str(n),           base))
-                rows_taq.append(("date" + str(n),  "تاريخ الاستحقاق " + str(n), base + 1))
+                rows_taq.append(('القسط_' + str(n),               'القسط ' + str(n),            base))
+                rows_taq.append(('تاريخ_الاستحقاق_' + str(n),     'تاريخ الاستحقاق ' + str(n),  base + 1))
+            rows_taq.append(('عدد_ساعات_الدراسة',  'عدد ساعات الدراسة', 28))
+            rows_taq.append(('تاريخ_بدء_الدورة',   'تاريخ بدء الدورة',   29))
+            rows_taq.append(('تاريخ_انتهاء_الدورة','تاريخ انتهاء الدورة', 30))
             for key, label, order in rows_taq:
                 try:
                     db2.execute(
                         "INSERT INTO taqseet_col_labels(col_key, col_label, col_order) "
                         "VALUES(?,?,?) "
-                        "ON CONFLICT(col_key) DO UPDATE SET col_label=EXCLUDED.col_label",
+                        "ON CONFLICT(col_key) DO UPDATE SET col_label=EXCLUDED.col_label, col_order=EXCLUDED.col_order",
                         (key, label, order),
                     )
                 except Exception:
                     try:
                         cur = db2.execute(
-                            "UPDATE taqseet_col_labels SET col_label=? WHERE col_key=?",
-                            (label, key),
+                            "UPDATE taqseet_col_labels SET col_label=?, col_order=? WHERE col_key=?",
+                            (label, order, key),
                         )
                         if cur.rowcount == 0:
                             db2.execute(
@@ -1270,7 +1282,20 @@ if True:
                             )
                     except Exception:
                         pass
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("taqseet_labels_seed_v3",))
+            # Mirror to unified column_labels if those columns exist.
+            try:
+                cl_cols = [r[1] for r in db2.execute("PRAGMA table_info(column_labels)").fetchall()]
+                if 'table_name' in cl_cols and 'internal_name' in cl_cols and 'display_name' in cl_cols:
+                    db2.execute("DELETE FROM column_labels WHERE table_name=?", ('taqseet',))
+                    for key, label, order in rows_taq:
+                        db2.execute(
+                            "INSERT INTO column_labels(table_name, internal_name, display_name, col_order, col_key, col_label) "
+                            "VALUES(?,?,?,?,?,?)",
+                            ('taqseet', key, label, order, key, label),
+                        )
+            except Exception:
+                pass
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("taqseet_labels_seed_v4_arabic",))
             db2.commit()
         except Exception:
             pass
@@ -5526,42 +5551,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
   </div>
   <div id="taqseetWrap" class="table-wrap" style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px #6c3fa022;">
     <table id="taqseetTable" style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;">
-      <thead>
-        <tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">
-          <th class="bulk-col" style="padding:10px 8px;"><input type="checkbox" id="selectAll_taqseet" class="bulk-cb" onclick="_bulkSelectAll('taqseetBody','selectAll_taqseet','bulkDelBtn_taqseet',this.checked)"></th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>
-          <th data-col="taqseet_method" style="padding:10px 8px;white-space:nowrap;min-width:120px;">&#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</th>
-          <th data-col="course_amount" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x645;&#x628;&#x644;&#x63A; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</th>
-          <th data-col="num_installments" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;</th>
-          <th data-col="inst1" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 1</th>
-          <th data-col="date1" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 1</th>
-          <th data-col="inst2" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 2</th>
-          <th data-col="date2" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 2</th>
-          <th data-col="inst3" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 3</th>
-          <th data-col="date3" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 3</th>
-          <th data-col="inst4" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 4</th>
-          <th data-col="date4" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 4</th>
-          <th data-col="inst5" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 5</th>
-          <th data-col="date5" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 5</th>
-          <th data-col="inst6" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 6</th>
-          <th data-col="date6" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 6</th>
-          <th data-col="inst7" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 7</th>
-          <th data-col="date7" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 7</th>
-          <th data-col="inst8" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 8</th>
-          <th data-col="date8" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 8</th>
-          <th data-col="inst9" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 9</th>
-          <th data-col="date9" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 9</th>
-          <th data-col="inst10" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 10</th>
-          <th data-col="date10" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 10</th>
-          <th data-col="inst11" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 11</th>
-          <th data-col="date11" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 11</th>
-          <th data-col="inst12" style="padding:10px 8px;white-space:nowrap;min-width:90px;">&#x627;&#x644;&#x642;&#x633;&#x637; 12</th>
-          <th data-col="date12" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x62D;&#x642;&#x627;&#x642; 12</th>
-          <th data-col="study_hours" style="padding:10px 8px;white-space:nowrap;min-width:100px;">&#x639;&#x62F;&#x62F; &#x633;&#x627;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629;</th>
-          <th data-col="start_date" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x628;&#x62F;&#x621; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</th>
-          <th data-col="end_date" style="padding:10px 8px;white-space:nowrap;min-width:110px;">&#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x646;&#x647;&#x627;&#x64A;&#x629; &#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;</th>
-          <th style="padding:10px 8px;white-space:nowrap;min-width:80px;">&#x625;&#x62C;&#x631;&#x627;&#x621;&#x627;&#x62A;</th>
-        </tr>
+      <thead id="taqseetThead">
+        <!-- Built dynamically by renderTaqseet() from /api/taqseet-labels. -->
       </thead>
       <tbody id="taqseetBody"></tbody>
     </table>
@@ -6456,125 +6447,153 @@ function applyFreezeFromModal(){
 // \u2500\u2500\u2500 Taqseet (Payment Plans) Table \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var allTaqseet = null;
 var editingTaqseetId = null;
-var taqseetLabels = {};  // col_key -> Arabic label for dynamically-added columns
+var taqseetLabels = {};   // internal_name -> Arabic display label
+var taqseetSchema = [];   // [{key,label}] in display order
+
+// Arabic column-name constants. All references go through these so a future
+// rename only touches this block. JS allows non-ASCII identifiers, but we
+// keep them as string literals to avoid surprises.
+var TQ_METHOD = "\u0637\u0631\u064A\u0642\u0629_\u0627\u0644\u062A\u0642\u0633\u064A\u0637";
+var TQ_AMOUNT = "\u0645\u0628\u0644\u063A_\u0627\u0644\u062F\u0648\u0631\u0629";
+var TQ_NUM    = "\u0639\u062F\u062F_\u0627\u0644\u0627\u0642\u0633\u0627\u0637";
+var TQ_HOURS  = "\u0639\u062F\u062F_\u0633\u0627\u0639\u0627\u062A_\u0627\u0644\u062F\u0631\u0627\u0633\u0629";
+var TQ_START  = "\u062A\u0627\u0631\u064A\u062E_\u0628\u062F\u0621_\u0627\u0644\u062F\u0648\u0631\u0629";
+var TQ_END    = "\u062A\u0627\u0631\u064A\u062E_\u0627\u0646\u062A\u0647\u0627\u0621_\u0627\u0644\u062F\u0648\u0631\u0629";
+var TQ_INST_PREFIX = "\u0627\u0644\u0642\u0633\u0637_";
+var TQ_DATE_PREFIX = "\u062A\u0627\u0631\u064A\u062E_\u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642_";
+function TQ_INST(n){ return TQ_INST_PREFIX + n; }
+function TQ_DATE(n){ return TQ_DATE_PREFIX + n; }
+function _tqIsInstField(f){ return typeof f === "string" && f.indexOf(TQ_INST_PREFIX) === 0; }
 
 function loadTaqseet() {
   Promise.all([
-    fetch('/api/taqseet').then(function(r){return r.json();}),
-    fetch('/api/taqseet-labels').then(function(r){return r.ok ? r.json() : {};}).catch(function(){return {};})
+    fetch("/api/taqseet").then(function(r){return r.json();}),
+    fetch("/api/taqseet-labels").then(function(r){return r.ok ? r.json() : null;}).catch(function(){return null;})
   ]).then(function(res){
-    allTaqseet = res[0] || [];
-    taqseetLabels = res[1] || {};
-    document.getElementById('taqseetCount').textContent = allTaqseet.length;
+    var raw = res[0] || [];
+    if (Array.isArray(raw)) {
+      allTaqseet = raw;
+    } else {
+      allTaqseet = raw.rows || [];
+      if (Array.isArray(raw.schema)) taqseetSchema = raw.schema;
+    }
+    var lbls = res[1];
+    if (lbls && Array.isArray(lbls.schema)) {
+      taqseetSchema = lbls.schema;
+      taqseetLabels = {};
+      lbls.schema.forEach(function(o){ taqseetLabels[o.key] = o.label; });
+    } else if (lbls && typeof lbls === "object") {
+      taqseetLabels = lbls;
+    }
+    document.getElementById("taqseetCount").textContent = allTaqseet.length;
     renderTaqseet();
   });
 }
 
+function _renderTaqseetThead(fields) {
+  var thead = document.getElementById("taqseetThead");
+  if (!thead) return;
+  var html = '<tr style="background:linear-gradient(135deg,#6c3fa0,#9b59b6);color:#fff;">';
+  html += '<th class="bulk-col" style="padding:10px 8px;"><input type="checkbox" id="selectAll_taqseet" class="bulk-cb" onclick="_bulkSelectAll(\\'taqseetBody\\',\\'selectAll_taqseet\\',\\'bulkDelBtn_taqseet\\',this.checked)"></th>';
+  html += '<th style="padding:10px 8px;white-space:nowrap;min-width:50px;">#</th>';
+  fields.forEach(function(f){
+    var label = taqseetLabels[f] || f;
+    var w = (f === TQ_METHOD ? 120 : (f.indexOf(TQ_DATE_PREFIX) === 0 || f === TQ_START || f === TQ_END ? 110 : (f === TQ_AMOUNT ? 110 : 100)));
+    html += '<th data-col="' + f + '" style="padding:10px 8px;white-space:nowrap;min-width:' + w + 'px;">' + _esc(label) + '</th>';
+  });
+  html += '<th style="padding:10px 8px;white-space:nowrap;min-width:80px;">\u0625\u062C\u0631\u0627\u0621\u0627\u062A</th>';
+  html += '</tr>';
+  thead.innerHTML = html;
+}
+
+function _taqseetFields(){
+  if (taqseetSchema && taqseetSchema.length) {
+    return taqseetSchema.map(function(o){ return o.key; });
+  }
+  var fields = [];
+  if (allTaqseet && allTaqseet.length){
+    var seen = {id:1, created_at:1};
+    allTaqseet.forEach(function(r){
+      Object.keys(r).forEach(function(k){
+        if(!seen[k]){ seen[k] = 1; fields.push(k); }
+      });
+    });
+  }
+  return fields;
+}
+
 function renderTaqseet() {
-  var tbody = document.getElementById('taqseetBody');
+  var tbody = document.getElementById("taqseetBody");
+  var fields = _taqseetFields();
+  _renderTaqseetThead(fields);
   if (!allTaqseet || !allTaqseet.length) {
-    tbody.innerHTML = '<tr><td colspan="33" style="text-align:center;color:#aaa;padding:24px;">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</td></tr>';
-    _bulkUpdate('taqseetBody','selectAll_taqseet','bulkDelBtn_taqseet');
-    applyFreezeToTable('taqseet');
+    var span = fields.length + 3;
+    tbody.innerHTML = '<tr><td colspan="' + span + '" style="text-align:center;color:#aaa;padding:24px;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0628\u064A\u0627\u0646\u0627\u062A</td></tr>';
+    _bulkUpdate("taqseetBody","selectAll_taqseet","bulkDelBtn_taqseet");
+    applyFreezeToTable("taqseet");
     return;
   }
-  var baseFields = ['taqseet_method','course_amount','num_installments',
-    'inst1','date1','inst2','date2','inst3','date3','inst4','date4',
-    'inst5','date5','inst6','date6','inst7','date7','inst8','date8',
-    'inst9','date9','inst10','date10','inst11','date11','inst12','date12',
-    'study_hours','start_date','end_date'];
-  // Detect extra columns (auto-created via Excel import) present in the data
-  // but not in the static header. Append them after the baseline columns so
-  // they show up in the UI.
-  var seen = {id:1, created_at:1};
-  baseFields.forEach(function(f){ seen[f] = 1; });
-  var extraFields = [];
-  allTaqseet.forEach(function(r){
-    Object.keys(r).forEach(function(k){
-      if(!seen[k]){ seen[k] = 1; extraFields.push(k); }
-    });
-  });
-  var fields = baseFields.concat(extraFields);
-  // If extras exist, append matching <th> cells to the thead (idempotent).
-  if(extraFields.length){
-    var thead = document.querySelector('#taqseetTable thead tr');
-    if(thead){
-      var existingKeys = {};
-      thead.querySelectorAll('th[data-col]').forEach(function(th){ existingKeys[th.dataset.col] = 1; });
-      var actionsTh = thead.lastElementChild;
-      extraFields.forEach(function(k){
-        if(existingKeys[k]) return;
-        var th = document.createElement('th');
-        th.dataset.col = k;
-        th.style.cssText = 'padding:10px 8px;white-space:nowrap;min-width:110px;';
-        th.textContent = (taqseetLabels && taqseetLabels[k]) || k;
-        thead.insertBefore(th, actionsTh);
-      });
-    }
-  }
   tbody.innerHTML = allTaqseet.map(function(r, i) {
-    var bg = i % 2 === 0 ? '#fff' : '#f8f4ff';
+    var bg = i % 2 === 0 ? "#fff" : "#f8f4ff";
     var cells = fields.map(function(f) {
-      // num_installments is auto-calculated from inst1..inst12 and is not hand-editable.
-      if (f === 'num_installments') {
-        return '<td data-id="' + r.id + '" data-field="' + f + '" title="\u064A\u062D\u0633\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B" style="padding:8px;min-width:80px;background:#eef5ff;color:#1565C0;font-weight:700;text-align:center;">' + (r[f]||'') + '</td>';
+      var v = r[f];
+      var disp = (v === null || v === undefined) ? "" : String(v);
+      if (f === TQ_NUM) {
+        return '<td data-id="' + r.id + '" data-field="' + f + '" title="\u064A\u062D\u0633\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B" style="padding:8px;min-width:80px;background:#eef5ff;color:#1565C0;font-weight:700;text-align:center;">' + _esc(disp) + '</td>';
       }
-      return '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + f + '" style="padding:8px;min-width:80px;">' + (r[f]||'') + '</td>';
-    }).join('');
+      return '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + f + '" style="padding:8px;min-width:80px;">' + _esc(disp) + '</td>';
+    }).join("");
     return '<tr style="background:' + bg + ';">' +
       '<td class="bulk-col" style="padding:8px;"><input type="checkbox" class="bulk-cb" data-id="' + r.id + '" onclick="_bulkUpdate(\\'taqseetBody\\',\\'selectAll_taqseet\\',\\'bulkDelBtn_taqseet\\')"></td>' +
       '<td style="padding:8px;text-align:center;color:#6c3fa0;font-weight:700;">' + (i+1) + '</td>' +
       cells +
       '<td style="padding:8px;white-space:nowrap;text-align:center;">' +
-        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">&#x62D;&#x630;&#x641;</button>' +
+        '<button class="btn-icon" style="background:#c0392b;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;" onclick="deleteTaqseet(' + r.id + ')">\u062D\u0630\u0641</button>' +
       '</td>' +
     '</tr>';
-  }).join('');
-  // Attach blur events + real-time lock updates for inst*/course_amount.
-  tbody.querySelectorAll('.editable[data-field]').forEach(function(td) {
-    td.addEventListener('blur', function() {
+  }).join("");
+  tbody.querySelectorAll(".editable[data-field]").forEach(function(td) {
+    td.addEventListener("blur", function() {
       saveTaqseetCell(parseInt(this.dataset.id), this.dataset.field, this);
     });
     var f = td.dataset.field;
-    if (/^inst\d+$/.test(f) || f === 'course_amount') {
-      td.addEventListener('input', function() {
-        updateTaqseetLockState(this.closest('tr'));
+    if (_tqIsInstField(f) || f === TQ_AMOUNT) {
+      td.addEventListener("input", function() {
+        updateTaqseetLockState(this.closest("tr"));
       });
     }
   });
-  // Initial lock evaluation per row (reflect whatever's already saved).
-  tbody.querySelectorAll('tr').forEach(function(tr){ updateTaqseetLockState(tr); });
-  applyFreezeToTable('taqseet');
+  tbody.querySelectorAll("tr").forEach(function(tr){ updateTaqseetLockState(tr); });
+  applyFreezeToTable("taqseet");
 }
 
 function _taqseetParseNum(s){
-  var v = parseFloat(String(s == null ? '' : s).replace(/,/g, ''));
+  var v = parseFloat(String(s == null ? "" : s).replace(/,/g, ""));
   return isNaN(v) ? 0 : v;
 }
 function _taqseetSetLocked(cell, lock){
   if (!cell) return;
   if (lock) {
-    cell.setAttribute('contenteditable', 'false');
-    cell.classList.add('taqseet-locked');
+    cell.setAttribute("contenteditable", "false");
+    cell.classList.add("taqseet-locked");
   } else {
-    cell.setAttribute('contenteditable', 'true');
-    cell.classList.remove('taqseet-locked');
+    cell.setAttribute("contenteditable", "true");
+    cell.classList.remove("taqseet-locked");
   }
 }
 function updateTaqseetLockState(tr){
   if (!tr) return;
-  var courseCell = tr.querySelector('td[data-field="course_amount"]');
+  var courseCell = tr.querySelector('td[data-field="' + TQ_AMOUNT + '"]');
   var courseAmt = courseCell ? _taqseetParseNum(courseCell.innerText) : 0;
-  // No valid ceiling -> every inst cell stays editable.
   if (courseAmt <= 0) {
     for (var i = 1; i <= 12; i++) {
-      _taqseetSetLocked(tr.querySelector('td[data-field="inst'+i+'"]'), false);
+      _taqseetSetLocked(tr.querySelector('td[data-field="' + TQ_INST(i) + '"]'), false);
     }
     return;
   }
   var sum = 0, locked = false;
   for (var i = 1; i <= 12; i++) {
-    var c = tr.querySelector('td[data-field="inst'+i+'"]');
+    var c = tr.querySelector('td[data-field="' + TQ_INST(i) + '"]');
     if (!c) continue;
     if (locked) { _taqseetSetLocked(c, true); continue; }
     var v = _taqseetParseNum(c.innerText);
@@ -6591,35 +6610,39 @@ function saveTaqseetCell(id, field, el) {
   var updated = {};
   for (var k in r) { updated[k] = r[k]; }
   updated[field] = val;
-  var affectsInstallments = /^inst\d+$/.test(field) || field === 'course_amount';
+  var affectsInstallments = _tqIsInstField(field) || field === TQ_AMOUNT;
   var installmentCount = 0;
   if (affectsInstallments) {
     var sum = 0;
     for (var i = 1; i <= 12; i++) {
-      var v = parseFloat(String(updated['inst'+i] || '').replace(/,/g, ''));
+      var v = parseFloat(String(updated[TQ_INST(i)] || "").replace(/,/g, ""));
       if (!isNaN(v) && v > 0) { sum += v; installmentCount++; }
     }
-    var courseAmt = parseFloat(String(updated.course_amount || '').replace(/,/g, ''));
+    var courseAmt = parseFloat(String(updated[TQ_AMOUNT] || "").replace(/,/g, ""));
     if (!isNaN(courseAmt) && courseAmt > 0 && sum > courseAmt) {
-      showToast('\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 (' + sum + ') \u064A\u062A\u062C\u0627\u0648\u0632 \u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629 (' + courseAmt + ')', '#e53935');
-      el.innerText = r[field] == null ? '' : String(r[field]);
-      updateTaqseetLockState(el.closest('tr'));
+      showToast("\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 (" + sum + ") \u064A\u062A\u062C\u0627\u0648\u0632 \u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629 (" + courseAmt + ")", "#e53935");
+      el.innerText = r[field] == null ? "" : String(r[field]);
+      updateTaqseetLockState(el.closest("tr"));
       return;
     }
-    updated.num_installments = String(installmentCount);
+    updated[TQ_NUM] = installmentCount;
   }
-  fetch('/api/taqseet/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updated)})
+  fetch("/api/taqseet/" + id, {method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify(updated)})
     .then(function(res){return res.json();})
-    .then(function(){
-      if (r) {
-        r[field] = val;
-        if (affectsInstallments) {
-          r.num_installments = String(installmentCount);
-          var tr = el.closest('tr');
-          if (tr) {
-            var niCell = tr.querySelector('td[data-field="num_installments"]');
-            if (niCell) niCell.innerText = String(installmentCount);
-          }
+    .then(function(j){
+      if (j && j.ok === false) {
+        showToast(j.error || "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062D\u0641\u0638", "#e53935");
+        el.innerText = r[field] == null ? "" : String(r[field]);
+        updateTaqseetLockState(el.closest("tr"));
+        return;
+      }
+      r[field] = val;
+      if (affectsInstallments) {
+        r[TQ_NUM] = installmentCount;
+        var tr = el.closest("tr");
+        if (tr) {
+          var niCell = tr.querySelector('td[data-field="' + TQ_NUM + '"]');
+          if (niCell) niCell.innerText = String(installmentCount);
         }
       }
     });
@@ -6627,23 +6650,27 @@ function saveTaqseetCell(id, field, el) {
 
 function openAddTaqseet() {
   var nextNum = allTaqseet ? allTaqseet.length + 1 : 1;
-  var payload = {taqseet_method: String(nextNum),
-    course_amount: 0, num_installments: 0,
-    study_hours:'', start_date:'', end_date:''};
+  var payload = {};
+  payload[TQ_METHOD] = String(nextNum);
+  payload[TQ_AMOUNT] = 0;
+  payload[TQ_NUM]    = 0;
+  payload[TQ_HOURS]  = "";
+  payload[TQ_START]  = "";
+  payload[TQ_END]    = "";
   for (var i = 1; i <= 12; i++) {
-    payload['inst' + i] = 0;
-    payload['date' + i] = '';
+    payload[TQ_INST(i)] = 0;
+    payload[TQ_DATE(i)] = "";
   }
-  fetch('/api/taqseet', {method:'POST', headers:{'Content-Type':'application/json'},
+  fetch("/api/taqseet", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify(payload)})
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (j && j.ok === false) {
-        showToast(j.error || 'خطأ في الإضافة', '#e53935');
+        showToast(j.error || "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0625\u0636\u0627\u0641\u0629", "#e53935");
         return;
       }
       loadTaqseet();
-      showToast('&#x62A;&#x645; &#x625;&#x636;&#x627;&#x641;&#x629; &#x635;&#x641; &#x62C;&#x62F;&#x64A;&#x62F;', '#1a8754');
+      showToast("\u062A\u0645 \u0625\u0636\u0627\u0641\u0629 \u0635\u0641 \u062C\u062F\u064A\u062F", "#1a8754");
     });
 }
 
@@ -10140,12 +10167,18 @@ BUILT_IN_COLUMN_LABELS = {
     "registration_term2_2026":"تسجيل الفصل الثاني 2026",
 }
 
-# taqseet has 24 numbered columns (inst1..inst12, date1..date12) that
-# don't fit cleanly into a flat dict literal. Populate them
-# programmatically so every taqseet column renders Arabic in /settings
-# and تعديل الجدول even on a fresh DB where the taqseet_labels_seed_v3
-# migration hasn't run yet. (paid1..paid12 were dropped in the v3 rebuild.)
+# Taqseet columns are now Arabic identifiers (after v4 rebuild). Seed
+# both the Arabic-named keys and the legacy ASCII aliases so /settings
+# and تعديل الجدول render Arabic for either schema.
+BUILT_IN_COLUMN_LABELS["طريقة_التقسيط"]       = "طريقة التقسيط"
+BUILT_IN_COLUMN_LABELS["مبلغ_الدورة"]          = "مبلغ الدورة"
+BUILT_IN_COLUMN_LABELS["عدد_الاقساط"]          = "عدد الأقساط"
+BUILT_IN_COLUMN_LABELS["عدد_ساعات_الدراسة"]   = "عدد ساعات الدراسة"
+BUILT_IN_COLUMN_LABELS["تاريخ_بدء_الدورة"]    = "تاريخ بدء الدورة"
+BUILT_IN_COLUMN_LABELS["تاريخ_انتهاء_الدورة"] = "تاريخ انتهاء الدورة"
 for _n in range(1, 13):
+    BUILT_IN_COLUMN_LABELS["القسط_" + str(_n)]               = "القسط " + str(_n)
+    BUILT_IN_COLUMN_LABELS["تاريخ_الاستحقاق_" + str(_n)]     = "تاريخ الاستحقاق " + str(_n)
     BUILT_IN_COLUMN_LABELS["inst" + str(_n)] = "القسط " + str(_n)
     BUILT_IN_COLUMN_LABELS["date" + str(_n)] = "تاريخ الاستحقاق " + str(_n)
 
@@ -12643,12 +12676,64 @@ def api_logout():
 
 # &#x2500;&#x2500;&#x2500; Taqseet (Payment Plans) API &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 
-@app.route('/api/taqseet', methods=['GET'])
-@login_required
-def api_taqseet_get():
+# ─── Taqseet column-name constants (must match the live PG schema) ───
+# All column identifiers contain Arabic; psycopg2 sends them as-is when
+# wrapped via _pg_quote_ident() (see below).
+TQ_METHOD = 'طريقة_التقسيط'
+TQ_AMOUNT = 'مبلغ_الدورة'
+TQ_NUM    = 'عدد_الاقساط'
+TQ_HOURS  = 'عدد_ساعات_الدراسة'
+TQ_START  = 'تاريخ_بدء_الدورة'
+TQ_END    = 'تاريخ_انتهاء_الدورة'
+def TQ_INST(n):  return 'القسط_' + str(n)
+def TQ_DATE(n):  return 'تاريخ_الاستحقاق_' + str(n)
+
+def _pg_quote_ident(name):
+    """Postgres identifier quoting: double-quotes around the name with any
+    embedded double-quotes doubled. Safe for Arabic column identifiers
+    that the ASCII-only _is_safe_ident() rejects."""
+    s = '' if name is None else str(name)
+    return '"' + s.replace('"', '""') + '"'
+
+def _taqseet_live_columns():
+    """Ordered list of taqseet column names from information_schema, with `id`
+    excluded. Reflects whatever the actual PG table looks like right now."""
     db = get_db()
-    rows = db.execute("SELECT * FROM taqseet ORDER BY id").fetchall()
-    return jsonify([dict(r) for r in rows])
+    rows = db.execute("PRAGMA table_info(taqseet)").fetchall()
+    return [r[1] for r in rows if r[1] and r[1] != 'id']
+
+def _taqseet_label_map():
+    """{col_key: col_label} for taqseet, preferring the unified column_labels
+    rows (table_name='taqseet') and falling back to taqseet_col_labels."""
+    db = get_db()
+    out = {}
+    try:
+        for r in db.execute(
+            "SELECT internal_name, display_name FROM column_labels "
+            "WHERE table_name=? AND internal_name IS NOT NULL "
+            "ORDER BY col_order",
+            ('taqseet',),
+        ).fetchall():
+            if r[0]:
+                out[r[0]] = r[1] or r[0]
+    except Exception:
+        pass
+    if not out:
+        try:
+            for r in db.execute(
+                "SELECT col_key, col_label FROM taqseet_col_labels ORDER BY col_order"
+            ).fetchall():
+                if r[0]:
+                    out[r[0]] = r[1] or r[0]
+        except Exception:
+            pass
+    return out
+
+def _taqseet_schema_for_client():
+    """Ordered [{key, label}] list for the client to render the thead."""
+    cols = _taqseet_live_columns()
+    labels = _taqseet_label_map()
+    return [{"key": c, "label": labels.get(c, c)} for c in cols]
 
 def _taqseet_num(v):
     """Coerce a payload value to a float; blank/None/garbage -> 0.0."""
@@ -12663,26 +12748,34 @@ def _taqseet_num(v):
         return 0.0
 
 def _taqseet_validate_and_fill(d):
-    """Apply smart-validation rules to a taqseet payload (mutates d).
-    - sum(inst1..inst12) <= course_amount; otherwise raises ValueError.
-    - num_installments := count of inst1..inst12 with value > 0.
+    """Apply smart-validation to a taqseet payload (mutates d).
+    - sum(القسط_1..القسط_12) <= مبلغ_الدورة; otherwise raises ValueError.
+    - عدد_الاقساط := count of installment cells with value > 0.
     Returns (course_amt, sum_inst, count_nonzero)."""
-    course = _taqseet_num(d.get('course_amount'))
+    course = _taqseet_num(d.get(TQ_AMOUNT))
     total = 0.0
     count = 0
     for i in range(1, 13):
-        v = _taqseet_num(d.get('inst' + str(i)))
+        v = _taqseet_num(d.get(TQ_INST(i)))
         if v > 0:
             total += v
             count += 1
     if course > 0 and total - course > 0.005:
         raise ValueError(
-            "مجموع الأقساط ("
-            + str(total) + ") يتجاوز مبلغ "
-            "الدورة (" + str(course) + ")"
+            "مجموع الأقساط (" + str(total) + ") يتجاوز مبلغ الدورة (" + str(course) + ")"
         )
-    d['num_installments'] = count
+    d[TQ_NUM] = count
     return course, total, count
+
+@app.route('/api/taqseet', methods=['GET'])
+@login_required
+def api_taqseet_get():
+    db = get_db()
+    rows = db.execute("SELECT * FROM taqseet ORDER BY id").fetchall()
+    return jsonify({
+        "rows":   [dict(r) for r in rows],
+        "schema": _taqseet_schema_for_client(),
+    })
 
 @app.route('/api/taqseet', methods=['POST'])
 @login_required
@@ -12693,35 +12786,41 @@ def api_taqseet_post():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     db = get_db()
-    cols = [
-        'taqseet_method', 'course_amount', 'num_installments',
-        'inst1','date1','inst2','date2','inst3','date3','inst4','date4',
-        'inst5','date5','inst6','date6','inst7','date7','inst8','date8',
-        'inst9','date9','inst10','date10','inst11','date11','inst12','date12',
-        'study_hours', 'start_date', 'end_date',
-    ]
+    live_cols = _taqseet_live_columns()
+    # Build INSERT against the live schema; only include columns the payload
+    # provides (or always-set ones we just computed in validate_and_fill).
+    cols = [c for c in live_cols if c in d]
+    if not cols:
+        # Fall back to inserting just the method so we get an id.
+        cols = [TQ_METHOD] if TQ_METHOD in live_cols else []
+    if not cols:
+        return jsonify({"ok": False, "error": "schema mismatch"}), 500
+    quoted = ",".join(_pg_quote_ident(c) for c in cols)
     placeholders = ",".join(["?"] * len(cols))
     values = tuple(d.get(c, '') for c in cols)
     db.execute(
-        "INSERT INTO taqseet (" + ",".join(cols) + ") VALUES (" + placeholders + ")",
+        "INSERT INTO taqseet (" + quoted + ") VALUES (" + placeholders + ")",
         values,
     )
     db.commit()
-    return jsonify({"ok": True, "id": db.execute("SELECT last_insert_rowid()").fetchone()[0]})
+    new_id = None
+    try:
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        try:
+            new_id = db.execute("SELECT MAX(id) FROM taqseet").fetchone()[0]
+        except Exception:
+            pass
+    return jsonify({"ok": True, "id": new_id})
 
 @app.route('/api/taqseet/<int:row_id>', methods=['PUT'])
 @login_required
 def api_taqseet_put(row_id):
     d = request.get_json() or {}
     db = get_db()
-    # Reflect live schema so columns auto-added via Excel import also persist.
-    cols = [r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()]
-    # Apply validation only if the payload touches any installment or course_amount
-    # field. Pure cell edits to other fields shouldn't be blocked.
-    affects = ('course_amount' in d) or any(('inst' + str(i)) in d for i in range(1, 13))
+    live_cols = _taqseet_live_columns()
+    affects = (TQ_AMOUNT in d) or any(TQ_INST(i) in d for i in range(1, 13))
     if affects:
-        # Merge with current row so partial updates still validate against the
-        # whole row, not just the field being edited.
         cur_row = db.execute("SELECT * FROM taqseet WHERE id=?", (row_id,)).fetchone()
         if cur_row:
             merged = dict(cur_row)
@@ -12731,11 +12830,11 @@ def api_taqseet_put(row_id):
                 _taqseet_validate_and_fill(merged)
             except ValueError as e:
                 return jsonify({"ok": False, "error": str(e)}), 400
-            d['num_installments'] = merged['num_installments']
-    writable = [c for c in cols if c != "id" and c in d]
+            d[TQ_NUM] = merged[TQ_NUM]
+    writable = [c for c in live_cols if c in d]
     if not writable:
         return jsonify({"ok": True})
-    set_clause = ",".join([c + "=?" for c in writable])
+    set_clause = ",".join(_pg_quote_ident(c) + "=?" for c in writable)
     values = tuple(d.get(c, '') for c in writable) + (row_id,)
     db.execute("UPDATE taqseet SET " + set_clause + " WHERE id=?", values)
     db.commit()
@@ -12752,12 +12851,7 @@ def api_taqseet_delete(row_id):
 @app.route('/api/taqseet-labels', methods=['GET'])
 @login_required
 def api_taqseet_labels_get():
-    db = get_db()
-    try:
-        rows = db.execute("SELECT col_key,col_label FROM taqseet_col_labels").fetchall()
-        return jsonify({r[0]: r[1] for r in rows})
-    except Exception:
-        return jsonify({})
+    return jsonify({"schema": _taqseet_schema_for_client()})
 
 
 @app.route('/api/payments/<int:student_id>/<int:inst_num>', methods=['PUT'])
@@ -12794,11 +12888,14 @@ IMPORT_TABLE_FIELDS = {
         "status","message","message_status","study_status",
     ],
     "taqseet": [
-        "taqseet_method","course_amount","num_installments",
-        "inst1","date1","inst2","date2","inst3","date3","inst4","date4",
-        "inst5","date5","inst6","date6","inst7","date7","inst8","date8",
-        "inst9","date9","inst10","date10","inst11","date11","inst12","date12",
-        "study_hours","start_date","end_date",
+        "طريقة_التقسيط","مبلغ_الدورة","عدد_الاقساط",
+        "القسط_1","تاريخ_الاستحقاق_1","القسط_2","تاريخ_الاستحقاق_2",
+        "القسط_3","تاريخ_الاستحقاق_3","القسط_4","تاريخ_الاستحقاق_4",
+        "القسط_5","تاريخ_الاستحقاق_5","القسط_6","تاريخ_الاستحقاق_6",
+        "القسط_7","تاريخ_الاستحقاق_7","القسط_8","تاريخ_الاستحقاق_8",
+        "القسط_9","تاريخ_الاستحقاق_9","القسط_10","تاريخ_الاستحقاق_10",
+        "القسط_11","تاريخ_الاستحقاق_11","القسط_12","تاريخ_الاستحقاق_12",
+        "عدد_ساعات_الدراسة","تاريخ_بدء_الدورة","تاريخ_انتهاء_الدورة",
     ],
     "evaluations": [
         "form_fill_date","group_name","student_name","class_participation",
@@ -12819,7 +12916,7 @@ IMPORT_TABLE_KEYS = {
     "students":       ["personal_id"],
     "student_groups": ["group_name"],
     "attendance":     ["group_name", "attendance_date", "student_name"],
-    "taqseet":        ["taqseet_method"],
+    "taqseet":        ["طريقة_التقسيط"],
     "evaluations":    ["form_fill_date", "group_name", "student_name"],
     "payment_log":    ["personal_id"],
 }
