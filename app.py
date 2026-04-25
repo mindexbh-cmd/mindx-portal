@@ -10650,20 +10650,65 @@ function _arRender(){
     var rejection = (sk === "rejected" && r.rejection_reason) ? (\'<div class="rec-rejection">❌ سبب الرفض: \' + _arEsc(r.rejection_reason) + \'</div>\') : \'\';
     var actions;
     if (sk === "pending"){
-      var instSel = \'<select id="ar-inst-\' + r.id + \'">\';
-      for (var k=1; k<=12; k++){
-        var sel = (parseInt(r.installment_number || 0, 10) === k) ? \' selected\' : \'\';
-        instSel += \'<option value="\' + k + \'"\' + sel + \'>القسط \' + k + \'</option>\';
+      /* Build the installment dropdown from the student\'s actual
+         plan, filtering out fully-paid + exempt entries so the admin
+         can\'t accidentally double-charge an installment. The parent\'s
+         pre-selected installment_number wins when it\'s still
+         eligible; otherwise the first eligible row is selected. */
+      var planRows = (r.plan_installments || []).filter(function(i){
+        return i && i.status_label !== "paid" && i.status_label !== "exempt";
+      });
+      var preselectedN = parseInt(r.installment_number || 0, 10) || 0;
+      var preselectedPaid = false;
+      if (preselectedN){
+        var preFull = (r.plan_installments || []).filter(function(i){ return i.n === preselectedN; })[0];
+        if (preFull && (preFull.status_label === "paid" || preFull.status_label === "exempt")){
+          preselectedPaid = true;
+        }
       }
-      instSel += \'</select>\';
-      var amt = (r.installment_amount != null && r.installment_amount !== \'\') ? r.installment_amount : 0;
+      var instSel;
+      var instWarn = "";
+      if (!planRows.length){
+        instSel = \'<select id="ar-inst-\' + r.id + \'" disabled><option>(لا توجد أقساط متبقية)</option></select>\';
+        instWarn = \'<div style="color:#c62828;font-size:12.5px;font-weight:700;margin-top:4px;">⚠ جميع الأقساط مدفوعة بالكامل لهذا الطالب</div>\';
+      } else {
+        instSel = \'<select id="ar-inst-\' + r.id + \'" onchange="_arInstChange(\' + r.id + \')">\';
+        var fallbackPicked = false;
+        planRows.forEach(function(i){
+          var rem = (i.remaining != null) ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
+          var marker = (i.status_label === "partial") ? " (مدفوع جزئياً)" : "";
+          var pick;
+          if (preselectedN && i.n === preselectedN){ pick = " selected"; fallbackPicked = true; }
+          else if (!preselectedN && !fallbackPicked){ pick = " selected"; fallbackPicked = true; }
+          else                                       { pick = ""; }
+          instSel += \'<option value="\' + i.n + \'" data-rem="\' + rem + \'" data-amt="\' + (i.amount||0) + \'"\' + pick + \'>\' +
+                     \'القسط \' + i.n + \' - \' + (i.amount||0) + \' د\' + (rem !== (i.amount||0) ? (" - متبقي " + rem + " د") : "") + marker +
+                     \'</option>\';
+        });
+        instSel += \'</select>\';
+        if (preselectedPaid){
+          instWarn = \'<div style="color:#E65100;font-size:12.5px;font-weight:700;margin-top:4px;background:#fff8e1;border:1.5px solid #ffd54f;border-radius:8px;padding:6px 10px;">⚠ القسط الذي اختاره ولي الأمر (\' + preselectedN + \') تم دفعه مسبقاً — اختر قسطاً آخر أو راجع المبلغ.</div>\';
+        }
+      }
+      /* Default amount = remaining of the selected installment (so the
+         admin doesn\'t have to retype). Fall back to the parent-supplied
+         amount when no plan rows. */
+      var defaultAmt;
+      if (planRows.length){
+        var selRow = planRows.filter(function(i){ return i.n === preselectedN; })[0] || planRows[0];
+        var selRem = (selRow.remaining != null) ? selRow.remaining : Math.max(0, (selRow.amount||0) - (selRow.paid||0));
+        defaultAmt = (selRem > 0 ? selRem : (selRow.amount||0));
+      } else {
+        defaultAmt = (r.installment_amount != null && r.installment_amount !== "") ? r.installment_amount : 0;
+      }
+      var disable = (!planRows.length) ? " disabled" : "";
       actions =
         \'<div class="confirm-bar">\' +
           \'<div><label>القسط</label>\' + instSel + \'</div>\' +
-          \'<div><label>المبلغ المدفوع</label><input id="ar-amt-\' + r.id + \'" type="number" min="0" step="0.5" value="\' + amt + \'"></div>\' +
-          \'<button class="rec-btn rec-btn-ok" onclick="arConfirm(\' + r.id + \')">✅ تأكيد وتسجيل الدفع</button>\' +
+          \'<div><label>المبلغ المدفوع</label><input id="ar-amt-\' + r.id + \'" type="number" min="0" step="0.5" value="\' + defaultAmt + \'"\' + disable + \'></div>\' +
+          \'<button class="rec-btn rec-btn-ok" onclick="arConfirm(\' + r.id + \')"\' + disable + \'>✅ تأكيد وتسجيل الدفع</button>\' +
           \'<button class="rec-btn rec-btn-no" onclick="arReject(\' + r.id + \')">❌ رفض</button>\' +
-        \'</div>\';
+        \'</div>\' + instWarn;
     } else {
       actions = \'<div style="margin-top:8px;"><button class="rec-btn rec-btn-reset" onclick="arResetStatus(\' + r.id + \')">↺ إعادة للمراجعة</button></div>\';
     }
@@ -10678,6 +10723,17 @@ function _arRender(){
       \'<div class="rec-grid"><div>\' + actions + \'</div><div>\' + img + \'</div></div>\' +
     \'</div>\';
   }).join("");
+}
+function _arInstChange(id){
+  /* When admin switches the dropdown, refresh the amount input to the
+     selected installment\'s remaining value (or full amount if none). */
+  var sel = document.getElementById("ar-inst-" + id);
+  var amt = document.getElementById("ar-amt-" + id);
+  if (!sel || !amt) return;
+  var opt = sel.options[sel.selectedIndex]; if (!opt) return;
+  var rem = parseFloat(opt.dataset.rem || 0);
+  var full = parseFloat(opt.dataset.amt || 0);
+  amt.value = (rem > 0 ? rem : full);
 }
 function arConfirm(id){
   var n = parseInt((document.getElementById("ar-inst-" + id) || {}).value || 0, 10);
@@ -10743,6 +10799,18 @@ def api_admin_receipts_list():
         ).fetchall()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
+    # Cache per-student plan so we don\'t recompute it for each receipt
+    # of the same student (parents may submit several receipts).
+    plan_cache = {}
+    def _plan_for(sid):
+        if sid in plan_cache: return plan_cache[sid]
+        try:
+            p = _payment_compute_plan(db, sid)
+        except Exception:
+            p = None
+        plan_cache[sid] = p
+        return p
+
     out = []
     for r in rows:
         d = dict(r)
@@ -10752,6 +10820,7 @@ def api_admin_receipts_list():
         # Look up the student\'s group for filter purposes.
         sid = d.get("student_id")
         d["group"] = ""
+        d["plan_installments"] = []
         if sid:
             try:
                 gr = db.execute(
@@ -10760,6 +10829,30 @@ def api_admin_receipts_list():
                 ).fetchone()
                 if gr and gr[0]: d["group"] = gr[0]
             except Exception: pass
+            # Plan installments — only those that exist in the student\'s
+            # plan (amount > 0). Each carries the per-installment paid /
+            # remaining and a status_label so the admin dropdown can
+            # filter to "still owed" entries.
+            p = _plan_for(sid)
+            if p and p.get("plan", {}).get("installments"):
+                for inst in p["plan"]["installments"]:
+                    amt  = float(inst.get("amount") or 0)
+                    if amt <= 0: continue
+                    paid = float(inst.get("paid") or 0)
+                    rem  = float(inst.get("remaining") or 0)
+                    tok  = (inst.get("status") or '')
+                    if tok == 'exempt':       lab = 'exempt'
+                    elif rem <= 0.005:        lab = 'paid'
+                    elif paid <= 0.005:       lab = 'unpaid'
+                    else:                     lab = 'partial'
+                    d["plan_installments"].append({
+                        "n":            inst.get("n"),
+                        "amount":       amt,
+                        "paid":         paid,
+                        "remaining":    rem,
+                        "due_date":     inst.get("due_date") or '',
+                        "status_label": lab,
+                    })
         out.append(d)
     return jsonify({"ok": True, "receipts": out})
 
