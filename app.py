@@ -3653,6 +3653,10 @@ function srSave(){ _srTrySave(); }  /* backward-compat shim */
             <span class="mab-title">&#x1F6A8; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; &#x648;&#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</span>
             <span class="mab-desc">&#x625;&#x631;&#x633;&#x627;&#x644; &#x631;&#x633;&#x627;&#x626;&#x644; &#x644;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x64A;&#x646; &#x648;&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x64A;&#x646; &#x641;&#x64A; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x644;&#x64A;&#x648;&#x645; &#x645;&#x62D;&#x62F;&#x62F;</span>
           </button>
+          <button type="button" class="msg-action-btn mab-blue" style="background:linear-gradient(135deg,#1565C0,#42A5F5);" onclick="msgOpenPayment()">
+            <span class="mab-title">&#x1F4B0; &#x631;&#x633;&#x627;&#x626;&#x644; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+            <span class="mab-desc">&#x62A;&#x630;&#x643;&#x64A;&#x631; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x628;&#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62D;&#x642;&#x629; &#x645;&#x646; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+          </button>
         </div>
         <div id="msg-tpl-wrap"></div>
       </div>
@@ -3859,6 +3863,70 @@ function srSave(){ _srTrySave(); }  /* backward-compat shim */
 <div id="msg-abs-undo" class="msg-abs-undo">
   <span id="msg-abs-undo-text"></span>
   <span id="msg-abs-undo-count" class="msg-abs-undo-count"></span>
+</div>
+<!-- Payment-reminder messaging modal -->
+<div id="msg-pay-modal" class="msg-modal">
+  <div class="msg-box">
+    <div class="msg-header" style="background:linear-gradient(135deg,#1565C0,#42A5F5);">
+      <span class="msg-header-title">&#x1F4B0; &#x631;&#x633;&#x627;&#x626;&#x644; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+      <button class="msg-close" onclick="msgClosePayment()">&times;</button>
+    </div>
+    <div class="msg-body">
+      <div class="msg-form-grid">
+        <div>
+          <label class="msg-label" style="margin:0 0 4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
+          <select id="msg-pay-group" class="msg-select" onchange="msgPayLoad()">
+            <option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option>
+            <option value="__all__">&#x1F310; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</option>
+          </select>
+        </div>
+        <div>
+          <label class="msg-label" style="margin:0 0 4px;">&#x627;&#x644;&#x642;&#x633;&#x637;</label>
+          <select id="msg-pay-inst" class="msg-select" onchange="msgPayLoad()">
+            <option value="1">&#x627;&#x644;&#x642;&#x633;&#x637; 1</option>
+            <option value="2">&#x627;&#x644;&#x642;&#x633;&#x637; 2</option>
+            <option value="3">&#x627;&#x644;&#x642;&#x633;&#x637; 3</option>
+            <option value="4">&#x627;&#x644;&#x642;&#x633;&#x637; 4</option>
+            <option value="5">&#x627;&#x644;&#x642;&#x633;&#x637; 5</option>
+          </select>
+        </div>
+      </div>
+      <div id="msg-pay-filters" class="msg-abs-filters" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;padding:8px;background:#e3f2fd;border-radius:10px;">
+        <button type="button" class="msg-abs-filter active" data-filter="unpaid" onclick="msgPaySetFilter('unpaid')">
+          &#x1F534; <span>&#x644;&#x645; &#x64A;&#x62F;&#x641;&#x639;&#x648;&#x627;</span>
+          <span class="msg-abs-filter-count" id="msg-pay-fc-unpaid">0</span>
+        </button>
+        <button type="button" class="msg-abs-filter" data-filter="paid" onclick="msgPaySetFilter('paid')">
+          &#x2705; <span>&#x62F;&#x641;&#x639;&#x648;&#x627;</span>
+          <span class="msg-abs-filter-count" id="msg-pay-fc-paid">0</span>
+        </button>
+        <button type="button" class="msg-abs-filter" data-filter="all" onclick="msgPaySetFilter('all')">
+          &#x1F4CB; <span>&#x627;&#x644;&#x643;&#x644;</span>
+          <span class="msg-abs-filter-count" id="msg-pay-fc-all">0</span>
+        </button>
+        <span class="msg-abs-spacer" style="flex:1;"></span>
+        <button type="button" id="msg-pay-bulk-btn" class="msg-bulk" onclick="msgPayBulkSend()" style="display:none;">&#x1F680; &#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button>
+      </div>
+      <div style="margin-top:8px;background:#fffde7;border:1.5px solid #fdd835;border-radius:10px;padding:10px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="msg-label" style="margin:0;">&#x270D;&#xFE0F; &#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629; &#x644;&#x644;&#x62A;&#x630;&#x643;&#x64A;&#x631; &#x628;&#x627;&#x644;&#x62F;&#x641;&#x639;</label>
+          <button type="button" class="msg-save-tpl" onclick="msgPaySaveTemplate()" style="padding:4px 12px;font-size:12px;">&#x1F4BE; &#x62D;&#x641;&#x638;</button>
+        </div>
+        <textarea id="msg-pay-tpl" class="msg-textarea" rows="5" style="width:100%;direction:rtl;font-family:inherit;line-height:1.7;" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x646;&#x635; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x630;&#x643;&#x64A;&#x631;..."></textarea>
+        <div style="font-size:11.5px;color:#5d4037;margin-top:6px;">
+          &#x1F4A1; &#x627;&#x644;&#x645;&#x62A;&#x63A;&#x64A;&#x631;&#x627;&#x62A;:
+          <code>{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x637;&#x627;&#x644;&#x628;}</code>
+          <code>{&#x631;&#x642;&#x645;_&#x627;&#x644;&#x642;&#x633;&#x637;}</code>
+          <code>{&#x627;&#x644;&#x645;&#x628;&#x644;&#x63A;_&#x627;&#x644;&#x645;&#x633;&#x62A;&#x62D;&#x642;}</code>
+          <code>{&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;}</code>
+          <code>{&#x645;&#x628;&#x644;&#x63A;_&#x627;&#x644;&#x62F;&#x648;&#x631;&#x629;}</code>
+          <code>{&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;}</code>
+        </div>
+      </div>
+      <div id="msg-pay-status" class="msg-empty" style="display:none;margin-top:10px;"></div>
+      <div id="msg-pay-list" class="msg-abs-card-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
 </div>
 <script>
 var _msgGroups = [];
@@ -4371,6 +4439,197 @@ function msgCloseAbsence(){
   document.getElementById('msg-abs-modal').style.display = 'none';
   _msgAbsenceHideUndo();
 }
+
+/* ─── Payment-reminder messaging ─────────────────────────────────────
+ * Pulls students whose payment_log row shows no/partial payment for a
+ * chosen installment, lets the admin filter / bulk-send WhatsApp
+ * reminders, and persists the editable Arabic template via the
+ * existing settings endpoints (messaging.payment_template).
+ */
+var _msgPayState = { rows: [], filter: 'unpaid', loaded: false };
+/* Use String.fromCharCode(10) for newlines — Python's triple-quoted
+   block parses \\n as a real newline, which breaks the JS string. */
+var _msgPayNL = String.fromCharCode(10);
+var _msgPayDefaultTpl = (
+    'السلام عليكم' + _msgPayNL + _msgPayNL +
+    'ولي أمر الطالب/ة {اسم_الطالب}،' + _msgPayNL +
+    'نود تذكيركم بالقسط رقم {رقم_القسط} المستحق بقيمة {المبلغ_المستحق} دينار.' + _msgPayNL +
+    'المبلغ المتبقي: {المتبقي} دينار من إجمالي {مبلغ_الدورة} دينار.' + _msgPayNL + _msgPayNL +
+    'نشكر لكم حسن تعاونكم.' + _msgPayNL +
+    'مملكة الإنجليزي'
+);
+
+function msgOpenPayment(){
+  document.getElementById('msg-pay-modal').style.display = 'block';
+  /* Populate group dropdown once. */
+  if (!_msgPayState.loaded){
+    _msgPayState.loaded = true;
+    fetch('/api/groups-students', {credentials:'include'}).then(function(r){return r.json();}).then(function(gs){
+      var sel = document.getElementById('msg-pay-group');
+      Object.keys(gs || {}).sort().forEach(function(g){
+        var arr = gs[g] || [];
+        var o = document.createElement('option');
+        o.value = g; o.textContent = g + ' (' + arr.length + ')';
+        sel.appendChild(o);
+      });
+    });
+    /* Load saved template (or default). */
+    fetch('/api/settings', {credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+      var tpl = '';
+      try {
+        var arr = (d.settings && d.settings.messaging) || [];
+        for (var i=0; i<arr.length; i++){
+          if (arr[i].component === 'payment_template'){ tpl = arr[i].value || ''; break; }
+        }
+      } catch(e){}
+      document.getElementById('msg-pay-tpl').value = tpl || _msgPayDefaultTpl;
+    }).catch(function(){
+      document.getElementById('msg-pay-tpl').value = _msgPayDefaultTpl;
+    });
+  }
+}
+function msgClosePayment(){
+  document.getElementById('msg-pay-modal').style.display = 'none';
+}
+function msgPaySetFilter(f){
+  _msgPayState.filter = f;
+  document.querySelectorAll('#msg-pay-filters .msg-abs-filter').forEach(function(b){
+    b.classList[b.dataset.filter === f ? 'add' : 'remove']('active');
+  });
+  _msgPayRender();
+}
+function msgPayLoad(){
+  var g    = document.getElementById('msg-pay-group').value;
+  var inst = document.getElementById('msg-pay-inst').value;
+  var stat = document.getElementById('msg-pay-status');
+  if (!g){
+    document.getElementById('msg-pay-list').innerHTML = '';
+    stat.style.display = 'block';
+    stat.textContent = 'اختر مجموعة ورقم قسط';
+    document.getElementById('msg-pay-fc-unpaid').textContent = '0';
+    document.getElementById('msg-pay-fc-paid').textContent = '0';
+    document.getElementById('msg-pay-fc-all').textContent = '0';
+    return;
+  }
+  stat.style.display = 'block'; stat.textContent = 'جاري التحميل...';
+  fetch('/api/payment-reminders?group=' + encodeURIComponent(g) + '&inst=' + encodeURIComponent(inst), {credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      _msgPayState.rows = (d && d.ok) ? (d.rows || []) : [];
+      var unpaid = _msgPayState.rows.filter(function(x){return x.status==='unpaid';}).length;
+      var paid   = _msgPayState.rows.filter(function(x){return x.status==='paid';  }).length;
+      document.getElementById('msg-pay-fc-unpaid').textContent = unpaid;
+      document.getElementById('msg-pay-fc-paid').textContent   = paid;
+      document.getElementById('msg-pay-fc-all').textContent    = _msgPayState.rows.length;
+      stat.style.display = 'none';
+      _msgPayRender();
+    })
+    .catch(function(){
+      stat.style.display = 'block'; stat.textContent = 'خطأ في الاتصال';
+    });
+}
+function _msgPayFilteredRows(){
+  if (_msgPayState.filter === 'all')   return _msgPayState.rows;
+  if (_msgPayState.filter === 'paid')  return _msgPayState.rows.filter(function(x){return x.status==='paid';});
+  return _msgPayState.rows.filter(function(x){return x.status!=='paid';});
+}
+function _msgPayRender(){
+  var rows = _msgPayFilteredRows();
+  var box  = document.getElementById('msg-pay-list');
+  if (!rows.length){
+    box.innerHTML = '<div class="msg-empty">لا يوجد طلبة في هذا الفلتر</div>';
+    document.getElementById('msg-pay-bulk-btn').style.display = 'none';
+    return;
+  }
+  document.getElementById('msg-pay-bulk-btn').style.display = '';
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e0e0e0;">';
+  html += '<thead><tr style="background:linear-gradient(135deg,#1565C0,#42A5F5);color:#fff;">';
+  html += '<th style="padding:8px 10px;text-align:right;width:40px;"><input type="checkbox" id="msg-pay-all" onchange="_msgPaySelectAll(this)"></th>';
+  html += '<th style="padding:8px 10px;text-align:right;">الاسم</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">الواتساب</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">المستحق</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">المدفوع</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">المتبقي</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">الحالة</th>';
+  html += '<th style="padding:8px 10px;text-align:right;">إرسال</th>';
+  html += '</tr></thead><tbody>';
+  rows.forEach(function(r, idx){
+    var bg = idx % 2 ? '#f8f9fa' : '#fff';
+    var stHtml;
+    if (r.status === 'paid')        stHtml = '<span style="background:#e8f5e9;color:#2E7D32;padding:2px 8px;border-radius:999px;font-weight:700;">✅ مدفوع</span>';
+    else if (r.status === 'partial') stHtml = '<span style="background:#fff8e1;color:#E65100;padding:2px 8px;border-radius:999px;font-weight:700;">\U0001F7E1 جزئي</span>';
+    else                              stHtml = '<span style="background:#ffebee;color:#c62828;padding:2px 8px;border-radius:999px;font-weight:700;">\U0001F534 لم يدفع</span>';
+    var sendBtn = '<button type="button" class="msg-bulk" style="background:#25D366;padding:5px 10px;font-size:12px;" onclick="_msgPaySendOne(' + idx + ')">\U0001F4E4 إرسال</button>';
+    if (!r.whatsapp) sendBtn = '<span style="color:#999;">لا يوجد رقم</span>';
+    html += '<tr style="background:' + bg + ';border-top:1px solid #f0f0f0;">';
+    html += '<td style="padding:6px 10px;"><input type="checkbox" class="msg-pay-cb" data-idx="' + idx + '" ' + (r.whatsapp ? '' : 'disabled') + '></td>';
+    html += '<td style="padding:6px 10px;font-weight:700;">' + (r.name || '') + '</td>';
+    html += '<td style="padding:6px 10px;direction:ltr;">' + (r.whatsapp || '<span style="color:#999;">—</span>') + '</td>';
+    html += '<td style="padding:6px 10px;color:#1565C0;font-weight:700;">' + (r.amount || 0) + '</td>';
+    html += '<td style="padding:6px 10px;color:#2E7D32;font-weight:700;">' + (r.paid || 0) + '</td>';
+    html += '<td style="padding:6px 10px;color:#c62828;font-weight:700;">' + (r.remaining || 0) + '</td>';
+    html += '<td style="padding:6px 10px;">' + stHtml + '</td>';
+    html += '<td style="padding:6px 10px;">' + sendBtn + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+function _msgPaySelectAll(chk){
+  document.querySelectorAll('.msg-pay-cb:not([disabled])').forEach(function(c){ c.checked = chk.checked; });
+}
+function _msgPayCleanPhone(raw){
+  var d = String(raw || '').replace(/[^0-9]/g, '');
+  if (!d) return '';
+  if (d.indexOf('00') === 0) d = d.substring(2);
+  if (d.length === 8) d = '973' + d;
+  return d;
+}
+function _msgPayFillTemplate(tpl, r){
+  return String(tpl || '')
+    .replace(/\{اسم_الطالب\}/g, r.name || '')
+    .replace(/\{رقم_القسط\}/g, String(r.inst || ''))
+    .replace(/\{المبلغ_المستحق\}/g, String(r.amount || 0))
+    .replace(/\{المتبقي\}/g, String(r.remaining || 0))
+    .replace(/\{مبلغ_الدورة\}/g, String(r.course_amount || 0))
+    .replace(/\{المجموعة\}/g, r.group || '');
+}
+function _msgPaySendOne(idx){
+  var rows = _msgPayFilteredRows();
+  var r = rows[idx]; if (!r) return;
+  var phone = _msgPayCleanPhone(r.whatsapp);
+  if (!phone) return;
+  var tpl  = document.getElementById('msg-pay-tpl').value || _msgPayDefaultTpl;
+  var text = _msgPayFillTemplate(tpl, r);
+  var url  = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+  /* Also log to message_log so سجل الرسائل records it. */
+  fetch('/api/message-log', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({student_name: r.name || '', student_whatsapp: phone, template_name: 'تذكير بالدفع'})}).catch(function(){});
+}
+function msgPayBulkSend(){
+  var checked = Array.prototype.slice.call(document.querySelectorAll('.msg-pay-cb:checked'));
+  if (!checked.length){
+    alert('لم يتم تحديد أي طالب');
+    return;
+  }
+  if (checked.length > 1 && !confirm('ستُفتح ' + checked.length + ' نوافذ واتساب - هل تريد المتابعة؟')) return;
+  checked.forEach(function(cb, i){
+    setTimeout(function(){ _msgPaySendOne(parseInt(cb.dataset.idx, 10)); }, i * 400);
+  });
+}
+function msgPaySaveTemplate(){
+  var tpl = document.getElementById('msg-pay-tpl').value || '';
+  fetch('/api/settings', {method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+    body: JSON.stringify({page:'messaging', component:'payment_template', value: tpl})})
+    .then(function(r){return r.json();}).then(function(d){
+      if (d && d.ok){
+        if (typeof window.mxToast === 'function') window.mxToast('تم حفظ قالب الرسالة', 'success');
+        else alert('تم الحفظ');
+      }
+    });
+}
+
 function msgAbsenceToggleAllDates(){
   var chk = document.getElementById('msg-abs-all-dates-chk');
   var dateInp = document.getElementById('msg-abs-date');
@@ -15203,6 +15462,92 @@ def api_payment_student_pay(sid):
     new_plan["ok"] = True
     new_plan["recorded"] = {"n": n, "amount": amount, "new_paid": new_paid}
     return jsonify(new_plan)
+
+
+@app.route('/api/payment-reminders', methods=['GET'])
+@login_required
+def api_payment_reminders():
+    """Returns rows for the إرسال الرسائل → رسائل متابعة الدفع modal:
+       students in the chosen group (in-person or online), enriched
+       with the chosen installment\'s due-amount, paid amount, and
+       remaining — read directly from payment_log when present so the
+       displayed numbers match the rest of the app."""
+    db = get_db()
+    group = (request.args.get('group') or '').strip()
+    try:
+        n = int(request.args.get('inst') or 1)
+    except Exception:
+        n = 1
+    if n < 1 or n > 12:
+        return jsonify({"ok": False, "error": "invalid installment number"}), 400
+
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live_cols = set()
+    has_online = online_col in live_cols and online_col != in_col
+
+    if group == '__all__':
+        sql = ('SELECT id, student_name, personal_id, whatsapp, "' + in_col + '" '
+               + (', "' + online_col + '"' if has_online else '')
+               + ' FROM students ORDER BY student_name')
+        params = ()
+    elif has_online:
+        sql = ('SELECT id, student_name, personal_id, whatsapp, "' + in_col + '" '
+               '"' + online_col + '" '
+               'FROM students WHERE TRIM(COALESCE("' + in_col + '", \'\'))=? '
+               'OR TRIM(COALESCE("' + online_col + '", \'\'))=? ORDER BY student_name')
+        params = (group, group)
+    else:
+        sql = ('SELECT id, student_name, personal_id, whatsapp, "' + in_col + '" '
+               'FROM students WHERE TRIM(COALESCE("' + in_col + '", \'\'))=? ORDER BY student_name')
+        params = (group,)
+    try:
+        students = db.execute(sql, params).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    rows = []
+    for s in students:
+        sid = s[0]; sname = s[1] or ''; spid = s[2] or ''; phone = s[3] or ''
+        sgrp = s[4] or ''
+        if has_online and len(s) > 5 and not sgrp:
+            sgrp = s[5] or ''
+        plan = _payment_compute_plan(db, sid)
+        if plan is None or not plan["plan"]["installments"]:
+            continue
+        target = None
+        for inst in plan["plan"]["installments"]:
+            if inst["n"] == n: target = inst; break
+        if target is None or (target.get("amount") or 0) <= 0:
+            continue
+        amt   = float(target.get("amount") or 0)
+        paid  = float(target.get("paid")   or 0)
+        rem   = float(target.get("remaining") or 0)
+        if rem <= 0.005:
+            status = 'paid'
+        elif paid <= 0.005:
+            status = 'unpaid'
+        else:
+            status = 'partial'
+        rows.append({
+            "id":             sid,
+            "name":           sname,
+            "personal_id":    spid,
+            "whatsapp":       phone,
+            "group":          sgrp,
+            "inst":           n,
+            "amount":         amt,
+            "paid":           paid,
+            "remaining":      rem,
+            "course_amount":  plan["plan"]["course_amount"],
+            "status":         status,
+        })
+    return jsonify({"ok": True, "rows": rows, "inst": n, "group": group})
 
 
 @app.route('/api/message-templates', methods=['GET'])
