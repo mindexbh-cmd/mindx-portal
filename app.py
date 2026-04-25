@@ -13699,16 +13699,45 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     'th:hover .mx-col-del-btn{opacity:1;}',
     '.mx-col-del-btn:hover{background:#e74c3c !important;color:#fff !important;opacity:1 !important;box-shadow:0 0 0 2px rgba(231,76,60,.35);}',
     '@media (pointer:coarse){.mx-col-del-btn{opacity:.65;}}',
-    /* Drag handle ⠿ for column reordering. */
-    '.mx-drag-handle{display:inline-block;opacity:.45;cursor:grab;font-size:13px;line-height:1;padding:0 4px;margin-left:2px;color:inherit;user-select:none;transition:opacity .15s ease;}',
-    'th:hover .mx-drag-handle{opacity:1;}',
-    '.mx-drag-handle:active{cursor:grabbing;}',
-    'th.mx-dragging{opacity:.45 !important;background:#cfd8dc !important;}',
+    /* Drag handle ⠿ for column reordering. ALWAYS visible; only the colour
+       deepens on hover so the user is never left guessing where to grab. */
+    '.mx-drag-handle{display:inline-flex;align-items:center;justify-content:center;opacity:.85;cursor:grab;font-size:14px;line-height:1;padding:2px 5px;margin-left:3px;color:inherit;user-select:none;-webkit-user-select:none;touch-action:none;border-radius:4px;transition:background .15s ease,opacity .15s ease,transform .15s ease;}',
+    '.mx-drag-handle:hover{opacity:1;background:rgba(255,255,255,.22);transform:scale(1.08);}',
+    '.mx-drag-handle.mx-grabbing,.mx-drag-handle:active{cursor:grabbing;background:rgba(255,255,255,.32);}',
+    /* The header that is currently being dragged becomes a faint placeholder
+       reading "---" so the user can still see "where it came from". */
+    'th.mx-drag-source{position:relative;}',
+    'th.mx-drag-source > *:not(.mx-drag-source-mask){visibility:hidden !important;}',
+    '.mx-drag-source-mask{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#eceff1,#eceff1 6px,#cfd8dc 6px,#cfd8dc 12px);color:#90a4ae;font-weight:900;font-size:14px;letter-spacing:2px;border-radius:4px;}',
+    /* Ghost element: floats with the cursor showing the column label so the
+       drop is unambiguous on touch devices that lack a native drag image. */
+    '.mx-drag-ghost{position:fixed;top:0;left:0;z-index:99999;pointer-events:none;background:linear-gradient(135deg,#1565C0,#42A5F5);color:#fff;border-radius:8px;padding:8px 14px;font-weight:800;font-size:13px;box-shadow:0 8px 24px rgba(21,101,192,.45),0 0 0 2px #fff;white-space:nowrap;direction:rtl;opacity:.94;transform:translate(-50%,-50%);}',
+    '.mx-drag-ghost::before{content:"⠿ ";opacity:.9;}',
+    /* Smooth slide for the cells that are stepping aside. */
+    'th.mx-col-anim,td.mx-col-anim{transition:transform .18s ease,background .15s ease;}',
+    /* Drop-zone background highlight on the th the cursor is currently over. */
+    'th.mx-drop-zone-hover{background:linear-gradient(135deg,rgba(33,150,243,.32),rgba(100,181,246,.32)) !important;outline:2px dashed rgba(13,71,161,.55);outline-offset:-3px;}',
+    'th.mx-drop-zone-invalid{background:linear-gradient(135deg,rgba(229,57,53,.25),rgba(239,83,80,.25)) !important;outline:2px dashed rgba(183,28,28,.55);outline-offset:-3px;}',
+    /* Final flash on every column after a successful reorder. */
     'th.mx-col-flash{animation:mxColFlash .65s ease;}',
     '@keyframes mxColFlash{0%,100%{background:inherit;}50%{background:rgba(46,125,50,.35);}}',
-    '.mx-drop-indicator{position:absolute;width:3px;background:#2196F3;box-shadow:0 0 8px #2196F3;pointer-events:none;z-index:1000;display:none;border-radius:2px;}',
+    /* Thick drop indicator: 3px vertical bar that animates between positions. */
+    '.mx-drop-indicator{position:absolute;width:3px;background:#2196F3;box-shadow:0 0 10px rgba(33,150,243,.85);pointer-events:none;z-index:99998;display:none;border-radius:2px;transition:left .12s ease,top .12s ease,height .12s ease;}',
     '.mx-drop-indicator.show{display:block;}',
-    '@media (pointer:coarse){.mx-drag-handle{opacity:.75;}}',
+    '.mx-drop-indicator::before,.mx-drop-indicator::after{content:"";position:absolute;left:50%;width:11px;height:11px;border-radius:50%;background:#2196F3;transform:translateX(-50%);box-shadow:0 0 8px rgba(33,150,243,.85);}',
+    '.mx-drop-indicator::before{top:-5px;}',
+    '.mx-drop-indicator::after{bottom:-5px;}',
+    /* Saving / undo toast that hovers above the table during reorder save. */
+    '.mx-reorder-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#263238;color:#fff;padding:10px 18px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,.32);z-index:99999;font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:12px;direction:rtl;opacity:0;transition:opacity .18s ease,transform .18s ease;}',
+    '.mx-reorder-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}',
+    '.mx-reorder-toast.saving{background:#1565C0;}',
+    '.mx-reorder-toast.success{background:#2e7d32;}',
+    '.mx-reorder-toast.error{background:#c62828;}',
+    '.mx-reorder-toast .mx-rt-undo{background:#fff;color:#1a237e;border:none;padding:5px 14px;border-radius:999px;font-weight:800;cursor:pointer;font-size:12.5px;}',
+    '.mx-reorder-toast .mx-rt-undo:hover{background:#e3f2fd;}',
+    '.mx-reorder-toast .mx-rt-spinner{display:inline-block;width:14px;height:14px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:mxRtSpin .8s linear infinite;}',
+    '@keyframes mxRtSpin{to{transform:rotate(360deg);}}',
+    '@media (pointer:coarse){.mx-drag-handle{opacity:.95;font-size:16px;padding:4px 7px;}}',
     '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
     '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
     '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
@@ -14445,13 +14474,15 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   }
 
   /* ==================================================================
-   * Column drag-and-drop reordering.
-   * Wire a ⠿ drag-handle span on every header cell; HTML5 drag-and-drop
-   * reorders the thead + the matching <td> in every tbody row, then
-   * PATCHes /api/custom-table/<tid>/reorder-columns so the order sticks
-   * for tables whose renderers respect col_order.
+   * Column drag-and-drop reordering — Pointer Events edition.
+   * Works on mouse, touch, and pen. Replaces HTML5 drag-and-drop, which
+   * had no mobile support. Each ⠿ handle owns its pointer for the
+   * lifetime of the gesture; a custom ghost element follows the cursor;
+   * a thick blue drop indicator + zone highlight tells the user exactly
+   * where the column will land. After a successful drop the server is
+   * PATCHed and a toast offers an instant ↩ تراجع back to the previous
+   * order.
    * ================================================================== */
-  var _mxDragState = null;    /* {table, srcTh, srcIdx} while a drag is in flight */
   var _mxDropIndicator = null;
   function _mxEnsureDropIndicator(){
     if (_mxDropIndicator) return _mxDropIndicator;
@@ -14466,10 +14497,11 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   function _mxShowDropIndicatorAt(rect, leftSide){
     var ind = _mxEnsureDropIndicator();
     ind.classList.add('show');
-    ind.style.top    = (rect.top + window.scrollY) + 'px';
-    ind.style.height = rect.height + 'px';
+    ind.style.top    = (rect.top + window.scrollY - 4) + 'px';
+    ind.style.height = (rect.height + 8) + 'px';
     ind.style.left   = ((leftSide ? rect.left : rect.right) + window.scrollX - 1) + 'px';
   }
+
   function _mxSwapTableColumn(table, fromIdx, toIdx){
     /* Move every row's cell at fromIdx to toIdx. Works for thead and tbody. */
     if (fromIdx === toIdx) return;
@@ -14481,7 +14513,6 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       var moving = kids[fromIdx];
       if (!moving) continue;
       if (toIdx > fromIdx){
-        /* Insert before the element that's one past the target slot. */
         var target = kids[toIdx];
         row.insertBefore(moving, target ? target.nextSibling : null);
       } else {
@@ -14489,16 +14520,21 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       }
     }
   }
+  function _mxClearDropZones(table){
+    table.querySelectorAll('th.mx-drop-zone-hover, th.mx-drop-zone-invalid').forEach(function(el){
+      el.classList.remove('mx-drop-zone-hover');
+      el.classList.remove('mx-drop-zone-invalid');
+    });
+  }
   function _mxCollectCurrentColumnOrder(table){
-    /* Read the ordered list of display labels straight from the live DOM,
-       resolve each to a col_key via the cached column map. */
+    /* Read the ordered list of display labels straight from the live DOM. */
     var labels = [];
     var ths = table.querySelectorAll('thead tr th');
     for (var i=0; i<ths.length; i++){
       var th = ths[i];
       if (th.classList.contains('bulk-col')) continue;
       var clone = th.cloneNode(true);
-      clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle').forEach(function(n){ n.remove(); });
+      clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
       var lbl = (clone.textContent || '').replace(/\s+/g, ' ').trim();
       if (!lbl) continue;
       if (/^(إجراءات|actions|Actions)$/.test(lbl) || lbl === '#') continue;
@@ -14506,115 +14542,279 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     }
     return labels;
   }
-  function _mxPersistReorder(table, tid){
-    /* Collect the live column order, resolve each label to a col_key via
-       /api/custom-table/<tid>/columns, then PATCH the server. */
-    var current = _mxCollectCurrentColumnOrder(table);
-    fetch('/api/custom-table/' + encodeURIComponent(tid) + '/columns', {credentials:'include'})
+
+  /* ---------- Reorder toast (saving + undo) -------------------------- */
+  var _mxReorderToast = null;
+  var _mxReorderToastTimer = null;
+  function _mxToastEl(){
+    if (_mxReorderToast) return _mxReorderToast;
+    _mxReorderToast = document.createElement('div');
+    _mxReorderToast.className = 'mx-reorder-toast';
+    document.body.appendChild(_mxReorderToast);
+    return _mxReorderToast;
+  }
+  function _mxShowSavingToast(){
+    var t = _mxToastEl();
+    t.classList.remove('success','error');
+    t.classList.add('saving','show');
+    t.innerHTML = '<span class="mx-rt-spinner"></span><span>جاري الحفظ...</span>';
+    if (_mxReorderToastTimer){ clearTimeout(_mxReorderToastTimer); _mxReorderToastTimer = null; }
+  }
+  function _mxShowUndoToast(undoFn){
+    var t = _mxToastEl();
+    t.classList.remove('saving','error');
+    t.classList.add('success','show');
+    t.innerHTML = '<span>✅ تم تغيير ترتيب الأعمدة</span>';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mx-rt-undo';
+    btn.textContent = '↩ تراجع';
+    btn.addEventListener('click', function(){
+      _mxHideToast();
+      undoFn();
+    });
+    t.appendChild(btn);
+    if (_mxReorderToastTimer) clearTimeout(_mxReorderToastTimer);
+    _mxReorderToastTimer = setTimeout(_mxHideToast, 6000);
+  }
+  function _mxShowErrorToast(msg){
+    var t = _mxToastEl();
+    t.classList.remove('saving','success');
+    t.classList.add('error','show');
+    t.textContent = msg || 'تعذّر حفظ الترتيب';
+    if (_mxReorderToastTimer) clearTimeout(_mxReorderToastTimer);
+    _mxReorderToastTimer = setTimeout(_mxHideToast, 4500);
+  }
+  function _mxHideToast(){
+    if (!_mxReorderToast) return;
+    _mxReorderToast.classList.remove('show');
+  }
+
+  /* ---------- Persist + undo ----------------------------------------- */
+  function _mxResolveLabelsToKeys(tid, labels){
+    /* Returns a Promise<string[]> of col_keys in the requested label order.
+       Falls back to using the label as the key when no match is found
+       (covers ASCII-keyed tables whose labels equal the col_key). */
+    return fetch('/api/custom-table/' + encodeURIComponent(tid) + '/columns', {credentials:'include'})
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (!d || !d.ok) return;
         var labelToKey = {};
-        (d.columns || []).forEach(function(c){
-          var lbl = (c.col_label || '').replace(/\s+/g, ' ').trim();
-          if (lbl) labelToKey[lbl] = c.col_key;
-          labelToKey[c.col_key] = c.col_key;
-        });
+        if (d && d.ok && Array.isArray(d.columns)){
+          d.columns.forEach(function(c){
+            var lbl = (c.col_label || '').replace(/\s+/g, ' ').trim();
+            if (lbl) labelToKey[lbl] = c.col_key;
+            labelToKey[c.col_key] = c.col_key;
+          });
+        }
         var keys = [];
-        current.forEach(function(it){
-          var k = labelToKey[it.label];
+        labels.forEach(function(lbl){
+          var k = labelToKey[lbl] || lbl;
           if (k) keys.push(k);
         });
-        if (!keys.length) return;
-        fetch('/api/custom-table/' + encodeURIComponent(tid) + '/reorder-columns', {
-          method:'PATCH',
-          headers:{'Content-Type':'application/json'},
-          credentials:'include',
-          body: JSON.stringify({columns: keys})
-        }).then(function(r){ return r.json(); })
-          .then(function(res){
-            if (res && res.ok){
-              if (typeof window.mxToast === 'function') window.mxToast('تم تغيير ترتيب الأعمدة', 'success');
-              /* Brief green flash on every reordered header. */
-              current.forEach(function(it){
-                it.th.classList.add('mx-col-flash');
-                setTimeout(function(){ it.th.classList.remove('mx-col-flash'); }, 700);
-              });
-              /* SYNC RULE: refresh both tbody and the UTEM modal (if
-                 open) so the new col_order is mirrored across both
-                 surfaces immediately. */
-              window.refreshTable(tid);
-            } else {
-              if (typeof window.mxToast === 'function')
-                window.mxToast((res && res.error) || 'تعذّر حفظ الترتيب', 'error');
-            }
-          })
-          .catch(function(){
-            if (typeof window.mxToast === 'function') window.mxToast('خطأ في حفظ الترتيب', 'error');
-          });
+        return keys;
       });
   }
+  function _mxSendReorder(tid, keys){
+    return fetch('/api/custom-table/' + encodeURIComponent(tid) + '/reorder-columns', {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body: JSON.stringify({columns: keys})
+    }).then(function(r){ return r.json(); });
+  }
+  function _mxFlashHeaders(table){
+    var current = _mxCollectCurrentColumnOrder(table);
+    current.forEach(function(it){
+      it.th.classList.add('mx-col-flash');
+      setTimeout(function(){ it.th.classList.remove('mx-col-flash'); }, 700);
+    });
+  }
+  function _mxPersistReorderWithUndo(table, tid, prevLabels){
+    /* Send the new order; on success register an undo handler that
+       PATCHes the previous order back. `prevLabels` is the snapshot
+       captured BEFORE the swap (in DOM order). */
+    var newLabels = _mxCollectCurrentColumnOrder(table).map(function(it){ return it.label; });
+    if (!newLabels.length) return;
+    _mxShowSavingToast();
+    _mxResolveLabelsToKeys(tid, newLabels)
+      .then(function(keys){
+        if (!keys.length) { _mxShowErrorToast('تعذّر حفظ الترتيب'); return; }
+        return _mxSendReorder(tid, keys).then(function(res){
+          if (!res || !res.ok){
+            _mxShowErrorToast((res && res.error) || 'تعذّر حفظ الترتيب');
+            return;
+          }
+          _mxFlashHeaders(table);
+          window.refreshTable(tid);
+          _mxShowUndoToast(function(){
+            /* Undo: send the previous order back. */
+            _mxShowSavingToast();
+            _mxResolveLabelsToKeys(tid, prevLabels).then(function(prevKeys){
+              if (!prevKeys.length){ _mxShowErrorToast('تعذّر التراجع'); return; }
+              _mxSendReorder(tid, prevKeys).then(function(r2){
+                if (r2 && r2.ok){
+                  _mxFlashHeaders(table);
+                  window.refreshTable(tid);
+                  var t = _mxToastEl();
+                  t.classList.remove('saving','error');
+                  t.classList.add('success','show');
+                  t.innerHTML = '<span>✅ تمّ التراجع</span>';
+                  if (_mxReorderToastTimer) clearTimeout(_mxReorderToastTimer);
+                  _mxReorderToastTimer = setTimeout(_mxHideToast, 2500);
+                } else {
+                  _mxShowErrorToast((r2 && r2.error) || 'تعذّر التراجع');
+                }
+              }).catch(function(){ _mxShowErrorToast('خطأ في الاتصال'); });
+            }).catch(function(){ _mxShowErrorToast('خطأ في الاتصال'); });
+          });
+        });
+      })
+      .catch(function(){ _mxShowErrorToast('خطأ في الاتصال'); });
+  }
+
+  /* ---------- Pointer-event drag wiring ------------------------------ */
+  var _mxActiveDrag = null;
+  function _mxDirRtl(el){
+    return getComputedStyle(el).direction === 'rtl' || document.documentElement.dir === 'rtl';
+  }
+  function _mxFindThUnder(table, x, y){
+    var ind = _mxDropIndicator;
+    var ghost = _mxActiveDrag && _mxActiveDrag.ghost;
+    if (ind) ind.style.pointerEvents = 'none';
+    if (ghost) ghost.style.pointerEvents = 'none';
+    var el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    var th = el.closest && el.closest('th');
+    if (!th) return null;
+    /* Must belong to the SAME table's header row. */
+    if (!table.contains(th)) return null;
+    if (th.classList.contains('bulk-col')) return null;
+    var txt = (th.textContent || '').replace(/🔽|✕|⠿/g, '').trim();
+    if (/^(إجراءات|actions|Actions)$/.test(txt) || txt === '#') return null;
+    return th;
+  }
+  function _mxBuildGhost(srcTh){
+    var clone = srcTh.cloneNode(true);
+    clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
+    var label = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+    var g = document.createElement('div');
+    g.className = 'mx-drag-ghost';
+    g.textContent = label;
+    document.body.appendChild(g);
+    return g;
+  }
+  function _mxAttachSourceMask(srcTh){
+    if (srcTh.querySelector('.mx-drag-source-mask')) return;
+    var mask = document.createElement('span');
+    mask.className = 'mx-drag-source-mask';
+    mask.textContent = '— — —';
+    srcTh.appendChild(mask);
+    srcTh.classList.add('mx-drag-source');
+  }
+  function _mxRemoveSourceMask(srcTh){
+    if (!srcTh) return;
+    srcTh.classList.remove('mx-drag-source');
+    var mask = srcTh.querySelector('.mx-drag-source-mask');
+    if (mask) mask.remove();
+  }
   function _mxWireDragHandle(handle, th, table){
-    handle.addEventListener('dragstart', function(ev){
-      var kids = th.parentNode.children;
-      var idx = Array.prototype.indexOf.call(kids, th);
-      _mxDragState = {table: table, srcTh: th, srcIdx: idx};
-      th.classList.add('mx-dragging');
-      try {
-        ev.dataTransfer.effectAllowed = 'move';
-        ev.dataTransfer.setData('text/plain', 'mx-col');
-      } catch(e){}
-    });
-    handle.addEventListener('dragend', function(){
-      if (_mxDragState && _mxDragState.srcTh) _mxDragState.srcTh.classList.remove('mx-dragging');
-      _mxDragState = null;
-      _mxHideDropIndicator();
-    });
-    /* Each <th> becomes a drop target. Wire on the parent th so ANY
-       hover over the header reacts, including cells with no handle
-       yet (edge during rapid DnD). */
-    th.addEventListener('dragover', function(ev){
-      if (!_mxDragState || _mxDragState.table !== table) return;
+    handle.style.touchAction = 'none';
+    handle.addEventListener('pointerdown', function(ev){
+      /* Mouse: only the primary (left) button starts a drag. Touch /
+         pen: any contact starts. */
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
       ev.preventDefault();
-      ev.dataTransfer.dropEffect = 'move';
-      var rect = th.getBoundingClientRect();
-      /* Drop position = before this <th> if the pointer is on its
-         leading (right in RTL) half, else after. */
-      var rtl = getComputedStyle(th).direction === 'rtl' || document.documentElement.dir === 'rtl';
-      var midX = rect.left + rect.width / 2;
-      var before;
-      if (rtl) before = ev.clientX > midX;
-      else     before = ev.clientX < midX;
-      _mxShowDropIndicatorAt(rect, before);
+      ev.stopPropagation();
+      try { handle.setPointerCapture(ev.pointerId); } catch(e){}
+      handle.classList.add('mx-grabbing');
+      document.body.style.userSelect = 'none';
+
+      /* Snapshot pre-reorder labels for the eventual undo. */
+      var prevLabels = _mxCollectCurrentColumnOrder(table).map(function(it){ return it.label; });
+
+      var ghost = _mxBuildGhost(th);
+      _mxAttachSourceMask(th);
+
+      _mxActiveDrag = {
+        table: table, srcTh: th, ghost: ghost, pointerId: ev.pointerId,
+        prevLabels: prevLabels, hoverTh: null, dropBefore: false, moved: false
+      };
+
+      function positionGhost(x, y){
+        ghost.style.left = x + 'px';
+        ghost.style.top  = y + 'px';
+      }
+      positionGhost(ev.clientX, ev.clientY);
+
+      function onMove(mev){
+        if (mev.pointerId !== _mxActiveDrag.pointerId) return;
+        _mxActiveDrag.moved = true;
+        positionGhost(mev.clientX, mev.clientY);
+        var overTh = _mxFindThUnder(table, mev.clientX, mev.clientY);
+        if (!overTh){
+          _mxActiveDrag.hoverTh = null;
+          _mxClearDropZones(table);
+          _mxHideDropIndicator();
+          return;
+        }
+        var dRect = overTh.getBoundingClientRect();
+        var rtl = _mxDirRtl(overTh);
+        var midX = dRect.left + dRect.width / 2;
+        var before = rtl ? mev.clientX > midX : mev.clientX < midX;
+        var srcIdx = Array.prototype.indexOf.call(th.parentNode.children, th);
+        var dIdx   = Array.prototype.indexOf.call(overTh.parentNode.children, overTh);
+        var target = before ? dIdx : dIdx + 1;
+        if (srcIdx < target) target -= 1;
+        var invalid = (target === srcIdx) || overTh === th;
+        _mxClearDropZones(table);
+        overTh.classList.add(invalid ? 'mx-drop-zone-invalid' : 'mx-drop-zone-hover');
+        if (invalid) _mxHideDropIndicator();
+        else _mxShowDropIndicatorAt(dRect, before);
+        _mxActiveDrag.hoverTh = overTh;
+        _mxActiveDrag.dropBefore = before;
+        _mxActiveDrag.invalid = invalid;
+      }
+      function onEnd(uev){
+        if (!_mxActiveDrag) return;
+        if (uev && uev.pointerId !== _mxActiveDrag.pointerId) return;
+        document.removeEventListener('pointermove', onMove, true);
+        document.removeEventListener('pointerup', onEnd, true);
+        document.removeEventListener('pointercancel', onEnd, true);
+        try { handle.releasePointerCapture(_mxActiveDrag.pointerId); } catch(e){}
+        handle.classList.remove('mx-grabbing');
+        document.body.style.userSelect = '';
+
+        var s = _mxActiveDrag;
+        _mxActiveDrag = null;
+
+        if (s.ghost) s.ghost.remove();
+        _mxRemoveSourceMask(s.srcTh);
+        _mxClearDropZones(table);
+        _mxHideDropIndicator();
+
+        /* Cancelled, no-op, or invalid -> do not persist. */
+        if (!s.moved || !s.hoverTh || s.invalid) return;
+
+        var kids = s.srcTh.parentNode.children;
+        var srcIdx = Array.prototype.indexOf.call(kids, s.srcTh);
+        var destIdx = Array.prototype.indexOf.call(kids, s.hoverTh);
+        if (srcIdx < 0 || destIdx < 0) return;
+        var target = s.dropBefore ? destIdx : destIdx + 1;
+        if (srcIdx < target) target -= 1;
+        if (target === srcIdx) return;
+
+        _mxSwapTableColumn(table, srcIdx, target);
+
+        var tid = _mxResolveTid(table);
+        if (tid) _mxPersistReorderWithUndo(table, tid, s.prevLabels);
+      }
+
+      document.addEventListener('pointermove', onMove, true);
+      document.addEventListener('pointerup',   onEnd,  true);
+      document.addEventListener('pointercancel', onEnd, true);
     });
-    th.addEventListener('dragleave', function(){
-      /* Don't hide aggressively — dragover on the next target will update. */
-    });
-    th.addEventListener('drop', function(ev){
-      if (!_mxDragState || _mxDragState.table !== table) return;
-      ev.preventDefault();
-      var destTh = th;
-      if (destTh === _mxDragState.srcTh) { _mxHideDropIndicator(); return; }
-      var kids  = destTh.parentNode.children;
-      var destIdx = Array.prototype.indexOf.call(kids, destTh);
-      var srcIdx  = Array.prototype.indexOf.call(kids, _mxDragState.srcTh);
-      if (srcIdx < 0 || destIdx < 0) { _mxHideDropIndicator(); return; }
-      var rect = destTh.getBoundingClientRect();
-      var rtl  = getComputedStyle(destTh).direction === 'rtl' || document.documentElement.dir === 'rtl';
-      var midX = rect.left + rect.width / 2;
-      var before;
-      if (rtl) before = ev.clientX > midX;
-      else     before = ev.clientX < midX;
-      /* Compute the final target index after pulling the src out. */
-      var target = before ? destIdx : destIdx + 1;
-      if (srcIdx < target) target -= 1;
-      _mxSwapTableColumn(table, srcIdx, target);
-      _mxHideDropIndicator();
-      _mxDragState.srcTh.classList.remove('mx-dragging');
-      _mxDragState = null;
-      var tid = _mxResolveTid(table);
-      if (tid) _mxPersistReorder(table, tid);
-    });
+    /* Block browser-native drag preview if any subtree is draggable. */
+    handle.addEventListener('dragstart', function(ev){ ev.preventDefault(); });
   }
 
   function wireColumnFilters(){
@@ -14649,7 +14849,6 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
           dh.className = 'mx-drag-handle';
           dh.title = 'اسحب لإعادة الترتيب';
           dh.textContent = '⠿';
-          dh.setAttribute('draggable', 'true');
           dh.dataset.colDisplay = currentLabel;
           _mxWireDragHandle(dh, th, table);
           // Insert as the first child so it's always at the start of the th.
