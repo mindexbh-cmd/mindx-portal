@@ -483,7 +483,10 @@ def init_db():
         upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         status TEXT DEFAULT 'قيد المراجعة',
         reviewed_by TEXT,
-        reviewed_at DATETIME)""")
+        reviewed_at DATETIME,
+        installment_number INTEGER,
+        installment_amount NUMERIC,
+        rejection_reason TEXT)""")
     db.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -1303,7 +1306,25 @@ if True:
         upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         status TEXT DEFAULT 'قيد المراجعة',
         reviewed_by TEXT,
-        reviewed_at DATETIME)""")
+        reviewed_at DATETIME,
+        installment_number INTEGER,
+        installment_amount NUMERIC,
+        rejection_reason TEXT)""")
+    # Migrate older parent_receipts schemas to v2 (installment columns).
+    if "parent_receipts_v2" not in applied:
+        try:
+            tq = [r[1] for r in db2.execute("PRAGMA table_info(parent_receipts)").fetchall()]
+            for c, ddl in [
+                ("installment_number", "ALTER TABLE parent_receipts ADD COLUMN installment_number INTEGER"),
+                ("installment_amount", "ALTER TABLE parent_receipts ADD COLUMN installment_amount NUMERIC"),
+                ("rejection_reason",   "ALTER TABLE parent_receipts ADD COLUMN rejection_reason TEXT"),
+            ]:
+                if c not in tq:
+                    try: db2.execute(ddl)
+                    except Exception: pass
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("parent_receipts_v2",))
+            db2.commit()
+        except Exception: pass
     db2.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -2402,16 +2423,29 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
     <h2>&#x1F4B0; &#x637;&#x631;&#x64A;&#x642;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</h2>
     <div id="pp-pay"></div>
   </div>
-  <div class="pp-card pp-section">
-    <h2>&#x1F4CE; &#x631;&#x641;&#x639; &#x625;&#x64A;&#x635;&#x627;&#x644; &#x627;&#x644;&#x62F;&#x641;&#x639;</h2>
+  <div class="pp-card pp-section" id="pp-pick-card" style="display:none;">
+    <h2>&#x1F4CE; &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x642;&#x633;&#x637; &#x627;&#x644;&#x630;&#x64A; &#x62A;&#x631;&#x64A;&#x62F; &#x633;&#x62F;&#x627;&#x62F;&#x647;</h2>
+    <div id="pp-pick-list"></div>
+  </div>
+  <div class="pp-card pp-section" id="pp-upload-card" style="display:none;">
+    <h2 id="pp-upload-title">&#x1F4CE; &#x631;&#x641;&#x639; &#x627;&#x644;&#x625;&#x64A;&#x635;&#x627;&#x644;</h2>
+    <div style="background:#f3e5f5;border:1.5px solid #ce93d8;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:0.88rem;color:#4a148c;">
+      <span id="pp-upload-context"></span>
+      <button type="button" onclick="ppCancelUpload()" style="background:transparent;border:none;color:#c62828;font-weight:800;cursor:pointer;float:left;font-size:0.85rem;">&times; &#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+    </div>
     <label class="pp-upload-zone" id="pp-upload-zone">
       <input type="file" id="pp-file" accept="image/*" capture="environment" onchange="ppFileChange(this)">
       <div class="pp-upload-icon">&#x1F4F7;</div>
       <div class="pp-upload-hint">&#x627;&#x636;&#x63A;&#x637; &#x644;&#x627;&#x644;&#x62A;&#x642;&#x627;&#x637; &#x635;&#x648;&#x631;&#x629; &#x623;&#x648; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div>
     </label>
     <img id="pp-preview" class="pp-preview" alt="">
-    <textarea id="pp-note" class="pp-textarea" placeholder="&#x645;&#x644;&#x627;&#x62D;&#x638;&#x629; (&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631;&#x64A;): &#x631;&#x642;&#x645; &#x627;&#x644;&#x642;&#x633;&#x637;&#x60C; &#x627;&#x644;&#x645;&#x628;&#x644;&#x63A;&#x60C; &#x62A;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x62F;&#x641;&#x639;..."></textarea>
-    <button class="pp-btn pp-btn-secondary" id="pp-send-btn" onclick="ppUpload()" disabled>&#x1F4E4; &#x625;&#x631;&#x633;&#x627;&#x644;</button>
+    <textarea id="pp-note" class="pp-textarea" placeholder="&#x645;&#x644;&#x627;&#x62D;&#x638;&#x629; (&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631;&#x64A;): &#x645;&#x644;&#x627;&#x62D;&#x638;&#x629; &#x644;&#x644;&#x625;&#x62F;&#x627;&#x631;&#x629;..."></textarea>
+    <button class="pp-btn pp-btn-secondary" id="pp-send-btn" onclick="ppUpload()" disabled>&#x1F4E4; &#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x625;&#x64A;&#x635;&#x627;&#x644; &#x644;&#x644;&#x625;&#x62F;&#x627;&#x631;&#x629;</button>
+  </div>
+  <div class="pp-card pp-section" id="pp-paid-msg" style="display:none;">
+    <div style="text-align:center;padding:14px;color:#2E7D32;font-weight:800;font-size:1rem;">
+      &#x2705; &#x62A;&#x645; &#x62F;&#x641;&#x639; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;
+    </div>
   </div>
 </div>
 
@@ -2503,9 +2537,68 @@ function _ppRender(d){
     p += '</div>';
   }
   document.getElementById('pp-pay').innerHTML = p;
+  /* Installment picker — only unpaid installments are clickable.
+     "Unpaid" means status is unpaid OR partial; paid + exempt are
+     hidden so the parent only sees what they still owe. */
+  _ppInstallments = (pd.installments || []).filter(function(i){
+    var st = i.status_label || 'unpaid';
+    return st === 'unpaid' || st === 'partial';
+  });
+  var pickCard = document.getElementById('pp-pick-card');
+  var paidMsg  = document.getElementById('pp-paid-msg');
+  var pickList = document.getElementById('pp-pick-list');
+  var uploadCard = document.getElementById('pp-upload-card');
+  uploadCard.style.display = 'none';
+  if (!pd.has_plan){
+    pickCard.style.display = 'none'; paidMsg.style.display = 'none';
+  } else if (!_ppInstallments.length){
+    pickCard.style.display = 'none'; paidMsg.style.display = '';
+  } else {
+    var ph = '';
+    _ppInstallments.forEach(function(i, idx){
+      var st = i.status_label || 'unpaid';
+      var ic = (st === 'partial') ? '🟡' : '🔴';
+      var rem = (typeof i.remaining === 'number') ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
+      ph += '<button type="button" class="pp-inst ' + st + '" onclick="ppPickInstallment(' + idx + ')" style="cursor:pointer;width:100%;border:1.5px solid;text-align:right;font-family:inherit;display:block;margin-bottom:8px;padding:12px 14px;border-radius:12px;">';
+      ph += '<div class="pp-inst-head" style="font-size:1rem;"><span>القسط ' + i.n + ' — ' + (rem||0) + ' د المتبقي</span><span>' + ic + '</span></div>';
+      ph += '<div style="font-size:0.85rem;color:#555;margin-top:2px;">';
+      ph += 'المبلغ المستحق: <b>' + (i.amount||0) + ' د</b>';
+      if (i.due_date) ph += '  •  تاريخ الاستحقاق: <b>' + _ppEsc(i.due_date) + '</b>';
+      if ((i.paid||0) > 0) ph += '<br>المدفوع سابقاً: <b style="color:#1565C0;">' + i.paid + ' د</b>';
+      ph += '</div></button>';
+    });
+    pickList.innerHTML = ph;
+    pickCard.style.display = '';
+    paidMsg.style.display = 'none';
+  }
   document.getElementById('pp-content').style.display = 'block';
   /* Smooth scroll to results. */
   setTimeout(function(){ document.getElementById('pp-content').scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
+}
+var _ppInstallments = [];
+var _ppCurrentInst = null;
+function ppPickInstallment(idx){
+  var i = _ppInstallments[idx]; if (!i) return;
+  _ppCurrentInst = i;
+  var rem = (typeof i.remaining === 'number') ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
+  document.getElementById('pp-upload-title').innerHTML =
+    'ὌE رفع إيصال القسط ' + i.n + ' (' + (i.amount||0) + ' دينار)';
+  document.getElementById('pp-upload-context').innerHTML =
+    '<b>القسط ' + i.n + '</b> — المبلغ المستحق: <b>' + (i.amount||0) + ' د</b>' +
+    (rem !== (i.amount||0) ? ('  •  المتبقي: <b>' + rem + ' د</b>') : '');
+  /* Reset file/note. */
+  var fi = document.getElementById('pp-file'); if (fi) fi.value = '';
+  document.getElementById('pp-note').value = '';
+  document.getElementById('pp-preview').classList.remove('show');
+  document.getElementById('pp-upload-zone').classList.remove('has-file');
+  document.getElementById('pp-send-btn').disabled = true;
+  document.getElementById('pp-upload-card').style.display = '';
+  /* Scroll to the upload card on mobile. */
+  setTimeout(function(){ document.getElementById('pp-upload-card').scrollIntoView({behavior:'smooth', block:'center'}); }, 60);
+}
+function ppCancelUpload(){
+  _ppCurrentInst = null;
+  document.getElementById('pp-upload-card').style.display = 'none';
 }
 function ppFileChange(inp){
   var f = inp.files && inp.files[0]; var btn = document.getElementById('pp-send-btn');
@@ -2521,6 +2614,7 @@ function ppFileChange(inp){
 }
 function ppUpload(){
   if (!_ppStudent){ _ppToast('ابحث عن الطالب أولاً', 'error'); return; }
+  if (!_ppCurrentInst){ _ppToast('اختر القسط أولاً', 'error'); return; }
   var f = document.getElementById('pp-file').files[0]; if (!f) return;
   var note = document.getElementById('pp-note').value || '';
   var btn = document.getElementById('pp-send-btn'); var prev = btn.innerHTML;
@@ -2531,6 +2625,8 @@ function ppUpload(){
   fd.append('personal_id', _ppStudent.personal_id || '');
   fd.append('note', note);
   fd.append('file', f);
+  fd.append('installment_number', String(_ppCurrentInst.n || ''));
+  fd.append('installment_amount', String(_ppCurrentInst.amount || 0));
   fetch('/api/parent/upload-receipt', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -2542,6 +2638,7 @@ function ppUpload(){
         document.getElementById('pp-preview').classList.remove('show');
         document.getElementById('pp-upload-zone').classList.remove('has-file');
         btn.disabled = true;
+        ppCancelUpload();
       } else {
         _ppToast(d.error || 'خطأ في الرفع', 'error');
       }
@@ -10405,31 +10502,42 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
 .topbar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 22px;border-radius:14px;margin-bottom:14px;box-shadow:0 6px 18px rgba(107,63,160,0.25);}
 .topbar h1{font-size:1.3rem;}
 .topbar a{color:#fff;background:rgba(255,255,255,.18);padding:7px 14px;border-radius:9px;text-decoration:none;font-weight:700;font-size:13px;}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;background:#fff;padding:8px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:14px;}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;background:#fff;padding:8px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:10px;}
 .tab{padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13.5px;color:#555;background:#f4f4f8;border:2px solid transparent;}
 .tab.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
 .tab .cnt{background:rgba(0,0,0,.15);padding:2px 8px;border-radius:999px;margin-right:6px;font-size:11.5px;}
 .tab.active .cnt{background:rgba(255,255,255,.3);}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;padding:10px 14px;border-radius:12px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+.filters label{font-size:12px;font-weight:700;color:#555;}
+.filters input,.filters select{padding:6px 10px;border:1.3px solid #d7dae0;border-radius:8px;font-size:13px;background:#fafbff;direction:rtl;font-family:inherit;}
 .list{display:grid;gap:14px;}
-.rec{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 3px 12px rgba(0,0,0,.06);display:grid;grid-template-columns:1fr 220px;gap:14px;align-items:start;}
-@media(max-width:760px){.rec{grid-template-columns:1fr;}}
+.rec{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 3px 12px rgba(0,0,0,.06);}
 .rec-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
 .rec-head .name{font-weight:800;font-size:1.05rem;color:#4a148c;}
 .rec-head .pid{background:#f5f3ff;padding:3px 10px;border-radius:999px;font-size:12px;color:#6B3FA0;font-weight:700;direction:ltr;}
+.rec-head .group{background:#e0f2f1;padding:3px 10px;border-radius:999px;font-size:12px;color:#00695C;font-weight:700;}
 .rec-head .time{color:#888;font-size:12px;margin-right:auto;}
 .rec-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}
 .rec-status.pending{background:#fff8e1;color:#e65100;}
 .rec-status.approved{background:#e8f5e9;color:#1b5e20;}
 .rec-status.rejected{background:#ffebee;color:#c62828;}
-.rec-note{background:#f8f9fa;border-radius:8px;padding:8px 12px;color:#444;font-size:0.9rem;margin-bottom:8px;white-space:pre-wrap;}
-.rec-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
-.rec-btn{padding:8px 14px;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;}
+.rec-meta{background:#f5f3ff;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:10px 24px;font-size:13px;color:#37474F;}
+.rec-meta b{color:#4a148c;}
+.rec-note{background:#fffde7;border:1px solid #fdd835;border-radius:8px;padding:8px 12px;color:#5d4037;font-size:0.9rem;margin-bottom:10px;white-space:pre-wrap;}
+.rec-rejection{background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:8px 12px;color:#c62828;font-size:0.9rem;margin-bottom:10px;}
+.rec-grid{display:grid;grid-template-columns:1fr 240px;gap:14px;align-items:start;}
+@media(max-width:780px){.rec-grid{grid-template-columns:1fr;}}
+.rec-img{width:100%;max-height:200px;object-fit:cover;border-radius:10px;border:1px solid #ddd;cursor:zoom-in;}
+.rec-pdf{display:flex;align-items:center;justify-content:center;height:200px;background:#f5f3ff;border-radius:10px;border:1px dashed #b39ddb;font-size:1.3rem;font-weight:700;color:#6B3FA0;text-decoration:none;}
+.confirm-bar{background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:8px;}
+.confirm-bar label{font-size:12px;font-weight:700;color:#1b5e20;display:block;margin-bottom:3px;}
+.confirm-bar select,.confirm-bar input{padding:7px 10px;border:1.3px solid #a5d6a7;border-radius:8px;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}
+.confirm-bar input[type=number]{width:120px;direction:ltr;}
+.rec-btn{padding:9px 18px;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;}
 .rec-btn-ok{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;}
 .rec-btn-no{background:linear-gradient(135deg,#c62828,#e53935);color:#fff;}
-.rec-btn-view{background:#1565C0;color:#fff;}
+.rec-btn-reset{background:#eceff1;color:#455a64;}
 .rec-btn:active{transform:translateY(1px);}
-.rec-img{width:100%;max-height:180px;object-fit:cover;border-radius:10px;border:1px solid #ddd;cursor:zoom-in;}
-.rec-pdf{display:flex;align-items:center;justify-content:center;height:180px;background:#f5f3ff;border-radius:10px;border:1px dashed #b39ddb;font-size:1.3rem;font-weight:700;color:#6B3FA0;}
 .empty{padding:50px 20px;text-align:center;color:#888;font-weight:700;background:#fff;border-radius:14px;}
 .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;}
 .lightbox.show{display:flex;}
@@ -10450,81 +10558,158 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
   <button class="tab" data-f="rejected" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-rejected">0</span> &#x274C; &#x645;&#x631;&#x641;&#x648;&#x636;</button>
   <button class="tab" data-f="all" onclick="arSetFilter(this)"><span class="cnt" id="ar-cnt-all">0</span> &#x1F4CB; &#x627;&#x644;&#x643;&#x644;</button>
 </div>
+<div class="filters">
+  <div><label>&#x628;&#x62D;&#x62B;</label><input id="ar-q" type="text" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;..." oninput="_arRender()"></div>
+  <div><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="ar-group" onchange="_arRender()"><option value="">&mdash; &#x627;&#x644;&#x643;&#x644; &mdash;</option></select></div>
+  <div><label>&#x645;&#x646; &#x62A;&#x627;&#x631;&#x64A;&#x62E;</label><input id="ar-from" type="date" onchange="_arRender()"></div>
+  <div><label>&#x625;&#x644;&#x649; &#x62A;&#x627;&#x631;&#x64A;&#x62E;</label><input id="ar-to" type="date" onchange="_arRender()"></div>
+  <button type="button" onclick="arClearFilters()" style="background:#eceff1;border:none;padding:7px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;color:#455a64;">&#x21BA; &#x625;&#x639;&#x627;&#x62F;&#x629; &#x636;&#x628;&#x637;</button>
+</div>
 <div id="ar-list" class="list"></div>
-<div id="ar-lightbox" class="lightbox" onclick="this.classList.remove('show')"><img id="ar-lightbox-img" alt=""></div>
+<div id="ar-lightbox" class="lightbox" onclick="this.classList.remove(\'show\')"><img id="ar-lightbox-img" alt=""></div>
 <div id="ar-toast" class="toast"></div>
 <script>
-var _arData = []; var _arFilter = 'pending';
-function _arEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+var _arData = []; var _arFilter = "pending";
+function _arEsc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
 function _arToast(msg, kind){
-  var t = document.getElementById('ar-toast'); t.className = 'toast' + (kind==='error'?' error':'');
-  t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  var t = document.getElementById("ar-toast"); t.className = "toast" + (kind==="error"?" error":"");
+  t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 4000);
 }
 function _arStatusKey(s){
-  if (s === 'تم التأكيد') return 'approved';
-  if (s === 'مرفوض') return 'rejected';
-  return 'pending';
+  if (s === "تم التأكيد") return "approved";
+  if (s === "مرفوض") return "rejected";
+  return "pending";
 }
 function arLoad(){
-  fetch('/api/admin/receipts', {credentials:'include'})
+  fetch("/api/admin/receipts", {credentials:"include"})
     .then(function(r){ return r.json(); })
     .then(function(d){
       _arData = (d && d.receipts) || [];
       var c = {pending:0, approved:0, rejected:0, all:_arData.length};
-      _arData.forEach(function(r){ c[_arStatusKey(r.status)] = (c[_arStatusKey(r.status)] || 0) + 1; });
-      document.getElementById('ar-cnt-pending').textContent = c.pending;
-      document.getElementById('ar-cnt-approved').textContent = c.approved;
-      document.getElementById('ar-cnt-rejected').textContent = c.rejected;
-      document.getElementById('ar-cnt-all').textContent = c.all;
+      var groups = {};
+      _arData.forEach(function(r){
+        c[_arStatusKey(r.status)] = (c[_arStatusKey(r.status)] || 0) + 1;
+        if (r.group) groups[r.group] = 1;
+      });
+      document.getElementById("ar-cnt-pending").textContent = c.pending;
+      document.getElementById("ar-cnt-approved").textContent = c.approved;
+      document.getElementById("ar-cnt-rejected").textContent = c.rejected;
+      document.getElementById("ar-cnt-all").textContent = c.all;
+      var sel = document.getElementById("ar-group");
+      var keep = sel.value;
+      sel.innerHTML = \'<option value="">— الكل —</option>\';
+      Object.keys(groups).sort().forEach(function(g){
+        var o = document.createElement("option"); o.value = g; o.textContent = g; sel.appendChild(o);
+      });
+      if (keep) sel.value = keep;
       _arRender();
     });
 }
 function arSetFilter(btn){
-  document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
-  btn.classList.add('active'); _arFilter = btn.dataset.f; _arRender();
+  document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("active"); });
+  btn.classList.add("active"); _arFilter = btn.dataset.f; _arRender();
+}
+function arClearFilters(){
+  document.getElementById("ar-q").value = "";
+  document.getElementById("ar-group").value = "";
+  document.getElementById("ar-from").value = "";
+  document.getElementById("ar-to").value = "";
+  _arRender();
+}
+function _arDateOk(d, fromStr, toStr){
+  if (!fromStr && !toStr) return true;
+  var dStr = String(d || "").slice(0, 10); /* YYYY-MM-DD prefix */
+  if (fromStr && dStr < fromStr) return false;
+  if (toStr   && dStr > toStr)   return false;
+  return true;
 }
 function _arRender(){
-  var rows = (_arFilter === 'all') ? _arData : _arData.filter(function(r){ return _arStatusKey(r.status) === _arFilter; });
-  var box = document.getElementById('ar-list');
-  if (!rows.length){ box.innerHTML = '<div class="empty">لا توجد إيصالات في هذا الفلتر</div>'; return; }
+  var rows = (_arFilter === "all") ? _arData : _arData.filter(function(r){ return _arStatusKey(r.status) === _arFilter; });
+  var q = (document.getElementById("ar-q").value || "").trim().toLowerCase();
+  var grp = document.getElementById("ar-group").value || "";
+  var from = document.getElementById("ar-from").value || "";
+  var to   = document.getElementById("ar-to").value || "";
+  if (q)   rows = rows.filter(function(r){ return (r.student_name || "").toLowerCase().indexOf(q) >= 0 || String(r.personal_id || "").indexOf(q) >= 0; });
+  if (grp) rows = rows.filter(function(r){ return r.group === grp; });
+  if (from || to) rows = rows.filter(function(r){ return _arDateOk(r.upload_date, from, to); });
+  var box = document.getElementById("ar-list");
+  if (!rows.length){ box.innerHTML = \'<div class="empty">لا توجد إيصالات في هذا الفلتر</div>\'; return; }
   box.innerHTML = rows.map(function(r){
     var sk = _arStatusKey(r.status);
-    var img = '';
-    if ((r.file_mime || '').indexOf('image/') === 0){
-      img = '<img class="rec-img" src="/api/admin/receipts/' + r.id + '/file" onclick="document.getElementById(\\'ar-lightbox-img\\').src=this.src;document.getElementById(\\'ar-lightbox\\').classList.add(\\'show\\')">';
+    var img;
+    if ((r.file_mime || "").indexOf("image/") === 0){
+      img = \'<img class="rec-img" src="/api/admin/receipts/\' + r.id + \'/file" onclick="document.getElementById(\\\'ar-lightbox-img\\\').src=this.src;document.getElementById(\\\'ar-lightbox\\\').classList.add(\\\'show\\\')">\';
     } else {
-      img = '<a href="/api/admin/receipts/' + r.id + '/file" target="_blank" class="rec-pdf">📄 عرض الملف</a>';
+      img = \'<a href="/api/admin/receipts/\' + r.id + \'/file" target="_blank" class="rec-pdf">📄 عرض الملف</a>\';
     }
-    var actions = '';
-    if (sk === 'pending'){
+    var meta = \'<div class="rec-meta">\';
+    if (r.installment_number) meta += \'<div>القسط: <b>\' + r.installment_number + \'</b></div>\';
+    if (r.installment_amount) meta += \'<div>المبلغ المستحق: <b>\' + r.installment_amount + \' د</b></div>\';
+    meta += \'</div>\';
+    var note = r.note ? (\'<div class="rec-note">📝 \' + _arEsc(r.note) + \'</div>\') : \'\';
+    var rejection = (sk === "rejected" && r.rejection_reason) ? (\'<div class="rec-rejection">❌ سبب الرفض: \' + _arEsc(r.rejection_reason) + \'</div>\') : \'\';
+    var actions;
+    if (sk === "pending"){
+      var instSel = \'<select id="ar-inst-\' + r.id + \'">\';
+      for (var k=1; k<=12; k++){
+        var sel = (parseInt(r.installment_number || 0, 10) === k) ? \' selected\' : \'\';
+        instSel += \'<option value="\' + k + \'"\' + sel + \'>القسط \' + k + \'</option>\';
+      }
+      instSel += \'</select>\';
+      var amt = (r.installment_amount != null && r.installment_amount !== \'\') ? r.installment_amount : 0;
       actions =
-        '<button class="rec-btn rec-btn-ok" onclick="arSetStatus(' + r.id + ',\\'تم التأكيد\\')">✅ تأكيد</button>' +
-        '<button class="rec-btn rec-btn-no" onclick="arSetStatus(' + r.id + ',\\'مرفوض\\')">❌ رفض</button>';
+        \'<div class="confirm-bar">\' +
+          \'<div><label>القسط</label>\' + instSel + \'</div>\' +
+          \'<div><label>المبلغ المدفوع</label><input id="ar-amt-\' + r.id + \'" type="number" min="0" step="0.5" value="\' + amt + \'"></div>\' +
+          \'<button class="rec-btn rec-btn-ok" onclick="arConfirm(\' + r.id + \')">✅ تأكيد وتسجيل الدفع</button>\' +
+          \'<button class="rec-btn rec-btn-no" onclick="arReject(\' + r.id + \')">❌ رفض</button>\' +
+        \'</div>\';
     } else {
-      actions = '<button class="rec-btn" style="background:#eceff1;color:#455a64;" onclick="arSetStatus(' + r.id + ',\\'قيد المراجعة\\')">↺ إعادة للمراجعة</button>';
+      actions = \'<div style="margin-top:8px;"><button class="rec-btn rec-btn-reset" onclick="arResetStatus(\' + r.id + \')">↺ إعادة للمراجعة</button></div>\';
     }
-    return '<div class="rec">' +
-      '<div>' +
-        '<div class="rec-head">' +
-          '<span class="name">' + _arEsc(r.student_name||'—') + '</span>' +
-          '<span class="pid">' + _arEsc(r.personal_id||'—') + '</span>' +
-          '<span class="rec-status ' + sk + '">' + _arEsc(r.status||'—') + '</span>' +
-          '<span class="time">' + _arEsc(r.upload_date||'') + '</span>' +
-        '</div>' +
-        (r.note ? '<div class="rec-note">' + _arEsc(r.note) + '</div>' : '') +
-        '<div class="rec-actions">' + actions + '</div>' +
-      '</div>' +
-      '<div>' + img + '</div>' +
-    '</div>';
-  }).join('');
+    return \'<div class="rec">\' +
+      \'<div class="rec-head">\' +
+        \'<span class="name">\' + _arEsc(r.student_name || "—") + \'</span>\' +
+        \'<span class="pid">\' + _arEsc(r.personal_id || "—") + \'</span>\' +
+        (r.group ? \'<span class="group">\' + _arEsc(r.group) + \'</span>\' : \'\') +
+        \'<span class="rec-status \' + sk + \'">\' + _arEsc(r.status || "—") + \'</span>\' +
+        \'<span class="time">\' + _arEsc(r.upload_date || "") + \'</span>\' +
+      \'</div>\' + meta + note + rejection +
+      \'<div class="rec-grid"><div>\' + actions + \'</div><div>\' + img + \'</div></div>\' +
+    \'</div>\';
+  }).join("");
 }
-function arSetStatus(id, st){
-  fetch('/api/admin/receipts/' + id + '/status', {
-    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-    body: JSON.stringify({status: st})
+function arConfirm(id){
+  var n = parseInt((document.getElementById("ar-inst-" + id) || {}).value || 0, 10);
+  var amt = parseFloat((document.getElementById("ar-amt-" + id) || {}).value || 0);
+  if (!n || !(amt > 0)){ _arToast("أدخل القسط والمبلغ", "error"); return; }
+  fetch("/api/admin/receipts/" + id + "/confirm", {
+    method:"POST", headers:{"Content-Type":"application/json"}, credentials:"include",
+    body: JSON.stringify({n:n, amount:amt})
   }).then(function(r){return r.json();}).then(function(d){
-    if (d && d.ok){ _arToast('✅ ' + st); arLoad(); }
-    else _arToast('خطأ', 'error');
+    if (!d || !d.ok){ _arToast(d && d.error || "خطأ", "error"); return; }
+    _arToast("✅ تم تسجيل دفع القسط " + d.n + " - " + d.amount + " دينار للطالب " + (d.student_name || ""));
+    if (d.wa_url){ window.open(d.wa_url, "_blank"); }
+    arLoad();
+  });
+}
+function arReject(id){
+  var reason = window.prompt("سبب الرفض:");
+  if (reason === null) return;
+  fetch("/api/admin/receipts/" + id + "/reject", {
+    method:"POST", headers:{"Content-Type":"application/json"}, credentials:"include",
+    body: JSON.stringify({reason: reason})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (d && d.ok){ _arToast("❌ تم رفض الإيصال"); arLoad(); }
+    else _arToast(d && d.error || "خطأ", "error");
+  });
+}
+function arResetStatus(id){
+  fetch("/api/admin/receipts/" + id + "/status", {
+    method:"POST", headers:{"Content-Type":"application/json"}, credentials:"include",
+    body: JSON.stringify({status: "قيد المراجعة"})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (d && d.ok){ _arToast("↺ أُعيد للمراجعة"); arLoad(); }
   });
 }
 arLoad();
@@ -10541,21 +10726,40 @@ def admin_receipts_page():
 @login_required
 def api_admin_receipts_list():
     db = get_db()
+    # Pull live column list so we tolerate older paylog schemas without
+    # the v2 installment columns.
+    try:
+        cols = {r[1] for r in db.execute("PRAGMA table_info(parent_receipts)").fetchall()}
+    except Exception:
+        cols = set()
+    base_cols = ["id","student_id","student_name","personal_id","file_mime",
+                 "filename","note","upload_date","status","reviewed_by","reviewed_at"]
+    extra = [c for c in ("installment_number","installment_amount","rejection_reason") if c in cols]
+    sel_cols = base_cols + extra
+    sel = ",".join('"' + c + '"' for c in sel_cols)
     try:
         rows = db.execute(
-            "SELECT id, student_id, student_name, personal_id, file_mime, "
-            "filename, note, upload_date, status, reviewed_by, reviewed_at "
-            "FROM parent_receipts ORDER BY upload_date DESC LIMIT 500"
+            "SELECT " + sel + " FROM parent_receipts ORDER BY upload_date DESC LIMIT 500"
         ).fetchall()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
     out = []
     for r in rows:
         d = dict(r)
-        # Stringify timestamps for the JSON.
         for k in ('upload_date', 'reviewed_at'):
             if d.get(k) is not None and not isinstance(d[k], str):
                 d[k] = str(d[k])
+        # Look up the student\'s group for filter purposes.
+        sid = d.get("student_id")
+        d["group"] = ""
+        if sid:
+            try:
+                gr = db.execute(
+                    "SELECT COALESCE(NULLIF(TRIM(group_name_student),''), TRIM(COALESCE(group_online,''))) "
+                    "FROM students WHERE id=?", (sid,)
+                ).fetchone()
+                if gr and gr[0]: d["group"] = gr[0]
+            except Exception: pass
         out.append(d)
     return jsonify({"ok": True, "receipts": out})
 
@@ -10616,6 +10820,212 @@ def api_admin_receipt_status(rid):
         return jsonify({"ok": False, "error": str(ex)}), 500
     return jsonify({"ok": True})
 
+
+@app.route("/api/admin/receipts/<int:rid>/confirm", methods=["POST"])
+@login_required
+def api_admin_receipt_confirm(rid):
+    """Approve a receipt AND record the payment in payment_log via the
+    existing pay flow. Body: {n: <inst_num>, amount: <paid_amount>}.
+    Both default to whatever the parent submitted on the receipt."""
+    d = request.get_json() or {}
+    db = get_db()
+    rec = db.execute(
+        "SELECT student_id, student_name, personal_id, "
+        "installment_number, installment_amount FROM parent_receipts WHERE id=?",
+        (rid,),
+    ).fetchone()
+    if not rec:
+        return jsonify({"ok": False, "error": "receipt not found"}), 404
+    sid           = rec[0]
+    sname_paylog  = rec[1] or ''
+    pid_paylog    = rec[2] or ''
+    inst_default  = rec[3]
+    amt_default   = rec[4]
+    try:    n = int(d.get('n') or inst_default or 0)
+    except Exception: n = 0
+    amount = _payment_to_float(d.get('amount') if d.get('amount') not in (None, '') else amt_default)
+    if n < 1 or n > 12:
+        return jsonify({"ok": False, "error": "رقم القسط غير صحيح"}), 400
+    if amount <= 0:
+        return jsonify({"ok": False, "error": "المبلغ يجب أن يكون أكبر من صفر"}), 400
+    if not sid:
+        return jsonify({"ok": False, "error": "الإيصال غير مرتبط بطالب"}), 400
+    # Reuse the same pay logic the متابعة الدفع modal uses. We bypass
+    # the normal HTTP route to avoid request-context plumbing; instead
+    # we do the same work inline.
+    plan = _payment_compute_plan(db, sid)
+    if plan is None:
+        return jsonify({"ok": False, "error": "الطالب غير موجود"}), 404
+    target = None
+    for inst in plan["plan"]["installments"]:
+        if inst["n"] == n: target = inst; break
+    if target is None:
+        return jsonify({"ok": False, "error": "القسط غير موجود في خطة الطالب"}), 400
+    if amount > target["remaining"] + 0.005:
+        return jsonify({
+            "ok": False,
+            "error": "المبلغ يتجاوز المتبقي من القسط (" + str(target["remaining"]) + " دينار)",
+            "remaining": target["remaining"],
+        }), 400
+    new_paid = target["paid"] + amount
+    course_amount_now = plan["plan"]["course_amount"]
+    student = plan["student"]
+    pid     = (student.get('personal_id') or pid_paylog or '').strip()
+    sname   = (student.get('name') or sname_paylog or '').strip()
+    # Write to payment_log (same machinery as POST /api/payment/student/<sid>/pay).
+    if n <= 5:
+        try:
+            paid_str = ('%g' % new_paid) if new_paid == int(new_paid) else str(new_paid)
+            inst_col = 'inst' + str(n)
+            msg_col  = 'msg'  + str(n)
+            try:
+                live_cols = {r[1] for r in db.execute(
+                    "PRAGMA table_info(payment_log)"
+                ).fetchall()}
+            except Exception:
+                live_cols = set()
+            has_msg    = msg_col in live_cols
+            has_total  = 'total_paid' in live_cols and 'total_remaining' in live_cols
+            has_amount = 'course_amount' in live_cols
+            row_id = None
+            if pid:
+                r = db.execute(
+                    "SELECT id FROM payment_log WHERE personal_id=? AND personal_id <> '' LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute("SELECT id FROM payment_log WHERE TRIM(student_name)=? LIMIT 1", (sname,)).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute("SELECT id FROM payment_log WHERE student_name ILIKE ? LIMIT 1", ('%' + sname + '%',)).fetchone()
+                if r: row_id = r[0]
+            if row_id is None:
+                cols_  = ['student_name', inst_col]
+                vals_  = [sname, paid_str]
+                if pid: cols_.insert(0, 'personal_id'); vals_.insert(0, pid)
+                if has_msg:    cols_.append(msg_col);          vals_.append('تم الدفع')
+                if has_amount and course_amount_now: cols_.append('course_amount'); vals_.append(course_amount_now)
+                if has_total:  cols_ += ['total_paid', 'total_remaining']; vals_ += [new_paid, max(0.0, (course_amount_now or 0) - new_paid)]
+                ph = ','.join(['?'] * len(vals_))
+                db.execute(
+                    'INSERT INTO payment_log(' + ','.join('"' + c + '"' for c in cols_) + ') VALUES(' + ph + ')',
+                    tuple(vals_),
+                )
+                row_id = db.execute("SELECT MAX(id) FROM payment_log").fetchone()[0]
+            else:
+                set_pairs = ['"' + inst_col + '"=?']; params = [paid_str]
+                if has_msg:    set_pairs.append('"' + msg_col + '"=?');    params.append('تم الدفع')
+                if has_amount and course_amount_now:
+                    set_pairs.append('"course_amount"=?');                 params.append(course_amount_now)
+                params.append(row_id)
+                db.execute('UPDATE payment_log SET ' + ', '.join(set_pairs) + ' WHERE id=?', tuple(params))
+            if has_total:
+                fresh = db.execute(
+                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?', (row_id,),
+                ).fetchone()
+                fresh_total = 0.0
+                for k in range(1, 6):
+                    cell = fresh[k - 1]
+                    if cell is None: continue
+                    s = str(cell).strip()
+                    if not s: continue
+                    if 'تم الدفع' in s or 'معفي' in s or 'معفى' in s:
+                        plan_amt = 0.0
+                        if k == n: plan_amt = target["amount"]
+                        else:
+                            for inst in plan["plan"]["installments"]:
+                                if inst["n"] == k: plan_amt = inst["amount"]; break
+                        fresh_total += plan_amt
+                    else:
+                        fresh_total += _payment_to_float(s)
+                fresh_remaining = max(0.0, (course_amount_now or 0) - fresh_total)
+                db.execute('UPDATE payment_log SET total_paid=?, total_remaining=? WHERE id=?',
+                           (fresh_total, fresh_remaining, row_id))
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": "payment_log write failed: " + str(ex)}), 500
+    # Mirror to student_payments too.
+    try:
+        db.execute(
+            """INSERT INTO student_payments(student_id, inst_num, inst_type, price, paid)
+               VALUES(?,?,?,?,?)
+               ON CONFLICT(student_id, inst_num)
+                 DO UPDATE SET paid=EXCLUDED.paid, price=EXCLUDED.price""",
+            (sid, n, str(n), target["amount"], new_paid),
+        )
+    except Exception: pass
+    # Mark the receipt approved.
+    user = session.get('user') or {}
+    try:
+        db.execute(
+            "UPDATE parent_receipts SET status=?, reviewed_by=?, reviewed_at=?, "
+            "installment_number=?, installment_amount=? WHERE id=?",
+            ('تم التأكيد', user.get('username') or 'admin', _datetime_now_str(),
+             n, amount, rid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Compose a WhatsApp confirmation URL the admin can click.
+    wa_url = ''
+    try:
+        s_row = db.execute("SELECT whatsapp FROM students WHERE id=?", (sid,)).fetchone()
+        wa = (s_row[0] if s_row else '') or ''
+        digits = ''.join(c for c in wa if c.isdigit())
+        if digits.startswith('00'): digits = digits[2:]
+        if len(digits) == 8: digits = '973' + digits
+        if digits:
+            tpl = get_setting('messaging', 'payment_confirmed_template', '') or (
+                'السلام عليكم ولي أمر الطالب/ة {اسم_الطالب}،\n'
+                'تم استلام دفعة القسط رقم {رقم_القسط} بقيمة {المبلغ} دينار وتأكيدها.\n'
+                'شكراً لكم.\nمملكة الإنجليزي'
+            )
+            text = (tpl
+                    .replace('{اسم_الطالب}', sname)
+                    .replace('{رقم_القسط}', str(n))
+                    .replace('{المبلغ}', str(amount)))
+            import urllib.parse as _up
+            wa_url = 'https://wa.me/' + digits + '?text=' + _up.quote(text)
+    except Exception:
+        pass
+    return jsonify({
+        "ok": True,
+        "n": n, "amount": amount,
+        "new_paid": new_paid,
+        "student_name": sname,
+        "wa_url": wa_url,
+    })
+
+
+@app.route("/api/admin/receipts/<int:rid>/reject", methods=["POST"])
+@login_required
+def api_admin_receipt_reject(rid):
+    d = request.get_json() or {}
+    reason = (d.get('reason') or '').strip()
+    user = session.get('user') or {}
+    db = get_db()
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(parent_receipts)").fetchall()}
+    except Exception:
+        live_cols = set()
+    try:
+        if 'rejection_reason' in live_cols:
+            db.execute(
+                "UPDATE parent_receipts SET status=?, reviewed_by=?, reviewed_at=?, "
+                "rejection_reason=? WHERE id=?",
+                ('مرفوض', user.get('username') or 'admin', _datetime_now_str(), reason, rid),
+            )
+        else:
+            db.execute(
+                "UPDATE parent_receipts SET status=?, reviewed_by=?, reviewed_at=? WHERE id=?",
+                ('مرفوض', user.get('username') or 'admin', _datetime_now_str(), rid),
+            )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
 def _datetime_now_str():
     import datetime as _dt
     return _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -10634,6 +11044,12 @@ def api_parent_upload_receipt():
     sname   = (request.form.get('student_name') or '').strip()
     pid     = (request.form.get('personal_id') or '').strip()
     note    = (request.form.get('note') or '').strip()
+    inst_n_raw   = (request.form.get('installment_number') or '').strip()
+    inst_amt_raw = (request.form.get('installment_amount') or '').strip()
+    try:    inst_n = int(inst_n_raw) if inst_n_raw else None
+    except Exception: inst_n = None
+    try:    inst_amt = float(inst_amt_raw) if inst_amt_raw else None
+    except Exception: inst_amt = None
     f = request.files.get('file')
     if not f:
         return jsonify({"ok": False, "error": "لم يتم اختيار ملف"}), 400
@@ -10667,20 +11083,22 @@ def api_parent_upload_receipt():
             import psycopg2 as _ps
             db.execute(
                 "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
-                "file_data, file_mime, filename, note, status) "
-                "VALUES(?,?,?,?,?,?,?,?)",
+                "file_data, file_mime, filename, note, status, "
+                "installment_number, installment_amount) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (sid, sname or check[0] or '', pid,
                  _ps.Binary(blob), mime, f.filename or 'receipt', note,
-                 'قيد المراجعة'),
+                 'قيد المراجعة', inst_n, inst_amt),
             )
         else:
             db.execute(
                 "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
-                "file_data, file_mime, filename, note, status) "
-                "VALUES(?,?,?,?,?,?,?,?)",
+                "file_data, file_mime, filename, note, status, "
+                "installment_number, installment_amount) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (sid, sname or check[0] or '', pid,
                  blob, mime, f.filename or 'receipt', note,
-                 'قيد المراجعة'),
+                 'قيد المراجعة', inst_n, inst_amt),
             )
         db.commit()
     except Exception as ex:
