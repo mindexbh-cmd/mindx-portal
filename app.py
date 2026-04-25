@@ -1583,7 +1583,16 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
   </div>
 </div>
 <div id="tabs" class="tabs"></div>
-<div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x643;&#x627;&#x645;&#x644;&#x629;</button></div><div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
+<div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x643;&#x627;&#x645;&#x644;&#x629;</button></div>
+<div id="msg-tpl-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;"><div style="font-weight:800;color:#0277BD;font-size:1.05rem;">&#x1F4DD; &#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div><div style="font-size:12px;color:#666;">&#x627;&#x644;&#x645;&#x62A;&#x63A;&#x64A;&#x631;&#x627;&#x62A;: <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x637;&#x627;&#x644;&#x628;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x645;&#x639;&#x644;&#x645;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x648;&#x642;&#x62A;_&#x627;&#x644;&#x62D;&#x635;&#x629;}</code></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div><label style="font-weight:800;color:#c62828;display:block;margin-bottom:5px;font-size:13.5px;">&#x1F6AB; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;</label><textarea id="set-tpl-absent" rows="6" style="width:100%;padding:9px;border:1.3px solid #ccc;border-radius:8px;font-size:13px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;line-height:1.6;resize:vertical;background:#fafafa;"></textarea></div>
+    <div><label style="font-weight:800;color:#ef6c00;display:block;margin-bottom:5px;font-size:13.5px;">&#x23F1; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;</label><textarea id="set-tpl-late" rows="6" style="width:100%;padding:9px;border:1.3px solid #ccc;border-radius:8px;font-size:13px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;line-height:1.6;resize:vertical;background:#fafafa;"></textarea></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:10px;"><button id="set-tpl-save" type="button" style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;font-size:13.5px;cursor:pointer;">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x642;&#x648;&#x627;&#x644;&#x628;</button></div>
+</div>
+<div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
 <div id="toast" class="toast"></div>
 <script>
 /* ---------------- color helpers ---------------- */
@@ -2000,6 +2009,48 @@ loadAll();
     });
   }
   refreshLastBackup();
+})();
+
+/* ── Message templates editor on the settings page ───────────────── */
+(function(){
+  var aTa = document.getElementById('set-tpl-absent');
+  var lTa = document.getElementById('set-tpl-late');
+  var saveBtn = document.getElementById('set-tpl-save');
+  if (!aTa || !lTa || !saveBtn) return;
+  var defaults = { absent: '', late: '' };
+  function load(){
+    fetch('/api/messaging/templates', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        defaults.absent = d.default_absent || '';
+        defaults.late   = d.default_late   || '';
+        aTa.value = d.absent || defaults.absent;
+        lTa.value = d.late   || defaults.late;
+      })
+      .catch(function(){});
+  }
+  saveBtn.addEventListener('click', function(){
+    var nameVar = '{اسم_الطالب}';
+    if ((aTa.value || '').indexOf(nameVar) < 0 || (lTa.value || '').indexOf(nameVar) < 0){
+      showToast('يجب أن تحتوي الرسالتان على ' + nameVar, true);
+      return;
+    }
+    var prev = saveBtn.innerHTML;
+    saveBtn.disabled = true; saveBtn.textContent = '⏳ جاري الحفظ...';
+    fetch('/api/messaging/templates', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include',
+      body: JSON.stringify({absent: aTa.value || '', late: lTa.value || ''})
+    }).then(function(r){return r.json();}).then(function(d){
+      saveBtn.disabled = false; saveBtn.innerHTML = prev;
+      if (d && d.ok){ showToast('تم حفظ القوالب'); }
+      else { showToast((d && d.error) || 'خطأ في الحفظ', true); }
+    }).catch(function(){
+      saveBtn.disabled = false; saveBtn.innerHTML = prev;
+      showToast('خطأ في الاتصال', true);
+    });
+  });
+  load();
 })();
 </script>
 </body>
@@ -4866,6 +4917,36 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
       </div>
       <span class="student-count" id="studentCount" style="display:none;"></span>
       <div class="spinner" id="checkSpinner"><div class="spin-circle"></div><span>&#1580;&#1575;&#1585;&#1610; &#1575;&#1604;&#1578;&#1581;&#1602;&#1602;...</span></div>
+      <button type="button" id="btnEditTemplates" onclick="openMsgTemplatesModal()" style="margin-right:auto;background:linear-gradient(135deg,#0277BD,#0288D1);color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(2,119,189,0.25);">&#x1F4DD; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x642;&#x648;&#x627;&#x644;&#x628; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</button>
+    </div>
+  </div>
+  <!-- Message-templates modal -->
+  <div id="msgTplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;align-items:center;justify-content:center;padding:18px;">
+    <div style="background:#fff;border-radius:14px;max-width:760px;width:100%;max-height:92vh;overflow-y:auto;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,0.3);direction:rtl;">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px dashed #e0e0e0;padding-bottom:10px;margin-bottom:14px;">
+        <h2 style="font-size:1.2rem;color:#0277BD;display:flex;align-items:center;gap:8px;">&#x1F4DD; &#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</h2>
+        <button type="button" onclick="closeMsgTemplatesModal()" style="background:none;border:none;font-size:24px;color:#666;cursor:pointer;">&times;</button>
+      </div>
+
+      <div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1.5px solid #ffb74d;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12.5px;color:#5d4037;font-weight:600;">
+        &#x1F4A1; &#x627;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x627;&#x644;&#x645;&#x62A;&#x63A;&#x64A;&#x631;&#x627;&#x62A; &#x627;&#x644;&#x62A;&#x627;&#x644;&#x64A;&#x629; &#x644;&#x625;&#x62F;&#x631;&#x627;&#x62C; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x643;&#x644; &#x631;&#x633;&#x627;&#x644;&#x629;:
+        <div id="tplVarsBar" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      </div>
+
+      <label style="font-weight:800;color:#c62828;display:block;margin-bottom:5px;font-size:14px;">&#x1F6AB; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;</label>
+      <textarea id="tplAbsent" rows="7" style="width:100%;padding:10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;line-height:1.7;resize:vertical;background:#fafafa;"></textarea>
+
+      <label style="font-weight:800;color:#ef6c00;display:block;margin:14px 0 5px;font-size:14px;">&#x23F1; &#x631;&#x633;&#x627;&#x644;&#x629; &#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;</label>
+      <textarea id="tplLate" rows="7" style="width:100%;padding:10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;line-height:1.7;resize:vertical;background:#fafafa;"></textarea>
+
+      <div id="tplPreviewBox" style="display:none;background:#e8f5e9;border:1.5px solid #66bb6a;border-radius:10px;padding:12px;margin-top:14px;white-space:pre-wrap;font-size:13px;line-height:1.8;color:#1b5e20;"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">
+        <button type="button" onclick="closeMsgTemplatesModal()" style="background:#eceff1;color:#455a64;border:none;padding:10px 18px;border-radius:9px;font-weight:700;font-size:13.5px;cursor:pointer;">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+        <button type="button" onclick="resetMsgTemplatesToDefaults()" style="background:#fff3e0;color:#e65100;border:1.5px solid #ffb74d;padding:10px 18px;border-radius:9px;font-weight:700;font-size:13.5px;cursor:pointer;">&#x21BA; &#x627;&#x644;&#x639;&#x648;&#x62F;&#x629; &#x644;&#x644;&#x627;&#x641;&#x62A;&#x631;&#x627;&#x636;&#x64A;</button>
+        <button type="button" onclick="previewMsgTemplate()" style="background:#0288D1;color:#fff;border:none;padding:10px 18px;border-radius:9px;font-weight:700;font-size:13.5px;cursor:pointer;">&#x1F441; &#x645;&#x639;&#x627;&#x64A;&#x646;&#x629;</button>
+        <button type="button" onclick="saveMsgTemplates()" style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:10px 22px;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 3px 10px rgba(46,125,50,0.35);">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x642;&#x648;&#x627;&#x644;&#x628;</button>
+      </div>
     </div>
   </div>
 
@@ -5022,26 +5103,142 @@ function onWaSent(link) {
   }
 }
 
-function buildWaMsg(name, status) {
-  var date = document.getElementById('dateInput') ? document.getElementById('dateInput').value : '';
-  var dayBadge = document.getElementById('dayBadge');
-  var day = (dayBadge && !dayBadge.className.includes('empty')) ? dayBadge.textContent.trim() : '';
-  var dateFormatted = date;
-  if (date && date.includes('-')) {
-    var parts = date.split('-');
-    if (parts.length === 3) dateFormatted = parts[2] + '/' + parts[1] + '/' + parts[0];
+/* Editable absent / late templates — pulled from /api/messaging/templates 
+   on page load and cached in _attTpl. buildWaMsg() interpolates the
+   placeholders {\u0627\u0633\u0645_\u0627\u0644\u0637\u0627\u0644\u0628} {\u0627\u0644\u062A\u0627\u0631\u064A\u062E} {\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629} {\u0627\u0633\u0645_\u0627\u0644\u0645\u0639\u0644\u0645}
+   {\u0648\u0642\u062A_\u0627\u0644\u062D\u0635\u0629} at send time. Defaults come from the server so a
+   fresh DB still produces sensible Arabic text. */
+var _attTpl = { absent: "", late: "", defaultAbsent: "", defaultLate: "", vars: [] };
+function _attLoadTemplates(){
+  return fetch("/api/messaging/templates", {credentials:"include"})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok){
+        _attTpl.absent = d.absent || "";
+        _attTpl.late   = d.late   || "";
+        _attTpl.defaultAbsent = d.default_absent || "";
+        _attTpl.defaultLate   = d.default_late   || "";
+        _attTpl.vars   = d.variables || [];
+      }
+    })
+    .catch(function(){});
+}
+function _attRenderTemplate(tpl, ctx){
+  if (!tpl) return "";
+  var name = (ctx && ctx.name) || "";
+  var date = (ctx && ctx.date) || "";
+  var group = (ctx && ctx.group) || "";
+  var teacher = (ctx && ctx.teacher) || "";
+  var time = (ctx && ctx.time) || "";
+  return String(tpl)
+    .replace(/\{\u0627\u0633\u0645_\u0627\u0644\u0637\u0627\u0644\u0628\}/g, name)
+    .replace(/\{\u0627\u0644\u062A\u0627\u0631\u064A\u062E\}/g, date)
+    .replace(/\{\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629\}/g, group)
+    .replace(/\{\u0627\u0633\u0645_\u0627\u0644\u0645\u0639\u0644\u0645\}/g, teacher)
+    .replace(/\{\u0648\u0642\u062A_\u0627\u0644\u062D\u0635\u0629\}/g, time);
+}
+function _attLookupTeacher(){
+  var sel = document.getElementById("groupSelect");
+  if (!sel) return "";
+  var g = sel.value || "";
+  if (!g || !groupsData) return "";
+  var arr = groupsData[g] || [];
+  for (var i=0; i<arr.length; i++){
+    if (arr[i].teacher_2026) return arr[i].teacher_2026;
   }
-  var isAbsent = (status === '\u063a\u0627\u0626\u0628');
-  var statusWord = isAbsent ? '\u063a\u0627\u0626\u0628\u064b\u0627' : '\u0645\u062a\u0623\u062e\u0631\u064b\u0627';
-  var NL = String.fromCharCode(10);
-  var msg = '\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0648\u0631\u062d\u0645\u0629 \u0627\u0644\u0644\u0647 \u0648\u0628\u0631\u0643\u0627\u062a\u0647' + NL + NL
-    + '\u0648\u0644\u064a \u0623\u0645\u0631 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + '\u060c' + NL
-    + '\u0646\u0648\u062f \u0625\u062d\u0627\u0637\u062a\u0643\u0645 \u0639\u0644\u0645\u064b\u0627 \u0628\u0623\u0646 \u0627\u0644\u0637\u0627\u0644\u0628/\u0629 ' + name + ' \u0643\u0627\u0646 ' + statusWord + ' \u064a\u0648\u0645 ' + day + ' \u0627\u0644\u0645\u0648\u0627\u0641\u0642 ' + dateFormatted + NL + NL
-    + '\u0648\u062d\u0631\u0635\u064b\u0627 \u0645\u0646\u0627 \u0639\u0644\u0649 \u0645\u062a\u0627\u0628\u0639\u0629 \u0623\u0628\u0646\u0627\u0626\u0646\u0627 \u0627\u0644\u0637\u0644\u0628\u0629 \u0648\u0627\u0644\u0627\u0637\u0645\u0626\u0646\u0627\u0646 \u0639\u0644\u0649 \u0645\u0633\u062a\u0648\u0627\u0647\u0645 \u0627\u0644\u062f\u0631\u0627\u0633\u064a\u060c \u0646\u0623\u0645\u0644 \u062f\u0639\u0645\u0643\u0645 \u0627\u0644\u0643\u0631\u064a\u0645 \u0641\u064a \u062a\u0639\u0632\u064a\u0632 \u0627\u0644\u0627\u0644\u062a\u0632\u0627\u0645 \u0628\u0627\u0644\u062d\u0636\u0648\u0631 \u0627\u0644\u0645\u0646\u062a\u0638\u0645\u060c \u0644\u0645\u0627 \u0644\u0630\u0644\u0643 \u0645\u0646 \u0623\u062b\u0631 \u0625\u064a\u062c\u0627\u0628\u064a \u0641\u064a \u0627\u0633\u062a\u064a\u0639\u0627\u0628 \u0627\u0644\u062f\u0631\u0648\u0633 \u0648\u0636\u0645\u0627\u0646 \u062a\u0633\u0644\u0633\u0644 \u0627\u0644\u0639\u0645\u0644\u064a\u0629 \u0627\u0644\u062a\u0639\u0644\u064a\u0645\u064a\u0629\u060c \u062d\u064a\u062b \u0625\u0646 \u0627\u0644\u063a\u064a\u0627\u0628 \u0648\u0627\u0644\u062a\u0623\u062e\u0631 \u0627\u0644\u0645\u062a\u0643\u0631\u0631 \u0642\u062f \u064a\u0624\u062b\u0631 \u0633\u0644\u0628\u064b\u0627 \u0639\u0644\u0649 \u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u062f\u0631\u0627\u0633\u064a.' + NL + NL
-    + '\u0646\u0634\u0643\u0631 \u0644\u0643\u0645 \u062d\u0633\u0646 \u062a\u0639\u0627\u0648\u0646\u0643\u0645 \u0648\u0627\u0647\u062a\u0645\u0627\u0645\u0643\u0645\u060c \u0648\u0646\u062a\u0645\u0646\u0649 \u0644\u0644\u0637\u0627\u0644\u0628/\u0629 \u062f\u0648\u0627\u0645 \u0627\u0644\u062a\u0648\u0641\u064a\u0642 \u0648\u0627\u0644\u0646\u062c\u0627\u062d.' + NL + NL
-    + '\u060c\u0648\u062a\u0641\u0636\u0644\u0648\u0627 \u0628\u0642\u0628\u0648\u0644 \u0641\u0627\u0626\u0642 \u0627\u0644\u0627\u062d\u062a\u0631\u0627\u0645 \u0648\u0627\u0644\u062a\u0642\u062f\u064a\u0631' + NL + NL
-    + '\u0645\u0645\u0644\u0643\u0629 \u0627\u0644\u0625\u0646\u062c\u0644\u064a\u0632\u064a';
-  return msg;
+  return "";
+}
+function _attLookupClassTime(){ return ""; }
+function buildWaMsg(name, status) {
+  var date = document.getElementById("dateInput") ? document.getElementById("dateInput").value : "";
+  var dayBadge = document.getElementById("dayBadge");
+  var day = (dayBadge && !dayBadge.className.includes("empty")) ? dayBadge.textContent.trim() : "";
+  var dateFormatted = date;
+  if (date && date.indexOf("-") >= 0) {
+    var parts = date.split("-");
+    if (parts.length === 3) dateFormatted = parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+  if (day) dateFormatted = day + " " + dateFormatted;
+  var isAbsent = (status === "\u063A\u0627\u0626\u0628");
+  var tpl = isAbsent ? (_attTpl.absent || _attTpl.defaultAbsent) : (_attTpl.late || _attTpl.defaultLate);
+  var group = (document.getElementById("groupSelect") || {}).value || "";
+  return _attRenderTemplate(tpl, {name:name||"", date:dateFormatted, group:group, teacher:_attLookupTeacher(), time:_attLookupClassTime()});
+}
+/* ── Templates modal handlers ── */
+function openMsgTemplatesModal(){
+  var m = document.getElementById("msgTplModal");
+  if (!m) return;
+  m.style.display = "flex";
+  _attLoadTemplates().then(function(){
+    document.getElementById("tplAbsent").value = _attTpl.absent || _attTpl.defaultAbsent || "";
+    document.getElementById("tplLate").value   = _attTpl.late   || _attTpl.defaultLate   || "";
+    var bar = document.getElementById("tplVarsBar"); bar.innerHTML = "";
+    (_attTpl.vars || []).forEach(function(v){
+      var chip = document.createElement("button");
+      chip.type = "button"; chip.textContent = v.key; chip.title = v.desc || "";
+      chip.style.cssText = "background:#fff;border:1.3px solid #ffb74d;color:#e65100;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;";
+      chip.addEventListener("click", function(){ _tplInsertAtCursor(v.key); });
+      bar.appendChild(chip);
+    });
+    document.getElementById("tplPreviewBox").style.display = "none";
+  });
+}
+function closeMsgTemplatesModal(){
+  var m = document.getElementById("msgTplModal"); if (m) m.style.display = "none";
+  var pb = document.getElementById("tplPreviewBox"); if (pb) pb.style.display = "none";
+}
+function _tplActiveTextarea(){
+  var ae = document.activeElement;
+  if (ae && (ae.id === "tplAbsent" || ae.id === "tplLate")) return ae;
+  return document.getElementById("tplAbsent");
+}
+function _tplInsertAtCursor(text){
+  var ta = _tplActiveTextarea(); if (!ta) return;
+  var start = ta.selectionStart || 0, end = ta.selectionEnd || 0, v = ta.value;
+  ta.value = v.slice(0, start) + text + v.slice(end);
+  ta.selectionStart = ta.selectionEnd = start + text.length; ta.focus();
+}
+function previewMsgTemplate(){
+  var sel = document.getElementById("groupSelect");
+  var group = (sel && sel.value) || "\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629";
+  var sampleName = "\u0623\u062D\u0645\u062F \u0645\u062D\u0645\u062F";
+  var dateInput = document.getElementById("dateInput");
+  var d = (dateInput && dateInput.value) || "";
+  if (d && d.indexOf("-") >= 0){ var p = d.split("-"); if (p.length === 3) d = p[2] + "/" + p[1] + "/" + p[0]; }
+  if (!d) d = new Date().toLocaleDateString("ar-EG");
+  var ctx = {name: sampleName, date: d, group: group, teacher: _attLookupTeacher(), time: ""};
+  var absentTxt = _attRenderTemplate(document.getElementById("tplAbsent").value || "", ctx);
+  var lateTxt   = _attRenderTemplate(document.getElementById("tplLate").value   || "", ctx);
+  var box = document.getElementById("tplPreviewBox");
+  box.textContent = "\u1F6AB \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u063A\u0627\u0626\u0628 \u2014 \u0645\u0639\u0627\u064A\u0646\u0629 \u0644\u0640 \"" + sampleName + "\"\n----------\n" + absentTxt + "\n\n\u23F1 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0645\u062A\u0623\u062E\u0631 \u2014 \u0645\u0639\u0627\u064A\u0646\u0629 \u0644\u0640 \"" + sampleName + "\"\n----------\n" + lateTxt;
+  box.style.display = "block";
+}
+function resetMsgTemplatesToDefaults(){
+  if (!confirm("\u0627\u0644\u0639\u0648\u062F\u0629 \u0625\u0644\u0649 \u0627\u0644\u0642\u0648\u0627\u0644\u0628 \u0627\u0644\u0627\u0641\u062A\u0631\u0627\u0636\u064A\u0629\u061F")) return;
+  document.getElementById("tplAbsent").value = _attTpl.defaultAbsent || "";
+  document.getElementById("tplLate").value   = _attTpl.defaultLate   || "";
+}
+function saveMsgTemplates(){
+  var absentTxt = document.getElementById("tplAbsent").value || "";
+  var lateTxt   = document.getElementById("tplLate").value   || "";
+  var nameVar = "{\u0627\u0633\u0645_\u0627\u0644\u0637\u0627\u0644\u0628}";
+  if (absentTxt.indexOf(nameVar) < 0 || lateTxt.indexOf(nameVar) < 0){
+    showToast("\u064A\u062C\u0628 \u0623\u0646 \u062A\u062D\u062A\u0648\u064A \u0627\u0644\u0631\u0633\u0627\u0644\u062A\u0627\u0646 \u0639\u0644\u0649 " + nameVar, "#e53935"); return;
+  }
+  fetch("/api/messaging/templates", {method:"PUT", headers:{"Content-Type":"application/json"}, credentials:"include", body: JSON.stringify({absent: absentTxt, late: lateTxt})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d && d.ok){
+        _attTpl.absent = absentTxt; _attTpl.late = lateTxt;
+        showToast("\u062A\u0645 \u062D\u0641\u0638 \u0627\u0644\u0642\u0648\u0627\u0644\u0628", "#43A047");
+        closeMsgTemplatesModal();
+        var sel2 = document.getElementById("groupSelect");
+        if (sel2 && sel2.value) onControlChange();
+      } else {
+        showToast((d && d.error) || "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062D\u0641\u0638", "#e53935");
+      }
+    })
+    .catch(function(){ showToast("\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644", "#e53935"); });
 }
 
 function loadGroups() {
@@ -5370,6 +5567,7 @@ function saveAllAttendance() {
 }
 
 loadGroups();
+_attLoadTemplates();
 </script>
 </body>
 </html>"""
@@ -10143,6 +10341,85 @@ def api_settings_patch():
                 "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
                 (page, component, component, value),
             )
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+# ─── Attendance message templates (absent / late) ───────────────────
+# Two settings rows store the editable Arabic templates that the
+# attendance page uses when generating a WhatsApp message for an
+# absent or late student. Placeholders inside the template are
+# substituted at send time:
+#   {اسم_الطالب}  → student_name (mandatory; never omitted)
+#   {التاريخ}     → today's date (formatted)
+#   {المجموعة}    → group_name
+#   {اسم_المعلم}  → teacher_name from group settings
+#   {وقت_الحصة}   → class time from group settings
+DEFAULT_ABSENT_TEMPLATE = (
+    "السلام عليكم ورحمة الله وبركاته\n\n"
+    "ولي أمر الطالب/ة {اسم_الطالب}،\n"
+    "نود إحاطتكم علماً بأن الطالب/ة {اسم_الطالب} كان غائباً عن "
+    "حصة {المجموعة} يوم {التاريخ}.\n\n"
+    "نأمل دعمكم في تعزيز الالتزام بالحضور المنتظم، لما لذلك من أثر "
+    "إيجابي في استيعاب الدروس وتسلسل العملية التعليمية.\n\n"
+    "شكراً لكم على حسن تعاونكم.\n"
+    "مملكة الإنجليزي"
+)
+DEFAULT_LATE_TEMPLATE = (
+    "السلام عليكم ورحمة الله وبركاته\n\n"
+    "ولي أمر الطالب/ة {اسم_الطالب}،\n"
+    "نود إحاطتكم علماً بأن الطالب/ة {اسم_الطالب} تأخر عن "
+    "حصة {المجموعة} يوم {التاريخ}.\n\n"
+    "نأمل دعمكم في تعزيز الالتزام بالحضور في الموعد المحدد.\n\n"
+    "شكراً لكم على حسن تعاونكم.\n"
+    "مملكة الإنجليزي"
+)
+
+@app.route('/api/messaging/templates', methods=['GET'])
+@login_required
+def api_messaging_templates_get():
+    absent = get_setting('messaging', 'absent_template', '') or DEFAULT_ABSENT_TEMPLATE
+    late   = get_setting('messaging', 'late_template',   '') or DEFAULT_LATE_TEMPLATE
+    return jsonify({
+        "ok": True,
+        "absent": absent,
+        "late":   late,
+        "default_absent": DEFAULT_ABSENT_TEMPLATE,
+        "default_late":   DEFAULT_LATE_TEMPLATE,
+        "variables": [
+            {"key": "{اسم_الطالب}", "desc": "اسم الطالب (إلزامي)"},
+            {"key": "{التاريخ}",   "desc": "تاريخ الحصة"},
+            {"key": "{المجموعة}",   "desc": "اسم المجموعة"},
+            {"key": "{اسم_المعلم}", "desc": "اسم المعلم"},
+            {"key": "{وقت_الحصة}",  "desc": "وقت الحصة"},
+        ],
+    })
+
+@app.route('/api/messaging/templates', methods=['PUT', 'PATCH'])
+@login_required
+def api_messaging_templates_put():
+    d = request.get_json() or {}
+    db = get_db()
+    pairs = []
+    if 'absent' in d:
+        pairs.append(('absent_template', 'قالب رسالة الغائب', d.get('absent') or ''))
+    if 'late'   in d:
+        pairs.append(('late_template',   'قالب رسالة المتأخر', d.get('late')   or ''))
+    if not pairs:
+        return jsonify({"ok": False, "error": "no template provided"}), 400
+    try:
+        for component, label, value in pairs:
+            cur = db.execute(
+                "UPDATE settings SET value=?, label=? WHERE page=? AND component=?",
+                (value, label, 'messaging', component),
+            )
+            if cur.rowcount == 0:
+                db.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                    ('messaging', component, label, value),
+                )
         db.commit()
         return jsonify({"ok": True})
     except Exception as ex:
