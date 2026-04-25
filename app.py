@@ -4742,116 +4742,208 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:20px auto;border-radius:14px;max-width:99%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(107,63,160,0.25);"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4B3; &#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:160px;font-size:0.95rem;"><option value="">&mdash; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &mdash;</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</label><div style="display:flex;gap:8px;align-items:center;"><input type="date" id="pm-date" onchange="pmSetDay()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:0.95rem;"><label style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#4a148c;background:#ede7f6;padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;cursor:pointer;white-space:nowrap;user-select:none;"><input type="checkbox" id="pm-all-dates" onchange="pmToggleAllDates()" style="accent-color:#6B3FA0;cursor:pointer;">&#x1F5D3;&#xFE0F; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x62A;&#x648;&#x627;&#x631;&#x64A;&#x62E;</label></div></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x627;&#x644;&#x64A;&#x648;&#x645;</label><input type="text" id="pm-day" readonly style="padding:7px 12px;border-radius:8px;border:1.5px solid #ccc;background:#f0f0f0;min-width:90px;font-size:0.95rem;"></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">&#x628;&#x62D;&#x62B;</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645;..." style="padding:7px 12px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:170px;font-size:0.95rem;"></div></div></div><div style="overflow-x:auto;"><table id="pm-tbl" style="border-collapse:collapse;width:100%;min-width:400px;font-size:0.76rem;"><thead><tr style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;text-align:center;"><th rowspan="2" style="padding:8px 14px;border:1px solid #9b6fd4;position:sticky;right:0;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);z-index:2;min-width:140px;">&#x627;&#x644;&#x627;&#x633;&#x645;</th><th colspan="4" style="padding:7px 4px;border:1px solid #9b6fd4;">&#x642;&#x633;&#x637; 1</th></tr><tr style="background:#ede7f6;color:#4a148c;text-align:center;"><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x646;&#x648;&#x639; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x633;&#x639;&#x631;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;</th><th style="padding:5px 3px;border:1px solid #c5b3e6;white-space:nowrap;">&#x627;&#x644;&#x645;&#x62A;&#x628;&#x642;&#x64A;</th></tr></thead><tbody id="pm-tbody"></tbody></table></div></div></div>
-<script>
-var _pmStudents=[];var _pmTaqseet=[];
-function _norm(s){return(s||"").replace(/[\u0623\u0625\u0622\u0671]/g,"\u0627").replace(/\u0629/g,"\u0647").replace(/\u0649/g,"\u064A");}
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث بالاسم</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="ابحث بالاسم..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:200px;font-size:0.95rem;"></div><div id="pm-summary" style="margin-right:auto;display:none;background:#fff;border:1.5px solid #8B5CC8;border-radius:10px;padding:8px 14px;font-size:13px;color:#4a148c;font-weight:700;"><div>إجمالي مبالغ الدورات: <span id="pm-sum-course" style="color:#1B5E20;">0</span> د</div><div>إجمالي المدفوع: <span id="pm-sum-paid" style="color:#1565C0;">0</span> د</div><div>إجمالي المتبقي: <span id="pm-sum-remain" style="color:#c62828;">0</span> د</div><div>نسبة التحصيل: <span id="pm-sum-pct">0%</span></div></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
+/* ── متابعة الدفع — student-card workflow ───────────────────────── */
+function _pmNorm(s){return(s||"").replace(/[\u0623\u0625\u0622\u0671]/g,"\u0627").replace(/\u0629/g,"\u0647").replace(/\u0649/g,"\u064A");}
+var _pmGroupCache = null;     /* {groupName: [{id,name}]} */
+var _pmCurrentGroup = "";
+var _pmStudentRows = [];      /* DOM row info for the current view */
+function _pmToast(msg, kind){
+  var t = document.getElementById("pm-toast"); if(!t) return;
+  t.className = ""; if(kind) t.classList.add(kind); t.classList.add("show");
+  t.textContent = msg;
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 3500);
+}
 function pmOpen(){
-  document.getElementById("pay-modal").style.display="block";
-  if(!window._pmGL){window._pmGL=true;
-    fetch("/api/students").then(r=>r.json()).then(function(data){
-      var seen={};var sel=document.getElementById("pm-group");
-      (data.students||data).forEach(function(st){
-        var g=st.group_name_student||"";
-        if(g&&!seen[g]){seen[g]=1;var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o);}
-      });
-      _pmStudents=data.students||data;
-      fetch("/api/taqseet").then(function(r){return r.json();}).then(function(tq){_pmTaqseet=Array.isArray(tq)?tq:(tq&&tq.rows)||[];});
-    });
-  }
-}
-function pmTypeChange(sel){
-  var inst=sel.dataset.inst;
-  var val=sel.value;
-  if(!val)return;
-  var sid=sel.dataset.sid;
-  var studentMethod=null;
-  for(var m=0;m<_pmStudents.length;m++){if(String(_pmStudents[m].id)===String(sid)){studentMethod=String(_pmStudents[m].installment_type||"");break;}}
-  if(!studentMethod)return;
-  var tq=null;
-  for(var k=0;k<_pmTaqseet.length;k++){if(String(_pmTaqseet[k].taqseet_method)===studentMethod){tq=_pmTaqseet[k];break;}}
-  if(!tq)return;
-  var price=tq["inst"+val]||"";
-  var row=sel.closest("tr");
-  if(!row)return;
-  var priceInp=null;var _ps=row.querySelectorAll(".pm-price");for(var _pi=0;_pi<_ps.length;_pi++){if(String(_ps[_pi].dataset.inst)===String(inst)){priceInp=_ps[_pi];break;}}
-  if(priceInp&&(priceInp.value===null||priceInp.value===""||priceInp.value==="0")){priceInp.value=price;pmCalc(priceInp);}
-}
-function pmSetDay(){
-  var cb=document.getElementById("pm-all-dates");
-  if (cb && cb.checked) { document.getElementById("pm-day").value=""; return; }
-  var d=document.getElementById("pm-date").value;if(!d)return;
-  var days=["\u0627\u0644\u0623\u062d\u062f","\u0627\u0644\u0627\u062b\u0646\u064a\u0646","\u0627\u0644\u062b\u0644\u0627\u062b\u0627\u0621","\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621","\u0627\u0644\u062e\u0645\u064a\u0633","\u0627\u0644\u062c\u0645\u0639\u0629","\u0627\u0644\u0633\u0628\u062a"];
-  document.getElementById("pm-day").value=days[new Date(d).getDay()];
-}
-/* Toggle "جميع التواريخ" — disables the date/day inputs and signals the
-   save path to write pay_date="__all__". The loader never filters by date
-   server-side, so the table already reflects every record regardless of
-   the selected date; this toggle is purely UX parity with other pages. */
-function pmToggleAllDates(){
-  var cb=document.getElementById("pm-all-dates");
-  var dateInp=document.getElementById("pm-date");
-  var dayInp=document.getElementById("pm-day");
-  var on=!!(cb && cb.checked);
-  if (dateInp){ dateInp.disabled=on; dateInp.style.background=on?"#eceff1":""; if(on) dateInp.value=""; }
-  if (dayInp){  dayInp.disabled =on; dayInp.style.background =on?"#eceff1":"#f0f0f0"; if(on) dayInp.value=""; }
-}
-function pmLoadGroup(){
-  var g=document.getElementById("pm-group").value;if(!g)return;
-  fetch("/api/payments/group?group="+encodeURIComponent(g)).then(r=>r.json()).then(function(rows){
-    var tb=document.getElementById("pm-tbody");tb.innerHTML="";
-    rows.forEach(function(row){
-      var tr=document.createElement("tr");tr.dataset.name=row.name||"";tr.dataset.sid=row.id;
-      var td0=document.createElement("td");
-      td0.style.cssText="padding:6px 10px;border:1px solid #ddd;font-weight:bold;background:#f9f5ff;position:sticky;right:0;z-index:1;white-space:nowrap;";
-      td0.textContent=row.name||"";tr.appendChild(td0);
-      for(var i=1;i<=1;i++){
-        var pd=row["inst_"+i]||{};
-        var tdT=document.createElement("td");tdT.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
-        var sel=document.createElement("select");sel.dataset.sid=row.id;sel.dataset.inst=i;sel.className="pm-type";sel.onchange=function(){pmTypeChange(this);};
-        sel.style.cssText="padding:3px;border-radius:5px;border:1px solid #8B5CC8;width:58px;";
-        var o0=document.createElement("option");o0.value="";o0.textContent="-";sel.appendChild(o0);
-        for(var n=1;n<=12;n++){var op=document.createElement("option");op.value=n;op.textContent="\u0642\u0633\u0637 "+n;if(String(pd.inst_type)==String(n))op.selected=true;sel.appendChild(op);}
-        tdT.appendChild(sel);tr.appendChild(tdT);
-        var tdP=document.createElement("td");tdP.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
-        var iP=document.createElement("input");iP.type="number";iP.dataset.sid=row.id;iP.dataset.inst=i;iP.className="pm-price";
-        iP.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iP.value=pd.price!=null&&pd.price!==0?pd.price:(row["tq_inst"+i]||"");iP.placeholder="\u0627\u0644\u0633\u0639\u0631";
-        iP.oninput=function(){pmCalc(this);};tdP.appendChild(iP);tr.appendChild(tdP);
-        var tdPd=document.createElement("td");tdPd.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;";
-        var iPd=document.createElement("input");iPd.type="number";iPd.dataset.sid=row.id;iPd.dataset.inst=i;iPd.className="pm-paid";
-        iPd.style.cssText="width:70px;padding:3px;border-radius:5px;border:1px solid #ccc;";iPd.value=pd.paid!=null&&pd.paid!==0?pd.paid:"";iPd.placeholder="\u0627\u0644\u0645\u062f\u0641\u0648\u0639";
-        iPd.oninput=function(){pmCalc(this);};tdPd.appendChild(iPd);tr.appendChild(tdPd);
-        var tdR=document.createElement("td");tdR.style.cssText="padding:3px;border:1px solid #ddd;text-align:center;background:#f0fff0;";
-        var sp=document.createElement("span");sp.className="pm-rem-"+i;
-        var pr=parseFloat(pd.price)||0;var pa=parseFloat(pd.paid)||0;
-        sp.textContent=pr?(pr-pa).toFixed(2):"";tdR.appendChild(sp);
-        var sv=document.createElement("button");sv.textContent="\u062d\u0641\u0638";sv.dataset.sid=row.id;sv.dataset.inst=i;
-        sv.style.cssText="display:block;width:100%;margin-top:2px;padding:2px 4px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.7rem;";
-        sv.onclick=function(){pmSave(this);};tdR.appendChild(sv);tr.appendChild(tdR);
-      }
-      tb.appendChild(tr);
+  document.getElementById("pay-modal").style.display = "block";
+  if (_pmGroupCache) return;
+  fetch("/api/groups-students").then(function(r){return r.json();}).then(function(data){
+    _pmGroupCache = data || {};
+    var sel = document.getElementById("pm-group");
+    /* Keep the first two options (placeholder + "all"); append groups. */
+    var keep = sel.querySelectorAll('option[value=""],option[value="__ALL__"]');
+    sel.innerHTML = "";
+    keep.forEach(function(o){ sel.appendChild(o); });
+    var keys = Object.keys(_pmGroupCache).sort();
+    keys.forEach(function(g){
+      var arr = _pmGroupCache[g] || []; var o = document.createElement("option");
+      o.value = g; o.textContent = g + " (" + arr.length + ")"; sel.appendChild(o);
     });
   });
 }
-function pmCalc(inp){
-  var tr=inp.closest("tr");var inst=inp.dataset.inst;
-  var pr=parseFloat((tr.querySelector(".pm-price[data-inst='"+inst+"']")||{}).value)||0;
-  var pa=parseFloat((tr.querySelector(".pm-paid[data-inst='"+inst+"']")||{}).value)||0;
-  var sp=tr.querySelector(".pm-rem-"+inst);if(sp)sp.textContent=pr?(pr-pa).toFixed(2):"";
-}
-function pmSave(btn){
-  var sid=btn.dataset.sid;var inst=btn.dataset.inst;var tr=btn.closest("tr");
-  var _pmAll=!!(document.getElementById("pm-all-dates")||{}).checked;
-  var body={inst_type:((tr.querySelector(".pm-type[data-inst='"+inst+"']")||{}).value||""),
-    price:parseFloat(((tr.querySelector(".pm-price[data-inst='"+inst+"']")||{}).value))||0,
-    paid:parseFloat(((tr.querySelector(".pm-paid[data-inst='"+inst+"']")||{}).value))||0,
-    pay_date:(_pmAll?"__all__":((document.getElementById("pm-date")||{}).value||"")),
-    day_name:(_pmAll?"":((document.getElementById("pm-day")||{}).value||""))};
-  fetch("/api/payments/"+sid+"/"+inst,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).then(function(d){btn.textContent=d.ok?"\u2713":"\u274c";setTimeout(function(){btn.textContent="\u062d\u0641\u0638";},1800);});
-}
 function pmFilter(){
-  var q=_norm(document.getElementById("pm-search").value.toLowerCase());
-  document.querySelectorAll("#pm-tbody tr").forEach(function(tr){var n=_norm((tr.dataset.name||"").toLowerCase());tr.style.display=n.includes(q)?"":"none";});
+  var q = _pmNorm(document.getElementById("pm-search").value.toLowerCase());
+  document.querySelectorAll("#pm-cards .pm-card").forEach(function(c){
+    var n = _pmNorm((c.dataset.name || "").toLowerCase());
+    c.style.display = (!q || n.indexOf(q) >= 0) ? "" : "none";
+  });
+}
+function pmLoadGroup(){
+  var g = document.getElementById("pm-group").value;
+  _pmCurrentGroup = g;
+  var box = document.getElementById("pm-cards");
+  if (!g){ box.innerHTML = '<div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629 \u2014</div>'; document.getElementById("pm-summary").style.display = "none"; return; }
+  var students = [];
+  if (g === "__ALL__"){
+    var seen = {};
+    Object.keys(_pmGroupCache || {}).forEach(function(gn){
+      (_pmGroupCache[gn] || []).forEach(function(s){ if(!seen[s.id]){ seen[s.id] = 1; students.push({id:s.id, name:s.student_name||s.name||""}); } });
+    });
+  } else {
+    students = ((_pmGroupCache || {})[g] || []).map(function(s){ return {id:s.id, name:s.student_name||s.name||""}; });
+  }
+  if (!students.length){
+    box.innerHTML = '<div style="text-align:center;color:#c62828;padding:30px;font-size:14px;">\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0627\u0628 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</div>';
+    document.getElementById("pm-summary").style.display = "none"; return;
+  }
+  /* Render skeleton cards then fetch each plan in parallel. */
+  box.innerHTML = "";
+  _pmStudentRows = students.map(function(s){
+    var c = document.createElement("div");
+    c.className = "pm-card"; c.dataset.sid = s.id; c.dataset.name = s.name || "";
+    c.innerHTML =
+      '<div class="pm-card-head"><span>\u1F464</span><span class="pm-name">' + (s.name || "") + '</span><span class="pm-status" style="margin-right:auto;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</span></div>'
+      + '<div class="pm-summary-grid pm-loading" style="color:#999;">\u062C\u0627\u0631\u064A \u062A\u062D\u0645\u064A\u0644 \u062E\u0637\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637...</div>';
+    box.appendChild(c);
+    return {sid:s.id, name:s.name, card:c};
+  });
+  /* Fetch plans in batches to keep the UI responsive. */
+  Promise.all(_pmStudentRows.map(function(r){
+    return fetch("/api/payment/student/" + r.sid + "/plan").then(function(x){return x.json();}).catch(function(){return null;});
+  })).then(function(results){
+    var totalCourse = 0, totalPaid = 0;
+    results.forEach(function(res, idx){
+      var row = _pmStudentRows[idx];
+      _pmRenderCard(row.card, row.sid, row.name, res);
+      if (res && res.ok && res.plan){
+        totalCourse += (+res.plan.course_amount) || 0;
+        totalPaid   += (+res.plan.total_paid)    || 0;
+      }
+    });
+    var sum = document.getElementById("pm-summary");
+    document.getElementById("pm-sum-course").textContent = totalCourse.toFixed(2).replace(/\.00$/,"");
+    document.getElementById("pm-sum-paid").textContent   = totalPaid.toFixed(2).replace(/\.00$/,"");
+    var rem = Math.max(0, totalCourse - totalPaid);
+    document.getElementById("pm-sum-remain").textContent = rem.toFixed(2).replace(/\.00$/,"");
+    var pct = totalCourse > 0 ? Math.round(totalPaid / totalCourse * 100) : 0;
+    document.getElementById("pm-sum-pct").textContent = pct + "%";
+    sum.style.display = "block";
+  });
+}
+function _pmStatusLabel(s){
+  if (s === "paid")    return {cls:"paid",    txt:"\u0645\u062F\u0641\u0648\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u2705"};
+  if (s === "partial") return {cls:"partial", txt:"\u0645\u062F\u0641\u0648\u0639 \u062C\u0632\u0626\u064A\u0627\u064B \u1F7E1"};
+  if (s === "unpaid")  return {cls:"unpaid",  txt:"\u0644\u0645 \u064A\u062F\u0641\u0639 \u274C"};
+  if (s === "exempt")  return {cls:"exempt",  txt:"\u0645\u0639\u0641\u064A \u1F535"};
+  return {cls:"unpaid", txt:"\u0644\u0627 \u062A\u0648\u062C\u062F \u062E\u0637\u0629 \u26A0\uFE0F"};
+}
+function _pmRenderCard(card, sid, name, res){
+  if (!res || !res.ok || !res.plan){
+    card.innerHTML = '<div class="pm-card-head"><span>\u1F464</span><span>' + (name || "") + '</span><span class="pm-status unpaid" style="margin-right:auto;">\u0644\u0645 \u064A\u062A\u0645 \u062A\u0639\u064A\u064A\u0646 \u062E\u0637\u0629 \u062A\u0642\u0633\u064A\u0637</span></div>'
+      + '<div style="font-size:12.5px;color:#999;">\u0639\u064A\u0651\u0646 \u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0645\u0646 \u062C\u062F\u0648\u0644 \u0627\u0644\u0637\u0644\u0628\u0629 \u0623\u0648\u0644\u0627\u064B.</div>';
+    return;
+  }
+  var p = res.plan; var lbl = _pmStatusLabel(p.status);
+  var head = '<div class="pm-card-head"><span>\u1F464</span><span class="pm-name">' + (name || "") + '</span>'
+           + '<span class="pm-status ' + lbl.cls + '" style="margin-right:auto;">' + lbl.txt + '</span></div>';
+  var summary = '<div class="pm-summary-grid">'
+    + '<div>\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629: <b>' + p.course_amount + ' \u062F</b></div>'
+    + '<div>\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637: <b>\u0637\u0631\u064A\u0642\u0629 ' + (p.method || "—") + '</b></div>'
+    + '<div>\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637: <b>' + p.num_installments + '</b></div>'
+    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639: <b style="color:#1565C0;">' + p.total_paid + ' \u062F</b> \u2705</div>'
+    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062A\u0628\u0642\u064A: <b style="color:#c62828;">' + p.total_remaining + ' \u062F</b> \u1F534</div>'
+    + '</div>';
+  var optsHtml = '<option value="">— \u0627\u062E\u062A\u0631 \u0627\u0644\u0642\u0633\u0637 —</option>';
+  p.installments.forEach(function(i){
+    var due = i.due_date ? (" - " + i.due_date) : "";
+    var rem = (typeof i.remaining === "number") ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
+    var status = (rem <= 0.005) ? " \u2705" : "";
+    optsHtml += '<option value="' + i.n + '">\u0627\u0644\u0642\u0633\u0637 ' + i.n + ' - ' + i.amount + ' \u062F' + due + status + '</option>';
+  });
+  var controls =
+    '<div class="pm-controls">'
+    + '<div><label>\u0627\u062E\u062A\u0631 \u0627\u0644\u0642\u0633\u0637</label><select class="pm-inst-sel" data-sid="' + sid + '" onchange="pmInstChange(this)">' + optsHtml + '</select></div>'
+    + '<div><label>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639 (\u062F\u064A\u0646\u0627\u0631)</label><input type="number" min="0" step="0.5" class="pm-amount-in" data-sid="' + sid + '" placeholder="0" disabled></div>'
+    + '<div><button class="pm-pay" data-sid="' + sid + '" onclick="pmRecordPay(this)" disabled>\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639</button></div>'
+    + '</div>'
+    + '<div class="pm-detail" id="pm-detail-' + sid + '"></div>';
+  card.innerHTML = head + summary + controls;
+  card._pmPlan = p;
+}
+function pmInstChange(sel){
+  var sid = parseInt(sel.dataset.sid, 10);
+  var n   = parseInt(sel.value, 10);
+  var card = sel.closest(".pm-card");
+  var det  = document.getElementById("pm-detail-" + sid);
+  var amt  = card.querySelector(".pm-amount-in");
+  var btn  = card.querySelector(".pm-pay");
+  if (!n){
+    det.classList.remove("show"); det.innerHTML = "";
+    amt.disabled = true; amt.value = ""; btn.disabled = true; return;
+  }
+  var inst = (card._pmPlan && card._pmPlan.installments || []).filter(function(i){ return i.n === n; })[0];
+  if (!inst){ det.classList.remove("show"); return; }
+  var due = inst.due_date || "—";
+  var ok = (inst.remaining <= 0.005) ? ' \u2705' : "";
+  det.innerHTML = '<div class="pm-detail-grid">'
+    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0633\u062A\u062D\u0642: <b>' + inst.amount + ' \u062F</b></div>'
+    + '<div>\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: <b>' + due + '</b></div>'
+    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639 \u0633\u0627\u0628\u0642\u0627\u064B: <b style="color:#1565C0;">' + inst.paid + ' \u062F</b>' + ok + '</div>'
+    + '<div>\u0627\u0644\u0645\u062A\u0628\u0642\u064A \u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0637: <b style="color:#c62828;">' + inst.remaining + ' \u062F</b></div>'
+    + '</div>';
+  det.classList.add("show");
+  amt.disabled = false; amt.max = inst.remaining; amt.value = "";
+  btn.disabled = (inst.remaining <= 0.005);
+  if (btn.disabled) btn.textContent = "\u2705 \u0645\u062F\u0641\u0648\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644";
+  else              btn.innerHTML   = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
+  amt.focus();
+}
+function pmRecordPay(btn){
+  var sid  = parseInt(btn.dataset.sid, 10);
+  var card = btn.closest(".pm-card");
+  var sel  = card.querySelector(".pm-inst-sel");
+  var amtIn= card.querySelector(".pm-amount-in");
+  var n    = parseInt(sel.value, 10);
+  var amount = parseFloat(amtIn.value);
+  if (!n || !(amount > 0)){
+    _pmToast("\u0623\u062F\u062E\u0644 \u0645\u0628\u0644\u063A\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627", "error"); return;
+  }
+  var inst = (card._pmPlan && card._pmPlan.installments || []).filter(function(i){ return i.n === n; })[0];
+  if (inst && amount > inst.remaining + 0.005){
+    _pmToast("\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u062E\u0644 \u064A\u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0645\u062A\u0628\u0642\u064A \u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0637", "warn"); return;
+  }
+  btn.disabled = true; btn.textContent = "\u23F3 \u062C\u0627\u0631\u064A \u0627\u0644\u062D\u0641\u0638...";
+  fetch("/api/payment/student/" + sid + "/pay", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({n:n, amount:amount})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if (!res || !res.ok){
+        _pmToast((res && res.error) || "\u062A\u0639\u0630\u0651\u0631 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639", "error");
+        btn.disabled = false; btn.innerHTML = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639"; return;
+      }
+      var name = card.dataset.name || "";
+      _pmToast("\u2705 \u062A\u0645 \u062A\u0633\u062C\u064A\u0644 \u062F\u0641\u0639 \u0627\u0644\u0642\u0633\u0637 " + n + " - " + amount + " \u062F \u0644\u0644\u0637\u0627\u0644\u0628 " + name);
+      _pmRenderCard(card, sid, name, res);
+      /* Recompute group totals after a successful save. */
+      _pmRecomputeSummary();
+    })
+    .catch(function(){
+      _pmToast("\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644", "error");
+      btn.disabled = false; btn.innerHTML = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
+    });
+}
+function _pmRecomputeSummary(){
+  var totalCourse = 0, totalPaid = 0;
+  document.querySelectorAll("#pm-cards .pm-card").forEach(function(c){
+    var p = c._pmPlan; if (!p) return;
+    totalCourse += (+p.course_amount) || 0;
+    totalPaid   += (+p.total_paid)    || 0;
+  });
+  document.getElementById("pm-sum-course").textContent = totalCourse.toFixed(2).replace(/\.00$/,"");
+  document.getElementById("pm-sum-paid").textContent   = totalPaid.toFixed(2).replace(/\.00$/,"");
+  var rem = Math.max(0, totalCourse - totalPaid);
+  document.getElementById("pm-sum-remain").textContent = rem.toFixed(2).replace(/\.00$/,"");
+  var pct = totalCourse > 0 ? Math.round(totalPaid / totalCourse * 100) : 0;
+  document.getElementById("pm-sum-pct").textContent = pct + "%";
 }
 </script>
 <div id="srm-type-modal" class="srm-type-bg"><div class="srm-type-box"><h3 id="srm-type-title">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</h3><p id="srm-type-msg"></p><span class="srm-type-expected" id="srm-type-expected"></span><input class="srm-type-input" id="srm-type-input" type="text" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x643;&#x645;&#x627; &#x647;&#x648;"><div class="srm-type-actions"><button class="srm-btn-delete" id="srm-type-yes">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</button><button class="srm-btn-cancel-edit" id="srm-type-no">&#x625;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div id="srm-log-modal" class="srm-log-bg"><div class="srm-log-box"><div class="srm-log-head">&#x1F4CB; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x63A;&#x64A;&#x64A;&#x631;&#x627;&#x62A; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x641;&#x638;</div><div class="srm-log-body" id="srm-log-body"></div><div class="srm-log-actions"><button class="srm-btn-save" id="srm-log-yes">&#x646;&#x639;&#x645;&#x60C; &#x627;&#x62D;&#x641;&#x638;</button><button class="srm-btn-cancel-edit" id="srm-log-no">&#x631;&#x627;&#x62C;&#x639; &#x645;&#x631;&#x629; &#x623;&#x62E;&#x631;&#x649;</button></div></div></div><div id="srm-auto-lock" class="srm-auto-lock-banner">&#x1F6AB; &#x62A;&#x645; &#x625;&#x644;&#x63A;&#x627;&#x621; &#x627;&#x644;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x628;&#x633;&#x628;&#x628; &#x639;&#x62F;&#x645; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;</div>
@@ -14490,6 +14582,249 @@ def api_payments_group():
             row["inst_" + str(p[0])] = {"inst_type": p[1], "price": p[2], "paid": p[3]}
         result.append(row)
     return jsonify(result)
+
+
+# ─── New payment-followup workflow ──────────────────────────────────
+# Three endpoints power the redesigned متابعة الدفع modal:
+#   GET  /api/payment/student/<sid>/plan
+#        → installment plan + per-installment paid/remaining + totals
+#   GET  /api/payment/student/<sid>/installment/<n>
+#        → details for a single installment
+#   POST /api/payment/student/<sid>/pay   body {n, amount}
+#        → record an additional payment, validate against remaining
+#
+# All read taqseet through the v4 Arabic columns with legacy fallback.
+# Per-installment paid amounts live in student_payments (student_id,
+# inst_num) — same table the legacy /api/payments/<sid>/<n> route uses,
+# so both code paths stay in sync.
+def _payment_load_taqseet_rows(db):
+    """Return [(id, method, inst1..12, date1..12)] schema-normalised."""
+    try:
+        cols = {r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()}
+    except Exception:
+        cols = set()
+    method_expr = ('"طريقة_التقسيط"' if 'طريقة_التقسيط' in cols
+                   else ('taqseet_method' if 'taqseet_method' in cols else "''"))
+    inst_exprs, date_exprs = [], []
+    for n in range(1, 13):
+        v4i, lgi = 'القسط_' + str(n), 'inst' + str(n)
+        v4d, lgd = 'تاريخ_الاستحقاق_' + str(n), 'date' + str(n)
+        inst_exprs.append('"' + v4i + '"' if v4i in cols else (lgi if lgi in cols else "''") + ' AS i' + str(n))
+        date_exprs.append('"' + v4d + '"' if v4d in cols else (lgd if lgd in cols else "''") + ' AS d' + str(n))
+    select = ('SELECT id, ' + method_expr + ' AS m, '
+              + ', '.join('(' + e + ') AS i' + str(n + 1) for n, e in enumerate(inst_exprs))
+              + ', ' + ', '.join('(' + e + ') AS d' + str(n + 1) for n, e in enumerate(date_exprs))
+              + ' FROM taqseet')
+    try:
+        return db.execute(select).fetchall()
+    except Exception:
+        return []
+
+def _payment_find_taqseet(rows, stored):
+    if stored is None: return None
+    s = str(stored).strip()
+    if not s: return None
+    for r in rows:
+        if str(r[0]) == s or (r[1] is not None and str(r[1]) == s):
+            return r
+    return None
+
+def _payment_to_float(v):
+    if v is None: return 0.0
+    s = str(v).strip().replace(',', '')
+    if not s: return 0.0
+    try: return float(s)
+    except Exception: return 0.0
+
+def _payment_load_student(db, sid):
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live_cols = set()
+    has_online = online_col in live_cols and online_col != in_col
+    cols = ['id', 'student_name', 'personal_id', 'installment_type', in_col]
+    if has_online: cols.append(online_col)
+    select = 'SELECT ' + ', '.join('"' + c + '"' for c in cols) + ' FROM students WHERE id=?'
+    row = db.execute(select, (sid,)).fetchone()
+    if not row:
+        return None
+    d = {
+        'id':              row[0],
+        'name':            row[1],
+        'personal_id':     row[2],
+        'installment_type': row[3],
+        'group':           row[4] or (row[5] if has_online and len(row) > 5 else ''),
+        'group_online':    (row[5] if has_online and len(row) > 5 else ''),
+    }
+    return d
+
+def _payment_compute_plan(db, sid):
+    """Build the plan payload for a given student. Returns None if the
+    student doesn\'t exist."""
+    student = _payment_load_student(db, sid)
+    if not student:
+        return None
+    tq_rows = _payment_load_taqseet_rows(db)
+    tq      = _payment_find_taqseet(tq_rows, student.get('installment_type'))
+    paid_by_inst = {}
+    try:
+        for r in db.execute(
+            "SELECT inst_num, paid FROM student_payments WHERE student_id=?",
+            (sid,),
+        ).fetchall():
+            try: paid_by_inst[int(r[0])] = _payment_to_float(r[1])
+            except Exception: pass
+    except Exception:
+        pass
+    installments = []
+    course_amount = 0.0
+    if tq:
+        for n in range(1, 13):
+            amt = _payment_to_float(tq[1 + n])     # row layout: id, m, i1..i12, d1..d12
+            if amt <= 0:
+                continue
+            due = tq[1 + 12 + n]
+            paid = paid_by_inst.get(n, 0.0)
+            installments.append({
+                "n":         n,
+                "amount":    amt,
+                "due_date":  ('' if due is None else str(due)),
+                "paid":      paid,
+                "remaining": max(0.0, amt - paid),
+            })
+            course_amount += amt
+    total_paid = sum(i["paid"] for i in installments)
+    total_remaining = max(0.0, course_amount - total_paid)
+    method_label = ''
+    if tq:
+        method_label = '' if tq[1] is None else str(tq[1])
+    if course_amount <= 0:
+        status = 'unknown'
+    elif total_remaining <= 0.005:
+        status = 'paid'
+    elif total_paid <= 0.005:
+        status = 'unpaid'
+    else:
+        status = 'partial'
+    return {
+        "student": {
+            "id":           student['id'],
+            "name":         student['name'],
+            "personal_id":  student.get('personal_id') or '',
+            "group":        student.get('group') or '',
+            "group_online": student.get('group_online') or '',
+        },
+        "plan": {
+            "method":          method_label,
+            "method_id":       (tq[0] if tq else None),
+            "course_amount":   course_amount,
+            "num_installments": len(installments),
+            "installments":    installments,
+            "total_paid":      total_paid,
+            "total_remaining": total_remaining,
+            "status":          status,
+        },
+    }
+
+@app.route('/api/payment/student/<int:sid>/plan', methods=['GET'])
+@login_required
+def api_payment_student_plan(sid):
+    db = get_db()
+    plan = _payment_compute_plan(db, sid)
+    if plan is None:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    plan["ok"] = True
+    return jsonify(plan)
+
+@app.route('/api/payment/student/<int:sid>/installment/<int:n>', methods=['GET'])
+@login_required
+def api_payment_student_installment(sid, n):
+    db = get_db()
+    plan = _payment_compute_plan(db, sid)
+    if plan is None:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    for inst in plan["plan"]["installments"]:
+        if inst["n"] == n:
+            return jsonify({
+                "ok":        True,
+                "n":         n,
+                "amount":    inst["amount"],
+                "due_date":  inst["due_date"],
+                "paid":      inst["paid"],
+                "remaining": inst["remaining"],
+                "student":   plan["student"],
+            })
+    return jsonify({"ok": False, "error": "installment not in this student\'s plan"}), 404
+
+@app.route('/api/payment/student/<int:sid>/pay', methods=['POST'])
+@login_required
+def api_payment_student_pay(sid):
+    d = request.get_json() or {}
+    try:
+        n = int(d.get('n') or 0)
+    except Exception:
+        n = 0
+    amount = _payment_to_float(d.get('amount'))
+    if n < 1 or n > 12:
+        return jsonify({"ok": False, "error": "invalid installment number"}), 400
+    if amount <= 0:
+        return jsonify({"ok": False, "error": "amount must be > 0"}), 400
+    db = get_db()
+    plan = _payment_compute_plan(db, sid)
+    if plan is None:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    target = None
+    for inst in plan["plan"]["installments"]:
+        if inst["n"] == n:
+            target = inst; break
+    if target is None:
+        return jsonify({"ok": False, "error": "installment not in this student\'s plan"}), 400
+    if amount > target["remaining"] + 0.005:
+        return jsonify({
+            "ok": False,
+            "error": "المبلغ المدخل يتجاوز المتبقي من هذا القسط",
+            "remaining": target["remaining"],
+        }), 400
+    new_paid = target["paid"] + amount
+    try:
+        db.execute(
+            """INSERT INTO student_payments(student_id, inst_num, inst_type, price, paid)
+               VALUES(?,?,?,?,?)
+               ON CONFLICT(student_id, inst_num)
+                 DO UPDATE SET paid=EXCLUDED.paid, price=EXCLUDED.price""",
+            (sid, n, str(n), target["amount"], new_paid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Mirror to payment_log inst1..inst5 if applicable (legacy column set).
+    if n <= 5:
+        try:
+            student = plan["student"]
+            pid = student.get('personal_id') or ''
+            sname = student.get('name') or ''
+            col = 'inst' + str(n)
+            cur = db.execute(
+                'UPDATE payment_log SET "' + col + '"=? WHERE personal_id=?',
+                (str(new_paid), pid)
+            )
+            if cur.rowcount == 0 and pid:
+                db.execute(
+                    'INSERT INTO payment_log(personal_id, student_name, "' + col + '") VALUES(?,?,?)',
+                    (pid, sname, str(new_paid))
+                )
+            db.commit()
+        except Exception:
+            pass
+    new_plan = _payment_compute_plan(db, sid)
+    new_plan["ok"] = True
+    new_plan["recorded"] = {"n": n, "amount": amount, "new_paid": new_paid}
+    return jsonify(new_plan)
+
 
 @app.route('/api/message-templates', methods=['GET'])
 @login_required
