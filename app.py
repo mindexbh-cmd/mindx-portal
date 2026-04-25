@@ -1474,6 +1474,26 @@ if True:
             db2.commit()
         except Exception:
             pass
+
+    # Older prod DBs were missing students.level_reached_2026 and
+    # students.teacher_2026 (both referenced by /api/students POST).
+    # Add them idempotently so add-student forms don't 400. Live prod
+    # was migrated out-of-band; this code covers any future fresh DB.
+    if "students_extra_2026_cols_v1" not in applied:
+        try:
+            tq = [r[1] for r in db2.execute("PRAGMA table_info(students)").fetchall()]
+            for c, ddl in [
+                ("level_reached_2026", "ALTER TABLE students ADD COLUMN level_reached_2026 TEXT"),
+                ("teacher_2026",       "ALTER TABLE students ADD COLUMN teacher_2026 TEXT"),
+            ]:
+                if c not in tq:
+                    try: db2.execute(ddl)
+                    except Exception: pass
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_extra_2026_cols_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     if "dashboard_math_kw_v1" not in applied:
         try:
             db2.execute(
@@ -2235,6 +2255,54 @@ ERROR_PLACEHOLDER
 </body>
 </html>"""
 
+# ─── Shared add-student modal ──────────────────────────────────────
+# Single source of truth for the "add new student" form. Used both by
+# قاعدة البيانات (the original mount) and by the بحث عن طالب modal\'s
+# new ➕ button. Field IDs prefixed with `sra_` so they never collide
+# with the database page\'s existing `f_*` form. POSTs to the same
+# /api/students endpoint, with the same required-field validation, so
+# behavior matches the original modal exactly.
+STUDENT_FORM_MODAL_HTML = """
+<div id="sra-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;overflow:auto;padding:18px;">
+  <div style="background:#fff;border-radius:14px;max-width:820px;width:100%;margin:0 auto;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.25);direction:rtl;">
+    <div style="background:linear-gradient(135deg,#2E7D32,#43A047);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;">
+      <h2 style="font-size:1.15rem;font-weight:800;">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;</h2>
+      <span onclick="srCloseAddStudent()" style="cursor:pointer;font-size:1.6rem;line-height:1;">&times;</span>
+    </div>
+    <div style="padding:18px 20px;max-height:75vh;overflow-y:auto;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px;">
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A; *</label><input id="sra_personal_id" placeholder="&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; *</label><input id="sra_student_name" placeholder="&#x627;&#x644;&#x627;&#x633;&#x645; &#x627;&#x644;&#x643;&#x627;&#x645;&#x644;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628;</label><input id="sra_whatsapp" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x635;&#x641;</label><input id="sra_class_name" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x635;&#x641; A" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</label><input id="sra_old_new_2026" placeholder="&#x642;&#x62F;&#x64A;&#x645; / &#x62C;&#x62F;&#x64A;&#x62F;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</label><input id="sra_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><input id="sra_group_name_student" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><input id="sra_group_online" placeholder="&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x627;&#x644;&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629;</label><select id="sra_final_result" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>&#x646;&#x627;&#x62C;&#x62D;</option><option>&#x631;&#x627;&#x633;&#x628;</option><option>&#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</option><option>&#x63A;&#x627;&#x626;&#x628;</option></select></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x625;&#x644;&#x649; &#x623;&#x64A;&#x646; &#x648;&#x635;&#x644; 2026</label><input id="sra_level_reached" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x648;&#x62D;&#x62F;&#x629; 5" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x645;&#x646;&#x627;&#x633;&#x628; &#x644;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026&#x61F;</label><input id="sra_suitable_level" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x633;&#x62A;&#x644;&#x627;&#x645; &#x627;&#x644;&#x643;&#x62A;&#x628;</label><input id="sra_books_received" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62F;&#x631;&#x633; 2026</label><input id="sra_teacher" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x623;&#x645;</label><input id="sra_mother_phone" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x623;&#x628;</label><input id="sra_father_phone" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x622;&#x62E;&#x631;</label><input id="sra_other_phone" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x645;&#x643;&#x627;&#x646; &#x627;&#x644;&#x633;&#x643;&#x646;</label><input id="sra_residence" placeholder="&#x627;&#x644;&#x645;&#x646;&#x637;&#x642;&#x629;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div style="grid-column:1/-1;"><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x645;&#x646;&#x632;&#x644;</label><input id="sra_home_address" placeholder="&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x645;&#x646;&#x632;&#x644;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;</label><input id="sra_road" placeholder="&#x631;&#x642;&#x645; &#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;</label><input id="sra_complex" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+      </div>
+      <div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x646;&#x648;&#x639; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</label><select id="sra_installment_type" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid #eee;background:#fafafa;">
+      <button onclick="srCloseAddStudent()" style="background:#eceff1;color:#455a64;border:none;padding:10px 22px;border-radius:9px;font-weight:700;cursor:pointer;font-size:14px;">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button onclick="srSaveAddStudent()" id="sra-save-btn" style="background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;padding:10px 28px;border-radius:9px;font-weight:800;cursor:pointer;font-size:14px;box-shadow:0 3px 10px rgba(46,125,50,.35);">&#x1F4BE; &#x62D;&#x641;&#x638;</button>
+    </div>
+  </div>
+</div>
+"""
+
+
 # ─── Public parent portal ──────────────────────────────────────────
 # A login-less, mobile-first Arabic page where a parent enters the
 # student\'s personal_id and sees attendance + payment plan + lets
@@ -2753,6 +2821,9 @@ function dhCopyParentLink(){
 <div id="sr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;">
   <div style="background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
     <div class="srm-header"><span>&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</span><span class="srm-close" onclick="srClose()">&times;</span></div>
+    <div style="padding:12px 16px 0;background:#f9f5ff;border-bottom:1px solid #e0d0f8;">
+      <button type="button" onclick="srOpenAddStudent()" style="background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;padding:11px 22px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(46,125,50,.3);">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;</button>
+    </div>
     <div class="srm-search">
       <input id="sr-query" type="text" oninput="srFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x2026;">
     </div>
@@ -2762,6 +2833,115 @@ function dhCopyParentLink(){
     </div>
   </div>
 </div>
+__STUDENT_FORM_MODAL__
+<script>
+/* ─── Add-student modal driver (search-modal) ────────────────────
+ * Shares the same Python-level STUDENT_FORM_MODAL_HTML constant
+ * as قاعدة البيانات\'s add modal would (single source of truth in
+ * the source file). Calls the same POST /api/students endpoint
+ * with the same field set and the same required-field validation.
+ * After save: closes, toast, fills the search box with the new
+ * student\'s name, and auto-picks the first matching result so
+ * the parent\'s card pops up immediately. */
+var _SRA_FIELDS = ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','mother_phone','father_phone','other_phone','residence','home_address','road','complex','installment_type'];
+var _SRA_PAYLOAD_KEY = {
+  personal_id:'personal_id', student_name:'student_name', whatsapp:'whatsapp',
+  class_name:'class_name', old_new_2026:'old_new_2026',
+  registration_term2_2026:'registration_term2_2026',
+  group_name_student:'group_name_student', group_online:'group_online',
+  final_result:'final_result', level_reached:'level_reached_2026',
+  suitable_level:'suitable_level_2026', books_received:'books_received',
+  teacher:'teacher_2026', mother_phone:'mother_phone',
+  father_phone:'father_phone', other_phone:'other_phone',
+  residence:'residence', home_address:'home_address', road:'road',
+  complex:'complex_name', installment_type:'installment_type'
+};
+function _sraToast(msg, kind){
+  if (typeof window.mxToast === 'function'){ window.mxToast(msg, kind || 'success'); return; }
+  alert(msg);
+}
+function srOpenAddStudent(){
+  /* Clear all fields. */
+  _SRA_FIELDS.forEach(function(k){
+    var el = document.getElementById('sra_' + k);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    else el.value = '';
+  });
+  document.getElementById('sra-modal-bg').style.display = 'block';
+  /* Populate the installment-type dropdown lazily on first open. */
+  var sel = document.getElementById('sra_installment_type');
+  if (sel && sel.options.length <= 1){
+    fetch('/api/taqseet', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var rows = Array.isArray(d) ? d : ((d && d.rows) || []);
+        rows.forEach(function(t){
+          var id  = t.id != null ? String(t.id) : '';
+          var lbl = t['طريقة_التقسيط'] || t.taqseet_method || id;
+          if (!id) return;
+          var amt = t['مبلغ_الدورة'] != null ? t['مبلغ_الدورة'] : t.course_amount;
+          var ni  = t['عدد_الاقساط'] != null ? t['عدد_الاقساط'] : t.num_installments;
+          var text = 'طريقة ' + lbl;
+          if (amt) text += ' — ' + amt + ' د';
+          if (ni)  text += ' — ' + ni  + ' أقساط';
+          var o = document.createElement('option');
+          o.value = id; o.textContent = text;
+          sel.appendChild(o);
+        });
+      })
+      .catch(function(){});
+  }
+  setTimeout(function(){ var f = document.getElementById('sra_personal_id'); if (f) f.focus(); }, 80);
+}
+function srCloseAddStudent(){
+  document.getElementById('sra-modal-bg').style.display = 'none';
+}
+function srSaveAddStudent(){
+  var body = {};
+  _SRA_FIELDS.forEach(function(k){
+    var el = document.getElementById('sra_' + k);
+    if (!el) return;
+    body[_SRA_PAYLOAD_KEY[k]] = (el.value || '').trim();
+  });
+  if (!body.personal_id || !body.student_name){
+    _sraToast('الرقم الشخصي واسم الطالب مطلوبان', 'error'); return;
+  }
+  var btn = document.getElementById('sra-save-btn');
+  var prev = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ جاري الحفظ...';
+  fetch('/api/students', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    credentials: 'include',
+    body: JSON.stringify(body)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.innerHTML = prev;
+    if (!d || !d.ok){
+      _sraToast(d && d.error ? d.error : 'حدث خطأ', 'error'); return;
+    }
+    srCloseAddStudent();
+    _sraToast('✅ تم إضافة الطالب بنجاح');
+    /* Refresh the in-memory student list so the search finds the new
+       row, then surface the new student\'s card. */
+    fetch('/api/students', {credentials:'include'}).then(function(r){return r.json();}).then(function(sd){
+      _srStudents = (sd && sd.students) || [];
+      var qInp = document.getElementById('sr-query');
+      if (qInp){ qInp.value = body.student_name; }
+      srFilter();
+      /* If exactly one match, auto-pick it so the card opens. Match
+         primarily by personal_id since that\'s unique. */
+      var match = _srStudents.find(function(s){
+        return String(s.personal_id || '').trim() === body.personal_id;
+      });
+      if (match) setTimeout(function(){ srPick(match.id); }, 120);
+    });
+  }).catch(function(){
+    btn.disabled = false; btn.innerHTML = prev;
+    _sraToast('خطأ في الاتصال', 'error');
+  });
+}
+</script>
 
 <div id="ss-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;"><div style="background:#fff;margin:40px auto;border-radius:14px;max-width:980px;width:94%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(230,81,0,0.25);"><div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span><span onclick="document.getElementById('ss-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 20px;background:#fff8f0;border-bottom:1px solid #ffe0b2;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;"><div style="position:relative;"><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</label><button type="button" id="ss-groups-btn" class="ss-groups-trigger">&#x2014; &#x627;&#x62E;&#x62A;&#x631; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x2014;</button><div id="ss-groups-panel" class="ss-groups-panel" style="display:none;"><input id="ss-groups-search" class="ss-groups-search" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;..."><label class="ss-groups-all-row"><input type="checkbox" id="ss-groups-all"> &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</label><div id="ss-groups-list" class="ss-groups-list"></div></div></div><div><label style="display:block;font-weight:bold;color:#E65100;margin-bottom:6px;font-size:0.9rem;">&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</label><input id="ss-search" type="text" oninput="ssOnSearch()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x641;&#x64A; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;..." style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #FB8C00;background:#fff;font-size:0.95rem;direction:rtl;"></div><div><button onclick="ssOpenAllGroups()" style="background:linear-gradient(135deg,#6A1B9A,#AB47BC);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-size:0.9rem;font-weight:800;cursor:pointer;white-space:nowrap;">&#x1F4CA; &#x645;&#x644;&#x62E;&#x635; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</button></div></div><div id="ss-body" style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:1.05rem;color:#333;"></div></div></div>
 
@@ -10091,7 +10271,11 @@ def login():
 def dashboard():
     user = session.get("user") or {}
     username = user.get("username") or user.get("name") or ""
-    return HOME_HTML.replace("USER_PLACEHOLDER", username)
+    return (
+        HOME_HTML
+        .replace("USER_PLACEHOLDER", username)
+        .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
+    )
 
 @app.route("/attendance")
 @login_required
