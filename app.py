@@ -5666,7 +5666,38 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div><div style="margin-top:8px;"><button type="button" onclick="pmOpenDueReminders()" style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(230,81,0,0.25);">📅 رسائل تذكير الاستحقاق</button></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}.pm-due-row.red>td{background:#ffebee;}.pm-due-row.yellow>td{background:#fff8e1;}.pm-due-row.green>td{background:#e8f5e9;}.pm-due-pill{padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-due-pill.red{background:#ffebee;color:#c62828;}.pm-due-pill.yellow{background:#fff8e1;color:#e65100;}.pm-due-pill.green{background:#e8f5e9;color:#1b5e20;}</style>
+<div id="pm-due-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;overflow:auto;padding:18px;direction:rtl;">
+  <div style="background:#fff;margin:0 auto;border-radius:14px;max-width:980px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
+    <div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;">
+      <h3 style="font-size:1.15rem;font-weight:800;">📅 رسائل تذكير الاستحقاق</h3>
+      <span onclick="pmCloseDueReminders()" style="cursor:pointer;font-size:1.6rem;line-height:1;">&times;</span>
+    </div>
+    <div style="padding:14px 18px;background:#fff8e1;border-bottom:1px solid #ffd54f;">
+      <div style="font-weight:800;color:#e65100;margin-bottom:8px;">اختر نوع الفلتر:</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 14px;font-size:14px;color:#333;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="today" checked onchange="_pmDueFltChange()"> حان موعد الاستحقاق اليوم</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="within" onchange="_pmDueFltChange()"> يستحق خلال: <input type="number" id="pm-due-days" value="3" min="1" max="60" style="width:60px;padding:4px 8px;border:1.3px solid #ffb74d;border-radius:6px;font-weight:800;direction:ltr;" onchange="_pmDueFltChange(true)"> أيام</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="overdue" onchange="_pmDueFltChange()"> متأخر عن الاستحقاق</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><input type="radio" name="pm-due-flt" value="manual" onchange="_pmDueFltChange()"> اختيار قسط محدد يدوياً</label>
+      </div>
+      <div id="pm-due-manual-row" style="display:none;margin-top:10px;display:none;flex-wrap:wrap;gap:14px;">
+        <div><label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">القسط</label><select id="pm-due-n" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-weight:700;direction:rtl;"><option value="1">القسط 1</option><option value="2">القسط 2</option><option value="3">القسط 3</option><option value="4">القسط 4</option><option value="5">القسط 5</option><option value="6">القسط 6</option><option value="7">القسط 7</option><option value="8">القسط 8</option><option value="9">القسط 9</option><option value="10">القسط 10</option><option value="11">القسط 11</option><option value="12">القسط 12</option></select></div>
+        <div><label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">المجموعة</label><select id="pm-due-group" style="padding:7px 12px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;direction:rtl;min-width:160px;"><option value="">جميع المجموعات</option></select></div>
+      </div>
+      <div style="margin-top:12px;"><button onclick="pmDueLoad()" style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;padding:9px 20px;border-radius:9px;font-weight:800;cursor:pointer;font-size:14px;">🔍 عرض الطلاب المستهدفين</button></div>
+    </div>
+    <div style="padding:10px 18px;background:#fff;border-bottom:1px solid #ffe0b2;display:none;" id="pm-due-tplbar">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><label style="font-weight:800;color:#e65100;font-size:13px;">✍ نص رسالة التذكير</label><button onclick="pmDueSaveTemplate()" style="background:#fff3e0;border:1.5px solid #ffb74d;color:#e65100;padding:4px 12px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12px;">💾 حفظ</button></div>
+      <textarea id="pm-due-tpl" rows="3" style="width:100%;padding:8px 10px;border:1.3px solid #ffe0b2;border-radius:8px;font-family:inherit;direction:rtl;line-height:1.6;font-size:13px;background:#fffde7;"></textarea>
+      <div style="font-size:11.5px;color:#5d4037;margin-top:4px;">💡 المتغيرات: <code>{اسم_الطالب}</code> <code>{رقم_القسط}</code> <code>{مبلغ_القسط}</code> <code>{تاريخ_الاستحقاق}</code> <code>{المتبقي}</code></div>
+    </div>
+    <div id="pm-due-results" style="padding:10px 18px;max-height:55vh;overflow-y:auto;">
+      <div style="padding:30px;text-align:center;color:#999;font-weight:700;">— اختر فلتر واضغط «عرض الطلاب المستهدفين» —</div>
+    </div>
+  </div>
+</div>
+<script>
 /* ── متابعة الدفع — student-card workflow ───────────────────────── */
 function _pmNorm(s){return(s||"").replace(/[\u0623\u0625\u0622\u0671]/g,"\u0627").replace(/\u0629/g,"\u0647").replace(/\u0649/g,"\u064A");}
 var _pmGroupCache = null;     /* {groupName: [{id,name}]} */
@@ -6031,6 +6062,248 @@ function pmRecordPay(btn){
       _pmToast("\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644", "error");
       btn.disabled = false; btn.innerHTML = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
     });
+}
+
+/* ─── Due-date reminder messaging (📅 رسائل تذكير الاستحقاق) ───── */
+var _pmDueRows = [];
+var _pmDueDefaultTpl = "السلام عليكم ورحمة الله وبركاته" + String.fromCharCode(10) + String.fromCharCode(10)
+  + "ولي أمر الطالب/ة {اسم_الطالب}،" + String.fromCharCode(10)
+  + "نذكركم بأن القسط رقم {رقم_القسط} بقيمة {مبلغ_القسط} د.ب يستحق بتاريخ {تاريخ_الاستحقاق}." + String.fromCharCode(10)
+  + "المبلغ المتبقي: {المتبقي} د.ب" + String.fromCharCode(10) + String.fromCharCode(10)
+  + "نشكر تعاونكم." + String.fromCharCode(10)
+  + "مملكة الإنجليزي";
+
+function pmCloseDueReminders(){
+  var m = document.getElementById('pm-due-modal');
+  if (m) m.style.display = 'none';
+}
+
+function _pmDueFltChange(){
+  var el = document.querySelector('input[name="pm-due-flt"]:checked');
+  var f = (el && el.value) || 'today';
+  var manualBox = document.getElementById('pm-due-manual');
+  if (manualBox) manualBox.style.display = (f === 'manual') ? 'flex' : 'none';
+  var daysWrap = document.getElementById('pm-due-days');
+  if (daysWrap) daysWrap.disabled = (f !== 'within');
+}
+
+function _pmDueLoadManualOptions(){
+  var nSel = document.getElementById('pm-due-n');
+  var gSel = document.getElementById('pm-due-grp');
+  if (nSel && nSel.options.length === 0){
+    for (var i=1;i<=12;i++){
+      var op = document.createElement('option');
+      op.value = i; op.textContent = 'القسط ' + i;
+      nSel.appendChild(op);
+    }
+  }
+  if (gSel){
+    var src = document.getElementById('pm-group');
+    gSel.innerHTML = '';
+    var opAll = document.createElement('option');
+    opAll.value = ''; opAll.textContent = '— كل المجموعات —';
+    gSel.appendChild(opAll);
+    if (src){
+      for (var j=0;j<src.options.length;j++){
+        var v = src.options[j].value;
+        if (!v || v === '__ALL__') continue;
+        var op2 = document.createElement('option');
+        op2.value = v; op2.textContent = src.options[j].textContent;
+        gSel.appendChild(op2);
+      }
+    }
+  }
+}
+
+function pmOpenDueReminders(){
+  var m = document.getElementById('pm-due-modal');
+  if (!m) return;
+  m.style.display = 'block';
+  _pmDueLoadManualOptions();
+  _pmDueFltChange();
+  var res = document.getElementById('pm-due-results');
+  if (res) res.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر معايير التصفية ثم اضغط عرض —</div>';
+  fetch('/api/messaging/templates', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var ta = document.getElementById('pm-due-tpl');
+      var bar = document.getElementById('pm-due-tplbar');
+      if (ta) ta.value = (d && d.due_reminder) ? d.due_reminder : _pmDueDefaultTpl;
+      if (bar) bar.style.display = 'block';
+    })
+    .catch(function(){
+      var ta = document.getElementById('pm-due-tpl');
+      var bar = document.getElementById('pm-due-tplbar');
+      if (ta) ta.value = _pmDueDefaultTpl;
+      if (bar) bar.style.display = 'block';
+    });
+}
+
+function pmDueLoad(){
+  var el = document.querySelector('input[name="pm-due-flt"]:checked');
+  var f = (el && el.value) || 'today';
+  var qs = 'filter=' + encodeURIComponent(f);
+  if (f === 'within'){
+    var d = (document.getElementById('pm-due-days')||{}).value || '3';
+    qs += '&days=' + encodeURIComponent(d);
+  } else if (f === 'manual'){
+    var n = (document.getElementById('pm-due-n')||{}).value || '1';
+    var g = (document.getElementById('pm-due-grp')||{}).value || '';
+    qs += '&n=' + encodeURIComponent(n) + '&group=' + encodeURIComponent(g);
+  }
+  var res = document.getElementById('pm-due-results');
+  if (res) res.innerHTML = '<div style="text-align:center;color:#666;padding:24px;">⏳ جارٍ التحميل...</div>';
+  fetch('/api/payment/due-reminders?' + qs, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _pmDueRows = (d && d.rows) || [];
+      _pmDueRender();
+    })
+    .catch(function(){
+      if (res) res.innerHTML = '<div style="text-align:center;color:#c62828;padding:24px;">خطأ في الاتصال</div>';
+    });
+}
+
+function _pmEsc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _pmDueRender(){
+  var res = document.getElementById('pm-due-results');
+  if (!res) return;
+  if (!_pmDueRows.length){
+    res.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:14px;">— لا يوجد طلاب يطابقون التصفية —</div>';
+    return;
+  }
+  var html = '';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">';
+  html += '<div><label style="font-weight:700;cursor:pointer;font-size:13px;"><input type="checkbox" id="pm-due-all" onchange="_pmDueSelectAll(this.checked)"> تحديد الكل</label> <span style="color:#666;font-size:12.5px;margin-right:10px;">عدد الطلاب: ' + _pmDueRows.length + '</span></div>';
+  html += '<div style="display:flex;gap:6px;"><button onclick="_pmDueSendSelected()" style="background:#1976D2;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12.5px;">📤 إرسال للمحدد</button><button onclick="_pmDueSendAll()" style="background:#2e7d32;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12.5px;">📨 إرسال للجميع</button></div>';
+  html += '</div>';
+  html += '<div style="overflow:auto;max-height:48vh;border:1px solid #eee;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+  html += '<thead style="background:#fff3e0;position:sticky;top:0;"><tr>';
+  html += '<th style="padding:8px;text-align:center;width:38px;"></th>';
+  html += '<th style="padding:8px;text-align:right;">الطالب</th>';
+  html += '<th style="padding:8px;text-align:right;">المجموعة</th>';
+  html += '<th style="padding:8px;text-align:center;">القسط</th>';
+  html += '<th style="padding:8px;text-align:center;">المبلغ</th>';
+  html += '<th style="padding:8px;text-align:center;">المتبقي</th>';
+  html += '<th style="padding:8px;text-align:center;">تاريخ الاستحقاق</th>';
+  html += '<th style="padding:8px;text-align:center;">الحالة</th>';
+  html += '<th style="padding:8px;text-align:center;">إجراء</th>';
+  html += '</tr></thead><tbody>';
+  for (var i=0;i<_pmDueRows.length;i++){
+    var r = _pmDueRows[i];
+    var color = r.due_color || 'green';
+    var statusLabel = (color === 'red') ? 'مستحق/متأخر' : (color === 'yellow' ? 'قريب' : 'لاحق');
+    html += '<tr class="pm-due-row ' + color + '">';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><input type="checkbox" class="pm-due-cb" data-i="' + i + '"></td>';
+    html += '<td style="padding:6px;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.name) + '</td>';
+    html += '<td style="padding:6px;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.group) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.n) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;">' + _pmEsc(r.amount) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;color:' + (Number(r.remaining||0) > 0 ? '#c62828' : '#1b5e20') + ';font-weight:700;">' + _pmEsc(r.remaining) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;direction:ltr;">' + _pmEsc(r.due_date) + '</td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><span class="pm-due-pill ' + color + '">' + statusLabel + '</span></td>';
+    html += '<td style="padding:6px;text-align:center;border-bottom:1px solid #f0f0f0;"><button onclick="_pmDueSendOne(' + i + ')" style="background:#25D366;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-weight:800;cursor:pointer;font-size:11.5px;">📲 واتساب</button></td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  res.innerHTML = html;
+}
+
+function _pmDueSelectAll(on){
+  var cbs = document.querySelectorAll('.pm-due-cb');
+  for (var i=0;i<cbs.length;i++) cbs[i].checked = !!on;
+}
+
+function _pmDueCleanPhone(p){
+  p = String(p == null ? '' : p).replace(/[^0-9+]/g, '');
+  if (p.indexOf('+') === 0) p = p.substring(1);
+  if (!p) return '';
+  if (p.length === 8) p = '973' + p;
+  return p;
+}
+
+function _pmDueFillTemplate(tpl, r){
+  return String(tpl == null ? '' : tpl)
+    .replace(/\{اسم_الطالب\}/g, r.name == null ? '' : String(r.name))
+    .replace(/\{رقم_القسط\}/g, r.n == null ? '' : String(r.n))
+    .replace(/\{مبلغ_القسط\}/g, r.amount == null ? '0' : String(r.amount))
+    .replace(/\{تاريخ_الاستحقاق\}/g, r.due_date == null ? '' : String(r.due_date))
+    .replace(/\{المتبقي\}/g, r.remaining == null ? '0' : String(r.remaining))
+    .replace(/\{المجموعة\}/g, r.group == null ? '' : String(r.group));
+}
+
+function _pmDueLogSend(rows, message){
+  try {
+    fetch('/api/message-log', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({ kind: 'due_reminder', rows: rows, message: message })
+    }).catch(function(){});
+  } catch(e){}
+}
+
+function _pmDueSendOne(i){
+  var r = _pmDueRows[i]; if (!r) return;
+  var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
+  var phone = _pmDueCleanPhone(r.whatsapp);
+  if (!phone){ _pmToast('لا يوجد رقم هاتف للطالب', 'error'); return; }
+  var msg = _pmDueFillTemplate(tpl, r);
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+  _pmDueLogSend([{ student_id: r.student_id, name: r.name, group: r.group, n: r.n }], msg);
+}
+
+function _pmDueSendBatch(rows){
+  if (!rows.length){ _pmToast('لا يوجد طلاب للإرسال', 'warn'); return; }
+  var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
+  var sent = 0, skipped = 0, logged = [];
+  for (var i=0;i<rows.length;i++){
+    var r = rows[i];
+    var phone = _pmDueCleanPhone(r.whatsapp);
+    if (!phone){ skipped++; continue; }
+    var msg = _pmDueFillTemplate(tpl, r);
+    window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    logged.push({ student_id: r.student_id, name: r.name, group: r.group, n: r.n });
+    sent++;
+  }
+  if (logged.length) _pmDueLogSend(logged, '(template)');
+  var msgOut = 'تم فتح ' + sent + ' محادثة';
+  if (skipped) msgOut += ' ، تخطي ' + skipped + ' (بدون رقم)';
+  _pmToast(msgOut, skipped ? 'warn' : 'success');
+}
+
+function _pmDueSendSelected(){
+  var cbs = document.querySelectorAll('.pm-due-cb:checked');
+  if (!cbs.length){ _pmToast('لم يتم تحديد أي طالب', 'warn'); return; }
+  var rows = [];
+  for (var i=0;i<cbs.length;i++){
+    var idx = parseInt(cbs[i].getAttribute('data-i'), 10);
+    if (!isNaN(idx) && _pmDueRows[idx]) rows.push(_pmDueRows[idx]);
+  }
+  _pmDueSendBatch(rows);
+}
+
+function _pmDueSendAll(){ _pmDueSendBatch(_pmDueRows.slice()); }
+
+function pmDueSaveTemplate(){
+  var ta = document.getElementById('pm-due-tpl'); if (!ta) return;
+  fetch('/api/messaging/templates', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({ due_reminder: ta.value })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok) _pmToast('تم حفظ القالب');
+      else _pmToast('تعذر الحفظ', 'error');
+    })
+    .catch(function(){ _pmToast('خطأ في الاتصال', 'error'); });
 }
 </script>
 <div id="srm-type-modal" class="srm-type-bg"><div class="srm-type-box"><h3 id="srm-type-title">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</h3><p id="srm-type-msg"></p><span class="srm-type-expected" id="srm-type-expected"></span><input class="srm-type-input" id="srm-type-input" type="text" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x643;&#x645;&#x627; &#x647;&#x648;"><div class="srm-type-actions"><button class="srm-btn-delete" id="srm-type-yes">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</button><button class="srm-btn-cancel-edit" id="srm-type-no">&#x625;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div id="srm-log-modal" class="srm-log-bg"><div class="srm-log-box"><div class="srm-log-head">&#x1F4CB; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x63A;&#x64A;&#x64A;&#x631;&#x627;&#x62A; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x641;&#x638;</div><div class="srm-log-body" id="srm-log-body"></div><div class="srm-log-actions"><button class="srm-btn-save" id="srm-log-yes">&#x646;&#x639;&#x645;&#x60C; &#x627;&#x62D;&#x641;&#x638;</button><button class="srm-btn-cancel-edit" id="srm-log-no">&#x631;&#x627;&#x62C;&#x639; &#x645;&#x631;&#x629; &#x623;&#x62E;&#x631;&#x649;</button></div></div></div><div id="srm-auto-lock" class="srm-auto-lock-banner">&#x1F6AB; &#x62A;&#x645; &#x625;&#x644;&#x63A;&#x627;&#x621; &#x627;&#x644;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x628;&#x633;&#x628;&#x628; &#x639;&#x62F;&#x645; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;</div>
@@ -12962,23 +13235,40 @@ DEFAULT_LATE_TEMPLATE = (
     "مملكة الإنجليزي"
 )
 
+DEFAULT_DUE_REMINDER_TEMPLATE = (
+    "السلام عليكم ورحمة الله وبركاته\n\n"
+    "ولي أمر الطالب/ة {اسم_الطالب}،\n"
+    "نذكركم بأن القسط رقم {رقم_القسط} بقيمة {مبلغ_القسط} د.ب "
+    "يستحق بتاريخ {تاريخ_الاستحقاق}.\n"
+    "المبلغ المتبقي: {المتبقي} د.ب\n\n"
+    "نشكر تعاونكم.\n"
+    "مملكة الإنجليزي"
+)
+
 @app.route('/api/messaging/templates', methods=['GET'])
 @login_required
 def api_messaging_templates_get():
     absent = get_setting('messaging', 'absent_template', '') or DEFAULT_ABSENT_TEMPLATE
     late   = get_setting('messaging', 'late_template',   '') or DEFAULT_LATE_TEMPLATE
+    due    = get_setting('messaging', 'due_reminder_template', '') or DEFAULT_DUE_REMINDER_TEMPLATE
     return jsonify({
         "ok": True,
         "absent": absent,
         "late":   late,
-        "default_absent": DEFAULT_ABSENT_TEMPLATE,
-        "default_late":   DEFAULT_LATE_TEMPLATE,
+        "due_reminder":         due,
+        "default_absent":       DEFAULT_ABSENT_TEMPLATE,
+        "default_late":         DEFAULT_LATE_TEMPLATE,
+        "default_due_reminder": DEFAULT_DUE_REMINDER_TEMPLATE,
         "variables": [
             {"key": "{اسم_الطالب}", "desc": "اسم الطالب (إلزامي)"},
             {"key": "{التاريخ}",   "desc": "تاريخ الحصة"},
             {"key": "{المجموعة}",   "desc": "اسم المجموعة"},
             {"key": "{اسم_المعلم}", "desc": "اسم المعلم"},
             {"key": "{وقت_الحصة}",  "desc": "وقت الحصة"},
+            {"key": "{رقم_القسط}",  "desc": "رقم القسط"},
+            {"key": "{مبلغ_القسط}", "desc": "مبلغ القسط"},
+            {"key": "{تاريخ_الاستحقاق}", "desc": "تاريخ الاستحقاق"},
+            {"key": "{المتبقي}", "desc": "المبلغ المتبقي"},
         ],
     })
 
@@ -12992,6 +13282,8 @@ def api_messaging_templates_put():
         pairs.append(('absent_template', 'قالب رسالة الغائب', d.get('absent') or ''))
     if 'late'   in d:
         pairs.append(('late_template',   'قالب رسالة المتأخر', d.get('late')   or ''))
+    if 'due_reminder' in d:
+        pairs.append(('due_reminder_template', 'قالب تذكير الاستحقاق', d.get('due_reminder') or ''))
     if not pairs:
         return jsonify({"ok": False, "error": "no template provided"}), 400
     try:
@@ -17231,6 +17523,140 @@ def api_payment_student_edit(sid):
     new_plan["ok"] = True
     new_plan["edited"] = {"n": n, "old_amount": old_amount, "new_amount": new_amount}
     return jsonify(new_plan)
+
+
+@app.route('/api/payment/due-reminders', methods=['GET'])
+@login_required
+def api_payment_due_reminders():
+    """Returns rows for the متابعة الدفع → 📅 رسائل تذكير الاستحقاق
+    modal. Walks every student\'s taqseet plan, joins with payment_log
+    inst1..5 (or student_payments for n>=6), keeps only installments
+    that are NOT yet fully paid, and applies the filter:
+      - filter=today   → due_date == today
+      - filter=within  → due_date <= today + days
+      - filter=overdue → due_date < today
+      - filter=manual  → installment_number == n (any due date), and
+                          optionally restricted by group
+    Each row carries the data the front-end needs to render + send."""
+    import datetime as _dt
+    db = get_db()
+    flt = (request.args.get('filter') or 'today').strip()
+    try:
+        days = int(request.args.get('days') or 3)
+    except Exception:
+        days = 3
+    try:
+        manual_n = int(request.args.get('n') or 0)
+    except Exception:
+        manual_n = 0
+    group_filter = (request.args.get('group') or '').strip()
+
+    today = _dt.date.today()
+    deadline = today + _dt.timedelta(days=days)
+
+    # Group lookup config — same as /api/payments/group.
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live_cols = set()
+    has_online = online_col in live_cols and online_col != in_col
+
+    cols_select = ['id', 'student_name', 'personal_id', 'whatsapp', 'installment_type', '"' + in_col + '"']
+    if has_online: cols_select.append('"' + online_col + '"')
+    sql = ('SELECT ' + ', '.join(cols_select) + ' FROM students '
+           'WHERE installment_type IS NOT NULL AND TRIM(installment_type) <> \'\' '
+           'ORDER BY student_name')
+    try:
+        students = db.execute(sql).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    def _parse_date(s):
+        if s is None: return None
+        s = str(s).strip()
+        if not s: return None
+        # Normalise common formats — taqseet dates land as YYYY-MM-DD
+        # via _att_normalize_date but we accept slashes too.
+        try:
+            iso = _att_normalize_date(s)
+            if iso and len(iso) >= 10:
+                y, m, d = iso[:4], iso[5:7], iso[8:10]
+                return _dt.date(int(y), int(m), int(d))
+        except Exception:
+            pass
+        return None
+
+    def _color_for(d):
+        if d is None: return ''
+        delta = (d - today).days
+        if delta < 0:    return 'red'         # overdue
+        if delta == 0:   return 'red'         # today
+        if delta <= 3:   return 'yellow'
+        return 'green'
+
+    out = []
+    for s in students:
+        sid    = s[0]
+        sname  = s[1] or ''
+        pid    = s[2] or ''
+        phone  = s[3] or ''
+        sgrp   = s[5] or ''
+        if has_online and len(s) > 6 and not sgrp:
+            sgrp = s[6] or ''
+        if group_filter and sgrp != group_filter:
+            continue
+        plan = _payment_compute_plan(db, sid)
+        if plan is None or not plan["plan"].get("installments"):
+            continue
+        for inst in plan["plan"]["installments"]:
+            n = inst.get("n")
+            amt  = float(inst.get("amount") or 0)
+            paid = float(inst.get("paid") or 0)
+            rem  = float(inst.get("remaining") or 0)
+            if amt <= 0:        continue
+            if rem <= 0.005:    continue   # already fully paid
+            if (inst.get("status") or '') == 'exempt': continue
+            due = _parse_date(inst.get("due_date"))
+            # Apply filter.
+            if flt == 'manual':
+                if manual_n and n != manual_n: continue
+            elif flt == 'today':
+                if due != today: continue
+            elif flt == 'within':
+                if due is None: continue
+                if not (today <= due <= deadline): continue
+            elif flt == 'overdue':
+                if due is None: continue
+                if due >= today: continue
+            else:
+                continue
+            out.append({
+                "student_id":    sid,
+                "name":          sname,
+                "personal_id":   pid,
+                "whatsapp":      phone,
+                "group":         sgrp,
+                "n":             n,
+                "amount":        amt,
+                "paid":          paid,
+                "remaining":     rem,
+                "due_date":      inst.get("due_date") or '',
+                "due_color":     _color_for(due),
+                "course_amount": plan["plan"]["course_amount"],
+            })
+    return jsonify({
+        "ok":     True,
+        "rows":   out,
+        "filter": flt,
+        "days":   days,
+        "n":      manual_n,
+        "group":  group_filter,
+        "today":  today.strftime('%Y-%m-%d'),
+    })
 
 
 @app.route('/api/payment-reminders', methods=['GET'])
