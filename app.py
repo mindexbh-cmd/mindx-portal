@@ -982,6 +982,36 @@ if True:
         is_visible INTEGER DEFAULT 1,
         col_type TEXT DEFAULT 'نص',
         col_options TEXT DEFAULT '')""")
+    # Ensure the v2 paylog columns exist on legacy DBs that were
+    # created before course_amount / total_paid / total_remaining /
+    # msg1..msg5 were part of the schema. Idempotent — checks the
+    # live information_schema before each ALTER. The matching
+    # migration tag prevents the backfill from running twice; live
+    # prod was migrated out-of-band but the tag is recorded too.
+    if "paylog_extra_cols_v1" not in applied:
+        try:
+            tq_cols = [r[1] for r in db2.execute("PRAGMA table_info(payment_log)").fetchall()]
+        except Exception:
+            tq_cols = []
+        for c, ddl in [
+            ("course_amount",   "ALTER TABLE payment_log ADD COLUMN course_amount NUMERIC"),
+            ("total_paid",      "ALTER TABLE payment_log ADD COLUMN total_paid NUMERIC"),
+            ("total_remaining", "ALTER TABLE payment_log ADD COLUMN total_remaining NUMERIC"),
+            ("msg1", "ALTER TABLE payment_log ADD COLUMN msg1 TEXT"),
+            ("msg2", "ALTER TABLE payment_log ADD COLUMN msg2 TEXT"),
+            ("msg3", "ALTER TABLE payment_log ADD COLUMN msg3 TEXT"),
+            ("msg4", "ALTER TABLE payment_log ADD COLUMN msg4 TEXT"),
+            ("msg5", "ALTER TABLE payment_log ADD COLUMN msg5 TEXT"),
+        ]:
+            if c not in tq_cols:
+                try: db2.execute(ddl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("paylog_extra_cols_v1",))
+            db2.commit()
+        except Exception:
+            pass
+
     if "paylog_labels_v2" not in applied:
         seed_paylog_labels = [
             ("student_name",        "&#x627;&#x644;&#x627;&#x633;&#x645;", 1),
@@ -14653,45 +14683,49 @@ def _payment_normalize_name(s):
     return s.strip().lower()
 
 def _payment_log_paid_for_student(db, student_name, personal_id):
-    """Return paid_by_inst dict (int n → float amount) read DIRECTLY
-    from payment_log. Looks up first by personal_id (cheapest, exact),
-    then by trimmed-+-normalized student_name. Token "تم الدفع" maps
-    to a sentinel string for the front-end; "معفي" maps to "exempt".
-    Numeric strings parse to floats."""
+    """Return (paid_by_inst, pl_row_dict) read DIRECTLY from
+    payment_log. pl_row_dict carries the persisted total_paid,
+    total_remaining, course_amount, and msg1..msg5 columns when they
+    exist on the live schema (they were added in the paylog v2
+    migration). Lookup ladder: personal_id → exact-normalised
+    student_name → ILIKE substring."""
     paid_by_inst = {}
     pl_row = None
+    # Detect which paylog columns exist (course_amount, total_paid,
+    # total_remaining, msg1..msg5 were added later — be tolerant of
+    # legacy DBs without them).
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(payment_log)").fetchall()}
+    except Exception:
+        live_cols = set()
+    extra_cols = []
+    for c in ('course_amount', 'total_paid', 'total_remaining',
+              'msg1', 'msg2', 'msg3', 'msg4', 'msg5'):
+        if c in live_cols:
+            extra_cols.append(c)
+    select_cols = (
+        ['student_name', 'inst1', 'inst2', 'inst3', 'inst4', 'inst5']
+        + extra_cols
+    )
+    select_sql_base = ('SELECT ' + ', '.join('"' + c + '"' for c in select_cols)
+                       + ' FROM payment_log ')
     try:
         if personal_id and str(personal_id).strip():
             pl_row = db.execute(
-                "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
-                "WHERE personal_id=? AND personal_id <> '' LIMIT 1",
+                select_sql_base + "WHERE personal_id=? AND personal_id <> '' LIMIT 1",
                 (str(personal_id).strip(),),
             ).fetchone()
         if not pl_row and student_name:
             target = _payment_normalize_name(student_name)
-            for r in db.execute(
-                "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log"
-            ).fetchall():
+            for r in db.execute(select_sql_base).fetchall():
                 if _payment_normalize_name(r[0]) == target:
-                    pl_row = r
-                    break
+                    pl_row = r; break
             if not pl_row:
-                # Fuzzy substring match — student_name may have slight
-                # variations (initials, parent name) between students
-                # and payment_log.
-                for r in db.execute(
-                    "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
-                    "WHERE student_name ILIKE ? LIMIT 1",
-                    ('%' + str(student_name).strip() + '%',),
-                ).fetchone() or []:
-                    pass  # no-op; fetchone returns row or None directly
                 row = db.execute(
-                    "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
-                    "WHERE student_name ILIKE ? LIMIT 1",
+                    select_sql_base + "WHERE student_name ILIKE ? LIMIT 1",
                     ('%' + str(student_name).strip() + '%',),
                 ).fetchone()
-                if row:
-                    pl_row = row
+                if row: pl_row = row
     except Exception:
         pl_row = None
     if not pl_row:
@@ -14707,7 +14741,15 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
             paid_by_inst[n] = ('__exempt__', s)
         else:
             paid_by_inst[n] = _payment_to_float(s)
-    return paid_by_inst, pl_row
+    # Build a dict-style view of the row including the extra cols.
+    extras = {c: pl_row[6 + i] for i, c in enumerate(extra_cols)}
+    pl_dict = {
+        'student_name': pl_row[0],
+        'inst1': pl_row[1], 'inst2': pl_row[2], 'inst3': pl_row[3],
+        'inst4': pl_row[4], 'inst5': pl_row[5],
+        **extras,
+    }
+    return paid_by_inst, pl_dict
 
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
@@ -14778,8 +14820,33 @@ def _payment_compute_plan(db, sid):
                 "source":    'payment_log' if pl_val is not None else 'student_payments',
             })
             course_amount += amt
-    total_paid = sum(i["paid"] for i in installments)
-    total_remaining = max(0.0, course_amount - total_paid)
+    # Per spec: prefer the persisted columns on payment_log when they
+    # carry actual data — never zero-out a student whose paylog row
+    # already records a paid total.
+    total_paid_calc = sum(i["paid"] for i in installments)
+    total_paid_pl = None
+    course_amount_pl = None
+    total_remaining_pl = None
+    if pl_row:
+        v = pl_row.get('total_paid')
+        if v is not None and v != '':
+            try: total_paid_pl = float(v)
+            except Exception: total_paid_pl = None
+        v = pl_row.get('course_amount')
+        if v is not None and v != '':
+            try: course_amount_pl = float(v)
+            except Exception: course_amount_pl = None
+        v = pl_row.get('total_remaining')
+        if v is not None and v != '':
+            try: total_remaining_pl = float(v)
+            except Exception: total_remaining_pl = None
+    total_paid = total_paid_pl if total_paid_pl is not None else total_paid_calc
+    if course_amount_pl is not None and course_amount_pl > 0:
+        course_amount = course_amount_pl
+    if total_remaining_pl is not None:
+        total_remaining = total_remaining_pl
+    else:
+        total_remaining = max(0.0, course_amount - total_paid)
     method_label = ''
     if tq:
         method_label = '' if tq[1] is None else str(tq[1])
@@ -14811,6 +14878,7 @@ def _payment_compute_plan(db, sid):
             "total_remaining": total_remaining,
             "status":          status,
             "paylog_matched":  bool(pl_row),
+            "totals_source":   "payment_log" if total_paid_pl is not None else "computed",
         },
     }
 
@@ -14877,56 +14945,107 @@ def api_payment_student_pay(sid):
     student = plan["student"]
     pid     = (student.get('personal_id') or '').strip()
     sname   = (student.get('name') or '').strip()
+    course_amount_now = plan["plan"]["course_amount"]
 
-    # PRIMARY write: payment_log.inst<N> for n in 1..5. The spec requires
-    # paid amounts live in payment_log, so we match an existing row by
-    # personal_id (when present) or by name (fuzzy-trimmed), and only
-    # create a new row if no match exists. Stored as a string so the
-    # legacy paylog column type is preserved.
+    # PRIMARY write: payment_log.inst<N>, msg<N>, total_paid,
+    # total_remaining, course_amount. The spec wants the totals
+    # persisted so the next read can trust them directly. Match an
+    # existing row by personal_id → exact name → ILIKE substring;
+    # INSERT a new row only if no match.
     if n <= 5:
         try:
-            col = 'inst' + str(n)
             paid_str = ('%g' % new_paid) if new_paid == int(new_paid) else str(new_paid)
-            updated = 0
+            inst_col = 'inst' + str(n)
+            msg_col  = 'msg'  + str(n)
+            try:
+                live_cols = {r[1] for r in db.execute(
+                    "PRAGMA table_info(payment_log)"
+                ).fetchall()}
+            except Exception:
+                live_cols = set()
+            has_msg   = msg_col in live_cols
+            has_total = 'total_paid' in live_cols and 'total_remaining' in live_cols
+            has_amount= 'course_amount' in live_cols
+            # Resolve the row id once via the same lookup ladder.
+            row_id = None
             if pid:
-                cur = db.execute(
-                    'UPDATE payment_log SET "' + col + '"=? WHERE personal_id=? AND personal_id <> \'\'',
-                    (paid_str, pid),
-                )
-                updated = cur.rowcount or 0
-            if not updated and sname:
-                cur = db.execute(
-                    'UPDATE payment_log SET "' + col + '"=? WHERE TRIM(student_name)=?',
-                    (paid_str, sname),
-                )
-                updated = cur.rowcount or 0
-            if not updated and sname:
-                # ILIKE substring fallback — still writes to one row only
-                # because we apply a LIMIT via a sub-select on id.
-                row = db.execute(
+                r = db.execute(
+                    "SELECT id FROM payment_log "
+                    "WHERE personal_id=? AND personal_id <> '' LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute(
+                    "SELECT id FROM payment_log WHERE TRIM(student_name)=? LIMIT 1",
+                    (sname,),
+                ).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute(
                     "SELECT id FROM payment_log WHERE student_name ILIKE ? LIMIT 1",
                     ('%' + sname + '%',),
                 ).fetchone()
-                if row:
-                    cur = db.execute(
-                        'UPDATE payment_log SET "' + col + '"=? WHERE id=?',
-                        (paid_str, row[0]),
-                    )
-                    updated = cur.rowcount or 0
-            if not updated:
-                # No matching row — insert a fresh paylog entry. Keep
-                # personal_id NULL when blank to mirror the live data
-                # shape (most prod rows have personal_id NULL anyway).
-                if pid:
-                    db.execute(
-                        'INSERT INTO payment_log(personal_id, student_name, "' + col + '") VALUES(?,?,?)',
-                        (pid, sname, paid_str),
-                    )
-                else:
-                    db.execute(
-                        'INSERT INTO payment_log(student_name, "' + col + '") VALUES(?,?)',
-                        (sname, paid_str),
-                    )
+                if r: row_id = r[0]
+            if row_id is None:
+                # INSERT a fresh row.
+                cols  = ['student_name', inst_col]
+                vals  = [sname, paid_str]
+                if pid: cols.insert(0, 'personal_id'); vals.insert(0, pid)
+                if has_msg:    cols.append(msg_col);          vals.append('تم الدفع')
+                if has_amount and course_amount_now: cols.append('course_amount'); vals.append(course_amount_now)
+                if has_total:  cols += ['total_paid', 'total_remaining']; vals += [new_paid, max(0.0, (course_amount_now or 0) - new_paid)]
+                ph = ','.join(['?'] * len(vals))
+                db.execute(
+                    'INSERT INTO payment_log(' + ','.join('"' + c + '"' for c in cols) + ') VALUES(' + ph + ')',
+                    tuple(vals),
+                )
+                row_id = db.execute("SELECT MAX(id) FROM payment_log").fetchone()[0]
+            else:
+                # UPDATE the existing row's inst<N> + msg<N> + totals.
+                set_pairs = ['"' + inst_col + '"=?']
+                params    = [paid_str]
+                if has_msg:
+                    set_pairs.append('"' + msg_col + '"=?');     params.append('تم الدفع')
+                if has_amount and course_amount_now:
+                    set_pairs.append('"course_amount"=?');       params.append(course_amount_now)
+                params.append(row_id)
+                db.execute(
+                    'UPDATE payment_log SET ' + ', '.join(set_pairs) + ' WHERE id=?',
+                    tuple(params),
+                )
+            # Recompute persisted totals from the live inst columns +
+            # the just-applied write. Token cells ("تم الدفع" / "معفي")
+            # contribute by their installment\'s plan amount, since
+            # they\'re full-paid markers.
+            if has_total:
+                fresh = db.execute(
+                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?',
+                    (row_id,),
+                ).fetchone()
+                fresh_total = 0.0
+                for k in range(1, 6):
+                    cell = fresh[k - 1]
+                    if cell is None: continue
+                    s = str(cell).strip()
+                    if not s: continue
+                    if 'تم الدفع' in s or 'معفي' in s or 'معفى' in s:
+                        # Look up the matching plan amount; default to
+                        # what we know about target if k == n.
+                        plan_amt = 0.0
+                        if k == n:
+                            plan_amt = target["amount"]
+                        else:
+                            for inst in plan["plan"]["installments"]:
+                                if inst["n"] == k: plan_amt = inst["amount"]; break
+                        fresh_total += plan_amt
+                    else:
+                        fresh_total += _payment_to_float(s)
+                fresh_remaining = max(0.0, (course_amount_now or 0) - fresh_total)
+                db.execute(
+                    'UPDATE payment_log SET total_paid=?, total_remaining=? WHERE id=?',
+                    (fresh_total, fresh_remaining, row_id),
+                )
             db.commit()
         except Exception as ex:
             return jsonify({"ok": False, "error": "payment_log write failed: " + str(ex)}), 500
