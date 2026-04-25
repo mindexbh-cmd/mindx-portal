@@ -14387,19 +14387,107 @@ def api_session_summary():
 @app.route('/api/payments/group')
 @login_required
 def api_payments_group():
+    """Students in the chosen group + their per-installment plan and
+    payment status. Two long-standing bugs are addressed here:
+
+    1. Online-only groups returned empty because the WHERE clause only
+       checked `group_name_student`. Now we accept either the in-person
+       column OR the online column (both configurable via settings),
+       trimming both sides so a stray space won\'t miss a match.
+    2. The taqseet lookup used `taqseet_method`, an ASCII column that
+       was DROPPED in the v4 rebuild — every call raised
+       UndefinedColumn and 500\'d. We now read from the live taqseet
+       row whose `id` OR `طريقة_التقسيط` matches the student\'s stored
+       installment_type, pulling the v4-named installment columns
+       (`القسط_1`..`القسط_12`).
+    """
     db = get_db()
-    group = request.args.get('group','')
-    students = db.execute("SELECT id,student_name,installment_type FROM students WHERE group_name_student=? ORDER BY student_name", (group,)).fetchall()
+    group = (request.args.get('group') or '').strip()
+    if not group:
+        return jsonify([])
+
+    # Resolve column names from settings, with hardcoded fallbacks.
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+
+    # Confirm columns exist on the live schema; fall back gracefully.
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live_cols = set()
+    has_online = online_col in live_cols and online_col != in_col
+
+    if has_online:
+        sql = (
+            'SELECT id, student_name, installment_type FROM students '
+            'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
+            'OR TRIM(COALESCE("' + online_col + '", \'\')) = ? '
+            'ORDER BY student_name'
+        )
+        students = db.execute(sql, (group, group)).fetchall()
+    else:
+        sql = (
+            'SELECT id, student_name, installment_type FROM students '
+            'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
+            'ORDER BY student_name'
+        )
+        students = db.execute(sql, (group,)).fetchall()
+
+    # Pre-load taqseet rows once (cheap — the table is tiny).
+    tq_rows = []
+    try:
+        tq_cols = [r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()]
+        # Build a SELECT that survives both the v4 schema (Arabic
+        # columns) and any legacy DB that still has `taqseet_method`.
+        def _q(c): return '"' + c + '"' if c in tq_cols else 'NULL AS ' + c
+        method_alias = '"طريقة_التقسيط"' if 'طريقة_التقسيط' in tq_cols else ('taqseet_method' if 'taqseet_method' in tq_cols else "''")
+        inst_select = []
+        for n in range(1, 13):
+            v4 = 'القسط_' + str(n)
+            legacy = 'inst' + str(n)
+            if v4 in tq_cols:
+                inst_select.append('"' + v4 + '" AS i' + str(n))
+            elif legacy in tq_cols:
+                inst_select.append(legacy + ' AS i' + str(n))
+            else:
+                inst_select.append("'' AS i" + str(n))
+        sql_tq = ('SELECT id, ' + method_alias + ' AS m, '
+                  + ', '.join(inst_select) + ' FROM taqseet')
+        tq_rows = db.execute(sql_tq).fetchall()
+    except Exception:
+        tq_rows = []
+
+    def _find_taqseet(stored):
+        if stored is None: return None
+        s = str(stored).strip()
+        if not s: return None
+        for r in tq_rows:
+            tid    = r[0]
+            method = r[1]
+            if str(tid) == s or (method is not None and str(method) == s):
+                return r
+        return None
+
     result = []
     for s in students:
-        row = {"id": s[0], "name": s[1]}
-        tq = db.execute("SELECT inst1,inst2,inst3,inst4,inst5,inst6,inst7,inst8,inst9,inst10,inst11,inst12 FROM taqseet WHERE taqseet_method=?", (str(s[2] or ''),)).fetchone()
+        sid, sname, itype = s[0], s[1], s[2]
+        row = {"id": sid, "name": sname}
+        tq = _find_taqseet(itype)
         if tq:
-            for n in range(1,13):
-                row["tq_inst"+str(n)] = tq[n-1] if tq[n-1] else ''
-        payments = db.execute("SELECT inst_num,inst_type,price,paid FROM student_payments WHERE student_id=?", (s[0],)).fetchall()
+            for n in range(1, 13):
+                v = tq[1 + n]  # row layout: id, m, i1..i12
+                row["tq_inst" + str(n)] = ('' if v is None else v)
+        try:
+            payments = db.execute(
+                "SELECT inst_num,inst_type,price,paid FROM student_payments WHERE student_id=?",
+                (sid,),
+            ).fetchall()
+        except Exception:
+            payments = []
         for p in payments:
-            row["inst_"+str(p[0])] = {"inst_type": p[1], "price": p[2], "paid": p[3]}
+            row["inst_" + str(p[0])] = {"inst_type": p[1], "price": p[2], "paid": p[3]}
         result.append(row)
     return jsonify(result)
 
