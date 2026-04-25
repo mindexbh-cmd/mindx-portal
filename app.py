@@ -4643,7 +4643,7 @@ function pmOpen(){
         if(g&&!seen[g]){seen[g]=1;var o=document.createElement("option");o.value=g;o.textContent=g;sel.appendChild(o);}
       });
       _pmStudents=data.students||data;
-      fetch("/api/taqseet").then(function(r){return r.json();}).then(function(tq){_pmTaqseet=tq;});
+      fetch("/api/taqseet").then(function(r){return r.json();}).then(function(tq){_pmTaqseet=Array.isArray(tq)?tq:(tq&&tq.rows)||[];});
     });
   }
 }
@@ -6840,7 +6840,15 @@ var allTaqseetData=[];
 async function loadStudents(){
 const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet').catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
 const sData=await sRes.json(); const cData=await cRes.json();
-allStudents=sData.students||[]; allColumns=cData.columns||[]; allTaqseetData=await tRes.json(); populateTaqseetDropdowns();
+allStudents=sData.students||[]; allColumns=cData.columns||[];
+/* /api/taqseet (v4+) returns {rows, schema}; older builds returned a
+   flat array. Normalise to an array so populateTaqseetDropdowns +
+   getTaqseetDetail keep working — without this the .forEach call
+   below throws "forEach is not a function" and renderTable(allStudents)
+   never runs, leaving the page empty. */
+var _tq = await tRes.json();
+allTaqseetData = Array.isArray(_tq) ? _tq : ((_tq && _tq.rows) || []);
+try { populateTaqseetDropdowns(); } catch(e){ console.error('populateTaqseetDropdowns failed:', e); }
 renderTable(allStudents);
 /* Count only ACTIVE students here — inactive ones still appear in the
    table + the search modal, but the stat badge on the database page
@@ -9407,7 +9415,24 @@ def api_columns_get():
                 db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(key,label,order))
             except: pass
         db.commit()
-    rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM column_labels ORDER BY col_order").fetchall()
+    # Filter by table_name='students' if the column exists. The v4
+    # taqseet rebuild added a `table_name` column to column_labels and
+    # now stores taqseet labels in the same table; without this filter
+    # /api/columns leaks taqseet rows into the students page header.
+    try:
+        cl_cols = [r[1] for r in db.execute("PRAGMA table_info(column_labels)").fetchall()]
+    except Exception:
+        cl_cols = []
+    if 'table_name' in cl_cols:
+        rows = db.execute(
+            "SELECT col_key,col_label,col_order,is_visible FROM column_labels "
+            "WHERE table_name='students' OR table_name IS NULL "
+            "ORDER BY col_order"
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT col_key,col_label,col_order,is_visible FROM column_labels ORDER BY col_order"
+        ).fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
 @app.route("/api/columns", methods=["POST"])
@@ -9440,7 +9465,19 @@ def api_columns_add():
         else:
             max_order = db.execute("SELECT MAX(col_order) FROM column_labels").fetchone()[0] or 0
             new_order = max_order + 1
-        db.execute("INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",(col_key,col_label,new_order))
+        # Tag the new label with table_name='students' if the column
+        # exists, so the v4-aware /api/columns filter picks it up.
+        cl_cols = [r[1] for r in db.execute("PRAGMA table_info(column_labels)").fetchall()]
+        if 'table_name' in cl_cols:
+            db.execute(
+                "INSERT INTO column_labels(col_key,col_label,col_order,table_name) VALUES(?,?,?,?)",
+                (col_key, col_label, new_order, 'students'),
+            )
+        else:
+            db.execute(
+                "INSERT INTO column_labels(col_key,col_label,col_order) VALUES(?,?,?)",
+                (col_key, col_label, new_order),
+            )
         db.execute("ALTER TABLE students ADD COLUMN "+col_key+" TEXT")
         db.commit()
         return jsonify({"ok":True})
