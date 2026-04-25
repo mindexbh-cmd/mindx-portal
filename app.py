@@ -4742,7 +4742,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث بالاسم</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="ابحث بالاسم..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:200px;font-size:0.95rem;"></div><div id="pm-summary" style="margin-right:auto;display:none;background:#fff;border:1.5px solid #8B5CC8;border-radius:10px;padding:8px 14px;font-size:13px;color:#4a148c;font-weight:700;"><div>إجمالي مبالغ الدورات: <span id="pm-sum-course" style="color:#1B5E20;">0</span> د</div><div>إجمالي المدفوع: <span id="pm-sum-paid" style="color:#1565C0;">0</span> د</div><div>إجمالي المتبقي: <span id="pm-sum-remain" style="color:#c62828;">0</span> د</div><div>نسبة التحصيل: <span id="pm-sum-pct">0%</span></div></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث بالاسم</label><input type="text" id="pm-search" oninput="pmFilter()" placeholder="ابحث بالاسم..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:200px;font-size:0.95rem;"></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}</style><script>
 /* ── متابعة الدفع — student-card workflow ───────────────────────── */
 function _pmNorm(s){return(s||"").replace(/[\u0623\u0625\u0622\u0671]/g,"\u0627").replace(/\u0629/g,"\u0647").replace(/\u0649/g,"\u064A");}
 var _pmGroupCache = null;     /* {groupName: [{id,name}]} */
@@ -4782,7 +4782,7 @@ function pmLoadGroup(){
   var g = document.getElementById("pm-group").value;
   _pmCurrentGroup = g;
   var box = document.getElementById("pm-cards");
-  if (!g){ box.innerHTML = '<div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629 \u2014</div>'; document.getElementById("pm-summary").style.display = "none"; return; }
+  if (!g){ box.innerHTML = '<div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">\u2014 \u0627\u062E\u062A\u0631 \u0645\u062C\u0645\u0648\u0639\u0629 \u0644\u0639\u0631\u0636 \u0627\u0644\u0637\u0644\u0628\u0629 \u2014</div>'; return; }
   var students = [];
   if (g === "__ALL__"){
     var seen = {};
@@ -4794,7 +4794,7 @@ function pmLoadGroup(){
   }
   if (!students.length){
     box.innerHTML = '<div style="text-align:center;color:#c62828;padding:30px;font-size:14px;">\u0644\u0627 \u064A\u0648\u062C\u062F \u0637\u0644\u0627\u0628 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</div>';
-    document.getElementById("pm-summary").style.display = "none"; return;
+    return;
   }
   /* Render skeleton cards then fetch each plan in parallel. */
   box.innerHTML = "";
@@ -4811,23 +4811,10 @@ function pmLoadGroup(){
   Promise.all(_pmStudentRows.map(function(r){
     return fetch("/api/payment/student/" + r.sid + "/plan").then(function(x){return x.json();}).catch(function(){return null;});
   })).then(function(results){
-    var totalCourse = 0, totalPaid = 0;
     results.forEach(function(res, idx){
       var row = _pmStudentRows[idx];
       _pmRenderCard(row.card, row.sid, row.name, res);
-      if (res && res.ok && res.plan){
-        totalCourse += (+res.plan.course_amount) || 0;
-        totalPaid   += (+res.plan.total_paid)    || 0;
-      }
     });
-    var sum = document.getElementById("pm-summary");
-    document.getElementById("pm-sum-course").textContent = totalCourse.toFixed(2).replace(/\.00$/,"");
-    document.getElementById("pm-sum-paid").textContent   = totalPaid.toFixed(2).replace(/\.00$/,"");
-    var rem = Math.max(0, totalCourse - totalPaid);
-    document.getElementById("pm-sum-remain").textContent = rem.toFixed(2).replace(/\.00$/,"");
-    var pct = totalCourse > 0 ? Math.round(totalPaid / totalCourse * 100) : 0;
-    document.getElementById("pm-sum-pct").textContent = pct + "%";
-    sum.style.display = "block";
   });
 }
 function _pmStatusLabel(s){
@@ -4923,27 +4910,11 @@ function pmRecordPay(btn){
       var name = card.dataset.name || "";
       _pmToast("\u2705 \u062A\u0645 \u062A\u0633\u062C\u064A\u0644 \u062F\u0641\u0639 \u0627\u0644\u0642\u0633\u0637 " + n + " - " + amount + " \u062F \u0644\u0644\u0637\u0627\u0644\u0628 " + name);
       _pmRenderCard(card, sid, name, res);
-      /* Recompute group totals after a successful save. */
-      _pmRecomputeSummary();
     })
     .catch(function(){
       _pmToast("\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644", "error");
       btn.disabled = false; btn.innerHTML = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
     });
-}
-function _pmRecomputeSummary(){
-  var totalCourse = 0, totalPaid = 0;
-  document.querySelectorAll("#pm-cards .pm-card").forEach(function(c){
-    var p = c._pmPlan; if (!p) return;
-    totalCourse += (+p.course_amount) || 0;
-    totalPaid   += (+p.total_paid)    || 0;
-  });
-  document.getElementById("pm-sum-course").textContent = totalCourse.toFixed(2).replace(/\.00$/,"");
-  document.getElementById("pm-sum-paid").textContent   = totalPaid.toFixed(2).replace(/\.00$/,"");
-  var rem = Math.max(0, totalCourse - totalPaid);
-  document.getElementById("pm-sum-remain").textContent = rem.toFixed(2).replace(/\.00$/,"");
-  var pct = totalCourse > 0 ? Math.round(totalPaid / totalCourse * 100) : 0;
-  document.getElementById("pm-sum-pct").textContent = pct + "%";
 }
 </script>
 <div id="srm-type-modal" class="srm-type-bg"><div class="srm-type-box"><h3 id="srm-type-title">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</h3><p id="srm-type-msg"></p><span class="srm-type-expected" id="srm-type-expected"></span><input class="srm-type-input" id="srm-type-input" type="text" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x643;&#x645;&#x627; &#x647;&#x648;"><div class="srm-type-actions"><button class="srm-btn-delete" id="srm-type-yes">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</button><button class="srm-btn-cancel-edit" id="srm-type-no">&#x625;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div id="srm-log-modal" class="srm-log-bg"><div class="srm-log-box"><div class="srm-log-head">&#x1F4CB; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x63A;&#x64A;&#x64A;&#x631;&#x627;&#x62A; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x641;&#x638;</div><div class="srm-log-body" id="srm-log-body"></div><div class="srm-log-actions"><button class="srm-btn-save" id="srm-log-yes">&#x646;&#x639;&#x645;&#x60C; &#x627;&#x62D;&#x641;&#x638;</button><button class="srm-btn-cancel-edit" id="srm-log-no">&#x631;&#x627;&#x62C;&#x639; &#x645;&#x631;&#x629; &#x623;&#x62E;&#x631;&#x649;</button></div></div></div><div id="srm-auto-lock" class="srm-auto-lock-banner">&#x1F6AB; &#x62A;&#x645; &#x625;&#x644;&#x63A;&#x627;&#x621; &#x627;&#x644;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x628;&#x633;&#x628;&#x628; &#x639;&#x62F;&#x645; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;</div>
@@ -14662,39 +14633,149 @@ def _payment_load_student(db, sid):
     }
     return d
 
+def _payment_normalize_name(s):
+    """Whitespace-collapse and strip diacritics so a payment_log row
+    survives slight name spelling differences (extra space, alef
+    variants, ta-marbuta vs heh, etc.) when matched against the
+    students.student_name."""
+    if not s: return ''
+    s = str(s)
+    repl = {
+        'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا',
+        'ة': 'ه', 'ى': 'ي',
+    }
+    for k, v in repl.items():
+        s = s.replace(k, v)
+    # Strip Arabic tashkeel marks.
+    import re as _re
+    s = _re.sub(r'[ً-ٟ]', '', s)
+    s = ' '.join(s.split())
+    return s.strip().lower()
+
+def _payment_log_paid_for_student(db, student_name, personal_id):
+    """Return paid_by_inst dict (int n → float amount) read DIRECTLY
+    from payment_log. Looks up first by personal_id (cheapest, exact),
+    then by trimmed-+-normalized student_name. Token "تم الدفع" maps
+    to a sentinel string for the front-end; "معفي" maps to "exempt".
+    Numeric strings parse to floats."""
+    paid_by_inst = {}
+    pl_row = None
+    try:
+        if personal_id and str(personal_id).strip():
+            pl_row = db.execute(
+                "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
+                "WHERE personal_id=? AND personal_id <> '' LIMIT 1",
+                (str(personal_id).strip(),),
+            ).fetchone()
+        if not pl_row and student_name:
+            target = _payment_normalize_name(student_name)
+            for r in db.execute(
+                "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log"
+            ).fetchall():
+                if _payment_normalize_name(r[0]) == target:
+                    pl_row = r
+                    break
+            if not pl_row:
+                # Fuzzy substring match — student_name may have slight
+                # variations (initials, parent name) between students
+                # and payment_log.
+                for r in db.execute(
+                    "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
+                    "WHERE student_name ILIKE ? LIMIT 1",
+                    ('%' + str(student_name).strip() + '%',),
+                ).fetchone() or []:
+                    pass  # no-op; fetchone returns row or None directly
+                row = db.execute(
+                    "SELECT student_name, inst1, inst2, inst3, inst4, inst5 FROM payment_log "
+                    "WHERE student_name ILIKE ? LIMIT 1",
+                    ('%' + str(student_name).strip() + '%',),
+                ).fetchone()
+                if row:
+                    pl_row = row
+    except Exception:
+        pl_row = None
+    if not pl_row:
+        return paid_by_inst, None
+    for n in range(1, 6):
+        v = pl_row[n]
+        if v is None: continue
+        s = str(v).strip()
+        if not s: continue
+        if 'تم الدفع' in s:
+            paid_by_inst[n] = ('__paid__', s)
+        elif 'معفي' in s or 'معفى' in s:
+            paid_by_inst[n] = ('__exempt__', s)
+        else:
+            paid_by_inst[n] = _payment_to_float(s)
+    return paid_by_inst, pl_row
+
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
-    student doesn\'t exist."""
+    student doesn\'t exist.
+
+    Source-of-truth for *paid* amounts is `payment_log` (per spec).
+    student_payments stays as a fallback for installments 6..12 (the
+    legacy paylog only has 5 inst columns), and for any student whose
+    name doesn't resolve in payment_log."""
     student = _payment_load_student(db, sid)
     if not student:
         return None
     tq_rows = _payment_load_taqseet_rows(db)
     tq      = _payment_find_taqseet(tq_rows, student.get('installment_type'))
-    paid_by_inst = {}
+
+    paid_pl, pl_row = _payment_log_paid_for_student(
+        db, student.get('name'), student.get('personal_id')
+    )
+    # Backfill from student_payments for any installment payment_log
+    # doesn't cover (typically n in 6..12 since paylog only has 5 cols).
+    paid_sp = {}
     try:
         for r in db.execute(
             "SELECT inst_num, paid FROM student_payments WHERE student_id=?",
             (sid,),
         ).fetchall():
-            try: paid_by_inst[int(r[0])] = _payment_to_float(r[1])
+            try: paid_sp[int(r[0])] = _payment_to_float(r[1])
             except Exception: pass
     except Exception:
         pass
+
     installments = []
     course_amount = 0.0
+    has_exempt = False
     if tq:
         for n in range(1, 13):
             amt = _payment_to_float(tq[1 + n])     # row layout: id, m, i1..i12, d1..d12
             if amt <= 0:
                 continue
             due = tq[1 + 12 + n]
-            paid = paid_by_inst.get(n, 0.0)
+            pl_val = paid_pl.get(n)
+            inst_status = ''
+            paid_token  = ''
+            if isinstance(pl_val, tuple):
+                kind, raw = pl_val
+                paid_token = raw
+                if kind == '__paid__':
+                    paid = amt
+                    inst_status = 'paid_token'
+                elif kind == '__exempt__':
+                    paid = amt
+                    inst_status = 'exempt'
+                    has_exempt = True
+                else:
+                    paid = 0.0
+            elif isinstance(pl_val, (int, float)):
+                paid = float(pl_val)
+            else:
+                paid = paid_sp.get(n, 0.0)
             installments.append({
                 "n":         n,
                 "amount":    amt,
                 "due_date":  ('' if due is None else str(due)),
                 "paid":      paid,
                 "remaining": max(0.0, amt - paid),
+                "status":    inst_status,
+                "token":     paid_token,
+                "source":    'payment_log' if pl_val is not None else 'student_payments',
             })
             course_amount += amt
     total_paid = sum(i["paid"] for i in installments)
@@ -14704,6 +14785,8 @@ def _payment_compute_plan(db, sid):
         method_label = '' if tq[1] is None else str(tq[1])
     if course_amount <= 0:
         status = 'unknown'
+    elif has_exempt and total_remaining <= 0.005:
+        status = 'exempt'
     elif total_remaining <= 0.005:
         status = 'paid'
     elif total_paid <= 0.005:
@@ -14727,6 +14810,7 @@ def _payment_compute_plan(db, sid):
             "total_paid":      total_paid,
             "total_remaining": total_remaining,
             "status":          status,
+            "paylog_matched":  bool(pl_row),
         },
     }
 
@@ -14790,6 +14874,66 @@ def api_payment_student_pay(sid):
             "remaining": target["remaining"],
         }), 400
     new_paid = target["paid"] + amount
+    student = plan["student"]
+    pid     = (student.get('personal_id') or '').strip()
+    sname   = (student.get('name') or '').strip()
+
+    # PRIMARY write: payment_log.inst<N> for n in 1..5. The spec requires
+    # paid amounts live in payment_log, so we match an existing row by
+    # personal_id (when present) or by name (fuzzy-trimmed), and only
+    # create a new row if no match exists. Stored as a string so the
+    # legacy paylog column type is preserved.
+    if n <= 5:
+        try:
+            col = 'inst' + str(n)
+            paid_str = ('%g' % new_paid) if new_paid == int(new_paid) else str(new_paid)
+            updated = 0
+            if pid:
+                cur = db.execute(
+                    'UPDATE payment_log SET "' + col + '"=? WHERE personal_id=? AND personal_id <> \'\'',
+                    (paid_str, pid),
+                )
+                updated = cur.rowcount or 0
+            if not updated and sname:
+                cur = db.execute(
+                    'UPDATE payment_log SET "' + col + '"=? WHERE TRIM(student_name)=?',
+                    (paid_str, sname),
+                )
+                updated = cur.rowcount or 0
+            if not updated and sname:
+                # ILIKE substring fallback — still writes to one row only
+                # because we apply a LIMIT via a sub-select on id.
+                row = db.execute(
+                    "SELECT id FROM payment_log WHERE student_name ILIKE ? LIMIT 1",
+                    ('%' + sname + '%',),
+                ).fetchone()
+                if row:
+                    cur = db.execute(
+                        'UPDATE payment_log SET "' + col + '"=? WHERE id=?',
+                        (paid_str, row[0]),
+                    )
+                    updated = cur.rowcount or 0
+            if not updated:
+                # No matching row — insert a fresh paylog entry. Keep
+                # personal_id NULL when blank to mirror the live data
+                # shape (most prod rows have personal_id NULL anyway).
+                if pid:
+                    db.execute(
+                        'INSERT INTO payment_log(personal_id, student_name, "' + col + '") VALUES(?,?,?)',
+                        (pid, sname, paid_str),
+                    )
+                else:
+                    db.execute(
+                        'INSERT INTO payment_log(student_name, "' + col + '") VALUES(?,?)',
+                        (sname, paid_str),
+                    )
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": "payment_log write failed: " + str(ex)}), 500
+
+    # Secondary mirror: student_payments (handles n in 6..12 cleanly,
+    # since payment_log only has 5 inst columns; also keeps the legacy
+    # /api/payments/<sid>/<n> endpoint consistent).
     try:
         db.execute(
             """INSERT INTO student_payments(student_id, inst_num, inst_type, price, paid)
@@ -14799,27 +14943,9 @@ def api_payment_student_pay(sid):
             (sid, n, str(n), target["amount"], new_paid),
         )
         db.commit()
-    except Exception as ex:
-        return jsonify({"ok": False, "error": str(ex)}), 500
-    # Mirror to payment_log inst1..inst5 if applicable (legacy column set).
-    if n <= 5:
-        try:
-            student = plan["student"]
-            pid = student.get('personal_id') or ''
-            sname = student.get('name') or ''
-            col = 'inst' + str(n)
-            cur = db.execute(
-                'UPDATE payment_log SET "' + col + '"=? WHERE personal_id=?',
-                (str(new_paid), pid)
-            )
-            if cur.rowcount == 0 and pid:
-                db.execute(
-                    'INSERT INTO payment_log(personal_id, student_name, "' + col + '") VALUES(?,?,?)',
-                    (pid, sname, str(new_paid))
-                )
-            db.commit()
-        except Exception:
-            pass
+    except Exception:
+        pass
+
     new_plan = _payment_compute_plan(db, sid)
     new_plan["ok"] = True
     new_plan["recorded"] = {"n": n, "amount": amount, "new_paid": new_paid}
