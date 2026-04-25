@@ -487,6 +487,17 @@ def init_db():
         installment_number INTEGER,
         installment_amount NUMERIC,
         rejection_reason TEXT)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS payment_edits(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        personal_id TEXT,
+        installment_number INTEGER,
+        old_amount NUMERIC,
+        new_amount NUMERIC,
+        reason TEXT,
+        edited_by TEXT,
+        edit_date DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -1325,6 +1336,17 @@ if True:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("parent_receipts_v2",))
             db2.commit()
         except Exception: pass
+    db2.execute("""CREATE TABLE IF NOT EXISTS payment_edits(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        personal_id TEXT,
+        installment_number INTEGER,
+        old_amount NUMERIC,
+        new_amount NUMERIC,
+        reason TEXT,
+        edited_by TEXT,
+        edit_date DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db2.execute("""CREATE TABLE IF NOT EXISTS table_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tbl_name TEXT UNIQUE,
@@ -5847,10 +5869,20 @@ function pmInstChange(sel){
   if (!inst){ det.classList.remove("show"); return; }
   var due = inst.due_date || "—";
   var ok = (inst.remaining <= 0.005) ? ' \u2705' : "";
+  /* If the installment already has a recorded paid amount, surface
+     a small \u270F edit button next to "previously paid" so admins
+     can correct data-entry mistakes (two-step confirm + audit log). */
+  var editBtn = "";
+  if ((inst.paid || 0) > 0){
+    editBtn = ' <button type="button" onclick="pmStartEdit(' + sid + ',' + n + ')" '
+            + 'style="background:#fff3e0;color:#e65100;border:1.5px solid #ffb74d;'
+            + 'padding:3px 10px;border-radius:6px;font-weight:800;cursor:pointer;'
+            + 'font-size:12px;margin-right:8px;">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</button>';
+  }
   det.innerHTML = '<div class="pm-detail-grid">'
     + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u0633\u062A\u062D\u0642: <b>' + inst.amount + ' \u062F</b></div>'
     + '<div>\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: <b>' + due + '</b></div>'
-    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639 \u0633\u0627\u0628\u0642\u0627\u064B: <b style="color:#1565C0;">' + inst.paid + ' \u062F</b>' + ok + '</div>'
+    + '<div>\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062F\u0641\u0648\u0639 \u0633\u0627\u0628\u0642\u0627\u064B: <b style="color:#1565C0;">' + inst.paid + ' \u062F</b>' + ok + editBtn + '</div>'
     + '<div>\u0627\u0644\u0645\u062A\u0628\u0642\u064A \u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0637: <b style="color:#c62828;">' + inst.remaining + ' \u062F</b></div>'
     + '</div>';
   det.classList.add("show");
@@ -5860,6 +5892,115 @@ function pmInstChange(sel){
   else              btn.innerHTML   = "\u1F4BE \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
   amt.focus();
 }
+/* ── Edit-installment flow (paid-installment correction) ────────
+   Two-step confirmation + audit-logged. The modal element is built
+   once on first use and reused for all subsequent edits. */
+var _pmEditState = null;
+function _pmEnsureEditModal(){
+  if (document.getElementById("pm-edit-bg")) return;
+  var bg = document.createElement("div");
+  bg.id = "pm-edit-bg";
+  bg.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;align-items:center;justify-content:center;padding:18px;direction:rtl;";
+  bg.innerHTML =
+    '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);">' +
+      '<h3 id="pm-edit-title" style="font-size:1.1rem;font-weight:800;color:#E65100;margin-bottom:12px;border-bottom:1.5px dashed #ffb74d;padding-bottom:8px;">✏️ تعديل القسط</h3>' +
+      '<div id="pm-edit-body" style="font-size:14px;color:#333;line-height:1.7;"></div>' +
+      '<div id="pm-edit-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;"></div>' +
+    '</div>';
+  document.body.appendChild(bg);
+}
+function _pmCloseEdit(){
+  var bg = document.getElementById("pm-edit-bg");
+  if (bg) bg.style.display = "none";
+  _pmEditState = null;
+}
+function pmStartEdit(sid, n){
+  var card = document.querySelector('.pm-card[data-sid="' + sid + '"]');
+  if (!card || !card._pmPlan) return;
+  var inst = (card._pmPlan.installments || []).filter(function(i){ return i.n === n; })[0];
+  if (!inst) return;
+  _pmEditState = {sid: sid, n: n, inst: inst, card: card};
+  _pmEnsureEditModal();
+  document.getElementById("pm-edit-title").innerHTML = "⚠️ تأكيد التعديل";
+  document.getElementById("pm-edit-body").innerHTML =
+    "هل تريد تعديل <b>القسط " + n + "</b> المسجل بمبلغ " +
+    "<b style=\\"color:#1565C0;\\">" + inst.paid + " د</b>؟";
+  document.getElementById("pm-edit-actions").innerHTML =
+    '<button onclick="_pmCloseEdit()" style="background:#eceff1;color:#455a64;border:none;padding:8px 18px;border-radius:8px;font-weight:700;cursor:pointer;">إلغاء</button>' +
+    '<button onclick="_pmShowEditForm()" style="background:linear-gradient(135deg,#E65100,#FF6F00);color:#fff;border:none;padding:8px 22px;border-radius:8px;font-weight:800;cursor:pointer;">نعم، عدّل</button>';
+  document.getElementById("pm-edit-bg").style.display = "flex";
+}
+function _pmShowEditForm(){
+  if (!_pmEditState) return;
+  var inst = _pmEditState.inst;
+  document.getElementById("pm-edit-title").innerHTML = "✏️ تعديل القسط " + _pmEditState.n;
+  document.getElementById("pm-edit-body").innerHTML =
+    '<div style="display:grid;gap:10px;">' +
+      '<div style="display:flex;justify-content:space-between;background:#f8f4ff;border-radius:8px;padding:8px 12px;">' +
+        '<span>المبلغ الحالي:</span>' +
+        '<b style="color:#1565C0;">' + inst.paid + ' د</b>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;background:#fff;border:1.5px solid #ffb74d;border-radius:8px;padding:8px 12px;align-items:center;gap:8px;">' +
+        '<span style="white-space:nowrap;">المبلغ الجديد:</span>' +
+        '<input id="pm-edit-newamt" type="number" min="0" max="' + inst.amount + '" step="0.5" value="' + inst.paid + '" style="flex:1;padding:6px 10px;border:1.3px solid #b39ddb;border-radius:7px;font-size:14px;font-weight:800;direction:ltr;">' +
+        '<span style="white-space:nowrap;color:#666;font-size:12px;">/ المستحق ' + inst.amount + ' د</span>' +
+      '</div>' +
+      '<div>' +
+        '<label style="display:block;font-size:12px;color:#666;margin-bottom:3px;">سبب التعديل (اختياري):</label>' +
+        '<input id="pm-edit-reason" type="text" placeholder="مثال: خطأ في الإدخال" style="width:100%;padding:6px 10px;border:1.3px solid #ccc;border-radius:7px;font-size:13px;direction:rtl;">' +
+      '</div>' +
+    '</div>';
+  document.getElementById("pm-edit-actions").innerHTML =
+    '<button onclick="_pmCloseEdit()" style="background:#eceff1;color:#455a64;border:none;padding:8px 18px;border-radius:8px;font-weight:700;cursor:pointer;">إلغاء</button>' +
+    '<button onclick="_pmConfirmEdit()" style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 22px;border-radius:8px;font-weight:800;cursor:pointer;">ὋE حفظ التعديل</button>';
+  setTimeout(function(){ var x = document.getElementById("pm-edit-newamt"); if (x){ x.focus(); x.select(); } }, 60);
+}
+function _pmConfirmEdit(){
+  if (!_pmEditState) return;
+  var inst = _pmEditState.inst;
+  var newAmt = parseFloat(document.getElementById("pm-edit-newamt").value);
+  var reason = (document.getElementById("pm-edit-reason").value || "").trim();
+  if (isNaN(newAmt) || newAmt < 0){
+    _pmToast("المبلغ لا يمكن أن يكون سالباً", "error"); return;
+  }
+  if (newAmt > inst.amount + 0.005){
+    _pmToast("⚠ المبلغ لا يمكن أن يتجاوز المبلغ المستحق " + inst.amount + " دينار", "warn"); return;
+  }
+  _pmEditState.newAmt = newAmt; _pmEditState.reason = reason;
+  document.getElementById("pm-edit-title").innerHTML = "ὑ2 تأكيد نهائي";
+  document.getElementById("pm-edit-body").innerHTML =
+    '<div style="background:#fff8e1;border:1.5px solid #ffb74d;border-radius:10px;padding:12px 14px;line-height:1.8;">' +
+      "هل أنت متأكد؟ سيتم تغيير <b>القسط " + _pmEditState.n + "</b> من " +
+      "<b style=\\"color:#1565C0;\\">" + inst.paid + " د</b> إلى " +
+      "<b style=\\"color:#2e7d32;\\">" + newAmt + " د</b>." +
+    '</div>';
+  document.getElementById("pm-edit-actions").innerHTML =
+    '<button onclick="_pmShowEditForm()" style="background:#eceff1;color:#455a64;border:none;padding:8px 18px;border-radius:8px;font-weight:700;cursor:pointer;">↺ راجع مرة أخرى</button>' +
+    '<button onclick="_pmSubmitEdit()" style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 22px;border-radius:8px;font-weight:800;cursor:pointer;">نعم، احفظ</button>';
+}
+function _pmSubmitEdit(){
+  if (!_pmEditState) return;
+  var s = _pmEditState;
+  document.getElementById("pm-edit-actions").innerHTML = '<span style="color:#666;font-weight:700;">⏳ جاري الحفظ...</span>';
+  fetch("/api/payment/student/" + s.sid + "/edit", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    credentials: "include",
+    body: JSON.stringify({n: s.n, new_amount: s.newAmt, reason: s.reason || ""})
+  }).then(function(r){return r.json();}).then(function(res){
+    if (!res || !res.ok){
+      _pmToast((res && res.error) || "تعذّر التعديل", "error");
+      _pmCloseEdit(); return;
+    }
+    _pmToast("✅ تم تعديل القسط " + s.n + " من " + s.inst.paid + " إلى " + s.newAmt + " دينار");
+    _pmCloseEdit();
+    _pmRenderCard(s.card, s.sid, s.card.dataset.name || "", res);
+  }).catch(function(){
+    _pmToast("خطأ في الاتصال", "error");
+    _pmCloseEdit();
+  });
+}
+
 function pmRecordPay(btn){
   var sid  = parseInt(btn.dataset.sid, 10);
   var card = btn.closest(".pm-card");
@@ -16953,6 +17094,142 @@ def api_payment_student_pay(sid):
     new_plan = _payment_compute_plan(db, sid)
     new_plan["ok"] = True
     new_plan["recorded"] = {"n": n, "amount": amount, "new_paid": new_paid}
+    return jsonify(new_plan)
+
+
+@app.route('/api/payment/student/<int:sid>/edit', methods=['POST'])
+@login_required
+def api_payment_student_edit(sid):
+    """Replace the recorded paid amount for a single installment.
+    Body: {n, new_amount, reason}.
+    Validates new_amount in [0, plan_amount], rewrites payment_log
+    inst<N> + msg<N>, recomputes total_paid / total_remaining, mirrors
+    to student_payments, and writes an audit row to payment_edits."""
+    d = request.get_json() or {}
+    try:
+        n = int(d.get('n') or 0)
+    except Exception:
+        n = 0
+    new_amount = _payment_to_float(d.get('new_amount'))
+    reason = (d.get('reason') or '').strip()
+    if n < 1 or n > 12:
+        return jsonify({"ok": False, "error": "رقم القسط غير صحيح"}), 400
+    if new_amount < 0:
+        return jsonify({"ok": False, "error": "المبلغ لا يمكن أن يكون سالباً"}), 400
+    db = get_db()
+    plan = _payment_compute_plan(db, sid)
+    if plan is None:
+        return jsonify({"ok": False, "error": "الطالب غير موجود"}), 404
+    target = None
+    for inst in plan["plan"]["installments"]:
+        if inst["n"] == n: target = inst; break
+    if target is None:
+        return jsonify({"ok": False, "error": "القسط غير موجود في خطة الطالب"}), 400
+    if new_amount > target["amount"] + 0.005:
+        return jsonify({
+            "ok": False,
+            "error": "المبلغ لا يمكن أن يتجاوز المبلغ المستحق " + str(target["amount"]) + " دينار",
+            "max_amount": target["amount"],
+        }), 400
+    old_amount = float(target.get("paid") or 0)
+    course_amount_now = plan["plan"]["course_amount"]
+    student = plan["student"]
+    pid     = (student.get('personal_id') or '').strip()
+    sname   = (student.get('name') or '').strip()
+    # Write to payment_log inst<N> + msg<N>. msg<N> = 'تم الدفع' if
+    # new_amount > 0, else cleared (so the per-receipt dropdown
+    # surfaces it again as still-owed).
+    if n <= 5:
+        try:
+            paid_str = ('%g' % new_amount) if new_amount == int(new_amount) else str(new_amount)
+            inst_col = 'inst' + str(n)
+            msg_col  = 'msg'  + str(n)
+            try:
+                live_cols = {r[1] for r in db.execute("PRAGMA table_info(payment_log)").fetchall()}
+            except Exception:
+                live_cols = set()
+            has_msg    = msg_col in live_cols
+            has_total  = 'total_paid' in live_cols and 'total_remaining' in live_cols
+            has_amount = 'course_amount' in live_cols
+            row_id = None
+            if pid:
+                r = db.execute("SELECT id FROM payment_log WHERE personal_id=? AND personal_id <> '' LIMIT 1", (pid,)).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute("SELECT id FROM payment_log WHERE TRIM(student_name)=? LIMIT 1", (sname,)).fetchone()
+                if r: row_id = r[0]
+            if row_id is None and sname:
+                r = db.execute("SELECT id FROM payment_log WHERE student_name ILIKE ? LIMIT 1", ('%' + sname + '%',)).fetchone()
+                if r: row_id = r[0]
+            new_msg = 'تم الدفع' if new_amount > 0.005 else ''
+            if row_id is None:
+                cols_  = ['student_name', inst_col]
+                vals_  = [sname, paid_str if new_amount > 0 else '']
+                if pid: cols_.insert(0, 'personal_id'); vals_.insert(0, pid)
+                if has_msg:    cols_.append(msg_col);          vals_.append(new_msg)
+                if has_amount and course_amount_now: cols_.append('course_amount'); vals_.append(course_amount_now)
+                if has_total:  cols_ += ['total_paid', 'total_remaining']; vals_ += [new_amount, max(0.0, (course_amount_now or 0) - new_amount)]
+                ph = ','.join(['?'] * len(vals_))
+                db.execute(
+                    'INSERT INTO payment_log(' + ','.join('"' + c + '"' for c in cols_) + ') VALUES(' + ph + ')',
+                    tuple(vals_),
+                )
+                row_id = db.execute("SELECT MAX(id) FROM payment_log").fetchone()[0]
+            else:
+                set_pairs = ['"' + inst_col + '"=?']; params = [paid_str if new_amount > 0 else '']
+                if has_msg:    set_pairs.append('"' + msg_col + '"=?');    params.append(new_msg)
+                params.append(row_id)
+                db.execute('UPDATE payment_log SET ' + ', '.join(set_pairs) + ' WHERE id=?', tuple(params))
+            if has_total:
+                fresh = db.execute(
+                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?', (row_id,),
+                ).fetchone()
+                fresh_total = 0.0
+                for k in range(1, 6):
+                    cell = fresh[k - 1]
+                    if cell is None: continue
+                    s = str(cell).strip()
+                    if not s: continue
+                    if 'تم الدفع' in s or 'معفي' in s or 'معفى' in s:
+                        plan_amt = 0.0
+                        if k == n: plan_amt = new_amount
+                        else:
+                            for inst in plan["plan"]["installments"]:
+                                if inst["n"] == k: plan_amt = inst["amount"]; break
+                        fresh_total += plan_amt
+                    else:
+                        fresh_total += _payment_to_float(s)
+                fresh_remaining = max(0.0, (course_amount_now or 0) - fresh_total)
+                db.execute('UPDATE payment_log SET total_paid=?, total_remaining=? WHERE id=?',
+                           (fresh_total, fresh_remaining, row_id))
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": "payment_log write failed: " + str(ex)}), 500
+    # Mirror to student_payments.
+    try:
+        db.execute(
+            """INSERT INTO student_payments(student_id, inst_num, inst_type, price, paid)
+               VALUES(?,?,?,?,?)
+               ON CONFLICT(student_id, inst_num)
+                 DO UPDATE SET paid=EXCLUDED.paid, price=EXCLUDED.price""",
+            (sid, n, str(n), target["amount"], new_amount),
+        )
+    except Exception: pass
+    # Audit log.
+    user = session.get('user') or {}
+    try:
+        db.execute(
+            "INSERT INTO payment_edits(student_id, student_name, personal_id, "
+            "installment_number, old_amount, new_amount, reason, edited_by) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (sid, sname, pid, n, old_amount, new_amount, reason,
+             user.get('username') or 'admin'),
+        )
+        db.commit()
+    except Exception: pass
+    new_plan = _payment_compute_plan(db, sid)
+    new_plan["ok"] = True
+    new_plan["edited"] = {"n": n, "old_amount": old_amount, "new_amount": new_amount}
     return jsonify(new_plan)
 
 
