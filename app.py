@@ -13738,6 +13738,56 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     '.mx-reorder-toast .mx-rt-spinner{display:inline-block;width:14px;height:14px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:mxRtSpin .8s linear infinite;}',
     '@keyframes mxRtSpin{to{transform:rotate(360deg);}}',
     '@media (pointer:coarse){.mx-drag-handle{opacity:.95;font-size:16px;padding:4px 7px;}}',
+    /* ───────── Inline column controls (mini toolbar) ───────── */
+    /* Type icon prefix (𝐓 / # / 📅 / ▼ / ☑ / ⭐) shown right after the
+       drag handle so the column type is identifiable at a glance. */
+    '.mx-col-type-icon{display:inline-block;font-size:12px;font-weight:700;opacity:.85;margin:0 4px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.15);color:inherit;line-height:1.4;cursor:pointer;user-select:none;transition:background .15s ease,transform .15s ease;}',
+    '.mx-col-type-icon:hover{background:rgba(255,255,255,.32);transform:scale(1.08);}',
+    /* The three new toolbar buttons share the hover-revealed style of the
+       existing delete (✕) button so the header isn\'t cluttered when the
+       user isn\'t aiming at it. On touch devices they\'re always visible. */
+    '.mx-col-tool-btn{background:transparent;border:none;color:inherit;opacity:0;font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;margin-right:2px;border-radius:5px;line-height:1;vertical-align:middle;transition:opacity .15s ease,background .15s ease;}',
+    'th:hover .mx-col-tool-btn{opacity:.95;}',
+    '.mx-col-tool-btn:hover{background:rgba(255,255,255,.28);opacity:1 !important;}',
+    '.mx-col-tool-btn.mx-col-type-btn{color:#e3f2fd;}',
+    '.mx-col-tool-btn.mx-col-add-btn{color:#c8e6c9;font-weight:800;}',
+    '.mx-col-tool-btn.mx-col-rename-btn{color:#fff8e1;}',
+    '@media (pointer:coarse){.mx-col-tool-btn{opacity:.7;}}',
+    /* Inline-rename input: replaces the label text in place. */
+    '.mx-col-rename-input{background:#fff;color:#0d47a1;border:1.5px solid #1976D2;border-radius:6px;padding:3px 8px;font-size:13px;font-weight:800;font-family:inherit;direction:rtl;outline:none;min-width:90px;max-width:240px;box-shadow:0 0 0 3px rgba(33,150,243,.25);}',
+    /* Type-selector dropdown panel anchored under the header. */
+    '.mx-col-popup{position:absolute;z-index:10070;background:#fff;border:1.5px solid #1976D2;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:10px;min-width:240px;max-width:320px;direction:rtl;font-size:13px;color:#222;}',
+    '.mx-col-popup h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin:0 0 8px 0;padding-bottom:6px;border-bottom:1px solid #e3f2fd;}',
+    '.mx-col-popup label.mx-col-type-row{display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-weight:600;color:#333;border-radius:6px;transition:background .12s ease;}',
+    '.mx-col-popup label.mx-col-type-row:hover{background:#e3f2fd;}',
+    '.mx-col-popup label.mx-col-type-row input{margin:0;}',
+    '.mx-col-popup label.mx-col-type-row .mx-cti{display:inline-block;width:22px;text-align:center;font-weight:800;color:#1565C0;}',
+    '.mx-col-popup .mx-col-popup-row{display:flex;flex-direction:column;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid #e3f2fd;}',
+    '.mx-col-popup .mx-col-popup-row label{font-size:12px;font-weight:700;color:#455a64;}',
+    '.mx-col-popup input[type="text"],.mx-col-popup textarea,.mx-col-popup select{width:100%;padding:6px 10px;border:1.3px solid #90caf9;border-radius:7px;font-size:13px;background:#fafafa;direction:rtl;font-family:inherit;outline:none;}',
+    '.mx-col-popup input[type="text"]:focus,.mx-col-popup textarea:focus,.mx-col-popup select:focus{background:#fff;border-color:#1976D2;}',
+    '.mx-col-popup textarea{resize:vertical;min-height:50px;}',
+    '.mx-col-popup .mx-col-popup-actions{display:flex;gap:6px;margin-top:10px;justify-content:flex-end;}',
+    '.mx-col-popup button.mx-cp-ok{background:linear-gradient(135deg,#1976D2,#42A5F5);color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:800;cursor:pointer;font-size:13px;}',
+    '.mx-col-popup button.mx-cp-ok:hover{filter:brightness(1.08);}',
+    '.mx-col-popup button.mx-cp-cancel{background:#eceff1;color:#455a64;border:none;padding:7px 14px;border-radius:7px;font-weight:700;cursor:pointer;font-size:13px;}',
+    '.mx-col-popup .mx-cp-msg{margin-top:8px;font-size:12px;font-weight:700;color:#2e7d32;text-align:center;display:none;}',
+    '.mx-col-popup .mx-cp-msg.show{display:block;}',
+    '.mx-col-popup .mx-cp-msg.error{color:#c62828;}',
+    /* Row-number cell becomes a click target with an underline cue. */
+    'td.mx-row-num{cursor:pointer;position:relative;}',
+    'td.mx-row-num:hover{background:rgba(33,150,243,.12) !important;}',
+    'td.mx-row-num::after{content:"⋮";position:absolute;top:2px;left:4px;font-size:11px;color:#1565C0;opacity:.5;}',
+    'td.mx-row-num:hover::after{opacity:1;}',
+    /* Row-action menu — small floating list anchored beside the # cell. */
+    '.mx-row-menu{position:absolute;z-index:10080;background:#fff;border:1.5px solid #1976D2;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:6px;min-width:180px;direction:rtl;font-size:13px;}',
+    '.mx-row-menu button{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;color:#222;padding:7px 10px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;text-align:right;}',
+    '.mx-row-menu button:hover{background:#e3f2fd;color:#0d47a1;}',
+    '.mx-row-menu button.danger:hover{background:#ffebee;color:#c62828;}',
+    '.mx-row-menu .mx-rm-icon{display:inline-block;width:20px;text-align:center;font-size:14px;}',
+    /* Header-cell flash specifically when ✏ rename succeeds. */
+    'th.mx-rename-flash{animation:mxRenameFlash .85s ease;}',
+    '@keyframes mxRenameFlash{0%,100%{background:inherit;}40%{background:rgba(46,125,50,.45);}}',
     '.mx-filter-panel{position:absolute;z-index:10050;background:#fff;border:1.5px solid #2196F3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;min-width:220px;max-width:320px;max-height:360px;overflow:auto;direction:rtl;font-size:13px;}',
     '.mx-filter-panel h4{font-size:12.5px;font-weight:800;color:#0d47a1;margin-bottom:6px;}',
     '.mx-filter-panel label{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;font-weight:600;color:#333;}',
@@ -14817,6 +14867,508 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     handle.addEventListener('dragstart', function(ev){ ev.preventDefault(); });
   }
 
+  /* ==================================================================
+   * Inline column controls — type icon, type dropdown, add-column popup,
+   * inline rename. Each header gains an action toolbar on hover; clicking
+   * any of the new buttons opens a small panel anchored under the cell.
+   * Saves go through the existing /api/custom-table/<tid>/* endpoints
+   * which already support both numeric (custom) and string (built-in)
+   * tids. After every successful operation, window.refreshTable(tid)
+   * re-renders the data via the SYNC RULE.
+   * ================================================================== */
+  var _MX_TYPE_ICON = {
+    'نص':           '𝐓',
+    'رقم':          '#',
+    'تاريخ':        '📅',
+    'قائمة منسدلة': '▼',
+    'نعم/لا':       '☑',
+    'نعم / لا':     '☑',
+    'تقييم':        '⭐'
+  };
+  var _MX_TYPES = [
+    {key:'نص',           icon:'𝐓', label:'نص'},
+    {key:'رقم',          icon:'#', label:'رقم'},
+    {key:'تاريخ',        icon:'📅', label:'تاريخ'},
+    {key:'قائمة منسدلة', icon:'▼', label:'قائمة منسدلة'},
+    {key:'نعم / لا',     icon:'☑', label:'نعم / لا'},
+    {key:'تقييم',        icon:'⭐', label:'تقييم (1-10)'}
+  ];
+  function _mxTypeIcon(type){
+    var t = (type || '').replace(/\s+/g,' ').trim();
+    if (_MX_TYPE_ICON[t]) return _MX_TYPE_ICON[t];
+    if (t === 'نعم لا') return '☑';
+    return '𝐓';
+  }
+  /* Cache of {col_label, col_type, col_options} per column, keyed by
+     normalised display label. Refreshed when refreshTable() flushes. */
+  var _MX_COLINFO_CACHE = {};
+  function _mxColInfoForTable(tid){
+    if (!tid) return Promise.resolve({});
+    if (_MX_COLINFO_CACHE[tid]) return Promise.resolve(_MX_COLINFO_CACHE[tid]);
+    return fetch('/api/custom-table/' + encodeURIComponent(tid) + '/columns', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var out = {byLabel:{}, byKey:{}, columns:[]};
+        if (d && d.ok && Array.isArray(d.columns)){
+          d.columns.forEach(function(c){
+            var lbl = (c.col_label || '').replace(/\s+/g,' ').trim();
+            var info = {col_key:c.col_key, col_label:c.col_label, col_type:c.col_type || 'نص', col_options:c.col_options || ''};
+            if (lbl) out.byLabel[lbl] = info;
+            out.byKey[c.col_key] = info;
+            out.columns.push(info);
+          });
+        }
+        _MX_COLINFO_CACHE[tid] = out;
+        return out;
+      })
+      .catch(function(){ return {byLabel:{},byKey:{},columns:[]}; });
+  }
+  /* Hook into refreshTable so we drop the col-info cache when the
+     table is reloaded; without this the type icons would be stale. */
+  (function(){
+    var prev = window.refreshTable;
+    window.refreshTable = function(tid){
+      try { delete _MX_COLINFO_CACHE[tid]; } catch(e){}
+      if (typeof prev === 'function') prev(tid);
+    };
+  })();
+  function _mxApplyTypeIcons(table){
+    var tid = _mxResolveTid(table);
+    if (!tid) return;
+    _mxColInfoForTable(tid).then(function(info){
+      var ths = table.querySelectorAll('thead tr th');
+      for (var i=0; i<ths.length; i++){
+        var th = ths[i];
+        if (th.classList.contains('bulk-col')) continue;
+        var lblHolder = th.querySelector('.mx-col-type-icon');
+        if (lblHolder) continue; // already done
+        var clone = th.cloneNode(true);
+        clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-col-tool-btn,.mx-col-type-icon,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
+        var lbl = (clone.textContent || '').replace(/\s+/g,' ').trim();
+        if (!lbl || /^(إجراءات|actions|Actions|#)$/.test(lbl)) continue;
+        var col = info.byLabel[lbl] || info.byKey[lbl];
+        var ic = document.createElement('span');
+        ic.className = 'mx-col-type-icon';
+        ic.textContent = _mxTypeIcon(col ? col.col_type : 'نص');
+        ic.title = (col ? col.col_type : 'نص');
+        ic.addEventListener('click', function(ev){
+          ev.stopPropagation(); ev.preventDefault();
+          var thEl = ev.currentTarget.closest('th');
+          if (!thEl) return;
+          _mxOpenColumnTypeDropdown(thEl, ev.currentTarget);
+        });
+        // Insert AFTER the drag handle (or as first child if no handle).
+        var dh = th.querySelector('.mx-drag-handle');
+        if (dh && dh.nextSibling) th.insertBefore(ic, dh.nextSibling);
+        else if (dh) th.appendChild(ic);
+        else th.insertBefore(ic, th.firstChild);
+      }
+    });
+  }
+
+  /* ---------- Common popup machinery ---------- */
+  var _mxOpenPopup = null;
+  function _mxClosePopups(){
+    document.querySelectorAll('.mx-col-popup, .mx-row-menu').forEach(function(p){ p.remove(); });
+    _mxOpenPopup = null;
+  }
+  function _mxAnchorBelow(panel, anchorEl){
+    var rect = anchorEl.getBoundingClientRect();
+    document.body.appendChild(panel);
+    var pw = panel.offsetWidth || 240;
+    var top = rect.bottom + window.scrollY + 6;
+    var left = rect.right + window.scrollX - pw; // RTL: align to right edge
+    if (left < 8) left = 8;
+    if (left + pw > window.scrollX + document.documentElement.clientWidth - 8){
+      left = window.scrollX + document.documentElement.clientWidth - 8 - pw;
+    }
+    panel.style.top = top + 'px';
+    panel.style.left = left + 'px';
+  }
+  function _mxResolveColInfo(table, thEl){
+    var tid = _mxResolveTid(table);
+    if (!tid) return Promise.resolve(null);
+    var clone = thEl.cloneNode(true);
+    clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-col-tool-btn,.mx-col-type-icon,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
+    var lbl = (clone.textContent || '').replace(/\s+/g,' ').trim();
+    return _mxColInfoForTable(tid).then(function(info){
+      var col = info.byLabel[lbl] || info.byKey[lbl];
+      return {tid: tid, label: lbl, col: col};
+    });
+  }
+
+  /* ---------- Type dropdown ---------- */
+  function _mxOpenColumnTypeDropdown(thEl, anchorEl){
+    _mxClosePopups();
+    var table = thEl.closest('table');
+    if (!table) return;
+    var panel = document.createElement('div');
+    panel.className = 'mx-col-popup';
+    panel.innerHTML =
+      '<h4>نوع العمود</h4>' +
+      '<div class="mx-col-type-list"></div>' +
+      '<div class="mx-col-popup-row mx-cp-opts-row" style="display:none;">' +
+        '<label>الخيارات (مفصولة بفاصلة):</label>' +
+        '<input type="text" class="mx-cp-opts" placeholder="مثال: ذكر, أنثى" />' +
+      '</div>' +
+      '<div class="mx-col-popup-actions">' +
+        '<button type="button" class="mx-cp-cancel">إلغاء</button>' +
+        '<button type="button" class="mx-cp-ok">حفظ</button>' +
+      '</div>' +
+      '<div class="mx-cp-msg"></div>';
+    panel.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    _mxAnchorBelow(panel, anchorEl);
+    _mxOpenPopup = panel;
+
+    _mxResolveColInfo(table, thEl).then(function(ctx){
+      var list = panel.querySelector('.mx-col-type-list');
+      var current = (ctx && ctx.col && ctx.col.col_type) || 'نص';
+      var options  = (ctx && ctx.col && ctx.col.col_options) || '';
+      _MX_TYPES.forEach(function(t){
+        var row = document.createElement('label');
+        row.className = 'mx-col-type-row';
+        var rb = document.createElement('input');
+        rb.type = 'radio'; rb.name = 'mx-cp-type'; rb.value = t.key;
+        if (t.key === current || (t.key === 'نعم / لا' && (current === 'نعم/لا' || current === 'نعم لا'))) rb.checked = true;
+        var ic = document.createElement('span'); ic.className = 'mx-cti'; ic.textContent = t.icon;
+        var nm = document.createElement('span'); nm.textContent = t.label;
+        row.appendChild(rb); row.appendChild(ic); row.appendChild(nm);
+        list.appendChild(row);
+      });
+      var optsRow = panel.querySelector('.mx-cp-opts-row');
+      var optsInput = panel.querySelector('.mx-cp-opts');
+      optsInput.value = options;
+      function syncOpts(){
+        var sel = panel.querySelector('input[name="mx-cp-type"]:checked');
+        var v = sel ? sel.value : '';
+        optsRow.style.display = (v === 'قائمة منسدلة') ? '' : 'none';
+      }
+      list.addEventListener('change', syncOpts);
+      syncOpts();
+      panel.querySelector('.mx-cp-cancel').addEventListener('click', _mxClosePopups);
+      panel.querySelector('.mx-cp-ok').addEventListener('click', function(){
+        var sel = panel.querySelector('input[name="mx-cp-type"]:checked');
+        if (!sel || !ctx || !ctx.col){ _mxClosePopups(); return; }
+        var newType = sel.value;
+        var newOpts = (newType === 'قائمة منسدلة') ? optsInput.value.trim() : '';
+        var tid = ctx.tid;
+        var msg = panel.querySelector('.mx-cp-msg');
+        msg.classList.remove('error'); msg.classList.add('show'); msg.textContent = 'جاري الحفظ...';
+        fetch('/api/custom-table/' + encodeURIComponent(tid) + '/column-type', {
+          method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({col_key: ctx.col.col_key, col_type: newType, col_options: newOpts})
+        }).then(function(r){return r.json();}).then(function(res){
+          if (res && res.ok){
+            msg.textContent = '✅ تم الحفظ';
+            thEl.classList.add('mx-rename-flash');
+            setTimeout(function(){ thEl.classList.remove('mx-rename-flash'); }, 850);
+            setTimeout(function(){ _mxClosePopups(); window.refreshTable(tid); }, 450);
+          } else {
+            msg.classList.add('error');
+            msg.textContent = (res && res.error) || 'تعذّر الحفظ';
+          }
+        }).catch(function(){
+          msg.classList.add('error'); msg.textContent = 'خطأ في الاتصال';
+        });
+      });
+    });
+  }
+
+  /* ---------- Add column popup ---------- */
+  function _mxOpenAddColumnPopup(thEl, anchorEl){
+    _mxClosePopups();
+    var table = thEl.closest('table');
+    if (!table) return;
+    var tid = _mxResolveTid(table);
+    if (!tid){
+      if (typeof window.mxToast === 'function') window.mxToast('لا يمكن إضافة عمود لهذا الجدول', 'error');
+      return;
+    }
+    var panel = document.createElement('div');
+    panel.className = 'mx-col-popup';
+    panel.innerHTML =
+      '<h4>إضافة عمود جديد</h4>' +
+      '<div class="mx-col-popup-row">' +
+        '<label>اسم العمود:</label>' +
+        '<input type="text" class="mx-cp-label" placeholder="مثال: الملاحظات" />' +
+      '</div>' +
+      '<div class="mx-col-popup-row">' +
+        '<label>النوع:</label>' +
+        '<select class="mx-cp-type">' +
+          '<option value="نص">𝐓 نص</option>' +
+          '<option value="رقم"># رقم</option>' +
+          '<option value="تاريخ">📅 تاريخ</option>' +
+          '<option value="قائمة منسدلة">▼ قائمة منسدلة</option>' +
+          '<option value="نعم / لا">☑ نعم / لا</option>' +
+          '<option value="تقييم">⭐ تقييم</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="mx-col-popup-row mx-cp-opts-row" style="display:none;">' +
+        '<label>الخيارات (مفصولة بفاصلة):</label>' +
+        '<input type="text" class="mx-cp-opts" placeholder="مثال: ذكر, أنثى" />' +
+      '</div>' +
+      '<div class="mx-col-popup-actions">' +
+        '<button type="button" class="mx-cp-cancel">إلغاء</button>' +
+        '<button type="button" class="mx-cp-ok">إضافة</button>' +
+      '</div>' +
+      '<div class="mx-cp-msg"></div>';
+    panel.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    _mxAnchorBelow(panel, anchorEl);
+    _mxOpenPopup = panel;
+    var lblInput = panel.querySelector('.mx-cp-label');
+    var typeSel  = panel.querySelector('.mx-cp-type');
+    var optsRow  = panel.querySelector('.mx-cp-opts-row');
+    var optsInp  = panel.querySelector('.mx-cp-opts');
+    typeSel.addEventListener('change', function(){
+      optsRow.style.display = (typeSel.value === 'قائمة منسدلة') ? '' : 'none';
+    });
+    setTimeout(function(){ lblInput.focus(); }, 30);
+    panel.querySelector('.mx-cp-cancel').addEventListener('click', _mxClosePopups);
+    function submit(){
+      var label = lblInput.value.trim();
+      var msg = panel.querySelector('.mx-cp-msg');
+      if (!label){
+        msg.classList.add('error','show'); msg.textContent = 'الاسم مطلوب';
+        lblInput.focus(); return;
+      }
+      var tp = typeSel.value || 'نص';
+      var opts = (tp === 'قائمة منسدلة') ? optsInp.value.trim() : '';
+      msg.classList.remove('error'); msg.classList.add('show'); msg.textContent = 'جاري الإضافة...';
+      fetch('/api/custom-table/' + encodeURIComponent(tid) + '/add-column', {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({col_label: label, col_type: tp, col_options: opts})
+      }).then(function(r){return r.json();}).then(function(res){
+        if (res && res.ok){
+          msg.textContent = '✅ تمت الإضافة';
+          /* Reorder so the new column lands immediately to the RIGHT of
+             the column whose + button was clicked. We rebuild the
+             desired column-key order from the live DOM (excluding the
+             new column) and splice the new key after the anchor. */
+          var newKey = (res.column && res.column.col_key) || res.col_key || null;
+          var anchorClone = thEl.cloneNode(true);
+          anchorClone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-col-tool-btn,.mx-col-type-icon,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
+          var anchorLbl = (anchorClone.textContent || '').replace(/\s+/g,' ').trim();
+          delete _MX_COLINFO_CACHE[tid];
+          if (newKey){
+            _mxColInfoForTable(tid).then(function(info){
+              var keys = info.columns.map(function(c){ return c.col_key; });
+              var without = keys.filter(function(k){ return k !== newKey; });
+              var anchorKey = (info.byLabel[anchorLbl] || {}).col_key;
+              var anchorIdx = anchorKey ? without.indexOf(anchorKey) : -1;
+              if (anchorIdx < 0) anchorIdx = without.length - 1;
+              var finalOrder = without.slice(0, anchorIdx + 1).concat([newKey], without.slice(anchorIdx + 1));
+              fetch('/api/custom-table/' + encodeURIComponent(tid) + '/reorder-columns', {
+                method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+                body: JSON.stringify({columns: finalOrder})
+              }).then(function(){ window.refreshTable(tid); });
+            });
+          } else {
+            window.refreshTable(tid);
+          }
+          setTimeout(_mxClosePopups, 400);
+        } else {
+          msg.classList.add('error');
+          msg.textContent = (res && res.error) || 'تعذّر الإضافة';
+        }
+      }).catch(function(){
+        msg.classList.add('error'); msg.textContent = 'خطأ في الاتصال';
+      });
+    }
+    panel.querySelector('.mx-cp-ok').addEventListener('click', submit);
+    panel.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter'){ ev.preventDefault(); submit(); }
+      else if (ev.key === 'Escape'){ _mxClosePopups(); }
+    });
+  }
+
+  /* ---------- Inline rename ---------- */
+  function _mxStartInlineRename(thEl){
+    var table = thEl.closest('table');
+    if (!table) return;
+    /* Find the text node holding the label. We swap THAT node for an
+       <input>, restoring it on save / cancel so the existing buttons +
+       drag handle keep their slots. */
+    var clone = thEl.cloneNode(true);
+    clone.querySelectorAll('.mx-filter-btn,.mx-col-del-btn,.mx-drag-handle,.mx-col-tool-btn,.mx-col-type-icon,.mx-drag-source-mask').forEach(function(n){ n.remove(); });
+    var origLabel = (clone.textContent || '').replace(/\s+/g,' ').trim();
+    if (!origLabel) return;
+    /* Replace every direct text-node child with empty, gather them so we
+       can restore on cancel. Children that are elements stay put. */
+    var savedTexts = [];
+    var kids = Array.prototype.slice.call(thEl.childNodes);
+    kids.forEach(function(n){
+      if (n.nodeType === 3){
+        savedTexts.push({node:n, text:n.nodeValue});
+        n.nodeValue = '';
+      }
+    });
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'mx-col-rename-input';
+    input.value = origLabel;
+    thEl.appendChild(input);
+    setTimeout(function(){ input.focus(); input.select(); }, 30);
+
+    function restore(){
+      savedTexts.forEach(function(s){ s.node.nodeValue = s.text; });
+      input.remove();
+    }
+    function cancel(){ restore(); }
+    function commit(){
+      var newLabel = input.value.replace(/\s+/g,' ').trim();
+      if (!newLabel || newLabel === origLabel){ cancel(); return; }
+      var tid = _mxResolveTid(table);
+      if (!tid){ cancel(); return; }
+      _mxResolveColInfo(table, thEl).then(function(ctx){
+        if (!ctx || !ctx.col){ cancel(); return; }
+        fetch('/api/custom-table/' + encodeURIComponent(tid) + '/rename-column', {
+          method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({col_key: ctx.col.col_key, new_label: newLabel})
+        }).then(function(r){return r.json();}).then(function(res){
+          if (res && res.ok){
+            /* Restore label text first so the flash animation has
+               something to flash. */
+            savedTexts.forEach(function(s, i){
+              s.node.nodeValue = (i === 0 ? newLabel : '');
+            });
+            input.remove();
+            thEl.classList.add('mx-rename-flash');
+            setTimeout(function(){ thEl.classList.remove('mx-rename-flash'); }, 900);
+            if (typeof window.mxToast === 'function') window.mxToast('تم تغيير اسم العمود', 'success');
+            window.refreshTable(tid);
+          } else {
+            cancel();
+            if (typeof window.mxToast === 'function')
+              window.mxToast((res && res.error) || 'تعذّر تغيير الاسم', 'error');
+          }
+        }).catch(function(){
+          cancel();
+          if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
+        });
+      });
+    }
+    input.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+      else if (ev.key === 'Escape'){ ev.preventDefault(); cancel(); }
+    });
+    input.addEventListener('blur', function(){ commit(); });
+    /* Stop bubbling so the global outside-click handler doesn't kill us. */
+    input.addEventListener('click', function(ev){ ev.stopPropagation(); });
+  }
+
+  /* ---------- Row mini menu (#-cell click) ---------- */
+  function _mxFindRowDeleteButton(tr){
+    /* Most renderers wire a per-row delete button with onclick=
+       "deleteX(<id>)". Click that programmatically so each table's
+       custom confirmation flow is preserved. */
+    var btns = tr.querySelectorAll('button, .btn-icon, .btn-bulk-del');
+    for (var i=0; i<btns.length; i++){
+      var b = btns[i];
+      var oc = b.getAttribute('onclick') || '';
+      if (/delete\w+\s*\(/i.test(oc) || /حذف/.test(b.textContent || '')) return b;
+    }
+    return null;
+  }
+  function _mxFindRowFirstEditable(tr){
+    return tr.querySelector('[contenteditable="true"], input.editable, .editable');
+  }
+  function _mxRowDataId(tr){
+    var cb = tr.querySelector('input.bulk-cb, .bulk-cb');
+    if (cb && cb.dataset && cb.dataset.id) return cb.dataset.id;
+    var anyDataId = tr.querySelector('[data-id]');
+    if (anyDataId) return anyDataId.getAttribute('data-id');
+    return null;
+  }
+  function _mxOpenRowMenu(tdEl){
+    _mxClosePopups();
+    var tr = tdEl.closest('tr');
+    if (!tr) return;
+    var menu = document.createElement('div');
+    menu.className = 'mx-row-menu';
+    menu.innerHTML =
+      '<button type="button" data-act="edit"><span class="mx-rm-icon">✏</span><span>تعديل هذا الصف</span></button>' +
+      '<button type="button" data-act="up"><span class="mx-rm-icon">↑</span><span>نقل الصف لأعلى</span></button>' +
+      '<button type="button" data-act="down"><span class="mx-rm-icon">↓</span><span>نقل الصف لأسفل</span></button>' +
+      '<button type="button" data-act="copy"><span class="mx-rm-icon">📋</span><span>نسخ الصف</span></button>' +
+      '<button type="button" data-act="delete" class="danger"><span class="mx-rm-icon">🗑</span><span>حذف هذا الصف</span></button>';
+    menu.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    _mxAnchorBelow(menu, tdEl);
+    _mxOpenPopup = menu;
+    menu.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var act = btn.dataset.act;
+        _mxClosePopups();
+        if (act === 'edit'){
+          var ed = _mxFindRowFirstEditable(tr);
+          if (ed){ ed.focus(); ed.scrollIntoView({block:'center', behavior:'smooth'}); }
+          else if (typeof window.mxToast === 'function') window.mxToast('لا توجد خلية قابلة للتعديل', 'error');
+        }
+        else if (act === 'delete'){
+          var del = _mxFindRowDeleteButton(tr);
+          if (del){ del.click(); }
+          else if (typeof window.mxToast === 'function') window.mxToast('الحذف غير متاح لهذا الصف', 'error');
+        }
+        else if (act === 'up' || act === 'down'){
+          var sib = act === 'up' ? tr.previousElementSibling : tr.nextElementSibling;
+          if (!sib){
+            if (typeof window.mxToast === 'function') window.mxToast(act === 'up' ? 'هذا أول صف' : 'هذا آخر صف', 'error');
+            return;
+          }
+          if (act === 'up') tr.parentNode.insertBefore(tr, sib);
+          else              tr.parentNode.insertBefore(sib, tr);
+          _mxRenumberRows(tr.closest('table'));
+          if (typeof window.mxToast === 'function') window.mxToast('تم نقل الصف (محلياً)', 'success');
+        }
+        else if (act === 'copy'){
+          var rid = _mxRowDataId(tr);
+          if (typeof window.mxToast === 'function')
+            window.mxToast(rid ? ('انسخ يدوياً: ID #' + rid) : 'لا يمكن نسخ هذا الصف تلقائياً', 'success');
+        }
+      });
+    });
+  }
+  function _mxRenumberRows(table){
+    if (!table) return;
+    var rows = table.querySelectorAll('tbody tr');
+    var n = 1;
+    rows.forEach(function(tr){
+      var cells = tr.children;
+      for (var i=0; i<cells.length; i++){
+        var td = cells[i];
+        if (td.classList.contains('bulk-col')) continue;
+        var t = (td.textContent || '').trim();
+        if (/^\d+$/.test(t) && td.classList.contains('mx-row-num')){ td.textContent = String(n); break; }
+        if (/^\d+$/.test(t) && cells[0].classList.contains('bulk-col') && i === 1){ td.textContent = String(n); td.classList.add('mx-row-num'); break; }
+        if (/^\d+$/.test(t) && i === 0){ td.textContent = String(n); td.classList.add('mx-row-num'); break; }
+      }
+      n++;
+    });
+  }
+  function _mxWireRowNumberCells(table){
+    var rows = table.querySelectorAll('tbody tr');
+    rows.forEach(function(tr){
+      var cells = tr.children;
+      var idxCell = null;
+      for (var i=0; i<cells.length; i++){
+        var td = cells[i];
+        if (td.classList.contains('bulk-col')) continue;
+        var t = (td.textContent || '').trim();
+        if (/^\d+$/.test(t) && t.length < 4){ idxCell = td; break; }
+        /* Stop after the first non-numeric content cell so we don't
+           latch onto a stray digit in a data column. */
+        break;
+      }
+      if (!idxCell) return;
+      if (idxCell.classList.contains('mx-row-num')) return;
+      idxCell.classList.add('mx-row-num');
+      idxCell.title = 'انقر للخيارات';
+      idxCell.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        _mxOpenRowMenu(ev.currentTarget);
+      });
+    });
+  }
+
   function wireColumnFilters(){
     // Any table inside a wrapper marked .table-wrap / .att-table-wrap /
     // #taqseetWrap (or .db-section / .custom-table-section for tables
@@ -14877,6 +15429,57 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
           });
           th.appendChild(fbtn);
         }
+        // --- Type-selector button (نوع ▼) ---
+        if (!th.querySelector('.mx-col-type-btn') && !isSkipCol){
+          var tbtn = document.createElement('button');
+          tbtn.type = 'button';
+          tbtn.className = 'mx-col-tool-btn mx-col-type-btn';
+          tbtn.title = 'نوع العمود';
+          tbtn.textContent = 'نوع ▼';
+          tbtn.dataset.colDisplay = currentLabel;
+          tbtn.addEventListener('click', function(ev){
+            ev.stopPropagation(); ev.preventDefault();
+            var btn = ev.currentTarget;
+            var thEl = btn.closest('th');
+            if (!thEl) return;
+            _mxOpenColumnTypeDropdown(thEl, btn);
+          });
+          th.appendChild(tbtn);
+        }
+        // --- Add-column button (+ عمود) ---
+        if (!th.querySelector('.mx-col-add-btn') && !isSkipCol){
+          var abtn = document.createElement('button');
+          abtn.type = 'button';
+          abtn.className = 'mx-col-tool-btn mx-col-add-btn';
+          abtn.title = 'إضافة عمود إلى اليسار';
+          abtn.textContent = '+ عمود';
+          abtn.dataset.colDisplay = currentLabel;
+          abtn.addEventListener('click', function(ev){
+            ev.stopPropagation(); ev.preventDefault();
+            var btn = ev.currentTarget;
+            var thEl = btn.closest('th');
+            if (!thEl) return;
+            _mxOpenAddColumnPopup(thEl, btn);
+          });
+          th.appendChild(abtn);
+        }
+        // --- Inline rename (✏) ---
+        if (!th.querySelector('.mx-col-rename-btn') && !isSkipCol){
+          var rbtn = document.createElement('button');
+          rbtn.type = 'button';
+          rbtn.className = 'mx-col-tool-btn mx-col-rename-btn';
+          rbtn.title = 'إعادة تسمية';
+          rbtn.textContent = '✏';
+          rbtn.dataset.colDisplay = currentLabel;
+          rbtn.addEventListener('click', function(ev){
+            ev.stopPropagation(); ev.preventDefault();
+            var btn = ev.currentTarget;
+            var thEl = btn.closest('th');
+            if (!thEl) return;
+            _mxStartInlineRename(thEl);
+          });
+          th.appendChild(rbtn);
+        }
         // --- Delete ✕ button (hover-reveal) ---
         if (!th.querySelector('.mx-col-del-btn') && !isSkipCol){
           var dbtn = document.createElement('button');
@@ -14905,6 +15508,8 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
         }
       }
       _mxMarkHeaderIcons(table);
+      _mxApplyTypeIcons(table);
+      _mxWireRowNumberCells(table);
       // Re-apply any sticky filter state after a table re-render.
       if (table._mxFilters) _mxApplyFilters(table);
     });
@@ -14925,8 +15530,14 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     if (!t) return;
     if (t.closest && (t.closest('.mx-filter-panel') || t.closest('.mx-filter-btn'))) return;
     _mxClosePanels();
+    if (t.closest && (t.closest('.mx-col-popup') || t.closest('.mx-row-menu') ||
+                      t.closest('.mx-col-tool-btn') || t.closest('.mx-col-type-icon') ||
+                      t.closest('td.mx-row-num'))) return;
+    _mxClosePopups();
   });
-  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') _mxClosePanels(); });
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape'){ _mxClosePanels(); _mxClosePopups(); }
+  });
 
   /* Unify existing delete-confirm text so the wording matches spec. */
   function unifyConfirmText(){
