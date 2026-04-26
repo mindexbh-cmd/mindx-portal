@@ -2376,6 +2376,7 @@ STUDENT_FORM_MODAL_HTML = """
         <div style="grid-column:1/-1;"><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x645;&#x646;&#x632;&#x644;</label><input id="sra_home_address" placeholder="&#x639;&#x646;&#x648;&#x627;&#x646; &#x627;&#x644;&#x645;&#x646;&#x632;&#x644;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;</label><input id="sra_road" placeholder="&#x631;&#x642;&#x645; &#x627;&#x644;&#x637;&#x631;&#x64A;&#x642;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;</label><input id="sra_complex" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x639;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div id="sra-extras" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px;"></div>
       </div>
       <div style="margin-top:14px;"><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x646;&#x648;&#x639; &#x627;&#x644;&#x62A;&#x642;&#x633;&#x64A;&#x637;</label><select id="sra_installment_type" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
     </div>
@@ -3040,6 +3041,17 @@ function srOpenAddStudent(){
     window.buildGroupDropdown('', document.getElementById('sra_group_online'),
       { allowEmpty:true, emptyLabel:'-- \u0644\u0627 \u064A\u0648\u062C\u062F --' });
   }
+  /* Schema-driven extras — any column added to `students` (via the
+     table-edit modal) appears at the bottom of this form automatically.
+     Static field IDs come from _SRA_PAYLOAD_KEY so renames in the
+     mapping are automatically respected. */
+  if (typeof window.mxLoadStudentsSchema === 'function'){
+    var known = Object.keys(_SRA_PAYLOAD_KEY).map(function(k){ return _SRA_PAYLOAD_KEY[k]; });
+    window.mxLoadStudentsSchema().then(function(schema){
+      var box = document.getElementById('sra-extras');
+      window.mxAppendCustomFields(box, 'sra_extra_', known, schema, {});
+    });
+  }
   document.getElementById('sra-modal-bg').style.display = 'block';
   /* Populate the installment-type dropdown lazily on first open. */
   var sel = document.getElementById('sra_installment_type');
@@ -3076,6 +3088,12 @@ function srSaveAddStudent(){
     if (!el) return;
     body[_SRA_PAYLOAD_KEY[k]] = (el.value || '').trim();
   });
+  /* Merge schema-driven extras (sra-extras grid). data-mx-field carries
+     the column key, so renames flow through correctly. */
+  if (typeof window.mxCollectCustomFieldValues === 'function'){
+    var extras = window.mxCollectCustomFieldValues(document.getElementById('sra-extras'), 'sra_extra_');
+    for (var k2 in extras){ if (Object.prototype.hasOwnProperty.call(extras,k2)) body[k2] = extras[k2]; }
+  }
   if (!body.personal_id || !body.student_name){
     _sraToast('الرقم الشخصي واسم الطالب مطلوبان', 'error'); return;
   }
@@ -3087,10 +3105,16 @@ function srSaveAddStudent(){
     headers: {'Content-Type': 'application/json'},
     credentials: 'include',
     body: JSON.stringify(body)
-  }).then(function(r){ return r.json(); }).then(function(d){
+  }).then(function(r){
+    return r.json().then(function(j){ return { status: r.status, body: j }; });
+  }).then(function(p){
     btn.disabled = false; btn.innerHTML = prev;
-    if (!d || !d.ok){
-      _sraToast(d && d.error ? d.error : 'حدث خطأ', 'error'); return;
+    var d = p.body || {};
+    if (p.status === 409 && d.duplicate){
+      _sraToast(d.error || 'الرقم الشخصي مسجل مسبقاً', 'error'); return;
+    }
+    if (!d.ok){
+      _sraToast(d.error || 'حدث خطأ', 'error'); return;
     }
     srCloseAddStudent();
     _sraToast('✅ تم إضافة الطالب بنجاح');
@@ -3938,6 +3962,29 @@ function _srComputeDiff(){
       diffs.push({field:k, label: _SR_FIELD_LABELS[k] || k, from:a, to:b});
     }
   });
+  /* Schema-driven extras: compare each #sr-extras control's current
+     value against the snapshot taken in _srRenderCard. */
+  var box = document.getElementById('sr-extras');
+  if (box){
+    var nodes = box.querySelectorAll('[data-mx-field]');
+    for (var i=0;i<nodes.length;i++){
+      var n = nodes[i];
+      var k2 = n.getAttribute('data-mx-field');
+      var b2 = (n.type === 'checkbox') ? (n.checked ? '1' : '') : (n.value == null ? '' : String(n.value));
+      var a2 = _srOriginal['__extra_' + k2] != null ? String(_srOriginal['__extra_' + k2]) : '';
+      if (a2 !== b2){
+        var labelEl = n.closest('.srm-field') ? n.closest('.srm-field').querySelector('label') : null;
+        /* Build the lock-emoji chars at runtime — embedding their
+           surrogate-pair escapes in this Python triple-quoted
+           string would land as Python-level lone surrogates and
+           break UTF-8 response encoding. */
+        var _lock1 = String.fromCodePoint(0x1F512), _lock2 = String.fromCodePoint(0x1F513);
+        var _lblText = labelEl ? labelEl.textContent : k2;
+        var lbl = String(_lblText || '').split(_lock1).join('').split(_lock2).join('').trim();
+        diffs.push({field:k2, label:lbl, from:a2, to:b2});
+      }
+    }
+  }
   return diffs;
 }
 function _srTrySave(){
@@ -4180,6 +4227,26 @@ function _srRenderCard(d){
   html += _srField('sr_home_address','العنوان', s.home_address);
   html += _srField('sr_road','الطريق', s.road);
   html += _srField('sr_complex_name','المجمع', s.complex_name);
+  /* Schema-driven extras: any students column not in _SR_FIELD_IDS
+     auto-renders here. data-mx-field on each control lets the diff +
+     save flows include them transparently. */
+  html += '<div id="sr-extras" class="srm-grid" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 14px;"></div>';
+  setTimeout(function(){
+    if (typeof window.mxLoadStudentsSchema !== 'function') return;
+    window.mxLoadStudentsSchema().then(function(schema){
+      var box = document.getElementById('sr-extras'); if (!box) return;
+      window.mxAppendCustomFields(box, 'sr_extra_', _SR_FIELD_IDS, schema, s, { layout:'sr', disabled:true });
+      /* Snapshot extras into _srOriginal so the diff catches changes. */
+      var nodes = box.querySelectorAll('[data-mx-field]');
+      for (var i=0;i<nodes.length;i++){
+        var n = nodes[i];
+        var k = n.getAttribute('data-mx-field');
+        var v = (n.type === 'checkbox') ? (n.checked ? '1' : '') : (n.value == null ? '' : String(n.value));
+        _srOriginal['__extra_' + k] = v;
+      }
+      _srApplyMode();
+    });
+  }, 0);
   html += '</div></div>';
   // PAYMENTS — unified "طريقة التقسيط" section. Combines the student\'s
   // taqseet plan + per-installment paid/remaining + persisted totals
@@ -11917,57 +11984,113 @@ def api_students_get():
         out.append(d)
     return jsonify({"students": out})
 
+def _students_live_columns(db):
+    """Live `students` table columns minus system / auto fields. Used by
+    POST + PATCH to whitelist any column the user actually sent."""
+    try:
+        rows = db.execute("PRAGMA table_info(students)").fetchall()
+    except Exception:
+        return []
+    return [r[1] for r in rows if r[1] not in ("id", "created_at")]
+
+
 @app.route("/api/students", methods=["POST"])
 @login_required
 def api_students_add():
-    d = request.get_json()
+    """Dynamic INSERT — accepts any column on the live `students` table.
+    New columns added via the table-edit UI are auto-supported because
+    the column list is read from PRAGMA at request time. Duplicate
+    personal_id is rejected before the INSERT so callers can surface
+    the existing student's name."""
+    d = request.get_json() or {}
+    pid = (d.get("personal_id") or "").strip()
+    sname = (d.get("student_name") or "").strip()
+    if not pid or not sname:
+        return jsonify({
+            "ok": False,
+            "error": "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A \u0648\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 \u0645\u0637\u0644\u0648\u0628\u0627\u0646",
+        }), 400
+    db = get_db()
     try:
-        db = get_db()
-        db.execute("""INSERT INTO students
-            (personal_id,student_name,whatsapp,class_name,old_new_2026,registration_term2_2026,
-             group_name_student,group_online,final_result,level_reached_2026,suitable_level_2026,
-             books_received,teacher_2026,installment1,installment2,installment3,installment4,
-             installment5,mother_phone,father_phone,other_phone,residence,home_address,road,complex_name,installment_type)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
-             d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
-             d.get("group_name_student"), d.get("group_online"),
-             d.get("final_result"), d.get("level_reached_2026"), d.get("suitable_level_2026"),
-             d.get("books_received"), d.get("teacher_2026"),
-             d.get("installment1"), d.get("installment2"), d.get("installment3"),
-             d.get("installment4"), d.get("installment5"),
-             d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
-             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type","")))
+        existing = db.execute(
+            "SELECT id, student_name FROM students WHERE personal_id=?",
+            (pid,),
+        ).fetchone()
+    except Exception:
+        existing = None
+    if existing:
+        ename = existing[1] if not hasattr(existing, "keys") else existing["student_name"]
+        return jsonify({
+            "ok": False,
+            "duplicate": True,
+            "existing_id":   existing[0] if not hasattr(existing, "keys") else existing["id"],
+            "existing_name": ename or "",
+            "error": "\u26A0 \u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A \u0645\u0633\u062C\u0644 \u0645\u0633\u0628\u0642\u0627\u064B \u0644\u0644\u0637\u0627\u0644\u0628: " + (ename or ""),
+        }), 409
+    cols = _students_live_columns(db)
+    use_cols, use_vals = [], []
+    for c in cols:
+        if c in d:
+            use_cols.append(c)
+            use_vals.append(d.get(c))
+    if "personal_id" not in use_cols:
+        use_cols.append("personal_id"); use_vals.append(pid)
+    if "student_name" not in use_cols:
+        use_cols.append("student_name"); use_vals.append(sname)
+    placeholders = ",".join(["?"] * len(use_cols))
+    quoted = ",".join('"' + c + '"' for c in use_cols)
+    sql = "INSERT INTO students (" + quoted + ") VALUES (" + placeholders + ")"
+    try:
+        db.execute(sql, tuple(use_vals))
         db.commit()
-        return jsonify({"ok": True})
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return jsonify({"ok": True, "id": new_id})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
-@app.route("/api/students/<int:sid>", methods=["PUT"])
+@app.route("/api/students/<int:sid>", methods=["PUT", "PATCH"])
 @login_required
 def api_students_update(sid):
-    d = request.get_json()
+    """Dynamic PARTIAL UPDATE. Only columns present in the request
+    body are touched, so the search-detail diff-only save flow no
+    longer overwrites unchanged columns with NULL. Any new column on
+    the `students` table is automatically supported."""
+    d = request.get_json() or {}
+    db = get_db()
+    cols = _students_live_columns(db)
+    set_cols, set_vals = [], []
+    for c in cols:
+        if c in d:
+            set_cols.append('"' + c + '"=?')
+            set_vals.append(d.get(c))
+    if not set_cols:
+        return jsonify({"ok": True, "noop": True})
+    # Duplicate-personal_id check on rename.
+    if "personal_id" in d:
+        new_pid = (d.get("personal_id") or "").strip()
+        if new_pid:
+            try:
+                ex = db.execute(
+                    "SELECT id, student_name FROM students "
+                    "WHERE personal_id=? AND id<>?",
+                    (new_pid, sid),
+                ).fetchone()
+            except Exception:
+                ex = None
+            if ex:
+                ename = ex[1] if not hasattr(ex, "keys") else ex["student_name"]
+                return jsonify({
+                    "ok": False,
+                    "duplicate": True,
+                    "existing_id":   ex[0] if not hasattr(ex, "keys") else ex["id"],
+                    "existing_name": ename or "",
+                    "error": "\u26A0 \u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A \u0645\u0633\u062C\u0644 \u0645\u0633\u0628\u0642\u0627\u064B \u0644\u0644\u0637\u0627\u0644\u0628: " + (ename or ""),
+                }), 409
+    sql = "UPDATE students SET " + ",".join(set_cols) + " WHERE id=?"
     try:
-        db = get_db()
-        db.execute("""UPDATE students SET
-            personal_id=?,student_name=?,whatsapp=?,class_name=?,old_new_2026=?,
-            registration_term2_2026=?,group_name_student=?,group_online=?,
-            final_result=?,level_reached_2026=?,suitable_level_2026=?,books_received=?,
-            teacher_2026=?,installment1=?,installment2=?,installment3=?,installment4=?,
-            installment5=?,mother_phone=?,father_phone=?,other_phone=?,residence=?,
-            home_address=?,road=?,complex_name=?,installment_type=?
-            WHERE id=?""",
-            (d.get("personal_id"), d.get("student_name"), d.get("whatsapp"),
-             d.get("class_name"), d.get("old_new_2026"), d.get("registration_term2_2026"),
-             d.get("group_name_student"), d.get("group_online"),
-             d.get("final_result"), d.get("level_reached_2026"), d.get("suitable_level_2026"),
-             d.get("books_received"), d.get("teacher_2026"),
-             d.get("installment1"), d.get("installment2"), d.get("installment3"),
-             d.get("installment4"), d.get("installment5"),
-             d.get("mother_phone"), d.get("father_phone"), d.get("other_phone"),
-             d.get("residence"), d.get("home_address"), d.get("road"), d.get("complex_name"), d.get("installment_type"), sid))
+        db.execute(sql, tuple(set_vals) + (sid,))
         db.commit()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "updated_columns": [c for c in cols if c in d]})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
@@ -20896,6 +21019,107 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   window._populateSelectFromLinked = _populateSelectFromLinked;
   window._invalidateLinkedCache   = _invalidateLinkedCache;
   window.buildGroupDropdown       = buildGroupDropdown;
+
+  /* ── Schema-driven extras for إضافة طالب + بحث عن طالب ─────────
+     Both surfaces render a static set of fields plus whatever extra
+     columns admins have added via the table-edit modal. The schema
+     is fetched once per (table, ttl) and reused. */
+  var _STUDENTS_SCHEMA_CACHE = window._STUDENTS_SCHEMA_CACHE = window._STUDENTS_SCHEMA_CACHE || {};
+  function mxLoadStudentsSchema(){
+    var key = 'students';
+    var c = _STUDENTS_SCHEMA_CACHE[key];
+    if (c && (Date.now() - c.t) < 30000) return Promise.resolve(c.list);
+    return fetch('/api/table/students/schema', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var list = (d && d.ok && d.schema) ? d.schema : [];
+        _STUDENTS_SCHEMA_CACHE[key] = { t: Date.now(), list: list };
+        return list;
+      })
+      .catch(function(){ return (c && c.list) || []; });
+  }
+  function _mxFieldHTML(idPrefix, col, value, opts){
+    var key  = col.col_key || col.internal_name || '';
+    var lbl  = col.col_label || col.display_name || key;
+    var type = col.col_type || '';
+    var raw  = col.col_options || '';
+    var v    = (value == null) ? '' : String(value);
+    var vEsc = _esc2(v);
+    var id   = idPrefix + key;
+    var box  = (opts && opts.layout === 'sr')
+      ? '<div class="srm-field"><label><span class="srm-lock">\ud83d\udd12</span>'+_esc2(lbl)+'</label>{INPUT}</div>'
+      : '<div class="field" style="margin-top:6px;"><label style="display:block;font-size:12.5px;font-weight:700;color:#333;margin-bottom:3px;">'+_esc2(lbl)+'</label>{INPUT}</div>';
+    var disabled = (opts && opts.disabled) ? ' disabled' : '';
+    var cls = (opts && opts.layout === 'sr') ? ' class="srm-readonly"' : '';
+    var inputHtml;
+    if (type === 'qaa\u0626\u0645\u0629') type = '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062F\u0644\u0629';
+    if (type === '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062F\u0644\u0629'){
+      var phId = id;
+      if (raw && raw.indexOf('source:') === 0){
+        inputHtml = '<select id="'+phId+'" data-mx-field="'+key+'"'+cls+disabled+'><option value="'+vEsc+'" selected>'+vEsc+'</option></select>';
+        setTimeout(function(){
+          var el = document.getElementById(phId); if (!el) return;
+          window._populateSelectFromLinked(el, raw, v, true, '');
+        }, 0);
+      } else {
+        var opts2 = String(raw||'').split(',').map(function(o){return o.trim();}).filter(function(o){return o.length;});
+        var inner = '<option value=""></option>';
+        var seen = false;
+        for (var k=0;k<opts2.length;k++){
+          var sel = (opts2[k] === v) ? ' selected' : '';
+          if (sel) seen = true;
+          inner += '<option'+sel+'>'+_esc2(opts2[k])+'</option>';
+        }
+        if (v && !seen) inner += '<option value="'+vEsc+'" selected>'+vEsc+'</option>';
+        inputHtml = '<select id="'+id+'" data-mx-field="'+key+'"'+cls+disabled+'>'+inner+'</select>';
+      }
+    } else if (type === '\u0631\u0642\u0645'){
+      inputHtml = '<input type="number" id="'+id+'" data-mx-field="'+key+'" value="'+vEsc+'"'+cls+disabled+'>';
+    } else if (type === '\u062A\u0627\u0631\u064A\u062E'){
+      inputHtml = '<input type="date" id="'+id+'" data-mx-field="'+key+'" value="'+vEsc+'"'+cls+disabled+'>';
+    } else if (type === '\u0646\u0639\u0645/\u0644\u0627' || type === '\u0646\u0639\u0645\u002F\u0644\u0627'){
+      var ck = (v === '1' || v === 'true' || v === '\u0646\u0639\u0645') ? ' checked' : '';
+      inputHtml = '<input type="checkbox" id="'+id+'" data-mx-field="'+key+'" value="1"'+ck+disabled+'>';
+    } else if (type === '\u062A\u0642\u064A\u064A\u0645'){
+      inputHtml = '<input type="number" min="1" max="10" id="'+id+'" data-mx-field="'+key+'" value="'+vEsc+'"'+cls+disabled+'>';
+    } else {
+      inputHtml = '<input type="text" id="'+id+'" data-mx-field="'+key+'" value="'+vEsc+'"'+cls+disabled+'>';
+    }
+    return box.replace('{INPUT}', inputHtml);
+  }
+  function mxAppendCustomFields(container, idPrefix, knownIds, schema, valuesByKey, opts){
+    if (!container) return;
+    valuesByKey = valuesByKey || {};
+    opts = opts || {};
+    var skip = { id:1, created_at:1, is_active:1 };
+    var known = {};
+    (knownIds || []).forEach(function(k){ known[k] = 1; });
+    var html = '';
+    for (var i=0;i<(schema||[]).length;i++){
+      var c = schema[i] || {};
+      var k = c.col_key || c.internal_name || '';
+      if (!k || skip[k] || known[k]) continue;
+      html += _mxFieldHTML(idPrefix, c, valuesByKey[k], opts);
+    }
+    container.innerHTML = html;
+    return container;
+  }
+  function mxCollectCustomFieldValues(container, idPrefix){
+    var out = {};
+    if (!container) return out;
+    var nodes = container.querySelectorAll('[data-mx-field]');
+    for (var i=0;i<nodes.length;i++){
+      var n = nodes[i];
+      var k = n.getAttribute('data-mx-field');
+      if (n.type === 'checkbox') out[k] = n.checked ? '1' : '';
+      else out[k] = (n.value == null ? '' : n.value);
+    }
+    return out;
+  }
+  window.mxLoadStudentsSchema      = mxLoadStudentsSchema;
+  window.mxAppendCustomFields      = mxAppendCustomFields;
+  window.mxCollectCustomFieldValues = mxCollectCustomFieldValues;
+
 
     mo.observe(document.body, { childList:true, subtree:true });
   }

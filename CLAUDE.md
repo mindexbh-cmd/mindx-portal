@@ -147,6 +147,24 @@ Never concatenate a raw column/table name into user-visible HTML. Route it throu
 
 The UI is Arabic, RTL (`<html lang="ar" dir="rtl">`). Arabic strings in Python source are stored as HTML numeric entities (`&#x627;` etc.) inside the HTML blobs, and as `\uXXXX` JS escapes inside inline `<script>` blocks. This is deliberate — see commit `74b87ac` ("replace mojibake Arabic strings with Unicode escapes"). Do not paste raw Arabic into `app.py`; it gets mangled on Windows/Render round-trips. When adding new UI strings, use the existing escape style of the surrounding block.
 
+**Surrogate-pair caveat:** never write JS escapes for non-BMP codepoints (e.g. `🔒`) inside a Python triple-quoted string — Python parses them as actual Unicode escapes, leaving lone surrogates in the in-memory string that crash UTF-8 response encoding at request time. Build the codepoint at runtime instead (e.g. `String.fromCodePoint(0x1F512)`).
+
+## Student sync (STUDENT SYNC RULE)
+
+**STUDENT SYNC RULE:** بحث عن طالب and إضافة طالب must ALWAYS use `/api/table/students/schema` to get current columns dynamically. Never hardcode student-table columns in these two features. Any column change in the `students` table must automatically reflect in both surfaces.
+
+How this is enforced today:
+- **Backend** — `POST /api/students` and `PUT/PATCH /api/students/<id>` are dynamic: they whitelist body keys against `PRAGMA table_info(students)` at request time. New columns added via the table-edit modal are auto-supported. PUT/PATCH only update the keys actually sent — no more silent NULL-overwrites of unchanged columns when the search-detail save flow sends only diffs.
+- **Duplicate check** — `POST` and PID-renaming `PUT/PATCH` reject duplicates with HTTP 409 + `{duplicate:true, existing_name, existing_id}` so the UI can surface "هذا الرقم الشخصي مسجل مسبقاً للطالب: [name]".
+- **Frontend (`/mx-helpers.js`)** — `mxLoadStudentsSchema()` (cached 30s) and `mxAppendCustomFields(container, idPrefix, knownIds, schema, valuesByKey, opts)` render any column NOT in the static field list as an extra control under the existing modal/card layout. Each control carries a `data-mx-field` attribute keyed by the DB column name; `mxCollectCustomFieldValues` reads the values back.
+- **إضافة طالب modal (`STUDENT_FORM_MODAL_HTML`)** — has a `<div id="sra-extras">` slot at the end of its grid. `srOpenAddStudent` repopulates it on every open. `srSaveAddStudent` merges its values into the POST body.
+- **بحث عن طالب card (`_srRenderCard`)** — has a `<div id="sr-extras">` slot. The renderer hooks `mxAppendCustomFields` after the static fields and snapshots the values into `_srOriginal['__extra_<col>']` so `_srComputeDiff` includes them in the change set.
+
+When you add a new feature that reads or writes the students table:
+1. **Never** hardcode a list of student columns in JS. Always go through `mxLoadStudentsSchema()` or `mxAppendCustomFields()`.
+2. **Never** hardcode a list of student columns in a server route. Always whitelist against `_students_live_columns(db)`.
+3. If the new feature needs a special widget for a specific column (e.g. linked dropdown), branch on `col_type` / `col_options` from the schema rather than the column name.
+
 ## Seeded credentials
 
 `init_db()` seeds: `admin/admin123`, `reception/rec123`, `teacher1/tea123`, `teacher2/tea456`. The login page (`login.html` and `LOGIN_HTML`) advertises additional role quick-buttons (`students/students123`, `curriculum/curriculum123`, `parent/parent123`, `zahraa/zahraa123`, `kauthar/kauthar123`, `media/media123`) that are **not seeded** — those buttons will fail unless those users are added.
