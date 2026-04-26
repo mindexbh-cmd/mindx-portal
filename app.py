@@ -481,6 +481,10 @@ def init_db():
         username TEXT,
         filename TEXT,
         bytes_written INTEGER DEFAULT 0,
+        tables_count INTEGER DEFAULT 0,
+        total_rows INTEGER DEFAULT 0,
+        verified INTEGER DEFAULT 0,
+        report_text TEXT DEFAULT '',
         downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     # Behavior-points tables (mirrored in the else-branch migration
     # 'points_v1' so existing DBs get them via CREATE IF NOT EXISTS).
@@ -1838,6 +1842,28 @@ if True:
             except Exception: pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("points_v2",))
+        except Exception: pass
+        db2.commit()
+
+    # backup_log v2 — verification metadata columns. These are
+    # populated by the new verified-backup pipeline; legacy rows
+    # default to NULL/0 so the history tab can render "—" for them.
+    if "backup_log_v2" not in applied:
+        try:
+            _bcols = {r[1] for r in db2.execute("PRAGMA table_info(backup_log)").fetchall()}
+        except Exception:
+            _bcols = set()
+        for _bc, _bt in (
+            ("tables_count", "INTEGER DEFAULT 0"),
+            ("total_rows",   "INTEGER DEFAULT 0"),
+            ("verified",     "INTEGER DEFAULT 0"),
+            ("report_text",  "TEXT DEFAULT ''"),
+        ):
+            if _bc not in _bcols:
+                try: db2.execute("ALTER TABLE backup_log ADD COLUMN " + _bc + " " + _bt)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("backup_log_v2",))
         except Exception: pass
         db2.commit()
 
@@ -15726,9 +15752,99 @@ def _backup_table_columns(db, t):
         return []
 
 
-def _backup_build_excel(db):
-    """Excel export — one sheet per table, Arabic sheet + column
-    names, RTL alignment, frozen header. Returns bytes."""
+# Sheet ordering — matches the قاعدة البيانات UI sidebar. Tables not
+# in this list come after, sorted alphabetically.
+_BACKUP_SHEET_ORDER = [
+    "students", "student_groups", "attendance", "payment_log",
+    "taqseet", "student_payments", "evaluations", "receipts_log",
+    "session_durations", "parent_receipts", "payment_edits",
+    "custom_tables", "custom_table_cols", "custom_table_rows",
+    # Feature tables next (points + messaging + center mode + backup)
+    "behaviors", "point_events", "point_notifications",
+    "rewards", "redemptions", "avatars", "levels",
+    "message_templates", "message_log", "message_reminders",
+    "payment_messages", "mode_exceptions", "backup_log",
+    # System tables last
+    "users", "settings", "schema_migrations", "table_labels",
+    "column_labels", "group_col_labels", "att_col_labels",
+    "eval_col_labels", "taqseet_col_labels", "paylog_col_labels",
+]
+
+
+def _backup_ordered_tables(db):
+    """Return tables in the canonical UI order, with any unlisted
+    tables appended alphabetically at the end."""
+    all_tables = _backup_collect_tables(db)
+    seen = set()
+    out = []
+    for t in _BACKUP_SHEET_ORDER:
+        if t in all_tables:
+            out.append(t); seen.add(t)
+    for t in sorted(all_tables):
+        if t not in seen:
+            out.append(t)
+    return out
+
+
+# Date and currency-like column heuristics for cell formatting.
+_DATE_COL_HINTS = (
+    "date", "_at", "due_", "issued_at", "redeemed_at", "delivered_at",
+    "downloaded_at", "created_at", "sent_at", "applied_at",
+    "reviewed_at", "upload_date", "form_fill_date", "edit_date",
+    "attendance_date",
+)
+_CURRENCY_COL_HINTS = (
+    "amount", "course_amount", "total_paid", "total_remaining",
+    "installment", "paid_amount", "points_spent", "bytes_written",
+    "size_bytes",
+)
+_BOOLEAN_COL_HINTS = (
+    "is_active", "is_global", "must_change_pw", "is_visible",
+    "books_received",
+)
+
+
+def _backup_format_cell_value(col_name, v):
+    """Return (display_value, number_format) tuple for an openpyxl
+    cell. None → empty cell, dates → ISO-style, booleans → نعم/لا,
+    currencies use the د.ب suffix in number_format."""
+    if v is None or v == "":
+        return "", None
+    cn = (col_name or "").lower()
+    # Booleans first — only on canonical-named columns to avoid
+    # turning e.g. installment_number into نعم/لا.
+    if cn in _BOOLEAN_COL_HINTS or cn.startswith("is_"):
+        if isinstance(v, (int, bool)):
+            return ("نعم" if int(v) else "لا"), None
+        sv = str(v).strip().lower()
+        if sv in ("1", "true", "yes", "y", "نعم"): return "نعم", None
+        if sv in ("0", "false", "no", "n", "لا"):  return "لا", None
+    # Date-shaped columns
+    if any(h in cn for h in _DATE_COL_HINTS):
+        s = str(v).strip()
+        # Don't munge non-date contents; show as-is. Excel auto-renders
+        # ISO yyyy-mm-dd in date format anyway.
+        return s, None
+    # Currency-shaped columns
+    if cn in _CURRENCY_COL_HINTS or cn.endswith("_amount"):
+        if isinstance(v, (int, float)):
+            try:
+                return float(v), '#,##0.000" د.ب"'
+            except Exception:
+                pass
+        return str(v), None
+    # Numeric pass-through
+    if isinstance(v, (int, float)):
+        return v, None
+    return str(v), None
+
+
+def _backup_build_excel(db, audit_trace=None):
+    """Publication-quality Excel export. Returns (bytes, per_table_counts).
+
+    audit_trace, if a list, gets per-table dicts appended for the
+    multi-stage verification flow.
+    """
     import io as _io
     try:
         from openpyxl import Workbook
@@ -15736,8 +15852,10 @@ def _backup_build_excel(db):
         from openpyxl.utils import get_column_letter
     except Exception as ex:
         raise RuntimeError("openpyxl not available: " + str(ex))
+
     wb = Workbook()
     wb.remove(wb.active)
+
     used_titles = set()
     def _safe_title(name, maxlen=31):
         t = (name or "table")
@@ -15751,41 +15869,149 @@ def _backup_build_excel(db):
             i += 1
         used_titles.add(t)
         return t
-    arabic_font = Font(name="Tahoma", size=11)
-    header_font = Font(name="Tahoma", size=11, bold=True, color="FFFFFF")
-    header_fill = PatternFill("solid", fgColor="6B3FA0")
-    rtl_align = Alignment(horizontal="right", vertical="center", wrap_text=True, readingOrder=2)
-    for t in _backup_collect_tables(db):
+
+    # Style toolkit.
+    HEADER_FILL = PatternFill("solid", fgColor="7F77DD")
+    ZEBRA_FILL  = PatternFill("solid", fgColor="F8F8F8")
+    HEADER_FONT = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    BODY_FONT   = Font(name="Arial", size=11)
+    HEADER_ALIGN = Alignment(horizontal="center", vertical="center",
+                             wrap_text=True, readingOrder=2)
+    RTL_ALIGN   = Alignment(horizontal="right", vertical="center",
+                            wrap_text=True, readingOrder=2)
+    NUM_ALIGN   = Alignment(horizontal="left", vertical="center", readingOrder=2)
+
+    # Build INDEX sheet first; we fill it after we know the per-sheet
+    # counts. Reserve it now so it's the first tab.
+    idx_ws = wb.create_sheet(_safe_title("الفهرس"))
+    try: idx_ws.sheet_view.rightToLeft = True
+    except Exception: pass
+
+    per_table_counts = []   # [{table, sheet, db_count, written, columns}]
+    grand_total = 0
+
+    for t in _backup_ordered_tables(db):
         cols = _backup_table_columns(db, t)
-        if not cols: continue
-        ws = wb.create_sheet(_safe_title(_backup_arabic_table_name(t)))
+        if not cols:
+            continue
+        sheet_name = _safe_title(_backup_arabic_table_name(t))
+        ws = wb.create_sheet(sheet_name)
         try: ws.sheet_view.rightToLeft = True
         except Exception: pass
+        ws.row_dimensions[1].height = 25
         labels = [_backup_arabic_col_name(t, c) for c in cols]
+
+        # Header row
         for j, lbl in enumerate(labels, start=1):
             cell = ws.cell(row=1, column=j, value=str(lbl))
-            cell.font = header_font; cell.fill = header_fill; cell.alignment = rtl_align
+            cell.font = HEADER_FONT
+            cell.fill = HEADER_FILL
+            cell.alignment = HEADER_ALIGN
+
+        # STAGE 1: count expected rows from DB.
         try:
-            data = db.execute("SELECT " + ",".join("\"" + c + "\"" for c in cols) + " FROM " + t).fetchall()
+            db_count = int(db.execute(
+                "SELECT COUNT(*) FROM " + '"' + t + '"'
+            ).fetchone()[0] or 0)
+        except Exception:
+            db_count = 0
+
+        # Pull rows.
+        try:
+            data = db.execute(
+                "SELECT " + ",".join('"' + c + '"' for c in cols) +
+                " FROM " + '"' + t + '"'
+            ).fetchall()
         except Exception:
             data = []
+
+        # STAGE 2: write rows to sheet, counting as we go. Track the
+        # widest content per column for auto-fit.
+        max_widths = [len(str(lbl or "")) + 4 for lbl in labels]
+        written = 0
         for ri, row in enumerate(data, start=2):
             try:
                 vals = list(row) if not hasattr(row, "keys") else [row[k] for k in cols]
             except Exception:
                 vals = list(row) if hasattr(row, "__iter__") else []
+            zebra = (ri % 2 == 1)   # rows 3, 5, 7, ... → light gray
             for j, v in enumerate(vals, start=1):
-                cell = ws.cell(row=ri, column=j, value=("" if v is None else (v if isinstance(v, (int, float)) else str(v))))
-                cell.font = arabic_font; cell.alignment = rtl_align
+                disp, fmt = _backup_format_cell_value(cols[j-1], v)
+                cell = ws.cell(row=ri, column=j, value=disp)
+                cell.font = BODY_FONT
+                if isinstance(disp, (int, float)) and not isinstance(disp, bool):
+                    cell.alignment = NUM_ALIGN
+                else:
+                    cell.alignment = RTL_ALIGN
+                if fmt:
+                    try: cell.number_format = fmt
+                    except Exception: pass
+                if zebra:
+                    cell.fill = ZEBRA_FILL
+                w = len(str(disp))
+                if w > max_widths[j-1]:
+                    max_widths[j-1] = w
+            written += 1
+
         ws.freeze_panes = "A2"
+        # Auto-fit (clamped 10..50).
         for j in range(1, len(cols) + 1):
             try:
                 col_letter = get_column_letter(j)
-                width = min(50, max(12, len(str(labels[j-1] or "")) + 4))
-                ws.column_dimensions[col_letter].width = width
+                ws.column_dimensions[col_letter].width = max(10, min(50, max_widths[j-1] + 2))
             except Exception:
                 pass
-    buf = _io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+        per_table_counts.append({
+            "table":      t,
+            "sheet":      sheet_name,
+            "db_count":   db_count,
+            "written":    written,
+            "columns":    len(cols),
+        })
+        grand_total += written
+        if isinstance(audit_trace, list):
+            audit_trace.append({"stage": "write", "table": t,
+                                "db_count": db_count, "written": written})
+
+    # Fill the INDEX sheet now that we have all the per-sheet counts.
+    try:
+        idx_ws.row_dimensions[1].height = 30
+        idx_ws.cell(row=1, column=1, value="الفهرس — نسخة احتياطية مايندكس").font = Font(name="Arial", size=14, bold=True, color="4A148C")
+        idx_ws.cell(row=2, column=1, value="إجمالي عدد الصفوف في هذه النسخة: " + str(grand_total)).font = Font(name="Arial", size=11, bold=True)
+        idx_ws.cell(row=3, column=1, value="تم التوليد: " + __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")).font = BODY_FONT
+        # Header row at row 5
+        hdrs = ["اسم الورقة", "الجدول الخام", "عدد الصفوف", "عدد الأعمدة", "الانتقال"]
+        for j, h in enumerate(hdrs, start=1):
+            cell = idx_ws.cell(row=5, column=j, value=h)
+            cell.font = HEADER_FONT; cell.fill = HEADER_FILL; cell.alignment = HEADER_ALIGN
+        for i, info in enumerate(per_table_counts, start=6):
+            idx_ws.cell(row=i, column=1, value=info["sheet"]).alignment = RTL_ALIGN
+            idx_ws.cell(row=i, column=2, value=info["table"]).alignment = NUM_ALIGN
+            idx_ws.cell(row=i, column=3, value=info["written"]).alignment = NUM_ALIGN
+            idx_ws.cell(row=i, column=4, value=info["columns"]).alignment = NUM_ALIGN
+            link_cell = idx_ws.cell(row=i, column=5, value="انتقل إلى الورقة")
+            try:
+                # Hyperlink to the sheet's A1.
+                link_cell.hyperlink = "#'" + info["sheet"] + "'!A1"
+                link_cell.font = Font(name="Arial", size=11, color="1565C0", underline="single")
+            except Exception:
+                pass
+            link_cell.alignment = RTL_ALIGN
+            for j in range(1, 6):
+                if (i % 2 == 0):
+                    idx_ws.cell(row=i, column=j).fill = ZEBRA_FILL
+        idx_ws.freeze_panes = "A6"
+        for j, w in enumerate([28, 22, 12, 12, 22], start=1):
+            try: idx_ws.column_dimensions[get_column_letter(j)].width = w
+            except Exception: pass
+    except Exception as _ex:
+        import sys as _sys
+        print("[backup] index sheet build failed: " + str(_ex), file=_sys.stderr)
+
+    buf = _io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue(), per_table_counts
 
 
 def _backup_build_sql(db):
@@ -15863,42 +16089,262 @@ def _backup_send_email(zip_path, recipients, settings_kind):
         return "failed", str(ex)
 
 
+def _backup_reopen_count(excel_bytes):
+    """STAGE 3: re-open the generated Excel buffer and count rows on
+    each sheet (excluding the index sheet + header row). Returns
+    {sheet_name: data_row_count}."""
+    import io as _io
+    try:
+        from openpyxl import load_workbook
+    except Exception:
+        return {}
+    try:
+        wb = load_workbook(_io.BytesIO(excel_bytes), read_only=True)
+    except Exception:
+        return {}
+    out = {}
+    for ws in wb.worksheets:
+        if ws.title == "الفهرس": continue
+        # max_row counts the highest row with data; the header is at
+        # row 1 so data rows = max_row - 1 (clamped to 0).
+        try:
+            mr = ws.max_row or 0
+        except Exception:
+            mr = 0
+        out[ws.title] = max(0, mr - 1)
+    try: wb.close()
+    except Exception: pass
+    return out
+
+
+def _backup_sql_count_rows(sql_text):
+    """STAGE 3 (SQL leg): count INSERT statements per table in the
+    generated SQL dump. Used as a third independent check."""
+    counts = {}
+    import re as _re
+    for m in _re.finditer(r'INSERT INTO "([^"]+)"', sql_text):
+        t = m.group(1)
+        counts[t] = counts.get(t, 0) + 1
+    return counts
+
+
+def _backup_compose_verification_report(meta, per_table, sql_counts,
+                                        reopen_counts_by_sheet,
+                                        fingerprints):
+    """Compose the Arabic verification report. Returns a UTF-8 string
+    (BOM is added when written to file)."""
+    L = []
+    L.append("════════════════════════════════════════════════════════")
+    L.append("           تقرير التحقق من النسخة الاحتياطية")
+    L.append("════════════════════════════════════════════════════════")
+    L.append("")
+    L.append("اسم الملف:      " + meta.get("zip_name", ""))
+    L.append("تاريخ التوليد:  " + meta.get("ts", ""))
+    L.append("منشئ النسخة:    " + meta.get("user", ""))
+    L.append("النوع:           " + meta.get("kind", ""))
+    if meta.get("reason"):
+        L.append("السبب:          " + meta.get("reason", ""))
+    L.append("قاعدة البيانات: " + meta.get("db_kind", ""))
+    L.append("")
+    L.append("بصمات الملفات (SHA-256):")
+    for k, v in (fingerprints or {}).items():
+        L.append("  " + k.ljust(28) + " " + v)
+    L.append("")
+    total_rows = sum(int(t.get("written") or 0) for t in per_table)
+    L.append("ملخص النسخة:")
+    L.append("  عدد الجداول المُصدَّرة: " + str(len(per_table)))
+    L.append("  إجمالي الصفوف:          " + str(total_rows))
+    L.append("")
+    L.append("التحقق من المطابقة لكل جدول")
+    L.append("(قاعدة البيانات ↔ Excel ↔ SQL)")
+    L.append("─" * 60)
+    header = ("الجدول".ljust(26) +
+              "DB".rjust(8) +
+              "Excel".rjust(10) +
+              "SQL".rjust(8) +
+              "الحالة".rjust(12))
+    L.append(header)
+    L.append("─" * 60)
+    all_ok = True
+    for t in per_table:
+        dbn = int(t.get("db_count") or 0)
+        wrn = int(t.get("written") or 0)
+        sql = int(sql_counts.get(t.get("table"), 0))
+        xls = int(reopen_counts_by_sheet.get(t.get("sheet"), wrn))
+        match = (dbn == wrn == sql == xls)
+        if not match: all_ok = False
+        status = "✓ مطابق" if match else "✗ مختلف"
+        line = (str(t.get("table") or "")[:24].ljust(26) +
+                str(dbn).rjust(8) +
+                str(xls).rjust(10) +
+                str(sql).rjust(8) +
+                status.rjust(12))
+        L.append(line)
+    L.append("─" * 60)
+    L.append("")
+    L.append("نتيجة التحقق العامة: " + ("✅ نجح التحقق — جميع الأعداد متطابقة"
+                                          if all_ok else "❌ فشل التحقق — اختلاف في الأعداد"))
+    L.append("")
+    L.append("ملاحظات:")
+    L.append("  • DB    = عدد الصفوف المقروء من قاعدة البيانات قبل الكتابة (Stage 1).")
+    L.append("  • Excel = عدد الصفوف عند إعادة فتح ملف Excel وقراءته (Stage 3).")
+    L.append("  • SQL   = عدد جمل INSERT المحفوظة في ملف SQL (Stage 3).")
+    L.append("  • التحقق آلي ولحظي. أي اختلاف يلغي حفظ الملف لحماية البيانات.")
+    L.append("")
+    L.append("لاستعادة هذه النسخة:")
+    L.append("  1. فك ضغط الملف .zip")
+    L.append("  2. افتح ملف Excel وراجع تبويب «الفهرس» للتأكد من الجداول.")
+    L.append("  3. لاستعادة قاعدة البيانات استخدم ملف SQL في sqlite3/psql.")
+    L.append("")
+    return "\n".join(L) + "\n"
+
+
 def _create_full_backup(db, kind="manual", reason=""):
-    """Generate Excel + SQL, ZIP them, write to disk, log to
-    backup_log, optionally email. Returns the backup_log row dict
-    on success or raises on failure."""
-    import zipfile, os as _os, datetime as _dt
+    """Generate Excel + SQL with multi-stage row-count verification.
+    Bundles Excel + SQL + VERIFICATION_REPORT.txt + (optional) CLAUDE.md
+    + TABLE_AUDIT.md into a *_verified.zip. Aborts (no file written)
+    on any row-count mismatch.
+
+    Returns dict with id/filename/path/size_bytes/kind/reason/
+    email_status/email_error/tables_count/total_rows/verified/
+    report_text/mismatch (the last is non-empty on abort)."""
+    import zipfile, os as _os, datetime as _dt, hashlib as _hashlib
+
     bdir = _backup_dir()
     stamp = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    zip_name = "mindex_backup_" + stamp + ".zip"
-    zip_path = _os.path.join(bdir, zip_name)
-    excel_bytes = _backup_build_excel(db)
-    sql_bytes   = _backup_build_sql(db)
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("mindex_backup_" + stamp + ".xlsx", excel_bytes)
-        zf.writestr("mindex_backup_" + stamp + ".sql",  sql_bytes)
-    try: size = _os.path.getsize(zip_path)
-    except Exception: size = 0
-    user = (session.get("user") or {}) if (request and "session" in str(type(session))) else {}
+    zip_name  = "mindex_backup_" + stamp + "_verified.zip"
+    zip_path  = _os.path.join(bdir, zip_name)
+    xlsx_name = "mindex_backup_" + stamp + ".xlsx"
+    sql_name  = "mindex_backup_" + stamp + ".sql"
+
+    # Progress tracking — published via /api/backup/progress so the UI
+    # can poll. Best-effort; if anything throws, the export still runs.
+    def _publish(stage, msg, **extra):
+        try:
+            payload = {"stage": stage, "msg": msg, "ts":
+                       _dt.datetime.now().strftime("%H:%M:%S")}
+            payload.update(extra)
+            _BACKUP_PROGRESS.update(payload)
+        except Exception:
+            pass
+
+    _publish("start", "بدء العملية", percent=2)
+
+    # ── STAGE 1+2: Build Excel (counts during write) ──
+    _publish("excel", "كتابة Excel...", percent=15)
+    try:
+        excel_bytes, per_table = _backup_build_excel(db)
+    except Exception as ex:
+        _publish("error", "فشل بناء Excel: " + str(ex), percent=0)
+        raise
+
+    # ── Build SQL ──
+    _publish("sql", "كتابة SQL...", percent=45)
+    sql_bytes = _backup_build_sql(db)
+
+    # ── STAGE 3: re-open Excel + count rows; count SQL inserts ──
+    _publish("verify", "التحقق من المطابقة...", percent=70)
+    reopen_counts = _backup_reopen_count(excel_bytes)
+    try:
+        sql_text = sql_bytes.decode("utf-8")
+    except Exception:
+        sql_text = ""
+    sql_counts = _backup_sql_count_rows(sql_text)
+
+    # ── STAGE 4: compare all three counts ──
+    mismatches = []
+    for info in per_table:
+        t  = info.get("table")
+        dbn = int(info.get("db_count") or 0)
+        wr  = int(info.get("written")  or 0)
+        xls = int(reopen_counts.get(info.get("sheet"), wr))
+        sql_c = int(sql_counts.get(t, 0))
+        if not (dbn == wr == xls == sql_c):
+            mismatches.append({
+                "table": t, "db": dbn, "written": wr,
+                "excel_reopen": xls, "sql": sql_c,
+            })
+
+    if mismatches:
+        # ABORT — no file written. The mismatched buffer never touches disk.
+        first = mismatches[0]
+        msg = ("⚠ فشلت النسخة "
+               "الاحتياطية: "
+               "عدم تطابق "
+               "في عدد صفوف "
+               "جدول [" + str(first.get("table") or "") + "] "
+               "(في DB: " + str(first.get("db")) + "، "
+               "في Excel: " + str(first.get("excel_reopen")) + "، "
+               "في SQL: " + str(first.get("sql")) + "). "
+               "تم إلغاء الحفظ "
+               "لحماية البيانات.")
+        try:
+            import sys as _sys
+            print("[backup] verification mismatch: " + str(mismatches), file=_sys.stderr)
+        except Exception: pass
+        _publish("error", msg, percent=0, mismatches=mismatches)
+        raise RuntimeError(msg)
+
+    # ── Compose verification report ──
     try: u = (session.get("user") or {})
     except Exception: u = {}
     username = u.get("username") or u.get("name") or "system"
+    db_kind = "PostgreSQL" if USE_PG else "SQLite"
+    fingerprints = {
+        xlsx_name + ":": _hashlib.sha256(excel_bytes).hexdigest(),
+        sql_name  + ":": _hashlib.sha256(sql_bytes).hexdigest(),
+    }
+    meta = {
+        "zip_name": zip_name, "ts": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "user": username, "kind": kind, "reason": reason or "",
+        "db_kind": db_kind,
+    }
+    report_text = _backup_compose_verification_report(
+        meta, per_table, sql_counts, reopen_counts, fingerprints,
+    )
+
+    # ── Bundle into zip ──
+    _publish("zip", "ضغط الملفات...", percent=85)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(xlsx_name, excel_bytes)
+        zf.writestr(sql_name,  sql_bytes)
+        # UTF-8 BOM so notepad-style readers render Arabic correctly.
+        zf.writestr("VERIFICATION_REPORT.txt",
+                    "﻿".encode("utf-8") + report_text.encode("utf-8"))
+        # Include schema reference + table audit for auditability.
+        proj_root = _os.path.dirname(__file__) or "."
+        for ref_name in ("CLAUDE.md", "TABLE_AUDIT.md"):
+            ref_path = _os.path.join(proj_root, ref_name)
+            if _os.path.exists(ref_path):
+                try:
+                    with open(ref_path, "rb") as f:
+                        zf.writestr(ref_name, f.read())
+                except Exception:
+                    pass
+
+    try: size = _os.path.getsize(zip_path)
+    except Exception: size = 0
+
     recipients_raw = get_setting("backup", "email_recipients", "") or ""
     recipients = [x.strip() for x in recipients_raw.replace(";", ",").split(",") if x.strip()]
     email_status, email_err = _backup_send_email(zip_path, recipients, kind)
+
+    tables_count = len(per_table)
+    total_rows   = sum(int(t.get("written") or 0) for t in per_table)
+    new_id = None
     try:
         db.execute(
             "INSERT INTO backup_log(username, filename, bytes_written, kind, reason, "
-            "path, size_bytes, email_status, email_to) "
-            "VALUES(?,?,?,?,?,?,?,?,?)",
+            "path, size_bytes, email_status, email_to, "
+            "tables_count, total_rows, verified, report_text) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (username, zip_name, size, kind, reason, zip_path, size,
-             email_status, ", ".join(recipients) if recipients else ""),
+             email_status, ", ".join(recipients) if recipients else "",
+             tables_count, total_rows, 1, report_text),
         )
         db.commit()
         new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
     except Exception as ex:
-        # Log row failed but file exists — return what we have.
-        new_id = None
         import sys as _sys
         print("[backup] log insert failed: " + str(ex), file=_sys.stderr)
     # Rotate.
@@ -15909,7 +16355,7 @@ def _create_full_backup(db, kind="manual", reason=""):
     try:
         rows = db.execute(
             "SELECT id, path FROM backup_log "
-            "WHERE kind IN (\'manual\', \'scheduled\', \'pre-destructive\') "
+            "WHERE kind IN ('manual', 'scheduled', 'pre-destructive') "
             "ORDER BY id DESC LIMIT 1000"
         ).fetchall()
         old = list(rows)[keep:] if len(list(rows)) > keep else []
@@ -15923,9 +16369,22 @@ def _create_full_backup(db, kind="manual", reason=""):
             except Exception: pass
         db.commit()
     except Exception: pass
-    return {"id": new_id, "filename": zip_name, "path": zip_path,
-            "size_bytes": size, "kind": kind, "reason": reason,
-            "email_status": email_status, "email_error": email_err}
+
+    _publish("done", "تم", percent=100)
+    return {
+        "id": new_id, "filename": zip_name, "path": zip_path,
+        "size_bytes": size, "kind": kind, "reason": reason,
+        "email_status": email_status, "email_error": email_err,
+        "tables_count": tables_count, "total_rows": total_rows,
+        "verified": 1, "report_text": report_text,
+        "mismatch": "",
+    }
+
+
+# Module-level progress dict for /api/backup/progress polling. Best-
+# effort, last-write-wins; safe enough for one admin clicking once.
+_BACKUP_PROGRESS = {"stage": "idle", "msg": "في الانتظار", "percent": 0,
+                    "ts": ""}
 
 
 def _pre_destructive_backup(reason):
@@ -15978,9 +16437,6 @@ def api_backups_list():
     if err: return err
     db = get_db()
     try:
-        # downloaded_at is a TIMESTAMP/DATETIME column — Postgres rejects
-        # '' as a fallback. Pass NULL through to JSON; the JS renderer
-        # already shows '—' for falsy values, so coalescing is unnecessary.
         rows = db.execute(
             "SELECT id, username, filename, bytes_written, downloaded_at AS created_at, "
             "       COALESCE(kind, \'manual\') AS kind, "
@@ -15988,13 +16444,48 @@ def api_backups_list():
             "       COALESCE(path, \'\') AS path, "
             "       COALESCE(size_bytes, 0) AS size_bytes, "
             "       COALESCE(email_status, \'\') AS email_status, "
-            "       COALESCE(email_to, \'\') AS email_to "
+            "       COALESCE(email_to, \'\') AS email_to, "
+            "       COALESCE(tables_count, 0) AS tables_count, "
+            "       COALESCE(total_rows, 0) AS total_rows, "
+            "       COALESCE(verified, 0) AS verified "
             "FROM backup_log ORDER BY id DESC LIMIT 500"
         ).fetchall()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
     out = [dict(r) for r in rows]
     return jsonify({"ok": True, "rows": out})
+
+
+@app.route('/api/backups/<int:bid>/report', methods=['GET'])
+@login_required
+def api_backups_report(bid):
+    """Return the saved verification report for a backup_log row."""
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, filename, COALESCE(report_text,'') AS report_text, "
+            "       COALESCE(tables_count,0) AS tables_count, "
+            "       COALESCE(total_rows,0) AS total_rows, "
+            "       COALESCE(verified,0) AS verified "
+            "FROM backup_log WHERE id=?", (bid,),
+        ).fetchone()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if not row:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return jsonify({"ok": True, **dict(row)})
+
+
+@app.route('/api/backup/progress', methods=['GET'])
+@login_required
+def api_backup_progress():
+    """Polling endpoint for the run-progress UI. Returns the current
+    stage of any running backup (best-effort, last-write-wins)."""
+    err = _require_admin_response()
+    if err: return err
+    return jsonify({"ok": True, **dict(_BACKUP_PROGRESS)})
 
 
 @app.route('/api/backups/<int:bid>/download', methods=['GET'])
@@ -28135,12 +28626,15 @@ th,td{padding:10px 12px;font-size:13.5px;text-align:right;border-bottom:1px soli
         <thead><tr>
           <th>التاريخ والوقت</th>
           <th>النوع</th>
+          <th>الجداول</th>
+          <th>الصفوف</th>
+          <th>التحقق</th>
           <th>السبب</th>
           <th>الحجم</th>
           <th>الإيميل</th>
           <th>الإجراءات</th>
         </tr></thead>
-        <tbody id="bk-log-body"><tr><td colspan="6" class="empty">جاري التحميل...</td></tr></tbody>
+        <tbody id="bk-log-body"><tr><td colspan="9" class="empty">جاري التحميل...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -28166,16 +28660,26 @@ function bkKindLabel(k){
 }
 function bkRender(rows){
   var tb = document.getElementById('bk-log-body');
-  if (!rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">لا توجد نسخ بعد</td></tr>'; return; }
+  if (!rows.length){ tb.innerHTML = '<tr><td colspan="9" class="empty">لا توجد نسخ بعد</td></tr>'; return; }
   var html = '';
   for (var i=0;i<rows.length;i++){
     var r = rows[i];
     var k = r.kind || 'manual';
     var es = (r.email_status || '').toLowerCase();
     var esLabel = es === 'sent' ? 'أُرسل' : (es === 'failed' ? 'فشل' : (es === 'skipped' ? 'متخطى' : '—'));
+    var verifiedBadge = (r.verified == 1)
+      ? '<span style="color:#1B5E20;font-weight:800;cursor:pointer;" onclick="bkShowReport(' + r.id + ')" title="عرض تقرير التحقق">✅ متحقق</span>'
+      : (r.verified === 0 && (r.tables_count || 0) > 0
+         ? '<span style="color:#c62828;font-weight:800;">❌ فشل</span>'
+         : '<span style="color:#999;">—</span>');
+    var rowsCell = (r.total_rows && r.total_rows > 0) ? r.total_rows : '—';
+    var tblsCell = (r.tables_count && r.tables_count > 0) ? r.tables_count : '—';
     html += '<tr>'
          + '<td style="direction:ltr;">' + (r.created_at || '—') + '</td>'
          + '<td><span class="kind ' + k + '">' + bkKindLabel(k) + '</span></td>'
+         + '<td style="text-align:center;">' + tblsCell + '</td>'
+         + '<td style="text-align:center;font-weight:700;">' + rowsCell + '</td>'
+         + '<td style="text-align:center;">' + verifiedBadge + '</td>'
          + '<td style="font-size:12px;color:#555;">' + (r.reason || '—') + '</td>'
          + '<td>' + bkFmtSize(r.size_bytes || r.bytes_written) + '</td>'
          + '<td>' + (es ? ('<span class="email-st ' + es + '">' + esLabel + '</span>') : '—') + '</td>'
@@ -28186,6 +28690,29 @@ function bkRender(rows){
          + '</tr>';
   }
   tb.innerHTML = html;
+}
+function bkShowReport(id){
+  fetch('/api/backups/' + id + '/report', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){ bkToast(d && d.error || 'تعذر تحميل التقرير', 'error'); return; }
+      var bg = document.getElementById('bk-report-modal');
+      if (!bg){
+        bg = document.createElement('div');
+        bg.id = 'bk-report-modal';
+        bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px;';
+        bg.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:780px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);direction:rtl;">'
+          + '<div style="background:linear-gradient(135deg,#7F77DD,#5e58a8);color:#fff;padding:14px 18px;font-weight:800;display:flex;justify-content:space-between;align-items:center;">'
+          +   '<span>📋 تقرير التحقق من النسخة الاحتياطية</span>'
+          +   '<span style="cursor:pointer;font-size:1.6rem;line-height:1;" onclick="document.getElementById(\'bk-report-modal\').remove();">×</span>'
+          + '</div>'
+          + '<pre id="bk-report-body" style="margin:0;padding:18px 20px;font-family:Consolas,monospace;font-size:13px;line-height:1.65;white-space:pre-wrap;direction:ltr;text-align:right;color:#212121;background:#fafafa;"></pre>'
+          + '</div>';
+        document.body.appendChild(bg);
+        bg.addEventListener('click', function(ev){ if (ev.target === bg) bg.remove(); });
+      }
+      document.getElementById('bk-report-body').textContent = d.report_text || '(لا يوجد تقرير محفوظ لهذه النسخة)';
+    });
 }
 function bkLoadList(){
   fetch('/api/backups', {credentials:'include'})
@@ -28243,15 +28770,101 @@ function bkSaveSettings(){
 function bkRunNow(){
   var btn = document.getElementById('bk-run-btn');
   btn.disabled = true; var prev = btn.innerHTML; btn.innerHTML = '⏳ جاري الإنشاء...';
+  /* Mount a progress bar above the button. */
+  bkShowProgress();
+  /* Start polling /api/backup/progress every 600ms so the user sees
+     stage labels even though the run itself is synchronous. */
+  var pollHandle = setInterval(function(){
+    fetch('/api/backup/progress',{credentials:'include'}).then(function(r){return r.json();}).then(function(p){
+      if (!p||!p.ok) return;
+      bkUpdateProgress(p.percent||0, p.msg||'');
+    });
+  }, 600);
   fetch('/api/backups/run', { method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason:'manual run'}) })
     .then(function(r){ return r.json(); })
     .then(function(d){
+      clearInterval(pollHandle);
       btn.disabled = false; btn.innerHTML = prev;
-      if (d && d.ok) { bkToast('✅ تم إنشاء النسخة (' + (d.email_status === 'sent' ? 'تم الإرسال بالإيميل' : 'لم يتم الإرسال') + ')'); bkLoadList(); }
-      else { bkToast(d.error || 'فشل الإنشاء', 'error'); }
+      if (d && d.ok) {
+        bkUpdateProgress(100, 'تم');
+        var emailLabel = (d.email_status === 'sent' ? 'تم الإرسال بالإيميل' : (d.email_status === 'skipped' ? 'بدون إيميل' : 'لم يتم الإرسال'));
+        var sizeMb = ((d.size_bytes||0)/1024/1024).toFixed(2);
+        bkShowSuccessBanner(d.tables_count||0, d.total_rows||0, sizeMb, emailLabel, d.id);
+        bkLoadList();
+        setTimeout(bkHideProgress, 3000);
+      }
+      else {
+        bkUpdateProgress(0, d && d.error ? d.error : 'فشل');
+        bkToast(d.error || 'فشل الإنشاء', 'error');
+        setTimeout(bkHideProgress, 4000);
+      }
     })
-    .catch(function(){ btn.disabled = false; btn.innerHTML = prev; bkToast('خطأ في الاتصال', 'error'); });
+    .catch(function(){
+      clearInterval(pollHandle);
+      btn.disabled = false; btn.innerHTML = prev;
+      bkHideProgress();
+      bkToast('خطأ في الاتصال', 'error');
+    });
+}
+function bkShowProgress(){
+  var el = document.getElementById('bk-progress');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'bk-progress';
+    el.style.cssText = 'background:#f3e5f5;border:1.4px solid #c4a8e8;border-radius:10px;padding:12px 14px;margin:12px 0;direction:rtl;';
+    el.innerHTML = ''
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:700;color:#4a148c;font-size:0.92rem;">'
+      +   '<span id="bk-progress-msg">بدء العملية...</span>'
+      +   '<span id="bk-progress-pct">0%</span>'
+      + '</div>'
+      + '<div style="background:#fff;border-radius:8px;height:14px;overflow:hidden;">'
+      +   '<div id="bk-progress-bar" style="background:linear-gradient(90deg,#7F77DD,#5e58a8);height:100%;width:0%;transition:width .35s ease;"></div>'
+      + '</div>';
+    var btn = document.getElementById('bk-run-btn');
+    if (btn && btn.parentNode) btn.parentNode.insertBefore(el, btn.nextSibling);
+  }
+  el.style.display = '';
+  bkUpdateProgress(2, 'بدء العملية...');
+}
+function bkUpdateProgress(p, msg){
+  var bar = document.getElementById('bk-progress-bar');
+  var lbl = document.getElementById('bk-progress-msg');
+  var pct = document.getElementById('bk-progress-pct');
+  if (bar) bar.style.width = (p||0) + '%';
+  if (lbl) lbl.textContent = msg || '';
+  if (pct) pct.textContent = (p||0) + '%';
+}
+function bkHideProgress(){
+  var el = document.getElementById('bk-progress');
+  if (el) el.style.display = 'none';
+}
+function bkShowSuccessBanner(tables, rows, sizeMb, emailLabel, backupId){
+  var bg = document.getElementById('bk-success-modal');
+  if (bg) bg.remove();
+  bg = document.createElement('div');
+  bg.id = 'bk-success-modal';
+  bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px;';
+  bg.innerHTML = ''
+    + '<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25);direction:rtl;overflow:hidden;">'
+    +   '<div style="background:linear-gradient(135deg,#1B5E20,#388E3C);color:#fff;padding:14px 18px;font-weight:800;font-size:1.05rem;">✅ تم إنشاء نسخة احتياطية كاملة ومتحققة</div>'
+    +   '<div style="padding:18px 20px;font-size:0.95rem;line-height:1.7;">'
+    +     '<p>تم إنشاء النسخة الاحتياطية بنجاح وتم التحقق من المطابقة.</p>'
+    +     '<ul style="margin:6px 0;padding-right:18px;">'
+    +       '<li><b>عدد الجداول:</b> ' + tables + '</li>'
+    +       '<li><b>إجمالي الصفوف:</b> ' + rows + '</li>'
+    +       '<li><b>الحجم:</b> ' + sizeMb + ' ميجابايت</li>'
+    +       '<li><b>البريد:</b> ' + emailLabel + '</li>'
+    +     '</ul>'
+    +     '<p style="color:#666;font-size:0.85rem;">هل تريدين فتح تقرير التحقق الآن للتأكد من اكتمال النسخة؟</p>'
+    +     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">'
+    +       '<button class="btn" style="background:#fafafa;color:#666;border:1px solid #ddd;padding:8px 16px;border-radius:8px;font-family:inherit;font-weight:700;cursor:pointer;" onclick="document.getElementById(\'bk-success-modal\').remove();">لاحقاً</button>'
+    +       '<button class="btn dl" style="padding:8px 16px;border-radius:8px;font-family:inherit;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#7F77DD,#5e58a8);color:#fff;border:none;" onclick="document.getElementById(\'bk-success-modal\').remove();bkShowReport(' + (backupId||0) + ');">نعم، اعرضي التقرير</button>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(bg);
+  bg.addEventListener('click', function(ev){ if (ev.target === bg) bg.remove(); });
 }
 function bkDownload(id){
   window.location.href = '/api/backups/' + id + '/download';
