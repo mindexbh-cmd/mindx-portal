@@ -3015,7 +3015,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
     <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
     <div id="dh-center-mode-exceptions" style="font-size:12.5px;color:#5d4037;font-weight:700;"></div>
-    <div id="dh-center-mode-controls" style="display:none;align-items:center;gap:8px;margin-right:auto;">
+    <div id="dh-center-mode-controls" style="display:DH_CTRL_DISP_PLACEHOLDER;align-items:center;gap:8px;margin-right:auto;">
       <select id="dh-center-mode-select" style="padding:7px 14px;border:1.4px solid #b39ddb;border-radius:9px;font-size:14px;font-weight:700;background:#faf7ff;font-family:inherit;cursor:pointer;">
         <option value="&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;">&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;</option>
         <option value="&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;">&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;</option>
@@ -3379,6 +3379,14 @@ function _dhPaintCenterMode(mode){
 }
 function _dhInitCenterMode(){
   var roleEl = document.body.dataset.role || '';
+  /* Visibility is now handled server-side in HOME_HTML based on
+     USER_ROLE_PLACEHOLDER, so the buttons show up immediately even
+     if /api/center/mode is slow or fails. We still refresh the
+     badge + dropdown when the API resolves. */
+  if (roleEl === 'admin'){
+    var c = document.getElementById('dh-center-mode-controls');
+    if (c && c.style.display === 'none') c.style.display = 'flex';
+  }
   fetch('/api/center/mode', {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -3386,12 +3394,10 @@ function _dhInitCenterMode(){
       _dhPaintCenterMode(d.mode);
       var sel = document.getElementById('dh-center-mode-select');
       if (sel) sel.value = d.mode;
-      if (roleEl === 'admin'){
-        var c = document.getElementById('dh-center-mode-controls');
-        if (c) c.style.display = 'flex';
-      }
     })
-    .catch(function(){});
+    .catch(function(err){
+      console.error('[center-mode] init failed:', err);
+    });
 }
 /* Cache + helpers for the exceptions UI. _dhExc holds the working
    state of the modal; it's flushed to /api/center/exceptions/replace
@@ -3585,6 +3591,61 @@ function dhConfirmModeChange(){
     if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644', 'error');
   });
 }
+/* Wrap the modal openers so a runtime error surfaces as a toast
+   instead of silently killing the click. The openers are also re-
+   bound via addEventListener as a defensive backup in case the
+   inline onclick path is ever broken (name collision, late
+   loading, CSP). Last-resort path: any unhandled error during
+   initialization is logged to console.error so DevTools shows the
+   real failure. */
+(function _dhWireButtons(){
+  var saveBtn = document.getElementById('dh-center-mode-save');
+  var excBtn  = document.getElementById('dh-mode-exc-edit');
+  var origOpen = window.dhOpenModeChangeModal;
+  var origExc  = window.dhOpenExceptionsEditor;
+  if (typeof origOpen === 'function'){
+    window.dhOpenModeChangeModal = function(){
+      try { return origOpen.apply(this, arguments); }
+      catch (e){
+        console.error('[center-mode] dhOpenModeChangeModal threw:', e);
+        if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u062F\u0627\u062E\u0644\u064A: ' + (e && e.message || e), 'error');
+      }
+    };
+  } else {
+    console.error('[center-mode] dhOpenModeChangeModal is not defined — inline onclick will fail');
+  }
+  if (typeof origExc === 'function'){
+    window.dhOpenExceptionsEditor = function(){
+      try { return origExc.apply(this, arguments); }
+      catch (e){
+        console.error('[center-mode] dhOpenExceptionsEditor threw:', e);
+        if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u062F\u0627\u062E\u0644\u064A: ' + (e && e.message || e), 'error');
+      }
+    };
+  } else {
+    console.error('[center-mode] dhOpenExceptionsEditor is not defined — inline onclick will fail');
+  }
+  /* Defensive backup binding. If the inline onclick is unreachable
+     (CSP, deferred load, etc.), the click still fires. */
+  if (saveBtn && !saveBtn._dhWired){
+    saveBtn._dhWired = true;
+    saveBtn.addEventListener('click', function(ev){
+      if (typeof window.dhOpenModeChangeModal === 'function'){
+        ev.preventDefault();
+        window.dhOpenModeChangeModal();
+      }
+    });
+  }
+  if (excBtn && !excBtn._dhWired){
+    excBtn._dhWired = true;
+    excBtn.addEventListener('click', function(ev){
+      if (typeof window.dhOpenExceptionsEditor === 'function'){
+        ev.preventDefault();
+        window.dhOpenExceptionsEditor();
+      }
+    });
+  }
+})();
 _dhInitCenterMode();
 _dhLoadExceptions();
 fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
@@ -12401,6 +12462,7 @@ def dashboard():
     return (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
+        .replace("DH_CTRL_DISP_PLACEHOLDER", ("flex" if role == "admin" else "none"))
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
     )
