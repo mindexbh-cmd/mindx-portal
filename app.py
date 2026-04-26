@@ -3369,9 +3369,12 @@ function _fmtHM(m){
   if(r)s+=(s?" ":"")+r+" \u062F\u0642\u064A\u0642\u0629";
   return s;
 }
-function dhLoadStats(){
-  /* Center mode card — admin sees the dropdown + change button,
-   everyone else sees only the read-only badge. */
+/* ── Center-mode dashboard helpers (PUBLIC — must be window-scoped
+   so the inline onclick handlers on #dh-center-mode-save and
+   #dh-mode-exc-edit can reach them. They were previously nested
+   inside dhLoadStats() which made them locals; clicks did nothing
+   because dhOpenModeChangeModal/dhOpenExceptionsEditor were
+   undefined at window scope.) ───────────────────────────────── */
 function _dhPaintCenterMode(mode){
   var b = document.getElementById('dh-center-mode-badge'); if (!b) return;
   var emoji = (mode === 'أونلاين') ? String.fromCodePoint(0x1F4BB) : (mode === 'رمضان') ? String.fromCodePoint(0x1F319) : String.fromCodePoint(0x1F3EB);
@@ -3648,7 +3651,8 @@ function dhConfirmModeChange(){
 })();
 _dhInitCenterMode();
 _dhLoadExceptions();
-fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
+function dhLoadStats(){
+  fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
     function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
     set('stat-english-students', d.english_students || 0);
     set('stat-math-students',    d.math_students || 0);
