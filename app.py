@@ -1440,6 +1440,28 @@ if True:
             pass
         db2.commit()
 
+    # Mode-exceptions table: per-group or per-student override of the
+    # global حالة المركز. Read by _resolve_center_class_meta so an
+    # excluded group/student keeps its own mode while everyone else
+    # follows the global selector.
+    if "center_mode_exceptions_v1" not in applied:
+        try:
+            db2.execute("""CREATE TABLE IF NOT EXISTS mode_exceptions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scope TEXT NOT NULL,         /* "group" or "student" */
+                key_name TEXT NOT NULL,      /* group_name OR student_name */
+                mode TEXT NOT NULL,          /* حضوري / أونلاين / رمضان */
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(scope, key_name)
+            )""")
+        except Exception:
+            pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("center_mode_exceptions_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -2992,13 +3014,69 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
     <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
+    <div id="dh-center-mode-exceptions" style="font-size:12.5px;color:#5d4037;font-weight:700;"></div>
     <div id="dh-center-mode-controls" style="display:none;align-items:center;gap:8px;margin-right:auto;">
       <select id="dh-center-mode-select" style="padding:7px 14px;border:1.4px solid #b39ddb;border-radius:9px;font-size:14px;font-weight:700;background:#faf7ff;font-family:inherit;cursor:pointer;">
         <option value="&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;">&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;</option>
         <option value="&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;">&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;</option>
         <option value="&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;">&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;</option>
       </select>
-      <button id="dh-center-mode-save" type="button" onclick="dhSaveCenterMode()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:13.5px;font-family:inherit;">&#x062A;&#x063A;&#x064A;&#x064A;&#x0631;</button>
+      <button id="dh-center-mode-save" type="button" onclick="dhOpenModeChangeModal()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:13.5px;font-family:inherit;">&#x062A;&#x063A;&#x064A;&#x064A;&#x0631;</button>
+      <button id="dh-mode-exc-edit" type="button" onclick="dhOpenExceptionsEditor()" style="background:#f5f0ff;border:1.4px solid #c4a8e8;color:#4a148c;padding:7px 14px;border-radius:9px;font-weight:800;cursor:pointer;font-size:13px;font-family:inherit;">&#x0625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621;&#x0627;&#x062A;</button>
+    </div>
+  </div>
+
+  <div id="dh-mode-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:11020;align-items:center;justify-content:center;direction:rtl;">
+    <div style="background:#fff;border-radius:14px;width:min(640px,94vw);max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:800;">
+        <span>&#x062A;&#x063A;&#x064A;&#x064A;&#x0631; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632;</span>
+        <span style="cursor:pointer;font-size:1.6rem;line-height:1;" onclick="dhCloseModeChangeModal()">&times;</span>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <div style="font-weight:800;color:#4a148c;margin-bottom:6px;">&#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x062C;&#x062F;&#x064A;&#x062F;&#x0629;:</div>
+          <div id="dh-modal-mode-preview" style="padding:8px 14px;border-radius:9px;background:#ede7f6;color:#4527a0;font-weight:800;display:inline-block;">&mdash;</div>
+        </div>
+        <div style="border-top:1.5px dashed #c4a8e8;padding-top:12px;">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:700;color:#1B5E20;padding:6px 0;">
+            <input type="radio" name="dh-mode-scope" value="all" checked onchange="dhToggleScope()"> &#x062A;&#x0637;&#x0628;&#x064A;&#x0642; &#x0639;&#x0644;&#x0649; &#x062C;&#x0645;&#x064A;&#x0639; &#x0627;&#x0644;&#x0637;&#x0644;&#x0627;&#x0628;
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:700;color:#E65100;padding:6px 0;">
+            <input type="radio" name="dh-mode-scope" value="custom" onchange="dhToggleScope()"> &#x062A;&#x062E;&#x0635;&#x064A;&#x0635; &#x2014; &#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A; &#x0623;&#x0648; &#x0637;&#x0644;&#x0627;&#x0628;
+          </label>
+        </div>
+        <div id="dh-mode-custom-panel" style="display:none;border:1.5px dashed #FB8C00;border-radius:11px;padding:12px;background:#fff8e1;">
+          <div style="font-weight:800;color:#E65100;margin-bottom:6px;">&#x0627;&#x0644;&#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621;&#x0627;&#x062A;: &#x0633;&#x062A;&#x0628;&#x0642;&#x0649; &#x0639;&#x0644;&#x0649; &#x062D;&#x0627;&#x0644;&#x0629; &#x0623;&#x062E;&#x0631;&#x0649;</div>
+          <div style="margin-bottom:8px;">
+            <label style="display:block;font-weight:700;color:#5d4037;font-size:12.5px;margin-bottom:4px;">&#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A;</label>
+            <select id="dh-exc-group-pick" style="padding:6px 10px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-family:inherit;direction:rtl;min-width:180px;"></select>
+            <select id="dh-exc-group-mode" style="padding:6px 10px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-family:inherit;">
+              <option value="&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;">&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;</option>
+              <option value="&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;">&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;</option>
+              <option value="&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;">&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;</option>
+            </select>
+            <button type="button" onclick="dhAddExc(\'group\')" style="background:#fff;border:1.3px solid #FB8C00;color:#E65100;padding:5px 12px;border-radius:7px;font-weight:800;cursor:pointer;">&#x2795;</button>
+          </div>
+          <div style="margin-bottom:8px;">
+            <label style="display:block;font-weight:700;color:#5d4037;font-size:12.5px;margin-bottom:4px;">&#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621; &#x0637;&#x0644;&#x0627;&#x0628;</label>
+            <input id="dh-exc-stu-search" type="text" placeholder="&#x0627;&#x0628;&#x062D;&#x062B; &#x0628;&#x0627;&#x0633;&#x0645; &#x0627;&#x0644;&#x0637;&#x0627;&#x0644;&#x0628;..." style="padding:6px 10px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-family:inherit;direction:rtl;min-width:200px;" oninput="dhStuSearch()">
+            <div id="dh-exc-stu-results" style="max-height:120px;overflow-y:auto;background:#fff;border:1.3px solid #ffe0b2;border-radius:7px;margin-top:4px;display:none;"></div>
+            <select id="dh-exc-stu-mode" style="padding:6px 10px;border:1.3px solid #ffb74d;border-radius:7px;background:#fff;font-family:inherit;margin-top:6px;">
+              <option value="&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;">&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;</option>
+              <option value="&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;">&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;</option>
+              <option value="&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;">&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;</option>
+            </select>
+          </div>
+          <div style="border-top:1.3px dashed #ffb74d;padding-top:8px;">
+            <div style="font-weight:800;color:#5d4037;margin-bottom:4px;">&#x0627;&#x0644;&#x0627;&#x0633;&#x062A;&#x062B;&#x0646;&#x0627;&#x0621;&#x0627;&#x062A; &#x0627;&#x0644;&#x0641;&#x0639;&#x0627;&#x0644;&#x0629;:</div>
+            <div id="dh-exc-list" style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid #eee;background:#fafafa;">
+        <button type="button" onclick="dhCloseModeChangeModal()" style="background:#eceff1;color:#455a64;border:none;padding:9px 22px;border-radius:9px;font-weight:800;cursor:pointer;font-family:inherit;">&#x0625;&#x0644;&#x063A;&#x0627;&#x0621;</button>
+        <button type="button" id="dh-modal-confirm" onclick="dhConfirmModeChange()" style="background:linear-gradient(135deg,#1B5E20,#43A047);color:#fff;border:none;padding:9px 26px;border-radius:9px;font-weight:800;cursor:pointer;font-family:inherit;">&#x062A;&#x0623;&#x0643;&#x064A;&#x062F; &#x0627;&#x0644;&#x062A;&#x063A;&#x064A;&#x064A;&#x0631;</button>
+      </div>
     </div>
   </div>
   <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
@@ -3315,29 +3393,200 @@ function _dhInitCenterMode(){
     })
     .catch(function(){});
 }
+/* Cache + helpers for the exceptions UI. _dhExc holds the working
+   state of the modal; it's flushed to /api/center/exceptions/replace
+   on confirm. */
+var _dhExc = { items: [] };
+var _dhGroupOptions = [];
+var _dhStudentOptions = [];
+
 function dhSaveCenterMode(){
+  /* Legacy single-button save — kept as a fallback for any caller
+     that bypasses the modal. The button now opens the modal instead
+     (see HOME HTML), so this path is rarely hit. */
+  dhOpenModeChangeModal();
+}
+function dhOpenModeChangeModal(){
   var sel = document.getElementById('dh-center-mode-select');
   if (!sel || !sel.value) return;
-  var btn = document.getElementById('dh-center-mode-save');
-  if (btn) { btn.disabled = true; btn.textContent = '\u062C\u0627\u0631\u064A...'; }
-  fetch('/api/center/mode', {method:'PATCH', credentials:'include',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({mode: sel.value})})
+  document.getElementById('dh-modal-mode-preview').textContent = sel.value;
+  document.querySelectorAll('input[name="dh-mode-scope"]').forEach(function(r){
+    r.checked = (r.value === 'all');
+  });
+  document.getElementById('dh-mode-custom-panel').style.display = 'none';
+  document.getElementById('dh-mode-modal').style.display = 'flex';
+  /* Lazy-load exceptions + group + student lists. */
+  _dhLoadGroupOptions();
+  _dhLoadStudentOptions();
+  _dhLoadExceptions();
+}
+function dhCloseModeChangeModal(){
+  document.getElementById('dh-mode-modal').style.display = 'none';
+}
+function dhToggleScope(){
+  var custom = document.querySelector('input[name="dh-mode-scope"]:checked').value === 'custom';
+  document.getElementById('dh-mode-custom-panel').style.display = custom ? 'block' : 'none';
+}
+function _dhLoadGroupOptions(){
+  if (_dhGroupOptions.length){ _dhRenderGroupPick(); return; }
+  fetch('/api/groups', {credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    var rows = (d && (d.groups || d)) || [];
+    if (!Array.isArray(rows)) rows = rows.groups || [];
+    _dhGroupOptions = rows.map(function(g){ return (g && (g.group_name || g.name)) || ''; }).filter(function(x){ return x; });
+    _dhRenderGroupPick();
+  }).catch(function(){});
+}
+function _dhRenderGroupPick(){
+  var sel = document.getElementById('dh-exc-group-pick');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— اختر مجموعة —</option>';
+  for (var i=0;i<_dhGroupOptions.length;i++){
+    var o = document.createElement('option');
+    o.value = _dhGroupOptions[i]; o.textContent = _dhGroupOptions[i];
+    sel.appendChild(o);
+  }
+}
+function _dhLoadStudentOptions(){
+  if (_dhStudentOptions.length) return;
+  fetch('/api/students', {credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    _dhStudentOptions = (d && d.students) || [];
+  }).catch(function(){});
+}
+function dhStuSearch(){
+  var q = (document.getElementById('dh-exc-stu-search').value || '').trim().toLowerCase();
+  var box = document.getElementById('dh-exc-stu-results');
+  if (!q){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  var matches = _dhStudentOptions.filter(function(s){
+    return ((s.student_name || '').toLowerCase().indexOf(q) >= 0)
+        || ((s.personal_id   || '').toLowerCase().indexOf(q) >= 0);
+  }).slice(0, 12);
+  if (!matches.length){ box.style.display = 'block'; box.innerHTML = '<div style="padding:6px 10px;color:#999;font-size:12.5px;">لا توجد نتائج</div>'; return; }
+  var html = '';
+  for (var i=0;i<matches.length;i++){
+    var s = matches[i];
+    html += '<div style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #ffe0b2;font-size:13px;" data-name="' + (s.student_name || '').replace(/"/g, '&quot;') + '" onclick="dhAddStudentExc(this.dataset.name)">'
+         +   (s.student_name || '—') + ' <span style="color:#999;direction:ltr;">(' + (s.personal_id || '') + ')</span>'
+         + '</div>';
+  }
+  box.style.display = 'block'; box.innerHTML = html;
+}
+function dhAddStudentExc(name){
+  if (!name) return;
+  var mode = document.getElementById('dh-exc-stu-mode').value;
+  _dhPushExc('student', name, mode);
+  document.getElementById('dh-exc-stu-search').value = '';
+  document.getElementById('dh-exc-stu-results').style.display = 'none';
+}
+function dhAddExc(scope){
+  if (scope === 'group'){
+    var gn = document.getElementById('dh-exc-group-pick').value;
+    var gm = document.getElementById('dh-exc-group-mode').value;
+    if (!gn) return;
+    _dhPushExc('group', gn, gm);
+  }
+}
+function _dhPushExc(scope, key, mode){
+  var dup = _dhExc.items.find(function(x){ return x.scope === scope && x.key_name === key; });
+  if (dup) dup.mode = mode;
+  else _dhExc.items.push({ scope: scope, key_name: key, mode: mode });
+  _dhRenderExcList();
+}
+function _dhRemoveExc(idx){
+  _dhExc.items.splice(idx, 1);
+  _dhRenderExcList();
+}
+function _dhRenderExcList(){
+  var box = document.getElementById('dh-exc-list');
+  if (!box) return;
+  if (!_dhExc.items.length){
+    box.innerHTML = '<div style="color:#999;padding:6px;text-align:center;">— لا توجد استثناءات —</div>';
+    return;
+  }
+  var html = '';
+  for (var i=0;i<_dhExc.items.length;i++){
+    var x = _dhExc.items[i];
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1.3px solid #ffe0b2;border-radius:7px;padding:6px 10px;font-size:13px;">'
+         +   '<span><b>' + (x.scope === 'group' ? 'مجموعة' : 'طالب') + ':</b> ' + x.key_name + ' <span style="color:#1565C0;">→ ' + x.mode + '</span></span>'
+         +   '<button type="button" onclick="_dhRemoveExc(' + i + ')" style="background:transparent;border:none;color:#c62828;cursor:pointer;font-weight:800;">×</button>'
+         + '</div>';
+  }
+  box.innerHTML = html;
+}
+function _dhLoadExceptions(){
+  fetch('/api/center/exceptions', {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (btn){ btn.disabled = false; btn.textContent = '\u062A\u063A\u064A\u064A\u0631'; }
-      if (d && d.ok){
-        _dhPaintCenterMode(d.mode);
-        if (typeof window.mxToast === 'function') window.mxToast('\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632 \u0625\u0644\u0649: ' + d.mode, 'success');
-      } else {
-        if (typeof window.mxToast === 'function') window.mxToast((d && d.error) || '\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u063A\u064A\u064A\u0631', 'error');
-      }
-    })
-    .catch(function(){
-      if (btn){ btn.disabled = false; btn.textContent = '\u062A\u063A\u064A\u064A\u0631'; }
+      _dhExc.items = (d && d.exceptions) ? d.exceptions.map(function(r){
+        return { scope: r.scope, key_name: r.key_name, mode: r.mode };
+      }) : [];
+      _dhRenderExcList();
+      _dhRenderExcSummary();
     });
 }
+function _dhRenderExcSummary(){
+  var el = document.getElementById('dh-center-mode-exceptions');
+  if (!el) return;
+  if (!_dhExc.items.length){ el.textContent = ''; return; }
+  var ng = 0, ns = 0;
+  _dhExc.items.forEach(function(r){ if (r.scope === 'group') ng++; else ns++; });
+  var parts = [];
+  if (ng) parts.push(ng + ' \u0645\u062C\u0645\u0648\u0639\u0629');
+  if (ns) parts.push(ns + ' \u0637\u0627\u0644\u0628');
+  el.textContent = '| \u0627\u0633\u062A\u062B\u0646\u0627\u0621\u0627\u062A: ' + parts.join('\u060C ');
+}
+function dhOpenExceptionsEditor(){
+  var sel = document.getElementById('dh-center-mode-select');
+  if (sel) document.getElementById('dh-modal-mode-preview').textContent = sel.value || '';
+  document.querySelector('input[name="dh-mode-scope"][value="custom"]').checked = true;
+  dhToggleScope();
+  document.getElementById('dh-mode-modal').style.display = 'flex';
+  _dhLoadGroupOptions();
+  _dhLoadStudentOptions();
+  _dhLoadExceptions();
+}
+function dhConfirmModeChange(){
+  var sel = document.getElementById('dh-center-mode-select');
+  if (!sel || !sel.value) return;
+  var btn = document.getElementById('dh-modal-confirm');
+  if (btn){ btn.disabled = true; btn.textContent = '\u062C\u0627\u0631\u064A...'; }
+  var scope = document.querySelector('input[name="dh-mode-scope"]:checked').value;
+  var bodyExc = (scope === 'custom') ? _dhExc.items : [];
+  function _saveMode(){
+    return fetch('/api/center/mode', {method:'PATCH', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode: sel.value})})
+      .then(function(r){ return r.json(); });
+  }
+  function _saveExceptions(){
+    return fetch('/api/center/exceptions/replace', {method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({exceptions: bodyExc})})
+      .then(function(r){ return r.json(); });
+  }
+  /* Save mode + exceptions in parallel; reflect both in the UI on
+     completion. */
+  Promise.all([_saveMode(), _saveExceptions()]).then(function(arr){
+    if (btn){ btn.disabled = false; btn.textContent = '\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062A\u063A\u064A\u064A\u0631'; }
+    var modeRes = arr[0]; var excRes = arr[1];
+    if (modeRes && modeRes.ok){
+      _dhPaintCenterMode(modeRes.mode);
+      _dhRenderExcSummary();
+      dhCloseModeChangeModal();
+      if (typeof window.mxToast === 'function') {
+        var msg = '\u2705 \u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632 \u0625\u0644\u0649: ' + modeRes.mode;
+        if (scope === 'custom' && _dhExc.items.length) msg += ' (\u0645\u0639 ' + _dhExc.items.length + ' \u0627\u0633\u062A\u062B\u0646\u0627\u0621)';
+        window.mxToast(msg, 'success');
+      }
+    } else {
+      if (typeof window.mxToast === 'function') window.mxToast((modeRes && modeRes.error) || '\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u063A\u064A\u064A\u0631', 'error');
+    }
+  }).catch(function(err){
+    if (btn){ btn.disabled = false; btn.textContent = '\u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062A\u063A\u064A\u064A\u0631'; }
+    if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644', 'error');
+  });
+}
 _dhInitCenterMode();
+_dhLoadExceptions();
 fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
     function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
     set('stat-english-students', d.english_students || 0);
@@ -17888,13 +18137,59 @@ def _set_center_mode(db, mode):
         return False
 
 
+def _lookup_mode_exception(db, student_id):
+    """Return the override mode for this student, or None. Priority:
+    student-level exception → group-level exception → None."""
+    try:
+        srow = db.execute(
+            "SELECT student_name, group_name_student, group_online FROM students WHERE id=?",
+            (student_id,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return None
+    sd = dict(srow) if hasattr(srow, "keys") else {
+        "student_name": srow[0],
+        "group_name_student": srow[1],
+        "group_online": srow[2],
+    }
+    sname = (sd.get("student_name") or "").strip()
+    if sname:
+        try:
+            r = db.execute(
+                "SELECT mode FROM mode_exceptions WHERE scope=\'student\' AND TRIM(key_name)=TRIM(?) LIMIT 1",
+                (sname,),
+            ).fetchone()
+        except Exception:
+            r = None
+        if r and r[0]:
+            return str(r[0])
+    for gkey in ("group_name_student", "group_online"):
+        gn = (sd.get(gkey) or "").strip()
+        if not gn: continue
+        try:
+            r = db.execute(
+                "SELECT mode FROM mode_exceptions WHERE scope=\'group\' AND TRIM(key_name)=TRIM(?) LIMIT 1",
+                (gn,),
+            ).fetchone()
+        except Exception:
+            r = None
+        if r and r[0]:
+            return str(r[0])
+    return None
+
+
 def _resolve_center_class_meta(db, mode, sid):
     """For a student id + active center mode, return:
-       { class_duration, class_type, group, warning? }
-    by joining students.<group_name_student | group_online> against
-    student_groups.session_duration. Best-effort — never raises."""
+       { class_duration, class_type, group, warning? }.
+       Honors per-student / per-group exceptions from the
+       mode_exceptions table — they override the passed-in mode."""
     if mode not in VALID_CENTER_MODES:
         mode = _center_mode_default()
+    override = _lookup_mode_exception(db, sid)
+    if override and override in VALID_CENTER_MODES:
+        mode = override
     out = {"class_duration": "", "class_type": mode, "group": "",
            "mode": mode, "warning": ""}
     try:
@@ -17954,6 +18249,103 @@ def _resolve_center_class_meta(db, mode, sid):
                           "\u0645\u062D\u062F\u062F\u0629 \u0644\u0644\u0645\u062C\u0645\u0648\u0639\u0629 "
                           "\u0641\u064A \u062C\u062F\u0648\u0644 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A")
     return out
+
+
+@app.route("/api/center/exceptions", methods=["GET"])
+@login_required
+def api_center_exceptions_list():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, scope, key_name, mode, created_at "
+            "FROM mode_exceptions ORDER BY scope, key_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True, "exceptions": [dict(r) for r in rows]})
+
+
+@app.route("/api/center/exceptions", methods=["POST"])
+@login_required
+def api_center_exceptions_add():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json() or {}
+    scope = (d.get("scope") or "").strip().lower()
+    key   = (d.get("key_name") or "").strip()
+    mode  = (d.get("mode") or "").strip()
+    if scope not in ("group", "student"):
+        return jsonify({"ok": False, "error": "scope must be group or student"}), 400
+    if mode not in VALID_CENTER_MODES:
+        return jsonify({"ok": False, "error": "invalid mode"}), 400
+    if not key:
+        return jsonify({"ok": False, "error": "key_name required"}), 400
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE mode_exceptions SET mode=? WHERE scope=? AND key_name=?",
+            (mode, scope, key),
+        )
+        if cur.rowcount == 0:
+            db.execute(
+                "INSERT INTO mode_exceptions(scope, key_name, mode) VALUES(?,?,?)",
+                (scope, key, mode),
+            )
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route("/api/center/exceptions/<int:eid>", methods=["DELETE"])
+@login_required
+def api_center_exceptions_delete(eid):
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    db = get_db()
+    try:
+        db.execute("DELETE FROM mode_exceptions WHERE id=?", (eid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route("/api/center/exceptions/replace", methods=["POST"])
+@login_required
+def api_center_exceptions_replace():
+    """Bulk-replace the exceptions list. Body: {exceptions:[{scope,
+    key_name, mode}]}. Use case: the admin's confirmation modal sends
+    one payload after تخصيص edits."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json() or {}
+    rows = d.get("exceptions") or []
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "exceptions must be a list"}), 400
+    db = get_db()
+    try:
+        db.execute("DELETE FROM mode_exceptions")
+        for r in rows:
+            scope = (r.get("scope") or "").strip().lower()
+            key   = (r.get("key_name") or "").strip()
+            mode  = (r.get("mode") or "").strip()
+            if scope not in ("group", "student"): continue
+            if mode not in VALID_CENTER_MODES:    continue
+            if not key:                            continue
+            try:
+                db.execute(
+                    "INSERT INTO mode_exceptions(scope, key_name, mode) VALUES(?,?,?)",
+                    (scope, key, mode),
+                )
+            except Exception: pass
+        db.commit()
+        return jsonify({"ok": True, "count": len(rows)})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
 
 
 @app.route("/api/center/mode", methods=["GET"])
