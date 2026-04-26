@@ -478,6 +478,74 @@ def init_db():
         filename TEXT,
         bytes_written INTEGER DEFAULT 0,
         downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    # Behavior-points tables (mirrored in the else-branch migration
+    # 'points_v1' so existing DBs get them via CREATE IF NOT EXISTS).
+    db.execute("""CREATE TABLE IF NOT EXISTS behaviors(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT,
+        type TEXT DEFAULT 'positive',
+        points_value INTEGER DEFAULT 1,
+        icon TEXT DEFAULT '',
+        color TEXT DEFAULT '',
+        created_by INTEGER,
+        is_global INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS point_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        behavior_id INTEGER,
+        behavior_name TEXT,
+        points_value INTEGER DEFAULT 0,
+        group_name TEXT,
+        awarded_by INTEGER,
+        awarded_by_name TEXT,
+        awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        note TEXT DEFAULT '')""")
+    db.execute("""CREATE TABLE IF NOT EXISTS rewards(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT,
+        point_cost INTEGER DEFAULT 0,
+        icon TEXT DEFAULT '',
+        stock INTEGER DEFAULT -1,
+        category TEXT DEFAULT '',
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS redemptions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT,
+        reward_id INTEGER,
+        reward_name TEXT,
+        points_spent INTEGER DEFAULT 0,
+        redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'pending',
+        delivered_by INTEGER,
+        delivered_at DATETIME)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS avatars(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        emoji TEXT,
+        sort_order INTEGER DEFAULT 0)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS levels(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT,
+        min_points INTEGER DEFAULT 0,
+        max_points INTEGER,
+        badge_icon TEXT,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS point_notifications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER,
+        student_id INTEGER,
+        student_name TEXT,
+        phone TEXT,
+        message TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        sent_at DATETIME)""")
     # Parent-portal receipt uploads. The parent-side page POSTs an image
     # blob + optional note; admins triage via /admin/receipts.
     db.execute("""CREATE TABLE IF NOT EXISTS parent_receipts(
@@ -1523,6 +1591,203 @@ if True:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("receipts_log_v3",))
         except Exception:
             pass
+        db2.commit()
+
+    # Behavior-points system v1 — six new tables for the ClassDojo-
+    # style points feature. All FKs are loose (column-only, no
+    # constraints) to mirror the rest of the schema and to tolerate
+    # legacy rows. Existing tables (students, student_groups, users)
+    # are NOT touched here; an avatar_id column on students is added
+    # in a separate migration block below for safety.
+    if "points_v1" not in applied:
+        try:
+            db2.execute("""CREATE TABLE IF NOT EXISTS behaviors(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name_ar TEXT,
+                type TEXT DEFAULT 'positive',
+                points_value INTEGER DEFAULT 1,
+                icon TEXT DEFAULT '',
+                color TEXT DEFAULT '',
+                created_by INTEGER,
+                is_global INTEGER DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS point_events(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                student_name TEXT,
+                behavior_id INTEGER,
+                behavior_name TEXT,
+                points_value INTEGER DEFAULT 0,
+                group_name TEXT,
+                awarded_by INTEGER,
+                awarded_by_name TEXT,
+                awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                note TEXT DEFAULT '')""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS rewards(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name_ar TEXT,
+                point_cost INTEGER DEFAULT 0,
+                icon TEXT DEFAULT '',
+                stock INTEGER DEFAULT -1,
+                category TEXT DEFAULT '',
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS redemptions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                student_name TEXT,
+                reward_id INTEGER,
+                reward_name TEXT,
+                points_spent INTEGER DEFAULT 0,
+                redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'pending',
+                delivered_by INTEGER,
+                delivered_at DATETIME)""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS avatars(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                emoji TEXT,
+                sort_order INTEGER DEFAULT 0)""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS levels(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name_ar TEXT,
+                min_points INTEGER DEFAULT 0,
+                max_points INTEGER,
+                badge_icon TEXT,
+                color TEXT,
+                sort_order INTEGER DEFAULT 0)""")
+            # WhatsApp notification queue for grants; one row per
+            # event flagged for parent notification. Admin can later
+            # click 'send' to open wa.me link (existing manual flow).
+            db2.execute("""CREATE TABLE IF NOT EXISTS point_notifications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER,
+                student_id INTEGER,
+                student_name TEXT,
+                phone TEXT,
+                message TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                sent_at DATETIME)""")
+        except Exception:
+            pass
+        # Seed default behaviors only if the table is empty.
+        try:
+            n = db2.execute("SELECT COUNT(*) FROM behaviors").fetchone()[0]
+        except Exception:
+            n = 0
+        if not n:
+            for nm, ty, pv, ic, cl in [
+                ("المشاركة في الصف",   "positive",  2, "🙋", "#1565C0"),
+                ("إنجاز الواجب",        "positive",  3, "📝", "#2E7D32"),
+                ("التعاون مع الزملاء",  "positive",  2, "🤝", "#0277BD"),
+                ("الالتزام بالحضور",    "positive",  1, "✅", "#388E3C"),
+                ("الإجابة الصحيحة",     "positive",  1, "💡", "#F9A825"),
+                ("مساعدة زميل",         "positive",  2, "👫", "#6A1B9A"),
+                ("التحضير للدرس",       "positive",  2, "📚", "#00838F"),
+                ("السلوك المثالي",      "positive",  3, "⭐", "#E65100"),
+                ("التأخر",              "negative", -1, "⏰", "#FB8C00"),
+                ("عدم الواجب",          "negative", -2, "📕", "#C62828"),
+                ("الإزعاج في الصف",     "negative", -2, "🔊", "#D32F2F"),
+                ("عدم الانتباه",        "negative", -1, "💤", "#7B1FA2"),
+                ("التحدث بدون إذن",     "negative", -1, "🙊", "#AD1457"),
+                ("نسيان الكتاب/المواد", "negative", -1, "📦", "#5D4037"),
+            ]:
+                try:
+                    db2.execute(
+                        "INSERT INTO behaviors(name_ar, type, points_value, icon, color, "
+                        "created_by, is_global, is_active) VALUES(?,?,?,?,?,?,?,?)",
+                        (nm, ty, pv, ic, cl, None, 1, 1),
+                    )
+                except Exception: pass
+        # Seed avatars (cute emoji set so v1 ships without needing
+        # bundled image assets).
+        try:
+            n = db2.execute("SELECT COUNT(*) FROM avatars").fetchone()[0]
+        except Exception:
+            n = 0
+        if not n:
+            _avs = [
+                "🦊","🐱","🐶","🐼","🦁","🐯","🐰","🐨","🦄","🐸",
+                "🐧","🐢","🐝","🦋","🐙","🐬","🦉","🦝","🦒","🦓",
+                "🐹","🐭","🐮","🐷","🐔","🦜","🐳","🦈","🦔","🐲",
+            ]
+            for i, e in enumerate(_avs):
+                try:
+                    db2.execute(
+                        "INSERT INTO avatars(name, emoji, sort_order) VALUES(?,?,?)",
+                        ("avatar_" + str(i + 1), e, i),
+                    )
+                except Exception: pass
+        # Seed levels (Bronze → Silver → Gold → Platinum).
+        try:
+            n = db2.execute("SELECT COUNT(*) FROM levels").fetchone()[0]
+        except Exception:
+            n = 0
+        if not n:
+            for nm, lo, hi, ic, cl, so in [
+                ("برونزي",   0,    49,  "🥉", "#8D6E63", 1),
+                ("فضي",     50,   149,  "🥈", "#90A4AE", 2),
+                ("ذهبي",   150,   299,  "🥇", "#FBC02D", 3),
+                ("بلاتيني",300, None,   "💎", "#7E57C2", 4),
+            ]:
+                try:
+                    db2.execute(
+                        "INSERT INTO levels(name_ar, min_points, max_points, "
+                        "badge_icon, color, sort_order) VALUES(?,?,?,?,?,?)",
+                        (nm, lo, hi, ic, cl, so),
+                    )
+                except Exception: pass
+        # Seed sample rewards.
+        try:
+            n = db2.execute("SELECT COUNT(*) FROM rewards").fetchone()[0]
+        except Exception:
+            n = 0
+        if not n:
+            for nm, cost, ic, cat in [
+                ("ملصق نجمة",          10, "⭐", "ملصقات"),
+                ("شهادة تقدير",        50, "📜", "شهادات"),
+                ("هدية صغيرة",        100, "🎁", "هدايا"),
+                ("اختيار النشاط القادم", 75, "🎯", "امتيازات"),
+            ]:
+                try:
+                    db2.execute(
+                        "INSERT INTO rewards(name_ar, point_cost, icon, "
+                        "stock, category, is_active) VALUES(?,?,?,?,?,?)",
+                        (nm, cost, ic, -1, cat, 1),
+                    )
+                except Exception: pass
+        # Settings: admin toggle for auto-WhatsApp parent notify.
+        try:
+            db2.execute(
+                "INSERT INTO settings(page, component, label, value, value_type) "
+                "VALUES(?,?,?,?,?)",
+                ("points", "auto_notify_parent",
+                 "إشعار ولي الأمر تلقائياً عند منح/خصم نقاط",
+                 "0", "toggle"),
+            )
+        except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("points_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
+    # Add avatar_id to students so each student can pick a points-system
+    # avatar without a separate join. Tagged separately so the points_v1
+    # migration is reversible at the table-creation level.
+    if "students_avatar_v1" not in applied:
+        try:
+            _scols = {r[1] for r in db2.execute("PRAGMA table_info(students)").fetchall()}
+        except Exception:
+            _scols = set()
+        if "avatar_id" not in _scols:
+            try: db2.execute("ALTER TABLE students ADD COLUMN avatar_id INTEGER DEFAULT 0")
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_avatar_v1",))
+        except Exception: pass
         db2.commit()
 
     # Students table: turn three columns into dropdowns. Linked dropdowns
@@ -3294,6 +3559,16 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x646;&#x633;&#x62E; &#x631;&#x627;&#x628;&#x637; &#x628;&#x648;&#x627;&#x628;&#x629; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</div>
       <div class="dh-action-desc">&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x631;&#x627;&#x628;&#x637; /parent &#x645;&#x639; &#x627;&#x644;&#x623;&#x647;&#x627;&#x644;&#x64A;</div>
     </button>
+    <a class="dh-action-card" href="/points/board" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);">
+      <div class="dh-action-icon">&#x1F31F;</div>
+      <div class="dh-action-title">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x635;&#x641; &#x2014; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
+      <div class="dh-action-desc">&#x645;&#x646;&#x62D; &#x646;&#x642;&#x627;&#x637; &#x627;&#x644;&#x633;&#x644;&#x648;&#x643; &#x644;&#x644;&#x637;&#x644;&#x628;&#x629; &#x645;&#x628;&#x627;&#x634;&#x631;&#x629;</div>
+    </a>
+    <a class="dh-action-card" href="/points/manage" id="dh-points-manage" style="background:linear-gradient(135deg,#AD1457,#D81B60);display:none;">
+      <div class="dh-action-icon">&#x2699;&#xFE0F;</div>
+      <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
+      <div class="dh-action-desc">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643;&#x064A;&#x627;&#x062A; &#x648;&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x062A; &#x648;&#x627;&#x644;&#x062A;&#x0642;&#x0627;&#x0631;&#x064A;&#x0631;</div>
+    </a>
   </div>
 </div>
 <script>
@@ -3775,6 +4050,14 @@ function dhConfirmModeChange(){
 })();
 _dhInitCenterMode();
 _dhLoadExceptions();
+/* Show admin-only points-manage link when role is admin. */
+(function(){
+  var role = (document.body.dataset.role || '').trim().toLowerCase();
+  if (role === 'admin'){
+    var el = document.getElementById('dh-points-manage');
+    if (el) el.style.display = '';
+  }
+})();
 function dhLoadStats(){
   fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
     function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -4933,11 +5216,72 @@ function _srRenderCard(d){
        + '</div></div>';
   // The legacy "سجل الدفع" block has been folded into the new
   // "💰 طريقة التقسيط" section above (_srBuildPaymentMethodSection).
+  // POINTS — load asynchronously (one extra request) and inject
+  // into a placeholder div. Pulls balance + level + last 5 events.
+  html += '<div class="srm-section" id="sr-points-section">'
+       +    '<div class="srm-section-title">🌟 نظام النقاط</div>'
+       +    '<div id="sr-points-body" style="padding:8px 0;color:#888;">جاري التحميل...</div>'
+       +  '</div>';
   // ACTIONS
   html += '<div class="srm-actions" id="sr-actions"></div>';
   html += '</div>';
   document.getElementById('sr-details').innerHTML = html;
+  _srLoadPoints(d.id || (d.student && d.student.id));
   _srApplyMode();
+}
+function _srLoadPoints(sid){
+  if (!sid) return;
+  var body = document.getElementById('sr-points-body');
+  if (!body) return;
+  fetch('/api/points/student/' + sid, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){
+        body.innerHTML = '<div style="color:#c62828;">لا تتوفر بيانات النقاط</div>';
+        return;
+      }
+      var bal = d.balance || 0;
+      var lvl = d.level || {};
+      var av  = d.avatar || {};
+      var avEmoji = av.emoji || '😊';
+      var lvlBadge = lvl.badge_icon ? (lvl.badge_icon + ' ' + (lvl.name_ar||'')) : '—';
+      var lvlColor = lvl.color || '#6B3FA0';
+      var html = ''
+        + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#faf7ff;border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+        +   '<div style="font-size:2.4rem;line-height:1;">' + avEmoji + '</div>'
+        +   '<div style="flex:1;min-width:140px;">'
+        +     '<div style="font-size:0.82rem;color:#666;">الرصيد الحالي</div>'
+        +     '<div style="font-size:1.8rem;font-weight:900;color:#4a148c;">' + bal + ' <span style="font-size:1rem;color:#888;font-weight:600;">نقطة</span></div>'
+        +   '</div>'
+        +   '<div style="text-align:center;">'
+        +     '<div style="font-size:0.82rem;color:#666;">المستوى</div>'
+        +     '<div style="font-weight:800;color:' + lvlColor + ';font-size:1.05rem;">' + lvlBadge + '</div>'
+        +   '</div>'
+        +   '<a href="/points/board/' + encodeURIComponent((d.student && d.student.group_name_student) || '') + '" class="btn" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:8px 16px;border-radius:9px;font-weight:700;text-decoration:none;display:inline-block;">منح نقاط</a>'
+        + '</div>';
+      var events = d.events || [];
+      if (events.length){
+        html += '<div style="font-weight:800;color:#4a148c;margin-bottom:6px;font-size:0.92rem;">آخر النشاطات</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:5px;">';
+        events.slice(0, 5).forEach(function(ev){
+          var pv = (ev.points_value >= 0 ? '+' : '') + ev.points_value;
+          var col = ev.points_value >= 0 ? '#1B5E20' : '#c62828';
+          var bg  = ev.points_value >= 0 ? '#e8f5e9' : '#ffebee';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;background:' + bg + ';border-radius:7px;padding:7px 10px;font-size:0.88rem;">'
+               +    '<div><b>' + (ev.behavior_name || '') + '</b>'
+               +      ' <span style="color:#777;font-size:0.78rem;">من ' + (ev.awarded_by_name || '—') + ' • ' + ((ev.awarded_at||'').slice(0, 16)) + '</span></div>'
+               +    '<div style="font-weight:900;color:' + col + ';">' + pv + '</div>'
+               +  '</div>';
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="color:#999;font-size:0.88rem;">لا توجد نشاطات بعد.</div>';
+      }
+      body.innerHTML = html;
+    })
+    .catch(function(){
+      body.innerHTML = '<div style="color:#c62828;">خطأ في تحميل النقاط</div>';
+    });
 }
 function srSave(){ _srTrySave(); }  /* backward-compat shim */
 
@@ -17974,6 +18318,1012 @@ def _teacher_groups_for(db, user):
     return deduped
 
 
+# ──────────────────────────────────────────────────────────────────
+# Behavior-points system (V1)
+# ──────────────────────────────────────────────────────────────────
+def _pts_user_role(user):
+    return ((user or {}).get("role") or "").strip().lower()
+
+def _pts_can_admin(user):
+    return _pts_user_role(user) == "admin"
+
+def _pts_can_grant(db, user, group_name):
+    """A user can grant points if (a) admin/manager, or (b) teacher
+    AND the group_name is among their assigned groups. Empty group
+    name = admin/manager only."""
+    role = _pts_user_role(user)
+    if role in ("admin", "manager"):
+        return True
+    if role == "teacher":
+        if not group_name:
+            return False
+        owned = set(_teacher_groups_for(db, user))
+        return group_name.strip() in owned
+    return False
+
+def _pts_visible_groups(db, user):
+    """Groups the user is allowed to see in the points UI."""
+    role = _pts_user_role(user)
+    if role in ("admin", "manager"):
+        try:
+            rows = db.execute(
+                "SELECT DISTINCT group_name FROM student_groups "
+                "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+                "ORDER BY group_name"
+            ).fetchall()
+            return [r[0] for r in rows]
+        except Exception:
+            return []
+    if role == "teacher":
+        return _teacher_groups_for(db, user)
+    return []
+
+def _pts_balance(db, sid):
+    """Current points balance for a student = sum of all event values
+    minus sum of redemption costs (delivered + pending)."""
+    try:
+        earned = db.execute(
+            "SELECT COALESCE(SUM(points_value), 0) FROM point_events WHERE student_id=?",
+            (int(sid),),
+        ).fetchone()[0] or 0
+    except Exception:
+        earned = 0
+    try:
+        spent = db.execute(
+            "SELECT COALESCE(SUM(points_spent), 0) FROM redemptions "
+            "WHERE student_id=? AND status<>?",
+            (int(sid), "cancelled"),
+        ).fetchone()[0] or 0
+    except Exception:
+        spent = 0
+    return int(earned) - int(spent)
+
+def _pts_level_for(db, balance):
+    """Return the level dict for a given balance, or {} if no levels
+    table is populated."""
+    try:
+        rows = db.execute(
+            "SELECT id, name_ar, min_points, max_points, badge_icon, color "
+            "FROM levels ORDER BY sort_order, min_points"
+        ).fetchall()
+    except Exception:
+        return {}
+    for r in rows:
+        rd = dict(r) if hasattr(r, "keys") else {
+            "id": r[0], "name_ar": r[1], "min_points": r[2],
+            "max_points": r[3], "badge_icon": r[4], "color": r[5],
+        }
+        lo = rd.get("min_points") or 0
+        hi = rd.get("max_points")
+        if balance >= lo and (hi is None or balance <= hi):
+            return rd
+    return {}
+
+def _pts_recent_events(db, sid, limit=10):
+    try:
+        rows = db.execute(
+            "SELECT id, behavior_id, behavior_name, points_value, "
+            "       group_name, awarded_by, awarded_by_name, "
+            "       awarded_at, note "
+            "FROM point_events WHERE student_id=? "
+            "ORDER BY id DESC LIMIT ?",
+            (int(sid), int(limit)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def _pts_format_event_message(student_name, behavior_name, points_value,
+                              teacher_name, balance):
+    """Build the WhatsApp text. Uses literal Arabic since this is a
+    Python-only string (not embedded in JS source)."""
+    sign = "+" + str(points_value) if points_value >= 0 else str(points_value)
+    return (
+        "السلام عليكم،\n"
+        "حصل " + (student_name or "") + " على " + sign + " نقطة "
+        "لـ " + (behavior_name or "") + " من " + (teacher_name or "") + ".\n"
+        "الرصيد الحالي: " + str(balance) + " نقطة."
+    )
+
+def _pts_get_student_phone(db, sid):
+    """Look up the parent's WhatsApp number for this student."""
+    try:
+        cols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        cols = set()
+    for cand in ("guardian_whatsapp", "parent_whatsapp", "guardian_phone",
+                 "parent_phone", "whatsapp", "contact_number"):
+        if cand in cols:
+            try:
+                row = db.execute(
+                    "SELECT \"" + cand + "\" FROM students WHERE id=?",
+                    (int(sid),),
+                ).fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+            except Exception:
+                pass
+    return ""
+
+
+# ── Behaviors CRUD (admin only) ──────────────────────────────────
+@app.route('/api/points/behaviors', methods=['GET'])
+@login_required
+def api_pts_behaviors_list():
+    """Return active behaviors. Teachers see global behaviors + their
+    own personal ones; admins see everything."""
+    db = get_db()
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    try:
+        if role in ("admin", "manager"):
+            rows = db.execute(
+                "SELECT id, name_ar, type, points_value, icon, color, "
+                "       created_by, is_global, is_active "
+                "FROM behaviors WHERE is_active=1 ORDER BY type DESC, id"
+            ).fetchall()
+        else:
+            uid = user.get("id") or 0
+            rows = db.execute(
+                "SELECT id, name_ar, type, points_value, icon, color, "
+                "       created_by, is_global, is_active "
+                "FROM behaviors "
+                "WHERE is_active=1 AND (is_global=1 OR created_by=?) "
+                "ORDER BY type DESC, id",
+                (uid,),
+            ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+
+
+@app.route('/api/points/behaviors', methods=['POST'])
+@login_required
+def api_pts_behaviors_create():
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    if role not in ("admin", "manager", "teacher"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json(silent=True) or {}
+    name = (d.get("name_ar") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "name_ar required"}), 400
+    bt = (d.get("type") or "positive").strip()
+    if bt not in ("positive", "negative"):
+        bt = "positive"
+    try:
+        pv = int(d.get("points_value") or 1)
+    except Exception:
+        pv = 1
+    icon = (d.get("icon") or "").strip()
+    color = (d.get("color") or "").strip()
+    is_global = 1 if role in ("admin", "manager") else 0
+    db = get_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO behaviors(name_ar, type, points_value, icon, color, "
+            "created_by, is_global, is_active) VALUES(?,?,?,?,?,?,?,1)",
+            (name, bt, pv, icon, color, user.get("id"), is_global),
+        )
+        db.commit()
+        new_id = cur.lastrowid
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": new_id})
+
+
+@app.route('/api/points/behaviors/<int:bid>', methods=['PATCH'])
+@login_required
+def api_pts_behaviors_update(bid):
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT created_by, is_global FROM behaviors WHERE id=?", (bid,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    rd = dict(row)
+    # Teachers can only edit their own (non-global) behaviors.
+    if role not in ("admin", "manager"):
+        if rd.get("is_global") or rd.get("created_by") != user.get("id"):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json(silent=True) or {}
+    fields = []
+    args = []
+    for k in ("name_ar", "type", "icon", "color"):
+        if k in d:
+            fields.append(k + "=?"); args.append((d.get(k) or "").strip())
+    if "points_value" in d:
+        try:
+            fields.append("points_value=?"); args.append(int(d["points_value"]))
+        except Exception:
+            pass
+    if "is_active" in d:
+        fields.append("is_active=?"); args.append(1 if d["is_active"] else 0)
+    if not fields:
+        return jsonify({"ok": False, "error": "no fields to update"}), 400
+    args.append(bid)
+    try:
+        db.execute("UPDATE behaviors SET " + ",".join(fields) + " WHERE id=?", tuple(args))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+@app.route('/api/points/behaviors/<int:bid>', methods=['DELETE'])
+@login_required
+def api_pts_behaviors_delete(bid):
+    """Soft-delete a behavior (sets is_active=0). Past point_events
+    keep their behavior_name snapshot, so history is preserved."""
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT created_by, is_global FROM behaviors WHERE id=?", (bid,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    rd = dict(row)
+    if role not in ("admin", "manager"):
+        if rd.get("is_global") or rd.get("created_by") != user.get("id"):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+    try:
+        db.execute("UPDATE behaviors SET is_active=0 WHERE id=?", (bid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+# ── Grant points ─────────────────────────────────────────────────
+@app.route('/api/points/grant', methods=['POST'])
+@login_required
+def api_pts_grant():
+    """Body: { student_ids: [int], behavior_id: int, group_name: str,
+    note?: str }. Permission: admin/manager always; teacher only if
+    group_name is one of their groups. Returns grant count and new
+    balances per student."""
+    user = session.get("user") or {}
+    d = request.get_json(silent=True) or {}
+    sids = d.get("student_ids") or []
+    if isinstance(sids, (int, str)):
+        sids = [sids]
+    try:
+        sids = [int(x) for x in sids if str(x).strip()]
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid student_ids"}), 400
+    if not sids:
+        return jsonify({"ok": False, "error": "at least one student_id required"}), 400
+    try:
+        bid = int(d.get("behavior_id") or 0)
+    except Exception:
+        bid = 0
+    if not bid:
+        return jsonify({"ok": False, "error": "behavior_id required"}), 400
+    group_name = (d.get("group_name") or "").strip()
+    note       = (d.get("note") or "").strip()
+    db = get_db()
+    if not _pts_can_grant(db, user, group_name):
+        return jsonify({"ok": False, "error": "forbidden for this group"}), 403
+    try:
+        b = db.execute(
+            "SELECT id, name_ar, type, points_value, icon, color, is_active "
+            "FROM behaviors WHERE id=?", (bid,),
+        ).fetchone()
+    except Exception:
+        b = None
+    if not b:
+        return jsonify({"ok": False, "error": "behavior not found"}), 404
+    bd = dict(b)
+    if not bd.get("is_active"):
+        return jsonify({"ok": False, "error": "behavior inactive"}), 400
+    pv = int(bd.get("points_value") or 0)
+    awarded_by = user.get("id") or 0
+    awarded_by_name = (user.get("name") or user.get("username") or "").strip()
+    notify_on = (get_setting("points", "auto_notify_parent", "0") or "0") == "1"
+    results = []
+    for sid in sids:
+        try:
+            srow = db.execute("SELECT student_name FROM students WHERE id=?", (sid,)).fetchone()
+        except Exception:
+            srow = None
+        sname = (dict(srow).get("student_name") if srow else "") or ""
+        try:
+            cur = db.execute(
+                "INSERT INTO point_events(student_id, student_name, behavior_id, "
+                "behavior_name, points_value, group_name, awarded_by, "
+                "awarded_by_name, note) VALUES(?,?,?,?,?,?,?,?,?)",
+                (sid, sname, bid, bd.get("name_ar") or "",
+                 pv, group_name, awarded_by, awarded_by_name, note),
+            )
+            db.commit()
+            event_id = cur.lastrowid
+        except Exception as ex:
+            results.append({"student_id": sid, "ok": False, "error": str(ex)})
+            continue
+        bal = _pts_balance(db, sid)
+        # Queue parent WhatsApp notification (admin-toggleable).
+        if notify_on:
+            phone = _pts_get_student_phone(db, sid)
+            msg = _pts_format_event_message(sname, bd.get("name_ar") or "",
+                                            pv, awarded_by_name, bal)
+            try:
+                db.execute(
+                    "INSERT INTO point_notifications(event_id, student_id, "
+                    "student_name, phone, message, status) VALUES(?,?,?,?,?,?)",
+                    (event_id, sid, sname, phone, msg, "pending"),
+                )
+                db.commit()
+            except Exception:
+                pass
+        results.append({
+            "student_id": sid, "ok": True,
+            "event_id": event_id, "balance": bal,
+            "student_name": sname,
+        })
+    return jsonify({
+        "ok": True,
+        "behavior":   bd,
+        "granted_to": sum(1 for r in results if r.get("ok")),
+        "results":    results,
+    })
+
+
+# ── Balance + recent events for a student ────────────────────────
+@app.route('/api/points/student/<int:sid>', methods=['GET'])
+@login_required
+def api_pts_student_summary(sid):
+    db = get_db()
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, personal_id, group_name_student, avatar_id "
+            "FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    sd = dict(srow)
+    # Permission: teacher must own the student's group.
+    if role == "teacher":
+        owned = set(_teacher_groups_for(db, user))
+        if (sd.get("group_name_student") or "").strip() not in owned:
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+    bal = _pts_balance(db, sid)
+    lvl = _pts_level_for(db, bal)
+    events = _pts_recent_events(db, sid, 10)
+    av = {}
+    if sd.get("avatar_id"):
+        try:
+            av_row = db.execute(
+                "SELECT id, name, emoji FROM avatars WHERE id=?",
+                (sd["avatar_id"],),
+            ).fetchone()
+            if av_row: av = dict(av_row)
+        except Exception:
+            pass
+    return jsonify({
+        "ok":      True,
+        "student": sd,
+        "balance": bal,
+        "level":   lvl,
+        "avatar":  av,
+        "events":  events,
+    })
+
+
+@app.route('/api/points/student/<int:sid>/avatar', methods=['PATCH'])
+@login_required
+def api_pts_set_avatar(sid):
+    """Set avatar_id for a student. Allowed for any signed-in user
+    who can grant points to that student's group."""
+    db = get_db()
+    user = session.get("user") or {}
+    d = request.get_json(silent=True) or {}
+    try:
+        avid = int(d.get("avatar_id") or 0)
+    except Exception:
+        avid = 0
+    if not avid:
+        return jsonify({"ok": False, "error": "avatar_id required"}), 400
+    try:
+        srow = db.execute(
+            "SELECT group_name_student FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    g = (dict(srow).get("group_name_student") or "").strip()
+    if not _pts_can_grant(db, user, g):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    try:
+        db.execute("UPDATE students SET avatar_id=? WHERE id=?", (avid, sid))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "avatar_id": avid})
+
+
+@app.route('/api/points/avatars', methods=['GET'])
+@login_required
+def api_pts_avatars():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name, emoji FROM avatars ORDER BY sort_order, id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+
+
+# ── Group leaderboard / class board data ─────────────────────────
+@app.route('/api/points/group', methods=['GET'])
+@login_required
+def api_pts_group_board():
+    """Return all students in a group with their balances + level
+    badges, for the لوحة الصف live class view."""
+    db = get_db()
+    user = session.get("user") or {}
+    g = (request.args.get("group") or "").strip()
+    if not g:
+        return jsonify({"ok": False, "error": "group required"}), 400
+    if not _pts_can_grant(db, user, g):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    try:
+        scols = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        scols = set()
+    avatar_select = "avatar_id" if "avatar_id" in scols else "0 AS avatar_id"
+    pid_select    = "personal_id" if "personal_id" in scols else "'' AS personal_id"
+    try:
+        rows = db.execute(
+            "SELECT id, student_name, " + pid_select + ", " + avatar_select + " "
+            "FROM students "
+            "WHERE TRIM(group_name_student)=TRIM(?) "
+            "AND student_name IS NOT NULL AND TRIM(student_name) <> '' "
+            "ORDER BY student_name",
+            (g,),
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    students = []
+    levels_cache = {}
+    for r in rows:
+        rd = dict(r)
+        bal = _pts_balance(db, rd["id"])
+        lvl = _pts_level_for(db, bal)
+        # Resolve avatar emoji
+        emoji = ""
+        if rd.get("avatar_id"):
+            try:
+                ar = db.execute("SELECT emoji FROM avatars WHERE id=?", (rd["avatar_id"],)).fetchone()
+                if ar: emoji = (dict(ar).get("emoji") if hasattr(ar, "keys") else ar[0]) or ""
+            except Exception:
+                pass
+        students.append({
+            "id":            rd["id"],
+            "student_name":  rd["student_name"],
+            "personal_id":   rd.get("personal_id") or "",
+            "avatar_id":     rd.get("avatar_id") or 0,
+            "avatar_emoji":  emoji,
+            "balance":       bal,
+            "level":         lvl,
+        })
+    return jsonify({"ok": True, "group": g, "students": students})
+
+
+@app.route('/api/points/groups', methods=['GET'])
+@login_required
+def api_pts_visible_groups():
+    """Groups the current user can grant points to."""
+    db = get_db()
+    user = session.get("user") or {}
+    return jsonify({"ok": True, "groups": _pts_visible_groups(db, user)})
+
+
+# ── Reports ──────────────────────────────────────────────────────
+@app.route('/api/points/reports/student/<int:sid>', methods=['GET'])
+@login_required
+def api_pts_report_student(sid):
+    """Per-student report: totals (week/month/all-time), behavior
+    distribution, and a 12-week sparkline of points-per-week."""
+    import datetime as _dt
+    db = get_db()
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, group_name_student FROM students WHERE id=?",
+            (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    sd = dict(srow)
+    g  = (sd.get("group_name_student") or "").strip()
+    if role == "teacher" and g not in set(_teacher_groups_for(db, user)):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    now  = _dt.datetime.now()
+    wk0  = now - _dt.timedelta(days=7)
+    mo0  = now - _dt.timedelta(days=30)
+    try:
+        all_time = db.execute(
+            "SELECT COALESCE(SUM(points_value),0) FROM point_events WHERE student_id=?",
+            (sid,),
+        ).fetchone()[0] or 0
+        wk = db.execute(
+            "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+            "WHERE student_id=? AND awarded_at >= ?",
+            (sid, wk0.strftime("%Y-%m-%d %H:%M:%S")),
+        ).fetchone()[0] or 0
+        mo = db.execute(
+            "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+            "WHERE student_id=? AND awarded_at >= ?",
+            (sid, mo0.strftime("%Y-%m-%d %H:%M:%S")),
+        ).fetchone()[0] or 0
+    except Exception:
+        all_time = wk = mo = 0
+    # Behavior distribution
+    try:
+        bd_rows = db.execute(
+            "SELECT behavior_name, COUNT(*) AS cnt, SUM(points_value) AS pts "
+            "FROM point_events WHERE student_id=? GROUP BY behavior_name "
+            "ORDER BY cnt DESC LIMIT 10",
+            (sid,),
+        ).fetchall()
+        behaviors = [dict(r) for r in bd_rows]
+    except Exception:
+        behaviors = []
+    # 12-week sparkline
+    weekly = []
+    for i in range(11, -1, -1):
+        wstart = (now - _dt.timedelta(days=(i+1)*7)).strftime("%Y-%m-%d %H:%M:%S")
+        wend   = (now - _dt.timedelta(days=i*7)).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            v = db.execute(
+                "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                "WHERE student_id=? AND awarded_at >= ? AND awarded_at < ?",
+                (sid, wstart, wend),
+            ).fetchone()[0] or 0
+        except Exception:
+            v = 0
+        weekly.append({"week_end": wend[:10], "points": int(v)})
+    # Group average (anonymized — no other student names)
+    group_avg = 0
+    if g:
+        try:
+            r = db.execute(
+                "SELECT COALESCE(AVG(s_pts),0) FROM ("
+                "  SELECT student_id, COALESCE(SUM(points_value),0) AS s_pts "
+                "  FROM point_events GROUP BY student_id"
+                ") "
+                "WHERE student_id IN ("
+                "  SELECT id FROM students WHERE TRIM(group_name_student)=TRIM(?)"
+                ")",
+                (g,),
+            ).fetchone()
+            group_avg = round(float(r[0] or 0), 1)
+        except Exception:
+            group_avg = 0
+    # Trend (last 4 weeks vs prior 4)
+    last4 = sum(w["points"] for w in weekly[-4:])
+    prev4 = sum(w["points"] for w in weekly[-8:-4])
+    if last4 > prev4 + 2:   trend = "improving"
+    elif last4 < prev4 - 2: trend = "declining"
+    else:                   trend = "stable"
+    return jsonify({
+        "ok":            True,
+        "student":       sd,
+        "balance":       _pts_balance(db, sid),
+        "totals": {
+            "week":      int(wk),
+            "month":     int(mo),
+            "all_time":  int(all_time),
+        },
+        "behaviors":     behaviors,
+        "weekly":        weekly,
+        "group_avg":     group_avg,
+        "trend":         trend,
+    })
+
+
+@app.route('/api/points/reports/group', methods=['GET'])
+@login_required
+def api_pts_report_group():
+    db = get_db()
+    user = session.get("user") or {}
+    g = (request.args.get("group") or "").strip()
+    if not g:
+        return jsonify({"ok": False, "error": "group required"}), 400
+    if not _pts_can_grant(db, user, g):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    import datetime as _dt
+    wk0 = (_dt.datetime.now() - _dt.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    # Top 5 students this week
+    try:
+        top = db.execute(
+            "SELECT student_id, student_name, "
+            "       COALESCE(SUM(points_value),0) AS pts "
+            "FROM point_events "
+            "WHERE TRIM(group_name)=TRIM(?) AND awarded_at >= ? "
+            "GROUP BY student_id, student_name "
+            "ORDER BY pts DESC LIMIT 5",
+            (g, wk0),
+        ).fetchall()
+        top_students = [dict(r) for r in top]
+    except Exception:
+        top_students = []
+    # Top positive + negative behaviors
+    try:
+        pos = db.execute(
+            "SELECT behavior_name, COUNT(*) AS cnt FROM point_events "
+            "WHERE TRIM(group_name)=TRIM(?) AND points_value > 0 "
+            "GROUP BY behavior_name ORDER BY cnt DESC LIMIT 5",
+            (g,),
+        ).fetchall()
+        neg = db.execute(
+            "SELECT behavior_name, COUNT(*) AS cnt FROM point_events "
+            "WHERE TRIM(group_name)=TRIM(?) AND points_value < 0 "
+            "GROUP BY behavior_name ORDER BY cnt DESC LIMIT 5",
+            (g,),
+        ).fetchall()
+        top_pos = [dict(r) for r in pos]
+        top_neg = [dict(r) for r in neg]
+    except Exception:
+        top_pos = []; top_neg = []
+    # Avg points per student in this group
+    try:
+        r = db.execute(
+            "SELECT COALESCE(AVG(s_pts),0) FROM ("
+            "  SELECT student_id, COALESCE(SUM(points_value),0) AS s_pts "
+            "  FROM point_events GROUP BY student_id"
+            ") "
+            "WHERE student_id IN ("
+            "  SELECT id FROM students WHERE TRIM(group_name_student)=TRIM(?)"
+            ")",
+            (g,),
+        ).fetchone()
+        avg = round(float(r[0] or 0), 1)
+    except Exception:
+        avg = 0.0
+    return jsonify({
+        "ok": True, "group": g,
+        "top_students":   top_students,
+        "top_positive":   top_pos,
+        "top_negative":   top_neg,
+        "avg_per_student": avg,
+    })
+
+
+@app.route('/api/points/reports/admin', methods=['GET'])
+@login_required
+def api_pts_report_admin():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        groups = db.execute(
+            "SELECT TRIM(group_name) AS g, "
+            "       COALESCE(SUM(points_value),0) AS total, "
+            "       COUNT(*) AS events, "
+            "       COUNT(DISTINCT student_id) AS students "
+            "FROM point_events "
+            "WHERE TRIM(group_name) <> '' "
+            "GROUP BY TRIM(group_name) ORDER BY total DESC"
+        ).fetchall()
+        groups_data = [dict(r) for r in groups]
+    except Exception:
+        groups_data = []
+    try:
+        teachers = db.execute(
+            "SELECT awarded_by, awarded_by_name, COUNT(*) AS events, "
+            "       COALESCE(SUM(points_value),0) AS total "
+            "FROM point_events "
+            "GROUP BY awarded_by, awarded_by_name ORDER BY events DESC"
+        ).fetchall()
+        teachers_data = [dict(r) for r in teachers]
+    except Exception:
+        teachers_data = []
+    return jsonify({
+        "ok": True,
+        "groups":   groups_data,
+        "teachers": teachers_data,
+    })
+
+
+# ── Rewards CRUD + redemption flow ───────────────────────────────
+@app.route('/api/points/rewards', methods=['GET'])
+@login_required
+def api_pts_rewards_list():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name_ar, point_cost, icon, stock, category, is_active "
+            "FROM rewards WHERE is_active=1 ORDER BY point_cost"
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/points/rewards', methods=['POST'])
+@login_required
+def api_pts_rewards_create():
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json(silent=True) or {}
+    name = (d.get("name_ar") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "name_ar required"}), 400
+    try:
+        cost = int(d.get("point_cost") or 0)
+    except Exception:
+        cost = 0
+    icon = (d.get("icon") or "").strip()
+    cat  = (d.get("category") or "").strip()
+    try:
+        stock = int(d.get("stock"))
+    except Exception:
+        stock = -1
+    db = get_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO rewards(name_ar, point_cost, icon, stock, category, is_active) "
+            "VALUES(?,?,?,?,?,1)",
+            (name, cost, icon, stock, cat),
+        )
+        db.commit()
+        return jsonify({"ok": True, "id": cur.lastrowid})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/points/rewards/<int:rid>', methods=['PATCH'])
+@login_required
+def api_pts_rewards_update(rid):
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json(silent=True) or {}
+    fields = []; args = []
+    for k in ("name_ar", "icon", "category"):
+        if k in d:
+            fields.append(k + "=?"); args.append((d.get(k) or "").strip())
+    for k in ("point_cost", "stock"):
+        if k in d:
+            try:
+                fields.append(k + "=?"); args.append(int(d[k]))
+            except Exception:
+                pass
+    if "is_active" in d:
+        fields.append("is_active=?"); args.append(1 if d["is_active"] else 0)
+    if not fields:
+        return jsonify({"ok": False, "error": "no fields to update"}), 400
+    args.append(rid)
+    db = get_db()
+    try:
+        db.execute("UPDATE rewards SET " + ",".join(fields) + " WHERE id=?", tuple(args))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+@app.route('/api/points/redemptions', methods=['GET'])
+@login_required
+def api_pts_redemptions_list():
+    db = get_db()
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    sid_q = request.args.get("student_id")
+    args = []
+    where = ""
+    if sid_q:
+        try:
+            where = " WHERE student_id=?"; args.append(int(sid_q))
+        except Exception: pass
+    elif role == "teacher":
+        # Only redemptions for students in their groups
+        owned = _teacher_groups_for(db, user)
+        if not owned:
+            return jsonify({"ok": True, "rows": []})
+        ph = ",".join(["?"] * len(owned))
+        where = (" WHERE student_id IN (SELECT id FROM students WHERE "
+                 "TRIM(group_name_student) IN (" + ph + "))")
+        args.extend(owned)
+    elif role not in ("admin", "manager"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    try:
+        rows = db.execute(
+            "SELECT id, student_id, student_name, reward_id, reward_name, "
+            "       points_spent, status, redeemed_at, delivered_by, delivered_at "
+            "FROM redemptions" + where + " ORDER BY id DESC LIMIT 500",
+            tuple(args),
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/points/redeem', methods=['POST'])
+@login_required
+def api_pts_redeem():
+    """Body: {student_id, reward_id}. Permission: admin/manager always;
+    teacher only if the student is in one of their groups. Deducts
+    points by inserting a redemption row with status='pending'. Stock
+    is decremented if finite."""
+    user = session.get("user") or {}
+    d = request.get_json(silent=True) or {}
+    try:
+        sid = int(d.get("student_id") or 0)
+        rid = int(d.get("reward_id") or 0)
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid payload"}), 400
+    if not sid or not rid:
+        return jsonify({"ok": False, "error": "student_id and reward_id required"}), 400
+    db = get_db()
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, group_name_student FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    sd = dict(srow)
+    if not _pts_can_grant(db, user, (sd.get("group_name_student") or "").strip()):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    try:
+        rrow = db.execute(
+            "SELECT id, name_ar, point_cost, stock, is_active FROM rewards WHERE id=?",
+            (rid,),
+        ).fetchone()
+    except Exception:
+        rrow = None
+    if not rrow:
+        return jsonify({"ok": False, "error": "reward not found"}), 404
+    rd = dict(rrow)
+    if not rd.get("is_active"):
+        return jsonify({"ok": False, "error": "reward inactive"}), 400
+    cost = int(rd.get("point_cost") or 0)
+    bal = _pts_balance(db, sid)
+    if bal < cost:
+        return jsonify({"ok": False, "error": "insufficient points",
+                        "balance": bal, "cost": cost}), 400
+    stock = int(rd.get("stock") or 0)
+    if stock == 0:
+        return jsonify({"ok": False, "error": "out of stock"}), 400
+    try:
+        cur = db.execute(
+            "INSERT INTO redemptions(student_id, student_name, reward_id, "
+            "reward_name, points_spent, status) VALUES(?,?,?,?,?,?)",
+            (sid, sd.get("student_name") or "", rid, rd.get("name_ar") or "",
+             cost, "pending"),
+        )
+        if stock > 0:
+            db.execute("UPDATE rewards SET stock=stock-1 WHERE id=? AND stock>0", (rid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "redemption_id": cur.lastrowid,
+                    "balance": _pts_balance(db, sid)})
+
+
+@app.route('/api/points/redemptions/<int:redeem_id>/deliver', methods=['POST'])
+@login_required
+def api_pts_redeem_deliver(redeem_id):
+    user = session.get("user") or {}
+    role = _pts_user_role(user)
+    if role not in ("admin", "manager", "teacher"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE redemptions SET status='delivered', delivered_by=?, "
+            "delivered_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'",
+            (user.get("id"), redeem_id),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+@app.route('/api/points/redemptions/<int:redeem_id>/cancel', methods=['POST'])
+@login_required
+def api_pts_redeem_cancel(redeem_id):
+    """Cancel a pending redemption — refunds points by setting status
+    to 'cancelled' (the balance helper excludes cancelled rows)."""
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        # Restore stock if reward had a finite stock
+        row = db.execute(
+            "SELECT reward_id, status FROM redemptions WHERE id=?", (redeem_id,),
+        ).fetchone()
+        if row:
+            rd = dict(row)
+            if rd.get("status") == "pending":
+                db.execute(
+                    "UPDATE rewards SET stock=stock+1 WHERE id=? AND stock>=0",
+                    (rd["reward_id"],),
+                )
+        db.execute(
+            "UPDATE redemptions SET status='cancelled' WHERE id=? AND status='pending'",
+            (redeem_id,),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+# ── Levels lookup (read-only) ────────────────────────────────────
+@app.route('/api/points/levels', methods=['GET'])
+@login_required
+def api_pts_levels():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name_ar, min_points, max_points, badge_icon, color "
+            "FROM levels ORDER BY sort_order, min_points"
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+# ── Notifications queue (admin) ──────────────────────────────────
+@app.route('/api/points/notifications', methods=['GET'])
+@login_required
+def api_pts_notifications_list():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    status = (request.args.get("status") or "pending").strip()
+    try:
+        rows = db.execute(
+            "SELECT id, event_id, student_id, student_name, phone, message, "
+            "       status, created_at, sent_at "
+            "FROM point_notifications WHERE status=? ORDER BY id DESC LIMIT 500",
+            (status,),
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/points/notifications/<int:nid>/sent', methods=['POST'])
+@login_required
+def api_pts_notifications_mark_sent(nid):
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE point_notifications SET status='sent', "
+            "sent_at=CURRENT_TIMESTAMP WHERE id=?",
+            (nid,),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
 # Arabic day names — used by the days-extractor below to detect
 # which row column actually carries the schedule's days.
 _AR_DAY_NAMES = (
@@ -26435,6 +27785,566 @@ def admin_backups_page():
     if (user.get("role") or "").strip().lower() != "admin":
         return redirect("/dashboard")
     return ADMIN_BACKUPS_HTML
+
+
+# ──────────────────────────────────────────────────────────────────
+# Behavior-points pages
+# ──────────────────────────────────────────────────────────────────
+POINTS_MANAGE_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>نظام النقاط — الإدارة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;padding:0;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px rgba(107,63,160,.25);}
+.topbar h1{margin:0;font-size:1.15rem;font-weight:800;}
+.topbar a{color:#fff;text-decoration:none;background:rgba(255,255,255,.18);padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.9rem;}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:14px 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.tab-btn{padding:10px 18px;border-radius:10px;border:1.5px solid #c4a8e8;background:#fff;color:#4a148c;font-weight:800;cursor:pointer;font-family:inherit;font-size:0.92rem;}
+.tab-btn.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;}
+.tab-btn:hover{background:#faf7ff;}
+.tab-btn.active:hover{background:linear-gradient(135deg,#5a3489,#7a4eb5);}
+.body{padding:18px 16px;max-width:1100px;margin:0 auto;}
+.card{background:#fff;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.section-title{font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:0.92rem;}
+th{background:#f8f3ff;color:#4a148c;font-weight:800;}
+tr:hover{background:#fafafa;}
+.btn{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-family:inherit;font-size:0.85rem;}
+.btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+.btn-add{background:#1B5E20;color:#fff;}
+.btn-edit{background:#1565C0;color:#fff;}
+.btn-del{background:#c62828;color:#fff;}
+.btn-deliver{background:#2E7D32;color:#fff;}
+.btn-cancel{background:#FB8C00;color:#fff;}
+.input{width:100%;padding:7px 10px;border:1.3px solid #ddd;border-radius:8px;font-family:inherit;font-size:0.92rem;background:#fafafa;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.tag{padding:3px 9px;border-radius:6px;font-size:0.78rem;font-weight:800;display:inline-block;}
+.tag-pos{background:#e8f5e9;color:#1B5E20;}
+.tag-neg{background:#ffebee;color:#c62828;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:9999;box-shadow:0 4px 18px rgba(0,0,0,.25);display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+.empty{padding:24px;text-align:center;color:#999;font-weight:600;}
+@media (max-width:600px){
+  .body{padding:12px 8px;}
+  th,td{padding:6px 6px;font-size:0.85rem;}
+  .tab-btn{padding:8px 12px;font-size:0.85rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>🌟 نظام النقاط — الإدارة</h1>
+  <a href="/dashboard">← الرئيسية</a>
+</div>
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('behaviors')">السلوكيات</button>
+  <button class="tab-btn"        onclick="showTab('rewards')">المكافآت</button>
+  <button class="tab-btn"        onclick="showTab('redemptions')">الاستبدالات</button>
+  <button class="tab-btn"        onclick="showTab('reports')">التقارير</button>
+  <button class="tab-btn"        onclick="showTab('notifications')">إشعارات الواتساب</button>
+  <button class="tab-btn"        onclick="showTab('settings')">إعدادات</button>
+</div>
+<div class="body" id="body">
+  <div class="empty">جاري التحميل...</div>
+</div>
+<div class="toast" id="t"></div>
+
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toast(msg, ok){var t=document.getElementById('t');t.textContent=msg;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2200);}
+function showTab(t){
+  var btns=document.querySelectorAll('.tab-btn');
+  btns.forEach(function(b){b.classList.remove('active');});
+  Array.prototype.find.call(btns,function(b){return b.textContent.indexOf({behaviors:'السلوكيات',rewards:'المكافآت',redemptions:'الاستبدالات',reports:'التقارير',notifications:'إشعارات الواتساب',settings:'إعدادات'}[t])>=0;}).classList.add('active');
+  ({behaviors:loadBehaviors,rewards:loadRewards,redemptions:loadRedemptions,reports:loadReports,notifications:loadNotifications,settings:loadSettings}[t])();
+}
+
+/* ── Behaviors tab ────────────────────────────────────────── */
+function loadBehaviors(){
+  fetch('/api/points/behaviors',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">فشل التحميل</div>';return;}
+    var pos=d.rows.filter(function(b){return b.type==='positive';});
+    var neg=d.rows.filter(function(b){return b.type==='negative';});
+    var html='';
+    html+='<div class="card"><div class="section-title">➕ السلوكيات الإيجابية</div>';
+    html+=tableBhv(pos,'positive');
+    html+='<div class="row" style="margin-top:12px;">'
+        +'<button class="btn btn-add" onclick="addBhv(\'positive\')">+ إضافة سلوك إيجابي</button>'
+        +'</div></div>';
+    html+='<div class="card"><div class="section-title">➖ السلوكيات السلبية</div>';
+    html+=tableBhv(neg,'negative');
+    html+='<div class="row" style="margin-top:12px;">'
+        +'<button class="btn btn-add" onclick="addBhv(\'negative\')">+ إضافة سلوك سلبي</button>'
+        +'</div></div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+function tableBhv(rows,kind){
+  if(!rows.length) return '<div class="empty">لا يوجد</div>';
+  var h='<table><thead><tr><th>الأيقونة</th><th>الاسم</th><th>القيمة</th><th>الإجراءات</th></tr></thead><tbody>';
+  rows.forEach(function(b){
+    var tag=kind==='positive'?'<span class="tag tag-pos">+'+b.points_value+'</span>':'<span class="tag tag-neg">'+b.points_value+'</span>';
+    h+='<tr><td style="font-size:1.2rem;">'+_esc(b.icon||'•')+'</td>'
+     +'<td>'+_esc(b.name_ar)+'</td>'
+     +'<td>'+tag+'</td>'
+     +'<td><button class="btn btn-edit" onclick="editBhv('+b.id+',\''+(b.name_ar||'').replace(/\\/g,'\\\\').replace(/\'/g,'\\\'')+'\','+b.points_value+',\''+_esc(b.icon||'')+'\')">تعديل</button>'
+     +'  <button class="btn btn-del" onclick="delBhv('+b.id+')">حذف</button></td></tr>';
+  });
+  h+='</tbody></table>';
+  return h;
+}
+function addBhv(kind){
+  var nm=prompt('اسم السلوك:');if(!nm) return;
+  var pv=prompt('قيمة النقاط (موجبة للإيجابي، سالبة للسلبي):',kind==='positive'?'2':'-1');
+  if(pv===null) return;
+  var icon=prompt('أيقونة (إيموجي):','⭐');
+  fetch('/api/points/behaviors',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name_ar:nm,type:kind,points_value:parseInt(pv,10)||(kind==='positive'?1:-1),icon:icon||''})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تمت الإضافة');loadBehaviors();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function editBhv(id,name,pv,icon){
+  var nm=prompt('اسم السلوك:',name);if(nm===null) return;
+  var npv=prompt('قيمة النقاط:',pv);if(npv===null) return;
+  var ni=prompt('أيقونة:',icon);if(ni===null) ni=icon;
+  fetch('/api/points/behaviors/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name_ar:nm,points_value:parseInt(npv,10)||pv,icon:ni})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم التعديل');loadBehaviors();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function delBhv(id){
+  if(!confirm('هل أنت متأكد من حذف السلوك؟ السجلات السابقة ستبقى محفوظة.')) return;
+  fetch('/api/points/behaviors/'+id,{method:'DELETE',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم الحذف');loadBehaviors();}else{toast(d.error||'خطأ',false);}
+  });
+}
+
+/* ── Rewards tab ──────────────────────────────────────────── */
+function loadRewards(){
+  fetch('/api/points/rewards',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">فشل التحميل</div>';return;}
+    var html='<div class="card"><div class="section-title">🎁 متجر المكافآت</div>';
+    if(!d.rows.length){html+='<div class="empty">لا يوجد مكافآت بعد</div>';}
+    else{
+      html+='<table><thead><tr><th>الأيقونة</th><th>الاسم</th><th>التكلفة</th><th>المخزون</th><th>الفئة</th><th>الإجراءات</th></tr></thead><tbody>';
+      d.rows.forEach(function(r){
+        var stk=r.stock<0?'∞':r.stock;
+        html+='<tr><td style="font-size:1.4rem;">'+_esc(r.icon||'🎁')+'</td>'
+          +'<td>'+_esc(r.name_ar)+'</td>'
+          +'<td><b>'+r.point_cost+'</b> نقطة</td>'
+          +'<td>'+stk+'</td>'
+          +'<td>'+_esc(r.category||'')+'</td>'
+          +'<td><button class="btn btn-edit" onclick="editReward('+r.id+',\''+(r.name_ar||'').replace(/\\/g,'\\\\').replace(/\'/g,'\\\'')+'\','+r.point_cost+','+r.stock+')">تعديل</button>'
+          +' <button class="btn btn-del" onclick="delReward('+r.id+')">حذف</button></td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    html+='<div class="row" style="margin-top:12px;"><button class="btn btn-add" onclick="addReward()">+ إضافة مكافأة</button></div>';
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+function addReward(){
+  var nm=prompt('اسم المكافأة:');if(!nm) return;
+  var c=prompt('التكلفة بالنقاط:','10');if(c===null) return;
+  var ic=prompt('أيقونة (إيموجي):','🎁');
+  var st=prompt('المخزون (-1 = غير محدود):','-1');
+  fetch('/api/points/rewards',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name_ar:nm,point_cost:parseInt(c,10)||0,icon:ic||'🎁',stock:parseInt(st,10)||(-1)})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تمت الإضافة');loadRewards();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function editReward(id,name,cost,stock){
+  var nm=prompt('اسم المكافأة:',name);if(nm===null) return;
+  var c=prompt('التكلفة:',cost);if(c===null) return;
+  var st=prompt('المخزون:',stock);if(st===null) return;
+  fetch('/api/points/rewards/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name_ar:nm,point_cost:parseInt(c,10)||cost,stock:parseInt(st,10)||stock})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم التعديل');loadRewards();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function delReward(id){
+  if(!confirm('هل أنت متأكد من حذف المكافأة؟')) return;
+  fetch('/api/points/rewards/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({is_active:false})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم الحذف');loadRewards();}else{toast(d.error||'خطأ',false);}
+  });
+}
+
+/* ── Redemptions tab ─────────────────────────────────────── */
+function loadRedemptions(){
+  fetch('/api/points/redemptions',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">فشل التحميل</div>';return;}
+    var html='<div class="card"><div class="section-title">📋 سجل الاستبدالات</div>';
+    if(!d.rows.length){html+='<div class="empty">لا توجد استبدالات حتى الآن</div>';}
+    else{
+      html+='<table><thead><tr><th>التاريخ</th><th>الطالب</th><th>المكافأة</th><th>التكلفة</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>';
+      d.rows.forEach(function(r){
+        var stColor={pending:'#FB8C00',delivered:'#2E7D32',cancelled:'#c62828'}[r.status]||'#666';
+        var stLabel={pending:'بانتظار التسليم',delivered:'تم التسليم',cancelled:'ملغى'}[r.status]||r.status;
+        var act='';
+        if(r.status==='pending'){
+          act='<button class="btn btn-deliver" onclick="markDelivered('+r.id+')">تم التسليم</button>'
+            +' <button class="btn btn-cancel" onclick="cancelRedemption('+r.id+')">إلغاء</button>';
+        }
+        html+='<tr><td style="direction:ltr;font-size:0.85rem;">'+_esc((r.redeemed_at||'').slice(0,16))+'</td>'
+          +'<td><b>'+_esc(r.student_name)+'</b></td>'
+          +'<td>'+_esc(r.reward_name)+'</td>'
+          +'<td>'+r.points_spent+'</td>'
+          +'<td><span style="font-weight:800;color:'+stColor+';">'+stLabel+'</span></td>'
+          +'<td>'+act+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+function markDelivered(id){
+  fetch('/api/points/redemptions/'+id+'/deliver',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم التسليم');loadRedemptions();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function cancelRedemption(id){
+  if(!confirm('إلغاء الاستبدال؟ سيتم استرداد النقاط للطالب.')) return;
+  fetch('/api/points/redemptions/'+id+'/cancel',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم الإلغاء واسترداد النقاط');loadRedemptions();}else{toast(d.error||'خطأ',false);}
+  });
+}
+
+/* ── Reports tab ──────────────────────────────────────────── */
+function _bar(value,max,color){
+  var w=max>0?Math.max(2,Math.round((value/max)*100)):0;
+  return '<div style="background:#eee;border-radius:6px;height:14px;overflow:hidden;"><div style="width:'+w+'%;height:100%;background:'+color+';"></div></div>';
+}
+function loadReports(){
+  fetch('/api/points/reports/admin',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
+    var html='';
+    html+='<div class="card"><div class="section-title">📊 ترتيب المجموعات</div>';
+    if(!d.groups.length){html+='<div class="empty">لا توجد بيانات بعد</div>';}
+    else{
+      var maxG=Math.max.apply(null,d.groups.map(function(g){return g.total||0;}).concat([1]));
+      html+='<table><thead><tr><th>المجموعة</th><th>إجمالي النقاط</th><th>عدد الأحداث</th><th>عدد الطلبة</th><th></th></tr></thead><tbody>';
+      d.groups.forEach(function(g){
+        html+='<tr><td><b>'+_esc(g.g)+'</b></td><td>'+g.total+'</td><td>'+g.events+'</td><td>'+g.students+'</td><td style="width:35%;">'+_bar(g.total,maxG,'#6B3FA0')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    html+='</div>';
+
+    html+='<div class="card"><div class="section-title">👩‍🏫 نشاط المعلمين</div>';
+    if(!d.teachers.length){html+='<div class="empty">لا توجد بيانات بعد</div>';}
+    else{
+      var maxT=Math.max.apply(null,d.teachers.map(function(t){return t.events||0;}).concat([1]));
+      html+='<table><thead><tr><th>المعلم/المعلمة</th><th>عدد الأحداث</th><th>إجمالي النقاط</th><th></th></tr></thead><tbody>';
+      d.teachers.forEach(function(t){
+        html+='<tr><td><b>'+_esc(t.awarded_by_name||'—')+'</b></td><td>'+t.events+'</td><td>'+t.total+'</td><td style="width:35%;">'+_bar(t.events,maxT,'#1565C0')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+
+/* ── Notifications tab ────────────────────────────────────── */
+function loadNotifications(){
+  fetch('/api/points/notifications?status=pending',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
+    var html='<div class="card"><div class="section-title">📱 إشعارات الواتساب المعلقة</div>';
+    html+='<div style="font-size:0.88rem;color:#666;margin-bottom:10px;">انقر على أيقونة الواتساب لفتح المحادثة وإرسال الرسالة، ثم اضغط "تم الإرسال".</div>';
+    if(!d.rows.length){html+='<div class="empty">لا توجد إشعارات معلقة</div>';}
+    else{
+      html+='<table><thead><tr><th>الطالب</th><th>الرقم</th><th>الرسالة</th><th>الإجراء</th></tr></thead><tbody>';
+      d.rows.forEach(function(n){
+        var phone=(n.phone||'').replace(/[^\d+]/g,'').replace(/^\+?/,'');
+        var waUrl=phone?'https://wa.me/'+phone+'?text='+encodeURIComponent(n.message||''):'#';
+        html+='<tr><td><b>'+_esc(n.student_name||'')+'</b></td>'
+          +'<td style="direction:ltr;">'+_esc(n.phone||'—')+'</td>'
+          +'<td style="white-space:pre-line;font-size:0.85rem;color:#333;max-width:400px;">'+_esc(n.message||'')+'</td>'
+          +'<td>'
+          +(phone?'<a href="'+waUrl+'" target="_blank" class="btn btn-deliver" style="text-decoration:none;display:inline-block;">📱 فتح واتساب</a> ':'')
+          +'<button class="btn btn-pri" onclick="markNotifSent('+n.id+')">تم الإرسال</button>'
+          +'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+function markNotifSent(id){
+  fetch('/api/points/notifications/'+id+'/sent',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم التحديث');loadNotifications();}else{toast(d.error||'خطأ',false);}
+  });
+}
+
+/* ── Settings tab ─────────────────────────────────────────── */
+function loadSettings(){
+  fetch('/api/settings',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    var s=(d.settings||{}).points||{};
+    var notif=s.auto_notify_parent||{};
+    var on=String(notif.value||'0')==='1';
+    var html='<div class="card"><div class="section-title">⚙️ إعدادات نظام النقاط</div>';
+    html+='<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;">'
+       +'<div><b>'+(notif.label||'إشعار ولي الأمر تلقائياً عند منح/خصم نقاط')+'</b><div style="font-size:0.82rem;color:#666;">عند التفعيل، يتم إنشاء رسالة واتساب جاهزة لكل عملية منح في تبويب "إشعارات الواتساب".</div></div>'
+       +'<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleNotify(this.checked)" style="width:20px;height:20px;cursor:pointer;"><span>'+(on?'مفعّل':'متوقف')+'</span></label>'
+       +'</div>';
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+  });
+}
+function toggleNotify(on){
+  fetch('/api/settings',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({page:'points',component:'auto_notify_parent',value:on?'1':'0'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.ok!==false){toast('تم الحفظ');loadSettings();}else{toast('خطأ',false);}
+  });
+}
+
+loadBehaviors();
+</script>
+</body></html>"""
+
+
+POINTS_BOARD_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>لوحة الصف — نظام النقاط</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;padding:0;direction:rtl;min-height:100vh;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);position:sticky;top:0;z-index:10;}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:800;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:7px 14px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.group-pick{padding:6px 10px;border-radius:8px;border:1.4px solid #c4a8e8;background:#fff;font-family:inherit;font-weight:700;color:#4a148c;}
+.body{padding:14px;max-width:1400px;margin:0 auto;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
+.card{background:#fff;border-radius:14px;padding:14px 12px;text-align:center;box-shadow:0 4px 16px rgba(107,63,160,.12);cursor:pointer;transition:transform .15s,box-shadow .2s;border:2px solid transparent;position:relative;user-select:none;}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(107,63,160,.22);}
+.card.selected{border-color:#6B3FA0;background:#faf7ff;}
+.card.pulse{animation:pulse .55s ease;}
+@keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.06);box-shadow:0 8px 24px rgba(76,175,80,.5);}100%{transform:scale(1);}}
+.card.pulse-neg{animation:pulseNeg .55s ease;}
+@keyframes pulseNeg{0%{transform:scale(1);}50%{transform:scale(1.06);box-shadow:0 8px 24px rgba(244,67,54,.5);}100%{transform:scale(1);}}
+.avatar{font-size:3rem;line-height:1;margin-bottom:6px;}
+.sname{font-weight:800;font-size:0.96rem;color:#212121;margin-bottom:4px;line-height:1.25;min-height:2.4em;}
+.bal{font-size:1.6rem;font-weight:900;color:#4a148c;}
+.lvl{font-size:0.78rem;color:#666;font-weight:700;margin-top:2px;}
+.checkbox{position:absolute;top:8px;right:8px;width:22px;height:22px;border:2px solid #c4a8e8;border-radius:6px;background:#fff;}
+.card.selected .checkbox{background:#6B3FA0;border-color:#6B3FA0;}
+.card.selected .checkbox::before{content:'✓';color:#fff;font-weight:900;display:block;line-height:18px;}
+.toolbar{position:sticky;top:62px;z-index:9;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:10px;margin:-14px -14px 14px -14px;border-bottom:1px solid #e1d4ec;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.toolbar .selcount{font-weight:800;color:#4a148c;}
+.btn{padding:8px 14px;border-radius:9px;border:none;cursor:pointer;font-weight:700;font-family:inherit;font-size:0.88rem;}
+.btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+.btn-clear{background:#fafafa;color:#666;border:1px solid #ddd;}
+.empty{padding:40px;text-align:center;color:#999;font-weight:700;}
+.menu{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;align-items:center;justify-content:center;padding:14px;}
+.menu.show{display:flex;}
+.menu-box{background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:84vh;overflow:auto;}
+.menu-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:800;border-radius:16px 16px 0 0;}
+.menu-tabs{display:flex;background:#f8f3ff;}
+.menu-tabs button{flex:1;padding:10px;background:none;border:none;font-family:inherit;font-weight:800;cursor:pointer;color:#4a148c;border-bottom:3px solid transparent;}
+.menu-tabs button.active{border-bottom-color:#6B3FA0;background:#fff;}
+.bhv-list{padding:10px;}
+.bhv-row{display:flex;align-items:center;gap:10px;padding:10px;border:1.4px solid #e0e0e0;border-radius:10px;cursor:pointer;margin-bottom:6px;background:#fff;transition:transform .12s;}
+.bhv-row:hover{transform:translateY(-1px);background:#fafafa;}
+.bhv-row .ico{font-size:1.6rem;}
+.bhv-row .nm{flex:1;font-weight:700;color:#212121;}
+.bhv-row .pv{font-weight:900;font-size:1.05rem;}
+.bhv-row.pos .pv{color:#1B5E20;}
+.bhv-row.neg .pv{color:#c62828;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+@media (max-width:600px){
+  .grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .card{padding:10px 6px;}
+  .avatar{font-size:2.2rem;}
+  .sname{font-size:0.82rem;min-height:2em;}
+  .bal{font-size:1.2rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>🌟 لوحة الصف</h1>
+  <select id="grpSel" class="group-pick" onchange="changeGroup(this.value)"></select>
+  <a href="/dashboard">← الرئيسية</a>
+</div>
+<div class="body">
+  <div class="toolbar">
+    <span class="selcount" id="sc">المختار: 0</span>
+    <button class="btn btn-pri" onclick="openGrant()" id="grantBtn" disabled>منح نقاط</button>
+    <button class="btn btn-clear" onclick="clearSel()">إلغاء التحديد</button>
+    <span style="flex:1;"></span>
+    <a href="#" onclick="event.preventDefault();selAll();" style="color:#4a148c;font-weight:700;text-decoration:none;">تحديد الكل</a>
+  </div>
+  <div id="grid" class="grid"></div>
+</div>
+<div class="menu" id="menu">
+  <div class="menu-box">
+    <div class="menu-head">
+      <span id="menuTitle">منح نقاط</span>
+      <span style="cursor:pointer;font-size:1.4rem;line-height:1;" onclick="closeMenu()">×</span>
+    </div>
+    <div class="menu-tabs">
+      <button class="active" id="tabPos" onclick="setMenuTab('positive')">✨ إيجابي</button>
+      <button id="tabNeg" onclick="setMenuTab('negative')">⚠ سلبي</button>
+    </div>
+    <div class="bhv-list" id="bhvList"></div>
+  </div>
+</div>
+<div class="toast" id="t"></div>
+
+<script>
+var GROUP=__GROUP_ARG__;
+var STATE={students:[], selected:{}, behaviors:[], menuTab:'positive'};
+
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg, ok){var t=document.getElementById('t');t.textContent=msg;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);}
+
+function init(){
+  fetch('/api/points/groups',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('grpSel');
+    var gs=(d.groups||[]);
+    if(!gs.length){
+      sel.innerHTML='<option>—</option>';
+      document.getElementById('grid').innerHTML='<div class="empty">لا توجد مجموعات متاحة</div>';
+      return;
+    }
+    if(!GROUP || gs.indexOf(GROUP)<0) GROUP=gs[0];
+    sel.innerHTML=gs.map(function(g){return '<option '+(g===GROUP?'selected':'')+'>'+_esc(g)+'</option>';}).join('');
+    fetch('/api/points/behaviors',{credentials:'include'}).then(function(r){return r.json();}).then(function(d2){
+      STATE.behaviors=d2.rows||[];
+      loadGroup();
+    });
+  });
+}
+function changeGroup(g){
+  GROUP=g;
+  history.replaceState({},'','/points/board/'+encodeURIComponent(g));
+  loadGroup();
+}
+function loadGroup(){
+  document.getElementById('grid').innerHTML='<div class="empty">جاري التحميل...</div>';
+  STATE.selected={};
+  updateToolbar();
+  fetch('/api/points/group?group='+encodeURIComponent(GROUP),{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('grid').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
+    STATE.students=d.students||[];
+    render();
+  });
+}
+function render(){
+  var g=document.getElementById('grid');
+  if(!STATE.students.length){g.innerHTML='<div class="empty">لا يوجد طلبة في هذه المجموعة</div>';return;}
+  g.innerHTML=STATE.students.map(function(s){
+    var av=s.avatar_emoji||'😊';
+    var lvl=(s.level&&s.level.name_ar)?(s.level.badge_icon+' '+s.level.name_ar):'';
+    var sel=STATE.selected[s.id]?'selected':'';
+    return '<div class="card '+sel+'" id="card-'+s.id+'" onclick="toggleSel('+s.id+',event)">'
+      +'<div class="checkbox"></div>'
+      +'<div class="avatar">'+_esc(av)+'</div>'
+      +'<div class="sname">'+_esc(s.student_name)+'</div>'
+      +'<div class="bal">'+s.balance+'</div>'
+      +'<div class="lvl">'+_esc(lvl)+'</div>'
+      +'</div>';
+  }).join('');
+}
+function toggleSel(sid){
+  if(STATE.selected[sid]) delete STATE.selected[sid]; else STATE.selected[sid]=true;
+  var c=document.getElementById('card-'+sid);
+  if(c) c.classList.toggle('selected');
+  updateToolbar();
+}
+function clearSel(){STATE.selected={};document.querySelectorAll('.card.selected').forEach(function(c){c.classList.remove('selected');});updateToolbar();}
+function selAll(){STATE.students.forEach(function(s){STATE.selected[s.id]=true;});document.querySelectorAll('.card').forEach(function(c){c.classList.add('selected');});updateToolbar();}
+function updateToolbar(){
+  var n=Object.keys(STATE.selected).length;
+  document.getElementById('sc').textContent='المختار: '+n;
+  document.getElementById('grantBtn').disabled=(n===0);
+}
+function openGrant(){
+  if(!Object.keys(STATE.selected).length){toast('اختر طالباً أو أكثر',false);return;}
+  setMenuTab('positive');
+  document.getElementById('menuTitle').textContent='منح نقاط لـ '+Object.keys(STATE.selected).length+' طالب';
+  document.getElementById('menu').classList.add('show');
+}
+function closeMenu(){document.getElementById('menu').classList.remove('show');}
+function setMenuTab(t){
+  STATE.menuTab=t;
+  document.getElementById('tabPos').classList.toggle('active',t==='positive');
+  document.getElementById('tabNeg').classList.toggle('active',t==='negative');
+  var rows=STATE.behaviors.filter(function(b){return b.type===t;});
+  document.getElementById('bhvList').innerHTML=rows.map(function(b){
+    var pv=b.points_value>=0?'+'+b.points_value:b.points_value;
+    return '<div class="bhv-row '+(t==='positive'?'pos':'neg')+'" onclick="grant('+b.id+')">'
+      +'<div class="ico">'+_esc(b.icon||'•')+'</div>'
+      +'<div class="nm">'+_esc(b.name_ar)+'</div>'
+      +'<div class="pv">'+pv+'</div>'
+      +'</div>';
+  }).join('') || '<div class="empty">لا يوجد سلوك</div>';
+}
+function grant(bid){
+  var sids=Object.keys(STATE.selected).map(function(x){return parseInt(x,10);});
+  if(!sids.length){closeMenu();return;}
+  var bhv=STATE.behaviors.find(function(b){return b.id===bid;});
+  fetch('/api/points/grant',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({student_ids:sids,behavior_id:bid,group_name:GROUP})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){toast(d.error||'خطأ',false);return;}
+    var pos=(bhv.points_value>=0);
+    d.results.forEach(function(res){
+      if(!res.ok) return;
+      var stu=STATE.students.find(function(s){return s.id===res.student_id;});
+      if(stu) stu.balance=res.balance;
+      var c=document.getElementById('card-'+res.student_id);
+      if(c){
+        c.classList.remove('pulse','pulse-neg');
+        void c.offsetWidth;
+        c.classList.add(pos?'pulse':'pulse-neg');
+        var bal=c.querySelector('.bal');
+        if(bal) bal.textContent=res.balance;
+      }
+    });
+    toast('✅ تم منح '+bhv.name_ar+' لـ '+d.granted_to+' طالب');
+    clearSel();
+    closeMenu();
+    setTimeout(loadGroup,800);
+  }).catch(function(){toast('خطأ في الاتصال',false);});
+}
+init();
+</script>
+</body></html>"""
+
+
+@app.route('/points/manage')
+@login_required
+def points_manage_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return redirect("/dashboard")
+    return POINTS_MANAGE_HTML
+
+
+@app.route('/points/board')
+@app.route('/points/board/<path:group>')
+@login_required
+def points_board_page(group=None):
+    user = session.get("user") or {}
+    if _pts_user_role(user) not in ("admin", "manager", "teacher"):
+        return redirect("/dashboard")
+    # Inline-encode the group name as a JS string so the page knows
+    # which group to load. json.dumps handles all the quoting safely.
+    g_arg = json.dumps(group or "", ensure_ascii=False)
+    return POINTS_BOARD_HTML.replace("__GROUP_ARG__", g_arg)
 
 
 if __name__ == "__main__":
