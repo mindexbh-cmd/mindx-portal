@@ -7340,27 +7340,30 @@ function _tShowAlert(text, kind){
 }
 
 function _tFmtGroupOption(g){
-  // g may be a plain string (legacy) or an object {name, study_days, study_time}.
+  // g may be:
+  //   - a plain string (legacy)
+  //   - an object {name, schedule, study_days, study_time, ramadan_time, online_time}
+  // The new mode-aware backend annotates each group with `schedule`
+  // (the right time column for the active center mode). We prefer
+  // it; if absent (older response shape), fall back to combining
+  // study_days + study_time the legacy way.
   if (!g) return '';
   if (typeof g === 'string') return g;
   var name = String(g.name || '').trim();
-  var days = String(g.study_days || '').trim();
-  var time = String(g.study_time || '').trim();
-  /* Spec: always wrap in parens. If schedule is missing or
-     incomplete, surface a placeholder so the admin notices the
-     gap without blocking selection.
-       both present  → "name (الأيام - الوقت)"
-       only days     → "name (الأيام - لم يُحدد الوقت)"
-       only time     → "name (لم تُحدد الأيام - الوقت)"
-       neither       → "name (لم يُحدد الوقت)" */
-  var DAYS_MISSING = '\u0644\u0645 \u062A\u064F\u062D\u062F\u062F \u0627\u0644\u0623\u064A\u0627\u0645';
+  var schedule = String(g.schedule || '').trim();
+  if (!schedule){
+    // Legacy fallback: build from days + time. Also try the other
+    // mode-specific time columns in case the backend didn't
+    // annotate (e.g., a teacher loaded the page during a deploy
+    // that returned the old payload shape).
+    var days = String(g.study_days   || '').trim();
+    var time = String(g.study_time   || g.ramadan_time || g.online_time || '').trim();
+    if (days && time) schedule = days + ' - ' + time;
+    else if (days)    schedule = days;
+    else if (time)    schedule = time;
+  }
   var TIME_MISSING = '\u0644\u0645 \u064A\u064F\u062D\u062F\u062F \u0627\u0644\u0648\u0642\u062A';
-  var sched;
-  if (days && time)      sched = days + ' - ' + time;
-  else if (days)         sched = days + ' - ' + TIME_MISSING;
-  else if (time)         sched = DAYS_MISSING + ' - ' + time;
-  else                   sched = TIME_MISSING;
-  return name + ' (' + sched + ')';
+  return name + ' (' + (schedule || TIME_MISSING) + ')';
 }
 function tLoadGroups(){
   var sel = document.getElementById('t-group');
@@ -16924,11 +16927,11 @@ def _teacher_groups_for(db, user):
 
 
 def _teacher_groups_detailed_for(db, user):
-    """Same teacher → groups mapping as `_teacher_groups_for`, but each
-    entry is a dict carrying the schedule fields the teacher dropdown
-    formats next to the group name (study_days + study_time). Reads
-    columns defensively in case the live `student_groups` table is on
-    an older schema."""
+    """Same teacher → groups mapping as `_teacher_groups_for`, but
+    each entry carries every schedule column the teacher dropdown
+    might surface (study_time, ramadan_time, online_time, plus the
+    legacy study_days for back-compat). Defensive against missing
+    columns on older DBs."""
     keys = _teacher_match_keys(user)
     if not keys:
         return []
@@ -16937,8 +16940,8 @@ def _teacher_groups_detailed_for(db, user):
     except Exception:
         live = set()
     sel = ['group_name', 'teacher_name']
-    if 'study_days' in live: sel.append('study_days')
-    if 'study_time' in live: sel.append('study_time')
+    for cand in ('study_days', 'study_time', 'ramadan_time', 'online_time'):
+        if cand in live: sel.append(cand)
     try:
         rows = db.execute(
             'SELECT ' + ', '.join('"' + c + '"' for c in sel) +
@@ -16956,9 +16959,11 @@ def _teacher_groups_detailed_for(db, user):
         if gn in seen: continue
         seen.add(gn)
         out.append({
-            "name":        gn,
-            "study_days": (rd.get('study_days') or '').strip(),
-            "study_time": (rd.get('study_time') or '').strip(),
+            "name":         gn,
+            "study_days":  (rd.get('study_days')  or '').strip(),
+            "study_time":  (rd.get('study_time')  or '').strip(),
+            "ramadan_time":(rd.get('ramadan_time') or '').strip(),
+            "online_time": (rd.get('online_time') or '').strip(),
         })
     out.sort(key=lambda g: g["name"])
     return out
@@ -17023,27 +17028,46 @@ def _teacher_mode_filtered_groups(db, user, mode):
         if kn and md: exc_map[kn] = md
 
     is_online = (mode == "\u0623\u0648\u0646\u0644\u0627\u064A\u0646")
+    is_ramadan = (mode == "\u0631\u0645\u0636\u0627\u0646")
+    def _decorate(g, used_mode):
+        """Pick the right time column for this mode and put it on a
+        flat `schedule` field; collapse to the legacy days+time
+        combo if needed for older callers."""
+        gd = dict(g)
+        # Choose the per-mode column. Fall back to study_time (where
+        # admins enter the combined day+time string) if the mode-
+        # specific column is empty — so an in-person group seen
+        # under أونلاين still shows ITS in-person time rather than
+        # the placeholder.
+        if used_mode == "\u0623\u0648\u0646\u0644\u0627\u064A\u0646":
+            sched = gd.get("online_time") or gd.get("study_time") or ""
+        elif used_mode == "\u0631\u0645\u0636\u0627\u0646":
+            sched = gd.get("ramadan_time") or gd.get("study_time") or ""
+        else:
+            sched = gd.get("study_time") or ""
+        # If a legacy study_days survives, prepend it for prettiness.
+        days = (gd.get("study_days") or "").strip()
+        if days and sched and (days not in sched):
+            sched = days + " - " + sched
+        elif days and not sched:
+            sched = days
+        gd["schedule"] = (sched or "").strip()
+        gd["used_mode"] = used_mode
+        return gd
     out = []
     for gn, g in owned_index.items():
         ex = exc_map.get(gn)
         if ex:
-            # Excepted group: visible only when global mode matches
-            # the override. (Spec: "appears in the dropdown only when
-            # the teacher is recording attendance for [E]-excepted
-            # students; otherwise it follows the global mode rule" —
-            # "follows the global mode rule" is satisfied because the
-            # exception itself defines the mode.)
             if ex == mode:
-                out.append(g)
+                out.append(_decorate(g, ex))
             continue
         kset = kinds.get(gn, set())
         if is_online:
             if "online" in kset:
-                out.append(g)
+                out.append(_decorate(g, mode))
         else:
-            # حضوري / رمضان both source from group_name_student
             if "in-person" in kset:
-                out.append(g)
+                out.append(_decorate(g, mode))
     out.sort(key=lambda g: g["name"])
     return out
 
