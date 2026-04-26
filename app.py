@@ -1931,6 +1931,39 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
     <a href="/dashboard">&#x2190; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
   </div>
 </div>
+<!-- Section selector: two top-level buttons. Default is no
+     section open per spec. -->
+<div id="settings-section-buttons" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+  <button type="button" id="set-sec-backup-btn" onclick="setShowSection(\'backup\')" class="set-sec-btn">
+    &#x1F4BE; &#x0627;&#x0644;&#x0646;&#x0633;&#x062E; &#x0627;&#x0644;&#x0627;&#x062D;&#x062A;&#x064A;&#x0627;&#x0637;&#x064A;
+  </button>
+  <button type="button" id="set-sec-other-btn" onclick="setShowSection(\'other\')" class="set-sec-btn">
+    &#x2699;&#xFE0F; &#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A; &#x0623;&#x062E;&#x0631;&#x0649;
+  </button>
+</div>
+<style>
+  .set-sec-btn{padding:14px 28px;border-radius:14px;border:2px solid #c4a8e8;background:#fff;color:#4a148c;font-weight:800;font-size:16px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(107,63,160,.08);transition:all .15s ease;flex:1 1 220px;justify-content:center;}
+  .set-sec-btn:hover{background:#faf7ff;transform:translateY(-1px);box-shadow:0 5px 14px rgba(107,63,160,.12);}
+  .set-sec-btn.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;box-shadow:0 5px 16px rgba(107,63,160,.32);}
+  #settings-empty-hint{padding:30px 20px;text-align:center;color:#6B3FA0;font-weight:700;font-size:14px;background:#fff;border:2px dashed #c4a8e8;border-radius:14px;margin-bottom:14px;}
+</style>
+
+<!-- Empty hint shown by default until the user picks a section. -->
+<div id="settings-empty-hint">
+  &#x2192; &#x0627;&#x062E;&#x062A;&#x0631; &#x0623;&#x062D;&#x062F; &#x0627;&#x0644;&#x0623;&#x0642;&#x0633;&#x0627;&#x0645; &#x0623;&#x0639;&#x0644;&#x0627;&#x0647; &#x0644;&#x0639;&#x0631;&#x0636; &#x0627;&#x0644;&#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A;
+</div>
+
+<!-- Backup section: embed /admin/backups via iframe so every
+     backup feature (manual, auto-download toggle, schedule, email,
+     history, auto-pre-destructive) keeps working unchanged. -->
+<div id="settings-backup-section" style="display:none;">
+  <iframe id="set-backup-iframe" src="about:blank" style="width:100%;height:80vh;border:none;border-radius:14px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,0.05);"></iframe>
+</div>
+
+<!-- Other settings section: holds every existing settings card and
+     control. Wrapped here so we can hide it when the backup section
+     is open. -->
+<div id="settings-other-section" style="display:none;">
 <div id="tabs" class="tabs"></div>
 <div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup-excel" type="button" style="background:#6B3FA0;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4CA; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x643;&#x640; Excel</button><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x646;&#x633;&#x62E;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x646;&#x64A;&#x629; &#x1F512;</button></div>
 <div id="msg-tpl-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
@@ -1942,6 +1975,7 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
   <div style="display:flex;justify-content:flex-end;margin-top:10px;"><button id="set-tpl-save" type="button" style="background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;font-size:13.5px;cursor:pointer;">&#x1F4BE; &#x62D;&#x641;&#x638; &#x627;&#x644;&#x642;&#x648;&#x627;&#x644;&#x628;</button></div>
 </div>
 <div id="workspace" class="loading-full">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</div>
+</div>  <!-- /#settings-other-section -->
 <div id="toast" class="toast"></div>
 <script>
 /* ---------------- color helpers ---------------- */
@@ -2451,6 +2485,33 @@ loadAll();
   });
   load();
 })();
+
+/* ── Section toggle (النسخ الاحتياطي / إعدادات أخرى) ────────── */
+function setShowSection(which){
+  var bk  = document.getElementById('settings-backup-section');
+  var oth = document.getElementById('settings-other-section');
+  var hint = document.getElementById('settings-empty-hint');
+  var bkBtn  = document.getElementById('set-sec-backup-btn');
+  var othBtn = document.getElementById('set-sec-other-btn');
+  if (which === 'backup'){
+    bk.style.display = 'block';
+    oth.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    bkBtn.classList.add('active'); othBtn.classList.remove('active');
+    /* Lazy-load the iframe so the backup page only fetches when
+       this section is opened. /admin/backups is admin-only; if the
+       user lacks the role the page itself redirects to /dashboard. */
+    var ifr = document.getElementById('set-backup-iframe');
+    if (ifr && (!ifr.src || ifr.src.indexOf('about:blank') === 0)){
+      ifr.src = '/admin/backups';
+    }
+  } else if (which === 'other'){
+    bk.style.display = 'none';
+    oth.style.display = 'block';
+    if (hint) hint.style.display = 'none';
+    othBtn.classList.add('active'); bkBtn.classList.remove('active');
+  }
+}
 </script>
 </body>
 </html>"""
