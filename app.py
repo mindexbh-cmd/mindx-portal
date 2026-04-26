@@ -5385,12 +5385,18 @@ function _msgPaySendOne(idx){
   var phone = _msgPayCleanPhone(r.whatsapp);
   if (!phone) return;
   var tpl  = document.getElementById('msg-pay-tpl').value || _msgPayDefaultTpl;
-  var text = _msgPayFillTemplate(tpl, r);
-  var url  = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(text);
-  window.open(url, '_blank');
-  /* Also log to message_log so سجل الرسائل records it. */
-  fetch('/api/message-log', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-    body: JSON.stringify({student_name: r.name || '', student_whatsapp: phone, template_name: 'تذكير بالدفع'})}).catch(function(){});
+  /* Resolve {س:...} placeholders for this student, then apply the
+     legacy {اسم_الطالب} substitutions, then open wa.me. */
+  var resolveP = (typeof window.mxResolveTemplate === 'function')
+    ? window.mxResolveTemplate(tpl, r.id)
+    : Promise.resolve(tpl);
+  resolveP.then(function(resolved){
+    var text = _msgPayFillTemplate(resolved, r);
+    var url  = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(text);
+    window.open(url, '_blank');
+    fetch('/api/message-log', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+      body: JSON.stringify({student_name: r.name || '', student_whatsapp: phone, template_name: 'تذكير بالدفع'})}).catch(function(){});
+  });
 }
 function msgPayBulkSend(){
   var checked = Array.prototype.slice.call(document.querySelectorAll('.msg-pay-cb:checked'));
@@ -6485,35 +6491,59 @@ function _pmDueSendOne(i){
   var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
   var phone = _pmDueCleanPhone(r.whatsapp);
   if (!phone){ _pmToast('لا يوجد رقم هاتف للطالب', 'error'); return; }
-  var msg = _pmDueFillTemplate(tpl, r);
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
-  _pmDueLogSend([{ student_id: r.student_id, name: r.name, group: r.group, n: r.n }], msg);
-  r.last_sent_at = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
-  r.last_sent_by = 'الآن';
-  _pmDueRender();
+  /* Resolve any {س:...} placeholders against THIS student's row data
+     before applying the legacy {اسم_الطالب} placeholders. */
+  var resolveP = (typeof window.mxResolveTemplate === 'function')
+    ? window.mxResolveTemplate(tpl, r.student_id)
+    : Promise.resolve(tpl);
+  resolveP.then(function(resolved){
+    var msg = _pmDueFillTemplate(resolved, r);
+    window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    _pmDueLogSend([{ student_id: r.student_id, name: r.name, group: r.group, n: r.n }], msg);
+    r.last_sent_at = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
+    r.last_sent_by = 'الآن';
+    _pmDueRender();
+  });
 }
 
 function _pmDueSendBatch(rows){
   if (!rows.length){ _pmToast('لا يوجد طلاب للإرسال', 'warn'); return; }
   var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
-  var sent = 0, skipped = 0, logged = [];
   var nowStr = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
-  for (var i=0;i<rows.length;i++){
-    var r = rows[i];
-    var phone = _pmDueCleanPhone(r.whatsapp);
-    if (!phone){ skipped++; continue; }
-    var msg = _pmDueFillTemplate(tpl, r);
-    window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
-    logged.push({ student_id: r.student_id, name: r.name, group: r.group, n: r.n });
-    r.last_sent_at = nowStr;
-    r.last_sent_by = 'الآن';
-    sent++;
+  var ids = rows.map(function(r){ return r.student_id; }).filter(function(x){ return x; });
+  var hasVar = /\{\s*\u0633\s*:[^}]+\}/.test(tpl);
+  var resolveP;
+  if (hasVar && typeof window.fetch === 'function'){
+    resolveP = fetch('/api/vars/render-batch', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body: JSON.stringify({ template: tpl, student_ids: ids })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      return (d && d.ok && d.rendered) ? d.rendered : {};
+    }).catch(function(){ return {}; });
+  } else {
+    resolveP = Promise.resolve({});
   }
-  if (logged.length) _pmDueLogSend(logged, '(template)');
-  var msgOut = 'تم فتح ' + sent + ' محادثة';
-  if (skipped) msgOut += ' ، تخطي ' + skipped + ' (بدون رقم)';
-  _pmToast(msgOut, skipped ? 'warn' : 'success');
-  _pmDueRender();
+  resolveP.then(function(rendered){
+    var sent = 0, skipped = 0, logged = [];
+    for (var i=0;i<rows.length;i++){
+      var r = rows[i];
+      var phone = _pmDueCleanPhone(r.whatsapp);
+      if (!phone){ skipped++; continue; }
+      var perStudent = rendered[r.student_id] || tpl;
+      var msg = _pmDueFillTemplate(perStudent, r);
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+      logged.push({ student_id: r.student_id, name: r.name, group: r.group, n: r.n });
+      r.last_sent_at = nowStr;
+      r.last_sent_by = 'الآن';
+      sent++;
+    }
+    if (logged.length) _pmDueLogSend(logged, '(template)');
+    var msgOut = 'تم فتح ' + sent + ' محادثة';
+    if (skipped) msgOut += ' ، تخطي ' + skipped + ' (بدون رقم)';
+    _pmToast(msgOut, skipped ? 'warn' : 'success');
+    _pmDueRender();
+  });
 }
 
 function _pmDueSendSelected(){
@@ -13961,6 +13991,241 @@ def api_messaging_templates_get():
             {"key": "{المتبقي}", "desc": "المبلغ المتبقي"},
         ],
     })
+
+import re as _vars_re_module
+_VAR_PLACEHOLDER_RE = _vars_re_module.compile(
+    r"\{\s*\u0633\s*:\s*([^}]+?)\s*-\s*([^}]+?)\s*\}"
+)
+
+
+def _vars_table_label_to_internal(label, db):
+    """Map an Arabic table label back to its internal name.
+    Falls back to identity if the user pasted the raw name."""
+    label = (label or "").strip()
+    if not label:
+        return None
+    try:
+        row = db.execute(
+            "SELECT tbl_name FROM table_labels WHERE tbl_label=?", (label,)
+        ).fetchone()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    for k, v in BUILT_IN_TABLE_LABELS.items():
+        if (v or "").strip() == label:
+            return k
+    if label in get_all_tables():
+        return label
+    return None
+
+
+def _vars_col_label_to_internal(table, label, db):
+    """Map an Arabic column label back to the column's internal key."""
+    label = (label or "").strip()
+    if not label or not table:
+        return None
+    cmap = _column_label_map(table) or {}
+    for k, v in cmap.items():
+        if (v or "").strip() == label:
+            return k
+    if label in cmap:
+        return label
+    return None
+
+
+def _vars_safe_col(col):
+    """Allow any column name that doesn't carry SQL-quote-breaking
+    chars. Permits Arabic identifiers (taqseet uses them)."""
+    if not col:
+        return False
+    return ('"' not in col) and ("\\" not in col) and ("\x00" not in col)
+
+
+def _lookup_var_value(db, tbl, col, sid):
+    """Look up the cell value for the given (table, column) keyed
+    against the student's row. Returns None if anything fails."""
+    if not _vars_safe_col(col):
+        return None
+    qcol = '"' + col + '"'
+    try:
+        s = db.execute("SELECT * FROM students WHERE id=?", (sid,)).fetchone()
+    except Exception:
+        s = None
+    if not s:
+        return None
+    sd = dict(s)
+    try:
+        if tbl == "students":
+            return sd.get(col)
+        elif tbl == "student_groups":
+            gn = (sd.get("group_name_student") or "").strip()
+            if not gn:
+                return None
+            row = db.execute(
+                "SELECT " + qcol + " FROM student_groups "
+                "WHERE TRIM(group_name)=TRIM(?) LIMIT 1",
+                (gn,),
+            ).fetchone()
+            return row[0] if row else None
+        elif tbl == "taqseet":
+            method = (sd.get("installment_type") or "").strip()
+            if not method:
+                return None
+            try:
+                tq_cols = {r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()}
+            except Exception:
+                tq_cols = set()
+            match_col = None
+            for cand in ("taqseet_method", "\u0637\u0631\u064A\u0642\u0629_\u0627\u0644\u062A\u0642\u0633\u064A\u0637"):
+                if cand in tq_cols:
+                    match_col = cand; break
+            if not match_col:
+                return None
+            row = db.execute(
+                "SELECT " + qcol + ' FROM taqseet WHERE "' + match_col + '"=? LIMIT 1',
+                (method,),
+            ).fetchone()
+            return row[0] if row else None
+        elif tbl == "payment_log":
+            pid = (sd.get("personal_id") or "").strip()
+            if not pid:
+                return None
+            row = db.execute(
+                "SELECT " + qcol + " FROM payment_log WHERE personal_id=? LIMIT 1",
+                (pid,),
+            ).fetchone()
+            return row[0] if row else None
+        elif tbl == "attendance":
+            nm = (sd.get("student_name") or "").strip()
+            if not nm:
+                return None
+            row = db.execute(
+                "SELECT " + qcol + " FROM attendance "
+                "WHERE TRIM(student_name)=TRIM(?) ORDER BY id DESC LIMIT 1",
+                (nm,),
+            ).fetchone()
+            return row[0] if row else None
+        elif tbl == "evaluations":
+            nm = (sd.get("student_name") or "").strip()
+            if not nm:
+                return None
+            row = db.execute(
+                "SELECT " + qcol + " FROM evaluations "
+                "WHERE TRIM(student_name)=TRIM(?) ORDER BY id DESC LIMIT 1",
+                (nm,),
+            ).fetchone()
+            return row[0] if row else None
+    except Exception:
+        return None
+    return None
+
+
+def _resolve_template_for_student(template, sid, db):
+    """Substitute every {\u0633:Arabic_table_label - Arabic_col_label}
+    placeholder in `template` with the looked-up value for the student
+    with id == sid. Unknown placeholders are left in place (visible to
+    the admin so they know which one didn't resolve)."""
+    if not template:
+        return template
+    def repl(m):
+        tlabel = (m.group(1) or "").strip()
+        clabel = (m.group(2) or "").strip()
+        tbl = _vars_table_label_to_internal(tlabel, db)
+        if not tbl: return m.group(0)
+        col = _vars_col_label_to_internal(tbl, clabel, db)
+        if not col: return m.group(0)
+        v = _lookup_var_value(db, tbl, col, sid)
+        return "" if v is None else str(v)
+    return _VAR_PLACEHOLDER_RE.sub(repl, template)
+
+
+@app.route('/api/vars/tables', methods=['GET'])
+@login_required
+def api_vars_tables():
+    """List every public table with its Arabic display label, sorted
+    by label. Used by the variable picker."""
+    out = []
+    for tname in get_all_tables():
+        # Hide internal/system tables — keep only the ones the user
+        # already sees in the database UI.
+        if tname.startswith('sqlite_') or tname == 'schema_migrations':
+            continue
+        if tname in ('users', 'sessions', 'session_durations',
+                     'column_labels', 'group_col_labels',
+                     'att_col_labels', 'eval_col_labels',
+                     'taqseet_col_labels', 'paylog_col_labels',
+                     'custom_table_cols', 'custom_table_rows',
+                     'custom_tables', 'table_labels', 'settings',
+                     'message_templates', 'message_reminders',
+                     'parent_receipts', 'payment_edits',
+                     'payment_messages', 'student_payments'):
+            # Internal — exclude from the picker. The user spec listed
+            # the tables they care about (طلبة، مجموعات، أقساط، سجل
+            # الدفع، سجل الغياب، التقييمات).
+            continue
+        out.append({
+            "name":  tname,
+            "label": _table_display_label(tname),
+        })
+    out.sort(key=lambda x: x["label"])
+    return jsonify({"ok": True, "tables": out})
+
+
+@app.route('/api/vars/columns', methods=['GET'])
+@login_required
+def api_vars_columns():
+    """List every column of the given table with its Arabic display
+    label. The column picker uses this; cascading on the table choice."""
+    table = (request.args.get('table') or '').strip()
+    if not table:
+        return jsonify({"ok": False, "error": "table required"}), 400
+    if not _is_safe_ident(table):
+        return jsonify({"ok": False, "error": "invalid table"}), 400
+    cmap = _column_label_map(table) or {}
+    skip = {"id", "created_at"}
+    out = []
+    for c in get_table_columns(table):
+        if c in skip: continue
+        out.append({
+            "name":  c,
+            "label": cmap.get(c, c),
+        })
+    out.sort(key=lambda x: x["label"])
+    return jsonify({"ok": True, "table": table, "columns": out})
+
+
+@app.route('/api/vars/render-batch', methods=['POST'])
+@login_required
+def api_vars_render_batch():
+    """Resolve a template for many students in one call. Body:
+    {template: <string>, student_ids: [int, ...]}.
+    Returns: {ok, rendered: {sid: text, ...}}.
+    Templates without any {\u0633:...} placeholder are returned as-is
+    without touching the DB."""
+    d = request.get_json() or {}
+    tpl = d.get("template") or ""
+    ids = d.get("student_ids") or []
+    if not isinstance(ids, list):
+        return jsonify({"ok": False, "error": "student_ids must be a list"}), 400
+    rendered = {}
+    if not tpl or not _VAR_PLACEHOLDER_RE.search(tpl):
+        for sid in ids:
+            try: rendered[int(sid)] = tpl
+            except Exception: continue
+        return jsonify({"ok": True, "rendered": rendered, "noop": True})
+    db = get_db()
+    for sid in ids:
+        try:
+            isid = int(sid)
+        except Exception:
+            continue
+        try:
+            rendered[isid] = _resolve_template_for_student(tpl, isid, db)
+        except Exception:
+            rendered[isid] = tpl
+    return jsonify({"ok": True, "rendered": rendered})
+
 
 @app.route('/api/messaging/templates', methods=['PUT', 'PATCH'])
 @login_required
@@ -22011,6 +22276,239 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       });
       mo.observe(document.body, { childList:true, subtree:true });
     }
+
+  /* ── Template variable picker {س:table - column} ──────────────── */
+  (function(){
+    if (window._MX_VAR_PICKER_INSTALLED) return;
+    window._MX_VAR_PICKER_INSTALLED = true;
+
+    var styleId = 'mx-var-picker-style';
+    if (!document.getElementById(styleId)){
+      var style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = [
+        '#mx-var-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:11000;align-items:center;justify-content:center;direction:rtl;font-family:inherit;}',
+        '#mx-var-modal.show{display:flex;}',
+        '#mx-var-modal .box{background:#fff;border-radius:14px;width:min(520px,92vw);box-shadow:0 12px 40px rgba(0,0,0,0.3);overflow:hidden;}',
+        '#mx-var-modal .head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:800;}',
+        '#mx-var-modal .head .x{cursor:pointer;font-size:1.6rem;line-height:1;}',
+        '#mx-var-modal .body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}',
+        '#mx-var-modal label{font-weight:700;color:#4a148c;font-size:13px;display:block;margin-bottom:5px;}',
+        '#mx-var-modal select{width:100%;padding:9px 12px;border:1.4px solid #c4a8e8;border-radius:9px;background:#faf7ff;font-size:14px;font-weight:600;direction:rtl;font-family:inherit;}',
+        '#mx-var-modal .preview{background:#f5f0ff;border:1.5px dashed #8B5CC8;border-radius:9px;padding:8px 12px;font-size:13px;color:#4a148c;direction:rtl;word-break:break-word;}',
+        '#mx-var-modal .actions{display:flex;gap:10px;justify-content:flex-end;padding:12px 18px;border-top:1px solid #eee;background:#fafafa;}',
+        '#mx-var-modal .btn{padding:9px 22px;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;border:none;}',
+        '#mx-var-modal .btn.cancel{background:#eceff1;color:#455a64;}',
+        '#mx-var-modal .btn.insert{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}',
+        '#mx-var-modal .btn:disabled{opacity:.5;cursor:not-allowed;}',
+        '.mx-var-btn{background:#f5f0ff;border:1.5px solid #c4a8e8;color:#4a148c;padding:5px 12px;border-radius:7px;font-weight:800;cursor:pointer;font-size:12.5px;font-family:inherit;}',
+        '.mx-var-btn:hover{background:#ede5ff;}'
+      ].join('\n');
+      document.head.appendChild(style);
+    }
+
+    function _ensureModal(){
+      var m = document.getElementById('mx-var-modal');
+      if (m) return m;
+      m = document.createElement('div');
+      m.id = 'mx-var-modal';
+      m.innerHTML = ''
+        + '<div class="box" onclick="event.stopPropagation();">'
+        +   '<div class="head"><span>\u062D\u0631\u0641 \u0633: \u0625\u062F\u0631\u0627\u062C \u0645\u062A\u063A\u064A\u0631 \u0645\u0646 \u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A</span><span class="x">&times;</span></div>'
+        +   '<div class="body">'
+        +     '<div><label>\u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644</label><select id="mx-var-tbl"><option value="">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</option></select></div>'
+        +     '<div><label>\u0627\u062E\u062A\u0631 \u0627\u0644\u0639\u0645\u0648\u062F</label><select id="mx-var-col" disabled><option value="">\u2014 \u0627\u062E\u062A\u0631 \u062C\u062F\u0648\u0644\u0627\u064B \u0623\u0648\u0644\u0627\u064B \u2014</option></select></div>'
+        +     '<div><label>\u0645\u0639\u0627\u064A\u0646\u0629</label><div class="preview" id="mx-var-preview">\u2014</div></div>'
+        +   '</div>'
+        +   '<div class="actions">'
+        +     '<button class="btn cancel" id="mx-var-cancel">\u0625\u0644\u063A\u0627\u0621</button>'
+        +     '<button class="btn insert" id="mx-var-insert" disabled>\u0625\u062F\u0631\u0627\u062C</button>'
+        +   '</div>'
+        + '</div>';
+      m.addEventListener('click', function(e){ if (e.target === m) _close(); });
+      m.querySelector('.x').addEventListener('click', _close);
+      m.querySelector('#mx-var-cancel').addEventListener('click', _close);
+      m.querySelector('#mx-var-insert').addEventListener('click', _doInsert);
+      m.querySelector('#mx-var-tbl').addEventListener('change', _onTableChange);
+      m.querySelector('#mx-var-col').addEventListener('change', _onColChange);
+      document.body.appendChild(m);
+      return m;
+    }
+
+    var _activeTextarea = null;
+    var _tablesCache = null;
+    var _colsCache   = {};
+    function _close(){
+      var m = document.getElementById('mx-var-modal');
+      if (m) m.classList.remove('show');
+      _activeTextarea = null;
+    }
+    function _refreshPreview(){
+      var t = document.getElementById('mx-var-tbl');
+      var c = document.getElementById('mx-var-col');
+      var p = document.getElementById('mx-var-preview');
+      var ins = document.getElementById('mx-var-insert');
+      var tlabel = t && t.options[t.selectedIndex] ? t.options[t.selectedIndex].textContent : '';
+      var clabel = c && c.options[c.selectedIndex] ? c.options[c.selectedIndex].textContent : '';
+      if (t.value && c.value){
+        p.textContent = '{\u0633:' + tlabel + ' - ' + clabel + '}';
+        ins.disabled = false;
+      } else {
+        p.textContent = '\u2014';
+        ins.disabled = true;
+      }
+    }
+    function _onTableChange(){
+      var tsel = document.getElementById('mx-var-tbl');
+      var csel = document.getElementById('mx-var-col');
+      var t = tsel.value;
+      csel.innerHTML = '<option value="">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</option>';
+      csel.disabled = true;
+      if (!t){ _refreshPreview(); return; }
+      var done = function(list){
+        csel.innerHTML = '<option value="">\u2014 \u0627\u062E\u062A\u0631 \u0627\u0644\u0639\u0645\u0648\u062F \u2014</option>';
+        for (var i=0;i<list.length;i++){
+          var o = document.createElement('option');
+          o.value = list[i].name; o.textContent = list[i].label;
+          csel.appendChild(o);
+        }
+        csel.disabled = false;
+        _refreshPreview();
+      };
+      if (_colsCache[t]) { done(_colsCache[t]); return; }
+      fetch('/api/vars/columns?table=' + encodeURIComponent(t), {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var list = (d && d.ok && d.columns) ? d.columns : [];
+          _colsCache[t] = list;
+          done(list);
+        })
+        .catch(function(){ done([]); });
+    }
+    function _onColChange(){ _refreshPreview(); }
+    function _populateTables(){
+      var sel = document.getElementById('mx-var-tbl');
+      var done = function(list){
+        sel.innerHTML = '<option value="">\u2014 \u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644 \u2014</option>';
+        for (var i=0;i<list.length;i++){
+          var o = document.createElement('option');
+          o.value = list[i].name; o.textContent = list[i].label;
+          sel.appendChild(o);
+        }
+      };
+      if (_tablesCache){ done(_tablesCache); return; }
+      fetch('/api/vars/tables', {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var list = (d && d.ok && d.tables) ? d.tables : [];
+          _tablesCache = list;
+          done(list);
+        })
+        .catch(function(){ done([]); });
+    }
+    function _doInsert(){
+      if (!_activeTextarea) { _close(); return; }
+      var t = document.getElementById('mx-var-tbl');
+      var c = document.getElementById('mx-var-col');
+      if (!t.value || !c.value) return;
+      var tlabel = t.options[t.selectedIndex].textContent;
+      var clabel = c.options[c.selectedIndex].textContent;
+      var token = '{\u0633:' + tlabel + ' - ' + clabel + '}';
+      var ta = _activeTextarea;
+      var start = ta.selectionStart || 0;
+      var end   = ta.selectionEnd   || 0;
+      var v = ta.value || '';
+      ta.value = v.substring(0, start) + token + v.substring(end);
+      var pos = start + token.length;
+      ta.focus();
+      try { ta.setSelectionRange(pos, pos); } catch(e){}
+      // Fire input/change so any autosaving listener picks it up.
+      ta.dispatchEvent(new Event('input', {bubbles:true}));
+      _close();
+    }
+
+    window.mxOpenVarPicker = function(target){
+      var ta = (typeof target === 'string') ? document.getElementById(target) : target;
+      if (!ta || !('selectionStart' in ta)) return;
+      _activeTextarea = ta;
+      var m = _ensureModal();
+      // Refresh tables every open so a brand-new table appears here too.
+      _tablesCache = null; _colsCache = {};
+      _populateTables();
+      var csel = document.getElementById('mx-var-col');
+      csel.innerHTML = '<option value="">\u2014 \u0627\u062E\u062A\u0631 \u062C\u062F\u0648\u0644\u0627\u064B \u0623\u0648\u0644\u0627\u064B \u2014</option>';
+      csel.disabled = true;
+      document.getElementById('mx-var-tbl').value = '';
+      _refreshPreview();
+      m.classList.add('show');
+    };
+
+    /* Resolve {س:...} placeholders for a single student via the
+       /api/vars/render-batch endpoint. No-op when the template has
+       no placeholder, so existing call sites pay nothing. */
+    var _MX_VAR_RE = /\{\s*\u0633\s*:\s*[^}]+?\s*-\s*[^}]+?\s*\}/;
+    window.mxResolveTemplate = function(template, studentId){
+      if (!template || !_MX_VAR_RE.test(template)) return Promise.resolve(template || '');
+      var sid = parseInt(studentId, 10);
+      if (!sid) return Promise.resolve(template);
+      return fetch('/api/vars/render-batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({ template: template, student_ids: [sid] })
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.ok && d.rendered && d.rendered[sid] != null) return d.rendered[sid];
+        return template;
+      }).catch(function(){ return template; });
+    };
+
+    /* Auto-attach an "إضافة متغير" button next to known template
+       textareas. Idempotent — safe to call multiple times. */
+    function _attachVarButton(ta){
+      if (!ta || ta.dataset.mxVarAttached === '1') return;
+      ta.dataset.mxVarAttached = '1';
+      var bar;
+      // Look for the same flex row that hosts the existing 💾 save
+      // button (sibling of the textarea, before it in the DOM).
+      var prev = ta.previousElementSibling;
+      while (prev){
+        if (prev.querySelector && prev.querySelector('button')){ bar = prev; break; }
+        prev = prev.previousElementSibling;
+      }
+      if (!bar) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mx-var-btn';
+      btn.textContent = '\u0633: \u0625\u0636\u0627\u0641\u0629 \u0645\u062A\u063A\u064A\u0631';
+      btn.title = '\u0625\u0636\u0627\u0641\u0629 \u0645\u062A\u063A\u064A\u0631 \u0645\u0646 \u062C\u062F\u0648\u0644 \u062F\u064A\u0646\u0627\u0645\u064A\u0643\u064A';
+      btn.style.marginLeft = '6px';
+      btn.addEventListener('click', function(){ window.mxOpenVarPicker(ta); });
+      // Insert next to the existing save button so the bar stays
+      // visually tight.
+      var saveBtn = bar.querySelector('button');
+      if (saveBtn && saveBtn.parentNode){
+        saveBtn.parentNode.insertBefore(btn, saveBtn);
+      } else {
+        bar.appendChild(btn);
+      }
+    }
+    function _scanVarHosts(){
+      var ids = ['msg-pay-tpl', 'pm-due-tpl'];
+      for (var i=0;i<ids.length;i++){
+        var ta = document.getElementById(ids[i]);
+        if (ta) _attachVarButton(ta);
+      }
+    }
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', _scanVarHosts);
+    } else {
+      _scanVarHosts();
+    }
+    // Modal-opens push the textareas into the DOM lazily; observe.
+    var mo2 = new MutationObserver(_scanVarHosts);
+    mo2.observe(document.body, { childList: true, subtree: true });
+  })();
+
     if (document.readyState === 'loading'){
       document.addEventListener('DOMContentLoaded', _boot);
     } else {
