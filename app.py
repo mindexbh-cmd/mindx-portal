@@ -6674,7 +6674,12 @@ select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
 
   <div class="card" id="t-table-card" style="display:none;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <div style="font-size:17px;font-weight:800;color:#00897B;">&#x0642;&#x0627;&#x0626;&#x0645;&#x0629; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="font-size:17px;font-weight:800;color:#00897B;">&#x0642;&#x0627;&#x0626;&#x0645;&#x0629; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;</div>
+        <button type="button" id="t-mark-all" onclick="tMarkAllPresent()" style="background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;border:none;padding:8px 18px;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(46,125,50,0.25);font-family:inherit;">
+          &#x2705; &#x062A;&#x062D;&#x062F;&#x064A;&#x062F; &#x0627;&#x0644;&#x0643;&#x0644; &#x062D;&#x0627;&#x0636;&#x0631;
+        </button>
+      </div>
       <div class="summary-pills" id="t-pills"></div>
     </div>
     <div class="tbl-wrap">
@@ -6763,6 +6768,18 @@ function _tStatusChanged(sel){
   _tStudents[i].status = sel.value || '';
   sel.className = 'status-sel ' + _tStatusClass(sel.value);
   _tUpdatePills();
+}
+
+function tMarkAllPresent(){
+  if (!_tStudents.length){
+    _tToast('\u0644\u0627 \u062A\u0648\u062C\u062F \u0637\u0644\u0628\u0629 \u0644\u0644\u062A\u062D\u062F\u064A\u062F','warn');
+    return;
+  }
+  for (var i=0;i<_tStudents.length;i++){
+    _tStudents[i].status = '\u062D\u0627\u0636\u0631';
+  }
+  _tRender();
+  _tToast('\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u062C\u0645\u064A\u0639 \u0627\u0644\u0637\u0644\u0628\u0629 \u0643\u062D\u0627\u0636\u0631 (' + _tStudents.length + ')');
 }
 
 function _tUpdatePills(){
@@ -7109,7 +7126,9 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         <span>&#9997;&#65039; &#1603;&#1588;&#1601; &#1575;&#1604;&#1581;&#1590;&#1608;&#1585;</span>
         <span id="attSectionGroupName" style="color:#26A69A;font-size:16px;"></span>
       </div>
-
+      <button type="button" class="btn-mark-all-present" onclick="markAllPresent()" id="btnMarkAllPresent" style="background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;border:none;padding:10px 22px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(46,125,50,0.25);">
+        &#x2705; &#x062A;&#x062D;&#x062F;&#x064A;&#x062F; &#x0627;&#x0644;&#x0643;&#x0644; &#x062D;&#x0627;&#x0636;&#x0631;
+      </button>
     </div>
     <div class="att-table-wrap">
       <table>
@@ -7512,6 +7531,24 @@ function onStatusChange(sel) {
   } else {
     actionCell.innerHTML = '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</button>';
   }
+}
+
+// One-click bulk-mark-all-present. Sets every status dropdown in the
+// attendance table to \u062D\u0627\u0636\u0631 ("present") and pipes
+// each through the standard onStatusChange so the row's CSS class +
+// WhatsApp action cell update consistently. Users can still tweak
+// individual rows afterwards before saving.
+function markAllPresent() {
+  var sels = document.querySelectorAll('#attTableBody .status-select');
+  if (!sels.length) {
+    if (typeof showToast === 'function') showToast('\u0644\u0627 \u062A\u0648\u062C\u062F \u0635\u0641\u0648\u0641 \u0644\u0644\u062A\u062D\u062F\u064A\u062F', '#FB8C00');
+    return;
+  }
+  for (var i = 0; i < sels.length; i++) {
+    sels[i].value = '\u062D\u0627\u0636\u0631';
+    onStatusChange(sels[i]);
+  }
+  if (typeof showToast === 'function') showToast('\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u062C\u0645\u064A\u0639 \u0627\u0644\u0637\u0644\u0627\u0628 \u0643\u062D\u0627\u0636\u0631 (' + sels.length + ')', '#2E7D32');
 }
 
 // Multi-key lookup helpers for attendance records.
