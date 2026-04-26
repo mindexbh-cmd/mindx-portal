@@ -2421,7 +2421,7 @@ loadAll();
   if (btn){
     btn.addEventListener('click', function(){
       /* The technical ZIP needs an admin confirmation per spec. */
-      if (!confirm('سيتم تنزيل نسخة تقنية كاملة (كود + قواعد بيانات).\nهل تريد المتابعة؟')) return;
+      if (!confirm('سيتم تنزيل نسخة تقنية كاملة (كود + قواعد بيانات).\\nهل تريد المتابعة؟')) return;
       var prev = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = '⏳ جاري إنشاء النسخة الاحتياطية...';
