@@ -7346,11 +7346,21 @@ function _tFmtGroupOption(g){
   var name = String(g.name || '').trim();
   var days = String(g.study_days || '').trim();
   var time = String(g.study_time || '').trim();
-  var sched = '';
+  /* Spec: always wrap in parens. If schedule is missing or
+     incomplete, surface a placeholder so the admin notices the
+     gap without blocking selection.
+       both present  → "name (الأيام - الوقت)"
+       only days     → "name (الأيام - لم يُحدد الوقت)"
+       only time     → "name (لم تُحدد الأيام - الوقت)"
+       neither       → "name (لم يُحدد الوقت)" */
+  var DAYS_MISSING = '\u0644\u0645 \u062A\u064F\u062D\u062F\u062F \u0627\u0644\u0623\u064A\u0627\u0645';
+  var TIME_MISSING = '\u0644\u0645 \u064A\u064F\u062D\u062F\u062F \u0627\u0644\u0648\u0642\u062A';
+  var sched;
   if (days && time)      sched = days + ' - ' + time;
-  else if (days)         sched = days;
-  else if (time)         sched = time;
-  return sched ? (name + ' (' + sched + ')') : name;
+  else if (days)         sched = days + ' - ' + TIME_MISSING;
+  else if (time)         sched = DAYS_MISSING + ' - ' + time;
+  else                   sched = TIME_MISSING;
+  return name + ' (' + sched + ')';
 }
 function tLoadGroups(){
   var sel = document.getElementById('t-group');
@@ -16954,6 +16964,90 @@ def _teacher_groups_detailed_for(db, user):
     return out
 
 
+def _teacher_mode_filtered_groups(db, user, mode):
+    """The teacher's owned groups, filtered by which student column
+    references each group AND respecting group-level mode_exceptions.
+
+    Default rule:
+      - mode = أونلاين → keep only groups referenced via
+        students.group_online
+      - mode = حضوري | رمضان → keep only groups referenced via
+        students.group_name_student
+
+    Exception override (per-group): if mode_exceptions has a row
+    {scope=group, key_name=<group>, mode=<E>}, the group is shown
+    ONLY when global mode == E (its column-of-reference is ignored
+    for the visibility decision). Per spec point 7.
+
+    Returns the same shape as _teacher_groups_detailed_for: list of
+    {name, study_days, study_time}."""
+    if mode not in VALID_CENTER_MODES:
+        mode = _center_mode_default()
+    owned = _teacher_groups_detailed_for(db, user)
+    if not owned:
+        return []
+    owned_index = {g["name"]: g for g in owned}
+
+    # Tag every group referenced in students table with the kinds it
+    # appears under. kinds: 'online' (group_online column) or
+    # 'in-person' (group_name_student column).
+    kinds = {}
+    try:
+        rows = db.execute(
+            "SELECT group_name_student, group_online FROM students"
+        ).fetchall()
+    except Exception:
+        rows = []
+    for r in rows:
+        rd = dict(r) if hasattr(r, "keys") else {
+            "group_name_student": r[0] if len(r) > 0 else "",
+            "group_online":       r[1] if len(r) > 1 else "",
+        }
+        gn1 = (rd.get("group_name_student") or "").strip()
+        gn2 = (rd.get("group_online")       or "").strip()
+        if gn1: kinds.setdefault(gn1, set()).add("in-person")
+        if gn2: kinds.setdefault(gn2, set()).add("online")
+
+    # Group-level exceptions.
+    try:
+        exc_rows = db.execute(
+            "SELECT key_name, mode FROM mode_exceptions WHERE scope=\'group\'"
+        ).fetchall()
+    except Exception:
+        exc_rows = []
+    exc_map = {}
+    for r in exc_rows:
+        rd = dict(r) if hasattr(r, "keys") else {"key_name": r[0], "mode": r[1]}
+        kn = (rd.get("key_name") or "").strip()
+        md = (rd.get("mode")     or "").strip()
+        if kn and md: exc_map[kn] = md
+
+    is_online = (mode == "\u0623\u0648\u0646\u0644\u0627\u064A\u0646")
+    out = []
+    for gn, g in owned_index.items():
+        ex = exc_map.get(gn)
+        if ex:
+            # Excepted group: visible only when global mode matches
+            # the override. (Spec: "appears in the dropdown only when
+            # the teacher is recording attendance for [E]-excepted
+            # students; otherwise it follows the global mode rule" —
+            # "follows the global mode rule" is satisfied because the
+            # exception itself defines the mode.)
+            if ex == mode:
+                out.append(g)
+            continue
+        kset = kinds.get(gn, set())
+        if is_online:
+            if "online" in kset:
+                out.append(g)
+        else:
+            # حضوري / رمضان both source from group_name_student
+            if "in-person" in kset:
+                out.append(g)
+    out.sort(key=lambda g: g["name"])
+    return out
+
+
 def _require_teacher():
     """Returns (user_dict, error_response_or_None). Used at the top
     of every /api/teacher/* route to gate access."""
@@ -16978,12 +17072,20 @@ def teacher_attendance_page():
 @app.route('/api/teacher/groups', methods=['GET'])
 @login_required
 def api_teacher_groups():
+    """Returns the teacher's groups, filtered by the active center
+    mode (حالة المركز) — أونلاين shows only group_online refs;
+    حضوري / رمضان shows only group_name_student refs. Group-level
+    mode_exceptions take precedence. Each entry carries study_days
+    + study_time so the frontend can render "(الأيام - الوقت)"
+    next to the group name."""
     user, err = _require_teacher()
     if err: return err
     db = get_db()
-    detailed = _teacher_groups_detailed_for(db, user)
+    mode = _get_center_mode(db)
+    detailed = _teacher_mode_filtered_groups(db, user, mode)
     return jsonify({
         "ok":     True,
+        "mode":   mode,
         "groups": detailed,
         # Plain list retained for any older caller that expects strings.
         "names":  [g["name"] for g in detailed],
