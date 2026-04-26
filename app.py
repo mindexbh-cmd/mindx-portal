@@ -1348,6 +1348,54 @@ if True:
             pass
         db2.commit()
 
+    # Comprehensive backup system migration. Adds metadata columns to
+    # backup_log so the new history view can render kind / size /
+    # email-status / file-path. The existing dashboard backup card
+    # continues to use the legacy schema (only username, filename,
+    # bytes_written, downloaded_at) — those columns stay intact.
+    if "backup_system_v1" not in applied:
+        try:
+            _bcols = {r[1] for r in db2.execute("PRAGMA table_info(backup_log)").fetchall()}
+        except Exception:
+            _bcols = set()
+        for _bc, _bt in (
+            ("kind",         "TEXT DEFAULT \'\'"),
+            ("reason",       "TEXT DEFAULT \'\'"),
+            ("path",         "TEXT DEFAULT \'\'"),
+            ("size_bytes",   "INTEGER DEFAULT 0"),
+            ("email_status", "TEXT DEFAULT \'\'"),
+            ("email_to",     "TEXT DEFAULT \'\'"),
+        ):
+            if _bc not in _bcols:
+                try: db2.execute("ALTER TABLE backup_log ADD COLUMN " + _bc + " " + _bt)
+                except Exception: pass
+        for _p, _c, _l, _v in (
+            ("backup", "schedule_kind",    "\u062C\u062F\u0648\u0644\u0629 \u0627\u0644\u0646\u0633\u062E", "off"),
+            ("backup", "schedule_time",    "\u0648\u0642\u062A \u0627\u0644\u062C\u062F\u0648\u0644\u0629", "02:00"),
+            ("backup", "schedule_day",     "\u064A\u0648\u0645 \u0627\u0644\u0623\u0633\u0628\u0648\u0639", "0"),
+            ("backup", "email_recipients", "\u0625\u064A\u0645\u064A\u0644 \u0627\u0644\u062A\u0633\u0644\u064A\u0645", ""),
+            ("backup", "keep_count",       "\u0639\u062F\u062F \u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0645\u062D\u0641\u0648\u0638\u0629", "30"),
+        ):
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                    "ON CONFLICT(page,component) DO NOTHING",
+                    (_p, _c, _l, _v),
+                )
+            except Exception:
+                try:
+                    db2.execute(
+                        "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                        (_p, _c, _l, _v),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("backup_system_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -13752,6 +13800,424 @@ def get_table_columns(table_name):
         return []
 
 
+_BACKUP_DIR = None
+def _backup_dir():
+    """Resolve a writable directory for backup files. /tmp is the
+    standard ephemeral location on Render — files survive the dyno
+    lifetime, which is enough for users to download or for the
+    auto-email path to attach them. Admins can mirror to durable
+    storage by changing BACKUP_DIR env."""
+    global _BACKUP_DIR
+    if _BACKUP_DIR: return _BACKUP_DIR
+    import os as _os, tempfile
+    p = _os.environ.get("BACKUP_DIR") or _os.path.join(tempfile.gettempdir(), "mindex_backups")
+    try: _os.makedirs(p, exist_ok=True)
+    except Exception: pass
+    _BACKUP_DIR = p
+    return p
+
+
+def _backup_arabic_table_name(internal):
+    """Best-effort Arabic display name for a table — used as the
+    sheet name in the Excel export. Falls back to the internal name."""
+    try:
+        return _table_display_label(internal) or internal
+    except Exception:
+        return internal
+
+
+def _backup_arabic_col_name(table, internal):
+    try:
+        cmap = _column_label_map(table) or {}
+        return cmap.get(internal, internal)
+    except Exception:
+        return internal
+
+
+def _backup_collect_tables(db):
+    """List every public/sqlite table the backup should include."""
+    try:
+        if USE_PG:
+            rows = db.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema=\'public\' AND table_type=\'BASE TABLE\' "
+                "ORDER BY table_name"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT name FROM sqlite_master WHERE type=\'table\' "
+                "AND name NOT LIKE \'sqlite_%\' ORDER BY name"
+            ).fetchall()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+def _backup_table_columns(db, t):
+    try:
+        return [r[1] for r in db.execute("PRAGMA table_info(" + t + ")").fetchall()]
+    except Exception:
+        return []
+
+
+def _backup_build_excel(db):
+    """Excel export — one sheet per table, Arabic sheet + column
+    names, RTL alignment, frozen header. Returns bytes."""
+    import io as _io
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+    except Exception as ex:
+        raise RuntimeError("openpyxl not available: " + str(ex))
+    wb = Workbook()
+    wb.remove(wb.active)
+    used_titles = set()
+    def _safe_title(name, maxlen=31):
+        t = (name or "table")
+        for ch in "[]:*?/\\":
+            t = t.replace(ch, "_")
+        t = t[:maxlen] or "table"
+        base = t; i = 2
+        while t in used_titles:
+            suf = "_" + str(i)
+            t = (base[: maxlen - len(suf)] + suf)
+            i += 1
+        used_titles.add(t)
+        return t
+    arabic_font = Font(name="Tahoma", size=11)
+    header_font = Font(name="Tahoma", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="6B3FA0")
+    rtl_align = Alignment(horizontal="right", vertical="center", wrap_text=True, readingOrder=2)
+    for t in _backup_collect_tables(db):
+        cols = _backup_table_columns(db, t)
+        if not cols: continue
+        ws = wb.create_sheet(_safe_title(_backup_arabic_table_name(t)))
+        try: ws.sheet_view.rightToLeft = True
+        except Exception: pass
+        labels = [_backup_arabic_col_name(t, c) for c in cols]
+        for j, lbl in enumerate(labels, start=1):
+            cell = ws.cell(row=1, column=j, value=str(lbl))
+            cell.font = header_font; cell.fill = header_fill; cell.alignment = rtl_align
+        try:
+            data = db.execute("SELECT " + ",".join("\"" + c + "\"" for c in cols) + " FROM " + t).fetchall()
+        except Exception:
+            data = []
+        for ri, row in enumerate(data, start=2):
+            try:
+                vals = list(row) if not hasattr(row, "keys") else [row[k] for k in cols]
+            except Exception:
+                vals = list(row) if hasattr(row, "__iter__") else []
+            for j, v in enumerate(vals, start=1):
+                cell = ws.cell(row=ri, column=j, value=("" if v is None else (v if isinstance(v, (int, float)) else str(v))))
+                cell.font = arabic_font; cell.alignment = rtl_align
+        ws.freeze_panes = "A2"
+        for j in range(1, len(cols) + 1):
+            try:
+                col_letter = get_column_letter(j)
+                width = min(50, max(12, len(str(labels[j-1] or "")) + 4))
+                ws.column_dimensions[col_letter].width = width
+            except Exception:
+                pass
+    buf = _io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+
+def _backup_build_sql(db):
+    """SQL-style dump with CREATE TABLE-like comments + INSERT
+    statements. Round-trippable on SQLite + readable on Postgres."""
+    import datetime as _dt
+    out = []
+    out.append("-- Mindex backup SQL dump")
+    out.append("-- generated: " + _dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"))
+    out.append("")
+    for t in _backup_collect_tables(db):
+        cols = _backup_table_columns(db, t)
+        if not cols: continue
+        try:
+            rows = db.execute("SELECT " + ",".join("\"" + c + "\"" for c in cols) + " FROM " + t).fetchall()
+        except Exception:
+            rows = []
+        out.append("-- ── " + t + " (" + str(len(rows)) + " rows) ──")
+        out.append("-- columns: " + ", ".join(cols))
+        for r in rows:
+            try:
+                vals = list(r) if not hasattr(r, "keys") else [r[k] for k in cols]
+            except Exception:
+                vals = list(r) if hasattr(r, "__iter__") else []
+            parts = []
+            for v in vals:
+                if v is None:                     parts.append("NULL")
+                elif isinstance(v, (int, float)): parts.append(str(v))
+                else:                              parts.append("\'" + str(v).replace("\'", "\'\'") + "\'")
+            out.append("INSERT INTO \"" + t + "\" (" + ",".join("\"" + c + "\"" for c in cols) +
+                       ") VALUES (" + ",".join(parts) + ");")
+        out.append("")
+    return "\n".join(out).encode("utf-8")
+
+
+def _backup_send_email(zip_path, recipients, settings_kind):
+    """Best-effort SMTP send. Reads SMTP_HOST / SMTP_USER / SMTP_PASS
+    / SMTP_FROM env. Returns (status_str, error_str)."""
+    import os as _os
+    if not recipients:
+        return "skipped", "no recipients configured"
+    host = _os.environ.get("SMTP_HOST") or ""
+    if not host:
+        return "skipped", "SMTP_HOST not set"
+    user = _os.environ.get("SMTP_USER") or ""
+    pwd  = _os.environ.get("SMTP_PASS") or ""
+    sender = _os.environ.get("SMTP_FROM") or user or "mindx-backups@localhost"
+    try:
+        import smtplib, ssl
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.base import MIMEBase
+        from email.mime.text import MIMEText
+        from email import encoders
+        msg = MIMEMultipart()
+        msg["From"] = sender
+        msg["To"]   = ", ".join(recipients)
+        msg["Subject"] = "Mindex backup (" + settings_kind + ")"
+        msg.attach(MIMEText("نسخة احتياطية تلقائية - مرفقة بصيغة ZIP.", "plain", "utf-8"))
+        with open(zip_path, "rb") as f:
+            part = MIMEBase("application", "zip")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment",
+                        filename=_os.path.basename(zip_path))
+        msg.attach(part)
+        port = int(_os.environ.get("SMTP_PORT") or 587)
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP(host, port, timeout=20) as s:
+            try: s.starttls(context=ctx)
+            except Exception: pass
+            if user and pwd: s.login(user, pwd)
+            s.sendmail(sender, recipients, msg.as_string())
+        return "sent", ""
+    except Exception as ex:
+        return "failed", str(ex)
+
+
+def _create_full_backup(db, kind="manual", reason=""):
+    """Generate Excel + SQL, ZIP them, write to disk, log to
+    backup_log, optionally email. Returns the backup_log row dict
+    on success or raises on failure."""
+    import zipfile, os as _os, datetime as _dt
+    bdir = _backup_dir()
+    stamp = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    zip_name = "mindex_backup_" + stamp + ".zip"
+    zip_path = _os.path.join(bdir, zip_name)
+    excel_bytes = _backup_build_excel(db)
+    sql_bytes   = _backup_build_sql(db)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("mindex_backup_" + stamp + ".xlsx", excel_bytes)
+        zf.writestr("mindex_backup_" + stamp + ".sql",  sql_bytes)
+    try: size = _os.path.getsize(zip_path)
+    except Exception: size = 0
+    user = (session.get("user") or {}) if (request and "session" in str(type(session))) else {}
+    try: u = (session.get("user") or {})
+    except Exception: u = {}
+    username = u.get("username") or u.get("name") or "system"
+    recipients_raw = get_setting("backup", "email_recipients", "") or ""
+    recipients = [x.strip() for x in recipients_raw.replace(";", ",").split(",") if x.strip()]
+    email_status, email_err = _backup_send_email(zip_path, recipients, kind)
+    try:
+        db.execute(
+            "INSERT INTO backup_log(username, filename, bytes_written, kind, reason, "
+            "path, size_bytes, email_status, email_to) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            (username, zip_name, size, kind, reason, zip_path, size,
+             email_status, ", ".join(recipients) if recipients else ""),
+        )
+        db.commit()
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception as ex:
+        # Log row failed but file exists — return what we have.
+        new_id = None
+        import sys as _sys
+        print("[backup] log insert failed: " + str(ex), file=_sys.stderr)
+    # Rotate.
+    try:
+        keep = int(get_setting("backup", "keep_count", "30") or 30)
+    except Exception:
+        keep = 30
+    try:
+        rows = db.execute(
+            "SELECT id, path FROM backup_log "
+            "WHERE kind IN (\'manual\', \'scheduled\', \'pre-destructive\') "
+            "ORDER BY id DESC LIMIT 1000"
+        ).fetchall()
+        old = list(rows)[keep:] if len(list(rows)) > keep else []
+        for r in old:
+            rid_old = r[0] if not hasattr(r, "keys") else r["id"]
+            rpath   = r[1] if not hasattr(r, "keys") else r["path"]
+            try:
+                if rpath and _os.path.exists(rpath): _os.remove(rpath)
+            except Exception: pass
+            try: db.execute("DELETE FROM backup_log WHERE id=?", (rid_old,))
+            except Exception: pass
+        db.commit()
+    except Exception: pass
+    return {"id": new_id, "filename": zip_name, "path": zip_path,
+            "size_bytes": size, "kind": kind, "reason": reason,
+            "email_status": email_status, "email_error": email_err}
+
+
+def _pre_destructive_backup(reason):
+    """Hook called before any destructive operation. Runs a backup
+    silently. If it fails, raises RuntimeError so the caller can
+    BLOCK the destructive op + return the spec error message."""
+    db = get_db()
+    try:
+        info = _create_full_backup(db, kind="pre-destructive", reason=reason or "")
+        return info
+    except Exception as ex:
+        import sys as _sys
+        print("[pre-destructive backup] failed: " + str(ex), file=_sys.stderr)
+        raise RuntimeError("\u26A0 \u0641\u0634\u0644 \u0627\u0644\u0646\u0633\u062E "
+                           "\u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A "
+                           "\u0627\u0644\u062A\u0644\u0642\u0627\u0626\u064A \u2014 "
+                           "\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 "
+                           "\u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0644\u062D\u0645\u0627\u064A\u0629 "
+                           "\u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A")
+
+
+def _require_admin_response():
+    u = session.get("user") or {}
+    if (u.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin role required"}), 403
+    return None
+
+
+@app.route('/api/backups/run', methods=['POST'])
+@login_required
+def api_backups_run():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    d = request.get_json(silent=True) or {}
+    reason = (d.get("reason") or "manual").strip()
+    try:
+        info = _create_full_backup(db, kind="manual", reason=reason)
+        return jsonify({"ok": True, **info})
+    except Exception as ex:
+        import sys as _sys
+        print("[backup] manual run failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/backups', methods=['GET'])
+@login_required
+def api_backups_list():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, username, filename, bytes_written, COALESCE(downloaded_at, \'\') AS created_at, "
+            "       COALESCE(kind, \'manual\') AS kind, "
+            "       COALESCE(reason, \'\') AS reason, "
+            "       COALESCE(path, \'\') AS path, "
+            "       COALESCE(size_bytes, 0) AS size_bytes, "
+            "       COALESCE(email_status, \'\') AS email_status, "
+            "       COALESCE(email_to, \'\') AS email_to "
+            "FROM backup_log ORDER BY id DESC LIMIT 500"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = [dict(r) for r in rows]
+    return jsonify({"ok": True, "rows": out})
+
+
+@app.route('/api/backups/<int:bid>/download', methods=['GET'])
+@login_required
+def api_backups_download(bid):
+    err = _require_admin_response()
+    if err: return err
+    import os as _os
+    db = get_db()
+    row = db.execute(
+        "SELECT path, filename FROM backup_log WHERE id=?", (bid,)
+    ).fetchone()
+    if not row: return jsonify({"ok": False, "error": "not found"}), 404
+    rd = dict(row)
+    fp = rd.get("path") or _os.path.join(_backup_dir(), rd.get("filename") or "")
+    if not fp or not _os.path.exists(fp):
+        return jsonify({"ok": False, "error": "file missing on disk"}), 404
+    with open(fp, "rb") as f:
+        data = f.read()
+    return Response(
+        data,
+        mimetype="application/zip",
+        headers={"Content-Disposition": "attachment; filename=" + (rd.get("filename") or "backup.zip")},
+    )
+
+
+@app.route('/api/backups/<int:bid>', methods=['DELETE'])
+@login_required
+def api_backups_delete(bid):
+    err = _require_admin_response()
+    if err: return err
+    import os as _os
+    db = get_db()
+    row = db.execute("SELECT path FROM backup_log WHERE id=?", (bid,)).fetchone()
+    if row:
+        rd = dict(row)
+        fp = rd.get("path")
+        if fp and _os.path.exists(fp):
+            try: _os.remove(fp)
+            except Exception: pass
+    try:
+        db.execute("DELETE FROM backup_log WHERE id=?", (bid,))
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/backups/settings', methods=['GET'])
+@login_required
+def api_backups_settings_get():
+    err = _require_admin_response()
+    if err: return err
+    return jsonify({
+        "ok": True,
+        "schedule_kind":    get_setting("backup", "schedule_kind",    "off"),
+        "schedule_time":    get_setting("backup", "schedule_time",    "02:00"),
+        "schedule_day":     get_setting("backup", "schedule_day",     "0"),
+        "email_recipients": get_setting("backup", "email_recipients", ""),
+        "keep_count":       get_setting("backup", "keep_count",       "30"),
+    })
+
+
+@app.route('/api/backups/settings', methods=['PATCH', 'PUT'])
+@login_required
+def api_backups_settings_set():
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json() or {}
+    db = get_db()
+    pairs = []
+    for k in ("schedule_kind", "schedule_time", "schedule_day",
+              "email_recipients", "keep_count"):
+        if k in d:
+            pairs.append((k, str(d.get(k) or "")))
+    for component, value in pairs:
+        try:
+            cur = db.execute(
+                "UPDATE settings SET value=? WHERE page=? AND component=?",
+                (value, "backup", component),
+            )
+            if cur.rowcount == 0:
+                db.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                    ("backup", component, component, value),
+                )
+        except Exception:
+            pass
+    db.commit()
+    return jsonify({"ok": True, "updated": [p[0] for p in pairs]})
+
+
 @app.route('/api/backup/last', methods=['GET'])
 @login_required
 def api_backup_last():
@@ -16770,13 +17236,19 @@ def api_custom_tables_create():
 @app.route('/api/custom-tables/<int:tid>', methods=['DELETE'])
 @login_required
 def api_custom_tables_delete(tid):
+    # Auto-backup-before-destructive: takes a full backup first; if
+    # the backup fails, BLOCK the delete and return the spec error.
+    try:
+        _pre_destructive_backup("custom-table delete tid=" + str(tid))
+    except RuntimeError as _bx:
+        return jsonify({'ok': False, 'error': str(_bx)}), 500
     db = get_db()
     try:
         db.execute("DELETE FROM custom_table_rows WHERE table_id=?", (tid,))
         db.execute("DELETE FROM custom_table_cols WHERE table_id=?", (tid,))
         db.execute("DELETE FROM custom_tables WHERE id=?", (tid,))
         db.commit()
-        return jsonify({'ok': True})
+        return jsonify({'ok': True, 'auto_backup': True})
     except Exception as ex:
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
@@ -16851,11 +17323,15 @@ def api_custom_table_col_add(tid):
 @app.route('/api/custom-tables/<int:tid>/cols/<col_key>', methods=['DELETE'])
 @login_required
 def api_custom_table_col_delete(tid, col_key):
+    try:
+        _pre_destructive_backup("custom-table col delete tid=" + str(tid) + " key=" + col_key)
+    except RuntimeError as _bx:
+        return jsonify({'ok': False, 'error': str(_bx)}), 500
     db = get_db()
     try:
         db.execute("DELETE FROM custom_table_cols WHERE table_id=? AND col_key=?", (tid, col_key))
         db.commit()
-        return jsonify({'ok': True})
+        return jsonify({'ok': True, 'auto_backup': True})
     except Exception as ex:
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
@@ -23475,10 +23951,289 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 def mx_helpers_js():
     return Response(MX_HELPERS_JS, mimetype='application/javascript; charset=utf-8')
 
-for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML', 'SETTINGS_HTML', 'LOGIN_HTML'):
+ADMIN_BACKUPS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>النسخ الاحتياطية - Mindex</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:#f5f3ff;direction:rtl;min-height:100vh;}
+.topbar{background:linear-gradient(135deg,#1B5E20,#43A047);color:#fff;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.topbar h1{font-size:20px;font-weight:800;}
+.btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+.main{padding:24px 28px;max-width:1200px;margin:0 auto;}
+.card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(27,94,32,.1);margin-bottom:24px;}
+.card h2{color:#1B5E20;font-size:18px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.btn{background:linear-gradient(135deg,#1B5E20,#43A047);color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn:hover{filter:brightness(1.07);}
+.btn:disabled{opacity:.55;cursor:not-allowed;}
+.btn.del{background:#fff;color:#c62828;border:1.5px solid #c62828;}
+.btn.dl{background:linear-gradient(135deg,#1565C0,#1976D2);}
+input[type=text],input[type=time],input[type=number],select{padding:8px 12px;border:1.4px solid #a5d6a7;border-radius:9px;font-size:14px;background:#fff;font-family:inherit;direction:rtl;}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-weight:700;color:#1B5E20;font-size:12.5px;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:linear-gradient(135deg,#1B5E20,#43A047);color:#fff;}
+th,td{padding:10px 12px;font-size:13.5px;text-align:right;border-bottom:1px solid #e8f5e9;}
+.kind{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}
+.kind.manual{background:#e8f5e9;color:#1b5e20;}
+.kind.scheduled{background:#e3f2fd;color:#0d47a1;}
+.kind.pre-destructive{background:#fff3e0;color:#e65100;}
+.email-st{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.email-st.sent{background:#e8f5e9;color:#1b5e20;}
+.email-st.failed{background:#ffebee;color:#c62828;}
+.email-st.skipped{background:#eceff1;color:#546e7a;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1b5e20;color:#fff;padding:12px 26px;border-radius:30px;font-weight:700;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.error{background:#c62828;}
+.empty{padding:24px;text-align:center;color:#999;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>💾 النسخ الاحتياطية</h1>
+    <div style="font-size:12.5px;opacity:.92;">إدارة النسخ اليدوية والتلقائية + الجدولة + الإيميل + سجل العمليات</div>
+  </div>
+  <a href="/dashboard" class="btn-back">← الرئيسية</a>
+</div>
+<div class="main">
+
+  <div class="card">
+    <h2>⚙️ إعدادات النسخ الاحتياطية</h2>
+    <div class="row">
+      <div class="field">
+        <label>جدولة النسخ</label>
+        <select id="bk-schedule-kind">
+          <option value="off">يدوية فقط</option>
+          <option value="daily">يومية</option>
+          <option value="weekly">أسبوعية</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>الوقت (HH:MM)</label>
+        <input type="time" id="bk-schedule-time" value="02:00">
+      </div>
+      <div class="field" id="bk-day-field" style="display:none;">
+        <label>يوم الأسبوع</label>
+        <select id="bk-schedule-day">
+          <option value="6">السبت</option>
+          <option value="0">الأحد</option>
+          <option value="1">الإثنين</option>
+          <option value="2">الثلاثاء</option>
+          <option value="3">الأربعاء</option>
+          <option value="4">الخميس</option>
+          <option value="5">الجمعة</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1 1 280px;">
+        <label>إيميل التسليم (يمكن وضع أكثر من إيميل بفاصلة)</label>
+        <input type="text" id="bk-email" placeholder="example@mail.com, second@mail.com">
+      </div>
+      <div class="field">
+        <label>عدد النسخ المحفوظة</label>
+        <input type="number" id="bk-keep" min="1" max="200" value="30" style="width:90px;">
+      </div>
+      <button class="btn" onclick="bkSaveSettings()">💾 حفظ الإعدادات</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📦 نسخة احتياطية يدوية</h2>
+    <div class="row" style="align-items:center;">
+      <button class="btn" id="bk-run-btn" onclick="bkRunNow()">📥 إنشاء نسخة احتياطية الآن</button>
+      <span style="color:#555;font-size:13px;">سيتم إنشاء ملف ZIP يحتوي على Excel + SQL وإرساله بالإيميل (إن وجد) ثم إضافته للسجل أدناه.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📜 سجل النسخ الاحتياطية</h2>
+    <div id="bk-log-wrap">
+      <table id="bk-log">
+        <thead><tr>
+          <th>التاريخ والوقت</th>
+          <th>النوع</th>
+          <th>السبب</th>
+          <th>الحجم</th>
+          <th>الإيميل</th>
+          <th>الإجراءات</th>
+        </tr></thead>
+        <tbody id="bk-log-body"><tr><td colspan="6" class="empty">جاري التحميل...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="bk-toast" class="toast"></div>
+<script>
+function bkToast(msg, kind){
+  var el = document.getElementById('bk-toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (kind === 'error' ? ' error' : '');
+  setTimeout(function(){ el.className = 'toast'; }, 2800);
+}
+function bkFmtSize(n){
+  n = Number(n||0);
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/(1024*1024)).toFixed(2) + ' MB';
+}
+function bkKindLabel(k){
+  if (k === 'scheduled')        return 'تلقائية مجدولة';
+  if (k === 'pre-destructive')  return 'تلقائية - قبل عملية حساسة';
+  return 'يدوية';
+}
+function bkRender(rows){
+  var tb = document.getElementById('bk-log-body');
+  if (!rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">لا توجد نسخ بعد</td></tr>'; return; }
+  var html = '';
+  for (var i=0;i<rows.length;i++){
+    var r = rows[i];
+    var k = r.kind || 'manual';
+    var es = (r.email_status || '').toLowerCase();
+    var esLabel = es === 'sent' ? 'أُرسل' : (es === 'failed' ? 'فشل' : (es === 'skipped' ? 'متخطى' : '—'));
+    html += '<tr>'
+         + '<td style="direction:ltr;">' + (r.created_at || '—') + '</td>'
+         + '<td><span class="kind ' + k + '">' + bkKindLabel(k) + '</span></td>'
+         + '<td style="font-size:12px;color:#555;">' + (r.reason || '—') + '</td>'
+         + '<td>' + bkFmtSize(r.size_bytes || r.bytes_written) + '</td>'
+         + '<td>' + (es ? ('<span class="email-st ' + es + '">' + esLabel + '</span>') : '—') + '</td>'
+         + '<td>'
+         +   '<button class="btn dl" style="padding:6px 12px;font-size:12px;margin-left:6px;" onclick="bkDownload(' + r.id + ')">⬇️ تحميل</button>'
+         +   '<button class="btn del" style="padding:6px 12px;font-size:12px;" onclick="bkDelete(' + r.id + ')">🗑️ حذف</button>'
+         + '</td>'
+         + '</tr>';
+  }
+  tb.innerHTML = html;
+}
+function bkLoadList(){
+  fetch('/api/backups', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d && d.ok) bkRender(d.rows || []); else bkToast(d.error || 'تعذر التحميل', 'error'); })
+    .catch(function(){ bkToast('خطأ في الاتصال', 'error'); });
+}
+function bkLoadSettings(){
+  fetch('/api/backups/settings', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      document.getElementById('bk-schedule-kind').value = d.schedule_kind || 'off';
+      document.getElementById('bk-schedule-time').value = d.schedule_time || '02:00';
+      document.getElementById('bk-schedule-day').value  = d.schedule_day  || '0';
+      document.getElementById('bk-email').value         = d.email_recipients || '';
+      document.getElementById('bk-keep').value          = d.keep_count || '30';
+      _bkUpdateDayVis();
+    });
+}
+function _bkUpdateDayVis(){
+  var k = document.getElementById('bk-schedule-kind').value;
+  document.getElementById('bk-day-field').style.display = (k === 'weekly') ? 'flex' : 'none';
+}
+document.getElementById('bk-schedule-kind').addEventListener('change', _bkUpdateDayVis);
+function bkSaveSettings(){
+  var body = {
+    schedule_kind:    document.getElementById('bk-schedule-kind').value,
+    schedule_time:    document.getElementById('bk-schedule-time').value || '02:00',
+    schedule_day:     document.getElementById('bk-schedule-day').value || '0',
+    email_recipients: document.getElementById('bk-email').value || '',
+    keep_count:       document.getElementById('bk-keep').value || '30'
+  };
+  fetch('/api/backups/settings', { method:'PATCH', credentials:'include',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ bkToast(d && d.ok ? 'تم حفظ الإعدادات' : (d.error || 'تعذر الحفظ'), d && d.ok ? 'success' : 'error'); })
+    .catch(function(){ bkToast('خطأ في الاتصال', 'error'); });
+}
+function bkRunNow(){
+  var btn = document.getElementById('bk-run-btn');
+  btn.disabled = true; var prev = btn.innerHTML; btn.innerHTML = '⏳ جاري الإنشاء...';
+  fetch('/api/backups/run', { method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason:'manual run'}) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      btn.disabled = false; btn.innerHTML = prev;
+      if (d && d.ok) { bkToast('✅ تم إنشاء النسخة (' + (d.email_status === 'sent' ? 'تم الإرسال بالإيميل' : 'لم يتم الإرسال') + ')'); bkLoadList(); }
+      else { bkToast(d.error || 'فشل الإنشاء', 'error'); }
+    })
+    .catch(function(){ btn.disabled = false; btn.innerHTML = prev; bkToast('خطأ في الاتصال', 'error'); });
+}
+function bkDownload(id){
+  window.location.href = '/api/backups/' + id + '/download';
+}
+function bkDelete(id){
+  if (!confirm('حذف النسخة الاحتياطية؟ لا يمكن التراجع.')) return;
+  fetch('/api/backups/' + id, { method:'DELETE', credentials:'include' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d && d.ok){ bkToast('تم الحذف'); bkLoadList(); } else bkToast(d.error || 'تعذر الحذف', 'error'); })
+    .catch(function(){ bkToast('خطأ في الاتصال', 'error'); });
+}
+bkLoadSettings();
+bkLoadList();
+</script>
+</body>
+</html>"""
+
+for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML', 'SETTINGS_HTML', 'LOGIN_HTML', 'ADMIN_BACKUPS_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
+
+def _backup_scheduler_loop():
+    """Daemon thread: every 60s, check the schedule. If now matches,
+    fire a scheduled backup. Best-effort — Render dyno cycling can
+    miss windows; that's acceptable for this product."""
+    import time as _time, datetime as _dt
+    last_run_key = None
+    while True:
+        try:
+            _time.sleep(60)
+            with app.app_context():
+                db = get_db()
+                kind = (get_setting("backup", "schedule_kind", "off") or "off").strip().lower()
+                if kind not in ("daily", "weekly"): continue
+                tstr = (get_setting("backup", "schedule_time", "02:00") or "02:00").strip()
+                try: hh, mm = [int(x) for x in tstr.split(":")[:2]]
+                except Exception: hh, mm = 2, 0
+                day = (get_setting("backup", "schedule_day", "0") or "0").strip()
+                try: day = int(day)
+                except Exception: day = 0
+                now = _dt.datetime.now()
+                hit = (now.hour == hh and now.minute == mm)
+                if kind == "weekly":
+                    hit = hit and (now.weekday() == day)
+                if not hit: continue
+                key = now.strftime("%Y-%m-%d %H:%M") + "/" + kind
+                if key == last_run_key: continue
+                last_run_key = key
+                _create_full_backup(db, kind="scheduled", reason="auto " + kind)
+        except Exception as _ex:
+            import sys as _sys
+            print("[backup scheduler] " + str(_ex), file=_sys.stderr)
+
+
+def _start_backup_scheduler():
+    import threading
+    t = threading.Thread(target=_backup_scheduler_loop, daemon=True, name="mindex-backup-scheduler")
+    t.start()
+
+
+# Kick off the scheduler thread on module import (so it runs under
+# both `python app.py` and gunicorn). The thread is cheap (60s tick)
+# and exits with the process — no shutdown handler needed.
+try: _start_backup_scheduler()
+except Exception: pass
+
+
+@app.route('/admin/backups')
+@login_required
+def admin_backups_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return redirect("/dashboard")
+    return ADMIN_BACKUPS_HTML
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
