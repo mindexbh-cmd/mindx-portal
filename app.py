@@ -7835,48 +7835,57 @@ function saveAllAttendance() {
 
   var pending = total;
 
-  /* Track failures so the final toast can flag silent-redirect /
-     auth issues instead of pretending the save succeeded. */
+  /* Track failures so the final toast surfaces the real backend
+     error (read from response body, not "HTTP 400") and so we can
+     skip the post-save reload when anything went wrong — that
+     preserves the user's in-progress selections. */
   var failures = [];
+  function _readErr(r){
+    return r.json().then(function(d){
+      var msg = (d && d.error) ? d.error : ('HTTP ' + r.status);
+      failures.push(String(msg));
+    }).catch(function(){
+      failures.push('HTTP ' + r.status);
+    });
+  }
+  function _afterFetch(r){
+    if (!r.ok){
+      return _readErr(r).then(function(){ pending--; if(pending===0) finish(); });
+    }
+    return r.json().then(function(d){
+      if (d && d.ok) done++;
+      else if (d && d.error) failures.push(String(d.error));
+      pending--; if(pending===0) finish();
+    }).catch(function(){
+      failures.push('استجابة غير صالحة من الخادم');
+      pending--; if(pending===0) finish();
+    });
+  }
   saves.forEach(function(rec) {
     fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(rec) })
-      .then(function(r){
-        if (!r.ok) { failures.push('HTTP ' + r.status); pending--; if(pending===0) finish(); return; }
-        return r.json().then(function(d){
-          if (d && d.ok) done++;
-          else if (d && d.error) failures.push(d.error);
-          pending--; if(pending===0) finish();
-        });
-      })
-      .catch(function(err){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
+      .then(_afterFetch)
+      .catch(function(){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
   });
 
   updates.forEach(function(rec) {
     fetch('/api/attendance/' + rec.id, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(rec) })
-      .then(function(r){
-        if (!r.ok) { failures.push('HTTP ' + r.status); pending--; if(pending===0) finish(); return; }
-        return r.json().then(function(d){
-          if (d && d.ok) done++;
-          else if (d && d.error) failures.push(d.error);
-          pending--; if(pending===0) finish();
-        });
-      })
-      .catch(function(err){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
+      .then(_afterFetch)
+      .catch(function(){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
   });
 
-  /* Override finish() with a version that surfaces partial failures —
-     the legacy version already runs first because it is captured by
-     closure above; keep this defensive in case finish() is called from
-     a fetch that landed before saves.length+updates.length pending
-     were posted. */
-  var _origFinish = finish;
+  /* Override finish() to surface the actual server error AND skip
+     the reload when something failed so the user's selections aren't
+     wiped. Successful runs still reload via checkAndLoad so the
+     duplicate-prevention path keeps working. */
   finish = function(){
     btn.disabled = false;
     if (failures.length){
       showToast('فشل حفظ بعض السجلات: ' + failures[0], '#e53935');
-    } else {
-      showToast('تم حفظ ' + done + '/' + total + ' سجل', '#00897B');
+      /* Keep the user's in-progress selections visible — do NOT
+         call checkAndLoad here. */
+      return;
     }
+    showToast('تم حفظ ' + done + '/' + total + ' سجل', '#00897B');
     checkAndLoad(group, date);
   };
 }
@@ -15971,6 +15980,14 @@ def api_teacher_attendance_save():
         if status:
             status = STATUS_REMAP.get(status, status)
         contact = (raw.get('contact_number') or '').strip()
+        body = {
+            "attendance_date": iso_date,
+            "day_name":        day_name,
+            "group_name":      group,
+            "student_name":    sname,
+            "contact_number":  contact,
+            "status":          status,
+        }
         try:
             existing = db.execute(
                 "SELECT id FROM attendance WHERE student_name=? AND attendance_date=? AND group_name=?",
@@ -15978,26 +15995,20 @@ def api_teacher_attendance_save():
             ).fetchone()
         except Exception:
             existing = None
-        if existing:
-            try:
-                db.execute(
-                    "UPDATE attendance SET day_name=?, contact_number=?, status=? WHERE id=?",
-                    (day_name, contact, status, existing[0]),
-                )
+        try:
+            if existing:
+                rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
+                _attendance_dynamic_update(db, rid, body)
                 updated += 1
-            except Exception:
-                skipped += 1
-        else:
-            try:
-                db.execute(
-                    "INSERT INTO attendance(attendance_date, day_name, group_name, "
-                    "student_name, contact_number, status, message, message_status, study_status) "
-                    "VALUES(?,?,?,?,?,?,?,?,?)",
-                    (iso_date, day_name, group, sname, contact, status, '', '', ''),
-                )
+            else:
+                _attendance_dynamic_insert(db, body)
                 inserted += 1
-            except Exception:
-                skipped += 1
+        except Exception as ex:
+            import sys as _sys
+            print("[teacher attendance] write failed: " + str(ex), file=_sys.stderr)
+            try: db.rollback()
+            except Exception: pass
+            skipped += 1
     db.commit()
     return jsonify({
         "ok": True,
@@ -16014,50 +16025,150 @@ def api_attendance_get():
     rows = db.execute("SELECT * FROM attendance ORDER BY id ASC").fetchall()
     return jsonify([dict(r) for r in rows])
 
+def _attendance_live_columns(db):
+    """Return the live attendance table's column list minus auto
+    fields. Used to build dynamic INSERT/UPDATE statements that
+    survive schema drift."""
+    try:
+        rows = db.execute("PRAGMA table_info(attendance)").fetchall()
+    except Exception:
+        return []
+    cols = []
+    for r in rows:
+        try:
+            name = r[1]
+        except Exception:
+            try: name = r["name"]
+            except Exception: continue
+        if name and name not in ("id", "created_at"):
+            cols.append(name)
+    return cols
+
+
+def _attendance_normalize_body(d):
+    """Fold history-tolerant fields: date → ISO, group/name trimmed +
+    whitespace-collapsed, status canonicalised through STATUS_REMAP."""
+    out = dict(d or {})
+    if "attendance_date" in out and out.get("attendance_date"):
+        try:
+            iso = _att_normalize_date(out["attendance_date"])
+            if iso: out["attendance_date"] = iso
+        except Exception:
+            pass
+    for k in ("group_name", "student_name"):
+        if isinstance(out.get(k), str):
+            out[k] = " ".join(out[k].split())
+    if isinstance(out.get("status"), str) and out["status"]:
+        out["status"] = STATUS_REMAP.get(out["status"], out["status"])
+    return out
+
+
+def _attendance_dynamic_insert(db, body):
+    """INSERT one attendance row, whitelisting body keys against the
+    live schema. Returns the new row id. Raises on SQL error."""
+    cols = _attendance_live_columns(db)
+    use_cols, use_vals = [], []
+    for c in cols:
+        if c in body:
+            use_cols.append(c); use_vals.append(body.get(c))
+    if not use_cols:
+        # All-empty body — fall back to inserting just the date so PRAGMA
+        # writes at least one column (avoids "no values" SQL error).
+        use_cols = [c for c in ("attendance_date",) if c in cols]
+        use_vals = [""]
+    placeholders = ",".join(["?"] * len(use_cols))
+    quoted = ",".join('"' + c + '"' for c in use_cols)
+    sql = "INSERT INTO attendance (" + quoted + ") VALUES (" + placeholders + ")"
+    db.execute(sql, tuple(use_vals))
+    db.commit()
+    try:
+        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        return None
+
+
+def _attendance_dynamic_update(db, rid, body):
+    """UPDATE only the columns present in body. No-op if body is
+    empty for safety. Returns rowcount."""
+    cols = _attendance_live_columns(db)
+    set_cols, set_vals = [], []
+    for c in cols:
+        if c in body:
+            set_cols.append('"' + c + '"=?'); set_vals.append(body.get(c))
+    if not set_cols:
+        return 0
+    sql = "UPDATE attendance SET " + ",".join(set_cols) + " WHERE id=?"
+    cur = db.execute(sql, tuple(set_vals) + (rid,))
+    db.commit()
+    try: return cur.rowcount
+    except Exception: return 1
+
+
 @app.route('/api/attendance', methods=['POST'])
 @login_required
 def api_attendance_add():
-    d = request.get_json()
+    """INSERT or UPDATE one attendance row. Whitelists body keys
+    against the live schema so an extra NOT-NULL column on the prod
+    DB doesn't poison the request. Logs exceptions to stderr."""
+    d = request.get_json() or {}
+    body = _attendance_normalize_body(d)
     db = get_db()
     try:
-        attendance_date = d.get('attendance_date','')
-        group_name = d.get('group_name','')
-        student_name = d.get('student_name','')
-        existing = db.execute(
-            "SELECT id FROM attendance WHERE student_name=? AND attendance_date=? AND group_name=?",
-            (student_name, attendance_date, group_name)
-        ).fetchone()
+        sname = body.get("student_name") or ""
+        sdate = body.get("attendance_date") or ""
+        sgrp  = body.get("group_name") or ""
+        existing = None
+        if sname and sdate and sgrp:
+            try:
+                existing = db.execute(
+                    "SELECT id FROM attendance "
+                    "WHERE student_name=? AND attendance_date=? AND group_name=?",
+                    (sname, sdate, sgrp),
+                ).fetchone()
+            except Exception:
+                existing = None
         if existing:
-            db.execute("""UPDATE attendance SET day_name=?,contact_number=?,status=?,message=?,message_status=?,study_status=? WHERE id=?""",
-                (d.get('day_name',''), d.get('contact_number',''), d.get('status',''),
-                 d.get('message',''), d.get('message_status',''), d.get('study_status',''), existing[0]))
-            db.commit()
-            return jsonify({"ok": True, "id": existing[0], "updated": True})
-        else:
-            db.execute("""INSERT INTO attendance(attendance_date,day_name,group_name,student_name,contact_number,status,message,message_status,study_status)
-                VALUES(?,?,?,?,?,?,?,?,?)""",
-                (attendance_date, d.get('day_name',''), group_name,
-                 student_name, d.get('contact_number',''), d.get('status',''),
-                 d.get('message',''), d.get('message_status',''), d.get('study_status','')))
-            db.commit()
-            rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-            return jsonify({"ok": True, "id": rid, "updated": False})
+            rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
+            try:
+                _attendance_dynamic_update(db, rid, body)
+            except Exception as ex:
+                try: db.rollback()
+                except Exception: pass
+                import sys as _sys
+                print("[attendance] update failed: " + str(ex), file=_sys.stderr)
+                return jsonify({"ok": False, "error": str(ex)}), 400
+            return jsonify({"ok": True, "id": rid, "updated": True})
+        try:
+            new_id = _attendance_dynamic_insert(db, body)
+        except Exception as ex:
+            try: db.rollback()
+            except Exception: pass
+            import sys as _sys
+            print("[attendance] insert failed: " + str(ex), file=_sys.stderr)
+            return jsonify({"ok": False, "error": str(ex)}), 400
+        return jsonify({"ok": True, "id": new_id, "updated": False})
     except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[attendance] handler crashed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": str(ex)}), 400
+
 
 @app.route('/api/attendance/<int:rid>', methods=['PUT'])
 @login_required
 def api_attendance_update(rid):
-    d = request.get_json()
+    d = request.get_json() or {}
+    body = _attendance_normalize_body(d)
     db = get_db()
     try:
-        db.execute("""UPDATE attendance SET attendance_date=?,day_name=?,group_name=?,student_name=?,contact_number=?,status=?,message=?,message_status=?,study_status=? WHERE id=?""",
-            (d.get('attendance_date',''), d.get('day_name',''), d.get('group_name',''),
-             d.get('student_name',''), d.get('contact_number',''), d.get('status',''),
-             d.get('message',''), d.get('message_status',''), d.get('study_status',''), rid))
-        db.commit()
+        _attendance_dynamic_update(db, rid, body)
         return jsonify({"ok": True})
     except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[attendance] PUT failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": str(ex)}), 400
 
 @app.route('/api/attendance/<int:rid>', methods=['DELETE'])
