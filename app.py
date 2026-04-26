@@ -7401,22 +7401,16 @@ function _tShowAlert(text, kind){
 }
 
 function _tFmtGroupOption(g){
-  // g may be:
-  //   - a plain string (legacy)
-  //   - an object {name, schedule, study_days, study_time, ramadan_time, online_time}
-  // The new mode-aware backend annotates each group with `schedule`
-  // (the right time column for the active center mode). We prefer
-  // it; if absent (older response shape), fall back to combining
-  // study_days + study_time the legacy way.
+  // Object shape:
+  //   {name, schedule, study_days, study_time, ramadan_time, online_time}
+  // The mode-aware backend pre-builds a clean `schedule` string
+  // (days + " - " + time or just one of them). Fall back to a
+  // legacy combo if `schedule` is missing.
   if (!g) return '';
   if (typeof g === 'string') return g;
   var name = String(g.name || '').trim();
   var schedule = String(g.schedule || '').trim();
   if (!schedule){
-    // Legacy fallback: build from days + time. Also try the other
-    // mode-specific time columns in case the backend didn't
-    // annotate (e.g., a teacher loaded the page during a deploy
-    // that returned the old payload shape).
     var days = String(g.study_days   || '').trim();
     var time = String(g.study_time   || g.ramadan_time || g.online_time || '').trim();
     if (days && time) schedule = days + ' - ' + time;
@@ -16988,44 +16982,110 @@ def _teacher_groups_for(db, user):
     return deduped
 
 
+# Arabic day names — used by the days-extractor below to detect
+# which row column actually carries the schedule's days.
+_AR_DAY_NAMES = (
+    "\u0627\u0644\u0633\u0628\u062A",       # السبت  Saturday
+    "\u0627\u0644\u0623\u062D\u062F",        # الأحد  Sunday
+    "\u0627\u0644\u0625\u062B\u0646\u064A\u0646",  # الإثنين Monday
+    "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621",  # الثلاثاء Tuesday
+    "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621",  # الأربعاء Wednesday
+    "\u0627\u0644\u062E\u0645\u064A\u0633",       # الخميس Thursday
+    "\u0627\u0644\u062C\u0645\u0639\u0629",       # الجمعة Friday
+    # Bare-name variants (no leading "ال")
+    "\u0633\u0628\u062A", "\u0623\u062D\u062F", "\u0625\u062B\u0646\u064A\u0646",
+    "\u062B\u0644\u0627\u062B\u0627\u0621", "\u0623\u0631\u0628\u0639\u0627\u0621",
+    "\u062E\u0645\u064A\u0633", "\u062C\u0645\u0639\u0629",
+)
+
+
+def _value_has_arabic_day(s):
+    if not s: return False
+    s = str(s)
+    for d in _AR_DAY_NAMES:
+        if d in s: return True
+    return False
+
+
+def _normalize_days_string(s):
+    """Accept comma-separated (ASCII , or Arabic ،), JSON arrays, or
+    free-form text containing day names. Return a clean
+    "الأحد، الثلاثاء، الخميس"-style string."""
+    s = (s or "").strip()
+    if not s: return ""
+    # JSON array?
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            import json as _json
+            arr = _json.loads(s)
+            if isinstance(arr, list):
+                parts = [str(x).strip() for x in arr if str(x).strip()]
+                return "\u060C ".join(parts)
+        except Exception:
+            pass
+    # Has comma separator → split + rejoin with Arabic comma.
+    if ("," in s) or ("\u060C" in s):
+        parts = [p.strip() for p in s.replace(",", "\u060C").split("\u060C") if p.strip()]
+        return "\u060C ".join(parts)
+    # Single token / free-form — leave as-is.
+    return s
+
+
 def _teacher_groups_detailed_for(db, user):
     """Same teacher → groups mapping as `_teacher_groups_for`, but
     each entry carries every schedule column the teacher dropdown
-    might surface (study_time, ramadan_time, online_time, plus the
-    legacy study_days for back-compat). Defensive against missing
-    columns on older DBs."""
+    might surface AND a "days_resolved" field that searches the
+    whole row for a column whose value carries Arabic day names —
+    catches the case where production admins added a custom days
+    column via the table-edit modal."""
     keys = _teacher_match_keys(user)
     if not keys:
         return []
     try:
-        live = {r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()}
+        live_cols = [r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()]
     except Exception:
-        live = set()
-    sel = ['group_name', 'teacher_name']
-    for cand in ('study_days', 'study_time', 'ramadan_time', 'online_time'):
-        if cand in live: sel.append(cand)
+        live_cols = []
+    if not live_cols:
+        return []
+    # SELECT * — we need every column to find a custom days field.
     try:
         rows = db.execute(
-            'SELECT ' + ', '.join('"' + c + '"' for c in sel) +
-            ' FROM student_groups '
+            'SELECT * FROM student_groups '
             "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
         ).fetchall()
     except Exception:
         return []
+    # Time columns we know about — exclude these when scanning for
+    # day names so we don't pick up combined "السبت 4-5" inside a
+    # time column AS the days column.
+    TIME_COLS = ("study_time", "ramadan_time", "online_time")
     out, seen = [], set()
     for r in rows:
-        rd = dict(r) if hasattr(r, 'keys') else {sel[i]: r[i] for i in range(len(sel))}
-        gn = (rd.get('group_name') or '').strip()
-        tn = (rd.get('teacher_name') or '').strip().lower()
+        rd = dict(r) if hasattr(r, "keys") else {live_cols[i]: r[i] for i in range(len(live_cols)) if i < len(r)}
+        gn = (rd.get("group_name") or "").strip()
+        tn = (rd.get("teacher_name") or "").strip().lower()
         if not gn or not tn or tn not in keys: continue
         if gn in seen: continue
         seen.add(gn)
+        # Canonical days first.
+        days_value = (rd.get("study_days") or "").strip()
+        # If empty, scan every other column for Arabic day names —
+        # picks up custom "أيام" / "day_list" / etc. columns.
+        if not days_value:
+            for col, val in rd.items():
+                if col in ("group_name", "teacher_name", "study_days") or col in TIME_COLS:
+                    continue
+                v = (val if isinstance(val, str) else (str(val) if val is not None else "")).strip()
+                if not v: continue
+                if _value_has_arabic_day(v):
+                    days_value = v
+                    break
         out.append({
-            "name":         gn,
-            "study_days":  (rd.get('study_days')  or '').strip(),
-            "study_time":  (rd.get('study_time')  or '').strip(),
-            "ramadan_time":(rd.get('ramadan_time') or '').strip(),
-            "online_time": (rd.get('online_time') or '').strip(),
+            "name":          gn,
+            "study_days":    _normalize_days_string(days_value),
+            "study_time":   (rd.get("study_time")   or "").strip(),
+            "ramadan_time": (rd.get("ramadan_time") or "").strip(),
+            "online_time":  (rd.get("online_time")  or "").strip(),
         })
     out.sort(key=lambda g: g["name"])
     return out
@@ -17093,26 +17153,24 @@ def _teacher_mode_filtered_groups(db, user, mode):
     is_ramadan = (mode == "\u0631\u0645\u0636\u0627\u0646")
     def _decorate(g, used_mode):
         """Pick the right time column for this mode and put it on a
-        flat `schedule` field; collapse to the legacy days+time
-        combo if needed for older callers."""
+        flat `schedule` field. Days come from the normalised
+        study_days; if the time column ALREADY embeds the days, we
+        skip the prepend so we don't duplicate."""
         gd = dict(g)
-        # Choose the per-mode column. Fall back to study_time (where
-        # admins enter the combined day+time string) if the mode-
-        # specific column is empty — so an in-person group seen
-        # under أونلاين still shows ITS in-person time rather than
-        # the placeholder.
         if used_mode == "\u0623\u0648\u0646\u0644\u0627\u064A\u0646":
-            sched = gd.get("online_time") or gd.get("study_time") or ""
+            sched_time = gd.get("online_time") or gd.get("study_time") or ""
         elif used_mode == "\u0631\u0645\u0636\u0627\u0646":
-            sched = gd.get("ramadan_time") or gd.get("study_time") or ""
+            sched_time = gd.get("ramadan_time") or gd.get("study_time") or ""
         else:
-            sched = gd.get("study_time") or ""
-        # If a legacy study_days survives, prepend it for prettiness.
+            sched_time = gd.get("study_time") or ""
         days = (gd.get("study_days") or "").strip()
-        if days and sched and (days not in sched):
-            sched = days + " - " + sched
-        elif days and not sched:
+        time_has_days = _value_has_arabic_day(sched_time)
+        if days and sched_time and not time_has_days:
+            sched = days + " - " + sched_time
+        elif days and not sched_time:
             sched = days
+        else:
+            sched = sched_time
         gd["schedule"] = (sched or "").strip()
         gd["used_mode"] = used_mode
         return gd
