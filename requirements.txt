@@ -3,3 +3,8 @@ gunicorn==21.2.0
 psycopg2-binary>=2.9.9
 openpyxl>=3.1.0
 qrcode[pil]>=7.4.2
+# Optional: enables auto-screenshot capture for the site docs page.
+# If install fails on the host (e.g., Render free tier without Chromium
+# binaries), the docs UI gracefully exposes a manual-upload fallback.
+playwright>=1.40
+Pillow>=10.0

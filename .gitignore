@@ -3,3 +3,8 @@ __pycache__/
 .claude/
 mindx.db
 test_*.db
+
+# Generated artifacts from the docs system (Phase 1).
+# Each environment captures its own; nothing to track in git.
+static/docs/screenshots/*.png
+static/docs/screenshots/*.jpg

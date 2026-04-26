@@ -555,6 +555,27 @@ def init_db():
         notification_type TEXT DEFAULT 'instant',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         sent_at DATETIME)""")
+    # Site documentation system (Phase 1)
+    db.execute("""CREATE TABLE IF NOT EXISTS docs_pages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT UNIQUE,
+        url TEXT,
+        title_ar TEXT,
+        section TEXT,
+        roles TEXT DEFAULT '[]',
+        capture_status TEXT DEFAULT 'pending',
+        last_captured_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS docs_screenshots(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id INTEGER,
+        role TEXT,
+        viewport TEXT DEFAULT 'desktop',
+        file_path TEXT,
+        captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        hash TEXT,
+        capture_method TEXT DEFAULT 'auto',
+        file_size INTEGER DEFAULT 0)""")
     # Parent-portal receipt uploads. The parent-side page POSTs an image
     # blob + optional note; admins triage via /admin/receipts.
     db.execute("""CREATE TABLE IF NOT EXISTS parent_receipts(
@@ -1867,6 +1888,39 @@ if True:
         except Exception: pass
         db2.commit()
 
+    # Site documentation system v1 — stores discovered pages and
+    # captured/uploaded screenshots. Empty by default; seeded
+    # programmatically via _docs_seed_pages on first /admin/docs load
+    # so we don't tie schema setup to module-import side effects.
+    if "docs_v1" not in applied:
+        try:
+            db2.execute("""CREATE TABLE IF NOT EXISTS docs_pages(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT UNIQUE,
+                url TEXT,
+                title_ar TEXT,
+                section TEXT,
+                roles TEXT DEFAULT '[]',
+                capture_status TEXT DEFAULT 'pending',
+                last_captured_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+            db2.execute("""CREATE TABLE IF NOT EXISTS docs_screenshots(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER,
+                role TEXT,
+                viewport TEXT DEFAULT 'desktop',
+                file_path TEXT,
+                captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                hash TEXT,
+                capture_method TEXT DEFAULT 'auto',
+                file_size INTEGER DEFAULT 0)""")
+        except Exception:
+            pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("docs_v1",))
+        except Exception: pass
+        db2.commit()
+
     # Auto-provision a `student` user account for every row in
     # students that has a personal_id. Idempotent: skips students
     # whose username already exists. Triggered by tag so it runs
@@ -2395,6 +2449,37 @@ body{background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);min-height:1
      is open. -->
 <div id="settings-other-section" style="display:none;">
 <div id="tabs" class="tabs"></div>
+<a href="/admin/docs" id="docs-link-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:none;align-items:center;gap:14px;flex-wrap:wrap;text-decoration:none;color:inherit;">
+  <div style="flex:1 1 260px;min-width:0;">
+    <div style="font-weight:800;color:#0277BD;font-size:1.05rem;margin-bottom:4px;">&#x1F4F7; &#x062F;&#x0644;&#x064A;&#x0644; &#x0627;&#x0644;&#x0645;&#x0648;&#x0642;&#x0639; &#x0627;&#x0644;&#x062A;&#x0641;&#x0627;&#x0639;&#x0644;&#x064A;</div>
+    <div style="font-size:12.5px;color:#666;">&#x0644;&#x0642;&#x0637;&#x0627;&#x062A; &#x0635;&#x0641;&#x062D;&#x0627;&#x062A; &#x0627;&#x0644;&#x0645;&#x0648;&#x0642;&#x0639; &#x0644;&#x0644;&#x062A;&#x0648;&#x062B;&#x064A;&#x0642; &#x0648;&#x0627;&#x0644;&#x062A;&#x062F;&#x0631;&#x064A;&#x0628;</div>
+  </div>
+  <span style="background:linear-gradient(135deg,#0277BD,#0288D1);color:#fff;padding:9px 18px;border-radius:9px;font-weight:800;font-size:13.5px;">&#x0627;&#x0641;&#x062A;&#x062D;</span>
+</a>
+<script>
+(function(){
+  /* Show the docs card to admin/manager only. The settings page
+     reuses the topbar role-aware data attribute (USER_ROLE_PLACEHOLDER
+     is replaced server-side in render_login + render_settings). Best-
+     effort: also check session-stored role via /api/me-role if needed. */
+  try {
+    var role = (document.body.dataset.role || '').toLowerCase();
+    if (role === 'admin' || role === 'manager'){
+      var el = document.getElementById('docs-link-card');
+      if (el) el.style.display = 'flex';
+    } else {
+      /* Probe via /api/me — best-effort, silent on failure. */
+      fetch('/api/me', {credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+        var r = ((d && d.role) || '').toLowerCase();
+        if (r === 'admin' || r === 'manager'){
+          var el = document.getElementById('docs-link-card');
+          if (el) el.style.display = 'flex';
+        }
+      }).catch(function(){});
+    }
+  } catch(e){}
+})();
+</script>
 <div id="backup-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:14px;align-items:center;"><div style="flex:1 1 260px;min-width:0;"><div style="font-weight:800;color:#1B5E20;font-size:1.05rem;margin-bottom:4px;">&#x1F4BE; &#x627;&#x644;&#x646;&#x633;&#x62E; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;</div><div id="backup-last" style="font-size:12.5px;color:#666;">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x641;&#x62D;&#x635;...</div></div><button id="btn-backup-excel" type="button" style="background:#6B3FA0;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4CA; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x643;&#x640; Excel</button><button id="btn-backup" type="button" style="background:#1B5E20;color:#fff;border:none;padding:11px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">&#x1F4BE; &#x62A;&#x646;&#x632;&#x64A;&#x644; &#x627;&#x644;&#x646;&#x633;&#x62E;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x646;&#x64A;&#x629; &#x1F512;</button></div>
 <div id="msg-tpl-card" style="background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;"><div style="font-weight:800;color:#0277BD;font-size:1.05rem;">&#x1F4DD; &#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div><div style="font-size:12px;color:#666;">&#x627;&#x644;&#x645;&#x62A;&#x63A;&#x64A;&#x631;&#x627;&#x62A;: <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x637;&#x627;&#x644;&#x628;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x627;&#x633;&#x645;_&#x627;&#x644;&#x645;&#x639;&#x644;&#x645;}</code> <code style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:5px;font-size:11px;">{&#x648;&#x642;&#x62A;_&#x627;&#x644;&#x62D;&#x635;&#x629;}</code></div></div>
@@ -13481,6 +13566,20 @@ def logout():
     return redirect("/login")
 
 
+@app.route("/api/me", methods=["GET"])
+@login_required
+def api_me():
+    """Lightweight session probe — returns the current user's role +
+    name. Used by client-side gates that don't have access to the
+    page's USER_ROLE_PLACEHOLDER substitution."""
+    u = session.get("user") or {}
+    return jsonify({
+        "ok":   True,
+        "role": (u.get("role") or "").strip().lower(),
+        "name": u.get("name") or u.get("username") or "",
+    })
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -20074,6 +20173,8 @@ _TBL_AUDIT_FEATURE = {
     "message_templates":   ("قوالب الرسائل",                "نظام الرسائل"),
     "payment_messages":    ("رسائل الدفع",                  "متابعة الدفع"),
     "mode_exceptions":     ("استثناءات حالة المركز",        "حالة المركز"),
+    "docs_pages":          ("صفحات دليل الموقع",            "نظام التوثيق"),
+    "docs_screenshots":    ("لقطات الصفحات",                 "نظام التوثيق"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -20429,6 +20530,704 @@ def _tbl_audit_startup_warning():
                       + " — review at /admin/table-audit", file=_sys.stderr)
     except Exception:
         pass
+
+
+# ──────────────────────────────────────────────────────────────────
+# Site documentation system (Phase 1)
+# ──────────────────────────────────────────────────────────────────
+# Hand-curated list of documentable pages. Each tuple is
+# (slug, url_template, title_ar, section, allowed_roles, requires_data).
+# `requires_data=True` means the URL contains a placeholder that needs
+# substitution at capture time (e.g., student_id) — Phase 1 captures
+# only stable pages and shows a "غير قابلة للتقاط تلقائياً" note for
+# the rest.
+_DOCS_PAGES_SEED = [
+    # slug, url, title_ar, section, roles_csv, requires_data
+    ("dashboard",          "/dashboard",                "لوحة التحكم",
+                            "الرئيسية",       "admin,manager,teacher",   False),
+    ("database",           "/database",                 "قاعدة البيانات",
+                            "البيانات",        "admin",                   False),
+    ("attendance",         "/attendance",               "رصد الغياب",
+                            "البيانات",        "admin,manager,teacher",   False),
+    ("teacher_attendance", "/teacher/attendance",       "صفحة المعلمين",
+                            "البيانات",        "teacher,admin",           False),
+    ("groups",             "/groups",                   "ملخص الحصص",
+                            "البيانات",        "admin,manager,teacher",   False),
+    ("settings",           "/settings",                 "الإعدادات",
+                            "الإدارة",         "admin",                   False),
+    ("admin_backups",      "/admin/backups",            "النسخ الاحتياطي",
+                            "الإدارة",         "admin",                   False),
+    ("admin_table_audit",  "/admin/table-audit",        "تدقيق الجداول",
+                            "الإدارة",         "admin",                   False),
+    ("admin_receipts",     "/admin/receipts",           "إيصالات أولياء الأمور",
+                            "الإدارة",         "admin",                   False),
+    ("points_manage",      "/points/manage",            "إدارة نظام النقاط",
+                            "نظام النقاط",     "admin",                   False),
+    ("points_board",       "/points/board",             "لوحة الصف",
+                            "نظام النقاط",     "admin,manager,teacher",   False),
+    ("portal_student",     "/portal/student",           "منصة الطالب",
+                            "بوابات",          "student",                 False),
+    ("portal_parent",      "/portal/parent",            "منصة ولي الأمر",
+                            "بوابات",          "parent",                  False),
+    ("admin_docs",         "/admin/docs",               "دليل الموقع التفاعلي",
+                            "الإدارة",         "admin,manager",           False),
+    # Pages that need a row id and aren't auto-captured in Phase 1.
+    ("verify_receipt",     "/verify-receipt/<receipt_number>",
+                            "التحقق من الرصيد",
+                            "أخرى",            "admin,manager",           True),
+]
+
+
+def _docs_dir():
+    """Folder where docs screenshots live. Created on demand."""
+    import os as _os
+    p = _os.path.join(_os.path.dirname(__file__) or ".",
+                      "static", "docs", "screenshots")
+    try: _os.makedirs(p, exist_ok=True)
+    except Exception: pass
+    return p
+
+
+def _docs_seed_pages(db):
+    """Idempotent seed: insert any page in _DOCS_PAGES_SEED that's not
+    already in docs_pages (matched by slug)."""
+    try:
+        existing = {r[0] if not hasattr(r, "keys") else r["slug"]
+                    for r in db.execute("SELECT slug FROM docs_pages").fetchall()}
+    except Exception:
+        existing = set()
+    inserted = 0
+    for slug, url, title, section, roles_csv, _req in _DOCS_PAGES_SEED:
+        if slug in existing: continue
+        roles = [r.strip() for r in roles_csv.split(",") if r.strip()]
+        try:
+            db.execute(
+                "INSERT INTO docs_pages(slug, url, title_ar, section, roles, "
+                "capture_status) VALUES(?,?,?,?,?,?)",
+                (slug, url, title, section, json.dumps(roles), "pending"),
+            )
+            inserted += 1
+        except Exception:
+            pass
+    if inserted:
+        try: db.commit()
+        except Exception: pass
+    return inserted
+
+
+_DOCS_AUTO_SKIP = {
+    "/", "/login", "/logout", "/mx-helpers.js", "/parent",
+    "/favicon.ico", "/static", "/healthz",
+}
+def _docs_discover_extra(db):
+    """Walk app.url_map to find admin/manager-visible pages that aren't
+    already in docs_pages. Conservative: skips API/static/login/parent
+    receipt-upload portal and any route with required URL params."""
+    try:
+        existing = {r[0] if not hasattr(r, "keys") else r["url"]
+                    for r in db.execute("SELECT url FROM docs_pages").fetchall()}
+    except Exception:
+        existing = set()
+    inserted = 0
+    for rule in app.url_map.iter_rules():
+        u = str(rule)
+        if u.startswith("/api/"):     continue
+        if u.startswith("/static/"):  continue
+        if u in _DOCS_AUTO_SKIP:      continue
+        # Skip the public parent receipt-upload portal — it's not part
+        # of the admin documentation.
+        if u.startswith("/parent/"):  continue
+        if "<" in u:                  continue
+        if u in existing:             continue
+        if "GET" not in (rule.methods or set()):
+            continue
+        slug = (rule.endpoint or u.strip("/").replace("/", "_") or "page").lower()
+        try:
+            db.execute(
+                "INSERT INTO docs_pages(slug, url, title_ar, section, roles, "
+                "capture_status) VALUES(?,?,?,?,?,?)",
+                (slug, u, slug.replace("_", " ").title(), "أخرى",
+                 json.dumps(["admin"]), "pending"),
+            )
+            inserted += 1
+        except Exception:
+            pass
+    if inserted:
+        try: db.commit()
+        except Exception: pass
+    return inserted
+
+
+def _docs_blur_image(in_bytes, blur_below_px=80):
+    """Apply a gaussian blur to the image area below the topbar
+    (everything except the top blur_below_px pixels). Uses Pillow.
+    Returns the modified bytes; on any failure returns the input
+    unchanged."""
+    try:
+        from PIL import Image, ImageFilter
+        import io as _io
+    except Exception:
+        return in_bytes
+    try:
+        img = Image.open(_io.BytesIO(in_bytes)).convert("RGB")
+        w, h = img.size
+        if h <= blur_below_px:
+            return in_bytes
+        top   = img.crop((0, 0, w, blur_below_px))
+        below = img.crop((0, blur_below_px, w, h))
+        # Strong gaussian — readable that "this is a sensitive area"
+        # but no PII visible.
+        below = below.filter(ImageFilter.GaussianBlur(radius=12))
+        out = Image.new("RGB", (w, h))
+        out.paste(top,   (0, 0))
+        out.paste(below, (0, blur_below_px))
+        buf = _io.BytesIO()
+        out.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return in_bytes
+
+
+# Pages whose data is sensitive (PII). Capture results blurred below
+# the navbar. Slugs only (no fuzzy match).
+_DOCS_BLUR_SLUGS = {
+    "database", "attendance", "teacher_attendance", "groups",
+    "admin_receipts", "portal_student", "portal_parent",
+}
+
+
+# Cache of "is Playwright importable?" — checked once per process.
+_DOCS_PLAYWRIGHT_OK = None
+def _docs_playwright_available():
+    global _DOCS_PLAYWRIGHT_OK
+    if _DOCS_PLAYWRIGHT_OK is not None:
+        return _DOCS_PLAYWRIGHT_OK
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        _DOCS_PLAYWRIGHT_OK = True
+    except Exception:
+        _DOCS_PLAYWRIGHT_OK = False
+    return _DOCS_PLAYWRIGHT_OK
+
+
+def _docs_capture_user_credentials(db):
+    """Ensure a dedicated capture admin exists. Returns (username, pw).
+    The password is rotated each call so leaks don't reuse."""
+    import secrets, string
+    pw = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24))
+    try:
+        existing = db.execute(
+            "SELECT id FROM users WHERE username=?", ("docs_capture",),
+        ).fetchone()
+    except Exception:
+        existing = None
+    if existing:
+        try:
+            db.execute("UPDATE users SET password=?, role='admin' WHERE id=?",
+                       (hp(pw), dict(existing)["id"]))
+            db.commit()
+        except Exception:
+            return "docs_capture", None
+    else:
+        try:
+            db.execute(
+                "INSERT INTO users(username, password, name, role) VALUES(?,?,?,?)",
+                ("docs_capture", hp(pw), "Docs Capture Bot", "admin"),
+            )
+            db.commit()
+        except Exception:
+            return "docs_capture", None
+    return "docs_capture", pw
+
+
+def _docs_capture_one(db, page_row, base_url):
+    """Capture a single page using Playwright. Returns dict with
+    {ok, file_path, hash, file_size, error}. On failure leaves the
+    docs_pages row's capture_status='failed' for the caller to log."""
+    import hashlib as _hashlib, os as _os
+    page = dict(page_row)
+    slug = page["slug"]
+    url  = (base_url.rstrip("/")) + (page["url"] or "/")
+    if not _docs_playwright_available():
+        return {"ok": False, "error": "playwright not installed"}
+    if "<" in (page.get("url") or ""):
+        return {"ok": False, "error": "url has dynamic param — manual upload required"}
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as ex:
+        return {"ok": False, "error": "playwright import failed: " + str(ex)}
+    user, pw = _docs_capture_user_credentials(db)
+    if not pw:
+        return {"ok": False, "error": "could not provision capture user"}
+    out_path = _os.path.join(_docs_dir(), slug + "_admin_desktop.png")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(viewport={"width": 1280, "height": 900},
+                                          locale="ar")
+            pg = context.new_page()
+            # Login first
+            pg.goto((base_url.rstrip("/")) + "/login", timeout=15000)
+            pg.fill('input[name="username"]', user)
+            pg.fill('input[name="password"]', pw)
+            pg.click('button[type="submit"], input[type="submit"]')
+            pg.wait_for_load_state("networkidle", timeout=10000)
+            # Now navigate to target
+            pg.goto(url, timeout=15000)
+            try: pg.wait_for_load_state("networkidle", timeout=10000)
+            except Exception: pass
+            png_bytes = pg.screenshot(full_page=True)
+            browser.close()
+    except Exception as ex:
+        return {"ok": False, "error": "capture failed: " + str(ex)}
+    if slug in _DOCS_BLUR_SLUGS:
+        png_bytes = _docs_blur_image(png_bytes)
+    try:
+        with open(out_path, "wb") as f:
+            f.write(png_bytes)
+    except Exception as ex:
+        return {"ok": False, "error": "write failed: " + str(ex)}
+    sha = _hashlib.sha256(png_bytes).hexdigest()
+    return {"ok": True, "file_path": out_path, "hash": sha,
+            "file_size": len(png_bytes)}
+
+
+def _docs_record_capture(db, page_id, role, file_path, sha, size, method):
+    """Insert/refresh a docs_screenshots row + update docs_pages
+    last_captured_at + capture_status."""
+    try:
+        db.execute(
+            "DELETE FROM docs_screenshots WHERE page_id=? AND role=? AND viewport='desktop'",
+            (page_id, role),
+        )
+        db.execute(
+            "INSERT INTO docs_screenshots(page_id, role, viewport, file_path, "
+            "hash, capture_method, file_size) VALUES(?,?,?,?,?,?,?)",
+            (page_id, role, "desktop", file_path, sha, method, int(size or 0)),
+        )
+        db.execute(
+            "UPDATE docs_pages SET capture_status=?, "
+            "last_captured_at=CURRENT_TIMESTAMP WHERE id=?",
+            ("captured" if method == "auto" else "manual", page_id),
+        )
+        db.commit()
+    except Exception:
+        pass
+
+
+# ── Endpoints ────────────────────────────────────────────────────
+def _docs_admin_or_manager_response():
+    u = session.get("user") or {}
+    role = (u.get("role") or "").strip().lower()
+    if role not in ("admin", "manager"):
+        return jsonify({"ok": False, "error": "admin or manager required"}), 403
+    return None
+
+
+@app.route('/api/docs/pages', methods=['GET'])
+@login_required
+def api_docs_pages_list():
+    """Return all documented pages, grouped under their section."""
+    err = _docs_admin_or_manager_response()
+    if err: return err
+    db = get_db()
+    _docs_seed_pages(db)
+    _docs_discover_extra(db)
+    try:
+        rows = db.execute(
+            "SELECT id, slug, url, title_ar, section, roles, "
+            "       capture_status, last_captured_at "
+            "FROM docs_pages ORDER BY section, title_ar"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = []
+    for r in rows:
+        rd = dict(r)
+        try: rd["roles"] = json.loads(rd.get("roles") or "[]")
+        except Exception: rd["roles"] = []
+        # Attach the latest screenshot file path if any.
+        try:
+            sr = db.execute(
+                "SELECT file_path, captured_at, hash, capture_method, file_size "
+                "FROM docs_screenshots WHERE page_id=? "
+                "ORDER BY captured_at DESC LIMIT 1",
+                (rd["id"],),
+            ).fetchone()
+            if sr:
+                srd = dict(sr)
+                # Convert local file path to a /static/... URL.
+                fp = srd.get("file_path") or ""
+                idx = fp.replace("\\", "/").find("/static/")
+                rd["screenshot_url"] = (fp.replace("\\", "/")[idx:]
+                                        if idx >= 0 else "")
+                rd["screenshot_at"] = srd.get("captured_at")
+                rd["screenshot_method"] = srd.get("capture_method")
+                rd["screenshot_size"] = srd.get("file_size")
+                rd["screenshot_hash"] = srd.get("hash")
+            else:
+                rd["screenshot_url"] = ""
+        except Exception:
+            rd["screenshot_url"] = ""
+        out.append(rd)
+    return jsonify({
+        "ok": True,
+        "pages": out,
+        "playwright_available": _docs_playwright_available(),
+    })
+
+
+@app.route('/api/docs/capture/<int:page_id>', methods=['POST'])
+@login_required
+def api_docs_capture_one(page_id):
+    err = _docs_admin_or_manager_response()
+    if err: return err
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, slug, url, title_ar FROM docs_pages WHERE id=?",
+            (page_id,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "page not found"}), 404
+    base_url = (request.host_url or "").rstrip("/")
+    res = _docs_capture_one(db, dict(row), base_url)
+    if not res.get("ok"):
+        try:
+            db.execute("UPDATE docs_pages SET capture_status='failed' WHERE id=?",
+                       (page_id,))
+            db.commit()
+        except Exception: pass
+        return jsonify(res), 200  # 200 so the UI can render the message
+    _docs_record_capture(db, page_id, "admin", res["file_path"],
+                         res["hash"], res["file_size"], "auto")
+    return jsonify({"ok": True, **res})
+
+
+@app.route('/api/docs/capture-all', methods=['POST'])
+@login_required
+def api_docs_capture_all():
+    err = _docs_admin_or_manager_response()
+    if err: return err
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, slug, url, title_ar FROM docs_pages"
+        ).fetchall()
+    except Exception:
+        rows = []
+    base_url = (request.host_url or "").rstrip("/")
+    ok_count, fail_count, fails = 0, 0, []
+    for r in rows:
+        rd = dict(r)
+        if "<" in (rd.get("url") or ""):
+            fail_count += 1
+            fails.append({"slug": rd["slug"], "error": "url has dynamic param"})
+            continue
+        res = _docs_capture_one(db, rd, base_url)
+        if res.get("ok"):
+            _docs_record_capture(db, rd["id"], "admin",
+                                 res["file_path"], res["hash"],
+                                 res["file_size"], "auto")
+            ok_count += 1
+        else:
+            fail_count += 1
+            fails.append({"slug": rd["slug"], "error": res.get("error", "")})
+    return jsonify({"ok": True, "captured": ok_count,
+                    "failed": fail_count, "fails": fails})
+
+
+@app.route('/api/docs/upload/<int:page_id>', methods=['POST'])
+@login_required
+def api_docs_upload(page_id):
+    """Manual upload fallback when Playwright isn't available."""
+    err = _docs_admin_or_manager_response()
+    if err: return err
+    import hashlib as _hashlib, os as _os
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, slug FROM docs_pages WHERE id=?", (page_id,)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "page not found"}), 404
+    rd = dict(row)
+    fobj = request.files.get("file")
+    if not fobj:
+        return jsonify({"ok": False, "error": "file required"}), 400
+    blob = fobj.read()
+    if not blob:
+        return jsonify({"ok": False, "error": "empty file"}), 400
+    if len(blob) > 10 * 1024 * 1024:
+        return jsonify({"ok": False, "error": "file too large (max 10 MB)"}), 400
+    # Optional blur for sensitive pages.
+    if rd["slug"] in _DOCS_BLUR_SLUGS:
+        blob = _docs_blur_image(blob)
+    out_path = _os.path.join(_docs_dir(), rd["slug"] + "_admin_desktop.png")
+    try:
+        with open(out_path, "wb") as f:
+            f.write(blob)
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "write failed: " + str(ex)}), 500
+    sha = _hashlib.sha256(blob).hexdigest()
+    _docs_record_capture(db, page_id, "admin", out_path, sha, len(blob), "manual")
+    return jsonify({"ok": True, "file_size": len(blob), "hash": sha})
+
+
+@app.route('/api/docs/screenshots/<int:page_id>', methods=['GET'])
+@login_required
+def api_docs_screenshot_history(page_id):
+    err = _docs_admin_or_manager_response()
+    if err: return err
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, role, viewport, file_path, captured_at, hash, "
+            "       capture_method, file_size FROM docs_screenshots "
+            "WHERE page_id=? ORDER BY captured_at DESC",
+            (page_id,),
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+# Re-capture all screenshots (called from scheduler tick).
+def _docs_run_weekly_recapture():
+    if not _docs_playwright_available():
+        return 0
+    with app.app_context():
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT id, slug, url, title_ar FROM docs_pages"
+            ).fetchall()
+        except Exception:
+            return 0
+        # Use a host URL probe — fall back to localhost.
+        host = "http://127.0.0.1:" + str(os.environ.get("PORT", "5000"))
+        ok = 0
+        for r in rows:
+            rd = dict(r)
+            if "<" in (rd.get("url") or ""):
+                continue
+            res = _docs_capture_one(db, rd, host)
+            if res.get("ok"):
+                # Compare with last hash; only persist if changed.
+                last = db.execute(
+                    "SELECT hash FROM docs_screenshots WHERE page_id=? "
+                    "ORDER BY captured_at DESC LIMIT 1",
+                    (rd["id"],),
+                ).fetchone()
+                last_hash = (dict(last).get("hash") if last else "") or ""
+                if last_hash != res.get("hash"):
+                    _docs_record_capture(db, rd["id"], "admin",
+                                         res["file_path"], res["hash"],
+                                         res["file_size"], "auto")
+                    ok += 1
+        return ok
+
+
+# ── /admin/docs page ─────────────────────────────────────────────
+ADMIN_DOCS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>دليل الموقع التفاعلي</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;padding:0;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#0277BD,#0288D1);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;box-shadow:0 2px 10px rgba(2,119,189,.25);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:800;}
+.topbar a{color:#fff;text-decoration:none;background:rgba(255,255,255,.18);padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.topbar .btn{padding:8px 14px;border-radius:9px;border:none;font-family:inherit;font-weight:700;cursor:pointer;font-size:0.85rem;}
+.btn-pri{background:rgba(255,255,255,.95);color:#0277BD;}
+.shell{display:flex;flex-wrap:wrap;}
+.sidebar{width:280px;background:#fff;border-left:1px solid #e1e1e1;height:calc(100vh - 58px);overflow-y:auto;padding:14px 12px;box-shadow:-2px 0 6px rgba(0,0,0,.04);}
+.main{flex:1;min-width:0;padding:18px;}
+.section-h{font-weight:800;color:#0277BD;font-size:0.95rem;margin:14px 0 6px;padding:0 4px;border-bottom:1px dashed #b3e5fc;padding-bottom:5px;}
+.page-item{padding:9px 12px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:0.92rem;color:#333;margin-bottom:3px;}
+.page-item:hover{background:#f0f8ff;}
+.page-item.active{background:#0277BD;color:#fff;font-weight:700;}
+.page-item .st{font-size:0.7rem;font-weight:700;}
+.page-item .st-pending  {color:#FB8C00;}
+.page-item.active .st-pending{color:#FFE0B2;}
+.page-item .st-captured {color:#1B5E20;}
+.page-item.active .st-captured{color:#C8E6C9;}
+.page-item .st-manual   {color:#6A1B9A;}
+.page-item.active .st-manual{color:#E1BEE7;}
+.page-item .st-failed   {color:#c62828;}
+.page-item.active .st-failed{color:#FFCDD2;}
+.page-item.active .st-warn{color:#FFE0B2;}
+.banner{background:#fff8e1;border:1.4px solid #ffe082;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#6d4c41;font-size:0.92rem;}
+.banner.error{background:#ffebee;border-color:#ffcdd2;color:#b71c1c;}
+.viewer{background:#fff;border-radius:14px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.viewer h2{margin:0 0 6px;color:#0277BD;font-size:1.1rem;}
+.meta{font-size:0.84rem;color:#666;margin-bottom:10px;}
+.meta b{color:#212121;}
+.meta .warn{color:#E65100;font-weight:800;}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;}
+.btn-act{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:0.85rem;}
+.btn-cap{background:#0288D1;color:#fff;}
+.btn-up{background:#FB8C00;color:#fff;}
+.btn-grey{background:#fafafa;color:#666;border:1px solid #ddd;}
+.shot{width:100%;border:1px solid #e1e1e1;border-radius:10px;background:#fafafa;}
+.placeholder{height:280px;display:flex;align-items:center;justify-content:center;color:#888;font-weight:700;background:#fafafa;border:2px dashed #c4a8e8;border-radius:12px;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+@media (max-width:760px){
+  .sidebar{width:100%;height:auto;max-height:240px;border-left:0;border-bottom:1px solid #e1e1e1;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📷 دليل الموقع التفاعلي</h1>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-pri" onclick="docsCaptureAll()">🔄 تحديث اللقطات الآن</button>
+    <a href="/dashboard">← الرئيسية</a>
+  </div>
+</div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"><div class="page-item">جاري التحميل...</div></aside>
+  <main class="main" id="main"><div class="placeholder">اختر صفحة من القائمة الجانبية</div></main>
+</div>
+<input type="file" id="upload-input" accept="image/png,image/jpeg" style="display:none;">
+<div class="toast" id="t"></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(m,ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2400);}
+var STATE={pages:[], current:null, playwright:false};
+
+function load(){
+  fetch('/api/docs/pages',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('main').innerHTML='<div class="banner error">'+(d.error||'فشل التحميل')+'</div>';return;}
+    STATE.pages=d.pages||[];
+    STATE.playwright=!!d.playwright_available;
+    renderSidebar();
+    renderMain();
+  });
+}
+function renderSidebar(){
+  var bySec={};
+  STATE.pages.forEach(function(p){(bySec[p.section||'أخرى']=bySec[p.section||'أخرى']||[]).push(p);});
+  var html='';
+  Object.keys(bySec).forEach(function(sec){
+    html+='<div class="section-h">'+_esc(sec)+'</div>';
+    bySec[sec].forEach(function(p){
+      var stClass='st-'+(p.capture_status||'pending');
+      if(p.capture_status==='captured' && _isStale(p.last_captured_at)) stClass='st-warn';
+      var stTxt={pending:'في الانتظار',captured:'محدثة',manual:'يدوية',failed:'فشل'}[p.capture_status]||'';
+      if(p.capture_status==='captured' && _isStale(p.last_captured_at)) stTxt='⚠ قديمة';
+      html+='<div class="page-item '+(STATE.current && STATE.current.id===p.id?'active':'')+'" onclick="selectPage('+p.id+')">'
+        +'<span>'+_esc(p.title_ar||p.slug)+'</span>'
+        +'<span class="st '+stClass+'">'+_esc(stTxt)+'</span>'
+        +'</div>';
+    });
+  });
+  document.getElementById('sidebar').innerHTML=html;
+}
+function _isStale(ts){
+  if(!ts) return false;
+  var d=new Date((ts+'').replace(' ','T')+'Z');
+  if(isNaN(d.getTime())) return false;
+  return (Date.now()-d.getTime())>14*86400000;
+}
+function selectPage(id){
+  var p=STATE.pages.find(function(x){return x.id===id;});
+  if(!p) return;
+  STATE.current=p;
+  renderSidebar();
+  renderMain();
+}
+function renderMain(){
+  var p=STATE.current;
+  var m=document.getElementById('main');
+  if(!p){m.innerHTML='<div class="placeholder">اختر صفحة من القائمة الجانبية</div>';return;}
+  var html='';
+  /* Banner if Playwright unavailable. */
+  if(!STATE.playwright){
+    html+='<div class="banner">⚠ خاصية اللقطات التلقائية غير مدعومة على هذا السيرفر. يمكن رفع اللقطات يدوياً من زر "رفع لقطة".</div>';
+  }
+  if((p.url||'').indexOf('<')>=0){
+    html+='<div class="banner">⚠ هذه الصفحة تتطلب معطى ديناميكي (مثل رقم الطالب) — التقاطها التلقائي غير ممكن. ارفع لقطة يدوياً.</div>';
+  }
+  html+='<div class="viewer">';
+  html+='<h2>'+_esc(p.title_ar||p.slug)+'</h2>';
+  var roles=(p.roles||[]).join('، ');
+  html+='<div class="meta"><b>الرابط:</b> <code style="direction:ltr;">'+_esc(p.url||'')+'</code> &nbsp;•&nbsp; <b>القسم:</b> '+_esc(p.section||'—')+' &nbsp;•&nbsp; <b>الصلاحيات:</b> '+_esc(roles||'—')+'</div>';
+  if(p.last_captured_at){
+    var stale=_isStale(p.last_captured_at);
+    html+='<div class="meta"><b>آخر تحديث:</b> <span style="direction:ltr;">'+_esc(p.last_captured_at)+'</span> '
+        +(stale?'<span class="warn">⚠ مرّ أكثر من 14 يوماً — يُستحسن إعادة التقاط</span>':'')
+        +(p.screenshot_method?(' &nbsp;•&nbsp; <b>الطريقة:</b> '+(p.screenshot_method==='auto'?'تلقائية':'يدوية')):'')
+        +'</div>';
+  } else {
+    html+='<div class="meta"><b>الحالة:</b> لم يتم التقاط لقطة بعد</div>';
+  }
+  html+='<div class="actions">';
+  if(STATE.playwright && (p.url||'').indexOf('<')<0){
+    html+='<button class="btn-act btn-cap" onclick="docsCaptureOne('+p.id+')">📷 تحديث هذه الصفحة فقط</button>';
+  }
+  html+='<button class="btn-act btn-up" onclick="docsUpload('+p.id+')">⬆ رفع لقطة</button>';
+  if(p.url){
+    html+='<a class="btn-act btn-grey" href="'+_esc(p.url)+'" target="_blank" style="text-decoration:none;display:inline-block;">↗ افتح الصفحة</a>';
+  }
+  html+='</div>';
+  if(p.screenshot_url){
+    html+='<img class="shot" alt="screenshot" src="'+_esc(p.screenshot_url)+'?t='+Date.now()+'">';
+  } else {
+    html+='<div class="placeholder">لم يتم التقاط لقطة بعد</div>';
+  }
+  html+='</div>';
+  m.innerHTML=html;
+}
+function docsCaptureAll(){
+  if(!STATE.playwright){toast('Playwright غير متوفر — استخدم رفع يدوي',false);return;}
+  if(!confirm('سيتم التقاط لقطات جميع الصفحات. قد يستغرق ذلك دقيقة أو أكثر. متابعة؟')) return;
+  toast('جاري الالتقاط...');
+  fetch('/api/docs/capture-all',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('✅ نجح: '+d.captured+' / فشل: '+d.failed);load();}
+    else{toast(d.error||'فشل',false);}
+  });
+}
+function docsCaptureOne(id){
+  toast('جاري الالتقاط...');
+  fetch('/api/docs/capture/'+id,{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('✅ تم الالتقاط');load();}
+    else{toast('فشل: '+(d.error||''),false);}
+  });
+}
+function docsUpload(id){
+  var inp=document.getElementById('upload-input');
+  inp.onchange=function(ev){
+    var f=ev.target.files && ev.target.files[0];
+    if(!f) return;
+    var fd=new FormData(); fd.append('file',f);
+    toast('جاري الرفع...');
+    fetch('/api/docs/upload/'+id,{method:'POST',credentials:'include',body:fd}).then(function(r){return r.json();}).then(function(d){
+      if(d.ok){toast('✅ تم الرفع');load();}
+      else{toast(d.error||'فشل',false);}
+    });
+  };
+  inp.value='';
+  inp.click();
+}
+load();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/docs')
+@login_required
+def admin_docs_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("admin", "manager"):
+        return redirect("/dashboard")
+    return ADMIN_DOCS_HTML
 
 
 @app.route('/api/points/notifications/<int:nid>/sent', methods=['POST'])
@@ -29126,9 +29925,28 @@ def _backup_scheduler_loop():
                 # Points digest scheduler — runs in the same tick, also
                 # at-most-once-per-minute thanks to its own keying.
                 _maybe_run_points_digest(now)
+                # Site-docs weekly re-capture (Sunday 03:00).
+                _maybe_run_docs_recapture(now)
         except Exception as _ex:
             import sys as _sys
             print("[backup scheduler] " + str(_ex), file=_sys.stderr)
+
+
+_DOCS_RECAPTURE_RUN_KEY = {"weekly": None}
+def _maybe_run_docs_recapture(now):
+    """Re-capture every docs page once a week (Sunday 03:00) when
+    Playwright is available. No-ops otherwise."""
+    if not _docs_playwright_available():
+        return
+    try:
+        if now.weekday() == 6 and now.hour == 3 and now.minute == 0:
+            key = now.strftime("%Y-%m-%d")
+            if _DOCS_RECAPTURE_RUN_KEY.get("weekly") != key:
+                _DOCS_RECAPTURE_RUN_KEY["weekly"] = key
+                try: _docs_run_weekly_recapture()
+                except Exception: pass
+    except Exception:
+        pass
 
 
 _PTS_DIGEST_RUN_KEY = {"daily": None, "weekly": None}
