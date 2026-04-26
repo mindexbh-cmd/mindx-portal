@@ -2,16 +2,35 @@ services:
   - type: web
     name: mindx-portal
     env: python
-    buildCommand: pip install -r requirements.txt
+    # Build pipeline:
+    #   1. pip install -r requirements.txt
+    #   2. playwright install chromium    → downloads the Chromium
+    #      binary to PLAYWRIGHT_BROWSERS_PATH on the persistent disk
+    #      so it survives subsequent deploys (cache hit on rebuild).
+    #   3. playwright install-deps chromium → installs system libs
+    #      (libnss3, libatk1.0-0, etc). Render's build environment is
+    #      privileged enough for this; if it fails on a future image
+    #      change the `|| true` keeps the deploy alive and the docs
+    #      system falls back to manual upload.
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python -m playwright install chromium &&
+      (python -m playwright install-deps chromium || echo "[deploy] install-deps non-fatal failure")
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DB_PATH
         value: /var/data/mindx.db
+      # Cache Chromium on the persistent disk so it doesn't re-download
+      # (~150 MB) on every deploy. Same disk as the SQLite DB.
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /var/data/playwright-browsers
+      - key: PYTHONUNBUFFERED
+        value: "1"
     disk:
       name: mindx-data
       mountPath: /var/data
       sizeGB: 1
 
-# redeploy 2026-04-10T12:06:17.295Z
+# redeploy 2026-04-26T23:45:00Z (chromium build)

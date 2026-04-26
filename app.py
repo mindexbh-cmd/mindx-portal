@@ -20696,18 +20696,67 @@ _DOCS_BLUR_SLUGS = {
 }
 
 
-# Cache of "is Playwright importable?" — checked once per process.
+# Cache of "is Playwright importable AND can it launch Chromium?" —
+# checked once per process. Both conditions must hold for auto-capture
+# to work. The check actually launches headless Chromium so we don't
+# rely solely on the import succeeding (the Python lib imports fine
+# even when the browser binary is absent — that's the exact silent
+# failure mode that breaks auto-capture in production).
 _DOCS_PLAYWRIGHT_OK = None
+_DOCS_PLAYWRIGHT_ERROR = ""
 def _docs_playwright_available():
-    global _DOCS_PLAYWRIGHT_OK
+    global _DOCS_PLAYWRIGHT_OK, _DOCS_PLAYWRIGHT_ERROR
     if _DOCS_PLAYWRIGHT_OK is not None:
         return _DOCS_PLAYWRIGHT_OK
     try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-        _DOCS_PLAYWRIGHT_OK = True
-    except Exception:
+        from playwright.sync_api import sync_playwright
+    except Exception as ex:
         _DOCS_PLAYWRIGHT_OK = False
-    return _DOCS_PLAYWRIGHT_OK
+        _DOCS_PLAYWRIGHT_ERROR = "playwright import failed: " + str(ex)
+        return False
+    # Try a real launch — this catches the missing-browser-binary case
+    # that the bare import does not.
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            browser.close()
+        _DOCS_PLAYWRIGHT_OK = True
+        _DOCS_PLAYWRIGHT_ERROR = ""
+        return True
+    except Exception as ex:
+        _DOCS_PLAYWRIGHT_OK = False
+        _DOCS_PLAYWRIGHT_ERROR = "chromium launch failed: " + str(ex)[:300]
+        return False
+
+
+def _docs_startup_chromium_check():
+    """Run the Chromium check once at module import and log the result
+    so admins can see immediately in the Render boot log whether
+    auto-capture is enabled. Skipped in test-client environments to
+    keep test output quiet."""
+    import sys as _sys, os as _os
+    # Skip during pytest / werkzeug-test runs.
+    if _os.environ.get("FLASK_ENV") == "testing":
+        return
+    if "pytest" in _sys.modules:
+        return
+    try:
+        ok = _docs_playwright_available()
+        if ok:
+            print("[mindex-docs] ✅ Playwright + Chromium ready. Auto-capture enabled.",
+                  file=_sys.stderr, flush=True)
+        else:
+            print("[mindex-docs] ⚠ Auto-capture unavailable — "
+                  + (_DOCS_PLAYWRIGHT_ERROR or "unknown reason")
+                  + " — falling back to manual upload.",
+                  file=_sys.stderr, flush=True)
+            print("[mindex-docs] To enable: ensure the Render build runs "
+                  "`playwright install chromium` (see render.yaml) and that "
+                  "PLAYWRIGHT_BROWSERS_PATH points to the persistent disk.",
+                  file=_sys.stderr, flush=True)
+    except Exception as ex:
+        print("[mindex-docs] startup check error: " + str(ex),
+              file=_sys.stderr, flush=True)
 
 
 def _docs_capture_user_credentials(db):
@@ -20874,6 +20923,7 @@ def api_docs_pages_list():
         "ok": True,
         "pages": out,
         "playwright_available": _docs_playwright_available(),
+        "playwright_error":     _DOCS_PLAYWRIGHT_ERROR or "",
     })
 
 
@@ -21106,6 +21156,7 @@ function load(){
     if(!d.ok){document.getElementById('main').innerHTML='<div class="banner error">'+(d.error||'فشل التحميل')+'</div>';return;}
     STATE.pages=d.pages||[];
     STATE.playwright=!!d.playwright_available;
+    STATE.playwrightError=d.playwright_error||'';
     renderSidebar();
     renderMain();
   });
@@ -21149,7 +21200,8 @@ function renderMain(){
   var html='';
   /* Banner if Playwright unavailable. */
   if(!STATE.playwright){
-    html+='<div class="banner">⚠ خاصية اللقطات التلقائية غير مدعومة على هذا السيرفر. يمكن رفع اللقطات يدوياً من زر "رفع لقطة".</div>';
+    var detail = STATE.playwrightError ? ('<div style="font-size:0.78rem;color:#888;margin-top:6px;direction:ltr;text-align:left;font-family:Consolas,monospace;">'+_esc(STATE.playwrightError.slice(0,240))+'</div>') : '';
+    html+='<div class="banner">⚠ خاصية اللقطات التلقائية غير مدعومة على هذا السيرفر. يمكن رفع اللقطات يدوياً من زر "رفع لقطة".'+detail+'</div>';
   }
   if((p.url||'').indexOf('<')>=0){
     html+='<div class="banner">⚠ هذه الصفحة تتطلب معطى ديناميكي (مثل رقم الطالب) — التقاطها التلقائي غير ممكن. ارفع لقطة يدوياً.</div>';
@@ -29997,6 +30049,12 @@ except Exception: pass
 # (Category D + empty + not approved-keep) so admins notice drift
 # between code and DB without having to open the audit UI.
 try: _tbl_audit_startup_warning()
+except Exception: pass
+
+# One-shot Chromium probe at boot — actually launches headless
+# Chromium so the boot log shows immediately whether auto-capture
+# works on this host. Falls back gracefully on any failure.
+try: _docs_startup_chromium_check()
 except Exception: pass
 
 
