@@ -2359,11 +2359,11 @@ STUDENT_FORM_MODAL_HTML = """
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A; *</label><input id="sra_personal_id" placeholder="&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; *</label><input id="sra_student_name" placeholder="&#x627;&#x644;&#x627;&#x633;&#x645; &#x627;&#x644;&#x643;&#x627;&#x645;&#x644;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628;</label><input id="sra_whatsapp" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
-        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x635;&#x641;</label><input id="sra_class_name" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x635;&#x641; A" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x635;&#x641;</label><select id="sra_class_name" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>0.3</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</label><input id="sra_old_new_2026" placeholder="&#x642;&#x62F;&#x64A;&#x645; / &#x62C;&#x62F;&#x64A;&#x62F;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</label><input id="sra_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
-        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><input id="sra_group_name_student" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
-        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><input id="sra_group_online" placeholder="&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x627;&#x644;&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sra_group_name_student" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><select id="sra_group_online" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x644;&#x627; &#x64A;&#x648;&#x62C;&#x62F; --</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629;</label><select id="sra_final_result" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>&#x646;&#x627;&#x62C;&#x62D;</option><option>&#x631;&#x627;&#x633;&#x628;</option><option>&#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</option><option>&#x63A;&#x627;&#x626;&#x628;</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x625;&#x644;&#x649; &#x623;&#x64A;&#x646; &#x648;&#x635;&#x644; 2026</label><input id="sra_level_reached" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x648;&#x62D;&#x62F;&#x629; 5" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x645;&#x646;&#x627;&#x633;&#x628; &#x644;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026&#x61F;</label><input id="sra_suitable_level" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
@@ -3029,6 +3029,17 @@ function srOpenAddStudent(){
     if (el.tagName === 'SELECT') el.selectedIndex = 0;
     else el.value = '';
   });
+  /* Populate the two group dropdowns from student_groups via the
+     shared buildGroupDropdown helper (mx-helpers.js). Cache is
+     invalidated on every open so a brand-new group added elsewhere
+     shows up here without a page reload. */
+  if (typeof window.buildGroupDropdown === 'function'){
+    if (typeof window._invalidateLinkedCache === 'function') window._invalidateLinkedCache('student_groups');
+    window.buildGroupDropdown('', document.getElementById('sra_group_name_student'),
+      { allowEmpty:true, emptyLabel:'-- \u0627\u062E\u062A\u0631 --' });
+    window.buildGroupDropdown('', document.getElementById('sra_group_online'),
+      { allowEmpty:true, emptyLabel:'-- \u0644\u0627 \u064A\u0648\u062C\u062F --' });
+  }
   document.getElementById('sra-modal-bg').style.display = 'block';
   /* Populate the installment-type dropdown lazily on first open. */
   var sel = document.getElementById('sra_installment_type');
@@ -3815,7 +3826,10 @@ function _srCurrentValues(){
 function _srApplyMode(){
   var fields = document.querySelectorAll('#sr-details .srm-field');
   for (var i=0; i<fields.length; i++){
-    var inp = fields[i].querySelector('input');
+    /* Match <input> AND <select> — three sr_* fields render as <select>
+       (الصف / المجموعة / المجموعة الأونلاين) and need the same
+       disabled-flip + lock-icon treatment as the regular text inputs. */
+    var inp = fields[i].querySelector('input, select');
     var lock = fields[i].querySelector('.srm-lock');
     if (!inp) continue;
     if (_srMode === 'edit'){
@@ -3891,6 +3905,15 @@ function _srEnterEditMode(){
   } else {
     if (!confirm('⚠ هل أنت متأكد من تعديل بيانات الطالب ' + sName + '؟')) return;
     _srMode = 'edit'; _srApplyMode(); _srWireIdleInputs(); _srResetIdle();
+    if (typeof window._invalidateLinkedCache === 'function') window._invalidateLinkedCache('student_groups');
+    if (typeof window.buildGroupDropdown === 'function'){
+      var gIn  = document.getElementById('sr_group_name_student');
+      var gOn  = document.getElementById('sr_group_online');
+      if (gIn) window.buildGroupDropdown(gIn.value || '', gIn,
+                  { allowEmpty:true, emptyLabel:'-- \u0627\u062E\u062A\u0631 --' });
+      if (gOn) window.buildGroupDropdown(gOn.value || '', gOn,
+                  { allowEmpty:true, emptyLabel:'-- \u0644\u0627 \u064A\u0648\u062C\u062F --' });
+    }
   }
 }
 function _srExitEditMode(rollback){
@@ -8738,12 +8761,16 @@ function updateInstallmentType(sid,val){
   .then(function(d){if(d.ok){var s=allStudents.find(function(x){return x.id===sid;});if(s)s.installment_type=val; renderTable(allStudents);}});
 }
 function _populateStudentGroupSelects(curIn, curOnline){
-  var spec = 'source:student_groups:group_name:group_name';
-  _invalidateLinkedCache('student_groups');
-  var p1 = _populateSelectFromLinked(document.getElementById('f_group_name_student'),
-            spec, curIn || '', true, '-- \u0627\u062E\u062A\u0631 --');
-  var p2 = _populateSelectFromLinked(document.getElementById('f_group_online'),
-            spec, curOnline || '', true, '-- \u0644\u0627 \u064A\u0648\u062C\u062F --');
+  // Delegates to the shared buildGroupDropdown (mx-helpers.js). Cache
+  // invalidation here so a new student_groups row added on /database
+  // shows up immediately on next open without waiting for the TTL.
+  if (typeof _invalidateLinkedCache === 'function') _invalidateLinkedCache('student_groups');
+  var p1 = buildGroupDropdown(curIn || '',
+            document.getElementById('f_group_name_student'),
+            { allowEmpty:true, emptyLabel:'-- \u0627\u062E\u062A\u0631 --' });
+  var p2 = buildGroupDropdown(curOnline || '',
+            document.getElementById('f_group_online'),
+            { allowEmpty:true, emptyLabel:'-- \u0644\u0627 \u064A\u0648\u062C\u062F --' });
   return Promise.all([p1, p2]);
 }
 function populateEditInstallmentSelect(curVal){
@@ -9222,69 +9249,6 @@ function utemSave(){
 
 // ─── Typed cell rendering (Part 3) ─────────────────────────────────────
 // Used by future custom-table renders; exposed globally so any table may opt in.
-/* ── Linked-dropdown options cache ────────────────────────────────
-   col_options of the form "source:<table>:<value_col>:<label_col>"
-   describes a foreign-key-style dropdown. Options are fetched from
-   /api/table/<table>/linked-options once per (spec, ttl) and reused.
-   The cache TTL is short so a brand-new student_groups row appears
-   in the students dropdowns within ~30s without a manual reload. */
-var _LINKED_OPTS_CACHE = {};
-var _LINKED_OPTS_TTL_MS = 30000;
-function _parseLinkedSpec(s){
-  s = String(s||'').trim();
-  if (s.indexOf('source:') !== 0) return null;
-  var parts = s.substring('source:'.length).split(':');
-  return {
-    table: (parts[0]||'').trim(),
-    value: (parts[1]||'id').trim(),
-    label: (parts[2]||parts[1]||'id').trim()
-  };
-}
-function _loadLinkedOpts(spec){
-  var p = _parseLinkedSpec(spec);
-  if (!p || !p.table) return Promise.resolve([]);
-  var key = p.table + '|' + p.value + '|' + p.label;
-  var now = Date.now();
-  var c = _LINKED_OPTS_CACHE[key];
-  if (c && (now - c.t) < _LINKED_OPTS_TTL_MS) return Promise.resolve(c.list);
-  var url = '/api/table/' + encodeURIComponent(p.table) + '/linked-options'
-          + '?source=' + encodeURIComponent(p.table)
-          + '&value='  + encodeURIComponent(p.value)
-          + '&label='  + encodeURIComponent(p.label);
-  return fetch(url, {credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var list = (d && d.options) ? d.options : [];
-      _LINKED_OPTS_CACHE[key] = { t: now, list: list };
-      return list;
-    })
-    .catch(function(){ return (c && c.list) || []; });
-}
-function _invalidateLinkedCache(table){
-  if (!table){ _LINKED_OPTS_CACHE = {}; return; }
-  for (var k in _LINKED_OPTS_CACHE){
-    if (k.indexOf(table + '|') === 0) delete _LINKED_OPTS_CACHE[k];
-  }
-}
-function _populateSelectFromLinked(selectEl, spec, currentValue, allowEmpty, emptyLabel){
-  if (!selectEl) return Promise.resolve();
-  return _loadLinkedOpts(spec).then(function(list){
-    var html = '';
-    if (allowEmpty){
-      html += '<option value="">' + _esc(emptyLabel || '') + '</option>';
-    }
-    var seen = false;
-    var keep = String(currentValue == null ? '' : currentValue);
-    for (var i=0;i<list.length;i++){
-      var v = String(list[i].value);
-      var sel = (v === keep) ? ' selected' : '';
-      if (sel) seen = true;
-      html += '<option value="' + _esc(v) + '"' + sel + '>' + _esc(list[i].label || v) + '</option>';
-    }
-    if (keep && !seen){ html += '<option value="' + _esc(keep) + '" selected>' + _esc(keep) + '</option>'; }
-    selectEl.innerHTML = html;
-  });
-}
 function renderCell(value, colType, colOptions, rowId, fieldKey) {
   var v = (value == null) ? '' : String(value);
   var esc = _esc(v);
@@ -20836,6 +20800,103 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       if (touchedTable || touchedTbody || touchedThead) wireColumnFilters();
       if (touchedBtn || touchedTable) _mxInjectUndoButtons();
     });
+
+  /* ── Linked-dropdown options cache ──────────────────────────────
+     col_options of the form "source:<table>:<value_col>:<label_col>"
+     describes a foreign-key-style dropdown. Options are fetched from
+     /api/table/<table>/linked-options once per (spec, ttl) and reused
+     across the whole site (every page that pulls in mx-helpers.js).
+     The cache TTL is short so a brand-new student_groups row appears
+     in the students dropdowns within ~30s without a manual reload. */
+  var _LINKED_OPTS_CACHE = window._LINKED_OPTS_CACHE = window._LINKED_OPTS_CACHE || {};
+  var _LINKED_OPTS_TTL_MS = 30000;
+  function _esc2(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function _parseLinkedSpec(s){
+    s = String(s||'').trim();
+    if (s.indexOf('source:') !== 0) return null;
+    var parts = s.substring('source:'.length).split(':');
+    return {
+      table: (parts[0]||'').trim(),
+      value: (parts[1]||'id').trim(),
+      label: (parts[2]||parts[1]||'id').trim()
+    };
+  }
+  function _loadLinkedOpts(spec){
+    var p = _parseLinkedSpec(spec);
+    if (!p || !p.table) return Promise.resolve([]);
+    var key = p.table + '|' + p.value + '|' + p.label;
+    var now = Date.now();
+    var c = _LINKED_OPTS_CACHE[key];
+    if (c && (now - c.t) < _LINKED_OPTS_TTL_MS) return Promise.resolve(c.list);
+    var url = '/api/table/' + encodeURIComponent(p.table) + '/linked-options'
+            + '?source=' + encodeURIComponent(p.table)
+            + '&value='  + encodeURIComponent(p.value)
+            + '&label='  + encodeURIComponent(p.label);
+    return fetch(url, {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var list = (d && d.options) ? d.options : [];
+        _LINKED_OPTS_CACHE[key] = { t: now, list: list };
+        return list;
+      })
+      .catch(function(){ return (c && c.list) || []; });
+  }
+  function _invalidateLinkedCache(table){
+    if (!table){
+      for (var k0 in _LINKED_OPTS_CACHE) delete _LINKED_OPTS_CACHE[k0];
+      return;
+    }
+    for (var k in _LINKED_OPTS_CACHE){
+      if (k.indexOf(table + '|') === 0) delete _LINKED_OPTS_CACHE[k];
+    }
+  }
+  function _populateSelectFromLinked(selectEl, spec, currentValue, allowEmpty, emptyLabel){
+    if (!selectEl) return Promise.resolve();
+    return _loadLinkedOpts(spec).then(function(list){
+      var html = '';
+      if (allowEmpty){
+        html += '<option value="">' + _esc2(emptyLabel || '') + '</option>';
+      }
+      var seen = false;
+      var keep = String(currentValue == null ? '' : currentValue);
+      for (var i=0;i<list.length;i++){
+        var v = String(list[i].value);
+        var sel = (v === keep) ? ' selected' : '';
+        if (sel) seen = true;
+        html += '<option value="' + _esc2(v) + '"' + sel + '>' + _esc2(list[i].label || v) + '</option>';
+      }
+      if (keep && !seen){ html += '<option value="' + _esc2(keep) + '" selected>' + _esc2(keep) + '</option>'; }
+      selectEl.innerHTML = html;
+    });
+  }
+  /* ── buildGroupDropdown(selectedValue, target?, opts?) ──────────
+     The single shared helper used by every place students show a
+     groups dropdown: the table-cell renderer, the إضافة طالب modal,
+     the بحث عن طالب edit mode, and the database-page edit modal.
+     Pulls options from student_groups.group_name through the cached
+     linked-options endpoint, so a new group added in any UI shows up
+     within the cache TTL on the next dropdown open.
+     Returns Promise<HTMLSelectElement>. */
+  function buildGroupDropdown(selectedValue, target, opts){
+    opts = opts || {};
+    var el = target || document.createElement('select');
+    return _populateSelectFromLinked(
+      el,
+      'source:student_groups:group_name:group_name',
+      selectedValue == null ? '' : String(selectedValue),
+      opts.allowEmpty !== false,
+      opts.emptyLabel || ''
+    ).then(function(){ return el; });
+  }
+  window._loadLinkedOpts          = _loadLinkedOpts;
+  window._populateSelectFromLinked = _populateSelectFromLinked;
+  window._invalidateLinkedCache   = _invalidateLinkedCache;
+  window.buildGroupDropdown       = buildGroupDropdown;
+
     mo.observe(document.body, { childList:true, subtree:true });
   }
 })();
