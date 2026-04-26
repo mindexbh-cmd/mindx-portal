@@ -236,7 +236,11 @@ def init_db():
         password TEXT,
         name TEXT,
         role TEXT,
-        department TEXT)""")
+        department TEXT,
+        linked_student_id INTEGER DEFAULT 0,
+        linked_parent_for TEXT DEFAULT '',
+        must_change_pw INTEGER DEFAULT 0,
+        notify_pref TEXT DEFAULT 'instant')""")
     db.execute("""CREATE TABLE IF NOT EXISTS students(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         personal_id TEXT UNIQUE,
@@ -544,6 +548,7 @@ def init_db():
         phone TEXT,
         message TEXT,
         status TEXT DEFAULT 'pending',
+        notification_type TEXT DEFAULT 'instant',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         sent_at DATETIME)""")
     # Parent-portal receipt uploads. The parent-side page POSTs an image
@@ -1787,6 +1792,102 @@ if True:
             except Exception: pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_avatar_v1",))
+        except Exception: pass
+        db2.commit()
+
+    # Points V2 — student/parent portals + digest scheduler.
+    # Adds 4 columns to users (linked_student_id, linked_parent_for,
+    # must_change_pw, notify_pref) and 1 column to point_notifications
+    # (notification_type). All idempotent.
+    if "points_v2" not in applied:
+        try:
+            _ucols = {r[1] for r in db2.execute("PRAGMA table_info(users)").fetchall()}
+        except Exception:
+            _ucols = set()
+        for col, decl in [
+            ("linked_student_id", "INTEGER DEFAULT 0"),
+            ("linked_parent_for", "TEXT DEFAULT ''"),  # JSON array of student ids
+            ("must_change_pw",    "INTEGER DEFAULT 0"),
+            ("notify_pref",       "TEXT DEFAULT 'instant'"),  # instant|daily|weekly|off
+        ]:
+            if col not in _ucols:
+                try: db2.execute("ALTER TABLE users ADD COLUMN " + col + " " + decl)
+                except Exception: pass
+        try:
+            _ncols = {r[1] for r in db2.execute("PRAGMA table_info(point_notifications)").fetchall()}
+        except Exception:
+            _ncols = set()
+        if "notification_type" not in _ncols:
+            try: db2.execute("ALTER TABLE point_notifications ADD COLUMN notification_type TEXT DEFAULT 'instant'")
+            except Exception: pass
+        # Settings rows for digest scheduler (mirror backup pattern)
+        for p, c, lbl, val in [
+            ("points", "digest_daily_time",   "وقت تشغيل الملخص اليومي",   "20:00"),
+            ("points", "digest_weekly_time",  "وقت تشغيل الملخص الأسبوعي", "18:00"),
+            ("points", "digest_weekly_day",   "يوم الملخص الأسبوعي (0=الإثنين، 4=الجمعة)", "4"),
+            ("points", "sound_effects",       "تشغيل المؤثرات الصوتية على لوحة الصف",       "1"),
+            ("points", "last_daily_run",      "آخر تشغيل للملخص اليومي",   ""),
+            ("points", "last_weekly_run",     "آخر تشغيل للملخص الأسبوعي", ""),
+        ]:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page, component, label, value, value_type) "
+                    "VALUES(?,?,?,?,?)",
+                    (p, c, lbl, val, "text"),
+                )
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("points_v2",))
+        except Exception: pass
+        db2.commit()
+
+    # Auto-provision a `student` user account for every row in
+    # students that has a personal_id. Idempotent: skips students
+    # whose username already exists. Triggered by tag so it runs
+    # once on first deploy after this code lands; subsequent
+    # students still get accounts via api_pts_provision_students.
+    if "students_users_provision_v1" not in applied:
+        try:
+            _ucols = {r[1] for r in db2.execute("PRAGMA table_info(users)").fetchall()}
+        except Exception:
+            _ucols = set()
+        # Re-check linked_student_id was added above.
+        if "linked_student_id" in _ucols:
+            try:
+                rows = db2.execute(
+                    "SELECT id, student_name, personal_id FROM students "
+                    "WHERE personal_id IS NOT NULL AND TRIM(personal_id) <> ''"
+                ).fetchall()
+            except Exception:
+                rows = []
+            existing = set()
+            try:
+                for u in db2.execute("SELECT username FROM users").fetchall():
+                    existing.add((u[0] if not hasattr(u, "keys") else u["username"]) or "")
+            except Exception:
+                pass
+            created = 0
+            for r in rows:
+                rd = dict(r) if hasattr(r, "keys") else {"id": r[0], "student_name": r[1], "personal_id": r[2]}
+                pid = (rd.get("personal_id") or "").strip()
+                if not pid or pid in existing:
+                    continue
+                try:
+                    db2.execute(
+                        "INSERT INTO users(username, password, name, role, "
+                        "linked_student_id, must_change_pw, notify_pref) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (pid, hp(pid), rd.get("student_name") or "", "student",
+                         rd.get("id") or 0, 1, "off"),
+                    )
+                    created += 1
+                except Exception:
+                    pass
+            if created:
+                import sys as _sys
+                print(f"[points-v2] auto-provisioned {created} student accounts", file=_sys.stderr)
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_users_provision_v1",))
         except Exception: pass
         db2.commit()
 
@@ -13288,22 +13389,64 @@ def index():
     session.clear()
     return render_login()
 
+# Simple in-memory rate limit for student/parent login (5 fails / 15 min).
+# Bytes a small dict; not a security boundary against a determined
+# attacker, but enough to block trivial brute-forcing.
+_LOGIN_FAILS = {}
+def _login_rate_check(username):
+    import time as _time
+    now = _time.time()
+    bucket = _LOGIN_FAILS.get(username) or []
+    bucket = [t for t in bucket if now - t < 900]   # 15 min window
+    _LOGIN_FAILS[username] = bucket
+    return len(bucket) < 5
+def _login_rate_record(username):
+    import time as _time
+    bucket = _LOGIN_FAILS.get(username) or []
+    bucket.append(_time.time())
+    _LOGIN_FAILS[username] = bucket
+def _login_rate_clear(username):
+    _LOGIN_FAILS.pop(username, None)
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         return render_login()
-    username = request.form.get("username", "")
-    password = request.form.get("password", "")
+    username = (request.form.get("username", "") or "").strip()
+    password = request.form.get("password", "") or ""
+    if not _login_rate_check(username):
+        return render_login("&#x062A;&#x0645; &#x062A;&#x062C;&#x0627;&#x0648;&#x0632; &#x0639;&#x062F;&#x062F; &#x0627;&#x0644;&#x0645;&#x062D;&#x0627;&#x0648;&#x0644;&#x0627;&#x062A; &#x0627;&#x0644;&#x0645;&#x0633;&#x0645;&#x0648;&#x062D;&#x0629;. &#x062D;&#x0627;&#x0648;&#x0644; &#x0644;&#x0627;&#x062D;&#x0642;&#x0627;&#x064B;."), 429
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
                       (username, hp(password))).fetchone()
     if not user:
+        _login_rate_record(username)
         return render_login("&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x627;&#x648; &#x643;&#x644;&#x645;&#x629; &#x627;&#x644;&#x645;&#x631;&#x648;&#x631; &#x63A;&#x644;&#x637;"), 401
+    _login_rate_clear(username)
     session["user"] = dict(user)
     role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
+    # Force password change on first login for student/parent accounts.
+    must_change = 0
+    try:
+        must_change = int(dict(user).get("must_change_pw") or 0)
+    except Exception:
+        must_change = 0
+    if must_change and role in ("student", "parent"):
+        return redirect("/portal/change-password")
     if role == "teacher":
         return redirect("/teacher/attendance")
+    if role == "student":
+        return redirect("/portal/student")
+    if role == "parent":
+        return redirect("/portal/parent")
     return redirect("/dashboard")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
 
 @app.route("/dashboard")
 @login_required
@@ -18446,6 +18589,29 @@ def _pts_get_student_phone(db, sid):
     return ""
 
 
+def _pts_parent_pref_for_student(db, sid):
+    """Return the linked parent's notify_pref ('instant'|'daily'|'weekly'|
+    'off') if a parent account is linked to this student, else None.
+    A student id is "linked" when it appears in any parent user row's
+    linked_parent_for JSON array."""
+    try:
+        rows = db.execute(
+            "SELECT id, linked_parent_for, notify_pref FROM users WHERE role='parent'"
+        ).fetchall()
+    except Exception:
+        return None
+    sid = int(sid)
+    for r in rows:
+        rd = dict(r) if hasattr(r, "keys") else {"linked_parent_for": r[1], "notify_pref": r[2]}
+        try:
+            ids = json.loads(rd.get("linked_parent_for") or "[]") or []
+            if sid in [int(x) for x in ids]:
+                return (rd.get("notify_pref") or "instant").strip().lower()
+        except Exception:
+            pass
+    return None
+
+
 # ── Behaviors CRUD (admin only) ──────────────────────────────────
 @app.route('/api/points/behaviors', methods=['GET'])
 @login_required
@@ -18650,20 +18816,27 @@ def api_pts_grant():
             results.append({"student_id": sid, "ok": False, "error": str(ex)})
             continue
         bal = _pts_balance(db, sid)
-        # Queue parent WhatsApp notification (admin-toggleable).
+        # Queue parent WhatsApp notification — skipped if the linked
+        # parent has notify_pref in {daily, weekly, off}, since those
+        # are handled by the digest scheduler instead.
         if notify_on:
-            phone = _pts_get_student_phone(db, sid)
-            msg = _pts_format_event_message(sname, bd.get("name_ar") or "",
-                                            pv, awarded_by_name, bal)
-            try:
-                db.execute(
-                    "INSERT INTO point_notifications(event_id, student_id, "
-                    "student_name, phone, message, status) VALUES(?,?,?,?,?,?)",
-                    (event_id, sid, sname, phone, msg, "pending"),
-                )
-                db.commit()
-            except Exception:
-                pass
+            parent_pref = _pts_parent_pref_for_student(db, sid)
+            if parent_pref in ("daily", "weekly", "off"):
+                pass  # digest scheduler will handle (or skip if off)
+            else:
+                phone = _pts_get_student_phone(db, sid)
+                msg = _pts_format_event_message(sname, bd.get("name_ar") or "",
+                                                pv, awarded_by_name, bal)
+                try:
+                    db.execute(
+                        "INSERT INTO point_notifications(event_id, student_id, "
+                        "student_name, phone, message, status, notification_type) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (event_id, sid, sname, phone, msg, "pending", "instant"),
+                    )
+                    db.commit()
+                except Exception:
+                    pass
         results.append({
             "student_id": sid, "ok": True,
             "event_id": event_id, "balance": bal,
@@ -19294,16 +19467,76 @@ def api_pts_notifications_list():
     if err: return err
     db = get_db()
     status = (request.args.get("status") or "pending").strip()
+    typ    = (request.args.get("type")   or "all").strip()
+    sql = ("SELECT id, event_id, student_id, student_name, phone, message, "
+           "       status, notification_type, created_at, sent_at "
+           "FROM point_notifications WHERE status=?")
+    args = [status]
+    if typ and typ != "all":
+        sql += " AND COALESCE(notification_type,'instant')=?"
+        args.append(typ)
+    sql += " ORDER BY id DESC LIMIT 500"
     try:
-        rows = db.execute(
-            "SELECT id, event_id, student_id, student_name, phone, message, "
-            "       status, created_at, sent_at "
-            "FROM point_notifications WHERE status=? ORDER BY id DESC LIMIT 500",
-            (status,),
-        ).fetchall()
+        rows = db.execute(sql, tuple(args)).fetchall()
         return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+@app.route('/api/points/digest/run', methods=['POST'])
+@login_required
+def api_pts_digest_run():
+    """Manually trigger a digest run. Useful for testing without
+    waiting for the scheduled time."""
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json(silent=True) or {}
+    period = (d.get("period") or "daily").strip()
+    if period not in ("daily", "weekly"):
+        return jsonify({"ok": False, "error": "invalid period"}), 400
+    try:
+        host = (request.host_url or "").rstrip("/")
+    except Exception:
+        host = ""
+    sent = _pts_run_digest(period, host_url=host)
+    return jsonify({"ok": True, "queued": sent, "period": period})
+
+
+@app.route('/api/points/digest/next', methods=['GET'])
+@login_required
+def api_pts_digest_next():
+    """Return next scheduled run timestamps for daily and weekly digests."""
+    err = _require_admin_response()
+    if err: return err
+    import datetime as _dt
+    daily_t = (get_setting("points", "digest_daily_time", "20:00") or "20:00").strip()
+    weekly_t = (get_setting("points", "digest_weekly_time", "18:00") or "18:00").strip()
+    try:
+        weekly_d = int((get_setting("points", "digest_weekly_day", "4") or "4").strip())
+    except Exception:
+        weekly_d = 4
+    now = _dt.datetime.now()
+    def _next_at(time_hhmm, weekday=None):
+        try:
+            hh, mm = [int(x) for x in time_hhmm.split(":", 1)]
+        except Exception:
+            hh, mm = 20, 0
+        target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if weekday is None:
+            if target <= now:
+                target += _dt.timedelta(days=1)
+            return target
+        # advance to next matching weekday (0=Mon..6=Sun)
+        delta = (weekday - target.weekday()) % 7
+        target += _dt.timedelta(days=delta)
+        if target <= now:
+            target += _dt.timedelta(days=7)
+        return target
+    return jsonify({
+        "ok":           True,
+        "daily_next":   _next_at(daily_t).strftime("%Y-%m-%d %H:%M"),
+        "weekly_next":  _next_at(weekly_t, weekly_d).strftime("%Y-%m-%d %H:%M"),
+    })
 
 
 @app.route('/api/points/notifications/<int:nid>/sent', methods=['POST'])
@@ -27732,6 +27965,122 @@ for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML'
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
 
+def _pts_compose_daily_digest(db, sid, student_name, since_dt):
+    """Return (positive_count, negative_count, balance, lines) summarising
+    point_events for student `sid` since `since_dt` (datetime). Returns
+    None if there were no events in the window."""
+    since_str = since_dt.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        rows = db.execute(
+            "SELECT behavior_name, points_value, awarded_by_name, awarded_at "
+            "FROM point_events WHERE student_id=? AND awarded_at >= ? "
+            "ORDER BY id ASC",
+            (int(sid), since_str),
+        ).fetchall()
+    except Exception:
+        rows = []
+    if not rows:
+        return None
+    pos = neg = 0
+    lines = []
+    for r in rows:
+        rd = dict(r) if hasattr(r, "keys") else {
+            "behavior_name": r[0], "points_value": r[1],
+            "awarded_by_name": r[2], "awarded_at": r[3],
+        }
+        pv = int(rd.get("points_value") or 0)
+        if pv > 0: pos += pv
+        elif pv < 0: neg += pv
+        sign = "+" + str(pv) if pv >= 0 else str(pv)
+        lines.append("• " + (rd.get("behavior_name") or "")
+                     + ": " + sign
+                     + " (" + (rd.get("awarded_by_name") or "-") + ")")
+    bal = _pts_balance(db, sid)
+    return pos, neg, bal, lines
+
+
+def _pts_run_digest(period, host_url=""):
+    """Generate digest messages for parents whose notify_pref matches
+    `period`. period: 'daily' or 'weekly'. Returns count of digests
+    queued. Empty digests are skipped."""
+    import datetime as _dt
+    if period not in ("daily", "weekly"):
+        return 0
+    span_days = 1 if period == "daily" else 7
+    with app.app_context():
+        db = get_db()
+        try:
+            parents = db.execute(
+                "SELECT id, username, name, linked_parent_for, notify_pref "
+                "FROM users WHERE role='parent' AND notify_pref=?",
+                (period,),
+            ).fetchall()
+        except Exception:
+            return 0
+        now = _dt.datetime.now()
+        since = now - _dt.timedelta(days=span_days)
+        portal_link = (host_url.rstrip("/") + "/portal/parent") if host_url else "/portal/parent"
+        sent = 0
+        period_label = "اليوم" if period == "daily" else "الأسبوع"
+        for p in parents:
+            pd = dict(p)
+            phone = (pd.get("username") or "").strip()
+            try:
+                sids = json.loads(pd.get("linked_parent_for") or "[]") or []
+            except Exception:
+                sids = []
+            for sid in sids:
+                try:
+                    sid = int(sid)
+                except Exception:
+                    continue
+                try:
+                    sn_row = db.execute(
+                        "SELECT student_name FROM students WHERE id=?", (sid,),
+                    ).fetchone()
+                except Exception:
+                    sn_row = None
+                if not sn_row: continue
+                sname = (dict(sn_row).get("student_name") or "").strip()
+                summary = _pts_compose_daily_digest(db, sid, sname, since)
+                if not summary:
+                    continue
+                pos, neg, bal, lines = summary
+                msg = (
+                    "السلام عليكم،\n"
+                    "ملخص نقاط " + sname + " لـ " + period_label + ":\n"
+                    "+ نقاط إيجابية: " + str(pos) + "\n"
+                    "- نقاط سلبية: " + str(abs(neg)) + "\n"
+                    "الرصيد الحالي: " + str(bal) + "\n\n"
+                    "آخر السلوكيات:\n"
+                    + "\n".join(lines[:10])
+                    + ("\n..." if len(lines) > 10 else "")
+                    + "\n\n"
+                    + "لمتابعة التفاصيل: " + portal_link
+                )
+                try:
+                    db.execute(
+                        "INSERT INTO point_notifications(event_id, student_id, "
+                        "student_name, phone, message, status, notification_type) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (0, sid, sname, phone, msg, "pending",
+                         "digest_" + period),
+                    )
+                    db.commit()
+                    sent += 1
+                except Exception:
+                    pass
+        try:
+            db.execute(
+                "UPDATE settings SET value=? WHERE page='points' AND component=?",
+                (now.strftime("%Y-%m-%d %H:%M"), "last_" + period + "_run"),
+            )
+            db.commit()
+        except Exception:
+            pass
+        return sent
+
+
 def _backup_scheduler_loop():
     """Daemon thread: every 60s, check the schedule. If now matches,
     fire a scheduled backup. Best-effort — Render dyno cycling can
@@ -27755,14 +28104,49 @@ def _backup_scheduler_loop():
                 hit = (now.hour == hh and now.minute == mm)
                 if kind == "weekly":
                     hit = hit and (now.weekday() == day)
-                if not hit: continue
-                key = now.strftime("%Y-%m-%d %H:%M") + "/" + kind
-                if key == last_run_key: continue
-                last_run_key = key
-                _create_full_backup(db, kind="scheduled", reason="auto " + kind)
+                if hit:
+                    key = now.strftime("%Y-%m-%d %H:%M") + "/" + kind
+                    if key != last_run_key:
+                        last_run_key = key
+                        _create_full_backup(db, kind="scheduled", reason="auto " + kind)
+                # Points digest scheduler — runs in the same tick, also
+                # at-most-once-per-minute thanks to its own keying.
+                _maybe_run_points_digest(now)
         except Exception as _ex:
             import sys as _sys
             print("[backup scheduler] " + str(_ex), file=_sys.stderr)
+
+
+_PTS_DIGEST_RUN_KEY = {"daily": None, "weekly": None}
+def _maybe_run_points_digest(now):
+    """Called from the existing 60s scheduler tick. Fires the daily
+    or weekly digest if the current minute matches the configured
+    time. Idempotent within a single minute."""
+    try:
+        d_t = (get_setting("points", "digest_daily_time", "20:00") or "20:00").strip()
+        try: dh, dm = [int(x) for x in d_t.split(":")[:2]]
+        except Exception: dh, dm = 20, 0
+        if now.hour == dh and now.minute == dm:
+            key = now.strftime("%Y-%m-%d %H:%M")
+            if _PTS_DIGEST_RUN_KEY.get("daily") != key:
+                _PTS_DIGEST_RUN_KEY["daily"] = key
+                try: _pts_run_digest("daily")
+                except Exception: pass
+        w_t = (get_setting("points", "digest_weekly_time", "18:00") or "18:00").strip()
+        try: wh, wm = [int(x) for x in w_t.split(":")[:2]]
+        except Exception: wh, wm = 18, 0
+        try:
+            wd = int((get_setting("points", "digest_weekly_day", "4") or "4").strip())
+        except Exception:
+            wd = 4
+        if now.hour == wh and now.minute == wm and now.weekday() == wd:
+            key = now.strftime("%Y-%m-%d %H:%M")
+            if _PTS_DIGEST_RUN_KEY.get("weekly") != key:
+                _PTS_DIGEST_RUN_KEY["weekly"] = key
+                try: _pts_run_digest("weekly")
+                except Exception: pass
+    except Exception:
+        pass
 
 
 def _start_backup_scheduler():
@@ -27788,12 +28172,962 @@ def admin_backups_page():
 
 
 # ──────────────────────────────────────────────────────────────────
+# Student & parent portals (V2)
+# ──────────────────────────────────────────────────────────────────
+PORTAL_CHANGE_PW_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تغيير كلمة المرور</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;direction:rtl;padding:14px;}
+.card{background:#fff;border-radius:18px;padding:28px 26px;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(107,63,160,.18);}
+h1{margin:0 0 18px;color:#4a148c;font-size:1.25rem;text-align:center;}
+.field{margin-bottom:14px;}
+label{display:block;font-weight:700;color:#4a148c;font-size:0.9rem;margin-bottom:5px;}
+input[type=password]{width:100%;padding:11px 13px;border:1.6px solid #c4a8e8;border-radius:10px;font-family:inherit;font-size:1rem;background:#faf7ff;box-sizing:border-box;}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;border-radius:10px;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;}
+.err{color:#c62828;font-size:0.88rem;text-align:center;margin-top:8px;min-height:18px;}
+.note{font-size:0.84rem;color:#666;text-align:center;margin-top:14px;line-height:1.6;}
+</style></head><body>
+<form class="card" onsubmit="return doChange(event);">
+  <h1>🔒 تغيير كلمة المرور</h1>
+  <div class="field"><label>كلمة المرور الجديدة</label><input id="p1" type="password" minlength="6" required></div>
+  <div class="field"><label>تأكيد كلمة المرور</label><input id="p2" type="password" minlength="6" required></div>
+  <button type="submit">حفظ ومتابعة</button>
+  <div class="err" id="err"></div>
+  <div class="note">يجب أن تكون كلمة المرور 6 أحرف على الأقل.<br>سجّل دخول مرة أخرى بعد التغيير.</div>
+</form>
+<script>
+function doChange(ev){
+  ev.preventDefault();
+  var p1=document.getElementById('p1').value;
+  var p2=document.getElementById('p2').value;
+  var err=document.getElementById('err');
+  if(p1.length<6){err.textContent='كلمة المرور قصيرة جداً';return false;}
+  if(p1!==p2){err.textContent='كلمتا المرور غير متطابقتين';return false;}
+  err.textContent='';
+  fetch('/api/portal/change-password',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p1})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){window.location.href='/login';}
+      else{err.textContent=(d&&d.error)||'فشل التحديث';}
+    });
+  return false;
+}
+</script>
+</body></html>"""
+
+
+PORTAL_STUDENT_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>منصة الطالب — نظام النقاط</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;padding:14px;color:#212121;}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.topbar h1{margin:0;font-size:1.1rem;color:#4a148c;}
+.logout{background:#fff;color:#4a148c;border:1.5px solid #c4a8e8;padding:7px 14px;border-radius:9px;text-decoration:none;font-weight:700;font-size:0.85rem;}
+.hero{background:#fff;border-radius:22px;padding:24px 22px;text-align:center;box-shadow:0 8px 28px rgba(107,63,160,.14);margin-bottom:14px;}
+.hero .av{font-size:5rem;line-height:1;display:block;margin-bottom:8px;}
+.hero .nm{font-size:1.5rem;font-weight:900;color:#4a148c;margin-bottom:6px;}
+.hero .pts{font-size:3rem;font-weight:900;color:#6B3FA0;letter-spacing:1px;}
+.hero .ptslbl{font-size:0.9rem;color:#666;margin-top:-4px;}
+.lvl{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:30px;background:#faf7ff;font-weight:800;margin-top:10px;}
+.progress{margin-top:10px;background:#eee;border-radius:10px;height:14px;overflow:hidden;}
+.progress > div{height:100%;background:linear-gradient(90deg,#6B3FA0,#FBC02D);transition:width .8s ease;}
+.section{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.06);}
+.section h2{margin:0 0 12px;color:#4a148c;font-size:1.05rem;display:flex;align-items:center;gap:8px;}
+.event{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fafafa;border-radius:10px;margin-bottom:6px;}
+.event b{color:#212121;font-size:0.95rem;}
+.event .meta{color:#777;font-size:0.78rem;}
+.event .pv{font-weight:900;font-size:1.05rem;}
+.event.pos{background:#e8f5e9;}
+.event.pos .pv{color:#1B5E20;}
+.event.neg{background:#ffebee;}
+.event.neg .pv{color:#c62828;}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.reward{background:#fafafa;border-radius:14px;padding:14px 10px;text-align:center;border:2px solid #eee;transition:transform .15s;}
+.reward:hover{transform:translateY(-2px);}
+.reward .ic{font-size:2.5rem;line-height:1;}
+.reward .nm{font-weight:800;font-size:0.92rem;margin:6px 0 4px;color:#212121;min-height:2.4em;}
+.reward .cost{font-weight:900;color:#FB8C00;margin-bottom:6px;}
+.btn{padding:7px 14px;border:none;border-radius:9px;font-weight:700;font-family:inherit;font-size:0.85rem;cursor:pointer;}
+.btn-redeem{background:#1B5E20;color:#fff;width:100%;}
+.btn-redeem:disabled{background:#bbb;cursor:not-allowed;}
+.history-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #eee;}
+.status-badge{padding:3px 9px;border-radius:6px;font-size:0.78rem;font-weight:800;}
+.s-pending{background:#fff3e0;color:#E65100;}
+.s-delivered{background:#e8f5e9;color:#1B5E20;}
+.s-cancelled{background:#ffebee;color:#c62828;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:14px;}
+.modal.show{display:flex;}
+.modal-box{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;text-align:center;}
+.modal-box h3{margin:0 0 12px;color:#4a148c;}
+.modal-box .row{display:flex;gap:8px;justify-content:center;margin-top:14px;}
+.empty{text-align:center;color:#888;padding:18px;font-size:0.92rem;}
+</style></head><body>
+<div class="topbar">
+  <h1>🌟 نقاطي</h1>
+  <a class="logout" href="/logout">خروج</a>
+</div>
+<div id="root"><div class="empty">جاري التحميل...</div></div>
+<div class="modal" id="confirm">
+  <div class="modal-box">
+    <h3 id="cTitle">تأكيد الاستبدال</h3>
+    <div id="cBody"></div>
+    <div class="row">
+      <button class="btn" style="background:#fafafa;color:#666;border:1px solid #ddd;" onclick="document.getElementById('confirm').classList.remove('show')">إلغاء</button>
+      <button class="btn btn-redeem" id="cOk">تأكيد</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="t"></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(m, ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
+var STATE={};
+
+function load(){
+  Promise.all([
+    fetch('/api/portal/student/me',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/points/rewards',{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/portal/student/redemptions',{credentials:'include'}).then(function(r){return r.json();}),
+  ]).then(function(arr){
+    var me=arr[0], rew=arr[1], red=arr[2];
+    if(!me.ok){document.getElementById('root').innerHTML='<div class="empty">'+(me.error||'فشل التحميل')+'</div>';return;}
+    STATE.me=me; STATE.rewards=rew.rows||[]; STATE.redemptions=red.rows||[];
+    render();
+  }).catch(function(){document.getElementById('root').innerHTML='<div class="empty">خطأ في الاتصال</div>';});
+}
+function render(){
+  var me=STATE.me;
+  var s=me.student||{};
+  var av=me.avatar&&me.avatar.emoji?me.avatar.emoji:'😊';
+  var bal=me.balance||0;
+  var lvl=me.level||{};
+  var nextLvl=me.next_level||null;
+  var progress=0;
+  if(lvl.min_points!=null && nextLvl && nextLvl.min_points){
+    var span=nextLvl.min_points-lvl.min_points;
+    var inLvl=bal-lvl.min_points;
+    progress=Math.max(0,Math.min(100,Math.round(inLvl/span*100)));
+  } else if(lvl.min_points!=null && !nextLvl){progress=100;}
+  var firstName=(s.student_name||'').split(' ')[0];
+  var html='';
+  html+='<div class="hero">'
+     +'<span class="av">'+_esc(av)+'</span>'
+     +'<div class="nm">'+_esc(firstName)+'</div>'
+     +'<div class="pts" id="balCount">0</div>'
+     +'<div class="ptslbl">نقطة</div>'
+     +'<div class="lvl" style="color:'+(lvl.color||'#6B3FA0')+';">'+_esc((lvl.badge_icon||'🏅'))+' المستوى: <b>'+_esc(lvl.name_ar||'—')+'</b></div>'
+     +'<div class="progress"><div style="width:'+progress+'%;"></div></div>'
+     +'<div style="font-size:0.78rem;color:#666;margin-top:6px;">'+(nextLvl?('للوصول إلى '+_esc(nextLvl.name_ar)+': '+(nextLvl.min_points-bal)+' نقطة'):'أعلى مستوى! 🎉')+'</div>'
+     +'</div>';
+
+  // Recent positive achievements
+  html+='<div class="section"><h2>🏆 إنجازاتي الأخيرة</h2>';
+  var pos=(me.events||[]).filter(function(e){return e.points_value>=0;}).slice(0,5);
+  if(!pos.length){html+='<div class="empty">لم تحصل على إنجازات بعد. ابدأ بمشاركتك في الصف!</div>';}
+  else{
+    pos.forEach(function(e){
+      html+='<div class="event pos">'
+       +'<div><b>'+_esc(e.behavior_name||'')+'</b><div class="meta">'+_esc(e.awarded_by_name||'—')+' • '+((e.awarded_at||'').slice(0,16))+'</div></div>'
+       +'<div class="pv">+'+e.points_value+'</div></div>';
+    });
+  }
+  html+='</div>';
+
+  // Reward shop
+  html+='<div class="section"><h2>🎁 متجر المكافآت</h2>';
+  if(!STATE.rewards.length){html+='<div class="empty">لا توجد مكافآت متاحة الآن.</div>';}
+  else{
+    html+='<div class="shop">';
+    STATE.rewards.forEach(function(r){
+      var canRedeem=bal>=r.point_cost && (r.stock<0 || r.stock>0);
+      html+='<div class="reward">'
+        +'<div class="ic">'+_esc(r.icon||'🎁')+'</div>'
+        +'<div class="nm">'+_esc(r.name_ar||'')+'</div>'
+        +'<div class="cost">'+r.point_cost+' نقطة</div>'
+        +'<button class="btn btn-redeem" '+(canRedeem?'':'disabled')+' onclick="askRedeem('+r.id+',\''+(r.name_ar||'').replace(/\\/g,'\\\\').replace(/\'/g,'\\\'').replace(/"/g,'\\\"')+'\','+r.point_cost+')">استبدال</button>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // Redemption history
+  html+='<div class="section"><h2>📋 مكافآتي</h2>';
+  if(!STATE.redemptions.length){html+='<div class="empty">لم تستبدل أي مكافأة بعد.</div>';}
+  else{
+    STATE.redemptions.forEach(function(r){
+      var stCls={pending:'s-pending',delivered:'s-delivered',cancelled:'s-cancelled'}[r.status]||'s-pending';
+      var stTxt={pending:'بانتظار التسليم',delivered:'تم التسليم',cancelled:'ملغى'}[r.status]||r.status;
+      html+='<div class="history-row">'
+       +'<div><b>'+_esc(r.reward_name||'')+'</b><div class="meta" style="color:#777;font-size:0.78rem;">'+((r.redeemed_at||'').slice(0,16))+' • '+r.points_spent+' نقطة</div></div>'
+       +'<span class="status-badge '+stCls+'">'+stTxt+'</span>'
+       +'</div>';
+    });
+  }
+  html+='</div>';
+  document.getElementById('root').innerHTML=html;
+  // Animate the points counter from 0 → bal
+  countUp('balCount', bal, 800);
+}
+function countUp(id, target, ms){
+  var el=document.getElementById(id);
+  if(!el) return;
+  var start=performance.now();
+  function tick(now){
+    var t=Math.min(1,(now-start)/ms);
+    var e=1-Math.pow(1-t,3); // easeOutCubic
+    el.textContent=Math.round(target*e);
+    if(t<1) requestAnimationFrame(tick); else el.textContent=target;
+  }
+  requestAnimationFrame(tick);
+}
+function askRedeem(rid,name,cost){
+  document.getElementById('cBody').innerHTML='هل تريد استبدال <b>'+cost+'</b> نقطة بـ <b>'+_esc(name)+'</b>؟';
+  document.getElementById('cOk').onclick=function(){doRedeem(rid);};
+  document.getElementById('confirm').classList.add('show');
+}
+function doRedeem(rid){
+  document.getElementById('confirm').classList.remove('show');
+  fetch('/api/portal/student/redeem',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({reward_id:rid})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){toast('✅ تم تسجيل طلب الاستبدال. ستحصل على المكافأة من المعلمة.');load();}
+      else{toast(d.error||'فشل الاستبدال',false);}
+    });
+}
+load();
+</script>
+</body></html>"""
+
+
+PORTAL_PARENT_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>منصة ولي الأمر — نظام النقاط</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;direction:rtl;color:#212121;padding:0;min-height:100vh;}
+.topbar{background:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.topbar h1{margin:0;color:#4a148c;font-size:1.05rem;}
+.topbar a{background:#f3e5f5;color:#4a148c;text-decoration:none;padding:7px 14px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.body{max-width:980px;margin:14px auto;padding:0 14px;}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.child-tab{padding:10px 18px;border-radius:10px;border:1.4px solid #c4a8e8;background:#fff;color:#4a148c;font-weight:800;cursor:pointer;font-family:inherit;}
+.child-tab.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;}
+.child-block{display:none;}
+.child-block.active{display:block;}
+.card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.summary .av{font-size:3.2rem;line-height:1;}
+.summary .nm{font-weight:900;color:#212121;font-size:1.2rem;margin-bottom:2px;}
+.summary .meta{color:#666;font-size:0.88rem;}
+.summary .bal{font-size:2rem;font-weight:900;color:#4a148c;}
+.summary .lvl{font-weight:700;color:#6B3FA0;}
+.s-title{font-weight:800;color:#4a148c;font-size:1rem;margin-bottom:10px;}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;}
+.chart-wrap{background:#fafafa;border-radius:10px;padding:12px;}
+.chart-title{font-weight:800;color:#4a148c;font-size:0.92rem;margin-bottom:6px;}
+.event{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;margin-bottom:5px;}
+.event b{color:#212121;}
+.event .meta{color:#777;font-size:0.78rem;}
+.event .pv{font-weight:900;}
+.event.pos{background:#e8f5e9;}
+.event.pos .pv{color:#1B5E20;}
+.event.neg{background:#ffebee;}
+.event.neg .pv{color:#c62828;}
+.actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{padding:9px 14px;border:none;border-radius:9px;font-family:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;font-size:0.88rem;}
+.btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+.btn-wa{background:#25D366;color:#fff;}
+.pref-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.pref-row select{padding:8px 14px;border:1.4px solid #c4a8e8;border-radius:9px;font-family:inherit;font-weight:700;background:#fff;}
+.empty{text-align:center;color:#888;padding:18px;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+@media (max-width:600px){
+  .summary .bal{font-size:1.5rem;}
+  .summary .av{font-size:2.4rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>👪 منصة ولي الأمر</h1>
+  <a href="/logout">خروج</a>
+</div>
+<div class="body" id="root">
+  <div class="card empty">جاري التحميل...</div>
+</div>
+<div class="toast" id="t"></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(m, ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
+var STATE={};
+
+function load(){
+  fetch('/api/portal/parent/me',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('root').innerHTML='<div class="card empty">'+_esc(d.error||'فشل التحميل')+'</div>';return;}
+    STATE=d;
+    render();
+  }).catch(function(){document.getElementById('root').innerHTML='<div class="card empty">خطأ في الاتصال</div>';});
+}
+function render(){
+  var html='';
+  var children=STATE.children||[];
+  if(!children.length){
+    document.getElementById('root').innerHTML='<div class="card empty">لا يوجد أطفال مرتبطون بحسابك. يرجى التواصل مع الإدارة.</div>';
+    return;
+  }
+  /* Tabs */
+  if(children.length>1){
+    html+='<div class="tabs">';
+    children.forEach(function(c,i){
+      html+='<button class="child-tab '+(i===0?'active':'')+'" onclick="showChild('+i+')">'+_esc(c.student.student_name||'')+'</button>';
+    });
+    html+='</div>';
+  }
+  /* Each child block */
+  children.forEach(function(c,i){
+    var s=c.student||{};
+    var av=(c.avatar&&c.avatar.emoji)?c.avatar.emoji:'😊';
+    var lvl=c.level||{};
+    html+='<div class="child-block '+(i===0?'active':'')+'" id="child-'+i+'">';
+    html+='<div class="card"><div class="summary">'
+       +'<div class="av">'+_esc(av)+'</div>'
+       +'<div style="flex:1;min-width:140px;">'
+         +'<div class="nm">'+_esc(s.student_name||'')+'</div>'
+         +'<div class="meta">المجموعة: '+_esc(s.group_name_student||'—')
+           +(c.teacher_name?' — المعلمة: '+_esc(c.teacher_name):'')+'</div>'
+       +'</div>'
+       +'<div style="text-align:center;">'
+         +'<div class="bal">'+(c.balance||0)+'</div>'
+         +'<div style="color:#888;font-size:0.78rem;">نقطة</div>'
+         +'<div class="lvl" style="margin-top:5px;">'+_esc((lvl.badge_icon||'🏅'))+' '+_esc(lvl.name_ar||'—')+'</div>'
+       +'</div></div></div>';
+
+    /* Charts */
+    html+='<div class="card"><div class="s-title">📈 التقدم خلال آخر 8 أسابيع</div><div class="charts">'
+       +'<div class="chart-wrap"><div class="chart-title">النقاط الأسبوعية (إيجابي / سلبي)</div><canvas id="ch-week-'+i+'" height="180"></canvas></div>'
+       +'<div class="chart-wrap"><div class="chart-title">التوزيع الشهري</div><canvas id="ch-pie-'+i+'" height="180"></canvas></div>'
+       +'</div></div>';
+
+    /* Activity feed */
+    html+='<div class="card"><div class="s-title">📝 آخر النشاطات (آخر 20 حدث)</div>';
+    var events=c.events||[];
+    if(!events.length){html+='<div class="empty">لا يوجد نشاط حتى الآن.</div>';}
+    else{
+      events.forEach(function(e){
+        var pv=(e.points_value>=0?'+':'')+e.points_value;
+        var cls=e.points_value>=0?'pos':'neg';
+        html+='<div class="event '+cls+'">'
+          +'<div><b>'+_esc(e.behavior_name||'')+'</b><div class="meta">'+_esc(e.awarded_by_name||'—')+' • '+((e.awarded_at||'').slice(0,16))+(e.note?(' • '+_esc(e.note)):'')+'</div></div>'
+          +'<div class="pv">'+pv+'</div></div>';
+      });
+    }
+    html+='</div>';
+
+    /* Action buttons */
+    html+='<div class="card"><div class="actions">';
+    if(c.teacher_name){
+      var msg='السلام عليكم، أود التواصل بخصوص '+(s.student_name||'').replace(/'/g,"’");
+      html+='<a class="btn btn-wa" href="https://wa.me/?text='+encodeURIComponent(msg)+'" target="_blank">📱 تواصل مع المعلمة</a>';
+    }
+    html+='</div></div>';
+
+    html+='</div>'; /* /child-block */
+  });
+
+  /* Notification preference (one per parent) */
+  var pref=STATE.notify_pref||'instant';
+  html+='<div class="card"><div class="s-title">🔔 إعدادات الإشعارات</div>'
+     +'<div class="pref-row">'
+     +'<div>اختر طريقة استلام إشعارات الواتساب:</div>'
+     +'<select id="prefSel" onchange="savePref(this.value)">'
+     +'<option value="instant"'+(pref==='instant'?' selected':'')+'>إشعار فوري لكل نقطة</option>'
+     +'<option value="daily"'+(pref==='daily'?' selected':'')+'>ملخص يومي</option>'
+     +'<option value="weekly"'+(pref==='weekly'?' selected':'')+'>ملخص أسبوعي</option>'
+     +'<option value="off"'+(pref==='off'?' selected':'')+'>إيقاف الإشعارات</option>'
+     +'</select></div></div>';
+
+  document.getElementById('root').innerHTML=html;
+
+  /* Render charts after DOM is mounted */
+  children.forEach(function(c,i){drawCharts(i,c);});
+}
+function showChild(i){
+  document.querySelectorAll('.child-tab').forEach(function(b,j){b.classList.toggle('active',j===i);});
+  document.querySelectorAll('.child-block').forEach(function(b,j){b.classList.toggle('active',j===i);});
+}
+function drawCharts(i,c){
+  if(!window.Chart) return;
+  var weekly=c.weekly||[];
+  var labels=weekly.map(function(w){return w.week_end;});
+  var pos=weekly.map(function(w){return w.positive;});
+  var neg=weekly.map(function(w){return Math.abs(w.negative);}); /* show as positive bar for stacking */
+  new Chart(document.getElementById('ch-week-'+i),{
+    type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'إيجابي',data:pos,backgroundColor:'#43A047',stack:'a'},
+      {label:'سلبي',  data:neg.map(function(v){return -v;}),backgroundColor:'#E53935',stack:'a'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true}},plugins:{legend:{position:'bottom',rtl:true,labels:{font:{family:'Segoe UI'}}}}}
+  });
+  new Chart(document.getElementById('ch-pie-'+i),{
+    type:'doughnut',
+    data:{labels:['إيجابي','سلبي'],datasets:[{data:[c.month_pos||0,Math.abs(c.month_neg||0)],backgroundColor:['#43A047','#E53935'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',rtl:true}}}
+  });
+}
+function savePref(v){
+  fetch('/api/portal/parent/notify-pref',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({notify_pref:v})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){toast('تم حفظ التفضيل');}else{toast(d.error||'خطأ',false);}
+    });
+}
+load();
+</script>
+</body></html>"""
+
+
+@app.route('/portal/change-password')
+@login_required
+def portal_change_pw_page():
+    return PORTAL_CHANGE_PW_HTML
+
+
+@app.route('/api/portal/change-password', methods=['POST'])
+@login_required
+def api_portal_change_pw():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("student", "parent"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json(silent=True) or {}
+    p = (d.get("password") or "").strip()
+    if len(p) < 6:
+        return jsonify({"ok": False, "error": "password too short"}), 400
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE users SET password=?, must_change_pw=0 WHERE id=?",
+            (hp(p), user.get("id")),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Force re-login.
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route('/portal/student')
+@login_required
+def portal_student_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_STUDENT_HTML
+
+
+@app.route('/api/portal/student/me', methods=['GET'])
+@login_required
+def api_portal_student_me():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return jsonify({"ok": False, "error": "account not linked to a student"}), 400
+    db = get_db()
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, personal_id, group_name_student, avatar_id "
+            "FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student record missing"}), 404
+    sd = dict(srow)
+    bal = _pts_balance(db, sid)
+    lvl = _pts_level_for(db, bal)
+    next_lvl = {}
+    try:
+        levels = db.execute(
+            "SELECT id, name_ar, min_points, max_points, badge_icon, color "
+            "FROM levels ORDER BY sort_order, min_points"
+        ).fetchall()
+        all_lvls = [dict(r) for r in levels]
+        for L in all_lvls:
+            if (L.get("min_points") or 0) > bal:
+                next_lvl = L; break
+    except Exception:
+        all_lvls = []
+    av = {}
+    if sd.get("avatar_id"):
+        try:
+            ar = db.execute("SELECT id, name, emoji FROM avatars WHERE id=?", (sd["avatar_id"],)).fetchone()
+            if ar: av = dict(ar)
+        except Exception: pass
+    events = _pts_recent_events(db, sid, 12)
+    return jsonify({
+        "ok":         True,
+        "student":    sd,
+        "balance":    bal,
+        "level":      lvl,
+        "next_level": next_lvl,
+        "avatar":     av,
+        "events":     events,
+    })
+
+
+@app.route('/api/portal/student/redemptions', methods=['GET'])
+@login_required
+def api_portal_student_redemptions():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return jsonify({"ok": True, "rows": []})
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, reward_id, reward_name, points_spent, status, "
+            "       redeemed_at, delivered_at "
+            "FROM redemptions WHERE student_id=? ORDER BY id DESC LIMIT 50",
+            (sid,),
+        ).fetchall()
+        return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+def _pts_parent_children_ids(user):
+    """Return the list of student ids this parent is linked to."""
+    raw = (user or {}).get("linked_parent_for") or ""
+    if not raw:
+        return []
+    try:
+        arr = json.loads(raw)
+        if isinstance(arr, list):
+            return [int(x) for x in arr if str(x).strip()]
+    except Exception:
+        pass
+    # Fallback: comma-separated.
+    out = []
+    for x in str(raw).split(","):
+        x = x.strip()
+        if x.isdigit(): out.append(int(x))
+    return out
+
+
+def _pts_random_password(n=8):
+    import secrets, string
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(n))
+
+
+# ── Admin: parent account management ─────────────────────────────
+@app.route('/api/admin/parents', methods=['GET'])
+@login_required
+def api_admin_parents_list():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, username, name, linked_parent_for, notify_pref "
+            "FROM users WHERE role='parent' ORDER BY id DESC"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = []
+    for r in rows:
+        rd = dict(r)
+        ids = []
+        try:
+            ids = json.loads(rd.get("linked_parent_for") or "[]") or []
+        except Exception:
+            ids = []
+        children = []
+        if ids:
+            try:
+                ph = ",".join(["?"]*len(ids))
+                crows = db.execute(
+                    "SELECT id, student_name FROM students WHERE id IN (" + ph + ")",
+                    tuple(ids),
+                ).fetchall()
+                children = [dict(c) for c in crows]
+            except Exception: pass
+        out.append({
+            "id": rd["id"], "username": rd["username"],
+            "name": rd["name"] or "",
+            "notify_pref": rd.get("notify_pref") or "instant",
+            "children":   children,
+        })
+    return jsonify({"ok": True, "rows": out})
+
+
+@app.route('/api/admin/parents', methods=['POST'])
+@login_required
+def api_admin_parents_create():
+    """Body: {phone, student_ids:[int], parent_name?}.
+    Creates a parent users row, returns the temporary password and
+    queues a credentials WhatsApp message."""
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json(silent=True) or {}
+    phone = (d.get("phone") or "").strip()
+    sids  = d.get("student_ids") or []
+    if isinstance(sids, (int, str)): sids = [sids]
+    try:
+        sids = [int(x) for x in sids if str(x).strip()]
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid student_ids"}), 400
+    if not phone:
+        return jsonify({"ok": False, "error": "phone required"}), 400
+    if not sids:
+        return jsonify({"ok": False, "error": "at least one student_id required"}), 400
+    db = get_db()
+    # Make sure students exist.
+    try:
+        ph = ",".join(["?"]*len(sids))
+        srows = db.execute(
+            "SELECT id, student_name FROM students WHERE id IN (" + ph + ")",
+            tuple(sids),
+        ).fetchall()
+    except Exception:
+        srows = []
+    if not srows:
+        return jsonify({"ok": False, "error": "no matching students"}), 404
+    pwd = _pts_random_password(8)
+    parent_name = (d.get("parent_name") or ("ولي أمر " + (dict(srows[0]).get("student_name") or ""))).strip()
+    children_ids_json = json.dumps(sids)
+    # Username = phone (just digits). Use existing username if same phone exists.
+    try:
+        existing = db.execute("SELECT id FROM users WHERE username=?", (phone,)).fetchone()
+    except Exception:
+        existing = None
+    if existing:
+        try:
+            db.execute(
+                "UPDATE users SET role='parent', name=?, linked_parent_for=?, "
+                "must_change_pw=1, password=?, notify_pref=COALESCE(notify_pref,'instant') "
+                "WHERE id=?",
+                (parent_name, children_ids_json, hp(pwd), dict(existing)["id"]),
+            )
+            db.commit()
+            uid = dict(existing)["id"]
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+    else:
+        try:
+            cur = db.execute(
+                "INSERT INTO users(username, password, name, role, "
+                "linked_parent_for, must_change_pw, notify_pref) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (phone, hp(pwd), parent_name, "parent",
+                 children_ids_json, 1, "instant"),
+            )
+            db.commit()
+            uid = cur.lastrowid
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+    # Queue WhatsApp credentials message
+    children_names = ", ".join(dict(s)["student_name"] for s in srows)
+    try:
+        host = (request.host_url or "").rstrip("/")
+    except Exception:
+        host = ""
+    msg = (
+        "مرحباً، تم إنشاء حساب لكم في منصة مايندكس لمتابعة "
+        + children_names + ".\n"
+        + "اسم المستخدم: " + phone + "\n"
+        + "كلمة المرور المؤقتة: " + pwd + "\n"
+        + "الرابط: " + host + "/login"
+    )
+    try:
+        db.execute(
+            "INSERT INTO point_notifications(event_id, student_id, student_name, "
+            "phone, message, status, notification_type) VALUES(?,?,?,?,?,?,?)",
+            (0, dict(srows[0])["id"], children_names, phone, msg,
+             "pending", "credentials"),
+        )
+        db.commit()
+    except Exception:
+        pass
+    return jsonify({
+        "ok": True, "id": uid, "username": phone, "temp_password": pwd,
+        "children_count": len(sids),
+    })
+
+
+@app.route('/api/admin/parents/<int:pid>', methods=['PATCH'])
+@login_required
+def api_admin_parents_update(pid):
+    """Body: {student_ids?: [int], notify_pref?, name?, deactivate?}."""
+    err = _require_admin_response()
+    if err: return err
+    d = request.get_json(silent=True) or {}
+    fields = []; args = []
+    if "student_ids" in d:
+        sids = d["student_ids"] or []
+        try:
+            sids = [int(x) for x in sids if str(x).strip()]
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid student_ids"}), 400
+        fields.append("linked_parent_for=?"); args.append(json.dumps(sids))
+    if "notify_pref" in d:
+        nv = (d.get("notify_pref") or "").strip()
+        if nv not in ("instant", "daily", "weekly", "off"):
+            return jsonify({"ok": False, "error": "invalid notify_pref"}), 400
+        fields.append("notify_pref=?"); args.append(nv)
+    if "name" in d:
+        fields.append("name=?"); args.append((d.get("name") or "").strip())
+    if d.get("deactivate"):
+        fields.append("role=?"); args.append("parent_disabled")
+    if not fields:
+        return jsonify({"ok": False, "error": "no fields"}), 400
+    args.append(pid)
+    db = get_db()
+    try:
+        db.execute("UPDATE users SET " + ",".join(fields) +
+                   " WHERE id=? AND role IN ('parent','parent_disabled')", tuple(args))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True})
+
+
+@app.route('/api/admin/parents/<int:pid>/reset-password', methods=['POST'])
+@login_required
+def api_admin_parents_reset(pid):
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    pwd = _pts_random_password(8)
+    try:
+        cur = db.execute(
+            "UPDATE users SET password=?, must_change_pw=1 WHERE id=? AND role IN ('parent','parent_disabled')",
+            (hp(pwd), pid),
+        )
+        db.commit()
+        if cur.rowcount == 0:
+            return jsonify({"ok": False, "error": "parent not found"}), 404
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "temp_password": pwd})
+
+
+# ── Parent portal endpoints ──────────────────────────────────────
+@app.route('/portal/parent')
+@login_required
+def portal_parent_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "parent":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_HTML
+
+
+@app.route('/api/portal/parent/me', methods=['GET'])
+@login_required
+def api_portal_parent_me():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "parent":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    db = get_db()
+    sids = _pts_parent_children_ids(user)
+    children = []
+    for sid in sids:
+        try:
+            srow = db.execute(
+                "SELECT id, student_name, personal_id, group_name_student, avatar_id "
+                "FROM students WHERE id=?", (sid,),
+            ).fetchone()
+        except Exception:
+            srow = None
+        if not srow: continue
+        sd = dict(srow)
+        bal = _pts_balance(db, sid)
+        lvl = _pts_level_for(db, bal)
+        av  = {}
+        if sd.get("avatar_id"):
+            try:
+                ar = db.execute("SELECT emoji FROM avatars WHERE id=?", (sd["avatar_id"],)).fetchone()
+                if ar: av = {"emoji": (dict(ar) if hasattr(ar, "keys") else {}).get("emoji") or ar[0]}
+            except Exception: pass
+        events = _pts_recent_events(db, sid, 20)
+        # Weekly chart series (last 8 weeks)
+        import datetime as _dt
+        now = _dt.datetime.now()
+        weekly = []
+        for i in range(7, -1, -1):
+            wstart = (now - _dt.timedelta(days=(i+1)*7)).strftime("%Y-%m-%d %H:%M:%S")
+            wend   = (now - _dt.timedelta(days=i*7)).strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                pos = db.execute(
+                    "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                    "WHERE student_id=? AND awarded_at>=? AND awarded_at<? AND points_value > 0",
+                    (sid, wstart, wend),
+                ).fetchone()[0] or 0
+                neg = db.execute(
+                    "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                    "WHERE student_id=? AND awarded_at>=? AND awarded_at<? AND points_value < 0",
+                    (sid, wstart, wend),
+                ).fetchone()[0] or 0
+            except Exception:
+                pos = 0; neg = 0
+            weekly.append({"week_end": wend[:10], "positive": int(pos), "negative": int(neg)})
+        # Month: positive vs negative
+        mo_start = (now - _dt.timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            mo_pos = db.execute(
+                "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                "WHERE student_id=? AND awarded_at>=? AND points_value > 0",
+                (sid, mo_start),
+            ).fetchone()[0] or 0
+            mo_neg = db.execute(
+                "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                "WHERE student_id=? AND awarded_at>=? AND points_value < 0",
+                (sid, mo_start),
+            ).fetchone()[0] or 0
+        except Exception:
+            mo_pos = 0; mo_neg = 0
+        # Group teacher (for "تواصل مع المعلمة")
+        teacher_phone = ""
+        teacher_name = ""
+        gn = (sd.get("group_name_student") or "").strip()
+        if gn:
+            try:
+                grow = db.execute(
+                    "SELECT teacher_name FROM student_groups WHERE TRIM(group_name)=TRIM(?) LIMIT 1",
+                    (gn,),
+                ).fetchone()
+                if grow:
+                    teacher_name = (dict(grow).get("teacher_name") or "").strip()
+            except Exception: pass
+        children.append({
+            "student":       sd,
+            "balance":       bal,
+            "level":         lvl,
+            "avatar":        av,
+            "events":        events,
+            "weekly":        weekly,
+            "month_pos":     int(mo_pos),
+            "month_neg":     int(mo_neg),
+            "teacher_name":  teacher_name,
+        })
+    return jsonify({
+        "ok":          True,
+        "name":        user.get("name") or "",
+        "notify_pref": user.get("notify_pref") or "instant",
+        "children":    children,
+    })
+
+
+@app.route('/api/portal/parent/notify-pref', methods=['POST'])
+@login_required
+def api_portal_parent_notify_pref():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "parent":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json(silent=True) or {}
+    pref = (d.get("notify_pref") or "").strip()
+    if pref not in ("instant", "daily", "weekly", "off"):
+        return jsonify({"ok": False, "error": "invalid notify_pref"}), 400
+    db = get_db()
+    try:
+        db.execute("UPDATE users SET notify_pref=? WHERE id=?",
+                   (pref, user.get("id")))
+        db.commit()
+        # Update session so subsequent requests see the new value.
+        session["user"]["notify_pref"] = pref
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "notify_pref": pref})
+
+
+@app.route('/api/portal/student/redeem', methods=['POST'])
+@login_required
+def api_portal_student_redeem():
+    """Student-initiated redemption. Forces student_id to the
+    logged-in student so they can't redeem for someone else."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return jsonify({"ok": False, "error": "no linked student"}), 400
+    d = request.get_json(silent=True) or {}
+    try:
+        rid = int(d.get("reward_id") or 0)
+    except Exception:
+        rid = 0
+    if not rid:
+        return jsonify({"ok": False, "error": "reward_id required"}), 400
+    db = get_db()
+    # Reuse the same redemption logic as /api/points/redeem but with
+    # the locked student_id. Permission bypassed since it's the
+    # student themselves redeeming for themselves.
+    try:
+        srow = db.execute(
+            "SELECT id, student_name FROM students WHERE id=?", (sid,),
+        ).fetchone()
+        if not srow:
+            return jsonify({"ok": False, "error": "student missing"}), 404
+        sd = dict(srow)
+        rrow = db.execute(
+            "SELECT id, name_ar, point_cost, stock, is_active FROM rewards WHERE id=?",
+            (rid,),
+        ).fetchone()
+        if not rrow:
+            return jsonify({"ok": False, "error": "reward not found"}), 404
+        rd = dict(rrow)
+        if not rd.get("is_active"):
+            return jsonify({"ok": False, "error": "reward inactive"}), 400
+        cost = int(rd.get("point_cost") or 0)
+        bal = _pts_balance(db, sid)
+        if bal < cost:
+            return jsonify({"ok": False, "error": "insufficient points"}), 400
+        stock = int(rd.get("stock") or 0)
+        if stock == 0:
+            return jsonify({"ok": False, "error": "out of stock"}), 400
+        cur = db.execute(
+            "INSERT INTO redemptions(student_id, student_name, reward_id, "
+            "reward_name, points_spent, status) VALUES(?,?,?,?,?,?)",
+            (sid, sd.get("student_name") or "", rid, rd.get("name_ar") or "",
+             cost, "pending"),
+        )
+        if stock > 0:
+            db.execute("UPDATE rewards SET stock=stock-1 WHERE id=? AND stock>0", (rid,))
+        db.commit()
+        return jsonify({"ok": True, "redemption_id": cur.lastrowid,
+                        "balance": _pts_balance(db, sid)})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+# ──────────────────────────────────────────────────────────────────
 # Behavior-points pages
 # ──────────────────────────────────────────────────────────────────
 POINTS_MANAGE_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>نظام النقاط — الإدارة</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;padding:0;direction:rtl;}
 .topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px rgba(107,63,160,.25);}
@@ -27843,6 +29177,7 @@ tr:hover{background:#fafafa;}
   <button class="tab-btn"        onclick="showTab('redemptions')">الاستبدالات</button>
   <button class="tab-btn"        onclick="showTab('reports')">التقارير</button>
   <button class="tab-btn"        onclick="showTab('notifications')">إشعارات الواتساب</button>
+  <button class="tab-btn"        onclick="showTab('parents')">أولياء الأمور</button>
   <button class="tab-btn"        onclick="showTab('settings')">إعدادات</button>
 </div>
 <div class="body" id="body">
@@ -27856,8 +29191,8 @@ function toast(msg, ok){var t=document.getElementById('t');t.textContent=msg;t.s
 function showTab(t){
   var btns=document.querySelectorAll('.tab-btn');
   btns.forEach(function(b){b.classList.remove('active');});
-  Array.prototype.find.call(btns,function(b){return b.textContent.indexOf({behaviors:'السلوكيات',rewards:'المكافآت',redemptions:'الاستبدالات',reports:'التقارير',notifications:'إشعارات الواتساب',settings:'إعدادات'}[t])>=0;}).classList.add('active');
-  ({behaviors:loadBehaviors,rewards:loadRewards,redemptions:loadRedemptions,reports:loadReports,notifications:loadNotifications,settings:loadSettings}[t])();
+  Array.prototype.find.call(btns,function(b){return b.textContent.indexOf({behaviors:'السلوكيات',rewards:'المكافآت',redemptions:'الاستبدالات',reports:'التقارير',notifications:'إشعارات الواتساب',parents:'أولياء الأمور',settings:'إعدادات'}[t])>=0;}).classList.add('active');
+  ({behaviors:loadBehaviors,rewards:loadRewards,redemptions:loadRedemptions,reports:loadReports,notifications:loadNotifications,parents:loadParents,settings:loadSettings}[t])();
 }
 
 /* ── Behaviors tab ────────────────────────────────────────── */
@@ -28018,34 +29353,64 @@ function cancelRedemption(id){
   });
 }
 
-/* ── Reports tab ──────────────────────────────────────────── */
-function _bar(value,max,color){
-  var w=max>0?Math.max(2,Math.round((value/max)*100)):0;
-  return '<div style="background:#eee;border-radius:6px;height:14px;overflow:hidden;"><div style="width:'+w+'%;height:100%;background:'+color+';"></div></div>';
-}
+/* ── Reports tab (Chart.js) ───────────────────────────────── */
 function loadReports(){
   fetch('/api/points/reports/admin',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
     var html='';
-    html+='<div class="card"><div class="section-title">📊 ترتيب المجموعات</div>';
+    html+='<div class="card"><div class="section-title">📊 ترتيب المجموعات بالنقاط</div>';
     if(!d.groups.length){html+='<div class="empty">لا توجد بيانات بعد</div>';}
     else{
-      var maxG=Math.max.apply(null,d.groups.map(function(g){return g.total||0;}).concat([1]));
-      html+='<table><thead><tr><th>المجموعة</th><th>إجمالي النقاط</th><th>عدد الأحداث</th><th>عدد الطلبة</th><th></th></tr></thead><tbody>';
-      d.groups.forEach(function(g){
-        html+='<tr><td><b>'+_esc(g.g)+'</b></td><td>'+g.total+'</td><td>'+g.events+'</td><td>'+g.students+'</td><td style="width:35%;">'+_bar(g.total,maxG,'#6B3FA0')+'</td></tr>';
-      });
-      html+='</tbody></table>';
+      html+='<div style="position:relative;height:'+Math.max(220, d.groups.length*32)+'px;"><canvas id="ch-groups"></canvas></div>';
     }
     html+='</div>';
 
     html+='<div class="card"><div class="section-title">👩‍🏫 نشاط المعلمين</div>';
     if(!d.teachers.length){html+='<div class="empty">لا توجد بيانات بعد</div>';}
     else{
-      var maxT=Math.max.apply(null,d.teachers.map(function(t){return t.events||0;}).concat([1]));
-      html+='<table><thead><tr><th>المعلم/المعلمة</th><th>عدد الأحداث</th><th>إجمالي النقاط</th><th></th></tr></thead><tbody>';
-      d.teachers.forEach(function(t){
-        html+='<tr><td><b>'+_esc(t.awarded_by_name||'—')+'</b></td><td>'+t.events+'</td><td>'+t.total+'</td><td style="width:35%;">'+_bar(t.events,maxT,'#1565C0')+'</td></tr>';
+      html+='<div style="position:relative;height:'+Math.max(220, d.teachers.length*32)+'px;"><canvas id="ch-teachers"></canvas></div>';
+    }
+    html+='</div>';
+    document.getElementById('body').innerHTML=html;
+    if(d.groups.length && window.Chart){
+      new Chart(document.getElementById('ch-groups'),{
+        type:'bar',
+        data:{labels:d.groups.map(function(g){return g.g;}),datasets:[{label:'إجمالي النقاط',data:d.groups.map(function(g){return g.total;}),backgroundColor:'#6B3FA0',borderRadius:6}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
+      });
+    }
+    if(d.teachers.length && window.Chart){
+      new Chart(document.getElementById('ch-teachers'),{
+        type:'bar',
+        data:{labels:d.teachers.map(function(t){return t.awarded_by_name||'—';}),datasets:[
+          {label:'عدد الأحداث',data:d.teachers.map(function(t){return t.events;}),backgroundColor:'#1565C0',borderRadius:6}
+        ]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}
+      });
+    }
+  });
+}
+
+/* ── Parents tab (admin manages parent accounts) ────────── */
+function loadParents(){
+  fetch('/api/admin/parents',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
+    var html='<div class="card"><div class="section-title">👪 حسابات أولياء الأمور</div>';
+    html+='<div class="row" style="margin-bottom:12px;"><button class="btn btn-add" onclick="addParent()">+ إنشاء حساب لولي أمر</button></div>';
+    if(!d.rows.length){html+='<div class="empty">لا توجد حسابات بعد</div>';}
+    else{
+      html+='<table><thead><tr><th>الاسم</th><th>اسم المستخدم (الرقم)</th><th>الأطفال</th><th>تفضيل الإشعار</th><th>الإجراءات</th></tr></thead><tbody>';
+      d.rows.forEach(function(p){
+        var kids=(p.children||[]).map(function(c){return _esc(c.student_name||'');}).join('، ');
+        var prefMap={instant:'فوري',daily:'يومي',weekly:'أسبوعي',off:'متوقف'};
+        html+='<tr><td><b>'+_esc(p.name||'—')+'</b></td>'
+          +'<td style="direction:ltr;">'+_esc(p.username||'')+'</td>'
+          +'<td>'+(kids||'—')+'</td>'
+          +'<td>'+(prefMap[p.notify_pref]||p.notify_pref||'فوري')+'</td>'
+          +'<td>'
+            +'<button class="btn btn-edit" onclick="editParent('+p.id+')">تعديل</button> '
+            +'<button class="btn btn-cancel" onclick="resetParentPw('+p.id+')">إعادة تعيين</button>'
+          +'</td></tr>';
       });
       html+='</tbody></table>';
     }
@@ -28053,20 +29418,78 @@ function loadReports(){
     document.getElementById('body').innerHTML=html;
   });
 }
+function addParent(){
+  var phone=prompt('رقم واتساب ولي الأمر (مع رمز الدولة، أرقام فقط):');
+  if(!phone) return;
+  phone=phone.replace(/[^\d]/g,'');
+  if(phone.length<7){toast('رقم غير صالح',false);return;}
+  var sidsRaw=prompt('أدخل أرقام الطلبة (IDs مفصولة بفاصلة، مثال: 12,34,56):');
+  if(!sidsRaw) return;
+  var sids=sidsRaw.split(',').map(function(x){return parseInt(x.trim(),10);}).filter(function(x){return !!x;});
+  if(!sids.length){toast('قائمة طلبة غير صالحة',false);return;}
+  var nm=prompt('اسم ولي الأمر (اختياري):','');
+  fetch('/api/admin/parents',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({phone:phone,student_ids:sids,parent_name:nm||''})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      alert('تم إنشاء الحساب\n\nاسم المستخدم: '+d.username+'\nكلمة المرور المؤقتة: '+d.temp_password+'\n\nتم إنشاء رسالة واتساب جاهزة في تبويب "إشعارات الواتساب"');
+      loadParents();
+    }else{toast(d.error||'خطأ',false);}
+  });
+}
+function editParent(pid){
+  var newSids=prompt('قائمة جديدة للأطفال (IDs مفصولة بفاصلة، اتركه فارغاً لإلغاء):');
+  if(newSids===null) return;
+  var arr=newSids.split(',').map(function(x){return parseInt(x.trim(),10);}).filter(function(x){return !!x;});
+  fetch('/api/admin/parents/'+pid,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({student_ids:arr})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('تم التحديث');loadParents();}else{toast(d.error||'خطأ',false);}
+  });
+}
+function resetParentPw(pid){
+  if(!confirm('إعادة تعيين كلمة المرور؟ سيُعطى ولي الأمر كلمة مرور جديدة.')) return;
+  fetch('/api/admin/parents/'+pid+'/reset-password',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){alert('كلمة المرور الجديدة: '+d.temp_password);loadParents();}
+    else{toast(d.error||'خطأ',false);}
+  });
+}
 
 /* ── Notifications tab ────────────────────────────────────── */
+var _notifFilter='all';
 function loadNotifications(){
-  fetch('/api/points/notifications?status=pending',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+  Promise.all([
+    fetch('/api/points/notifications?status=pending&type='+_notifFilter,{credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/points/digest/next',{credentials:'include'}).then(function(r){return r.json();}),
+  ]).then(function(arr){
+    var d=arr[0], nx=arr[1]||{};
     if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
+    var typeMap={instant:'فوري',daily:'يومي',weekly:'أسبوعي',credentials:'بيانات الدخول'};
     var html='<div class="card"><div class="section-title">📱 إشعارات الواتساب المعلقة</div>';
+    /* Next-run banner */
+    if(nx&&nx.ok){
+      html+='<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:8px;padding:8px 12px;margin-bottom:10px;color:#0d47a1;font-size:0.85rem;">'
+        +'⏰ التشغيل التالي للملخص اليومي: <b>'+_esc(nx.daily_next||'—')+'</b>'
+        +' &nbsp;•&nbsp; التشغيل التالي للملخص الأسبوعي: <b>'+_esc(nx.weekly_next||'—')+'</b>'
+        +'</div>';
+    }
+    /* Filter buttons */
+    var filters=[['all','الكل'],['instant','فوري'],['daily','يومي'],['weekly','أسبوعي'],['credentials','بيانات الدخول']];
+    html+='<div class="row" style="margin-bottom:10px;gap:6px;">';
+    filters.forEach(function(f){
+      html+='<button class="btn '+(_notifFilter===f[0]?'btn-pri':'btn-edit')+'" onclick="setNotifFilter(\''+f[0]+'\')">'+_esc(f[1])+'</button>';
+    });
+    html+='</div>';
     html+='<div style="font-size:0.88rem;color:#666;margin-bottom:10px;">انقر على أيقونة الواتساب لفتح المحادثة وإرسال الرسالة، ثم اضغط "تم الإرسال".</div>';
     if(!d.rows.length){html+='<div class="empty">لا توجد إشعارات معلقة</div>';}
     else{
-      html+='<table><thead><tr><th>الطالب</th><th>الرقم</th><th>الرسالة</th><th>الإجراء</th></tr></thead><tbody>';
+      html+='<table><thead><tr><th>النوع</th><th>الطالب</th><th>الرقم</th><th>الرسالة</th><th>الإجراء</th></tr></thead><tbody>';
       d.rows.forEach(function(n){
         var phone=(n.phone||'').replace(/[^\d+]/g,'').replace(/^\+?/,'');
         var waUrl=phone?'https://wa.me/'+phone+'?text='+encodeURIComponent(n.message||''):'#';
-        html+='<tr><td><b>'+_esc(n.student_name||'')+'</b></td>'
+        var typeLabel=typeMap[n.notification_type]||n.notification_type||'فوري';
+        html+='<tr><td><span class="tag tag-pos" style="background:#e3f2fd;color:#0d47a1;">'+_esc(typeLabel)+'</span></td>'
+          +'<td><b>'+_esc(n.student_name||'')+'</b></td>'
           +'<td style="direction:ltr;">'+_esc(n.phone||'—')+'</td>'
           +'<td style="white-space:pre-line;font-size:0.85rem;color:#333;max-width:400px;">'+_esc(n.message||'')+'</td>'
           +'<td>'
@@ -28080,6 +29503,7 @@ function loadNotifications(){
     document.getElementById('body').innerHTML=html;
   });
 }
+function setNotifFilter(f){_notifFilter=f;loadNotifications();}
 function markNotifSent(id){
   fetch('/api/points/notifications/'+id+'/sent',{method:'POST',credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     if(d.ok){toast('تم التحديث');loadNotifications();}else{toast(d.error||'خطأ',false);}
@@ -28090,24 +29514,57 @@ function markNotifSent(id){
 function loadSettings(){
   fetch('/api/settings',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     var s=(d.settings||{}).points||{};
-    var notif=s.auto_notify_parent||{};
-    var on=String(notif.value||'0')==='1';
+    function row(key, fallback){
+      var meta=s[key]||{};
+      var on=String(meta.value||fallback)==='1';
+      return '<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;">'
+        +'<div><b>'+_esc(meta.label||key)+'</b></div>'
+        +'<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleSetting(\''+key+'\',this.checked)" style="width:20px;height:20px;cursor:pointer;"><span>'+(on?'مفعّل':'متوقف')+'</span></label>'
+        +'</div>';
+    }
+    function timeRow(key, fallback){
+      var meta=s[key]||{};
+      var v=meta.value||fallback;
+      return '<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;">'
+        +'<div><b>'+_esc(meta.label||key)+'</b></div>'
+        +'<input type="time" value="'+_esc(v)+'" onchange="saveSetting(\''+key+'\',this.value)" style="padding:6px 10px;border:1.3px solid #ddd;border-radius:7px;font-family:inherit;">'
+        +'</div>';
+    }
+    function dayRow(key, fallback){
+      var meta=s[key]||{};
+      var v=meta.value||fallback;
+      var days=['الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
+      var sel=days.map(function(nm,idx){return '<option value="'+idx+'"'+(String(idx)===String(v)?' selected':'')+'>'+nm+'</option>';}).join('');
+      return '<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;">'
+        +'<div><b>'+_esc(meta.label||key)+'</b></div>'
+        +'<select onchange="saveSetting(\''+key+'\',this.value)" style="padding:6px 10px;border:1.3px solid #ddd;border-radius:7px;font-family:inherit;">'+sel+'</select>'
+        +'</div>';
+    }
     var html='<div class="card"><div class="section-title">⚙️ إعدادات نظام النقاط</div>';
-    html+='<div class="row" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;">'
-       +'<div><b>'+(notif.label||'إشعار ولي الأمر تلقائياً عند منح/خصم نقاط')+'</b><div style="font-size:0.82rem;color:#666;">عند التفعيل، يتم إنشاء رسالة واتساب جاهزة لكل عملية منح في تبويب "إشعارات الواتساب".</div></div>'
-       +'<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleNotify(this.checked)" style="width:20px;height:20px;cursor:pointer;"><span>'+(on?'مفعّل':'متوقف')+'</span></label>'
-       +'</div>';
+    html+=row('auto_notify_parent','0');
+    html+=row('sound_effects','1');
+    html+=timeRow('digest_daily_time','20:00');
+    html+=timeRow('digest_weekly_time','18:00');
+    html+=dayRow('digest_weekly_day','4');
     html+='</div>';
     document.getElementById('body').innerHTML=html;
   });
 }
-function toggleNotify(on){
+function toggleSetting(key, on){
   fetch('/api/settings',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({page:'points',component:'auto_notify_parent',value:on?'1':'0'})
+    body:JSON.stringify({page:'points',component:key,value:on?'1':'0'})
   }).then(function(r){return r.json();}).then(function(d){
     if(d&&d.ok!==false){toast('تم الحفظ');loadSettings();}else{toast('خطأ',false);}
   });
 }
+function saveSetting(key, val){
+  fetch('/api/settings',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({page:'points',component:key,value:String(val)})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.ok!==false){toast('تم الحفظ');}else{toast('خطأ',false);}
+  });
+}
+function toggleNotify(on){toggleSetting('auto_notify_parent',on);} /* back-compat */
 
 loadBehaviors();
 </script>
@@ -28205,7 +29662,25 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 
 <script>
 var GROUP=__GROUP_ARG__;
+var SOUND_ON=__SOUND_ON__;
 var STATE={students:[], selected:{}, behaviors:[], menuTab:'positive'};
+
+/* Pre-load sound effects so playback is instant on first grant. */
+var _sndPos = null, _sndNeg = null;
+if (SOUND_ON){
+  try {
+    _sndPos = new Audio('/static/sounds/positive_ding.wav');
+    _sndPos.preload = 'auto'; _sndPos.volume = 0.6;
+    _sndNeg = new Audio('/static/sounds/negative_buzz.wav');
+    _sndNeg.preload = 'auto'; _sndNeg.volume = 0.6;
+  } catch(e){ /* If audio init fails we just skip the sound. */ }
+}
+function _playSound(positive){
+  if (!SOUND_ON) return;
+  var a = positive ? _sndPos : _sndNeg;
+  if (!a) return;
+  try { a.currentTime = 0; var p = a.play(); if (p && p.catch) p.catch(function(){}); } catch(e){}
+}
 
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg, ok){var t=document.getElementById('t');t.textContent=msg;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);}
@@ -28301,6 +29776,7 @@ function grant(bid){
   }).then(function(r){return r.json();}).then(function(d){
     if(!d.ok){toast(d.error||'خطأ',false);return;}
     var pos=(bhv.points_value>=0);
+    _playSound(pos);
     d.results.forEach(function(res){
       if(!res.ok) return;
       var stu=STATE.students.find(function(s){return s.id===res.student_id;});
@@ -28344,7 +29820,11 @@ def points_board_page(group=None):
     # Inline-encode the group name as a JS string so the page knows
     # which group to load. json.dumps handles all the quoting safely.
     g_arg = json.dumps(group or "", ensure_ascii=False)
-    return POINTS_BOARD_HTML.replace("__GROUP_ARG__", g_arg)
+    snd_on = (get_setting("points", "sound_effects", "1") or "1") == "1"
+    snd_arg = "true" if snd_on else "false"
+    return (POINTS_BOARD_HTML
+            .replace("__GROUP_ARG__", g_arg)
+            .replace("__SOUND_ON__",  snd_arg))
 
 
 if __name__ == "__main__":
