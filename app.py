@@ -6757,6 +6757,19 @@ function _tShowAlert(text, kind){
   el.className = 'alert ' + (kind || 'fresh');
 }
 
+function _tFmtGroupOption(g){
+  // g may be a plain string (legacy) or an object {name, study_days, study_time}.
+  if (!g) return '';
+  if (typeof g === 'string') return g;
+  var name = String(g.name || '').trim();
+  var days = String(g.study_days || '').trim();
+  var time = String(g.study_time || '').trim();
+  var sched = '';
+  if (days && time)      sched = days + ' - ' + time;
+  else if (days)         sched = days;
+  else if (time)         sched = time;
+  return sched ? (name + ' (' + sched + ')') : name;
+}
 function tLoadGroups(){
   var sel = document.getElementById('t-group');
   fetch('/api/teacher/groups', {credentials:'include'})
@@ -6766,8 +6779,12 @@ function tLoadGroups(){
       var groups = d.groups || [];
       sel.innerHTML = '<option value="">— اختر مجموعتك —</option>';
       for (var i=0;i<groups.length;i++){
+        var g = groups[i];
+        var name = (typeof g === 'string') ? g : (g.name || '');
+        var label = _tFmtGroupOption(g);
         var o = document.createElement('option');
-        o.value = groups[i]; o.textContent = groups[i];
+        o.value = name;
+        o.textContent = label;
         sel.appendChild(o);
       }
       if (!groups.length){
@@ -15230,6 +15247,47 @@ def _teacher_groups_for(db, user):
     return deduped
 
 
+def _teacher_groups_detailed_for(db, user):
+    """Same teacher → groups mapping as `_teacher_groups_for`, but each
+    entry is a dict carrying the schedule fields the teacher dropdown
+    formats next to the group name (study_days + study_time). Reads
+    columns defensively in case the live `student_groups` table is on
+    an older schema."""
+    keys = _teacher_match_keys(user)
+    if not keys:
+        return []
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()}
+    except Exception:
+        live = set()
+    sel = ['group_name', 'teacher_name']
+    if 'study_days' in live: sel.append('study_days')
+    if 'study_time' in live: sel.append('study_time')
+    try:
+        rows = db.execute(
+            'SELECT ' + ', '.join('"' + c + '"' for c in sel) +
+            ' FROM student_groups '
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        return []
+    out, seen = [], set()
+    for r in rows:
+        rd = dict(r) if hasattr(r, 'keys') else {sel[i]: r[i] for i in range(len(sel))}
+        gn = (rd.get('group_name') or '').strip()
+        tn = (rd.get('teacher_name') or '').strip().lower()
+        if not gn or not tn or tn not in keys: continue
+        if gn in seen: continue
+        seen.add(gn)
+        out.append({
+            "name":        gn,
+            "study_days": (rd.get('study_days') or '').strip(),
+            "study_time": (rd.get('study_time') or '').strip(),
+        })
+    out.sort(key=lambda g: g["name"])
+    return out
+
+
 def _require_teacher():
     """Returns (user_dict, error_response_or_None). Used at the top
     of every /api/teacher/* route to gate access."""
@@ -15257,7 +15315,13 @@ def api_teacher_groups():
     user, err = _require_teacher()
     if err: return err
     db = get_db()
-    return jsonify({"ok": True, "groups": _teacher_groups_for(db, user)})
+    detailed = _teacher_groups_detailed_for(db, user)
+    return jsonify({
+        "ok":     True,
+        "groups": detailed,
+        # Plain list retained for any older caller that expects strings.
+        "names":  [g["name"] for g in detailed],
+    })
 
 
 @app.route('/api/teacher/students', methods=['GET'])
