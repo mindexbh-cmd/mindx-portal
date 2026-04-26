@@ -23968,6 +23968,253 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     mo.observe(document.body, { childList:true, subtree:true });
   }
 })();
+
+(function(){
+  /* ── Right-click / long-press column-header menu ────────────────
+     Replaces the per-header action buttons (rename / delete / add /
+     filter / type-icon) with a single context menu. Existing
+     handlers stay wired — they're reached through the menu items. */
+  if (window._MX_HEAD_MENU_INSTALLED) return;
+  window._MX_HEAD_MENU_INSTALLED = true;
+
+  var styleId = 'mx-head-menu-style';
+  if (!document.getElementById(styleId)){
+    var style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = [
+      /* Hide every per-header action button + type-icon. The buttons
+         keep their handlers wired so any code that triggers them
+         programmatically still works. */
+      'th .mx-col-tool-btn,th .mx-col-del-btn,th .mx-filter-btn,th .mx-col-type-icon{display:none !important;}',
+      /* Subtle cue when long-press is in flight. */
+      'th.mx-head-press{box-shadow:inset 0 0 0 2px rgba(33,150,243,.55) !important;transition:box-shadow .15s ease;}',
+      /* The custom menu itself. */
+      '.mx-head-menu{position:fixed;z-index:11050;background:#fff;border:1.5px solid #1976D2;border-radius:11px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:6px;min-width:240px;direction:rtl;font-family:inherit;font-size:13.5px;color:#1a237e;}',
+      '.mx-head-menu .mx-hm-title{padding:6px 12px 8px;font-size:12.5px;font-weight:800;color:#1565C0;border-bottom:1.4px solid #e3f2fd;margin-bottom:6px;direction:rtl;text-align:right;}',
+      '.mx-head-menu button.mx-hm-item{display:flex;width:100%;align-items:center;gap:10px;padding:8px 12px;border:none;background:transparent;cursor:pointer;border-radius:7px;font-family:inherit;font-size:13.5px;color:#263238;font-weight:600;text-align:right;direction:rtl;}',
+      '.mx-head-menu button.mx-hm-item:hover{background:#e3f2fd;color:#0d47a1;}',
+      '.mx-head-menu button.mx-hm-item:disabled{opacity:.45;cursor:not-allowed;}',
+      '.mx-head-menu .mx-hm-divider{height:1px;background:#eceff1;margin:5px 4px;}',
+      '.mx-head-menu .mx-hm-icon{display:inline-flex;width:22px;justify-content:center;}',
+      /* Sticky-frozen column applied via menu (local-only — the
+         existing freeze modal still drives persistent freezing). */
+      'table.mx-has-context-freeze th.mx-ctx-frozen,table.mx-has-context-freeze td.mx-ctx-frozen{position:sticky !important;right:0;z-index:3;background:inherit;box-shadow:-2px 0 6px rgba(33,150,243,.18);}',
+      'table.mx-has-context-freeze tr td.mx-ctx-frozen{background:#fff;}',
+      'table.mx-has-context-freeze tr:nth-child(even) td.mx-ctx-frozen{background:#f8f9fa;}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  var _hmCurrent = null;
+  function _hmClose(){
+    if (_hmCurrent && _hmCurrent.parentNode){
+      _hmCurrent.parentNode.removeChild(_hmCurrent);
+    }
+    _hmCurrent = null;
+  }
+  document.addEventListener('click', function(ev){
+    if (!_hmCurrent) return;
+    if (ev.target.closest && ev.target.closest('.mx-head-menu')) return;
+    _hmClose();
+  }, true);
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape') _hmClose();
+  });
+  window.addEventListener('scroll', _hmClose, true);
+  window.addEventListener('resize', _hmClose);
+
+  function _hmTitle(thEl){
+    var clone = thEl.cloneNode(true);
+    clone.querySelectorAll('.mx-col-tool-btn,.mx-col-del-btn,.mx-filter-btn,.mx-col-type-icon,.mx-drag-handle').forEach(function(n){ n.remove(); });
+    return (clone.textContent || '').replace(/\s+/g,' ').trim() || '—';
+  }
+
+  function _hmTableEl(thEl){ return thEl.closest('table'); }
+  function _hmColIndex(thEl){
+    if (!thEl || !thEl.parentNode) return -1;
+    return Array.prototype.indexOf.call(thEl.parentNode.children, thEl);
+  }
+
+  /* New: client-side sort. Sorts the tbody rows by the column's
+     text content. Numeric strings sort numerically. */
+  function _hmSortColumn(table, idx, asc){
+    var tbody = table.querySelector('tbody'); if (!tbody) return;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b){
+      var ca = a.children[idx], cb = b.children[idx];
+      if (!ca || !cb) return 0;
+      var va = (ca.textContent || '').trim();
+      var vb = (cb.textContent || '').trim();
+      var na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb) && va.match(/^-?\d+(\.\d+)?$/) && vb.match(/^-?\d+(\.\d+)?$/)){
+        return asc ? (na - nb) : (nb - na);
+      }
+      return asc ? va.localeCompare(vb, 'ar') : vb.localeCompare(va, 'ar');
+    });
+    rows.forEach(function(r){ tbody.appendChild(r); });
+  }
+
+  /* New: client-side per-column freeze toggle. Independent from the
+     existing freeze modal so the two systems coexist. */
+  function _hmToggleFreeze(table, idx, thEl){
+    table.classList.add('mx-has-context-freeze');
+    var on = !thEl.classList.contains('mx-ctx-frozen');
+    thEl.classList.toggle('mx-ctx-frozen', on);
+    var rows = table.querySelectorAll('tbody tr');
+    for (var r=0;r<rows.length;r++){
+      var c = rows[r].children[idx];
+      if (c) c.classList.toggle('mx-ctx-frozen', on);
+    }
+    return on;
+  }
+
+  function _hmIsLocked(thEl){
+    /* Bulk + index columns shouldn't expose the menu — they have no
+       data semantics. */
+    if (thEl.classList && (thEl.classList.contains('bulk-col') || thEl.classList.contains('mx-row-num'))) return true;
+    var t = (thEl.textContent || '').trim();
+    if (t === '#' || t === '🗑' || t === 'إجراءات') return true;
+    return false;
+  }
+
+  function _hmTriggerExisting(thEl, selector){
+    /* Fall back to clicking a hidden legacy button if it exists.
+       Lets us reuse the existing handler without re-implementing. */
+    var btn = thEl.querySelector(selector);
+    if (btn){ btn.click(); return true; }
+    return false;
+  }
+
+  function _hmOpenMenuAt(x, y, thEl){
+    _hmClose();
+    var table = _hmTableEl(thEl); if (!table) return;
+    var idx = _hmColIndex(thEl);
+    var menu = document.createElement('div');
+    menu.className = 'mx-head-menu';
+    menu.innerHTML = '<div class="mx-hm-title">' + _hmTitle(thEl).replace(/</g,'&lt;') + '</div>';
+    function add(label, icon, fn, opts){
+      opts = opts || {};
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mx-hm-item';
+      b.innerHTML = '<span class="mx-hm-icon">' + icon + '</span><span>' + label + '</span>';
+      b.addEventListener('click', function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        try { fn(ev); } catch(e){}
+        _hmClose();
+      });
+      if (opts.disabled) b.disabled = true;
+      menu.appendChild(b);
+    }
+    function divider(){
+      var d = document.createElement('div'); d.className = 'mx-hm-divider';
+      menu.appendChild(d);
+    }
+
+    /* ── Items ─────────────────────────────────────────────── */
+    add('\u062A\u0639\u062F\u064A\u0644 \u0627\u0633\u0645 \u0627\u0644\u0639\u0645\u0648\u062F', '\u270F\uFE0F', function(){
+      if (typeof window._mxStartInlineRename === 'function') window._mxStartInlineRename(thEl);
+      else _hmTriggerExisting(thEl, '.mx-col-rename-btn');
+    });
+    add('\u062D\u0630\u0641 \u0627\u0644\u0639\u0645\u0648\u062F', String.fromCodePoint(0x1F5D1), function(){
+      if (typeof window._mxHandleColumnDelete === 'function')
+        window._mxHandleColumnDelete(table, idx, thEl, thEl);
+      else _hmTriggerExisting(thEl, '.mx-col-del-btn');
+    });
+    divider();
+    add('\u062A\u0631\u062A\u064A\u0628 \u062A\u0635\u0627\u0639\u062F\u064A', '\u2191', function(){
+      _hmSortColumn(table, idx, true);
+    });
+    add('\u062A\u0631\u062A\u064A\u0628 \u062A\u0646\u0627\u0632\u0644\u064A', '\u2193', function(){
+      _hmSortColumn(table, idx, false);
+    });
+    divider();
+    var isFrozen = thEl.classList.contains('mx-ctx-frozen');
+    add(isFrozen
+        ? '\u0625\u0644\u063A\u0627\u0621 \u062A\u062C\u0645\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u062F'
+        : '\u062A\u062C\u0645\u064A\u062F \u0627\u0644\u0639\u0645\u0648\u062F',
+        String.fromCodePoint(0x1F4CC), function(){ _hmToggleFreeze(table, idx, thEl); });
+    add('\u0641\u0644\u062A\u0631\u0629 \u0627\u0644\u0639\u0645\u0648\u062F', String.fromCodePoint(0x1F50D), function(){
+      if (typeof window._mxOpenFilterPanel === 'function') window._mxOpenFilterPanel(table, idx, thEl);
+      else _hmTriggerExisting(thEl, '.mx-filter-btn');
+    });
+    divider();
+    add('\u0625\u0636\u0627\u0641\u0629 \u0639\u0645\u0648\u062F \u0642\u0628\u0644', '\u2795', function(){
+      var prev = thEl.previousElementSibling;
+      if (typeof window._mxOpenAddColumnPopup === 'function')
+        window._mxOpenAddColumnPopup(prev || thEl, thEl);
+      else _hmTriggerExisting(thEl, '.mx-col-add-btn');
+    });
+    add('\u0625\u0636\u0627\u0641\u0629 \u0639\u0645\u0648\u062F \u0628\u0639\u062F', '\u2795', function(){
+      if (typeof window._mxOpenAddColumnPopup === 'function')
+        window._mxOpenAddColumnPopup(thEl, thEl);
+      else _hmTriggerExisting(thEl, '.mx-col-add-btn');
+    });
+
+    /* Place + clamp inside viewport. */
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    var maxX = window.innerWidth  - w - 6;
+    var maxY = window.innerHeight - h - 6;
+    menu.style.left = Math.max(6, Math.min(x, maxX)) + 'px';
+    menu.style.top  = Math.max(6, Math.min(y, maxY)) + 'px';
+    _hmCurrent = menu;
+  }
+
+  /* ── Wire contextmenu + long-press on every <th>. ───────────────
+     Delegated on document so dynamically-added headers are
+     covered without an extra observer. */
+  document.addEventListener('contextmenu', function(ev){
+    var th = ev.target && ev.target.closest && ev.target.closest('th');
+    if (!th) return;
+    var table = th.closest('table');
+    if (!table || !table.tBodies || !table.tHead) return;
+    if (_hmIsLocked(th)) return;
+    ev.preventDefault();
+    _hmOpenMenuAt(ev.clientX, ev.clientY, th);
+  });
+
+  /* Long-press for touch devices. Tracks the pressed <th>; if the
+     user holds for ~500ms without moving the finger more than a
+     few pixels, fire the menu at the touch location. */
+  var _lpTh = null, _lpTimer = null, _lpStart = null;
+  document.addEventListener('touchstart', function(ev){
+    var th = ev.target && ev.target.closest && ev.target.closest('th');
+    if (!th) return;
+    var table = th.closest('table');
+    if (!table || !table.tBodies || !table.tHead) return;
+    if (_hmIsLocked(th)) return;
+    var t = ev.touches && ev.touches[0]; if (!t) return;
+    _lpTh = th;
+    _lpStart = { x: t.clientX, y: t.clientY };
+    th.classList.add('mx-head-press');
+    if (_lpTimer) clearTimeout(_lpTimer);
+    _lpTimer = setTimeout(function(){
+      if (!_lpTh) return;
+      _hmOpenMenuAt(_lpStart.x, _lpStart.y, _lpTh);
+      _lpTh.classList.remove('mx-head-press');
+      _lpTh = null;
+    }, 500);
+  }, { passive: true });
+  document.addEventListener('touchmove', function(ev){
+    if (!_lpTh || !_lpStart) return;
+    var t = ev.touches && ev.touches[0]; if (!t) return;
+    if (Math.abs(t.clientX - _lpStart.x) > 8 || Math.abs(t.clientY - _lpStart.y) > 8){
+      if (_lpTimer) clearTimeout(_lpTimer);
+      _lpTimer = null;
+      _lpTh.classList.remove('mx-head-press');
+      _lpTh = null;
+    }
+  }, { passive: true });
+  function _lpCancel(){
+    if (_lpTimer) clearTimeout(_lpTimer);
+    _lpTimer = null;
+    if (_lpTh) _lpTh.classList.remove('mx-head-press');
+    _lpTh = null;
+  }
+  document.addEventListener('touchend', _lpCancel, { passive: true });
+  document.addEventListener('touchcancel', _lpCancel, { passive: true });
+})();
 '''
 
 @app.route('/mx-helpers.js')
