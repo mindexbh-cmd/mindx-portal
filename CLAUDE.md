@@ -55,6 +55,20 @@ The helper API:
 
 Any SQL string that interpolates a value from `get_setting` MUST pass it through `_is_safe_ident(...)` and fall back to the hardcoded default on failure — `get_setting` does not do that validation itself.
 
+## Database type notes
+
+**DATABASE TYPE NOTES: Production runs on PostgreSQL (Render). PostgreSQL is strict about types — never use empty string `''` as a fallback for `timestamp`, `integer`, or other non-text columns. Use `NULL` or a proper typed default. Test all SQL queries against PostgreSQL behavior, not SQLite.**
+
+The `_PgConnection` wrapper translates `?` → `%s` and auto-appends `RETURNING id` (with the `_NO_ID_COLUMN_TABLES` exception list), but it does NOT rewrite SQL semantics — so type-mismatch errors that SQLite swallows silently will surface on prod. Common pitfalls:
+
+- `COALESCE(<timestamp_col>, '')` — Postgres error: "invalid input syntax for type timestamp". Drop the COALESCE and let JSON `null` reach the frontend (most renderers already show `—` for falsy), or cast first: `COALESCE(<col>::text, '')`.
+- `COALESCE(<int_col>, '')` — same problem. Use `COALESCE(<col>, 0)`.
+- Inserting empty strings into typed columns. On INSERT/UPDATE, pass Python `None` (→ SQL `NULL`) for missing timestamps/numbers, never `''`.
+- `WHERE ts_col = ''` — Postgres error. Use `WHERE ts_col IS NULL` for the same intent.
+- Column type mismatches between `init_db()` and the `else`-branch `ALTER TABLE`. The fresh-DB CREATE and the existing-DB ALTER must declare the same SQL type (e.g. both `DATETIME`/`TIMESTAMP`, not one `TEXT`). SQLite is forgiving; Postgres is not.
+
+When in doubt, mentally compile the query with `psql` semantics — that's the runtime that matters.
+
 ## Data safety (CRITICAL DATA SAFETY RULE)
 
 **NEVER** use `DROP TABLE`, `DELETE FROM <whole-table>`, or `TRUNCATE` on any user-data table in `app.py`. Every deployment must leave existing rows 100% intact.

@@ -15447,8 +15447,11 @@ def api_backups_list():
     if err: return err
     db = get_db()
     try:
+        # downloaded_at is a TIMESTAMP/DATETIME column — Postgres rejects
+        # '' as a fallback. Pass NULL through to JSON; the JS renderer
+        # already shows '—' for falsy values, so coalescing is unnecessary.
         rows = db.execute(
-            "SELECT id, username, filename, bytes_written, COALESCE(downloaded_at, \'\') AS created_at, "
+            "SELECT id, username, filename, bytes_written, downloaded_at AS created_at, "
             "       COALESCE(kind, \'manual\') AS kind, "
             "       COALESCE(reason, \'\') AS reason, "
             "       COALESCE(path, \'\') AS path, "
