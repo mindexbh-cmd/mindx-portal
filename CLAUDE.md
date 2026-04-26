@@ -55,6 +55,21 @@ The helper API:
 
 Any SQL string that interpolates a value from `get_setting` MUST pass it through `_is_safe_ident(...)` and fall back to the hardcoded default on failure — `get_setting` does not do that validation itself.
 
+## Table creation policy
+
+**Before creating any new table:**
+
+1. Document its purpose, owning feature, and lifecycle in this file (under the migration that introduces it).
+2. Add it to one of the three classification sets in the table-audit module (`_TBL_AUDIT_CORE`, `_TBL_AUDIT_FEATURE`, `_TBL_AUDIT_SYSTEM`) so it doesn't surface as a Category-D orphan in the audit UI.
+3. Update the dual-path schema block: `init_db()` `CREATE TABLE` for fresh DBs **AND** an `else`-branch `CREATE TABLE IF NOT EXISTS` migration tag for existing DBs.
+4. Never create temporary or experimental tables in production. If you need to prototype, do it in a local SQLite DB or under a feature-flagged migration tag that's reverted before merge.
+5. **If a feature is dropped, drop its tables in the same commit** — don't leave orphan tables behind. Update both the migration block and the table-audit classification sets.
+6. Quarterly run `GET /api/admin/table-audit` (or open the UI at `/admin/table-audit`) and clean up any Category-D orphans.
+
+The audit UI is admin-only and goes through the auto-pre-destructive-backup flow before any DROP. Approved-keep tables are persisted in `settings(page='table_audit', component='approved_<name>')` so they stay quiet across audits.
+
+A startup warning fires once per process if any orphan candidate is detected (Category D + empty + not approved-keep) — check the Render logs after every deploy.
+
 ## Database type notes
 
 **DATABASE TYPE NOTES: Production runs on PostgreSQL (Render). PostgreSQL is strict about types — never use empty string `''` as a fallback for `timestamp`, `integer`, or other non-text columns. Use `NULL` or a proper typed default. Test all SQL queries against PostgreSQL behavior, not SQLite.**

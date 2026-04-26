@@ -3670,6 +3670,11 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643;&#x064A;&#x627;&#x062A; &#x648;&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x062A; &#x648;&#x627;&#x644;&#x062A;&#x0642;&#x0627;&#x0631;&#x064A;&#x0631;</div>
     </a>
+    <a class="dh-action-card" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
+      <div class="dh-action-icon">&#x1F5C2;</div>
+      <div class="dh-action-title">&#x062A;&#x062F;&#x0642;&#x064A;&#x0642; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644;</div>
+      <div class="dh-action-desc">&#x062A;&#x0635;&#x0646;&#x064A;&#x0641; &#x0648;&#x062D;&#x0630;&#x0641; &#x0622;&#x0645;&#x0646; &#x0644;&#x644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x063A;&#x064A;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x0629;</div>
+    </a>
   </div>
 </div>
 <script>
@@ -4151,12 +4156,14 @@ function dhConfirmModeChange(){
 })();
 _dhInitCenterMode();
 _dhLoadExceptions();
-/* Show admin-only points-manage link when role is admin. */
+/* Show admin-only links when role is admin. */
 (function(){
   var role = (document.body.dataset.role || '').trim().toLowerCase();
   if (role === 'admin'){
-    var el = document.getElementById('dh-points-manage');
-    if (el) el.style.display = '';
+    ['dh-points-manage','dh-table-audit'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
   }
 })();
 function dhLoadStats(){
@@ -19539,6 +19546,400 @@ def api_pts_digest_next():
     })
 
 
+# ──────────────────────────────────────────────────────────────────
+# Table audit (Category A/B/C/D classification + safe-delete UI)
+# ──────────────────────────────────────────────────────────────────
+# Pre-classified tables. Anything not in any of these three sets is
+# automatically Category D (unknown/suspected unused) and surfaces in
+# the audit UI for admin review. Adding a new table to the codebase?
+# Update the matching set here so it doesn't show up as suspicious.
+_TBL_AUDIT_CORE = {
+    "students":            "الطلبة",
+    "student_groups":      "المجموعات",
+    "attendance":          "الحضور",
+    "payment_log":         "سجل الدفع",
+    "taqseet":             "خطط التقسيط",
+    "student_payments":    "أقساط الطلبة",
+    "evaluations":         "التقييمات",
+    "payment_edits":       "تعديلات الدفع",
+    "parent_receipts":     "إيصالات أولياء الأمور",
+    "session_durations":   "مدد الجلسات",
+    "receipts_log":        "سجل رصائد الدفع",
+    "custom_tables":       "الجداول المخصصة",
+    "custom_table_cols":   "أعمدة الجداول المخصصة",
+    "custom_table_rows":   "صفوف الجداول المخصصة",
+}
+_TBL_AUDIT_FEATURE = {
+    "backup_log":          ("سجل النسخ الاحتياطية",        "ميزة النسخ الاحتياطي"),
+    "behaviors":           ("السلوكيات",                    "نظام النقاط"),
+    "point_events":        ("سجل أحداث النقاط",             "نظام النقاط"),
+    "rewards":             ("متجر المكافآت",                "نظام النقاط"),
+    "redemptions":         ("استبدالات المكافآت",           "نظام النقاط"),
+    "avatars":             ("صور الأطفال الرمزية",          "نظام النقاط"),
+    "levels":              ("مستويات النقاط",               "نظام النقاط"),
+    "point_notifications": ("طابور إشعارات الواتساب",       "نظام النقاط + الواتساب"),
+    "message_log":         ("سجل الرسائل",                  "نظام الرسائل"),
+    "message_reminders":   ("تذكيرات الرسائل",              "نظام الرسائل"),
+    "message_templates":   ("قوالب الرسائل",                "نظام الرسائل"),
+    "payment_messages":    ("رسائل الدفع",                  "متابعة الدفع"),
+    "mode_exceptions":     ("استثناءات حالة المركز",        "حالة المركز"),
+}
+_TBL_AUDIT_SYSTEM = {
+    "users":               "حسابات المستخدمين والصلاحيات",
+    "settings":            "إعدادات النظام",
+    "schema_migrations":   "علامات هجرة قاعدة البيانات",
+    "table_labels":        "التسميات العربية للجداول",
+    "column_labels":       "التسميات العربية للأعمدة العامة",
+    "group_col_labels":    "تسميات أعمدة المجموعات",
+    "att_col_labels":      "تسميات أعمدة الحضور",
+    "eval_col_labels":     "تسميات أعمدة التقييمات",
+    "taqseet_col_labels":  "تسميات أعمدة التقسيط",
+    "paylog_col_labels":   "تسميات أعمدة سجل الدفع",
+}
+
+
+def _tbl_audit_list_tables(db):
+    """List user tables (excluding sqlite_* internals)."""
+    try:
+        if USE_PG:
+            rows = db.execute(
+                "SELECT tablename AS name FROM pg_tables WHERE schemaname='public' "
+                "ORDER BY tablename"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        return [(dict(r).get("name") if hasattr(r, "keys") else r[0]) for r in rows]
+    except Exception:
+        return []
+
+
+def _tbl_audit_row_count(db, t):
+    if not _is_safe_ident(t):
+        return 0
+    try:
+        n = db.execute('SELECT COUNT(*) FROM "' + t + '"').fetchone()[0]
+        return int(n or 0)
+    except Exception:
+        return 0
+
+
+def _tbl_audit_col_count(db, t):
+    if not _is_safe_ident(t):
+        return 0
+    try:
+        rows = db.execute('PRAGMA table_info("' + t + '")').fetchall()
+        return len(rows)
+    except Exception:
+        return 0
+
+
+# Cache the source-code grep counts so we don't reread app.py for
+# every table on every audit. Refreshed once per process.
+_TBL_AUDIT_GREP_CACHE = {"by_table": None}
+def _tbl_audit_code_refs(t):
+    """Approximate count of source-code references to a table name,
+    excluding the migration block. We snip out the block bounded by
+    the first 'def init_db' through 'init_db()' call so a created-
+    -then-orphaned table doesn't get falsely-positive references from
+    its CREATE statement alone."""
+    cache = _TBL_AUDIT_GREP_CACHE.get("by_table")
+    if cache is None:
+        try:
+            with open(__file__, "r", encoding="utf-8") as f:
+                src = f.read()
+        except Exception:
+            cache = {}
+        else:
+            # Strip out bare CREATE TABLE statements so a defined-
+            # but-unused table isn't credited just for existing.
+            import re as _re
+            stripped = _re.sub(
+                r'CREATE TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+\w+[^)]*\)+',
+                '', src, flags=_re.DOTALL,
+            )
+            cache = {}
+            for m in _re.finditer(r'\b([a-z_]+)\b', stripped):
+                w = m.group(1)
+                cache[w] = cache.get(w, 0) + 1
+        _TBL_AUDIT_GREP_CACHE["by_table"] = cache
+    return cache.get(t, 0)
+
+
+def _tbl_audit_classify(t):
+    """Return (category, label, feature). Anything unknown lands in D."""
+    if t in _TBL_AUDIT_CORE:
+        return ("A", _TBL_AUDIT_CORE[t], "بيانات أساسية")
+    if t in _TBL_AUDIT_FEATURE:
+        lbl, feat = _TBL_AUDIT_FEATURE[t]
+        return ("B", lbl, feat)
+    if t in _TBL_AUDIT_SYSTEM:
+        return ("C", _TBL_AUDIT_SYSTEM[t], "بنية النظام")
+    return ("D", t, "")
+
+
+def _tbl_audit_suspicion_reasons(t, rowcount, refcount):
+    """Build a list of reasons a Category D table looks suspicious."""
+    reasons = []
+    if refcount == 0:
+        reasons.append("لا توجد إشارة إلى الجدول في الكود")
+    elif refcount < 3:
+        reasons.append(f"إشارات قليلة جداً في الكود ({refcount})")
+    if rowcount == 0:
+        reasons.append("فارغ تماماً (0 صف)")
+    if t.startswith("tmp_") or t.startswith("temp_") or t.endswith("_old") or t.endswith("_bak"):
+        reasons.append("اسم يوحي بالتجريب أو النسخ المؤقتة")
+    if not reasons:
+        reasons.append("غير موثّق ضمن قائمة التصنيف")
+    return reasons
+
+
+def _tbl_audit_is_approved(db, t):
+    """Has the admin marked this table as 'احتفظ' in a previous run?"""
+    try:
+        row = db.execute(
+            "SELECT value FROM settings WHERE page='table_audit' AND component=?",
+            ("approved_" + t,),
+        ).fetchone()
+        if not row: return False
+        v = (dict(row).get("value") if hasattr(row, "keys") else row[0]) or ""
+        return str(v).strip() == "1"
+    except Exception:
+        return False
+
+
+def _tbl_audit_run(db):
+    """Build the full audit report. Returns
+       {tables: [...], counts: {A,B,C,D,total}, ts: iso}."""
+    import datetime as _dt
+    out = []
+    counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+    for t in _tbl_audit_list_tables(db):
+        cat, lbl, feat = _tbl_audit_classify(t)
+        rc = _tbl_audit_row_count(db, t)
+        cc = _tbl_audit_col_count(db, t)
+        refs = _tbl_audit_code_refs(t)
+        approved = _tbl_audit_is_approved(db, t)
+        reasons = []
+        if cat == "D":
+            reasons = _tbl_audit_suspicion_reasons(t, rc, refs)
+        out.append({
+            "name":       t,
+            "label":      lbl,
+            "category":   cat,
+            "feature":    feat,
+            "rows":       rc,
+            "columns":    cc,
+            "code_refs":  refs,
+            "approved":   approved,
+            "reasons":    reasons,
+        })
+        counts[cat] = counts[cat] + 1
+    counts["total"] = sum(counts[k] for k in ("A", "B", "C", "D"))
+    return {
+        "tables": out,
+        "counts": counts,
+        "ts":     _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _tbl_audit_render_md(report):
+    """Render the audit as a TABLE_AUDIT.md document."""
+    lines = []
+    c = report["counts"]
+    lines.append("# تدقيق جداول قاعدة البيانات")
+    lines.append("")
+    lines.append("**التاريخ:** " + report["ts"])
+    lines.append("**إجمالي عدد الجداول:** " + str(c["total"]))
+    lines.append("")
+    by_cat = {"A": [], "B": [], "C": [], "D": []}
+    for t in report["tables"]:
+        by_cat[t["category"]].append(t)
+
+    lines.append("## الفئة أ — جداول أساسية (لا تُحذف أبداً) — " + str(c["A"]))
+    lines.append("")
+    lines.append("| الاسم الخام | الاسم العربي | الصفوف | الأعمدة | إشارات الكود | ملاحظات |")
+    lines.append("|---|---|---:|---:|---:|---|")
+    for t in by_cat["A"]:
+        lines.append("| `" + t["name"] + "` | " + t["label"] + " | "
+                     + str(t["rows"]) + " | " + str(t["columns"]) + " | "
+                     + str(t["code_refs"]) + " | بيانات أساسية للمستخدمة |")
+    lines.append("")
+
+    lines.append("## الفئة ب — جداول داعمة لميزات نشطة — " + str(c["B"]))
+    lines.append("")
+    lines.append("| الاسم الخام | الاسم العربي | الصفوف | الميزة المرتبطة | إشارات الكود |")
+    lines.append("|---|---|---:|---|---:|")
+    for t in by_cat["B"]:
+        lines.append("| `" + t["name"] + "` | " + t["label"] + " | "
+                     + str(t["rows"]) + " | " + t["feature"] + " | "
+                     + str(t["code_refs"]) + " |")
+    lines.append("")
+
+    lines.append("## الفئة ج — جداول النظام — " + str(c["C"]))
+    lines.append("")
+    lines.append("| الاسم الخام | الغرض | الصفوف | إشارات الكود |")
+    lines.append("|---|---|---:|---:|")
+    for t in by_cat["C"]:
+        lines.append("| `" + t["name"] + "` | " + t["label"] + " | "
+                     + str(t["rows"]) + " | " + str(t["code_refs"]) + " |")
+    lines.append("")
+
+    lines.append("## الفئة د — جداول مشكوك فيها (مرشحة للحذف) — " + str(c["D"]))
+    lines.append("")
+    if not by_cat["D"]:
+        lines.append("لا توجد جداول مشكوك فيها — كل الجداول الموجودة موثّقة ضمن الفئات أ/ب/ج.")
+    else:
+        lines.append("| الاسم الخام | الصفوف | إشارات الكود | السبب في الاشتباه | الحالة |")
+        lines.append("|---|---:|---:|---|---|")
+        for t in by_cat["D"]:
+            status = "✅ معتمد للاحتفاظ" if t["approved"] else "⏳ بانتظار قرار الإدارة"
+            lines.append("| `" + t["name"] + "` | " + str(t["rows"]) + " | "
+                         + str(t["code_refs"]) + " | "
+                         + " · ".join(t["reasons"]) + " | " + status + " |")
+    lines.append("")
+
+    lines.append("## ملخص")
+    lines.append("")
+    lines.append("- إجمالي الجداول: **" + str(c["total"]) + "**")
+    lines.append("- جداول أساسية: **" + str(c["A"]) + "**")
+    lines.append("- جداول ميزات: **" + str(c["B"]) + "**")
+    lines.append("- جداول نظام: **" + str(c["C"]) + "**")
+    lines.append("- جداول مشكوك فيها: **" + str(c["D"]) + "**")
+    lines.append("")
+    lines.append("> ⚠ توصية: راجعي القائمة أعلاه. كل جدول في الفئة \"د\" يحتاج موافقتك قبل الحذف.")
+    lines.append("> هذا التدقيق آلي — لا يحذف أي جدول تلقائياً. كل الحذف يمر عبر زر صريح في صفحة /admin/table-audit بعد نسخة احتياطية تلقائية.")
+    return "\n".join(lines) + "\n"
+
+
+@app.route('/api/admin/table-audit', methods=['GET'])
+@login_required
+def api_admin_table_audit():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    report = _tbl_audit_run(db)
+    # Persist the markdown report at project root for git review.
+    save = (request.args.get("save") or "1").strip()
+    if save == "1":
+        try:
+            md = _tbl_audit_render_md(report)
+            with open(os.path.join(os.path.dirname(__file__) or ".", "TABLE_AUDIT.md"),
+                      "w", encoding="utf-8", newline="") as f:
+                f.write(md)
+            report["md_saved"] = True
+        except Exception:
+            report["md_saved"] = False
+    return jsonify({"ok": True, "report": report})
+
+
+@app.route('/api/admin/table-audit/<table_name>/approve', methods=['POST'])
+@login_required
+def api_admin_table_audit_approve(table_name):
+    """Mark a Category-D table as approved-keep so it stops appearing
+    in the suspicion list."""
+    err = _require_admin_response()
+    if err: return err
+    if not _is_safe_ident(table_name):
+        return jsonify({"ok": False, "error": "invalid table name"}), 400
+    db = get_db()
+    # Refuse to mark core/system tables (they shouldn't be in D anyway,
+    # but defence-in-depth).
+    cat, _, _ = _tbl_audit_classify(table_name)
+    if cat != "D":
+        return jsonify({"ok": False, "error": "only category D tables need approval"}), 400
+    try:
+        # Upsert via DELETE+INSERT on (page,component).
+        db.execute(
+            "DELETE FROM settings WHERE page='table_audit' AND component=?",
+            ("approved_" + table_name,),
+        )
+        db.execute(
+            "INSERT INTO settings(page, component, label, value, value_type) "
+            "VALUES(?,?,?,?,?)",
+            ("table_audit", "approved_" + table_name,
+             "إبقاء الجدول " + table_name, "1", "toggle"),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "approved": True})
+
+
+@app.route('/api/admin/table-audit/<table_name>/delete', methods=['POST'])
+@login_required
+def api_admin_table_audit_delete(table_name):
+    """Drop a Category-D table after taking an automatic backup. Hard
+    refuses any A/B/C table even if the request comes from admin."""
+    err = _require_admin_response()
+    if err: return err
+    if not _is_safe_ident(table_name):
+        return jsonify({"ok": False, "error": "invalid table name"}), 400
+    cat, _, _ = _tbl_audit_classify(table_name)
+    if cat != "D":
+        return jsonify({"ok": False,
+                        "error": "refusing to drop a documented table (category " + cat + ")"
+                        }), 400
+    db = get_db()
+    if not _tbl_audit_list_tables(db).__contains__(table_name):
+        return jsonify({"ok": False, "error": "table does not exist"}), 404
+    # 1) Auto-backup first.
+    try:
+        info = _pre_destructive_backup("table-audit drop " + table_name)
+    except RuntimeError as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # 2) Drop the table.
+    try:
+        db.execute('DROP TABLE IF EXISTS "' + table_name + '"')
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "drop failed: " + str(ex),
+                        "backup": info}), 500
+    # 3) Audit-log (use the existing backup_log so it shows on the
+    #    history page; kind='table-audit-drop').
+    try:
+        db.execute(
+            "INSERT INTO backup_log(username, filename, bytes_written, kind, reason) "
+            "VALUES(?,?,?,?,?)",
+            ((session.get("user") or {}).get("username") or "admin",
+             info.get("filename") if isinstance(info, dict) else "",
+             0, "table-audit-drop", "dropped: " + table_name),
+        )
+        db.commit()
+    except Exception:
+        pass
+    return jsonify({"ok": True, "dropped": table_name, "backup": info})
+
+
+# Boot-time orphan warning (printed once at module import). Skipped
+# under the test client to avoid noisy test output.
+def _tbl_audit_startup_warning():
+    """Print a one-shot warning if any table looks like an orphan
+    (Category D AND empty AND no approved-keep flag). Helps catch
+    drift between code and DB before the admin opens the audit UI."""
+    try:
+        with app.app_context():
+            db = get_db()
+            tables = _tbl_audit_list_tables(db)
+            orphans = []
+            for t in tables:
+                cat, _, _ = _tbl_audit_classify(t)
+                if cat != "D": continue
+                if _tbl_audit_is_approved(db, t): continue
+                if _tbl_audit_row_count(db, t) > 0: continue
+                orphans.append(t)
+            if orphans:
+                import sys as _sys
+                print("[mindex] table audit: " + str(len(orphans))
+                      + " orphan candidate(s) detected: "
+                      + ", ".join(orphans)
+                      + " — review at /admin/table-audit", file=_sys.stderr)
+    except Exception:
+        pass
+
+
 @app.route('/api/points/notifications/<int:nid>/sent', methods=['POST'])
 @login_required
 def api_pts_notifications_mark_sent(nid):
@@ -28161,6 +28562,12 @@ def _start_backup_scheduler():
 try: _start_backup_scheduler()
 except Exception: pass
 
+# One-shot table-audit warning at boot — flags orphan candidates
+# (Category D + empty + not approved-keep) so admins notice drift
+# between code and DB without having to open the audit UI.
+try: _tbl_audit_startup_warning()
+except Exception: pass
+
 
 @app.route('/admin/backups')
 @login_required
@@ -28169,6 +28576,200 @@ def admin_backups_page():
     if (user.get("role") or "").strip().lower() != "admin":
         return redirect("/dashboard")
     return ADMIN_BACKUPS_HTML
+
+
+TABLE_AUDIT_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تدقيق الجداول</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;padding:0;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px rgba(107,63,160,.25);flex-wrap:wrap;gap:8px;}
+.topbar h1{margin:0;font-size:1.15rem;font-weight:800;}
+.topbar a{color:#fff;text-decoration:none;background:rgba(255,255,255,.18);padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.9rem;}
+.body{padding:18px 16px;max-width:1100px;margin:0 auto;}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+.stat{background:#fff;padding:14px 12px;border-radius:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.stat .num{font-size:2rem;font-weight:900;color:#4a148c;}
+.stat .lbl{font-size:0.85rem;color:#666;font-weight:700;}
+.stat.A .num{color:#1B5E20;} .stat.B .num{color:#1565C0;}
+.stat.C .num{color:#5D4037;} .stat.D .num{color:#c62828;}
+.card{background:#fff;border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.section-title{font-weight:800;font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.title-A{color:#1B5E20;} .title-B{color:#1565C0;} .title-C{color:#5D4037;} .title-D{color:#c62828;}
+table{width:100%;border-collapse:collapse;font-size:0.92rem;}
+th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:right;}
+th{background:#fafafa;color:#4a148c;font-weight:800;font-size:0.88rem;}
+tr:hover{background:#fafafa;}
+.tname{font-family:Consolas,monospace;font-size:0.88rem;color:#212121;background:#f5f5f7;padding:2px 6px;border-radius:5px;direction:ltr;display:inline-block;}
+.btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-family:inherit;font-size:0.85rem;}
+.btn-del{background:#c62828;color:#fff;}
+.btn-keep{background:#2E7D32;color:#fff;}
+.btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}
+.btn-grey{background:#fafafa;color:#666;border:1px solid #ddd;}
+.empty{padding:24px;text-align:center;color:#888;font-weight:600;}
+.note{background:#fff8e1;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#6d4c41;font-size:0.9rem;border:1px solid #ffe082;}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:14px;}
+.modal.show{display:flex;}
+.modal-box{background:#fff;border-radius:14px;padding:22px;max-width:480px;width:100%;}
+.modal-box h3{margin:0 0 12px;color:#c62828;}
+.modal-box .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+.tag{padding:3px 9px;border-radius:6px;font-size:0.78rem;font-weight:800;display:inline-block;}
+.tag-approved{background:#e8f5e9;color:#1B5E20;}
+.tag-pending{background:#fff8e1;color:#E65100;}
+.reasons{font-size:0.85rem;color:#666;}
+@media (max-width:600px){
+  .body{padding:12px 8px;}
+  th,td{padding:6px 6px;font-size:0.82rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>🗂 تدقيق الجداول</h1>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-pri" onclick="loadAudit(true)">🔄 إعادة التدقيق</button>
+    <a href="/dashboard">← الرئيسية</a>
+  </div>
+</div>
+<div class="body" id="body">
+  <div class="empty">جاري التحميل...</div>
+</div>
+<div class="modal" id="confirm">
+  <div class="modal-box">
+    <h3 id="cTitle">تأكيد الحذف</h3>
+    <div id="cBody"></div>
+    <div class="row">
+      <button class="btn btn-grey" onclick="closeConfirm()">إلغاء</button>
+      <button class="btn btn-del" id="cOk">احذف</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="t"></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(m, ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2400);}
+function closeConfirm(){document.getElementById('confirm').classList.remove('show');}
+
+function loadAudit(force){
+  document.getElementById('body').innerHTML='<div class="empty">جاري التدقيق...</div>';
+  fetch('/api/admin/table-audit?save='+(force?'1':'1'),{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){document.getElementById('body').innerHTML='<div class="empty">'+(d.error||'فشل التدقيق')+'</div>';return;}
+    render(d.report);
+  });
+}
+
+function render(r){
+  var c=r.counts;
+  var html='';
+  /* Summary cards */
+  html+='<div class="summary">'
+    +'<div class="stat"><div class="num">'+c.total+'</div><div class="lbl">إجمالي الجداول</div></div>'
+    +'<div class="stat A"><div class="num">'+c.A+'</div><div class="lbl">أ — أساسية</div></div>'
+    +'<div class="stat B"><div class="num">'+c.B+'</div><div class="lbl">ب — ميزات</div></div>'
+    +'<div class="stat C"><div class="num">'+c.C+'</div><div class="lbl">ج — نظام</div></div>'
+    +'<div class="stat D"><div class="num">'+c.D+'</div><div class="lbl">د — مشكوك فيها</div></div>'
+    +'</div>';
+  html+='<div class="note">آخر تدقيق: <b>'+_esc(r.ts)+'</b> &nbsp;•&nbsp; لا يتم حذف أي جدول تلقائياً. كل حذف يسبقه نسخة احتياطية تلقائية.</div>';
+
+  var byCat={A:[],B:[],C:[],D:[]};
+  r.tables.forEach(function(t){byCat[t.category].push(t);});
+
+  /* Category D first — most actionable */
+  html+='<div class="card"><div class="section-title title-D">⚠ الفئة د — جداول مشكوك فيها ('+c.D+')</div>';
+  if(!byCat.D.length){
+    html+='<div class="empty">لا توجد جداول مشكوك فيها. كل الجداول موثّقة ضمن الفئات أ/ب/ج. ✅</div>';
+  } else {
+    html+='<table><thead><tr><th>الجدول</th><th>الصفوف</th><th>إشارات الكود</th><th>سبب الاشتباه</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>';
+    byCat.D.forEach(function(t){
+      var stTag=t.approved?'<span class="tag tag-approved">✅ معتمد</span>':'<span class="tag tag-pending">⏳ بانتظار قرار</span>';
+      var act=t.approved
+        ? '<button class="btn btn-grey" disabled>تم اعتماده</button>'
+        : '<button class="btn btn-keep" onclick="approveTable(\''+_esc(t.name)+'\')">احتفظ</button>'
+          +' <button class="btn btn-del" onclick="askDelete(\''+_esc(t.name)+'\','+t.rows+')">احذف</button>';
+      html+='<tr><td><span class="tname">'+_esc(t.name)+'</span></td>'
+        +'<td>'+t.rows+'</td>'
+        +'<td>'+t.code_refs+'</td>'
+        +'<td><span class="reasons">'+_esc((t.reasons||[]).join(' · '))+'</span></td>'
+        +'<td>'+stTag+'</td>'
+        +'<td>'+act+'</td></tr>';
+    });
+    html+='</tbody></table>';
+  }
+  html+='</div>';
+
+  /* Categories A, B, C */
+  html+='<div class="card"><div class="section-title title-A">🟢 الفئة أ — جداول أساسية ('+c.A+')</div>';
+  html+=tbl(byCat.A, true, false);
+  html+='</div>';
+
+  html+='<div class="card"><div class="section-title title-B">🔵 الفئة ب — جداول داعمة لميزات ('+c.B+')</div>';
+  html+=tbl(byCat.B, true, true);
+  html+='</div>';
+
+  html+='<div class="card"><div class="section-title title-C">⚙ الفئة ج — جداول النظام ('+c.C+')</div>';
+  html+=tbl(byCat.C, false, false);
+  html+='</div>';
+
+  document.getElementById('body').innerHTML=html;
+}
+
+function tbl(rows, showCols, showFeature){
+  if(!rows.length) return '<div class="empty">لا يوجد</div>';
+  var cols=['<th>الجدول</th>','<th>الاسم العربي</th>','<th>الصفوف</th>'];
+  if(showCols) cols.push('<th>الأعمدة</th>');
+  if(showFeature) cols.push('<th>الميزة</th>');
+  cols.push('<th>إشارات الكود</th>');
+  var html='<table><thead><tr>'+cols.join('')+'</tr></thead><tbody>';
+  rows.forEach(function(t){
+    html+='<tr><td><span class="tname">'+_esc(t.name)+'</span></td>'
+      +'<td>'+_esc(t.label)+'</td>'
+      +'<td>'+t.rows+'</td>';
+    if(showCols)    html+='<td>'+t.columns+'</td>';
+    if(showFeature) html+='<td>'+_esc(t.feature||'—')+'</td>';
+    html+='<td>'+t.code_refs+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  return html;
+}
+
+function approveTable(name){
+  fetch('/api/admin/table-audit/'+encodeURIComponent(name)+'/approve',{method:'POST',credentials:'include'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){toast('تم اعتماد الإبقاء على الجدول');loadAudit();}
+      else{toast(d.error||'خطأ',false);}
+    });
+}
+function askDelete(name, rows){
+  document.getElementById('cBody').innerHTML='<p>هل أنت متأكدة من حذف الجدول <b>'+_esc(name)+'</b>؟</p>'
+    +'<p style="font-size:0.88rem;color:#666;">سيحتوي هذا الجدول حالياً على <b>'+rows+'</b> صف. سيتم إنشاء <b>نسخة احتياطية تلقائية</b> أولاً قبل الحذف.</p>'
+    +'<p style="font-size:0.88rem;color:#c62828;font-weight:700;">⚠ هذه العملية لا يمكن التراجع عنها بعد إتمامها (إلا باستعادة النسخة الاحتياطية).</p>';
+  document.getElementById('cOk').onclick=function(){doDelete(name);};
+  document.getElementById('confirm').classList.add('show');
+}
+function doDelete(name){
+  closeConfirm();
+  document.getElementById('body').innerHTML='<div class="empty">جاري إنشاء النسخة الاحتياطية وحذف الجدول...</div>';
+  fetch('/api/admin/table-audit/'+encodeURIComponent(name)+'/delete',{method:'POST',credentials:'include'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.ok){toast('تم حذف الجدول '+name+' بعد نسخة احتياطية');loadAudit();}
+      else{toast(d.error||'فشل الحذف',false);loadAudit();}
+    });
+}
+
+loadAudit();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/table-audit')
+@login_required
+def admin_table_audit_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return redirect("/dashboard")
+    return TABLE_AUDIT_HTML
 
 
 # ──────────────────────────────────────────────────────────────────
