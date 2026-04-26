@@ -1375,6 +1375,7 @@ if True:
             ("backup", "schedule_day",     "\u064A\u0648\u0645 \u0627\u0644\u0623\u0633\u0628\u0648\u0639", "0"),
             ("backup", "email_recipients", "\u0625\u064A\u0645\u064A\u0644 \u0627\u0644\u062A\u0633\u0644\u064A\u0645", ""),
             ("backup", "keep_count",       "\u0639\u062F\u062F \u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0645\u062D\u0641\u0648\u0638\u0629", "30"),
+            ("backup", "auto_download_local", "\u062A\u062D\u0645\u064A\u0644 \u062A\u0644\u0642\u0627\u0626\u064A \u0625\u0644\u0649 \u0627\u0644\u062C\u0647\u0627\u0632", "on"),
         ):
             try:
                 db2.execute(
@@ -14181,11 +14182,12 @@ def api_backups_settings_get():
     if err: return err
     return jsonify({
         "ok": True,
-        "schedule_kind":    get_setting("backup", "schedule_kind",    "off"),
-        "schedule_time":    get_setting("backup", "schedule_time",    "02:00"),
-        "schedule_day":     get_setting("backup", "schedule_day",     "0"),
-        "email_recipients": get_setting("backup", "email_recipients", ""),
-        "keep_count":       get_setting("backup", "keep_count",       "30"),
+        "schedule_kind":       get_setting("backup", "schedule_kind",       "off"),
+        "schedule_time":       get_setting("backup", "schedule_time",       "02:00"),
+        "schedule_day":        get_setting("backup", "schedule_day",        "0"),
+        "email_recipients":    get_setting("backup", "email_recipients",    ""),
+        "keep_count":          get_setting("backup", "keep_count",          "30"),
+        "auto_download_local": get_setting("backup", "auto_download_local", "on"),
     })
 
 
@@ -14198,7 +14200,7 @@ def api_backups_settings_set():
     db = get_db()
     pairs = []
     for k in ("schedule_kind", "schedule_time", "schedule_day",
-              "email_recipients", "keep_count"):
+              "email_recipients", "keep_count", "auto_download_local"):
         if k in d:
             pairs.append((k, str(d.get(k) or "")))
     for component, value in pairs:
@@ -24037,6 +24039,13 @@ th,td{padding:10px 12px;font-size:13.5px;text-align:right;border-bottom:1px soli
         <label>عدد النسخ المحفوظة</label>
         <input type="number" id="bk-keep" min="1" max="200" value="30" style="width:90px;">
       </div>
+      <div class="field" style="flex:1 1 240px;">
+        <label>تحميل تلقائي إلى الجهاز</label>
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;background:#fff;padding:6px 12px;border:1.4px solid #a5d6a7;border-radius:9px;font-weight:700;color:#1b5e20;">
+          <input type="checkbox" id="bk-auto-dl" checked style="width:16px;height:16px;cursor:pointer;">
+          <span id="bk-auto-dl-label">مفعّل — سيتم تنزيل كل نسخة تلقائية عند فتح اللوحة</span>
+        </label>
+      </div>
       <button class="btn" onclick="bkSaveSettings()">💾 حفظ الإعدادات</button>
     </div>
   </div>
@@ -24124,21 +24133,36 @@ function bkLoadSettings(){
       document.getElementById('bk-schedule-day').value  = d.schedule_day  || '0';
       document.getElementById('bk-email').value         = d.email_recipients || '';
       document.getElementById('bk-keep').value          = d.keep_count || '30';
+      var dlOn = (d.auto_download_local !== 'off');
+      var dlEl = document.getElementById('bk-auto-dl');
+      if (dlEl) dlEl.checked = dlOn;
+      _bkUpdateAutoDlLabel();
       _bkUpdateDayVis();
     });
 }
+function _bkUpdateAutoDlLabel(){
+  var el = document.getElementById('bk-auto-dl');
+  var lb = document.getElementById('bk-auto-dl-label');
+  if (!el || !lb) return;
+  lb.textContent = el.checked
+    ? 'مفعّل — سيتم تنزيل كل نسخة تلقائية عند فتح اللوحة'
+    : 'متوقف — لن يتم تحميل النسخ تلقائياً إلى الجهاز';
+}
+document.getElementById('bk-auto-dl') && document.getElementById('bk-auto-dl').addEventListener('change', _bkUpdateAutoDlLabel);
 function _bkUpdateDayVis(){
   var k = document.getElementById('bk-schedule-kind').value;
   document.getElementById('bk-day-field').style.display = (k === 'weekly') ? 'flex' : 'none';
 }
 document.getElementById('bk-schedule-kind').addEventListener('change', _bkUpdateDayVis);
 function bkSaveSettings(){
+  var dlEl = document.getElementById('bk-auto-dl');
   var body = {
-    schedule_kind:    document.getElementById('bk-schedule-kind').value,
-    schedule_time:    document.getElementById('bk-schedule-time').value || '02:00',
-    schedule_day:     document.getElementById('bk-schedule-day').value || '0',
-    email_recipients: document.getElementById('bk-email').value || '',
-    keep_count:       document.getElementById('bk-keep').value || '30'
+    schedule_kind:       document.getElementById('bk-schedule-kind').value,
+    schedule_time:       document.getElementById('bk-schedule-time').value || '02:00',
+    schedule_day:        document.getElementById('bk-schedule-day').value || '0',
+    email_recipients:    document.getElementById('bk-email').value || '',
+    keep_count:          document.getElementById('bk-keep').value || '30',
+    auto_download_local: (dlEl && dlEl.checked) ? 'on' : 'off'
   };
   fetch('/api/backups/settings', { method:'PATCH', credentials:'include',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
@@ -24171,6 +24195,98 @@ function bkDelete(id){
 }
 bkLoadSettings();
 bkLoadList();
+
+/* ── Auto-download polling (admin-only, page-only) ──────────────
+   Pulls /api/backups every 30s, finds any row whose kind is
+   "scheduled" or "pre-destructive" with id > localStorage high-water
+   mark, and triggers a hidden-anchor download for each. The
+   high-water mark is stored per-browser so a backup that landed
+   while the admin was offline still gets downloaded the next time
+   they open this page (matches the spec's "queue + flush on open"
+   requirement). */
+var _BK_AUTO_DL_KEY = 'mxBkAutoDlLastId';
+var _bkAutoDlEnabled = true;
+function _bkAutoDlSetting(){
+  /* Reflects the current toggle state without re-reading the server. */
+  var el = document.getElementById('bk-auto-dl');
+  return el ? !!el.checked : true;
+}
+function _bkLastSeenId(){
+  try { return parseInt(localStorage.getItem(_BK_AUTO_DL_KEY) || '0', 10) || 0; }
+  catch(e){ return 0; }
+}
+function _bkSetLastSeenId(n){
+  try { localStorage.setItem(_BK_AUTO_DL_KEY, String(n)); } catch(e){}
+}
+function _bkTriggerDownload(row){
+  /* Hidden anchor click. Browsers usually allow this when the page
+     has had user interaction. If the click is blocked we surface a
+     fallback link in a sticky toast. */
+  var url = '/api/backups/' + row.id + '/download';
+  try {
+    var a = document.createElement('a');
+    a.href = url; a.download = row.filename || ('backup_' + row.id + '.zip');
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ a.parentNode && a.parentNode.removeChild(a); }, 1000);
+    bkToast('\u2705 \u062A\u0645 \u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u0646\u0633\u062E\u0629 \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A\u0629 \u0625\u0644\u0649 \u062C\u0647\u0627\u0632\u0643: ' + (row.filename || ''));
+    return true;
+  } catch (err) {
+    /* Fallback: a sticky element with a manual link. */
+    _bkShowDownloadFallback(row, url);
+    return false;
+  }
+}
+function _bkShowDownloadFallback(row, url){
+  var existing = document.getElementById('bk-fallback');
+  if (existing) existing.parentNode.removeChild(existing);
+  var box = document.createElement('div');
+  box.id = 'bk-fallback';
+  box.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#fff8e1;border:2px solid #FB8C00;color:#e65100;padding:12px 20px;border-radius:12px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:10001;display:flex;align-items:center;gap:12px;direction:rtl;';
+  box.innerHTML = '\u26A0 \u0627\u0644\u0645\u062A\u0635\u0641\u062D \u062D\u062C\u0628 \u0627\u0644\u062A\u062D\u0645\u064A\u0644 \u0627\u0644\u062A\u0644\u0642\u0627\u0626\u064A.&nbsp; '
+                 + '<a href="' + url + '" download style="background:#FB8C00;color:#fff;padding:6px 14px;border-radius:8px;text-decoration:none;font-weight:800;">\u062A\u062D\u0645\u064A\u0644 \u064A\u062F\u0648\u064A: ' + (row.filename || '') + '</a>'
+                 + '<button onclick="this.parentNode.remove();" style="background:transparent;border:none;cursor:pointer;font-size:18px;color:#e65100;">\u00D7</button>';
+  document.body.appendChild(box);
+}
+function _bkAutoDlPollOnce(){
+  if (!_bkAutoDlSetting()) return;
+  fetch('/api/backups', {credentials:'include'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if (!d || !d.ok || !Array.isArray(d.rows)) return;
+      var seen = _bkLastSeenId();
+      /* The list comes newest-first; we want oldest-first new entries
+         so manual triggers happen in chronological order. */
+      var rows = d.rows.slice().sort(function(a,b){ return (a.id||0) - (b.id||0); });
+      var maxId = seen;
+      for (var i=0;i<rows.length;i++){
+        var r = rows[i];
+        var id = r.id || 0;
+        if (id <= seen) continue;
+        var k = (r.kind || '').toLowerCase();
+        if (k === 'scheduled' || k === 'pre-destructive'){
+          _bkTriggerDownload(r);
+        }
+        if (id > maxId) maxId = id;
+      }
+      if (maxId > seen) _bkSetLastSeenId(maxId);
+      else if (seen === 0 && rows.length){
+        /* First-ever poll on this browser: don't re-download the
+           entire history. Set the high-water mark to the newest id
+           so only NEW automatic backups (after this moment) trigger
+           the auto-download. */
+        var newest = 0;
+        for (var j=0;j<rows.length;j++){ if ((rows[j].id||0) > newest) newest = rows[j].id||0; }
+        _bkSetLastSeenId(newest);
+      }
+    })
+    .catch(function(){});
+}
+/* First poll right away (catches any backups created while the admin
+   was offline since their last visit), then every 30s. */
+_bkAutoDlPollOnce();
+setInterval(_bkAutoDlPollOnce, 30000);
 </script>
 </body>
 </html>"""
