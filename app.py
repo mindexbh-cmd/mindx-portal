@@ -1312,6 +1312,30 @@ if True:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("settings_seed_v2",))
         except Exception:
             pass
+
+    # Students table: turn three columns into dropdowns. Linked dropdowns
+    # use the col_options="source:<table>:<value_col>:<label_col>" syntax
+    # the JS renderCell + add/edit modal both understand. The fixed
+    # class_name list is comma-separated.
+    if "students_dropdowns_v1" not in applied:
+        _student_drops = [
+            ("class_name",         "قائمة منسدلة", "0.3,1,2,3,4,5,6,7,8,9"),
+            ("group_name_student", "قائمة منسدلة", "source:student_groups:group_name:group_name"),
+            ("group_online",       "قائمة منسدلة", "source:student_groups:group_name:group_name"),
+        ]
+        for _k, _t, _o in _student_drops:
+            try:
+                db2.execute(
+                    "UPDATE column_labels SET col_type=?, col_options=? WHERE col_key=?",
+                    (_t, _o, _k),
+                )
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("students_dropdowns_v1",))
+        except Exception:
+            pass
+        db2.commit()
         db2.commit()
 
     # Ensure table_labels table exists for every DB, then seed built-in
@@ -3708,13 +3732,44 @@ function srPick(sid){
     _srRenderCard(d);
   });
 }
+var _SR_DROPDOWN_FIELDS = {
+  'sr_class_name':         { kind:'fixed',  options:['0.3','1','2','3','4','5','6','7','8','9'], emptyLabel:'-- \u0627\u062E\u062A\u0631 --' },
+  'sr_group_name_student': { kind:'linked', spec:'source:student_groups:group_name:group_name', emptyLabel:'-- \u0627\u062E\u062A\u0631 --' },
+  'sr_group_online':       { kind:'linked', spec:'source:student_groups:group_name:group_name', emptyLabel:'-- \u0644\u0627 \u064A\u0648\u062C\u062F --' }
+};
 function _srField(id, label, value){
   var v = value == null ? '' : String(value);
-  v = v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  // Fields ALWAYS render as disabled inputs in view mode. Edit mode flips
-  // the disabled flag + replaces the lock icon via _srApplyMode().
+  var vEsc = v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  // Fields render as disabled inputs in view mode. Edit mode flips
+  // disabled + lock icon via _srApplyMode(). The three dropdown fields
+  // render as <select>s instead — same disabled toggle keeps view-mode
+  // identical visually.
+  var d = _SR_DROPDOWN_FIELDS[id];
+  if (d){
+    var inner = '';
+    if (d.kind === 'fixed'){
+      inner = '<option value="">' + d.emptyLabel + '</option>';
+      for (var i=0;i<d.options.length;i++){
+        var ov = d.options[i];
+        var sel = (ov === v) ? ' selected' : '';
+        inner += '<option value="' + ov + '"' + sel + '>' + ov + '</option>';
+      }
+      if (v && d.options.indexOf(v) < 0){
+        inner += '<option value="' + vEsc + '" selected>' + vEsc + '</option>';
+      }
+    } else {
+      // linked — render placeholder, async-fill
+      inner = '<option value="' + vEsc + '" selected>' + vEsc + '</option>';
+      setTimeout(function(){
+        var el = document.getElementById(id); if (!el) return;
+        _populateSelectFromLinked(el, d.spec, v, true, d.emptyLabel);
+      }, 0);
+    }
+    return '<div class="srm-field"><label><span class="srm-lock">🔒</span>'+label+'</label>'
+         + '<select id="'+id+'" data-sr="'+id+'" class="srm-readonly" disabled>'+inner+'</select></div>';
+  }
   return '<div class="srm-field"><label><span class="srm-lock">🔒</span>'+label+'</label>'
-       + '<input id="'+id+'" data-sr="'+id+'" value="'+v+'" class="srm-readonly" disabled></div>';
+       + '<input id="'+id+'" data-sr="'+id+'" value="'+vEsc+'" class="srm-readonly" disabled></div>';
 }
 var _srMode = 'view';
 var _srOriginal = {};
@@ -7570,11 +7625,11 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 <div class="field"><label>&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A; *</label><input id="f_personal_id" placeholder="&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;"></div>
 <div class="field"><label>&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; *</label><input id="f_student_name" placeholder="&#x627;&#x644;&#x627;&#x633;&#x645; &#x627;&#x644;&#x643;&#x627;&#x645;&#x644;"></div>
 <div class="field"><label>&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x627;&#x644;&#x645;&#x639;&#x62A;&#x645;&#x62F;</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
-<div class="field"><label>&#x627;&#x644;&#x635;&#x641;</label><input id="f_class_name" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x635;&#x641; A"></div>
+<div class="field"><label>&#x627;&#x644;&#x635;&#x641;</label><select id="f_class_name"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>0.3</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
 <div class="field"><label>&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</label><input id="f_old_new_2026" placeholder="&#x642;&#x62F;&#x64A;&#x645; &#x623;&#x648; &#x62C;&#x62F;&#x64A;&#x62F;"></div>
 <div class="field"><label>&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</label><input id="f_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;"></div>
-<div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><input id="f_group_name_student" placeholder="&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;"></div>
-<div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><input id="f_group_online" placeholder="&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;"></div>
+<div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="f_group_name_student"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
+<div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><select id="f_group_online"><option value="">-- &#x644;&#x627; &#x64A;&#x648;&#x62C;&#x62F; --</option></select></div>
 <div class="field"><label>&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629; (&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026)</label><select id="f_final_result"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>&#x646;&#x627;&#x62C;&#x62D;</option><option>&#x631;&#x627;&#x633;&#x628;</option><option>&#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</option><option>&#x63A;&#x627;&#x626;&#x628;</option></select></div>
 <div class="field"><label>&#x627;&#x644;&#x649; &#x627;&#x64A;&#x646; &#x648;&#x635;&#x644; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; 2026</label><input id="f_level_reached" placeholder="&#x645;&#x62B;&#x627;&#x644;: &#x627;&#x644;&#x648;&#x62D;&#x62F;&#x629; 5"></div>
 <div class="field"><label>&#x647;&#x644; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x645;&#x646;&#x627;&#x633;&#x628; &#x644;&#x647;&#x630;&#x627; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026&#x61F;</label><input id="f_suitable_level" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;"></div>
@@ -8682,6 +8737,15 @@ function updateInstallmentType(sid,val){
   .then(function(r){return r.json();})
   .then(function(d){if(d.ok){var s=allStudents.find(function(x){return x.id===sid;});if(s)s.installment_type=val; renderTable(allStudents);}});
 }
+function _populateStudentGroupSelects(curIn, curOnline){
+  var spec = 'source:student_groups:group_name:group_name';
+  _invalidateLinkedCache('student_groups');
+  var p1 = _populateSelectFromLinked(document.getElementById('f_group_name_student'),
+            spec, curIn || '', true, '-- \u0627\u062E\u062A\u0631 --');
+  var p2 = _populateSelectFromLinked(document.getElementById('f_group_online'),
+            spec, curOnline || '', true, '-- \u0644\u0627 \u064A\u0648\u062C\u062F --');
+  return Promise.all([p1, p2]);
+}
 function populateEditInstallmentSelect(curVal){
   var sel=document.getElementById('f_installment_type');
   if(!sel) return;
@@ -8760,8 +8824,8 @@ function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   renderTable(allStudents.filter(s=>(s.student_name||'').toLowerCase().includes(q)||(s.personal_id||'').toLowerCase().includes(q)));
 }
-function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').innerHTML='&#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;';document.getElementById('modal').classList.add('open');}
-function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').innerHTML='&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
+function clearForm(){ ['personal_id','student_name','whatsapp','class_name','old_new_2026','registration_term2_2026','group_name_student','group_online','final_result','level_reached','suitable_level','books_received','teacher','installment1','installment2','installment3','installment4','installment5','mother_phone','father_phone','other_phone','residence','home_address','road','complex'].forEach(k=>{const el=document.getElementById('f_'+k);if(el)el.value='';}); document.getElementById('editId').value=''; } function openAddModal(){clearForm();document.getElementById('modalTitle').innerHTML='&#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;';_populateStudentGroupSelects('','');document.getElementById('modal').classList.add('open');}
+function openEdit(id){ const s=allStudents.find(x=>x.id===id);if(!s)return; document.getElementById('editId').value=id; document.getElementById('modalTitle').innerHTML='&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;'; document.getElementById('f_personal_id').value=s.personal_id||''; document.getElementById('f_student_name').value=s.student_name||''; document.getElementById('f_whatsapp').value=s.whatsapp||''; document.getElementById('f_class_name').value=s.class_name||''; document.getElementById('f_old_new_2026').value=s.old_new_2026||''; document.getElementById('f_registration_term2_2026').value=s.registration_term2_2026||''; document.getElementById('f_group_name_student').value=s.group_name_student||''; document.getElementById('f_group_online').value=s.group_online||''; document.getElementById('f_final_result').value=s.final_result||''; document.getElementById('f_level_reached').value=s.level_reached_2026||''; document.getElementById('f_suitable_level').value=s.suitable_level_2026||''; document.getElementById('f_books_received').value=s.books_received||''; document.getElementById('f_teacher').value=s.teacher_2026||''; document.getElementById('f_installment1').value=s.installment1||''; document.getElementById('f_installment2').value=s.installment2||''; document.getElementById('f_installment3').value=s.installment3||''; document.getElementById('f_installment4').value=s.installment4||''; document.getElementById('f_installment5').value=s.installment5||''; document.getElementById('f_mother_phone').value=s.mother_phone||''; document.getElementById('f_father_phone').value=s.father_phone||''; document.getElementById('f_other_phone').value=s.other_phone||''; document.getElementById('f_residence').value=s.residence||''; document.getElementById('f_home_address').value=s.home_address||''; document.getElementById('f_road').value=s.road||''; document.getElementById('f_complex').value=s.complex_name||''; document.getElementById('f_installment_type').value=s.installment_type||''; populateEditInstallmentSelect(s.installment_type||''); _populateStudentGroupSelects(s.group_name_student||'', s.group_online||''); document.getElementById('modal').classList.add('open'); } function closeModal(){document.getElementById('modal').classList.remove('open');}
 async function saveStudent(){ const editId=document.getElementById('editId').value; const body={ personal_id:document.getElementById('f_personal_id').value.trim(), student_name:document.getElementById('f_student_name').value.trim(), whatsapp:document.getElementById('f_whatsapp').value.trim(), class_name:document.getElementById('f_class_name').value.trim(), old_new_2026:document.getElementById('f_old_new_2026').value.trim(), registration_term2_2026:document.getElementById('f_registration_term2_2026').value.trim(), group_name_student:document.getElementById('f_group_name_student').value.trim(), group_online:document.getElementById('f_group_online').value.trim(), final_result:document.getElementById('f_final_result').value, level_reached_2026:document.getElementById('f_level_reached').value.trim(), suitable_level_2026:document.getElementById('f_suitable_level').value.trim(), books_received:document.getElementById('f_books_received').value.trim(), teacher_2026:document.getElementById('f_teacher').value.trim(), installment1:document.getElementById('f_installment1').value.trim(), installment2:document.getElementById('f_installment2').value.trim(), installment3:document.getElementById('f_installment3').value.trim(), installment4:document.getElementById('f_installment4').value.trim(), installment5:document.getElementById('f_installment5').value.trim(), mother_phone:document.getElementById('f_mother_phone').value.trim(), father_phone:document.getElementById('f_father_phone').value.trim(), other_phone:document.getElementById('f_other_phone').value.trim(), residence:document.getElementById('f_residence').value.trim(), home_address:document.getElementById('f_home_address').value.trim(), road:document.getElementById('f_road').value.trim(), complex_name:document.getElementById('f_complex').value.trim(), installment_type:document.getElementById('f_installment_type').value.trim(), }; if(!body.personal_id||!body.student_name){showToast('&#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A; &#x648;&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x645;&#x637;&#x644;&#x648;&#x628;&#x627;&#x646;','#e53935');return;} const url=editId?'/api/students/'+editId:'/api/students'; const method=editId?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data=await res.json(); if(data.ok){closeModal();showToast(editId?'&#x62A;&#x645; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x628;&#x646;&#x62C;&#x627;&#x62D;':'&#x62A;&#x645; &#x625;&#x636;&#x627;&#x641;&#x629; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x628;&#x646;&#x62C;&#x627;&#x62D;');loadStudents();} else{showToast(data.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x627;','#e53935');} } function askDelete(id){deleteTargetId=id;document.getElementById('confirmModal').classList.add('open');document.getElementById('confirmDelBtn').onclick=confirmDelete;}
 async function confirmDelete(){
   if(!deleteTargetId)return;
@@ -9158,6 +9222,69 @@ function utemSave(){
 
 // ─── Typed cell rendering (Part 3) ─────────────────────────────────────
 // Used by future custom-table renders; exposed globally so any table may opt in.
+/* ── Linked-dropdown options cache ────────────────────────────────
+   col_options of the form "source:<table>:<value_col>:<label_col>"
+   describes a foreign-key-style dropdown. Options are fetched from
+   /api/table/<table>/linked-options once per (spec, ttl) and reused.
+   The cache TTL is short so a brand-new student_groups row appears
+   in the students dropdowns within ~30s without a manual reload. */
+var _LINKED_OPTS_CACHE = {};
+var _LINKED_OPTS_TTL_MS = 30000;
+function _parseLinkedSpec(s){
+  s = String(s||'').trim();
+  if (s.indexOf('source:') !== 0) return null;
+  var parts = s.substring('source:'.length).split(':');
+  return {
+    table: (parts[0]||'').trim(),
+    value: (parts[1]||'id').trim(),
+    label: (parts[2]||parts[1]||'id').trim()
+  };
+}
+function _loadLinkedOpts(spec){
+  var p = _parseLinkedSpec(spec);
+  if (!p || !p.table) return Promise.resolve([]);
+  var key = p.table + '|' + p.value + '|' + p.label;
+  var now = Date.now();
+  var c = _LINKED_OPTS_CACHE[key];
+  if (c && (now - c.t) < _LINKED_OPTS_TTL_MS) return Promise.resolve(c.list);
+  var url = '/api/table/' + encodeURIComponent(p.table) + '/linked-options'
+          + '?source=' + encodeURIComponent(p.table)
+          + '&value='  + encodeURIComponent(p.value)
+          + '&label='  + encodeURIComponent(p.label);
+  return fetch(url, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var list = (d && d.options) ? d.options : [];
+      _LINKED_OPTS_CACHE[key] = { t: now, list: list };
+      return list;
+    })
+    .catch(function(){ return (c && c.list) || []; });
+}
+function _invalidateLinkedCache(table){
+  if (!table){ _LINKED_OPTS_CACHE = {}; return; }
+  for (var k in _LINKED_OPTS_CACHE){
+    if (k.indexOf(table + '|') === 0) delete _LINKED_OPTS_CACHE[k];
+  }
+}
+function _populateSelectFromLinked(selectEl, spec, currentValue, allowEmpty, emptyLabel){
+  if (!selectEl) return Promise.resolve();
+  return _loadLinkedOpts(spec).then(function(list){
+    var html = '';
+    if (allowEmpty){
+      html += '<option value="">' + _esc(emptyLabel || '') + '</option>';
+    }
+    var seen = false;
+    var keep = String(currentValue == null ? '' : currentValue);
+    for (var i=0;i<list.length;i++){
+      var v = String(list[i].value);
+      var sel = (v === keep) ? ' selected' : '';
+      if (sel) seen = true;
+      html += '<option value="' + _esc(v) + '"' + sel + '>' + _esc(list[i].label || v) + '</option>';
+    }
+    if (keep && !seen){ html += '<option value="' + _esc(keep) + '" selected>' + _esc(keep) + '</option>'; }
+    selectEl.innerHTML = html;
+  });
+}
 function renderCell(value, colType, colOptions, rowId, fieldKey) {
   var v = (value == null) ? '' : String(value);
   var esc = _esc(v);
@@ -9171,7 +9298,31 @@ function renderCell(value, colType, colOptions, rowId, fieldKey) {
     case '\u062a\u0627\u0631\u064a\u062e':
       return '<input type="date" value="' + esc + '"' + base + '>';
     case '\u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u0633\u062f\u0644\u0629':
-      var opts = String(colOptions||'').split(',').map(function(o){return o.trim();}).filter(function(o){return o.length;});
+      var raw = String(colOptions||'').trim();
+      if (raw.indexOf('source:') === 0){
+        // Linked dropdown — emit a placeholder <select> + async-fill from
+        // /api/table/<src>/linked-options. _LinkedOptsCache lookup is
+        // covered by _loadLinkedOpts.
+        var ph = 'mxld_' + Math.random().toString(36).slice(2,9);
+        setTimeout(function(){
+          var el = document.getElementById(ph); if (!el) return;
+          _loadLinkedOpts(raw).then(function(list){
+            var keep = el.value || el.getAttribute('data-current') || '';
+            var html2 = '<option value=""></option>';
+            var seen = false;
+            for (var k=0;k<list.length;k++){
+              var ov = String(list[k].value);
+              var sel2 = (ov === keep) ? ' selected' : '';
+              if (sel2) seen = true;
+              html2 += '<option value="' + _esc(ov) + '"' + sel2 + '>' + _esc(list[k].label || ov) + '</option>';
+            }
+            if (keep && !seen){ html2 += '<option value="' + _esc(keep) + '" selected>' + _esc(keep) + '</option>'; }
+            el.innerHTML = html2;
+          });
+        }, 0);
+        return '<select id="' + ph + '" data-current="' + _esc(v) + '"' + base + '><option value="">' + _esc(v) + '</option></select>';
+      }
+      var opts = raw.split(',').map(function(o){return o.trim();}).filter(function(o){return o.length;});
       var html = '<select' + base + '><option value=""></option>';
       for (var i=0;i<opts.length;i++){ var s = (opts[i] === v) ? ' selected' : ''; html += '<option' + s + '>' + _esc(opts[i]) + '</option>'; }
       return html + '</select>';
