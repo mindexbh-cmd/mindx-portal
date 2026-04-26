@@ -7549,8 +7549,15 @@ function onControlChange() {
 function checkAndLoad(group, date) {
   document.getElementById('checkSpinner').classList.add('show');
   Promise.all([
-    fetch('/api/attendance/check?group=' + encodeURIComponent(group) + '&date=' + encodeURIComponent(date)).then(function(r){ return r.json(); }),
-    fetch('/api/attendance/student-stats?group=' + encodeURIComponent(group)).then(function(r){ return r.json(); }).catch(function(){ return {stats:{}}; })
+    fetch('/api/attendance/check?group=' + encodeURIComponent(group) + '&date=' + encodeURIComponent(date), {credentials:'include'})
+      .then(function(r){
+        if (r.status === 401 || r.status === 302){ throw new Error('AUTH'); }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }),
+    fetch('/api/attendance/student-stats?group=' + encodeURIComponent(group), {credentials:'include'})
+      .then(function(r){ return r.ok ? r.json() : {stats:{}}; })
+      .catch(function(){ return {stats:{}}; })
   ]).then(function(results) {
     var data = results[0];
     var statsResp = results[1] || {};
@@ -7580,9 +7587,12 @@ function checkAndLoad(group, date) {
       document.getElementById('attSection').style.display = 'block';
       document.getElementById('attFooterBtns').style.display = 'flex';
     })
-    .catch(function() {
+    .catch(function(err) {
       document.getElementById('checkSpinner').classList.remove('show');
-      showToast('\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062a\u062d\u0642\u0642', '#e53935');
+      var msg = (err && err.message === 'AUTH')
+        ? '\u0627\u0646\u062A\u0647\u062A \u0627\u0644\u062C\u0644\u0633\u0629\u060C \u062F\u062E\u0648\u0644 \u0645\u062C\u062F\u062F\u0627\u064B \u0645\u0637\u0644\u0648\u0628'
+        : '\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062a\u062d\u0642\u0642';
+      showToast(msg, '#e53935');
     });
 }
 
@@ -7825,17 +7835,50 @@ function saveAllAttendance() {
 
   var pending = total;
 
+  /* Track failures so the final toast can flag silent-redirect /
+     auth issues instead of pretending the save succeeded. */
+  var failures = [];
   saves.forEach(function(rec) {
-    fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rec) })
-      .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) done++; pending--; if(pending===0) finish(); })
-      .catch(function(){ pending--; if(pending===0) finish(); });
+    fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(rec) })
+      .then(function(r){
+        if (!r.ok) { failures.push('HTTP ' + r.status); pending--; if(pending===0) finish(); return; }
+        return r.json().then(function(d){
+          if (d && d.ok) done++;
+          else if (d && d.error) failures.push(d.error);
+          pending--; if(pending===0) finish();
+        });
+      })
+      .catch(function(err){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
   });
 
   updates.forEach(function(rec) {
-    fetch('/api/attendance/' + rec.id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rec) })
-      .then(function(r){ return r.json(); }).then(function(d){ if(d.ok) done++; pending--; if(pending===0) finish(); })
-      .catch(function(){ pending--; if(pending===0) finish(); });
+    fetch('/api/attendance/' + rec.id, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(rec) })
+      .then(function(r){
+        if (!r.ok) { failures.push('HTTP ' + r.status); pending--; if(pending===0) finish(); return; }
+        return r.json().then(function(d){
+          if (d && d.ok) done++;
+          else if (d && d.error) failures.push(d.error);
+          pending--; if(pending===0) finish();
+        });
+      })
+      .catch(function(err){ failures.push('خطأ في الاتصال'); pending--; if(pending===0) finish(); });
   });
+
+  /* Override finish() with a version that surfaces partial failures —
+     the legacy version already runs first because it is captured by
+     closure above; keep this defensive in case finish() is called from
+     a fetch that landed before saves.length+updates.length pending
+     were posted. */
+  var _origFinish = finish;
+  finish = function(){
+    btn.disabled = false;
+    if (failures.length){
+      showToast('فشل حفظ بعض السجلات: ' + failures[0], '#e53935');
+    } else {
+      showToast('تم حفظ ' + done + '/' + total + ' سجل', '#00897B');
+    }
+    checkAndLoad(group, date);
+  };
 }
 
 loadGroups();
