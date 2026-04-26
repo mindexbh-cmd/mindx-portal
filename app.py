@@ -1462,6 +1462,31 @@ if True:
             pass
         db2.commit()
 
+    # Receipts log — every printed payment receipt is logged here so
+    # admins can audit who issued what + reprint via the قاعدة
+    # البيانات browser. Receipt numbers are sequential per issuance
+    # and unique.
+    if "receipts_log_v1" not in applied:
+        try:
+            db2.execute("""CREATE TABLE IF NOT EXISTS receipts_log(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_number TEXT UNIQUE,
+                student_id INTEGER,
+                student_name TEXT,
+                personal_id TEXT,
+                installment_number INTEGER,
+                amount REAL,
+                employee_name TEXT,
+                issued_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""")
+        except Exception:
+            pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("receipts_log_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -4702,6 +4727,14 @@ function _srRenderCard(d){
 
   var html = '<div class="srm-card">';
   html += '<div id="sr-edit-banner" class="srm-edit-banner">⚠ أنت في وضع التعديل — تأكد من صحة البيانات قبل الحفظ</div>';
+  /* Receipt-print button — opens the receipt modal pre-filled
+     with this student\'s paid-installment list. */
+  html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'
+       +   '<button type="button" onclick="srOpenReceiptModal(' + (s.id || 0) + ')" '
+       +     'style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;padding:10px 22px;border-radius:11px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(21,101,192,.25);font-family:inherit;">'
+       +     '&#x1F5A8; طباعة رصيد'
+       +   '</button>'
+       + '</div>';
   // BASIC
   html += '<div class="srm-section"><div class="srm-section-title">\U0001F464 البيانات الأساسية</div><div class="srm-grid">';
   html += _srField('sr_personal_id','الرقم الشخصي', s.personal_id);
@@ -4771,6 +4804,245 @@ function _srRenderCard(d){
   _srApplyMode();
 }
 function srSave(){ _srTrySave(); }  /* backward-compat shim */
+
+/* ── Receipt print (طباعة رصيد) ──────────────────────────────── */
+var _srRcpt = { sid: 0, data: null, selected: null };
+
+function srOpenReceiptModal(sid){
+  if (!sid){ if (typeof window.mxToast === 'function') window.mxToast('\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645 \u0637\u0627\u0644\u0628', 'error'); return; }
+  _srRcpt.sid = sid; _srRcpt.selected = null; _srRcpt.data = null;
+  _srRcptEnsureModal();
+  var m = document.getElementById('sr-rcpt-modal');
+  m.style.display = 'flex';
+  document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;text-align:center;color:#999;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
+  fetch('/api/receipts/student/' + sid, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){
+        document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">' + ((d && d.error) || '\u0641\u0634\u0644 \u0627\u0644\u062A\u062D\u0645\u064A\u0644') + '</div>';
+        return;
+      }
+      _srRcpt.data = d;
+      _srRcptRender();
+    })
+    .catch(function(){
+      document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644</div>';
+    });
+}
+
+function srCloseReceiptModal(){
+  var m = document.getElementById('sr-rcpt-modal');
+  if (m) m.style.display = 'none';
+}
+
+function _srRcptEnsureModal(){
+  if (document.getElementById('sr-rcpt-modal')) return;
+  var m = document.createElement('div');
+  m.id = 'sr-rcpt-modal';
+  m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:11030;align-items:center;justify-content:center;direction:rtl;font-family:inherit;';
+  m.innerHTML = ''
+    + '<div class="sr-rcpt-box" style="background:#fff;border-radius:14px;width:min(820px,96vw);max-height:92vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);">'
+    +   '<div class="sr-rcpt-head" style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:800;">'
+    +     '<span id="sr-rcpt-title">\u0637\u0628\u0627\u0639\u0629 \u0631\u0635\u064A\u062F</span>'
+    +     '<span style="cursor:pointer;font-size:1.6rem;line-height:1;" onclick="srCloseReceiptModal()">&times;</span>'
+    +   '</div>'
+    +   '<div id="sr-rcpt-body" style="padding:16px 20px;"></div>'
+    +   '<div class="sr-rcpt-foot" style="display:flex;gap:10px;justify-content:flex-end;padding:12px 18px;border-top:1px solid #eee;background:#fafafa;">'
+    +     '<button type="button" onclick="srCloseReceiptModal()" style="background:#eceff1;color:#455a64;border:none;padding:9px 22px;border-radius:9px;font-weight:800;cursor:pointer;font-family:inherit;">\u0625\u063A\u0644\u0627\u0642</button>'
+    +     '<button type="button" id="sr-rcpt-print" onclick="srPrintReceipt()" disabled style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;padding:9px 26px;border-radius:9px;font-weight:800;cursor:pointer;font-family:inherit;">&#x1F5A8; \u0637\u0628\u0627\u0639\u0629</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(m);
+
+  /* Inject print-only stylesheet once. Only #sr-rcpt-receipt-page
+     stays on paper; everything else is hidden during printing. */
+  if (!document.getElementById('sr-rcpt-print-style')){
+    var st = document.createElement('style');
+    st.id = 'sr-rcpt-print-style';
+    st.textContent = [
+      '@media print {',
+      '  body * { visibility: hidden !important; }',
+      '  #sr-rcpt-print-area, #sr-rcpt-print-area * { visibility: visible !important; }',
+      '  #sr-rcpt-print-area { position: absolute; inset: 0; left: 0; top: 0; width: 100%; padding: 16mm; background: #fff; color: #000; }',
+      '  @page { size: A5 portrait; margin: 10mm; }',
+      '}'
+    ].join('\\n');
+    document.head.appendChild(st);
+  }
+  /* Hidden print area sits at end of body so the @media print rule
+     can isolate it cleanly. */
+  if (!document.getElementById('sr-rcpt-print-area')){
+    var pa = document.createElement('div');
+    pa.id = 'sr-rcpt-print-area';
+    pa.style.cssText = 'position:absolute;left:-99999px;top:0;background:#fff;';
+    document.body.appendChild(pa);
+  }
+}
+
+function _srRcptFmt(v, dec){
+  var n = Number(v || 0);
+  return (isNaN(n) ? 0 : n).toFixed(dec == null ? 3 : dec);
+}
+
+function _srRcptRender(){
+  var d = _srRcpt.data; if (!d) return;
+  var s = d.student || {}; var p = d.plan || {};
+  document.getElementById('sr-rcpt-title').textContent = '\u0637\u0628\u0627\u0639\u0629 \u0631\u0635\u064A\u062F - ' + (s.name || '—');
+
+  var html = '';
+  html += '<div style="background:#f8f9fa;border-radius:10px;padding:12px 14px;margin-bottom:12px;">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13.5px;color:#222;">';
+  html += '<div><b>\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628:</b> ' + (s.name || '—') + '</div>';
+  html += '<div><b>\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A:</b> <span style="direction:ltr;">' + (s.personal_id || '—') + '</span></div>';
+  html += '<div><b>\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629:</b> ' + (s.group || '—') + '</div>';
+  html += '<div><b>\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637:</b> ' + (p.method || '—') + '</div>';
+  html += '<div><b>\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629:</b> ' + _srRcptFmt(p.course_amount) + ' \u062F.\u0628</div>';
+  html += '<div><b>\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0643\u0644\u064A:</b> ' + (p.num_installments || 0) + '</div>';
+  html += '<div><b>\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629:</b> ' + (p.paid_count || 0) + '</div>';
+  html += '<div><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062F\u0641\u0648\u0639:</b> ' + _srRcptFmt(p.total_paid) + ' \u062F.\u0628</div>';
+  html += '<div><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062A\u0628\u0642\u064A:</b> ' + _srRcptFmt(p.total_remaining) + ' \u062F.\u0628</div>';
+  html += '</div></div>';
+
+  /* Paid installments — radio (single-select, since each receipt
+     covers one specific paid installment). */
+  html += '<div style="margin-bottom:12px;">';
+  html += '<div style="font-weight:800;color:#1565C0;margin-bottom:8px;font-size:14px;">\u0627\u062E\u062A\u0631 \u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0645\u0631\u0627\u062F \u0625\u0635\u062F\u0627\u0631 \u0631\u0635\u064A\u062F\u0647:</div>';
+  var insts = d.paid_installments || [];
+  if (!insts.length){
+    html += '<div style="color:#999;text-align:center;padding:14px;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u0642\u0633\u0627\u0637 \u0645\u062F\u0641\u0648\u0639\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628</div>';
+  } else {
+    for (var i=0;i<insts.length;i++){
+      var inst = insts[i];
+      html += '<label style="display:block;padding:8px 12px;border:1.5px solid #e0e7ee;border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13.5px;background:#fff;">'
+           +   '<input type="radio" name="sr-rcpt-inst" value="' + inst.n + '" onchange="srSelectReceiptInst(' + inst.n + ')" style="margin-left:8px;"> '
+           +   '<b>\u0627\u0644\u0642\u0633\u0637 ' + inst.n + '</b> \u2014 ' + _srRcptFmt(inst.amount) + ' \u062F.\u0628 '
+           +   '<span style="color:#666;font-size:12.5px;">\u2014 \u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: ' + (inst.due_date || '—') + '</span>'
+           + '</label>';
+    }
+  }
+  html += '</div>';
+
+  /* Live preview placeholder. */
+  html += '<div id="sr-rcpt-preview-wrap" style="border:2px dashed #b0bec5;border-radius:10px;padding:16px;background:#fafbfc;color:#888;text-align:center;font-size:13px;">\u2014 \u0627\u062E\u062A\u0631 \u0642\u0633\u0637\u0627\u064B \u0644\u0639\u0631\u0636 \u0645\u0639\u0627\u064A\u0646\u0629 \u0627\u0644\u0631\u0635\u064A\u062F \u2014</div>';
+  document.getElementById('sr-rcpt-body').innerHTML = html;
+  document.getElementById('sr-rcpt-print').disabled = true;
+}
+
+function srSelectReceiptInst(n){
+  _srRcpt.selected = n;
+  var d = _srRcpt.data; if (!d) return;
+  var inst = (d.paid_installments || []).find(function(x){ return Number(x.n) === Number(n); });
+  if (!inst) return;
+  document.getElementById('sr-rcpt-print').disabled = false;
+  var s = d.student || {}; var p = d.plan || {};
+  var todayISO = (new Date()).toISOString().slice(0, 10);
+  var emp = (window._mxUserName || document.body.dataset.userName || '—');
+  /* Populate the live preview box AND the hidden print area with
+     identical receipt markup so the user sees what they'll get. */
+  var receiptHtml = _srRcptBuildReceiptHtml({
+    sid: s.id, sname: s.name, pid: s.personal_id, group: s.group,
+    method: p.method, course_amount: p.course_amount,
+    num: p.num_installments, paid_count: p.paid_count,
+    total_paid: p.total_paid, total_remaining: p.total_remaining,
+    inst: inst, employee: emp, issued_date: todayISO,
+    receipt_number: '\u2014 \u0633\u064A\u062A\u0645 \u062A\u0648\u0644\u064A\u062F\u0647 \u0639\u0646\u062F \u0627\u0644\u0637\u0628\u0627\u0639\u0629'
+  });
+  document.getElementById('sr-rcpt-preview-wrap').innerHTML = receiptHtml;
+}
+
+function _srRcptBuildReceiptHtml(ctx){
+  var fmt = _srRcptFmt;
+  var inst = ctx.inst || {};
+  var html = '';
+  html += '<div class="sr-rcpt-doc" style="background:#fff;color:#000;padding:14px 18px;font-family:Tahoma,Arial,sans-serif;direction:rtl;border:1px solid #ddd;border-radius:8px;max-width:520px;margin:0 auto;line-height:1.55;">';
+  html += '<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px;">';
+  html += '<div style="font-size:18px;font-weight:800;">\u0645\u0631\u0643\u0632 \u0645\u0627\u064A\u0646\u062F\u0643\u0633 \u0644\u0644\u062A\u0639\u0644\u064A\u0645 \u0648\u0627\u0644\u062A\u062F\u0631\u064A\u0628</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-top:4px;">\u0631\u0635\u064A\u062F \u062F\u0641\u0639</div>';
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:8px;">';
+  html += '<div><b>\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F:</b> ' + (ctx.receipt_number || '') + '</div>';
+  html += '<div><b>\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631:</b> <span style="direction:ltr;">' + (ctx.issued_date || '') + '</span></div>';
+  html += '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px;">';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;width:40%;font-weight:700;">\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.sname || '—') + '</td></tr>';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;direction:ltr;">' + (ctx.pid || '—') + '</td></tr>';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.group || '—') + '</td></tr>';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.method || '—') + '</td></tr>';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + fmt(ctx.course_amount) + ' \u062F.\u0628</td></tr>';
+  html += '</table>';
+  html += '<div style="background:#fff8e1;border:2px solid #FB8C00;border-radius:8px;padding:10px 12px;margin-bottom:10px;text-align:center;">';
+  html += '<div style="font-weight:800;color:#E65100;font-size:14px;">\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0645\u062F\u0641\u0648\u0639</div>';
+  html += '<div style="font-size:18px;font-weight:800;margin-top:4px;">\u0627\u0644\u0642\u0633\u0637 ' + (inst.n || '—') + ' / ' + (ctx.num || '—') + '</div>';
+  html += '<div style="font-size:18px;font-weight:800;margin-top:4px;">' + fmt(inst.amount || inst.paid) + ' \u062F.\u0628</div>';
+  html += '<div style="font-size:11.5px;margin-top:4px;color:#5d4037;">\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: <span style="direction:ltr;">' + (inst.due_date || '—') + '</span></div>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12.5px;margin-bottom:14px;">';
+  html += '<div style="padding:5px 8px;background:#e8f5e9;border-radius:6px;"><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062F\u0641\u0648\u0639:</b> ' + fmt(ctx.total_paid) + ' \u062F.\u0628</div>';
+  html += '<div style="padding:5px 8px;background:#ffebee;border-radius:6px;"><b>\u0627\u0644\u0645\u062A\u0628\u0642\u064A:</b> ' + fmt(ctx.total_remaining) + ' \u062F.\u0628</div>';
+  html += '</div>';
+  /* Stamp + signature boxes */
+  html += '<div style="display:flex;gap:12px;margin-top:18px;">';
+  html += '  <div style="flex:1;border:1.5px solid #000;border-radius:6px;height:90px;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;">';
+  html += '    <div style="font-size:11px;font-weight:700;border-top:1px solid #999;padding-top:3px;">\u062E\u062A\u0645 \u0627\u0644\u0645\u0631\u0643\u0632</div>';
+  html += '  </div>';
+  html += '  <div style="flex:1;border:1.5px solid #000;border-radius:6px;height:90px;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;">';
+  html += '    <div style="border-top:1px solid #999;padding-top:3px;font-size:12px;font-weight:700;">' + (ctx.employee || '—') + '</div>';
+  html += '    <div style="font-size:10.5px;color:#555;">\u062A\u0648\u0642\u064A\u0639 \u0627\u0644\u0645\u0648\u0638\u0641</div>';
+  html += '  </div>';
+  html += '</div>';
+  html += '<div style="font-size:10.5px;color:#666;text-align:center;margin-top:14px;border-top:1px dashed #999;padding-top:6px;">\u0647\u0630\u0627 \u0627\u0644\u0631\u0635\u064A\u062F \u0625\u062B\u0628\u0627\u062A \u0627\u0633\u062A\u0644\u0627\u0645 \u0645\u0628\u0644\u063A \u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0645\u0630\u0643\u0648\u0631 \u0623\u0639\u0644\u0627\u0647</div>';
+  html += '</div>';
+  return html;
+}
+
+function srPrintReceipt(){
+  var n = _srRcpt.selected; var d = _srRcpt.data;
+  if (!n || !d){ if (typeof window.mxToast === 'function') window.mxToast('\u0627\u062E\u062A\u0631 \u0642\u0633\u0637\u0627\u064B \u0623\u0648\u0644\u0627\u064B', 'warn'); return; }
+  var inst = (d.paid_installments || []).find(function(x){ return Number(x.n) === Number(n); });
+  if (!inst) return;
+  var btn = document.getElementById('sr-rcpt-print');
+  if (btn) btn.disabled = true;
+  /* Issue + log the receipt server-side first; the returned
+     receipt_number goes into both the on-screen preview and the
+     printed copy. */
+  fetch('/api/receipts/issue', {
+    method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      student_id:         _srRcpt.sid,
+      installment_number: n,
+      amount:             inst.amount || inst.paid || 0,
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (btn) btn.disabled = false;
+    if (!res || !res.ok){
+      if (typeof window.mxToast === 'function') window.mxToast((res && res.error) || '\u0641\u0634\u0644 \u0627\u0644\u0625\u0635\u062F\u0627\u0631', 'error');
+      return;
+    }
+    var s = d.student || {}; var p = d.plan || {};
+    var html = _srRcptBuildReceiptHtml({
+      sid: s.id, sname: s.name, pid: s.personal_id, group: s.group,
+      method: p.method, course_amount: p.course_amount,
+      num: p.num_installments, paid_count: p.paid_count,
+      total_paid: p.total_paid, total_remaining: p.total_remaining,
+      inst: inst, employee: res.employee_name, issued_date: (res.issued_at || (new Date()).toISOString().slice(0,10)).slice(0,10),
+      receipt_number: res.receipt_number,
+    });
+    /* Render into the dedicated print area + trigger the browser
+       print dialog. The @media print stylesheet hides everything
+       else. */
+    var pa = document.getElementById('sr-rcpt-print-area');
+    if (pa) pa.innerHTML = html;
+    /* Also update the visible preview to reflect the real receipt
+       number now that it has been issued. */
+    var pv = document.getElementById('sr-rcpt-preview-wrap');
+    if (pv) pv.innerHTML = html;
+    setTimeout(function(){ window.print(); }, 80);
+  }).catch(function(){
+    if (btn) btn.disabled = false;
+    if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644', 'error');
+  });
+}
 </script>
 
 <style>
@@ -13432,6 +13704,147 @@ def api_students_delete(sid):
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+def _receipt_next_number(db):
+    """Generate the next REC-<YEAR>-<NNNNN> receipt number. Uses the
+    log table's row count for the current year so numbers never
+    collide. Defensive — falls back to a UNIX-timestamp-suffixed
+    number if the count query fails so we never block issuance."""
+    import datetime as _dt
+    year = _dt.datetime.now().year
+    try:
+        n = db.execute(
+            "SELECT COUNT(*) FROM receipts_log WHERE receipt_number LIKE ?",
+            ("REC-" + str(year) + "-%",),
+        ).fetchone()[0]
+        seq = (int(n) if n is not None else 0) + 1
+        return "REC-" + str(year) + "-" + str(seq).zfill(5)
+    except Exception:
+        return "REC-" + str(year) + "-" + _dt.datetime.now().strftime("%H%M%S")
+
+
+@app.route('/api/receipts/student/<int:sid>', methods=['GET'])
+@login_required
+def api_receipts_student(sid):
+    """Return the student summary + list of PAID installments for the
+    receipt-print modal. Uses the existing _payment_compute_plan
+    helper so the totals + per-installment data match the rest of
+    the app."""
+    db = get_db()
+    plan_payload = _payment_compute_plan(db, sid)
+    if not plan_payload:
+        return jsonify({"ok": False, "error": "student not found"}), 404
+    student = plan_payload.get("student") or {}
+    plan    = plan_payload.get("plan")    or {}
+    insts   = plan.get("installments")    or []
+    paid_count = 0
+    paid_list  = []
+    for inst in insts:
+        try:
+            paid    = float(inst.get("paid")    or 0)
+            remain  = float(inst.get("remaining") or 0)
+            amount  = float(inst.get("amount")   or 0)
+        except Exception:
+            paid = remain = amount = 0
+        is_paid = (paid > 0.005 and remain <= 0.005) or ((inst.get("status") or "").lower() in ("paid", "paid_token"))
+        if is_paid:
+            paid_count += 1
+            paid_list.append({
+                "n":         inst.get("n"),
+                "amount":    amount or paid,
+                "paid":      paid,
+                "due_date":  inst.get("due_date") or "",
+                "status":    inst.get("status") or "paid",
+            })
+    return jsonify({
+        "ok": True,
+        "student": {
+            "id":          student.get("id") or sid,
+            "name":        student.get("name") or "",
+            "personal_id": student.get("personal_id") or "",
+            "group":       student.get("group") or "",
+        },
+        "plan": {
+            "method":           plan.get("method") or "",
+            "course_amount":    plan.get("course_amount") or 0,
+            "num_installments": plan.get("num_installments") or len(insts),
+            "total_paid":       plan.get("total_paid") or 0,
+            "total_remaining":  plan.get("total_remaining") or 0,
+            "paid_count":       paid_count,
+        },
+        "paid_installments": paid_list,
+    })
+
+
+@app.route('/api/receipts/issue', methods=['POST'])
+@login_required
+def api_receipts_issue():
+    """Log a new receipt and return the assigned number + row.
+    Body: {student_id, installment_number, amount}.
+    The employee name is auto-filled from the session."""
+    d = request.get_json() or {}
+    try:
+        sid = int(d.get("student_id") or 0)
+        n   = int(d.get("installment_number") or 0)
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid payload"}), 400
+    try:
+        amount = float(d.get("amount") or 0)
+    except Exception:
+        amount = 0.0
+    if not sid or not n:
+        return jsonify({"ok": False, "error": "student_id and installment_number required"}), 400
+    db = get_db()
+    try:
+        srow = db.execute("SELECT student_name, personal_id FROM students WHERE id=?", (sid,)).fetchone()
+    except Exception:
+        srow = None
+    sd = dict(srow) if srow else {}
+    user = session.get("user") or {}
+    emp_name = (user.get("name") or user.get("username") or "").strip() or "—"
+    rnum = _receipt_next_number(db)
+    try:
+        db.execute(
+            "INSERT INTO receipts_log(receipt_number, student_id, student_name, "
+            "personal_id, installment_number, amount, employee_name) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (rnum, sid, sd.get("student_name") or "", sd.get("personal_id") or "",
+             n, amount, emp_name),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+    return jsonify({
+        "ok": True,
+        "receipt_number":     rnum,
+        "student_id":         sid,
+        "student_name":       sd.get("student_name") or "",
+        "personal_id":        sd.get("personal_id") or "",
+        "installment_number": n,
+        "amount":             amount,
+        "employee_name":      emp_name,
+    })
+
+
+@app.route('/api/receipts', methods=['GET'])
+@login_required
+def api_receipts_list():
+    """Admin-only browse of every issued receipt — used by the
+    قاعدة البيانات سجل الرصائد view."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "error": "admin only"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, receipt_number, student_id, student_name, personal_id, "
+            "installment_number, amount, employee_name, issued_at "
+            "FROM receipts_log ORDER BY id DESC LIMIT 500"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
+
 
 @app.route("/api/students/<int:sid>/details", methods=["GET"])
 @login_required
