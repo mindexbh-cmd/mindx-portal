@@ -1507,6 +1507,24 @@ if True:
             pass
         db2.commit()
 
+    # Receipts log v3 — add verification_code column. Each receipt
+    # gets a unique CV-XXXXXX code that's encoded in its QR. The
+    # /verify-receipt page accepts (receipt_number, code) and only
+    # confirms MATCH if both line up against this row.
+    if "receipts_log_v3" not in applied:
+        try:
+            _rc_cols = {r[1] for r in db2.execute("PRAGMA table_info(receipts_log)").fetchall()}
+        except Exception:
+            _rc_cols = set()
+        if "verification_code" not in _rc_cols:
+            try: db2.execute("ALTER TABLE receipts_log ADD COLUMN verification_code TEXT DEFAULT ''")
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("receipts_log_v3",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -4890,6 +4908,8 @@ function srSave(){ _srTrySave(); }  /* backward-compat shim */
 var _srRcpt = { sid: 0, data: null, selected: null,
                 receipt_number: null, employee: null,
                 default_course: '', course_name: '',
+                verification_code: '', verify_url: '',
+                qr_data_uri: '',
                 printed: false };
 
 function srOpenReceiptModal(sid){
@@ -4903,6 +4923,7 @@ function srOpenReceiptModal(sid){
   _srRcpt.sid = sid; _srRcpt.selected = null; _srRcpt.data = null;
   _srRcpt.receipt_number = null; _srRcpt.employee = null;
   _srRcpt.default_course = ''; _srRcpt.course_name = '';
+  _srRcpt.verification_code = ''; _srRcpt.verify_url = ''; _srRcpt.qr_data_uri = '';
   _srRcpt.printed = false;
   _srRcptEnsureModal();
   var m = document.getElementById('sr-rcpt-modal');
@@ -4929,10 +4950,13 @@ function srOpenReceiptModal(sid){
       return;
     }
     _srRcpt.data = sd;
-    _srRcpt.receipt_number = rs.receipt_number;
-    _srRcpt.employee       = rs.employee_name || '\u2014';
-    _srRcpt.default_course = rs.default_course || '';
-    _srRcpt.course_name    = rs.default_course || '';
+    _srRcpt.receipt_number    = rs.receipt_number;
+    _srRcpt.employee          = rs.employee_name || '\u2014';
+    _srRcpt.default_course    = rs.default_course || '';
+    _srRcpt.course_name       = rs.default_course || '';
+    _srRcpt.verification_code = rs.verification_code || '';
+    _srRcpt.verify_url        = rs.verify_url || '';
+    _srRcpt.qr_data_uri       = rs.qr_data_uri || '';
     _srRcptRender();
   }).catch(function(){
     document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644</div>';
@@ -4992,6 +5016,13 @@ function _srRcptEnsureModal(){
       '  body * { visibility: hidden !important; }',
       '  #sr-rcpt-print-area, #sr-rcpt-print-area * { visibility: visible !important; }',
       '  #sr-rcpt-print-area { position: absolute; inset: 0; left: 0; top: 0; width: 100%; padding: 16mm; background: #fff; color: #000; }',
+      /* Force the QR PNG and the verify-block borders to render at
+         full fidelity in print. Some browsers drop colored borders
+         and inline images by default. */
+      '  #sr-rcpt-print-area .sr-rcpt-qr,',
+      '  #sr-rcpt-print-area .sr-rcpt-verify,',
+      '  #sr-rcpt-print-area img { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }',
+      '  #sr-rcpt-print-area .sr-rcpt-qr { width: 100px !important; height: 100px !important; image-rendering: pixelated; }',
       '  @page { size: A5 portrait; margin: 10mm; }',
       '}'
     ].join('\\n');
@@ -5092,8 +5123,11 @@ function srSelectReceiptInst(n){
     num: p.num_installments, paid_count: p.paid_count,
     total_paid: p.total_paid, total_remaining: p.total_remaining,
     inst: inst, employee: emp, issued_date: todayISO,
-    receipt_number: _srRcpt.receipt_number || '—',
-    course_name:    _srRcpt.course_name || ''
+    receipt_number:     _srRcpt.receipt_number || '—',
+    course_name:        _srRcpt.course_name || '',
+    verification_code:  _srRcpt.verification_code || '',
+    verify_url:         _srRcpt.verify_url || '',
+    qr_data_uri:        _srRcpt.qr_data_uri || ''
   });
   document.getElementById('sr-rcpt-preview-wrap').innerHTML = receiptHtml;
 }
@@ -5124,10 +5158,20 @@ function _srRcptBuildReceiptHtml(ctx){
   html += '<div style="font-size:18px;font-weight:800;margin-top:4px;">' + fmt(inst.amount || inst.paid) + ' \u062F.\u0628</div>';
   html += '<div style="font-size:11.5px;margin-top:4px;color:#5d4037;">\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: <span style="direction:ltr;">' + (inst.due_date || '—') + '</span></div>';
   html += '</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12.5px;margin-bottom:14px;">';
-  html += '<div style="padding:5px 8px;background:#e8f5e9;border-radius:6px;"><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062F\u0641\u0648\u0639:</b> ' + fmt(ctx.total_paid) + ' \u062F.\u0628</div>';
-  html += '<div style="padding:5px 8px;background:#ffebee;border-radius:6px;"><b>\u0627\u0644\u0645\u062A\u0628\u0642\u064A:</b> ' + fmt(ctx.total_remaining) + ' \u062F.\u0628</div>';
-  html += '</div>';
+  /* Totals removed from receipt per spec; verify block injected below. */
+  /* Verification block (QR + verify code) bottom-left of the
+     receipt. Black-on-white PNG keeps the QR scannable in print. */
+  if (ctx.qr_data_uri || ctx.verification_code){
+    html += '<div class="sr-rcpt-verify" style="display:flex;align-items:center;gap:12px;margin:10px 0 8px 0;padding:8px 10px;border:1.4px dashed #999;border-radius:8px;background:#fff;">';
+    if (ctx.qr_data_uri){
+      html += '<img class="sr-rcpt-qr" alt="QR" src="' + ctx.qr_data_uri + '" style="width:100px;height:100px;flex-shrink:0;background:#fff;">';
+    }
+    html += '<div style="flex:1;font-size:11.5px;line-height:1.55;color:#333;">';
+    html += '<div style="font-weight:800;font-size:12.5px;color:#1565C0;margin-bottom:3px;">\u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642</div>';
+    html += '<div style="font-family:Consolas,monospace;font-size:14px;font-weight:800;direction:ltr;text-align:left;letter-spacing:1.2px;color:#000;">' + (ctx.verification_code || '') + '</div>';
+    html += '<div style="margin-top:4px;color:#777;font-size:10.5px;">\u0627\u0645\u0633\u062D \u0627\u0644\u0631\u0645\u0632 \u0644\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0635\u062D\u0629 \u0627\u0644\u0631\u0635\u064A\u062F</div>';
+    html += '</div></div>';
+  }
   /* Stamp + signature boxes */
   html += '<div style="display:flex;gap:12px;margin-top:18px;">';
   html += '  <div style="flex:1;border:1.5px solid #000;border-radius:6px;height:90px;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;">';
@@ -5184,8 +5228,11 @@ function srPrintReceipt(){
       inst: inst,
       employee:        row.employee_name || _srRcpt.employee || '—',
       issued_date:     ((row.issued_at) || (new Date()).toISOString().slice(0,10)).slice(0,10),
-      receipt_number:  row.receipt_number || _srRcpt.receipt_number,
-      course_name:     row.course_name || _srRcpt.course_name || ''
+      receipt_number:     row.receipt_number || _srRcpt.receipt_number,
+      course_name:        row.course_name || _srRcpt.course_name || '',
+      verification_code:  row.verification_code || _srRcpt.verification_code || '',
+      verify_url:         row.verify_url || _srRcpt.verify_url || '',
+      qr_data_uri:        row.qr_data_uri || _srRcpt.qr_data_uri || ''
     });
     var pa = document.getElementById('sr-rcpt-print-area');
     if (pa) pa.innerHTML = html;
@@ -13974,7 +14021,57 @@ def _receipt_default_course(db, sid):
     return (sd.get("class_name") or "").strip()
 
 
-def _receipt_reserve_atomic(db, sid, sname, pid, employee_name, course_name):
+def _receipt_make_verification_code():
+    """Generate a 6-character hex code prefixed with CV-, e.g.
+    CV-A1B2C3. Cryptographically random so it can't be guessed by
+    incrementing."""
+    import secrets
+    return "CV-" + secrets.token_hex(3).upper()
+
+
+def _receipt_verify_url(receipt_number, code, host_url=None):
+    """Build the URL the QR encodes. Uses request.host_url when
+    available so the QR's domain matches whatever the user just
+    accessed (Render deploy, custom domain, local dev)."""
+    try:
+        from flask import request as _req
+        host = host_url or (_req.host_url if _req else "")
+    except Exception:
+        host = host_url or ""
+    host = (host or "").rstrip("/")
+    from urllib.parse import quote
+    return host + "/verify-receipt/" + quote(str(receipt_number), safe="") + "?code=" + quote(str(code or ""), safe="")
+
+
+def _receipt_qr_data_uri(payload):
+    """Encode a string as a black-on-white PNG QR returned as a
+    base64 data URI suitable for direct inclusion in an <img src>.
+    Falls back to an empty string if the qrcode library is missing
+    so a deploy without the lib still renders the rest of the
+    receipt."""
+    try:
+        import qrcode, io as _io, base64 as _b64
+    except Exception:
+        return ""
+    try:
+        # box_size=4 + border=2 -> ~ 132x132 px PNG: scannable at
+        # ~100 px on screen and at print resolution.
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=4, border=2,
+        )
+        qr.add_data(payload or "")
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        return "data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:
+        return ""
+
+
+def _receipt_reserve_atomic(db, sid, sname, pid, employee_name, course_name, verification_code):
     """Atomically reserve the next REC-<YEAR>-<NNNNN>. Inserts a row
     with status='reserved' so concurrent reservers can't collide on
     the UNIQUE(receipt_number) constraint. Retries up to 20 times."""
@@ -13995,10 +14092,11 @@ def _receipt_reserve_atomic(db, sid, sname, pid, employee_name, course_name):
             db.execute(
                 "INSERT INTO receipts_log(receipt_number, student_id, student_name, "
                 "personal_id, installment_number, amount, employee_name, "
-                "course_name, status) "
-                "VALUES(?,?,?,?,?,?,?,?,?)",
+                "course_name, status, verification_code) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (candidate, sid, sname or "", pid or "", 0, 0.0,
-                 employee_name or "", course_name or "", "reserved"),
+                 employee_name or "", course_name or "", "reserved",
+                 verification_code or ""),
             )
             db.commit()
             return candidate
@@ -14034,6 +14132,7 @@ def api_receipts_reserve():
     user = session.get("user") or {}
     emp = (user.get("name") or user.get("username") or "").strip() or "—"
     course = _receipt_default_course(db, sid)
+    code  = _receipt_make_verification_code()
     try:
         rnum = _receipt_reserve_atomic(
             db, sid,
@@ -14041,18 +14140,24 @@ def api_receipts_reserve():
             sd.get("personal_id")  or "",
             emp,
             course,
+            code,
         )
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
+    verify_url = _receipt_verify_url(rnum, code)
+    qr         = _receipt_qr_data_uri(verify_url)
     return jsonify({
-        "ok":              True,
-        "receipt_number":  rnum,
-        "student_id":      sid,
-        "student_name":    sd.get("student_name") or "",
-        "personal_id":     sd.get("personal_id") or "",
-        "employee_name":   emp,
-        "default_course":  course,
-        "status":          "reserved",
+        "ok":                 True,
+        "receipt_number":     rnum,
+        "student_id":         sid,
+        "student_name":       sd.get("student_name") or "",
+        "personal_id":        sd.get("personal_id") or "",
+        "employee_name":      emp,
+        "default_course":     course,
+        "status":             "reserved",
+        "verification_code":  code,
+        "verify_url":         verify_url,
+        "qr_data_uri":        qr,
     })
 
 
@@ -14086,10 +14191,16 @@ def api_receipts_finalize(receipt_number):
             return jsonify({"ok": False, "error": "receipt not found"}), 404
         row = db.execute(
             "SELECT receipt_number, student_id, student_name, personal_id, "
-            "installment_number, amount, employee_name, course_name, status, issued_at "
+            "installment_number, amount, employee_name, course_name, status, issued_at, "
+            "verification_code "
             "FROM receipts_log WHERE receipt_number=?", (receipt_number,)
         ).fetchone()
-        return jsonify({"ok": True, "row": dict(row) if row else {}})
+        rd = dict(row) if row else {}
+        rcode = rd.get("verification_code") or ""
+        verify_url = _receipt_verify_url(rd.get("receipt_number") or receipt_number, rcode)
+        rd["verify_url"]   = verify_url
+        rd["qr_data_uri"]  = _receipt_qr_data_uri(verify_url)
+        return jsonify({"ok": True, "row": rd})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
@@ -14111,6 +14222,93 @@ def api_receipts_cancel(receipt_number):
         return jsonify({"ok": True, "updated": cur.rowcount})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+VERIFY_RECEIPT_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>\u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0635\u064A\u062F</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;padding:24px;direction:rtl;}
+.card{max-width:520px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.08);padding:22px 24px;}
+.banner{padding:16px;border-radius:10px;font-size:18px;font-weight:800;text-align:center;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px;}
+.match{background:#e8f5e9;color:#1B5E20;border:2px solid #2E7D32;}
+.nomatch{background:#ffebee;color:#b71c1c;border:2px solid #c62828;}
+.cancelled{background:#fff8e1;color:#e65100;border:2px solid #fb8c00;}
+.reserved{background:#e3f2fd;color:#0d47a1;border:2px solid #1976D2;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+td{padding:7px 8px;border-bottom:1px solid #eee;}
+td:first-child{background:#fafafa;font-weight:700;width:40%;}
+.note{margin-top:14px;font-size:12.5px;color:#777;text-align:center;}
+.loginlink{margin-top:14px;text-align:center;}
+.loginlink a{display:inline-block;padding:10px 22px;background:#6B3FA0;color:#fff;border-radius:9px;text-decoration:none;font-weight:800;}
+</style></head><body><div class="card">{{BODY}}</div></body></html>"""
+
+
+def _verify_receipt_render(banner_kind, banner_text, rows):
+    parts = ["<div class=\"banner " + banner_kind + "\">" + banner_text + "</div>"]
+    if rows:
+        parts.append("<table>")
+        for label, val in rows:
+            parts.append("<tr><td>" + label + "</td><td>" + (val or "\u2014") + "</td></tr>")
+        parts.append("</table>")
+    body = "".join(parts)
+    return VERIFY_RECEIPT_HTML.replace("{{BODY}}", body)
+
+
+@app.route('/verify-receipt/<path:receipt_number>')
+def verify_receipt_page(receipt_number):
+    """Public verification landing page reached by scanning the
+    receipt's QR. Returns MATCH only when the row exists, the
+    code matches, and the status is 'issued'. The page does NOT
+    show internal totals - only the fields printed on the
+    receipt + status."""
+    code = (request.args.get("code") or "").strip()
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT receipt_number, student_name, personal_id, course_name, "
+            "installment_number, amount, employee_name, status, issued_at, "
+            "verification_code FROM receipts_log WHERE receipt_number=?",
+            (receipt_number,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        html = _verify_receipt_render("nomatch",
+            "\u274C \u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0635\u064A\u062F \u0628\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645",
+            [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
+        return Response(html, mimetype="text/html; charset=utf-8")
+    rd = dict(row)
+    stored = (rd.get("verification_code") or "").strip()
+    if not code or code != stored:
+        html = _verify_receipt_render("nomatch",
+            "\u274C \u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D",
+            [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
+        return Response(html, mimetype="text/html; charset=utf-8")
+    status = (rd.get("status") or "").strip()
+    if status == "issued":
+        kind, text = "match", "\u2705 \u062A\u0645 \u0627\u0644\u062A\u062D\u0642\u0642 \u0628\u0646\u062C\u0627\u062D"
+    elif status == "reserved":
+        kind, text = "reserved", "\u26A0\uFE0F \u0631\u0635\u064A\u062F \u0645\u062D\u062C\u0648\u0632 \u0644\u0645 \u064A\u062A\u0645 \u0625\u0635\u062F\u0627\u0631\u0647 \u0628\u0639\u062F"
+    elif status == "\u0645\u0644\u063A\u0649":
+        kind, text = "cancelled", "\u26D4 \u0647\u0630\u0627 \u0627\u0644\u0631\u0635\u064A\u062F \u0645\u0644\u063A\u0649"
+    else:
+        kind, text = "nomatch", "\u274C \u062D\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629"
+    fmt_amount = ("%.3f" % float(rd.get("amount") or 0)).rstrip("0").rstrip(".")
+    rows = [
+        ("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F",  rd.get("receipt_number") or ""),
+        ("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631", (rd.get("issued_at") or "")[:19]),
+        ("\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628", rd.get("student_name") or ""),
+        ("\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A", rd.get("personal_id") or ""),
+        ("\u0627\u0633\u0645 \u0627\u0644\u062F\u0648\u0631\u0629", rd.get("course_name") or ""),
+        ("\u0631\u0642\u0645 \u0627\u0644\u0642\u0633\u0637", str(rd.get("installment_number") or 0)),
+        ("\u0627\u0644\u0645\u0628\u0644\u063A", fmt_amount + " \u062F.\u0628"),
+        ("\u0627\u0644\u0645\u0648\u0638\u0641", rd.get("employee_name") or ""),
+        ("\u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642", stored),
+    ]
+    html = _verify_receipt_render(kind, text, rows)
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 
 @app.route('/api/receipts/issue', methods=['POST'])
