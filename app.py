@@ -5835,7 +5835,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div><div style="margin-top:8px;"><button type="button" onclick="pmOpenDueReminders()" style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(230,81,0,0.25);">📅 رسائل تذكير الاستحقاق</button></div></div></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}.pm-due-row.red>td{background:#ffebee;}.pm-due-row.yellow>td{background:#fff8e1;}.pm-due-row.green>td{background:#e8f5e9;}.pm-due-pill{padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-due-pill.red{background:#ffebee;color:#c62828;}.pm-due-pill.yellow{background:#fff8e1;color:#e65100;}.pm-due-pill.green{background:#e8f5e9;color:#1b5e20;}</style>
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div><div style="margin-top:8px;"><button type="button" onclick="pmOpenDueReminders()" style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(230,81,0,0.25);">📅 رسائل تذكير الاستحقاق</button></div></div></div><div id="pm-filter-bar" style="padding:10px 16px;background:#faf6ff;border-bottom:1px solid #e0d0f8;display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;font-weight:600;color:#4a148c;"><span style="font-weight:800;">تصفية:</span><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="all" checked onchange="_pmFilterChange()"> الكل</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="today" onchange="_pmFilterChange()"> حان موعد الاستحقاق اليوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="within" onchange="_pmFilterChange()"> يستحق خلال <input type="number" id="pm-flt-days" min="1" max="60" placeholder="عدد" oninput="_pmFilterChange(true)" onfocus="document.querySelector('input[name=pm-flt][value=within]').checked=true;_pmFilterChange(true);" style="width:64px;padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:800;direction:ltr;font-family:inherit;"> يوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="overdue" onchange="_pmFilterChange()"> متأخر عن الاستحقاق</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="manual" onchange="_pmFilterChange()"> اختيار قسط <select id="pm-flt-n" onchange="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" onfocus="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" style="padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:700;font-family:inherit;background:#fff;"><option value="1">القسط 1</option><option value="2">القسط 2</option><option value="3">القسط 3</option><option value="4">القسط 4</option><option value="5">القسط 5</option><option value="6">القسط 6</option><option value="7">القسط 7</option><option value="8">القسط 8</option><option value="9">القسط 9</option><option value="10">القسط 10</option><option value="11">القسط 11</option><option value="12">القسط 12</option></select></label><span id="pm-flt-count" style="margin-right:auto;color:#666;font-weight:700;font-size:12.5px;"></span></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}.pm-due-row.red>td{background:#ffebee;}.pm-due-row.yellow>td{background:#fff8e1;}.pm-due-row.green>td{background:#e8f5e9;}.pm-due-pill{padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-due-pill.red{background:#ffebee;color:#c62828;}.pm-due-pill.yellow{background:#fff8e1;color:#e65100;}.pm-due-pill.green{background:#e8f5e9;color:#1b5e20;}</style>
 <div id="pm-due-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;overflow:auto;padding:18px;direction:rtl;">
   <div style="background:#fff;margin:0 auto;border-radius:14px;max-width:980px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
     <div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;">
@@ -5976,6 +5976,7 @@ function pmSearchClick(){
         var row = _pmStudentRows[idx];
         _pmRenderCard(row.card, row.sid, row.name, res);
       });
+      if (typeof _pmApplyFilter === 'function') _pmApplyFilter();
     });
   });
 }
@@ -5990,6 +5991,91 @@ function _pmFilterLocal(q){
    works without a hard error. Same behaviour as the new local
    filter. */
 function pmFilter(){ _pmFilterLocal(document.getElementById("pm-search").value); }
+/* ── Filter bar (تصفية حسب الاستحقاق) ────────────────────────
+   Hides student cards whose plan doesn't match the current filter.
+   Re-runs every time the radio/days/N changes, and after pmLoadGroup
+   finishes loading plans (so freshly-attached _pmPlan.installments
+   are seen). */
+function _pmFilterParseISO(s){
+  if (!s) return null;
+  s = String(s).trim();
+  if (!s) return null;
+  s = s.replace(/[ء-ي٫٬]/g,'').replace(/\//g,'-').trim();
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (m) return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+  m = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(s);
+  if (m) return new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10));
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function _pmFilterTodayDate(){
+  var d = new Date(); d.setHours(0,0,0,0); return d;
+}
+function _pmFilterMatch(plan, mode, daysN, manualN){
+  if (!plan || !plan.installments) return mode === 'all';
+  var insts = plan.installments;
+  if (mode === 'all') return true;
+  if (mode === 'manual'){
+    for (var i=0;i<insts.length;i++){
+      if (Number(insts[i].n) === Number(manualN)) return true;
+    }
+    return false;
+  }
+  var today = _pmFilterTodayDate();
+  for (var j=0;j<insts.length;j++){
+    var it = insts[j];
+    var rem = Number(it.remaining);
+    if (isNaN(rem)) rem = Math.max(0, Number(it.amount||0) - Number(it.paid||0));
+    if (rem <= 0.005) continue;
+    if ((it.status||'') === 'exempt') continue;
+    var d = _pmFilterParseISO(it.due_date);
+    if (!d) continue;
+    d.setHours(0,0,0,0);
+    var diffDays = Math.round((d - today) / 86400000);
+    if (mode === 'today'   && diffDays === 0) return true;
+    if (mode === 'overdue' && diffDays  <  0) return true;
+    if (mode === 'within'){
+      var n = Math.max(1, parseInt(daysN || 0, 10) || 0);
+      if (diffDays >= 0 && diffDays <= n) return true;
+    }
+  }
+  return false;
+}
+function _pmCurrentFilter(){
+  var el = document.querySelector('input[name="pm-flt"]:checked');
+  var mode = (el && el.value) || 'all';
+  var daysEl = document.getElementById('pm-flt-days');
+  var nEl    = document.getElementById('pm-flt-n');
+  return {
+    mode:   mode,
+    daysN:  daysEl ? (parseInt(daysEl.value, 10) || 0) : 0,
+    manualN: nEl ? (parseInt(nEl.value, 10) || 0) : 0
+  };
+}
+function _pmApplyFilter(){
+  var f = _pmCurrentFilter();
+  var cards = document.querySelectorAll('#pm-cards .pm-card');
+  var visible = 0, total = cards.length;
+  for (var i=0;i<cards.length;i++){
+    var c = cards[i];
+    var plan = c._pmPlan || null;
+    var ok;
+    if (!plan){ ok = (f.mode === 'all'); }
+    else      { ok = _pmFilterMatch(plan, f.mode, f.daysN, f.manualN); }
+    c.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  }
+  var countEl = document.getElementById('pm-flt-count');
+  if (countEl){
+    countEl.textContent = (f.mode === 'all' && total === visible)
+      ? ''
+      : ('عرض: ' + visible + ' / ' + total);
+  }
+}
+function _pmFilterChange(_keepFocus){
+  _pmApplyFilter();
+}
+
 function pmLoadGroup(){
   var g = document.getElementById("pm-group").value;
   _pmCurrentGroup = g;
@@ -6027,6 +6113,7 @@ function pmLoadGroup(){
       var row = _pmStudentRows[idx];
       _pmRenderCard(row.card, row.sid, row.name, res);
     });
+    if (typeof _pmApplyFilter === 'function') _pmApplyFilter();
   });
 }
 function _pmStatusLabel(s){
