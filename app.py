@@ -6511,7 +6511,8 @@ function _pmDueSendBatch(rows){
   var tpl = (document.getElementById('pm-due-tpl')||{}).value || _pmDueDefaultTpl;
   var nowStr = (new Date()).toISOString().substring(0, 16).replace('T', ' ');
   var ids = rows.map(function(r){ return r.student_id; }).filter(function(x){ return x; });
-  var hasVar = /\{\s*\u0633\s*:[^}]+\}/.test(tpl);
+  var hasVar = /\{\s*\u0633\s*:[^}]+\}/.test(tpl)
+            || /\{(\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629|\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062F\u0641\u0648\u0639|\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062A\u0628\u0642\u064A|\u0639\u062F\u062F_\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629|\u0627\u0644\u0642\u0633\u0637_\u0627\u0644\u0642\u0627\u062F\u0645)\}/.test(tpl);
   var resolveP;
   if (hasVar && typeof window.fetch === 'function'){
     resolveP = fetch('/api/vars/render-batch', {
@@ -13998,6 +13999,115 @@ _VAR_PLACEHOLDER_RE = _vars_re_module.compile(
 )
 
 
+# ── Computed placeholders (متغيرات محسوبة) ─────────────────────────
+# Pure read-only derivations from payment_log + taqseet. Each key maps
+# to a callable that takes the plan dict from _payment_compute_plan
+# and returns the formatted Arabic string.
+
+_VAR_COMPUTED_KEYS = (
+    "\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629",  # paid installments list
+    "\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062F\u0641\u0648\u0639",                  # total paid
+    "\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062A\u0628\u0642\u064A",                  # total remaining
+    "\u0639\u062F\u062F_\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629",  # remaining count
+    "\u0627\u0644\u0642\u0633\u0637_\u0627\u0644\u0642\u0627\u062F\u0645",                                # next due
+)
+
+# Pre-compile a regex that matches any of the five names wrapped in {}.
+_VAR_COMPUTED_RE = _vars_re_module.compile(
+    "\{(" + "|".join(_VAR_COMPUTED_KEYS) + ")\}"
+)
+
+
+def _vars_fmt_dinar(v):
+    """Bahraini-dinar formatting — three decimals, the convention
+    used elsewhere in the UI."""
+    try:
+        return ("{:.3f}".format(float(v or 0)) + " \u062F.\u0628")  # X.XXX د.ب
+    except Exception:
+        return str(v or "0") + " \u062F.\u0628"
+
+
+def _vars_compute_for_plan(plan_payload, key):
+    """Resolve one computed-placeholder key against a plan payload as
+    returned by _payment_compute_plan(...). Returns "" on any error."""
+    if not plan_payload or not isinstance(plan_payload, dict):
+        return ""
+    plan = plan_payload.get("plan") or {}
+    insts = plan.get("installments") or []
+    course_amount  = float(plan.get("course_amount")  or 0)
+    total_paid     = float(plan.get("total_paid")     or 0)
+    total_remain   = float(plan.get("total_remaining") or 0)
+    num_inst       = int(plan.get("num_installments") or len(insts))
+
+    # Decide "paid" status per installment via the plan's status flag
+    # plus a remaining<=0 fallback (handles legacy rows where status
+    # didn't make it through the upserts).
+    def _is_paid(i):
+        st = (i.get("status") or "").lower()
+        if st in ("paid", "paid_token"):
+            return True
+        try:
+            return float(i.get("remaining") or 0) <= 0.005 and float(i.get("paid") or 0) > 0.005
+        except Exception:
+            return False
+
+    if key == "\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629":
+        # ✅ القسط N: AMOUNT د.ب — DATE  (one per line)
+        lines = []
+        for i in insts:
+            if not _is_paid(i):
+                continue
+            n   = i.get("n") or ""
+            amt = _vars_fmt_dinar(i.get("paid") or i.get("amount"))
+            due = i.get("due_date") or ""
+            line = "\u2705 \u0627\u0644\u0642\u0633\u0637 " + str(n) + ": " + amt
+            if due:
+                line += " \u2014 " + str(due)
+            lines.append(line)
+        return "\n".join(lines) if lines else "\u2014 \u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u0642\u0633\u0627\u0637 \u0645\u062F\u0641\u0648\u0639\u0629 \u2014"
+
+    if key == "\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062F\u0641\u0648\u0639":
+        return _vars_fmt_dinar(total_paid)
+
+    if key == "\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062A\u0628\u0642\u064A":
+        # course_amount - total_paid  (defensive max(0, ...))
+        return _vars_fmt_dinar(max(0.0, (course_amount or 0) - total_paid))
+
+    if key == "\u0639\u062F\u062F_\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629":
+        paid_count = sum(1 for i in insts if _is_paid(i))
+        remaining_count = max(0, num_inst - paid_count)
+        return str(remaining_count) + " \u0645\u0646 \u0623\u0635\u0644 " + str(num_inst)
+
+    if key == "\u0627\u0644\u0642\u0633\u0637_\u0627\u0644\u0642\u0627\u062F\u0645":
+        for i in insts:
+            if _is_paid(i):
+                continue
+            amt = _vars_fmt_dinar(i.get("amount"))
+            due = i.get("due_date") or ""
+            if due:
+                return amt + " \u2014 \u0645\u0633\u062A\u062D\u0642 \u0628\u062A\u0627\u0631\u064A\u062E " + str(due)
+            return amt
+        return "\u2014 \u062C\u0645\u064A\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0645\u062F\u0641\u0648\u0639\u0629 \u2014"
+
+    return ""
+
+
+def _vars_apply_computed(template, sid, db):
+    """Walk every {COMPUTED_KEY} in the template; substitute via the
+    plan payload. Caches the plan once per student to avoid repeating
+    the lookup on each placeholder."""
+    if not template or not _VAR_COMPUTED_RE.search(template):
+        return template
+    try:
+        plan_payload = _payment_compute_plan(db, sid)
+    except Exception:
+        plan_payload = None
+    def repl(m):
+        return _vars_compute_for_plan(plan_payload, m.group(1))
+    return _VAR_COMPUTED_RE.sub(repl, template)
+
+
+
 def _vars_table_label_to_internal(label, db):
     """Map an Arabic table label back to its internal name.
     Falls back to identity if the user pasted the raw name."""
@@ -14123,11 +14233,15 @@ def _lookup_var_value(db, tbl, col, sid):
 
 def _resolve_template_for_student(template, sid, db):
     """Substitute every {\u0633:Arabic_table_label - Arabic_col_label}
-    placeholder in `template` with the looked-up value for the student
-    with id == sid. Unknown placeholders are left in place (visible to
-    the admin so they know which one didn't resolve)."""
+    placeholder + every computed placeholder ({الأقساط_المدفوعة}, ...)
+    in `template`. Unknown {س:...} placeholders are left in place so
+    admins notice typos."""
     if not template:
         return template
+    out = template
+    # Computed pass first — these are pure derivations and can't fail
+    # silently against a missing table.
+    out = _vars_apply_computed(out, sid, db)
     def repl(m):
         tlabel = (m.group(1) or "").strip()
         clabel = (m.group(2) or "").strip()
@@ -14137,7 +14251,7 @@ def _resolve_template_for_student(template, sid, db):
         if not col: return m.group(0)
         v = _lookup_var_value(db, tbl, col, sid)
         return "" if v is None else str(v)
-    return _VAR_PLACEHOLDER_RE.sub(repl, template)
+    return _VAR_PLACEHOLDER_RE.sub(repl, out)
 
 
 @app.route('/api/vars/tables', methods=['GET'])
@@ -14209,9 +14323,11 @@ def api_vars_render_batch():
     if not isinstance(ids, list):
         return jsonify({"ok": False, "error": "student_ids must be a list"}), 400
     rendered = {}
-    if not tpl or not _VAR_PLACEHOLDER_RE.search(tpl):
+    has_var      = bool(tpl and _VAR_PLACEHOLDER_RE.search(tpl))
+    has_computed = bool(tpl and _VAR_COMPUTED_RE.search(tpl))
+    if not (has_var or has_computed):
         for sid in ids:
-            try: rendered[int(sid)] = tpl
+            try: rendered[int(sid)] = tpl or ""
             except Exception: continue
         return jsonify({"ok": True, "rendered": rendered, "noop": True})
     db = get_db()
@@ -22319,6 +22435,10 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
         +     '<div><label>\u0627\u062E\u062A\u0631 \u0627\u0644\u062C\u062F\u0648\u0644</label><select id="mx-var-tbl"><option value="">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</option></select></div>'
         +     '<div><label>\u0627\u062E\u062A\u0631 \u0627\u0644\u0639\u0645\u0648\u062F</label><select id="mx-var-col" disabled><option value="">\u2014 \u0627\u062E\u062A\u0631 \u062C\u062F\u0648\u0644\u0627\u064B \u0623\u0648\u0644\u0627\u064B \u2014</option></select></div>'
         +     '<div><label>\u0645\u0639\u0627\u064A\u0646\u0629</label><div class="preview" id="mx-var-preview">\u2014</div></div>'
+        +     '<div style="border-top:1.5px dashed #c4a8e8;padding-top:10px;">'
+        +       '<label style="color:#1565C0;">\u0645\u062A\u063A\u064A\u0631\u0627\u062A \u0645\u062D\u0633\u0648\u0628\u0629 (\u0645\u0646 \u0633\u062C\u0644 \u0627\u0644\u062F\u0641\u0639 \u0648\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637)</label>'
+        +       '<div id="mx-var-computed" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+        +     '</div>'
         +   '</div>'
         +   '<div class="actions">'
         +     '<button class="btn cancel" id="mx-var-cancel">\u0625\u0644\u063A\u0627\u0621</button>'
@@ -22332,7 +22452,57 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       m.querySelector('#mx-var-tbl').addEventListener('change', _onTableChange);
       m.querySelector('#mx-var-col').addEventListener('change', _onColChange);
       document.body.appendChild(m);
+      _renderComputedChips(m);
       return m;
+    }
+
+    function _insertAtCursor(token){
+      var ta = _activeTextarea; if (!ta) return;
+      var start = ta.selectionStart || 0;
+      var end   = ta.selectionEnd   || 0;
+      var v = ta.value || '';
+      ta.value = v.substring(0, start) + token + v.substring(end);
+      var pos = start + token.length;
+      ta.focus();
+      try { ta.setSelectionRange(pos, pos); } catch(e){}
+      ta.dispatchEvent(new Event('input', {bubbles:true}));
+    }
+
+    function _renderComputedChips(modalRoot){
+      var box = modalRoot.querySelector('#mx-var-computed');
+      if (!box) return;
+      // [{label, token}]. Tokens are the literal placeholders the
+      // backend resolver expects; labels are the Arabic names shown
+      // on the chip buttons.
+      var items = [
+        { label: '\u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629',
+          token: '{\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629}' },
+        { label: '\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062F\u0641\u0648\u0639',
+          token: '{\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062F\u0641\u0648\u0639}' },
+        { label: '\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062A\u0628\u0642\u064A',
+          token: '{\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062A\u0628\u0642\u064A}' },
+        { label: '\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629',
+          token: '{\u0639\u062F\u062F_\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629}' },
+        { label: '\u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0642\u0627\u062F\u0645',
+          token: '{\u0627\u0644\u0642\u0633\u0637_\u0627\u0644\u0642\u0627\u062F\u0645}' }
+      ];
+      var html = '';
+      for (var i=0;i<items.length;i++){
+        html += '<button type="button" class="mx-comp-chip" data-token="'
+              + items[i].token.replace(/"/g, '&quot;') + '" style="'
+              + 'background:#e3f2fd;border:1.4px solid #64b5f6;color:#0d47a1;'
+              + 'padding:6px 12px;border-radius:8px;font-weight:700;font-size:12.5px;'
+              + 'cursor:pointer;font-family:inherit;">' + items[i].label + '</button>';
+      }
+      box.innerHTML = html;
+      var chips = box.querySelectorAll('.mx-comp-chip');
+      for (var j=0;j<chips.length;j++){
+        chips[j].addEventListener('click', function(){
+          var tok = this.getAttribute('data-token');
+          _insertAtCursor(tok);
+          _close();
+        });
+      }
     }
 
     var _activeTextarea = null;
@@ -22447,8 +22617,9 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
        /api/vars/render-batch endpoint. No-op when the template has
        no placeholder, so existing call sites pay nothing. */
     var _MX_VAR_RE = /\{\s*\u0633\s*:\s*[^}]+?\s*-\s*[^}]+?\s*\}/;
+    var _MX_COMP_RE = /\{(\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629|\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062F\u0641\u0648\u0639|\u0625\u062C\u0645\u0627\u0644\u064A_\u0627\u0644\u0645\u062A\u0628\u0642\u064A|\u0639\u062F\u062F_\u0627\u0644\u0623\u0642\u0633\u0627\u0637_\u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629|\u0627\u0644\u0642\u0633\u0637_\u0627\u0644\u0642\u0627\u062F\u0645)\}/;
     window.mxResolveTemplate = function(template, studentId){
-      if (!template || !_MX_VAR_RE.test(template)) return Promise.resolve(template || '');
+      if (!template || (!_MX_VAR_RE.test(template) && !_MX_COMP_RE.test(template))) return Promise.resolve(template || '');
       var sid = parseInt(studentId, 10);
       if (!sid) return Promise.resolve(template);
       return fetch('/api/vars/render-batch', {
