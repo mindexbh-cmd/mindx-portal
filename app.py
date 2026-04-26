@@ -17035,13 +17035,105 @@ def _normalize_days_string(s):
     return s
 
 
+_DAY_TIME_COLS = ("study_time", "ramadan_time", "online_time")
+_COL_NAME_DAY_HINTS_LOWER = ("days", "day_list", "day-list", "days_of_week",
+                              "weekdays", "day_of_week", "schedule_days")
+_COL_NAME_DAY_HINTS_AR = ("\u0623\u064A\u0627\u0645", "\u0627\u064A\u0627\u0645",
+                           "\u064A\u0648\u0645")
+_BOOL_DAY_COLS = (
+    ("day_sat", "\u0627\u0644\u0633\u0628\u062A"),
+    ("day_sun", "\u0627\u0644\u0623\u062D\u062F"),
+    ("day_mon", "\u0627\u0644\u0625\u062B\u0646\u064A\u0646"),
+    ("day_tue", "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621"),
+    ("day_wed", "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621"),
+    ("day_thu", "\u0627\u0644\u062E\u0645\u064A\u0633"),
+    ("day_fri", "\u0627\u0644\u062C\u0645\u0639\u0629"),
+)
+_EN_TO_AR_DAY = {
+    "saturday":  "\u0627\u0644\u0633\u0628\u062A",
+    "sunday":    "\u0627\u0644\u0623\u062D\u062F",
+    "monday":    "\u0627\u0644\u0625\u062B\u0646\u064A\u0646",
+    "tuesday":   "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621",
+    "wednesday": "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621",
+    "thursday":  "\u0627\u0644\u062E\u0645\u064A\u0633",
+    "friday":    "\u0627\u0644\u062C\u0645\u0639\u0629",
+}
+
+def _translate_english_days(s):
+    """Replace English weekday names (case-insensitive) with their
+    Arabic equivalents in `s`."""
+    if not s: return s
+    import re as _re
+    def _sub(m):
+        return _EN_TO_AR_DAY.get(m.group(0).lower(), m.group(0))
+    return _re.sub(r"(?i)\b(saturday|sunday|monday|tuesday|wednesday|thursday|friday)\b", _sub, s)
+
+
+def _is_truthy_flag(v):
+    if v is None: return False
+    if isinstance(v, bool): return v
+    if isinstance(v, (int, float)): return v != 0
+    s = str(v).strip().lower()
+    return s in ("1", "true", "yes", "y", "\u0646\u0639\u0645", "\u0635\u062D")
+
+
+def _extract_days_from_row(rd):
+    """Multi-strategy extractor. Returns a normalised Arabic-comma
+    days string or empty. Optional MX_DEBUG_GROUPS env flag prints
+    the strategy picked + raw value for each row to stderr."""
+    import os as _os, sys as _sys
+    debug = bool(_os.environ.get("MX_DEBUG_GROUPS"))
+    name = (rd.get("group_name") or "").strip()
+    # Strategy 1: canonical study_days.
+    v = (rd.get("study_days") or "")
+    if isinstance(v, str): v = v.strip()
+    if v:
+        if debug: print("[mx-days] " + name + ": strategy=study_days raw=" + repr(v), file=_sys.stderr)
+        return _translate_english_days(_normalize_days_string(v))
+    # Strategy 2: any column whose NAME hints at days, regardless of
+    # the value's language/format.
+    for col, val in rd.items():
+        if col in _DAY_TIME_COLS or col in ("group_name", "teacher_name", "study_days"):
+            continue
+        if val is None: continue
+        sv = str(val).strip()
+        if not sv: continue
+        col_lc = col.lower()
+        hint_en = any(h in col_lc for h in _COL_NAME_DAY_HINTS_LOWER)
+        hint_ar = any(h in col for h in _COL_NAME_DAY_HINTS_AR)
+        if hint_en or hint_ar:
+            if debug: print("[mx-days] " + name + ": strategy=col-name-hint col=" + repr(col) + " raw=" + repr(sv), file=_sys.stderr)
+            return _translate_english_days(_normalize_days_string(sv))
+    # Strategy 3: value contains an Arabic day name.
+    for col, val in rd.items():
+        if col in _DAY_TIME_COLS or col in ("group_name", "teacher_name", "study_days"):
+            continue
+        if val is None: continue
+        sv = str(val).strip()
+        if not sv: continue
+        if _value_has_arabic_day(sv):
+            if debug: print("[mx-days] " + name + ": strategy=value-arabic-day col=" + repr(col) + " raw=" + repr(sv), file=_sys.stderr)
+            return _normalize_days_string(sv)
+    # Strategy 4: boolean per-day columns.
+    found = []
+    for cname, label in _BOOL_DAY_COLS:
+        if cname in rd and _is_truthy_flag(rd.get(cname)):
+            found.append(label)
+    if found:
+        joined = "\u060C ".join(found)
+        if debug: print("[mx-days] " + name + ": strategy=bool-cols joined=" + repr(joined), file=_sys.stderr)
+        return joined
+    if debug: print("[mx-days] " + name + ": strategy=none (empty)", file=_sys.stderr)
+    return ""
+
+
 def _teacher_groups_detailed_for(db, user):
     """Same teacher → groups mapping as `_teacher_groups_for`, but
     each entry carries every schedule column the teacher dropdown
-    might surface AND a "days_resolved" field that searches the
-    whole row for a column whose value carries Arabic day names —
-    catches the case where production admins added a custom days
-    column via the table-edit modal."""
+    might surface AND a normalised study_days string resolved via
+    _extract_days_from_row (which tries 4 strategies in priority
+    order — see helper above). Set MX_DEBUG_GROUPS=1 in the env
+    to print each row's extracted strategy to stderr."""
     keys = _teacher_match_keys(user)
     if not keys:
         return []
@@ -17051,7 +17143,6 @@ def _teacher_groups_detailed_for(db, user):
         live_cols = []
     if not live_cols:
         return []
-    # SELECT * — we need every column to find a custom days field.
     try:
         rows = db.execute(
             'SELECT * FROM student_groups '
@@ -17059,10 +17150,6 @@ def _teacher_groups_detailed_for(db, user):
         ).fetchall()
     except Exception:
         return []
-    # Time columns we know about — exclude these when scanning for
-    # day names so we don't pick up combined "السبت 4-5" inside a
-    # time column AS the days column.
-    TIME_COLS = ("study_time", "ramadan_time", "online_time")
     out, seen = [], set()
     for r in rows:
         rd = dict(r) if hasattr(r, "keys") else {live_cols[i]: r[i] for i in range(len(live_cols)) if i < len(r)}
@@ -17071,22 +17158,9 @@ def _teacher_groups_detailed_for(db, user):
         if not gn or not tn or tn not in keys: continue
         if gn in seen: continue
         seen.add(gn)
-        # Canonical days first.
-        days_value = (rd.get("study_days") or "").strip()
-        # If empty, scan every other column for Arabic day names —
-        # picks up custom "أيام" / "day_list" / etc. columns.
-        if not days_value:
-            for col, val in rd.items():
-                if col in ("group_name", "teacher_name", "study_days") or col in TIME_COLS:
-                    continue
-                v = (val if isinstance(val, str) else (str(val) if val is not None else "")).strip()
-                if not v: continue
-                if _value_has_arabic_day(v):
-                    days_value = v
-                    break
         out.append({
             "name":          gn,
-            "study_days":    _normalize_days_string(days_value),
+            "study_days":    _extract_days_from_row(rd),
             "study_time":   (rd.get("study_time")   or "").strip(),
             "ramadan_time": (rd.get("ramadan_time") or "").strip(),
             "online_time":  (rd.get("online_time")  or "").strip(),
@@ -17215,6 +17289,41 @@ def teacher_attendance_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip()
     return TEACHER_ATTENDANCE_HTML.replace("USER_PLACEHOLDER", who)
+
+
+@app.route('/api/teacher/groups-diag', methods=['GET'])
+@login_required
+def api_teacher_groups_diag():
+    """Admin-only diagnostic dump for debugging the teacher dropdown.
+    Returns the live student_groups schema, the first 20 raw rows,
+    and the extracted days for each row so a "missing days" report
+    can be diagnosed straight from prod without code changes."""
+    user = session.get('user') or {}
+    if (user.get('role') or '').strip().lower() != 'admin':
+        return jsonify({'ok': False, 'error': 'admin only'}), 403
+    db = get_db()
+    try:
+        schema = [dict(r) for r in db.execute('PRAGMA table_info(student_groups)').fetchall()]
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 500
+    try:
+        rows = db.execute('SELECT * FROM student_groups LIMIT 20').fetchall()
+    except Exception as ex:
+        return jsonify({'ok': False, 'error': str(ex)}), 500
+    out = []
+    for r in rows:
+        rd = dict(r)
+        non_empty = {k: (v if v is None else (v if isinstance(v, (int, float, bool)) else str(v)))
+                     for k, v in rd.items() if v is not None and (str(v).strip() if not isinstance(v, (int, float, bool)) else True)}
+        out.append({
+            'group_name':     rd.get('group_name'),
+            'raw_columns':    non_empty,
+            'extracted_days': _extract_days_from_row(rd),
+            'study_time':     rd.get('study_time'),
+            'ramadan_time':   rd.get('ramadan_time'),
+            'online_time':    rd.get('online_time'),
+        })
+    return jsonify({'ok': True, 'schema': schema, 'rows': out, 'count': len(out)})
 
 
 @app.route('/api/teacher/groups', methods=['GET'])
