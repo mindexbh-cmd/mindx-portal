@@ -3850,6 +3850,40 @@ function _ssRow(r){
     +   '<td style="padding:8px 10px;border-bottom:1px solid #f0e6d8;text-align:center;font-weight:800;color:' + color + ';">' + rate.toFixed(1) + '%</td>'
     + '</tr>';
 }
+/* Build the per-group info cards shown above the students table.
+   Reads teacher / level / time / days from the API response (fresh
+   from student_groups every load). On mobile the four fields wrap
+   to a single column instead of a 2x2 grid. */
+function _ssEsc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function _ssDash(v){
+  var s = (v == null ? '' : String(v)).trim();
+  return s ? _ssEsc(s) : '<span style="color:#999;font-weight:600;">غير محدد</span>';
+}
+function _ssBuildGroupInfoCards(infos){
+  if (!infos || !infos.length) return '';
+  var html = '';
+  for (var i = 0; i < infos.length; i++){
+    var g = infos[i] || {};
+    html += ''
+      + '<div class="ss-group-info" style="background:#fff;border:1.4px solid #c4a8e8;border-radius:12px;padding:12px 16px;margin-bottom:10px;box-shadow:0 2px 6px rgba(107,63,160,.06);">'
+      +   '<div style="font-weight:800;color:#4a148c;font-size:1.05rem;margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      +     '<span style="background:#6B3FA0;color:#fff;border-radius:6px;padding:2px 9px;font-size:0.8rem;">المجموعة</span>'
+      +     '<span>' + _ssEsc(g.group_name || '') + '</span>'
+      +   '</div>'
+      +   '<div class="ss-group-info-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 14px;font-size:0.92rem;color:#333;">'
+      +     '<div><span style="color:#777;font-size:0.78rem;">المعلمة</span><div style="font-weight:700;color:#1565C0;">' + _ssDash(g.teacher_name) + '</div></div>'
+      +     '<div><span style="color:#777;font-size:0.78rem;">المستوى</span><div style="font-weight:700;color:#2E7D32;">' + _ssDash(g.level_course) + '</div></div>'
+      +     '<div><span style="color:#777;font-size:0.78rem;">الأيام</span><div style="font-weight:700;color:#6A1B9A;">' + _ssDash(g.study_days) + '</div></div>'
+      +     '<div><span style="color:#777;font-size:0.78rem;">الوقت</span><div style="font-weight:700;color:#E65100;direction:ltr;text-align:right;">' + _ssDash(g.study_time) + '</div></div>'
+      +   '</div>'
+      + '</div>';
+  }
+  return html;
+}
 function _ssRenderStudents(list, headerHtml){
   var body = document.getElementById('ss-body');
   var html = headerHtml || '';
@@ -4043,6 +4077,9 @@ function _ssLoadSelection(){
       +     '<div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;"><div style="color:#777;font-size:0.78rem;">متوسط نسبة الحضور</div><div style="font-weight:800;color:' + _ssRateColor(d.avg_attendance_rate || 0) + ';">' + ((d.avg_attendance_rate || 0).toFixed ? (d.avg_attendance_rate||0).toFixed(1) : (d.avg_attendance_rate||0)) + '%</div></div>'
       +   '</div>'
       + '</div>';
+    /* Per-group info cards (teacher / level / days / time) — one
+       card per selected group, before the students table. */
+    header += _ssBuildGroupInfoCards(d.group_info || []);
     _ssRenderStudents(d.students, header);
   }).catch(function(){
     body.innerHTML = '<div style="padding:30px;text-align:center;color:#c62828;">خطأ في التحميل</div>';
@@ -20123,8 +20160,44 @@ def api_attendance_summary():
             })
         total_minutes = sum(dur_map.get((g, d), 0) for (d, g) in sessions)
         avg_rate = round(sum(rates) / len(rates), 1) if rates else 0.0
+        # Pull group meta (teacher / level / time / days) so the modal
+        # can show an info block per selected group. Read fresh from
+        # student_groups every call — no caching, so edits in قاعدة
+        # البيانات surface on next load.
+        group_info = []
+        try:
+            gph = ",".join(["?"] * len(gnames))
+            gi_rows = db.execute(
+                "SELECT group_name, teacher_name, level_course, study_time, study_days "
+                "FROM student_groups WHERE TRIM(group_name) IN (" + gph + ")",
+                tuple(gnames),
+            ).fetchall()
+            by_name = {}
+            for r in gi_rows:
+                rd = dict(r) if hasattr(r, "keys") else {
+                    "group_name":   r[0], "teacher_name": r[1],
+                    "level_course": r[2], "study_time":   r[3],
+                    "study_days":   r[4],
+                }
+                by_name[(rd.get("group_name") or "").strip()] = rd
+            for g in gnames:
+                rd = by_name.get(g.strip(), {})
+                group_info.append({
+                    "group_name":   g,
+                    "teacher_name": (rd.get("teacher_name") or "").strip(),
+                    "level_course": (rd.get("level_course") or "").strip(),
+                    "study_time":   (rd.get("study_time")   or "").strip(),
+                    "study_days":   (rd.get("study_days")   or "").strip(),
+                })
+        except Exception:
+            # Don't break the modal if student_groups is missing or
+            # unexpected — the rest of the response still works.
+            group_info = [{"group_name": g, "teacher_name": "",
+                           "level_course": "", "study_time": "",
+                           "study_days": ""} for g in gnames]
         return jsonify({
             "groups": gnames,
+            "group_info": group_info,
             "total_sessions": len(sessions),
             "total_minutes": total_minutes,
             "students_count": len(per_student),
