@@ -21733,6 +21733,292 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   window.mxAppendCustomFields      = mxAppendCustomFields;
   window.mxCollectCustomFieldValues = mxCollectCustomFieldValues;
 
+  /* ── Global frozen-by-default tables ─────────────────────────────
+     Spec: every data table is read-only until the teacher/admin
+     clicks "تعديل بيانات الجدول" above it. Save commits all changes;
+     Cancel discards. Future tables get this for free.
+
+     CSS layer freezes any cell-level interactive control. Built-in
+     tables that use plain <td> text for cells are already compliant
+     by virtue of having nothing interactive there; their per-row
+     pencil-button modal stays the canonical edit flow. */
+  (function(){
+    if (window._MX_FREEZE_INSTALLED) return;
+    window._MX_FREEZE_INSTALLED = true;
+
+    var styleId = 'mx-freeze-style';
+    if (!document.getElementById(styleId)) {
+      var style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = [
+        /* Default: every editable cell or cell-level control is locked. */
+        'table tbody td.editable{pointer-events:none !important;cursor:default !important;background:#fafbfd;}',
+        'table tbody input.cell-input,table tbody select.cell-input,table tbody textarea.cell-input{pointer-events:none !important;background:#fafbfd !important;border-color:transparent !important;box-shadow:none !important;}',
+        /* Edit mode flips them on. */
+        'table.mx-edit-mode tbody td.editable{pointer-events:auto !important;cursor:text !important;background:#fff8e1;outline:1px dashed #ffd54f;outline-offset:-1px;}',
+        'table.mx-edit-mode tbody td.editable.mx-dirty{background:#fff3e0 !important;outline-color:#fb8c00;}',
+        'table.mx-edit-mode tbody input.cell-input,table.mx-edit-mode tbody select.cell-input,table.mx-edit-mode tbody textarea.cell-input{pointer-events:auto !important;background:#fff !important;border-color:#d8c5f6 !important;}',
+        /* Edit-bar styling. Keeps the same look-and-feel as the
+           existing toolbar buttons. */
+        '.mx-edit-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px 0;}',
+        '.mx-edit-bar .mx-edit-btn{background:linear-gradient(135deg,#FF6B35,#E55A2B);color:#fff;border:none;padding:8px 16px;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;}',
+        '.mx-edit-bar .mx-edit-btn.save{background:linear-gradient(135deg,#2E7D32,#43A047);}',
+        '.mx-edit-bar .mx-edit-btn.cancel{background:#fff;color:#c62828;border:1.5px solid #c62828;}',
+        '.mx-edit-bar .mx-edit-btn:hover{filter:brightness(1.07);}',
+        '.mx-edit-bar .mx-edit-status{font-size:12.5px;color:#e65100;font-weight:700;}'
+      ].join('\n');
+      document.head.appendChild(style);
+    }
+
+    /* ── State ──────────────────────────────────────────────────── */
+    /* WeakMap of <table> → { snapshot:{cellKey: text}, pending:{cellKey: {tid,rid,ckey,newVal}} } */
+    var _state = new WeakMap();
+
+    function _tableKey(td){
+      return td.getAttribute('data-tid') + ':' + td.getAttribute('data-rid') + ':' + td.getAttribute('data-ckey');
+    }
+    function _tableOf(node){
+      while (node && node.tagName !== 'TABLE') node = node.parentNode;
+      return node;
+    }
+
+    /* Buffered editable-cell editor. Wraps the existing
+       window.editCustomCell behaviour but defers the PUT until Save. */
+    function _bufferedEditCustomCell(tdEl){
+      var table = _tableOf(tdEl);
+      if (!table || !table.classList.contains('mx-edit-mode')) return;
+      if (tdEl.querySelector('input')) return;
+      var oldVal = tdEl.textContent.trim();
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = oldVal;
+      input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;font-family:inherit;';
+      tdEl.innerHTML = '';
+      tdEl.appendChild(input);
+      input.focus();
+      var done = false;
+      function commit(){
+        if (done) return; done = true;
+        var newVal = input.value;
+        tdEl.textContent = newVal;
+        var st = _state.get(table); if (!st) return;
+        var k = _tableKey(tdEl);
+        var orig = st.snapshot[k];
+        if (newVal === orig){
+          delete st.pending[k];
+          tdEl.classList.remove('mx-dirty');
+        } else {
+          st.pending[k] = {
+            tid: parseInt(tdEl.getAttribute('data-tid'), 10),
+            rid: parseInt(tdEl.getAttribute('data-rid'), 10),
+            ckey: tdEl.getAttribute('data-ckey'),
+            newVal: newVal
+          };
+          tdEl.classList.add('mx-dirty');
+        }
+        _refreshStatus(table);
+      }
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') input.blur();
+        else if (e.key === 'Escape'){ input.value = oldVal; input.blur(); }
+      });
+    }
+
+    /* Monkey-patch the existing global so cells respect edit mode
+       even when triggered via the legacy onclick handler. */
+    function _installEditCellOverride(){
+      if (window._mxOriginalEditCustomCell) return;
+      if (typeof window.editCustomCell !== 'function') return;
+      window._mxOriginalEditCustomCell = window.editCustomCell;
+      window.editCustomCell = _bufferedEditCustomCell;
+    }
+
+    /* ── Edit-bar lifecycle per <table> ────────────────────────── */
+    function _findOrCreateBar(table){
+      var existing = table.previousElementSibling;
+      if (existing && existing.classList && existing.classList.contains('mx-edit-bar')) return existing;
+      var bar = document.createElement('div');
+      bar.className = 'mx-edit-bar';
+      bar.innerHTML =
+        '<button type="button" class="mx-edit-btn toggle">✏️ تعديل بيانات الجدول</button>'
+      + '<button type="button" class="mx-edit-btn save"  style="display:none;">&#x1F4BE; حفظ التغييرات</button>'
+      + '<button type="button" class="mx-edit-btn cancel" style="display:none;">❌ إلغاء</button>'
+      + '<span class="mx-edit-status" style="display:none;"></span>';
+      table.parentNode.insertBefore(bar, table);
+      bar.querySelector('.toggle').addEventListener('click', function(){ _enterEditMode(table); });
+      bar.querySelector('.save').addEventListener('click',  function(){ _saveEditMode(table); });
+      bar.querySelector('.cancel').addEventListener('click', function(){ _cancelEditMode(table); });
+      return bar;
+    }
+
+    function _shouldAttach(table){
+      if (!table || !table.tBodies || !table.tBodies.length) return false;
+      // Skip layout-only tables (no thead).
+      if (!table.tHead) return false;
+      // Already has a bar → skip.
+      var prev = table.previousElementSibling;
+      if (prev && prev.classList && prev.classList.contains('mx-edit-bar')) return false;
+      // Tables can opt out via [data-mx-no-edit].
+      if (table.hasAttribute('data-mx-no-edit')) return false;
+      var p = table.parentNode;
+      while (p && p !== document.body){
+        if (p.hasAttribute && p.hasAttribute('data-mx-no-edit')) return false;
+        p = p.parentNode;
+      }
+      return true;
+    }
+
+    function _scan(){
+      var tables = document.querySelectorAll('table');
+      for (var i=0;i<tables.length;i++){
+        if (_shouldAttach(tables[i])) _findOrCreateBar(tables[i]);
+      }
+      _installEditCellOverride();
+    }
+
+    function _enterEditMode(table){
+      _installEditCellOverride();
+      table.classList.add('mx-edit-mode');
+      var snapshot = {};
+      var cells = table.querySelectorAll('tbody td.editable[data-tid][data-rid][data-ckey]');
+      for (var i=0;i<cells.length;i++){
+        snapshot[_tableKey(cells[i])] = cells[i].textContent.trim();
+      }
+      _state.set(table, { snapshot: snapshot, pending: {} });
+      _swapButtons(table, true);
+      _refreshStatus(table);
+    }
+
+    function _swapButtons(table, editing){
+      var bar = table.previousElementSibling;
+      if (!bar || !bar.classList || !bar.classList.contains('mx-edit-bar')) return;
+      bar.querySelector('.toggle').style.display = editing ? 'none' : '';
+      bar.querySelector('.save').style.display   = editing ? '' : 'none';
+      bar.querySelector('.cancel').style.display = editing ? '' : 'none';
+      bar.querySelector('.mx-edit-status').style.display = editing ? '' : 'none';
+    }
+
+    function _refreshStatus(table){
+      var bar = table.previousElementSibling; if (!bar) return;
+      var st = _state.get(table); if (!st) return;
+      var n = Object.keys(st.pending).length;
+      var s = bar.querySelector('.mx-edit-status');
+      if (!s) return;
+      s.textContent = n
+        ? ('تعديلات غير محفوظة: ' + n)
+        : 'وضع التعديل مفعّل';
+    }
+
+    function _saveEditMode(table){
+      var st = _state.get(table) || { snapshot:{}, pending:{} };
+      var pending = st.pending || {};
+      var keys = Object.keys(pending);
+      if (!keys.length){
+        table.classList.remove('mx-edit-mode');
+        _swapButtons(table, false);
+        _state.delete(table);
+        if (typeof window.mxToast === 'function') window.mxToast('لا توجد تغييرات', 'info');
+        return;
+      }
+      // Group pending changes by row id (per custom-table). Each row
+      // has its own row_data dict on the server; we PUT the whole row
+      // with the merged updates.
+      var byRow = {};
+      for (var i=0;i<keys.length;i++){
+        var p = pending[keys[i]];
+        var rk = p.tid + ':' + p.rid;
+        if (!byRow[rk]) byRow[rk] = { tid: p.tid, rid: p.rid, updates: {} };
+        byRow[rk].updates[p.ckey] = p.newVal;
+      }
+      var promises = [];
+      Object.keys(byRow).forEach(function(rk){
+        var r = byRow[rk];
+        // Rebuild the full row_data from the current DOM + pending updates.
+        var rowCells = table.querySelectorAll('tbody td.editable[data-tid="' + r.tid + '"][data-rid="' + r.rid + '"]');
+        var rowData = {};
+        for (var c=0;c<rowCells.length;c++){
+          var ck = rowCells[c].getAttribute('data-ckey');
+          rowData[ck] = rowCells[c].textContent.trim();
+        }
+        for (var k in r.updates){ if (Object.prototype.hasOwnProperty.call(r.updates,k)) rowData[k] = r.updates[k]; }
+        promises.push(
+          fetch('/api/custom-tables/' + r.tid + '/rows/' + r.rid, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({ row_data: rowData })
+          }).then(function(resp){ return resp.json(); })
+        );
+      });
+      Promise.all(promises).then(function(results){
+        var ok = results.every(function(d){ return d && d.ok; });
+        table.classList.remove('mx-edit-mode');
+        _swapButtons(table, false);
+        _state.delete(table);
+        var dirty = table.querySelectorAll('tbody td.editable.mx-dirty');
+        for (var d=0; d<dirty.length; d++) dirty[d].classList.remove('mx-dirty');
+        if (typeof window.mxToast === 'function'){
+          window.mxToast(ok ? ('تم حفظ ' + keys.length + ' تعديل') : 'بعض التعديلات فشلت', ok ? 'success' : 'error');
+        }
+        // Refresh via the page-level loader so any computed columns
+        // re-derive from the saved data.
+        if (typeof window.loadCustomTables === 'function') window.loadCustomTables();
+      }).catch(function(){
+        if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
+      });
+    }
+
+    function _cancelEditMode(table){
+      var st = _state.get(table) || { snapshot:{}, pending:{} };
+      // Restore any cell that was edited during this session (the
+      // pending value is currently shown in the DOM; the original is
+      // in the snapshot). Server was never touched, so this is a clean
+      // discard.
+      var cells = table.querySelectorAll('tbody td.editable[data-tid][data-rid][data-ckey]');
+      for (var i=0;i<cells.length;i++){
+        var k = _tableKey(cells[i]);
+        if (st.snapshot[k] !== undefined && cells[i].textContent.trim() !== st.snapshot[k]){
+          cells[i].textContent = st.snapshot[k];
+        }
+        cells[i].classList.remove('mx-dirty');
+      }
+      table.classList.remove('mx-edit-mode');
+      _swapButtons(table, false);
+      _state.delete(table);
+      if (typeof window.mxToast === 'function') window.mxToast('تم إلغاء التعديلات', 'info');
+    }
+
+    /* Initial scan + watch. New tables get an edit-bar without any
+       per-table configuration. */
+    function _boot(){
+      _scan();
+      var mo = new MutationObserver(function(muts){
+        var dirty = false;
+        for (var i=0;i<muts.length;i++){
+          var nodes = muts[i].addedNodes;
+          for (var j=0;nodes && j<nodes.length;j++){
+            var n = nodes[j];
+            if (n && n.nodeType === 1){
+              if (n.tagName === 'TABLE' || (n.querySelector && n.querySelector('table'))) {
+                dirty = true; break;
+              }
+            }
+          }
+          if (dirty) break;
+        }
+        if (dirty) _scan();
+      });
+      mo.observe(document.body, { childList:true, subtree:true });
+    }
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', _boot);
+    } else {
+      _boot();
+    }
+  })();
+
+
 
     mo.observe(document.body, { childList:true, subtree:true });
   }
