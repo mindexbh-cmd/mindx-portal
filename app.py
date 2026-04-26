@@ -7574,11 +7574,28 @@ function performSearch(query) {
 }
 
 function onWaSent(link) {
-  var row = link.closest('tr');
-  if (row) {
-    var cb = row.querySelector('.sent-check');
-    if (cb) cb.checked = true;
+  var row = link.closest('tr'); if (!row) return;
+  var cb = row.querySelector('.sent-check');
+  var prevChecked = cb ? !!cb.checked : false;
+  if (cb) cb.checked = true;
+  /* Save and revert the tick on failure — saveAllAttendance shows
+     a red toast on its own; we just need to roll the visual back so
+     the user sees the actual persisted state. */
+  try {
     saveAllAttendance();
+    /* saveAllAttendance is async-but-fire-and-forget; observe the
+       red toast text via the existing toast element to decide
+       whether to revert. The toast text starts with "فشل" on
+       failure. We re-check after a short delay. */
+    setTimeout(function(){
+      var t = document.getElementById('toast');
+      var txt = (t && t.textContent) || '';
+      if (/^\s*\u0641\u0634\u0644/.test(txt) && cb){
+        cb.checked = prevChecked;
+      }
+    }, 2500);
+  } catch (e) {
+    if (cb) cb.checked = prevChecked;
   }
 }
 
@@ -7989,7 +8006,8 @@ function renderTable(students, existingList, stats) {
       }
       html += '</td>';
       
-      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (savedMsgStatus === '1' ? ' checked' : '') + '></td>';
+      var _sentChecked = (savedMsgStatus === '1' || (savedMsgStatus || '').trim() === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644');
+      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (_sentChecked ? ' checked' : '') + '></td>';
       // Class meta cell (duration + type) — populated async via
       // _attLoadMetaForRow once the per-row student id is known.
       var _sidAttr = (students[i].id != null) ? (' data-sid="' + students[i].id + '"') : '';
@@ -8043,16 +8061,19 @@ function saveAllAttendance() {
         student_name: existing.student_name,
         contact_number: existing.contact_number || '',
         message: existing.message || '',
-        message_status: (tr.querySelector('.sent-check') && tr.querySelector('.sent-check').checked) ? '1' : (existing.message_status || ''),
+        message_status: (tr.querySelector('.sent-check') && tr.querySelector('.sent-check').checked) ? '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644' : (existing.message_status || ''),
         study_status: existing.study_status || ''
       });
     } else {
       // Either mode==='new', or a student on the roster has no match in
       // existingRecords (e.g. a new student added after the import).
-      // Either way, insert a fresh row.
+      // Either way, insert a fresh row. Honour the per-row sent-check
+      // so onWaSent's auto-tick survives the post-save reload.
+      var _sentCb = tr.querySelector('.sent-check');
+      var _sentVal = (_sentCb && _sentCb.checked) ? '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644' : '';
       saves.push({ attendance_date: date, day_name: dayName,
         group_name: group, student_name: name,
-        contact_number: '', status: status, message: '', message_status: '', study_status: '' });
+        contact_number: '', status: status, message: '', message_status: _sentVal, study_status: '' });
     }
   });
 
