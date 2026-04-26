@@ -1397,6 +1397,49 @@ if True:
             pass
         db2.commit()
 
+    # Seed two teacher accounts whose username = the teacher's
+    # personal ID (numeric, leading-zero-preserving). The login route
+    # uses SQL parameter binding so the leading zero on 040507718 is
+    # preserved correctly — the previous failure was that these rows
+    # simply weren't in the users table. Re-applying the migration is
+    # safe: it UPSERTs the password hash + name + role so any prior
+    # half-seeded row gets healed.
+    if "seed_teachers_personal_id_v1" not in applied:
+        _teacher_accounts = [
+            # (username,    password,     role,      name)
+            ("040507718",  "040507718",  "teacher", "أ. زهراء نوح"),
+            ("960302557",  "960302557",  "teacher", "أ. كوثر شعبان"),
+        ]
+        for _u, _p, _r, _nm in _teacher_accounts:
+            _hashed = hashlib.sha256(_p.encode()).hexdigest()
+            try:
+                _cur = db2.execute(
+                    "UPDATE users SET password=?, role=?, name=? WHERE username=?",
+                    (_hashed, _r, _nm, _u),
+                )
+                if _cur.rowcount == 0:
+                    db2.execute(
+                        "INSERT INTO users(username,password,role,name) VALUES(?,?,?,?)",
+                        (_u, _hashed, _r, _nm),
+                    )
+            except Exception:
+                # Best-effort fallback: try a clean INSERT in case the
+                # UPDATE rowcount probe isn't available on this DB
+                # driver. Either succeeds (new row) or no-ops on the
+                # UNIQUE(username) constraint.
+                try:
+                    db2.execute(
+                        "INSERT INTO users(username,password,role,name) VALUES(?,?,?,?)",
+                        (_u, _hashed, _r, _nm),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("seed_teachers_personal_id_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
