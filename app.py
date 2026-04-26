@@ -1487,6 +1487,26 @@ if True:
             pass
         db2.commit()
 
+    # Receipts log v2 — add columns to support reserved-on-open
+    # workflow + the editable course-name field. Existing rows default
+    # to status="issued" so the audit trail is unchanged.
+    if "receipts_log_v2" not in applied:
+        try:
+            _rc_cols = {r[1] for r in db2.execute("PRAGMA table_info(receipts_log)").fetchall()}
+        except Exception:
+            _rc_cols = set()
+        if "status" not in _rc_cols:
+            try: db2.execute("ALTER TABLE receipts_log ADD COLUMN status TEXT DEFAULT 'issued'")
+            except Exception: pass
+        if "course_name" not in _rc_cols:
+            try: db2.execute("ALTER TABLE receipts_log ADD COLUMN course_name TEXT DEFAULT ''")
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("receipts_log_v2",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -4867,31 +4887,78 @@ function _srRenderCard(d){
 function srSave(){ _srTrySave(); }  /* backward-compat shim */
 
 /* ── Receipt print (طباعة رصيد) ──────────────────────────────── */
-var _srRcpt = { sid: 0, data: null, selected: null };
+var _srRcpt = { sid: 0, data: null, selected: null,
+                receipt_number: null, employee: null,
+                default_course: '', course_name: '',
+                printed: false };
 
 function srOpenReceiptModal(sid){
   if (!sid){ if (typeof window.mxToast === 'function') window.mxToast('\u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645 \u0637\u0627\u0644\u0628', 'error'); return; }
+  /* If a previous modal session reserved a number and the user
+     never printed, cancel it so the row lands in the log with
+     status \u0645\u0644\u063A\u0649. */
+  if (_srRcpt.receipt_number && !_srRcpt.printed){
+    _srCancelCurrentReservation();
+  }
   _srRcpt.sid = sid; _srRcpt.selected = null; _srRcpt.data = null;
+  _srRcpt.receipt_number = null; _srRcpt.employee = null;
+  _srRcpt.default_course = ''; _srRcpt.course_name = '';
+  _srRcpt.printed = false;
   _srRcptEnsureModal();
   var m = document.getElementById('sr-rcpt-modal');
   m.style.display = 'flex';
   document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;text-align:center;color:#999;">\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...</div>';
-  fetch('/api/receipts/student/' + sid, {credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d || !d.ok){
-        document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">' + ((d && d.error) || '\u0641\u0634\u0644 \u0627\u0644\u062A\u062D\u0645\u064A\u0644') + '</div>';
-        return;
-      }
-      _srRcpt.data = d;
-      _srRcptRender();
-    })
-    .catch(function(){
-      document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644</div>';
-    });
+  /* Reserve a number + load student data in parallel. The
+     reserve endpoint also returns the default course name so the
+     editable field has a value the moment the modal opens. */
+  Promise.all([
+    fetch('/api/receipts/student/' + sid, {credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/receipts/reserve', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({student_id: sid})
+    }).then(function(r){return r.json();})
+  ]).then(function(arr){
+    var sd = arr[0]; var rs = arr[1];
+    if (!sd || !sd.ok){
+      document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">' + ((sd && sd.error) || '\u0641\u0634\u0644 \u0627\u0644\u062A\u062D\u0645\u064A\u0644') + '</div>';
+      return;
+    }
+    if (!rs || !rs.ok){
+      document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">' + ((rs && rs.error) || '\u062A\u0639\u0630\u0631 \u062D\u062C\u0632 \u0631\u0642\u0645 \u0631\u0635\u064A\u062F') + '</div>';
+      return;
+    }
+    _srRcpt.data = sd;
+    _srRcpt.receipt_number = rs.receipt_number;
+    _srRcpt.employee       = rs.employee_name || '\u2014';
+    _srRcpt.default_course = rs.default_course || '';
+    _srRcpt.course_name    = rs.default_course || '';
+    _srRcptRender();
+  }).catch(function(){
+    document.getElementById('sr-rcpt-body').innerHTML = '<div style="padding:30px;color:#c62828;text-align:center;">\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644</div>';
+  });
+}
+
+function _srCancelCurrentReservation(){
+  /* Best-effort cancel \u2014 fire-and-forget. Server marks the
+     row status \u0645\u0644\u063A\u0649 so it stays in the
+     audit log. */
+  if (!_srRcpt.receipt_number) return;
+  var rn = _srRcpt.receipt_number;
+  _srRcpt.receipt_number = null;
+  try {
+    fetch('/api/receipts/' + encodeURIComponent(rn) + '/cancel', {
+      method:'POST', credentials:'include'
+    }).catch(function(){});
+  } catch(e){}
 }
 
 function srCloseReceiptModal(){
+  /* If the modal closes without a successful print, mark the
+     reserved number as cancelled in the log. */
+  if (_srRcpt.receipt_number && !_srRcpt.printed){
+    _srCancelCurrentReservation();
+  }
   var m = document.getElementById('sr-rcpt-modal');
   if (m) m.style.display = 'none';
 }
@@ -4948,47 +5015,66 @@ function _srRcptFmt(v, dec){
 function _srRcptRender(){
   var d = _srRcpt.data; if (!d) return;
   var s = d.student || {}; var p = d.plan || {};
-  document.getElementById('sr-rcpt-title').textContent = '\u0637\u0628\u0627\u0639\u0629 \u0631\u0635\u064A\u062F - ' + (s.name || '—');
+  document.getElementById('sr-rcpt-title').textContent = 'طباعة رصيد - ' + (s.name || '—');
 
   var html = '';
-  html += '<div style="background:#f8f9fa;border-radius:10px;padding:12px 14px;margin-bottom:12px;">';
+  /* Reserved receipt number — read-only, prominent. */
+  html += '<div style="background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;padding:10px 14px;border-radius:9px;margin-bottom:10px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+       +   '<span>رقم الرصيد المحجوز:</span>'
+       +   '<span style="font-size:1.05rem;background:#fff;color:#0d47a1;padding:4px 10px;border-radius:7px;direction:ltr;">' + (_srRcpt.receipt_number || '—') + '</span>'
+       + '</div>';
+  /* Student summary block. */
+  html += '<div style="background:#f8f9fa;border-radius:10px;padding:12px 14px;margin-bottom:10px;">';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13.5px;color:#222;">';
-  html += '<div><b>\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628:</b> ' + (s.name || '—') + '</div>';
-  html += '<div><b>\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A:</b> <span style="direction:ltr;">' + (s.personal_id || '—') + '</span></div>';
-  html += '<div><b>\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629:</b> ' + (s.group || '—') + '</div>';
-  html += '<div><b>\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637:</b> ' + (p.method || '—') + '</div>';
-  html += '<div><b>\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629:</b> ' + _srRcptFmt(p.course_amount) + ' \u062F.\u0628</div>';
-  html += '<div><b>\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0643\u0644\u064A:</b> ' + (p.num_installments || 0) + '</div>';
-  html += '<div><b>\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0633\u0627\u0637 \u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0629:</b> ' + (p.paid_count || 0) + '</div>';
-  html += '<div><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062F\u0641\u0648\u0639:</b> ' + _srRcptFmt(p.total_paid) + ' \u062F.\u0628</div>';
-  html += '<div><b>\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0645\u062A\u0628\u0642\u064A:</b> ' + _srRcptFmt(p.total_remaining) + ' \u062F.\u0628</div>';
+  html += '<div><b>اسم الطالب:</b> ' + (s.name || '—') + '</div>';
+  html += '<div><b>الرقم الشخصي:</b> <span style="direction:ltr;">' + (s.personal_id || '—') + '</span></div>';
+  html += '<div><b>المجموعة:</b> ' + (s.group || '—') + '</div>';
+  html += '<div><b>طريقة التقسيط:</b> ' + (p.method || '—') + '</div>';
+  html += '<div><b>مبلغ الدورة:</b> ' + _srRcptFmt(p.course_amount) + ' د.ب</div>';
+  html += '<div><b>عدد الأقساط الكلي:</b> ' + (p.num_installments || 0) + '</div>';
+  html += '<div><b>عدد الأقساط المدفوعة:</b> ' + (p.paid_count || 0) + '</div>';
+  html += '<div><b>إجمالي المدفوع:</b> ' + _srRcptFmt(p.total_paid) + ' د.ب</div>';
+  html += '<div><b>إجمالي المتبقي:</b> ' + _srRcptFmt(p.total_remaining) + ' د.ب</div>';
   html += '</div></div>';
 
-  /* Paid installments — radio (single-select, since each receipt
-     covers one specific paid installment). */
+  /* Editable course name — sits between student info and the
+     installment selector so the printed receipt reads naturally. */
+  var safeCourse = (_srRcpt.course_name || '').replace(/"/g, '&quot;');
+  html += '<div style="margin-bottom:12px;background:#fffde7;border:1.4px solid #fbc02d;border-radius:9px;padding:10px 12px;">'
+       +   '<label for="sr-rcpt-course" style="display:block;font-weight:800;color:#5d4037;font-size:13.5px;margin-bottom:5px;">اسم الدورة <span style="color:#888;font-weight:600;font-size:11.5px;">(يمكن تعديلها قبل الطباعة)</span></label>'
+       +   '<input type="text" id="sr-rcpt-course" oninput="srOnCourseInput()" value="' + safeCourse + '" placeholder="مثال: MAC 1.2 - الفصل الثاني" style="width:100%;padding:8px 12px;border:1.3px solid #fbc02d;border-radius:7px;font-family:inherit;font-size:14px;direction:rtl;background:#fff;">'
+       + '</div>';
+
+  /* Paid installments — radio (single-select). */
   html += '<div style="margin-bottom:12px;">';
-  html += '<div style="font-weight:800;color:#1565C0;margin-bottom:8px;font-size:14px;">\u0627\u062E\u062A\u0631 \u0627\u0644\u0642\u0633\u0637 \u0627\u0644\u0645\u0631\u0627\u062F \u0625\u0635\u062F\u0627\u0631 \u0631\u0635\u064A\u062F\u0647:</div>';
+  html += '<div style="font-weight:800;color:#1565C0;margin-bottom:8px;font-size:14px;">اختر القسط المراد إصدار رصيده:</div>';
   var insts = d.paid_installments || [];
   if (!insts.length){
-    html += '<div style="color:#999;text-align:center;padding:14px;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u0642\u0633\u0627\u0637 \u0645\u062F\u0641\u0648\u0639\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628</div>';
+    html += '<div style="color:#999;text-align:center;padding:14px;">لا توجد أقساط مدفوعة لهذا الطالب</div>';
   } else {
     for (var i=0;i<insts.length;i++){
       var inst = insts[i];
       html += '<label style="display:block;padding:8px 12px;border:1.5px solid #e0e7ee;border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13.5px;background:#fff;">'
            +   '<input type="radio" name="sr-rcpt-inst" value="' + inst.n + '" onchange="srSelectReceiptInst(' + inst.n + ')" style="margin-left:8px;"> '
-           +   '<b>\u0627\u0644\u0642\u0633\u0637 ' + inst.n + '</b> \u2014 ' + _srRcptFmt(inst.amount) + ' \u062F.\u0628 '
-           +   '<span style="color:#666;font-size:12.5px;">\u2014 \u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0633\u062A\u062D\u0642\u0627\u0642: ' + (inst.due_date || '—') + '</span>'
+           +   '<b>القسط ' + inst.n + '</b> — ' + _srRcptFmt(inst.amount) + ' د.ب '
+           +   '<span style="color:#666;font-size:12.5px;">— تاريخ الاستحقاق: ' + (inst.due_date || '—') + '</span>'
            + '</label>';
     }
   }
   html += '</div>';
 
   /* Live preview placeholder. */
-  html += '<div id="sr-rcpt-preview-wrap" style="border:2px dashed #b0bec5;border-radius:10px;padding:16px;background:#fafbfc;color:#888;text-align:center;font-size:13px;">\u2014 \u0627\u062E\u062A\u0631 \u0642\u0633\u0637\u0627\u064B \u0644\u0639\u0631\u0636 \u0645\u0639\u0627\u064A\u0646\u0629 \u0627\u0644\u0631\u0635\u064A\u062F \u2014</div>';
+  html += '<div id="sr-rcpt-preview-wrap" style="border:2px dashed #b0bec5;border-radius:10px;padding:16px;background:#fafbfc;color:#888;text-align:center;font-size:13px;">— اختر قسطاً لعرض معاينة الرصيد —</div>';
   document.getElementById('sr-rcpt-body').innerHTML = html;
   document.getElementById('sr-rcpt-print').disabled = true;
 }
 
+function srOnCourseInput(){
+  var inp = document.getElementById('sr-rcpt-course');
+  if (inp) _srRcpt.course_name = inp.value || '';
+  /* Live update: redraw the preview if a row is already selected. */
+  if (_srRcpt.selected) srSelectReceiptInst(_srRcpt.selected);
+}
 function srSelectReceiptInst(n){
   _srRcpt.selected = n;
   var d = _srRcpt.data; if (!d) return;
@@ -4997,7 +5083,7 @@ function srSelectReceiptInst(n){
   document.getElementById('sr-rcpt-print').disabled = false;
   var s = d.student || {}; var p = d.plan || {};
   var todayISO = (new Date()).toISOString().slice(0, 10);
-  var emp = (window._mxUserName || document.body.dataset.userName || '—');
+  var emp = _srRcpt.employee || (window._mxUserName || document.body.dataset.userName || '—');
   /* Populate the live preview box AND the hidden print area with
      identical receipt markup so the user sees what they'll get. */
   var receiptHtml = _srRcptBuildReceiptHtml({
@@ -5006,11 +5092,11 @@ function srSelectReceiptInst(n){
     num: p.num_installments, paid_count: p.paid_count,
     total_paid: p.total_paid, total_remaining: p.total_remaining,
     inst: inst, employee: emp, issued_date: todayISO,
-    receipt_number: '\u2014 \u0633\u064A\u062A\u0645 \u062A\u0648\u0644\u064A\u062F\u0647 \u0639\u0646\u062F \u0627\u0644\u0637\u0628\u0627\u0639\u0629'
+    receipt_number: _srRcpt.receipt_number || '—',
+    course_name:    _srRcpt.course_name || ''
   });
   document.getElementById('sr-rcpt-preview-wrap').innerHTML = receiptHtml;
 }
-
 function _srRcptBuildReceiptHtml(ctx){
   var fmt = _srRcptFmt;
   var inst = ctx.inst || {};
@@ -5028,6 +5114,7 @@ function _srRcptBuildReceiptHtml(ctx){
   html += '<tr><td style="padding:5px 6px;background:#f3f4f6;width:40%;font-weight:700;">\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.sname || '—') + '</td></tr>';
   html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;direction:ltr;">' + (ctx.pid || '—') + '</td></tr>';
   html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.group || '—') + '</td></tr>';
+  html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0627\u0633\u0645 \u0627\u0644\u062F\u0648\u0631\u0629</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.course_name || '—') + '</td></tr>';
   html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + (ctx.method || '—') + '</td></tr>';
   html += '<tr><td style="padding:5px 6px;background:#f3f4f6;font-weight:700;">\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629</td><td style="padding:5px 6px;border-bottom:1px solid #ddd;">' + fmt(ctx.course_amount) + ' \u062F.\u0628</td></tr>';
   html += '</table>';
@@ -5058,50 +5145,56 @@ function _srRcptBuildReceiptHtml(ctx){
 
 function srPrintReceipt(){
   var n = _srRcpt.selected; var d = _srRcpt.data;
-  if (!n || !d){ if (typeof window.mxToast === 'function') window.mxToast('\u0627\u062E\u062A\u0631 \u0642\u0633\u0637\u0627\u064B \u0623\u0648\u0644\u0627\u064B', 'warn'); return; }
+  if (!n || !d){ if (typeof window.mxToast === 'function') window.mxToast('اختر قسطاً أولاً', 'warn'); return; }
+  if (!_srRcpt.receipt_number){
+    if (typeof window.mxToast === 'function') window.mxToast('لم يتم حجز رقم رصيد', 'error'); return;
+  }
   var inst = (d.paid_installments || []).find(function(x){ return Number(x.n) === Number(n); });
   if (!inst) return;
   var btn = document.getElementById('sr-rcpt-print');
   if (btn) btn.disabled = true;
-  /* Issue + log the receipt server-side first; the returned
-     receipt_number goes into both the on-screen preview and the
-     printed copy. */
-  fetch('/api/receipts/issue', {
+  /* Sync the latest course-name input value into state. */
+  var inp = document.getElementById('sr-rcpt-course');
+  if (inp) _srRcpt.course_name = inp.value || '';
+  /* Finalize the previously-reserved receipt — flips status from
+     "reserved" to "issued" and persists course_name + amount +
+     installment_number. */
+  fetch('/api/receipts/' + encodeURIComponent(_srRcpt.receipt_number) + '/finalize', {
     method:'POST', credentials:'include',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
-      student_id:         _srRcpt.sid,
       installment_number: n,
       amount:             inst.amount || inst.paid || 0,
+      course_name:        _srRcpt.course_name || ''
     })
   }).then(function(r){ return r.json(); }).then(function(res){
     if (btn) btn.disabled = false;
     if (!res || !res.ok){
-      if (typeof window.mxToast === 'function') window.mxToast((res && res.error) || '\u0641\u0634\u0644 \u0627\u0644\u0625\u0635\u062F\u0627\u0631', 'error');
+      if (typeof window.mxToast === 'function') window.mxToast((res && res.error) || 'فشل الإصدار', 'error');
       return;
     }
+    var row = res.row || {};
     var s = d.student || {}; var p = d.plan || {};
+    _srRcpt.printed = true;
     var html = _srRcptBuildReceiptHtml({
       sid: s.id, sname: s.name, pid: s.personal_id, group: s.group,
       method: p.method, course_amount: p.course_amount,
       num: p.num_installments, paid_count: p.paid_count,
       total_paid: p.total_paid, total_remaining: p.total_remaining,
-      inst: inst, employee: res.employee_name, issued_date: (res.issued_at || (new Date()).toISOString().slice(0,10)).slice(0,10),
-      receipt_number: res.receipt_number,
+      inst: inst,
+      employee:        row.employee_name || _srRcpt.employee || '—',
+      issued_date:     ((row.issued_at) || (new Date()).toISOString().slice(0,10)).slice(0,10),
+      receipt_number:  row.receipt_number || _srRcpt.receipt_number,
+      course_name:     row.course_name || _srRcpt.course_name || ''
     });
-    /* Render into the dedicated print area + trigger the browser
-       print dialog. The @media print stylesheet hides everything
-       else. */
     var pa = document.getElementById('sr-rcpt-print-area');
     if (pa) pa.innerHTML = html;
-    /* Also update the visible preview to reflect the real receipt
-       number now that it has been issued. */
     var pv = document.getElementById('sr-rcpt-preview-wrap');
     if (pv) pv.innerHTML = html;
     setTimeout(function(){ window.print(); }, 80);
   }).catch(function(){
     if (btn) btn.disabled = false;
-    if (typeof window.mxToast === 'function') window.mxToast('\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644', 'error');
+    if (typeof window.mxToast === 'function') window.mxToast('خطأ في الاتصال', 'error');
   });
 }
 </script>
@@ -13835,6 +13928,189 @@ def api_receipts_student(sid):
         },
         "paid_installments": paid_list,
     })
+
+
+def _receipt_default_course(db, sid):
+    """Best-effort default for the editable اسم الدورة field. Tries
+    in priority: student's group level_course → taqseet method label
+    → student's class_name → empty."""
+    try:
+        s = db.execute("SELECT group_name_student, installment_type, class_name FROM students WHERE id=?", (sid,)).fetchone()
+    except Exception:
+        s = None
+    if not s: return ""
+    sd = dict(s) if hasattr(s, "keys") else {"group_name_student": s[0], "installment_type": s[1], "class_name": s[2]}
+    gn = (sd.get("group_name_student") or "").strip()
+    if gn:
+        try:
+            row = db.execute("SELECT level_course FROM student_groups WHERE TRIM(group_name)=TRIM(?) LIMIT 1", (gn,)).fetchone()
+        except Exception:
+            row = None
+        if row:
+            v = (dict(row).get("level_course") if hasattr(row, "keys") else row[0]) or ""
+            v = str(v).strip()
+            if v: return v
+    method = (sd.get("installment_type") or "").strip()
+    if method:
+        try:
+            tq_cols = {r[1] for r in db.execute("PRAGMA table_info(taqseet)").fetchall()}
+        except Exception:
+            tq_cols = set()
+        col = None
+        for c in ("taqseet_method",):
+            if c in tq_cols: col = c; break
+        if col:
+            try:
+                row = db.execute('SELECT "' + col + '" FROM taqseet WHERE id=? OR "' + col + '"=? LIMIT 1', (method, method)).fetchone()
+            except Exception:
+                row = None
+            if row:
+                try:
+                    v = row[col] if hasattr(row, "keys") else row[0]
+                except Exception:
+                    v = row[0]
+                v = str(v or "").strip()
+                if v: return v
+    return (sd.get("class_name") or "").strip()
+
+
+def _receipt_reserve_atomic(db, sid, sname, pid, employee_name, course_name):
+    """Atomically reserve the next REC-<YEAR>-<NNNNN>. Inserts a row
+    with status='reserved' so concurrent reservers can't collide on
+    the UNIQUE(receipt_number) constraint. Retries up to 20 times."""
+    import datetime as _dt
+    year = _dt.datetime.now().year
+    last_err = None
+    for _ in range(20):
+        try:
+            n = db.execute(
+                "SELECT COUNT(*) FROM receipts_log WHERE receipt_number LIKE ?",
+                ("REC-" + str(year) + "-%",),
+            ).fetchone()[0]
+        except Exception:
+            n = 0
+        seq = (int(n) if n is not None else 0) + 1
+        candidate = "REC-" + str(year) + "-" + str(seq).zfill(5)
+        try:
+            db.execute(
+                "INSERT INTO receipts_log(receipt_number, student_id, student_name, "
+                "personal_id, installment_number, amount, employee_name, "
+                "course_name, status) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
+                (candidate, sid, sname or "", pid or "", 0, 0.0,
+                 employee_name or "", course_name or "", "reserved"),
+            )
+            db.commit()
+            return candidate
+        except Exception as ex:
+            last_err = str(ex)
+            try: db.rollback()
+            except Exception: pass
+            continue
+    raise RuntimeError("could not reserve receipt number: " + (last_err or "unknown"))
+
+
+@app.route('/api/receipts/reserve', methods=['POST'])
+@login_required
+def api_receipts_reserve():
+    """Reserve the next sequential receipt number atomically. Called
+    when the modal opens so the displayed number is locked before the
+    employee picks an installment. Status starts as 'reserved' and
+    flips to 'issued' on print or 'ملغى' on
+    cancel."""
+    d = request.get_json() or {}
+    try:
+        sid = int(d.get("student_id") or 0)
+    except Exception:
+        sid = 0
+    if not sid:
+        return jsonify({"ok": False, "error": "student_id required"}), 400
+    db = get_db()
+    try:
+        srow = db.execute("SELECT student_name, personal_id FROM students WHERE id=?", (sid,)).fetchone()
+    except Exception:
+        srow = None
+    sd = dict(srow) if srow else {}
+    user = session.get("user") or {}
+    emp = (user.get("name") or user.get("username") or "").strip() or "—"
+    course = _receipt_default_course(db, sid)
+    try:
+        rnum = _receipt_reserve_atomic(
+            db, sid,
+            sd.get("student_name") or "",
+            sd.get("personal_id")  or "",
+            emp,
+            course,
+        )
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({
+        "ok":              True,
+        "receipt_number":  rnum,
+        "student_id":      sid,
+        "student_name":    sd.get("student_name") or "",
+        "personal_id":     sd.get("personal_id") or "",
+        "employee_name":   emp,
+        "default_course":  course,
+        "status":          "reserved",
+    })
+
+
+@app.route('/api/receipts/<path:receipt_number>/finalize', methods=['POST'])
+@login_required
+def api_receipts_finalize(receipt_number):
+    """Mark a reserved receipt as printed (status='issued') and
+    update its installment_number, amount, and course_name to the
+    final values from the print step."""
+    d = request.get_json() or {}
+    try:
+        n = int(d.get("installment_number") or 0)
+    except Exception:
+        n = 0
+    try:
+        amount = float(d.get("amount") or 0)
+    except Exception:
+        amount = 0.0
+    course = (d.get("course_name") or "").strip()
+    if not n:
+        return jsonify({"ok": False, "error": "installment_number required"}), 400
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE receipts_log SET status='issued', installment_number=?, "
+            "amount=?, course_name=? WHERE receipt_number=?",
+            (n, amount, course, receipt_number),
+        )
+        db.commit()
+        if cur.rowcount == 0:
+            return jsonify({"ok": False, "error": "receipt not found"}), 404
+        row = db.execute(
+            "SELECT receipt_number, student_id, student_name, personal_id, "
+            "installment_number, amount, employee_name, course_name, status, issued_at "
+            "FROM receipts_log WHERE receipt_number=?", (receipt_number,)
+        ).fetchone()
+        return jsonify({"ok": True, "row": dict(row) if row else {}})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route('/api/receipts/<path:receipt_number>/cancel', methods=['POST'])
+@login_required
+def api_receipts_cancel(receipt_number):
+    """Mark a reserved receipt as cancelled. Called when the employee
+    closes the modal without printing — the row stays in the log so
+    the audit trail has no gaps."""
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE receipts_log SET status='ملغى' "
+            "WHERE receipt_number=? AND status='reserved'",
+            (receipt_number,),
+        )
+        db.commit()
+        return jsonify({"ok": True, "updated": cur.rowcount})
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
 
 
 @app.route('/api/receipts/issue', methods=['POST'])
