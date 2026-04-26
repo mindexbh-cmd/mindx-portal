@@ -1313,6 +1313,41 @@ if True:
         except Exception:
             pass
 
+    # Global "حالة المركز" mode + per-row class_duration / class_type
+    # on attendance. The INSERT/UPDATE for attendance is already
+    # dynamic (whitelisted against PRAGMA table_info) so adding these
+    # columns is enough — no handler changes needed.
+    if "center_mode_v1" not in applied:
+        try:
+            _att_cols = {r[1] for r in db2.execute("PRAGMA table_info(attendance)").fetchall()}
+        except Exception:
+            _att_cols = set()
+        if "class_duration" not in _att_cols:
+            try: db2.execute("ALTER TABLE attendance ADD COLUMN class_duration TEXT DEFAULT \'\'")
+            except Exception: pass
+        if "class_type" not in _att_cols:
+            try: db2.execute("ALTER TABLE attendance ADD COLUMN class_type TEXT DEFAULT \'\'")
+            except Exception: pass
+        try:
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ("system", "center_mode", "\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632", "\u062D\u0636\u0648\u0631\u064A"),
+            )
+        except Exception:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                    ("system", "center_mode", "\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632", "\u062D\u0636\u0648\u0631\u064A"),
+                )
+            except Exception:
+                pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("center_mode_v1",))
+        except Exception:
+            pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
@@ -2852,6 +2887,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 </style>
 </head>
 <body>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <div class="dh-topbar">
   <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
   <div class="dh-topbar-right">
@@ -2861,6 +2897,18 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   </div>
 </div>
 <div class="dh-main">
+  <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
+    <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
+    <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
+    <div id="dh-center-mode-controls" style="display:none;align-items:center;gap:8px;margin-right:auto;">
+      <select id="dh-center-mode-select" style="padding:7px 14px;border:1.4px solid #b39ddb;border-radius:9px;font-size:14px;font-weight:700;background:#faf7ff;font-family:inherit;cursor:pointer;">
+        <option value="&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;">&#x062D;&#x0636;&#x0648;&#x0631;&#x064A;</option>
+        <option value="&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;">&#x0623;&#x0648;&#x0646;&#x0644;&#x0627;&#x064A;&#x0646;</option>
+        <option value="&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;">&#x0631;&#x0645;&#x0636;&#x0627;&#x0646;</option>
+      </select>
+      <button id="dh-center-mode-save" type="button" onclick="dhSaveCenterMode()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:13.5px;font-family:inherit;">&#x062A;&#x063A;&#x064A;&#x064A;&#x0631;</button>
+    </div>
+  </div>
   <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid">
     <div class="dh-stat-card teal">
@@ -3152,7 +3200,53 @@ function _fmtHM(m){
   return s;
 }
 function dhLoadStats(){
-  fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
+  /* Center mode card — admin sees the dropdown + change button,
+   everyone else sees only the read-only badge. */
+function _dhPaintCenterMode(mode){
+  var b = document.getElementById('dh-center-mode-badge'); if (!b) return;
+  var emoji = (mode === 'أونلاين') ? String.fromCodePoint(0x1F4BB) : (mode === 'رمضان') ? String.fromCodePoint(0x1F319) : String.fromCodePoint(0x1F3EB);
+  b.textContent = emoji + ' ' + mode;
+}
+function _dhInitCenterMode(){
+  var roleEl = document.body.dataset.role || '';
+  fetch('/api/center/mode', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      _dhPaintCenterMode(d.mode);
+      var sel = document.getElementById('dh-center-mode-select');
+      if (sel) sel.value = d.mode;
+      if (roleEl === 'admin'){
+        var c = document.getElementById('dh-center-mode-controls');
+        if (c) c.style.display = 'flex';
+      }
+    })
+    .catch(function(){});
+}
+function dhSaveCenterMode(){
+  var sel = document.getElementById('dh-center-mode-select');
+  if (!sel || !sel.value) return;
+  var btn = document.getElementById('dh-center-mode-save');
+  if (btn) { btn.disabled = true; btn.textContent = '\u062C\u0627\u0631\u064A...'; }
+  fetch('/api/center/mode', {method:'PATCH', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mode: sel.value})})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (btn){ btn.disabled = false; btn.textContent = '\u062A\u063A\u064A\u064A\u0631'; }
+      if (d && d.ok){
+        _dhPaintCenterMode(d.mode);
+        if (typeof window.mxToast === 'function') window.mxToast('\u062A\u0645 \u062A\u063A\u064A\u064A\u0631 \u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632 \u0625\u0644\u0649: ' + d.mode, 'success');
+      } else {
+        if (typeof window.mxToast === 'function') window.mxToast((d && d.error) || '\u062A\u0639\u0630\u0631 \u0627\u0644\u062A\u063A\u064A\u064A\u0631', 'error');
+      }
+    })
+    .catch(function(){
+      if (btn){ btn.disabled = false; btn.textContent = '\u062A\u063A\u064A\u064A\u0631'; }
+    });
+}
+_dhInitCenterMode();
+fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
     function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
     set('stat-english-students', d.english_students || 0);
     set('stat-math-students',    d.math_students || 0);
@@ -6759,6 +6853,11 @@ select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
 
   <div id="t-alert" class="alert"></div>
 
+  <div id="t-mode-banner" style="background:#ede7f6;border:1.5px solid #b39ddb;border-radius:11px;padding:10px 16px;margin-bottom:14px;font-weight:700;color:#4527a0;display:none;font-size:14px;">
+    &#x1F3DB;&#xFE0F; <span id="t-mode-text">&mdash;</span>
+    <span style="color:#7e57c2;font-weight:600;font-size:12.5px;margin-right:8px;">(&#x062A;&#x062A;&#x0645; &#x062A;&#x0639;&#x0628;&#x0626;&#x0629; &#x0645;&#x062F;&#x0629; &#x0648;&#x0646;&#x0648;&#x0639; &#x0627;&#x0644;&#x062D;&#x0635;&#x0629; &#x062A;&#x0644;&#x0642;&#x0627;&#x0626;&#x064A;&#x0627;&#x064B;)</span>
+  </div>
+
   <div class="card" id="t-table-card" style="display:none;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -6775,6 +6874,7 @@ select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
           <th class="idx-col">#</th>
           <th>&#x0627;&#x0633;&#x0645; &#x0627;&#x0644;&#x0637;&#x0627;&#x0644;&#x0628;</th>
           <th style="width:200px;">&#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x062D;&#x0636;&#x0648;&#x0631;</th>
+          <th style="text-align:center;min-width:160px;">&#x0627;&#x0644;&#x062D;&#x0635;&#x0629;</th>
         </tr></thead>
         <tbody id="t-tbody"></tbody>
       </table>
@@ -6843,8 +6943,14 @@ function _tRender(){
       + '<option value="متأخر"' + (st === 'متأخر' ? ' selected' : '') + '>متأخر</option>'
       + '</select>'
       + '</td>';
+    html += '<td class="t-meta-cell" data-i="' + i + '" style="text-align:center;font-size:12.5px;color:#37474F;min-width:160px;">'
+          + '<span class="t-meta-text" style="opacity:.6;">&mdash;</span> '
+          + '<button type="button" onclick="_tOpenMetaEditor(' + i + ')" title="تخصيص" style="background:#fff3e0;border:1.4px solid #ffb74d;color:#e65100;padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;font-family:inherit;margin-right:4px;">&#x270F;</button>'
+          + '</td>';
     html += '</tr>';
   }
+  /* Auto-resolve meta for every row using the loaded student id. */
+  for (var k=0;k<_tStudents.length;k++) _tLoadMetaForRow(k);
   tb.innerHTML = html;
   _tUpdatePills();
 }
@@ -6961,9 +7067,10 @@ function tLoadStudents(){
     _tStudents = students.map(function(s){
       var p = prior[(s.name || '').trim()];
       return {
-        name:   s.name,
+        id:      s.id || 0,
+        name:    s.name,
         contact: s.whatsapp || '',
-        status: p ? (p.status || '') : ''
+        status:  p ? (p.status || '') : ''
       };
     });
     _tExisting = existsList.length > 0;
@@ -6990,13 +7097,85 @@ function tReset(){
   _tExisting = false;
 }
 
+var _tCenterMode = '\u062D\u0636\u0648\u0631\u064A';
+function _tBannerEmoji(m){ if (m === 'أونلاين') return String.fromCodePoint(0x1F4BB); if (m === 'رمضان') return String.fromCodePoint(0x1F319); return String.fromCodePoint(0x1F3EB); }
+function tLoadCenterMode(){
+  fetch('/api/center/mode', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.mode){
+        _tCenterMode = d.mode;
+        var b = document.getElementById('t-mode-banner');
+        var t = document.getElementById('t-mode-text');
+        if (t) t.textContent = _tBannerEmoji(d.mode) + ' \u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632: ' + d.mode;
+        if (b) b.style.display = 'block';
+      }
+    }).catch(function(){});
+}
+function _tLoadMetaForRow(idx){
+  var s = _tStudents[idx]; if (!s || !s.id) return;
+  if (s._meta){ _tPaintMeta(idx); return; }
+  fetch('/api/center/auto-meta?student_id=' + s.id, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.meta){
+        s._meta = d.meta;
+        _tPaintMeta(idx);
+      }
+    }).catch(function(){});
+}
+function _tEffectiveMeta(idx){
+  var s = _tStudents[idx] || {};
+  var ov = s._override || null;
+  var auto = s._meta || {};
+  return {
+    class_duration: ov ? (ov.class_duration || '') : (auto.class_duration || ''),
+    class_type:     ov ? (ov.class_type     || _tCenterMode) : (auto.class_type || _tCenterMode),
+    warning:        auto.warning || ''
+  };
+}
+function _tPaintMeta(idx){
+  var td = document.querySelector('#t-tbody .t-meta-cell[data-i="' + idx + '"]');
+  if (!td) return;
+  var eff = _tEffectiveMeta(idx);
+  var s = _tStudents[idx] || {};
+  var dur = eff.class_duration || '\u2014';
+  var typ = eff.class_type || '\u2014';
+  var warn = eff.warning ? (' <div style="color:#c62828;font-size:11px;">' + eff.warning + '</div>') : '';
+  var ov  = s._override ? ' <span style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:6px;font-size:10.5px;font-weight:800;">\u0645\u062E\u0635\u0635</span>' : '';
+  var span = td.querySelector('.t-meta-text');
+  if (span){
+    span.style.opacity = '1';
+    span.innerHTML = '<span style="font-weight:700;">' + dur + '</span> \u2022 ' + typ + ov + warn;
+  }
+}
+function _tOpenMetaEditor(idx){
+  var s = _tStudents[idx] || {};
+  var eff = _tEffectiveMeta(idx);
+  var d = window.prompt('\u0645\u062F\u0629 \u0627\u0644\u062D\u0635\u0629 (\u0628\u0627\u0644\u062F\u0642\u0627\u0626\u0642):', eff.class_duration || '');
+  if (d === null) return;
+  var t = window.prompt('\u0646\u0648\u0639 \u0627\u0644\u062D\u0635\u0629 (\u062D\u0636\u0648\u0631\u064A / \u0623\u0648\u0646\u0644\u0627\u064A\u0646 / \u0631\u0645\u0636\u0627\u0646):', eff.class_type || _tCenterMode);
+  if (t === null) return;
+  d = (d || '').trim(); t = (t || '').trim();
+  if (!d && !t) delete s._override;
+  else          s._override = { class_duration: d, class_type: t };
+  _tPaintMeta(idx);
+}
+
 function tSave(){
   var g = document.getElementById('t-group').value;
   var d = document.getElementById('t-date').value;
   if (!g || !d){ _tToast('اختر مجموعة وتاريخاً','error'); return; }
   if (!_tStudents.length){ _tToast('لا يوجد طلبة','error'); return; }
-  var rows = _tStudents.map(function(s){
-    return { student_name:s.name, status:s.status || '', contact_number:s.contact || '' };
+  var rows = _tStudents.map(function(s, idx){
+    var eff = _tEffectiveMeta(idx);
+    return {
+      student_name:    s.name,
+      status:          s.status || '',
+      contact_number:  s.contact || '',
+      class_duration:  eff.class_duration || '',
+      class_type:      eff.class_type || _tCenterMode
+    };
   });
   var btn = document.getElementById('t-save');
   var prev = btn.innerHTML;
@@ -7033,6 +7212,7 @@ function tSave(){
   document.getElementById('t-day').textContent = _tDayName(iso);
   document.getElementById('t-day').className = 'day-badge';
   tLoadGroups();
+  tLoadCenterMode();
 })();
 </script>
 </body>
@@ -7207,6 +7387,10 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
     <span class="search-result-badge" id="searchBadge" style="display:none;"></span>
     <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;" title="&#1605;&#1587;&#1581;">&#10006;</button>
   </div>
+  <div id="att-mode-banner" style="background:#ede7f6;border:1.5px solid #b39ddb;border-radius:11px;padding:10px 16px;margin-bottom:16px;font-weight:700;color:#4527a0;display:none;font-size:14px;">
+    &#x1F3DB;&#xFE0F; <span id="att-mode-text">&mdash;</span>
+    <span style="color:#7e57c2;font-weight:600;font-size:12.5px;margin-right:8px;">(&#x062A;&#x062A;&#x0645; &#x062A;&#x0639;&#x0628;&#x0626;&#x0629; &#x0645;&#x062F;&#x0629; &#x0648;&#x0646;&#x0648;&#x0639; &#x0627;&#x0644;&#x062D;&#x0635;&#x0629; &#x062A;&#x0644;&#x0642;&#x0627;&#x0626;&#x064A;&#x0627;&#x064B;)</span>
+  </div>
   <div class="att-section" id="attSection" style="display:none;">
     <div class="att-section-header">
       <div class="att-section-title">
@@ -7226,6 +7410,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
             <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
             <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
             <th>&#x62A;&#x645; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</th>
+            <th style="text-align:center;">&#x0627;&#x0644;&#x062D;&#x0635;&#x0629;</th>
             <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
             <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</th>
             <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</th>
@@ -7756,6 +7941,10 @@ function renderTable(students, existingList, stats) {
       html += '</td>';
       
       html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (savedMsgStatus === '1' ? ' checked' : '') + '></td>';
+      // Class meta cell (duration + type) — populated async via
+      // _attLoadMetaForRow once the per-row student id is known.
+      var _sidAttr = (students[i].id != null) ? (' data-sid="' + students[i].id + '"') : '';
+      html += '<td class="att-meta-cell"' + _sidAttr + ' data-name="' + name.replace(/"/g,'&quot;') + '" style="text-align:center;font-size:12.5px;color:#37474F;min-width:140px;"><span class="att-meta-text" style="opacity:.6;">&mdash;</span> <button type="button" class="att-meta-edit" onclick="attOpenMetaEditor(this)" title="\u062A\u062E\u0635\u064A\u0635" style="background:#fff3e0;border:1.4px solid #ffb74d;color:#e65100;padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;font-family:inherit;">&#x270F;</button></td>';
       // Attendance stat cells (present/absent/late/percentage).
       var st = stats[name] || {present:0, absent:0, late:0, total:0, pct:0};
       var pctCls = 'att-stat att-stat-pct';
@@ -7892,6 +8081,143 @@ function saveAllAttendance() {
 
 loadGroups();
 _attLoadTemplates();
+
+/* ── Center mode + per-row class meta (مدة الحصة / نوع الحصة) ──── */
+var _attCenterMode  = '\u062D\u0636\u0648\u0631\u064A';      /* default */
+var _attMetaCache   = {};   /* sid → {class_duration, class_type, warning} */
+var _attMetaOverride= {};   /* sid → {class_duration, class_type} (per-save override) */
+
+function _attBannerEmoji(mode){ if (mode === 'أونلاين') return String.fromCodePoint(0x1F4BB); if (mode === 'رمضان') return String.fromCodePoint(0x1F319); return String.fromCodePoint(0x1F3EB); }
+function attLoadCenterMode(){
+  fetch('/api/center/mode', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.mode) {
+        _attCenterMode = d.mode;
+        var b = document.getElementById('att-mode-banner');
+        var t = document.getElementById('att-mode-text');
+        if (t) t.textContent = _attBannerEmoji(d.mode) + ' \u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632: ' + d.mode;
+        if (b) b.style.display = 'block';
+      }
+    }).catch(function(){});
+}
+function _attLoadMetaForRow(td){
+  var sid = parseInt(td.getAttribute('data-sid'), 10);
+  if (!sid) return;
+  if (_attMetaCache[sid]){ _attRenderMetaCell(td, _attMetaCache[sid]); return; }
+  fetch('/api/center/auto-meta?student_id=' + sid, {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.meta){
+        _attMetaCache[sid] = d.meta;
+        _attRenderMetaCell(td, d.meta);
+      }
+    }).catch(function(){});
+}
+function _attMetaEffective(sid){
+  var ov = _attMetaOverride[sid];
+  var auto = _attMetaCache[sid] || {};
+  return {
+    class_duration: (ov && ov.class_duration != null) ? ov.class_duration : (auto.class_duration || ''),
+    class_type:     (ov && ov.class_type     != null) ? ov.class_type     : (auto.class_type     || _attCenterMode),
+    warning:        auto.warning || ''
+  };
+}
+function _attRenderMetaCell(td, meta){
+  var sid = parseInt(td.getAttribute('data-sid'), 10);
+  var eff = _attMetaEffective(sid);
+  var dur = eff.class_duration || '\u2014';
+  var typ = eff.class_type || '\u2014';
+  var warn = eff.warning ? (' <span style="color:#c62828;font-size:11px;display:block;">' + eff.warning + '</span>') : '';
+  var ovBadge = _attMetaOverride[sid] ? ' <span style="background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:6px;font-size:10.5px;font-weight:800;">\u0645\u062E\u0635\u0635</span>' : '';
+  var span = td.querySelector('.att-meta-text');
+  if (span){
+    span.style.opacity = '1';
+    span.innerHTML = '<span style="font-weight:700;">' + dur + '</span> \u2022 ' + typ + ovBadge + warn;
+  }
+}
+function attOpenMetaEditor(btn){
+  var td = btn.closest('.att-meta-cell'); if (!td) return;
+  var sid = parseInt(td.getAttribute('data-sid'), 10) || 0;
+  if (!sid){ showToast('\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u062A\u062E\u0635\u064A\u0635 \u062F\u0648\u0646 \u0631\u0642\u0645 \u0637\u0627\u0644\u0628', '#e53935'); return; }
+  var eff = _attMetaEffective(sid);
+  var newDur = window.prompt('\u0645\u062F\u0629 \u0627\u0644\u062D\u0635\u0629 (\u0628\u0627\u0644\u062F\u0642\u0627\u0626\u0642):', eff.class_duration || '');
+  if (newDur === null) return;
+  var newTyp = window.prompt('\u0646\u0648\u0639 \u0627\u0644\u062D\u0635\u0629 (\u062D\u0636\u0648\u0631\u064A / \u0623\u0648\u0646\u0644\u0627\u064A\u0646 / \u0631\u0645\u0636\u0627\u0646):', eff.class_type || _attCenterMode);
+  if (newTyp === null) return;
+  newDur = (newDur || '').trim();
+  newTyp = (newTyp || '').trim();
+  if (!newDur && !newTyp){
+    delete _attMetaOverride[sid];
+  } else {
+    _attMetaOverride[sid] = { class_duration: newDur, class_type: newTyp };
+  }
+  _attRenderMetaCell(td, _attMetaCache[sid] || {});
+}
+/* Hook into renderTable so newly-rendered rows kick off their meta
+   fetch automatically. We wrap the existing renderTable. */
+(function(){
+  var _origRender = window.renderTable;
+  if (typeof _origRender !== 'function') return;
+  window.renderTable = function(){
+    var ret = _origRender.apply(this, arguments);
+    var cells = document.querySelectorAll('#attTableBody .att-meta-cell');
+    for (var i=0;i<cells.length;i++) _attLoadMetaForRow(cells[i]);
+    return ret;
+  };
+})();
+/* Patch saveAllAttendance to attach class_duration / class_type per
+   row from the cache + per-row override. Done by intercepting the
+   saves[] / updates[] arrays via a post-hook. */
+(function(){
+  var _origSave = window.saveAllAttendance;
+  if (typeof _origSave !== 'function') return;
+  window.saveAllAttendance = function(){
+    /* Pre-compute meta for every row's input element so the body the
+       backend sees carries the resolved values. We monkey-patch
+       Array.prototype.push only on the local arrays — easier: shadow
+       the document.querySelectorAll output by tagging each select
+       with the resolved meta as data-attrs, then have _origSave
+       behave normally — _origSave doesn't read those, so we instead
+       need a different approach. */
+    /* Direct approach: walk the rows, build the same payload _origSave
+       would, then call /api/attendance directly. We can't easily
+       reuse _origSave; safest is to call it but ALSO patch fetch to
+       inject our fields just for these requests. */
+    var _origFetch = window.fetch;
+    function _attEnrichBody(rec){
+      try {
+        var sel = document.querySelector('#attTableBody .status-select[data-name="' + (rec.student_name||'').replace(/"/g,'\\"') + '"]');
+        var td = sel ? sel.closest('tr').querySelector('.att-meta-cell') : null;
+        var sid = td ? parseInt(td.getAttribute('data-sid'), 10) : 0;
+        if (sid){
+          var eff = _attMetaEffective(sid);
+          if (rec.class_duration == null || rec.class_duration === '') rec.class_duration = eff.class_duration || '';
+          if (rec.class_type     == null || rec.class_type     === '') rec.class_type     = eff.class_type     || _attCenterMode;
+        }
+      } catch(e){}
+      return rec;
+    }
+    window.fetch = function(url, opts){
+      try {
+        if (typeof url === 'string' && /\/api\/attendance(?:$|\/(?:\d+))/.test(url) && opts && opts.body){
+          var rec = JSON.parse(opts.body);
+          rec = _attEnrichBody(rec);
+          opts = Object.assign({}, opts, { body: JSON.stringify(rec) });
+        }
+      } catch(e){}
+      return _origFetch.apply(this, [url, opts]);
+    };
+    try { return _origSave.apply(this, arguments); }
+    finally {
+      /* Restore after a tick so all the in-flight fetches in this
+         save call still see our wrapper, but later unrelated calls
+         don't get patched. */
+      setTimeout(function(){ window.fetch = _origFetch; }, 5000);
+    }
+  };
+})();
+attLoadCenterMode();
 </script>
 </body>
 </html>"""
@@ -11696,8 +12022,10 @@ def login():
 def dashboard():
     user = session.get("user") or {}
     username = user.get("username") or user.get("name") or ""
+    role = (user.get("role") or "").strip().lower()
     return (
         HOME_HTML
+        .replace("USER_ROLE_PLACEHOLDER", role)
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
     )
@@ -15988,6 +16316,29 @@ def api_teacher_attendance_save():
             "contact_number":  contact,
             "status":          status,
         }
+        # Honor per-row override if the client sent one; otherwise
+        # auto-resolve via the active center mode + the student's
+        # group references.
+        try:
+            sid_lookup = db.execute(
+                "SELECT id FROM students WHERE TRIM(student_name)=TRIM(?) LIMIT 1",
+                (sname,),
+            ).fetchone()
+        except Exception:
+            sid_lookup = None
+        _sid = sid_lookup[0] if sid_lookup else None
+        _override_dur = (raw.get("class_duration") or "").strip() if isinstance(raw, dict) else ""
+        _override_typ = (raw.get("class_type")     or "").strip() if isinstance(raw, dict) else ""
+        if _override_dur or _override_typ:
+            if _override_dur: body["class_duration"] = _override_dur
+            if _override_typ: body["class_type"]     = _override_typ
+        elif _sid:
+            try:
+                meta = _resolve_center_class_meta(db, _get_center_mode(db), _sid)
+                body["class_duration"] = meta.get("class_duration") or ""
+                body["class_type"]     = meta.get("class_type")     or ""
+            except Exception:
+                pass
         try:
             existing = db.execute(
                 "SELECT id FROM attendance WHERE student_name=? AND attendance_date=? AND group_name=?",
@@ -16956,6 +17307,154 @@ def _att_normalize_ar(s):
             prev_space = False
             out.append(ch)
     return "".join(out).strip()
+
+
+VALID_CENTER_MODES = ("\u062D\u0636\u0648\u0631\u064A", "\u0623\u0648\u0646\u0644\u0627\u064A\u0646", "\u0631\u0645\u0636\u0627\u0646")
+
+
+def _center_mode_default():
+    return "\u062D\u0636\u0648\u0631\u064A"
+
+
+def _get_center_mode(db):
+    """Read the active center mode from settings; default حضوري."""
+    try:
+        v = get_setting("system", "center_mode", _center_mode_default())
+    except Exception:
+        v = _center_mode_default()
+    v = (v or "").strip()
+    return v if v in VALID_CENTER_MODES else _center_mode_default()
+
+
+def _set_center_mode(db, mode):
+    mode = (mode or "").strip()
+    if mode not in VALID_CENTER_MODES:
+        return False
+    try:
+        cur = db.execute(
+            "UPDATE settings SET value=? WHERE page=? AND component=?",
+            (mode, "system", "center_mode"),
+        )
+        if cur.rowcount == 0:
+            db.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                ("system", "center_mode", "\u062D\u0627\u0644\u0629 \u0627\u0644\u0645\u0631\u0643\u0632", mode),
+            )
+        db.commit()
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_center_class_meta(db, mode, sid):
+    """For a student id + active center mode, return:
+       { class_duration, class_type, group, warning? }
+    by joining students.<group_name_student | group_online> against
+    student_groups.session_duration. Best-effort — never raises."""
+    if mode not in VALID_CENTER_MODES:
+        mode = _center_mode_default()
+    out = {"class_duration": "", "class_type": mode, "group": "",
+           "mode": mode, "warning": ""}
+    try:
+        s = db.execute(
+            "SELECT group_name_student, group_online FROM students WHERE id=?",
+            (sid,),
+        ).fetchone()
+    except Exception:
+        s = None
+    if not s:
+        return out
+    sd = dict(s) if hasattr(s, "keys") else {"group_name_student": s[0], "group_online": s[1]}
+    # Pick the group key per mode.
+    if mode == "\u0623\u0648\u0646\u0644\u0627\u064A\u0646":
+        gname = (sd.get("group_online") or "").strip()
+        if not gname:
+            out["warning"] = ("\u26A0 \u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0642\u0645 "
+                              "\u0645\u062C\u0645\u0648\u0639\u0629 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 "
+                              "\u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u2014 "
+                              "\u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u062E\u0635\u064A\u0635 "
+                              "\u064A\u062F\u0648\u064A\u0627\u064B")
+            return out
+    else:
+        gname = (sd.get("group_name_student") or "").strip()
+    out["group"] = gname
+    if not gname:
+        return out
+    # Look up the duration. For Ramadan, prefer a hypothetical
+    # ramadan-specific column if the admin ever adds one; otherwise
+    # fall back to session_duration. session_minutes_normal is a
+    # secondary fallback — some legacy groups use it.
+    try:
+        live_cols = {r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()}
+    except Exception:
+        live_cols = set()
+    cand_cols = []
+    if mode == "\u0631\u0645\u0636\u0627\u0646":
+        for c in ("ramadan_session_duration", "ramadan_duration", "ramadan_time", "session_duration", "session_minutes_normal"):
+            if c in live_cols: cand_cols.append(c)
+    else:
+        for c in ("session_duration", "session_minutes_normal"):
+            if c in live_cols: cand_cols.append(c)
+    for col in cand_cols:
+        try:
+            row = db.execute(
+                "SELECT \"" + col + "\" FROM student_groups "
+                "WHERE TRIM(group_name)=TRIM(?) LIMIT 1",
+                (gname,),
+            ).fetchone()
+        except Exception:
+            row = None
+        if row and row[0] is not None and str(row[0]).strip():
+            out["class_duration"] = str(row[0]).strip()
+            break
+    if not out["class_duration"]:
+        out["warning"] = ("\u26A0 \u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u062F\u0629 "
+                          "\u0645\u062D\u062F\u062F\u0629 \u0644\u0644\u0645\u062C\u0645\u0648\u0639\u0629 "
+                          "\u0641\u064A \u062C\u062F\u0648\u0644 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A")
+    return out
+
+
+@app.route("/api/center/mode", methods=["GET"])
+@login_required
+def api_center_mode_get():
+    db = get_db()
+    return jsonify({"ok": True, "mode": _get_center_mode(db),
+                    "modes": list(VALID_CENTER_MODES)})
+
+
+@app.route("/api/center/mode", methods=["PATCH", "PUT"])
+@login_required
+def api_center_mode_set():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "admin":
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    d = request.get_json() or {}
+    mode = (d.get("mode") or "").strip()
+    if mode not in VALID_CENTER_MODES:
+        return jsonify({"ok": False, "error": "invalid mode"}), 400
+    db = get_db()
+    if not _set_center_mode(db, mode):
+        return jsonify({"ok": False, "error": "save failed"}), 500
+    return jsonify({"ok": True, "mode": mode})
+
+
+@app.route("/api/center/auto-meta", methods=["GET"])
+@login_required
+def api_center_auto_meta():
+    """Resolve (class_duration, class_type) for a single student under
+    the current center mode. Used by the attendance pages to pre-fill
+    rows. The mode query param (optional) lets a teacher preview a
+    different mode without changing the global setting."""
+    try:
+        sid = int(request.args.get("student_id") or 0)
+    except Exception:
+        sid = 0
+    if not sid:
+        return jsonify({"ok": False, "error": "student_id required"}), 400
+    db = get_db()
+    mode = (request.args.get("mode") or "").strip() or _get_center_mode(db)
+    return jsonify({"ok": True, "meta": _resolve_center_class_meta(db, mode, sid)})
 
 
 @app.route("/api/attendance/check", methods=["GET"])
