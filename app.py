@@ -6548,6 +6548,344 @@ function pmDueSaveTemplate(){
 <div id="srm-type-modal" class="srm-type-bg"><div class="srm-type-box"><h3 id="srm-type-title">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</h3><p id="srm-type-msg"></p><span class="srm-type-expected" id="srm-type-expected"></span><input class="srm-type-input" id="srm-type-input" type="text" placeholder="&#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628; &#x643;&#x645;&#x627; &#x647;&#x648;"><div class="srm-type-actions"><button class="srm-btn-delete" id="srm-type-yes">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;</button><button class="srm-btn-cancel-edit" id="srm-type-no">&#x625;&#x644;&#x63A;&#x627;&#x621;</button></div></div></div><div id="srm-log-modal" class="srm-log-bg"><div class="srm-log-box"><div class="srm-log-head">&#x1F4CB; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x63A;&#x64A;&#x64A;&#x631;&#x627;&#x62A; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x641;&#x638;</div><div class="srm-log-body" id="srm-log-body"></div><div class="srm-log-actions"><button class="srm-btn-save" id="srm-log-yes">&#x646;&#x639;&#x645;&#x60C; &#x627;&#x62D;&#x641;&#x638;</button><button class="srm-btn-cancel-edit" id="srm-log-no">&#x631;&#x627;&#x62C;&#x639; &#x645;&#x631;&#x629; &#x623;&#x62E;&#x631;&#x649;</button></div></div></div><div id="srm-auto-lock" class="srm-auto-lock-banner">&#x1F6AB; &#x62A;&#x645; &#x625;&#x644;&#x63A;&#x627;&#x621; &#x627;&#x644;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x628;&#x633;&#x628;&#x628; &#x639;&#x62F;&#x645; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;</div>
 </body>
 </html>"""
+TEACHER_ATTENDANCE_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>&#x631;&#x635;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; - &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:#f5f3ff;min-height:100vh;direction:rtl;}
+.topbar{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.topbar h1{font-size:20px;font-weight:800;}
+.topbar .who{font-size:13px;opacity:.92;font-weight:600;}
+.btn-back{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.5);padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+.btn-back:hover{background:rgba(255,255,255,.3);}
+.main{padding:24px 28px;max-width:1100px;margin:0 auto;}
+.card{background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 2px 14px rgba(0,137,123,.1);margin-bottom:24px;}
+.controls-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+.ctrl-group{display:flex;flex-direction:column;gap:5px;}
+.ctrl-label{font-size:12px;font-weight:700;color:#00897B;}
+select.group-select,input.date-input{padding:10px 16px;border:1.5px solid #80CBC4;border-radius:10px;font-size:15px;font-weight:600;color:#333;background:#f0fdfc;outline:none;min-width:200px;cursor:pointer;}
+input.date-input{direction:ltr;min-width:160px;}
+select.group-select:focus,input.date-input:focus{border-color:#00897B;background:#fff;}
+.day-badge{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border-radius:10px;font-size:15px;font-weight:700;min-width:110px;}
+.day-badge.empty{background:#e0f2f1;color:#9e9e9e;font-weight:600;}
+.alert{display:none;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:16px;align-items:center;gap:10px;}
+.alert.exists{background:#fff3e0;border:2px solid #FB8C00;color:#e65100;display:flex;}
+.alert.fresh{background:#e8f5e9;border:2px solid #43A047;color:#2e7d32;display:flex;}
+.tbl-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
+.tbl-wrap table{width:100%;border-collapse:collapse;}
+.tbl-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
+.tbl-wrap th{padding:13px 18px;font-size:14px;font-weight:700;text-align:right;}
+.tbl-wrap td{padding:11px 16px;font-size:14px;border-bottom:1px solid #f0f4f3;color:#333;}
+.tbl-wrap tr:hover td{background:#f6fcfb;}
+.idx-col{width:48px;color:#999;font-weight:700;text-align:center;}
+select.status-sel{padding:7px 12px;border:1.4px solid #80CBC4;border-radius:8px;font-size:13.5px;font-weight:600;background:#fff;cursor:pointer;}
+select.status-sel.present{border-color:#43A047;color:#1b5e20;background:#e8f5e9;}
+select.status-sel.absent{border-color:#e53935;color:#c62828;background:#ffebee;}
+select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
+.foot-btns{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap;}
+.btn-save{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;border:none;padding:12px 30px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+.btn-save:hover{filter:brightness(1.08);}
+.btn-save:disabled{background:#b2dfdb;cursor:not-allowed;}
+.btn-cancel{background:#fff;color:#e53935;border:2px solid #e53935;padding:11px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-cancel:hover{background:#fdecea;}
+.empty-msg{padding:30px 20px;text-align:center;color:#999;font-weight:600;font-size:14px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:12px 26px;border-radius:30px;font-weight:700;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.error{background:#c62828;}
+.summary-pills{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;font-weight:700;}
+.pill{padding:5px 12px;border-radius:999px;background:#e0f2f1;color:#00695c;}
+.pill.p{background:#e8f5e9;color:#1b5e20;}
+.pill.a{background:#ffebee;color:#c62828;}
+.pill.l{background:#fff3e0;color:#e65100;}
+@media (max-width:600px){
+  .main{padding:14px;}
+  .topbar{padding:12px 14px;}
+  .topbar h1{font-size:17px;}
+  select.group-select,input.date-input{min-width:0;width:100%;}
+  .ctrl-group{width:100%;}
+  .tbl-wrap th,.tbl-wrap td{padding:9px 10px;font-size:13px;}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>&#x1F4DA; &#x631;&#x635;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; &mdash; &#x648;&#x627;&#x62C;&#x647;&#x629; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;</h1>
+    <div class="who">USER_PLACEHOLDER</div>
+  </div>
+  <a href="/logout" class="btn-back">&#x062E;&#x0631;&#x0648;&#x062C;</a>
+</div>
+<div class="main">
+  <div class="card">
+    <div class="controls-row">
+      <div class="ctrl-group">
+        <label class="ctrl-label">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
+        <select id="t-group" class="group-select" onchange="tLoadStudents()">
+          <option value="">&mdash; &#x627;&#x062E;&#x062A;&#x0631; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x062A;&#x0643; &mdash;</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label class="ctrl-label">&#x062A;&#x0627;&#x0631;&#x064A;&#x062E; &#x0627;&#x0644;&#x062D;&#x0635;&#x0629;</label>
+        <input type="date" id="t-date" class="date-input" onchange="tLoadStudents()">
+      </div>
+      <div class="ctrl-group">
+        <label class="ctrl-label">&#x0627;&#x0644;&#x064A;&#x0648;&#x0645;</label>
+        <span id="t-day" class="day-badge empty">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="t-alert" class="alert"></div>
+
+  <div class="card" id="t-table-card" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div style="font-size:17px;font-weight:800;color:#00897B;">&#x0642;&#x0627;&#x0626;&#x0645;&#x0629; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629;</div>
+      <div class="summary-pills" id="t-pills"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="idx-col">#</th>
+          <th>&#x0627;&#x0633;&#x0645; &#x0627;&#x0644;&#x0637;&#x0627;&#x0644;&#x0628;</th>
+          <th style="width:200px;">&#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x062D;&#x0636;&#x0648;&#x0631;</th>
+        </tr></thead>
+        <tbody id="t-tbody"></tbody>
+      </table>
+    </div>
+    <div class="foot-btns">
+      <button id="t-save" class="btn-save" onclick="tSave()">&#x1F4BE; &#x062D;&#x0641;&#x0638; &#x0627;&#x0644;&#x062D;&#x0636;&#x0648;&#x0631;</button>
+      <button class="btn-cancel" onclick="tReset()">&#x0625;&#x0644;&#x063A;&#x0627;&#x0621;</button>
+    </div>
+  </div>
+
+  <div id="t-empty" class="card empty-msg">&mdash; &#x0627;&#x062E;&#x062A;&#x0631; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0629; &#x0648;&#x062A;&#x0627;&#x0631;&#x064A;&#x062E;&#x0627;&#x064B; &#x0644;&#x0639;&#x0631;&#x0636; &#x0627;&#x0644;&#x0637;&#x0644;&#x0628;&#x0629; &mdash;</div>
+</div>
+<div id="t-toast" class="toast"></div>
+
+<script>
+var _tStudents = []; /* current list, each: {name, status, contact} */
+var _tExisting = false;
+
+function _tToast(msg, kind){
+  var el = document.getElementById('t-toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (kind === 'error' ? ' error' : '');
+  setTimeout(function(){ el.className = 'toast'; }, 2400);
+}
+
+function _tDayName(iso){
+  if (!iso) return '';
+  try {
+    var d = new Date(iso + 'T00:00:00');
+    var names = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    return names[d.getDay()] || '';
+  } catch(e){ return ''; }
+}
+
+function _tStatusClass(s){
+  if (s === 'حاضر') return 'present';
+  if (s === 'غائب') return 'absent';
+  if (s === 'متأخر') return 'late';
+  return '';
+}
+
+function _tEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _tRender(){
+  var tb = document.getElementById('t-tbody');
+  if (!_tStudents.length){
+    tb.innerHTML = '<tr><td colspan="3" class="empty-msg">لا يوجد طلبة في هذه المجموعة</td></tr>';
+    document.getElementById('t-pills').innerHTML = '';
+    return;
+  }
+  var html = '';
+  for (var i=0;i<_tStudents.length;i++){
+    var s = _tStudents[i];
+    var st = s.status || '';
+    var cls = _tStatusClass(st);
+    html += '<tr>';
+    html += '<td class="idx-col">' + (i+1) + '</td>';
+    html += '<td><b>' + _tEsc(s.name) + '</b></td>';
+    html += '<td>'
+      + '<select class="status-sel ' + cls + '" data-i="' + i + '" onchange="_tStatusChanged(this)">'
+      + '<option value=""' + (st === '' ? ' selected' : '') + '>— اختر —</option>'
+      + '<option value="حاضر"' + (st === 'حاضر' ? ' selected' : '') + '>حاضر</option>'
+      + '<option value="غائب"' + (st === 'غائب' ? ' selected' : '') + '>غائب</option>'
+      + '<option value="متأخر"' + (st === 'متأخر' ? ' selected' : '') + '>متأخر</option>'
+      + '</select>'
+      + '</td>';
+    html += '</tr>';
+  }
+  tb.innerHTML = html;
+  _tUpdatePills();
+}
+
+function _tStatusChanged(sel){
+  var i = parseInt(sel.dataset.i, 10);
+  if (isNaN(i)) return;
+  _tStudents[i].status = sel.value || '';
+  sel.className = 'status-sel ' + _tStatusClass(sel.value);
+  _tUpdatePills();
+}
+
+function _tUpdatePills(){
+  var p = 0, a = 0, l = 0, n = 0;
+  for (var i=0;i<_tStudents.length;i++){
+    var s = _tStudents[i].status || '';
+    if      (s === 'حاضر') p++;
+    else if (s === 'غائب') a++;
+    else if (s === 'متأخر') l++;
+    else n++;
+  }
+  document.getElementById('t-pills').innerHTML =
+    '<span class="pill p">حاضر: ' + p + '</span>'
+  + '<span class="pill a">غائب: ' + a + '</span>'
+  + '<span class="pill l">متأخر: ' + l + '</span>'
+  + '<span class="pill">غير محدد: ' + n + '</span>';
+}
+
+function _tShowAlert(text, kind){
+  var el = document.getElementById('t-alert');
+  if (!text){ el.style.display = 'none'; el.className = 'alert'; return; }
+  el.textContent = text;
+  el.className = 'alert ' + (kind || 'fresh');
+}
+
+function tLoadGroups(){
+  var sel = document.getElementById('t-group');
+  fetch('/api/teacher/groups', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){ _tToast(d && d.error || 'خطأ في تحميل المجموعات','error'); return; }
+      var groups = d.groups || [];
+      sel.innerHTML = '<option value="">— اختر مجموعتك —</option>';
+      for (var i=0;i<groups.length;i++){
+        var o = document.createElement('option');
+        o.value = groups[i]; o.textContent = groups[i];
+        sel.appendChild(o);
+      }
+      if (!groups.length){
+        sel.innerHTML = '<option value="">— لا توجد مجموعات مسندة لك —</option>';
+      }
+    })
+    .catch(function(){ _tToast('خطأ في الاتصال','error'); });
+}
+
+function tLoadStudents(){
+  var g = document.getElementById('t-group').value;
+  var d = document.getElementById('t-date').value;
+  var dayBadge = document.getElementById('t-day');
+  if (d){ dayBadge.textContent = _tDayName(d) || '—'; dayBadge.className = 'day-badge'; }
+  else  { dayBadge.textContent = '—'; dayBadge.className = 'day-badge empty'; }
+  if (!g || !d){
+    document.getElementById('t-table-card').style.display = 'none';
+    document.getElementById('t-empty').style.display = 'block';
+    _tShowAlert('');
+    return;
+  }
+  Promise.all([
+    fetch('/api/teacher/students?group=' + encodeURIComponent(g), {credentials:'include'}).then(function(r){return r.json();}),
+    fetch('/api/teacher/attendance/check?group=' + encodeURIComponent(g) + '&date=' + encodeURIComponent(d), {credentials:'include'}).then(function(r){return r.json();})
+  ]).then(function(arr){
+    var studentsResp = arr[0] || {};
+    var checkResp = arr[1] || {};
+    if (!studentsResp.ok){
+      _tToast(studentsResp.error || 'خطأ في تحميل الطلبة','error');
+      return;
+    }
+    var students = studentsResp.students || [];
+    var prior = {};
+    var existsList = (checkResp && checkResp.records) || [];
+    for (var i=0;i<existsList.length;i++){
+      var rec = existsList[i];
+      prior[(rec.student_name || '').trim()] = rec;
+    }
+    _tStudents = students.map(function(s){
+      var p = prior[(s.name || '').trim()];
+      return {
+        name:   s.name,
+        contact: s.whatsapp || '',
+        status: p ? (p.status || '') : ''
+      };
+    });
+    _tExisting = existsList.length > 0;
+    if (_tExisting){
+      _tShowAlert('⚠ توجد بيانات غياب مسجلة سابقاً لهذه المجموعة في هذا التاريخ — تم تحميل البيانات الحالية للتعديل', 'exists');
+    } else {
+      _tShowAlert('✨ لا توجد بيانات سابقة — سجل حضور اليوم', 'fresh');
+    }
+    document.getElementById('t-table-card').style.display = '';
+    document.getElementById('t-empty').style.display = 'none';
+    _tRender();
+  }).catch(function(){ _tToast('خطأ في الاتصال','error'); });
+}
+
+function tReset(){
+  document.getElementById('t-group').value = '';
+  document.getElementById('t-date').value = '';
+  document.getElementById('t-day').textContent = '—';
+  document.getElementById('t-day').className = 'day-badge empty';
+  document.getElementById('t-table-card').style.display = 'none';
+  document.getElementById('t-empty').style.display = 'block';
+  _tShowAlert('');
+  _tStudents = [];
+  _tExisting = false;
+}
+
+function tSave(){
+  var g = document.getElementById('t-group').value;
+  var d = document.getElementById('t-date').value;
+  if (!g || !d){ _tToast('اختر مجموعة وتاريخاً','error'); return; }
+  if (!_tStudents.length){ _tToast('لا يوجد طلبة','error'); return; }
+  var rows = _tStudents.map(function(s){
+    return { student_name:s.name, status:s.status || '', contact_number:s.contact || '' };
+  });
+  var btn = document.getElementById('t-save');
+  var prev = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ جاري الحفظ...';
+  fetch('/api/teacher/attendance', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ group_name:g, attendance_date:d, day_name:_tDayName(d), rows: rows })
+  })
+    .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; }); })
+    .then(function(p){
+      btn.disabled = false; btn.innerHTML = prev;
+      var d2 = p.body || {};
+      if (!d2.ok){
+        _tToast(d2.error || 'خطأ في الحفظ','error'); return;
+      }
+      _tToast('✅ تم حفظ الحضور — جديد: ' + (d2.inserted||0) + '، تعديل: ' + (d2.updated||0));
+      _tExisting = true;
+      _tShowAlert('✔ تم حفظ بيانات الحضور بنجاح','exists');
+    })
+    .catch(function(){
+      btn.disabled = false; btn.innerHTML = prev;
+      _tToast('خطأ في الاتصال','error');
+    });
+}
+
+/* Default the date input to today + load groups on page open. */
+(function(){
+  var dt = document.getElementById('t-date');
+  var today = new Date();
+  var iso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  dt.value = iso;
+  document.getElementById('t-day').textContent = _tDayName(iso);
+  document.getElementById('t-day').className = 'day-badge';
+  tLoadGroups();
+})();
+</script>
+</body>
+</html>"""
+
 ATTENDANCE_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -11124,6 +11462,9 @@ def login():
     if not user:
         return render_login("&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x627;&#x648; &#x643;&#x644;&#x645;&#x629; &#x627;&#x644;&#x645;&#x631;&#x648;&#x631; &#x63A;&#x644;&#x637;"), 401
     session["user"] = dict(user)
+    role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
+    if role == "teacher":
+        return redirect("/teacher/attendance")
     return redirect("/dashboard")
 
 @app.route("/dashboard")
@@ -14844,6 +15185,214 @@ def api_eval_columns_update(col_key):
         return jsonify({"ok":True})
     except Exception as ex:
         return jsonify({"ok":False,"error":str(ex)}),400
+
+
+def _teacher_match_keys(user):
+    """Return the set of lower-cased identifiers that count as
+    "this teacher" for the purposes of group ownership. Uses both
+    the username and the human name so a `student_groups.teacher_name`
+    of either form matches."""
+    if not user:
+        return set()
+    keys = set()
+    for k in ("username", "name"):
+        v = user.get(k)
+        if v:
+            keys.add(str(v).strip().lower())
+    return keys
+
+
+def _teacher_groups_for(db, user):
+    """List of group_name strings owned by this teacher. Empty when
+    the user has no role=teacher binding or no matching teacher_name
+    in student_groups."""
+    keys = _teacher_match_keys(user)
+    if not keys:
+        return []
+    try:
+        rows = db.execute(
+            "SELECT group_name, teacher_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        gn = (r[0] or '').strip()
+        tn = (r[1] or '').strip().lower()
+        if gn and tn and tn in keys:
+            out.append(gn)
+    seen = set(); deduped = []
+    for g in out:
+        if g not in seen:
+            seen.add(g); deduped.append(g)
+    deduped.sort()
+    return deduped
+
+
+def _require_teacher():
+    """Returns (user_dict, error_response_or_None). Used at the top
+    of every /api/teacher/* route to gate access."""
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "teacher":
+        return user, (jsonify({"ok": False, "error": "forbidden"}), 403)
+    return user, None
+
+
+@app.route('/teacher/attendance')
+@login_required
+def teacher_attendance_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "teacher":
+        return redirect("/dashboard")
+    who = (user.get("name") or user.get("username") or "").strip()
+    return TEACHER_ATTENDANCE_HTML.replace("USER_PLACEHOLDER", who)
+
+
+@app.route('/api/teacher/groups', methods=['GET'])
+@login_required
+def api_teacher_groups():
+    user, err = _require_teacher()
+    if err: return err
+    db = get_db()
+    return jsonify({"ok": True, "groups": _teacher_groups_for(db, user)})
+
+
+@app.route('/api/teacher/students', methods=['GET'])
+@login_required
+def api_teacher_students():
+    user, err = _require_teacher()
+    if err: return err
+    group = (request.args.get('group') or '').strip()
+    if not group:
+        return jsonify({"ok": False, "error": "group is required"}), 400
+    db = get_db()
+    own = _teacher_groups_for(db, user)
+    if group not in own:
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live = set()
+    has_online = (online_col in live and online_col != in_col)
+    where = '"' + in_col + '" = ?'
+    params = (group,)
+    if has_online:
+        where = '"' + in_col + '" = ? OR "' + online_col + '" = ?'
+        params = (group, group)
+    try:
+        rows = db.execute(
+            'SELECT id, student_name, whatsapp FROM students WHERE ' + where +
+            ' ORDER BY student_name', params
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = []
+    for r in rows:
+        nm = (r[1] or '').strip()
+        if not nm: continue
+        out.append({"id": r[0], "name": nm, "whatsapp": r[2] or ''})
+    return jsonify({"ok": True, "students": out, "group": group})
+
+
+@app.route('/api/teacher/attendance/check', methods=['GET'])
+@login_required
+def api_teacher_attendance_check():
+    user, err = _require_teacher()
+    if err: return err
+    group = (request.args.get('group') or '').strip()
+    date  = (request.args.get('date')  or '').strip()
+    if not group or not date:
+        return jsonify({"ok": True, "exists": False, "records": []})
+    db = get_db()
+    if group not in _teacher_groups_for(db, user):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    target = _att_normalize_date(date)
+    rows = db.execute(
+        "SELECT * FROM attendance WHERE TRIM(group_name)=TRIM(?)",
+        (group,)
+    ).fetchall()
+    out = []
+    for r in rows:
+        if _att_normalize_date(r["attendance_date"]) == target:
+            out.append(dict(r))
+    return jsonify({"ok": True, "exists": len(out) > 0, "records": out})
+
+
+@app.route('/api/teacher/attendance', methods=['POST'])
+@login_required
+def api_teacher_attendance_save():
+    """Bulk save: upserts each row in `rows` keyed by
+    (attendance_date, group_name, student_name). Mirrors the رصد
+    الغياب POST behaviour. Permission-gated to the teacher's own
+    groups."""
+    user, err = _require_teacher()
+    if err: return err
+    d = request.get_json() or {}
+    group = (d.get('group_name') or '').strip()
+    date_raw = (d.get('attendance_date') or '').strip()
+    day_name = (d.get('day_name') or '').strip()
+    rows = d.get('rows') or []
+    if not group or not date_raw:
+        return jsonify({"ok": False, "error": "group_name and attendance_date are required"}), 400
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows must be a list"}), 400
+    db = get_db()
+    if group not in _teacher_groups_for(db, user):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    iso_date = _att_normalize_date(date_raw) or date_raw
+    inserted = 0; updated = 0; skipped = 0
+    for raw in rows:
+        if not isinstance(raw, dict):
+            skipped += 1; continue
+        sname = (raw.get('student_name') or '').strip()
+        sname = " ".join(sname.split())
+        if not sname:
+            skipped += 1; continue
+        status = (raw.get('status') or '').strip()
+        if status:
+            status = STATUS_REMAP.get(status, status)
+        contact = (raw.get('contact_number') or '').strip()
+        try:
+            existing = db.execute(
+                "SELECT id FROM attendance WHERE student_name=? AND attendance_date=? AND group_name=?",
+                (sname, iso_date, group),
+            ).fetchone()
+        except Exception:
+            existing = None
+        if existing:
+            try:
+                db.execute(
+                    "UPDATE attendance SET day_name=?, contact_number=?, status=? WHERE id=?",
+                    (day_name, contact, status, existing[0]),
+                )
+                updated += 1
+            except Exception:
+                skipped += 1
+        else:
+            try:
+                db.execute(
+                    "INSERT INTO attendance(attendance_date, day_name, group_name, "
+                    "student_name, contact_number, status, message, message_status, study_status) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
+                    (iso_date, day_name, group, sname, contact, status, '', '', ''),
+                )
+                inserted += 1
+            except Exception:
+                skipped += 1
+    db.commit()
+    return jsonify({
+        "ok": True,
+        "inserted": inserted,
+        "updated":  updated,
+        "skipped":  skipped,
+    })
 
 
 @app.route('/api/attendance', methods=['GET'])
