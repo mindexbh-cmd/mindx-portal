@@ -2043,6 +2043,141 @@ if True:
         except Exception: pass
         db2.commit()
 
+    # employee_logins_v1 — ensure the three real employee accounts can
+    # log in with their personal-ID as both username and password. They
+    # were never part of the seeded set, so prod was rejecting them at
+    # the login query (no users row matched). Idempotent: each account
+    # is upserted by name-fragment first (re-uses an existing row if
+    # the employee was created earlier under a different username) and
+    # falls back to INSERT only when no fuzzy match exists.
+    #
+    # Rules: personal_id stored as TEXT (leading zeros preserved);
+    # password = hp(personal_id); must_change_pw = 0; never overwrite
+    # an unrelated account that happens to share a target username.
+    if "employee_logins_v1" not in applied:
+        import sys as _sys_emp
+        _emp_targets = [
+            ("021005931", "أحمد يونس",    "admin",   ["أحمد يونس", "احمد يونس", "احمد يونس", "أحمد يونس", "يونس"]),
+            ("010307885", "أحمد إبراهيم", "manager", ["أحمد إبراهيم", "احمد ابراهيم", "احمد إبراهيم", "أحمد ابراهيم", "إبراهيم", "ابراهيم"]),
+            ("980909805", "رائد",          "manager", ["رائد", "رايد"]),
+        ]
+        for _pid, _full_name, _role, _name_frags in _emp_targets:
+            try:
+                _hash = hp(_pid)
+                # 1. If a row already has this username, only patch the
+                #    fields we own; never silently overwrite an unrelated
+                #    person who happens to occupy the same username.
+                try:
+                    _existing = db2.execute(
+                        "SELECT id, name FROM users WHERE username=?", (_pid,),
+                    ).fetchone()
+                except Exception:
+                    _existing = None
+                if _existing:
+                    _ex = dict(_existing)
+                    _ex_name = (_ex.get("name") or "").strip()
+                    if _ex_name and _ex_name != _full_name and not any(
+                        f in _ex_name for f in _name_frags
+                    ):
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] SKIP collision: username " + _pid +
+                            " already taken by '" + _ex_name + "'\n"
+                        )
+                        continue
+                    try:
+                        db2.execute(
+                            "UPDATE users SET password=?, role=?, name=?, "
+                            "must_change_pw=0 WHERE id=?",
+                            (_hash, _role, _full_name, _ex["id"]),
+                        )
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] OK refresh: " + _pid +
+                            " (" + _full_name + " / " + _role + ")\n"
+                        )
+                    except Exception as _ex_upd:
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] update failed for " + _pid +
+                            ": " + str(_ex_upd) + "\n"
+                        )
+                    continue
+                # 2. No exact-username match. Try name-fragment lookup so
+                #    an employee that was created earlier under, say,
+                #    "ahmed_younes" gets renamed in place to keep history.
+                _name_match = None
+                for _frag in _name_frags:
+                    try:
+                        _rows = db2.execute(
+                            "SELECT id, username, name, role FROM users "
+                            "WHERE name LIKE ?", ("%" + _frag + "%",),
+                        ).fetchall()
+                    except Exception:
+                        _rows = []
+                    # Filter out students/parents — those are bulk-provisioned
+                    # by personal-id and are not the same identity. Also drop
+                    # the four seeded utility accounts so we never clobber
+                    # admin/reception/teacher1/teacher2.
+                    _rows = [
+                        dict(_r) for _r in _rows
+                        if (dict(_r).get("role") or "").strip().lower()
+                            not in ("student", "parent", "parent_disabled")
+                        and (dict(_r).get("username") or "")
+                            not in ("admin", "reception", "teacher1", "teacher2")
+                    ]
+                    if len(_rows) == 1:
+                        _name_match = _rows[0]
+                        break
+                    if len(_rows) > 1:
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] AMBIGUOUS name match for '"
+                            + _frag + "' (" + str(len(_rows)) +
+                            " hits) — falling through to INSERT\n"
+                        )
+                        break
+                if _name_match:
+                    try:
+                        db2.execute(
+                            "UPDATE users SET username=?, password=?, role=?, "
+                            "name=?, must_change_pw=0 WHERE id=?",
+                            (_pid, _hash, _role, _full_name, _name_match["id"]),
+                        )
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] OK relink: id=" +
+                            str(_name_match["id"]) + " '" +
+                            (_name_match.get("name") or "") +
+                            "' -> username=" + _pid + " (" + _role + ")\n"
+                        )
+                    except Exception as _ex_rel:
+                        _sys_emp.stderr.write(
+                            "[employee_logins_v1] relink failed for " + _pid +
+                            ": " + str(_ex_rel) + "\n"
+                        )
+                    continue
+                # 3. Brand-new account.
+                try:
+                    db2.execute(
+                        "INSERT INTO users(username, password, name, role, "
+                        "must_change_pw) VALUES(?,?,?,?,?)",
+                        (_pid, _hash, _full_name, _role, 0),
+                    )
+                    _sys_emp.stderr.write(
+                        "[employee_logins_v1] OK create: " + _pid +
+                        " (" + _full_name + " / " + _role + ")\n"
+                    )
+                except Exception as _ex_ins:
+                    _sys_emp.stderr.write(
+                        "[employee_logins_v1] insert failed for " + _pid +
+                        ": " + str(_ex_ins) + "\n"
+                    )
+            except Exception as _ex_outer:
+                _sys_emp.stderr.write(
+                    "[employee_logins_v1] outer error for " + _pid +
+                    ": " + str(_ex_outer) + "\n"
+                )
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("employee_logins_v1",))
+        except Exception: pass
+        db2.commit()
+
     # Students table: turn three columns into dropdowns. Linked dropdowns
     # use the col_options="source:<table>:<value_col>:<label_col>" syntax
     # the JS renderCell + add/edit modal both understand. The fixed
