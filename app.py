@@ -4101,15 +4101,37 @@ function dhCopyParentLink(){
     <div style="padding:12px 16px 0;background:#f9f5ff;border-bottom:1px solid #e0d0f8;">
       <button type="button" onclick="srOpenAddStudent()" style="background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;padding:11px 22px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(46,125,50,.3);">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;</button>
     </div>
-    <div class="srm-search">
-      <input id="sr-query" type="text" oninput="srFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x2026;">
+    <!-- Search-mode toggle (Step 3 of safe re-impl). Default = طالب
+         so the existing flow is unchanged on open. Toggle JS lives
+         in /static/js/group_search.js (external) so the existing
+         inline-script block is never touched. -->
+    <div class="search-mode-toggle" style="display:flex;gap:6px;align-items:center;justify-content:center;background:#f9f5ff;padding:10px;border-bottom:1px solid #e0d0f8;">
+      <label style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #c4a8e8;border-radius:999px;padding:7px 16px;cursor:pointer;font-weight:800;color:#4a148c;font-family:inherit;font-size:14px;">
+        <input type="radio" name="search-mode" value="student" checked style="accent-color:#6B3FA0;">
+        &#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #c4a8e8;border-radius:999px;padding:7px 16px;cursor:pointer;font-weight:800;color:#4a148c;font-family:inherit;font-size:14px;">
+        <input type="radio" name="search-mode" value="group" style="accent-color:#6B3FA0;">
+        &#x1F465; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;
+      </label>
     </div>
-    <div class="srm-body">
-      <div id="sr-results"></div>
-      <div id="sr-details" style="margin-top:10px;"></div>
+    <!-- Existing student-search content — wrapped UNTOUCHED. -->
+    <div class="search-mode-student">
+      <div class="srm-search">
+        <input id="sr-query" type="text" oninput="srFilter()" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;&#x2026;">
+      </div>
+      <div class="srm-body">
+        <div id="sr-results"></div>
+        <div id="sr-details" style="margin-top:10px;"></div>
+      </div>
+    </div>
+    <!-- Empty placeholder for the new mode (filled in step 4). -->
+    <div class="search-mode-group" style="display:none;padding:30px 16px;text-align:center;color:#888;font-weight:700;font-family:inherit;">
+      &#x642;&#x631;&#x64A;&#x628;&#x627;&#x064B; ...
     </div>
   </div>
 </div>
+<script src="/static/js/group_search.js"></script>
 __STUDENT_FORM_MODAL__
 <script>
 /* ─── Add-student modal driver (search-modal) ────────────────────
