@@ -1938,6 +1938,33 @@ if True:
         except Exception: pass
         db2.commit()
 
+    # manual_adjust_behavior_v1 — seed a special "تعديل يدوي" behavior
+    # used by the bulk-adjust page (/points/bulk-adjust). Default
+    # points_value is 0; the actual delta is supplied per-call via the
+    # `points_override` parameter on /api/points/grant. The seed is
+    # idempotent — if a row with the same name already exists, do not
+    # add a duplicate. The pencil icon distinguishes manual adjustments
+    # from regular behavior grants in reports + parent notifications.
+    if "manual_adjust_behavior_v1" not in applied:
+        try:
+            existing = db2.execute(
+                "SELECT id FROM behaviors WHERE name_ar=?", ("تعديل يدوي",),
+            ).fetchone()
+        except Exception:
+            existing = None
+        if not existing:
+            try:
+                db2.execute(
+                    "INSERT INTO behaviors(name_ar, type, points_value, icon, color, "
+                    "created_by, is_global, is_active) VALUES(?,?,?,?,?,?,?,?)",
+                    ("تعديل يدوي", "neutral", 0, "✏", "#455A64", None, 1, 1),
+                )
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("manual_adjust_behavior_v1",))
+        except Exception: pass
+        db2.commit()
+
     # backup_log v2 — verification metadata columns. These are
     # populated by the new verified-backup pipeline; legacy rows
     # default to NULL/0 so the history tab can render "—" for them.
@@ -19627,9 +19654,17 @@ def api_pts_behaviors_delete(bid):
 @login_required
 def api_pts_grant():
     """Body: { student_ids: [int], behavior_id: int, group_name: str,
-    note?: str }. Permission: admin/manager always; teacher only if
-    group_name is one of their groups. Returns grant count and new
-    balances per student."""
+    note?: str, points_override?: int }. Permission: admin/manager
+    always; teacher only if group_name is one of their groups. Returns
+    grant count and new balances per student.
+
+    `points_override` (signed integer) lets the bulk-adjust page
+    (/points/bulk-adjust) re-use this exact endpoint with the special
+    "تعديل يدوي" behavior — the behavior's own points_value is 0, the
+    actual delta comes per-call. Clamped to [-1000, 1000] so a typo
+    can't blow up balances. All other side-effects (point_events row,
+    parent notifications, balance recomputation) are unchanged.
+    """
     user = session.get("user") or {}
     d = request.get_json(silent=True) or {}
     sids = d.get("student_ids") or []
@@ -19649,6 +19684,17 @@ def api_pts_grant():
         return jsonify({"ok": False, "error": "behavior_id required"}), 400
     group_name = (d.get("group_name") or "").strip()
     note       = (d.get("note") or "").strip()
+    # Optional custom delta (bulk-adjust). Falls back to None when
+    # absent so the legacy single-behavior flow uses behaviors.points_value.
+    points_override = None
+    if "points_override" in d and d.get("points_override") not in (None, "", 0):
+        try:
+            points_override = int(d.get("points_override"))
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid points_override"}), 400
+        # Sanity clamp — bigger deltas are almost always typos.
+        if points_override < -1000 or points_override > 1000:
+            return jsonify({"ok": False, "error": "points_override out of range"}), 400
     db = get_db()
     if not _pts_can_grant(db, user, group_name):
         return jsonify({"ok": False, "error": "forbidden for this group"}), 403
@@ -19665,6 +19711,8 @@ def api_pts_grant():
     if not bd.get("is_active"):
         return jsonify({"ok": False, "error": "behavior inactive"}), 400
     pv = int(bd.get("points_value") or 0)
+    if points_override is not None:
+        pv = points_override
     awarded_by = user.get("id") or 0
     awarded_by_name = (user.get("name") or user.get("username") or "").strip()
     notify_on = (get_setting("points", "auto_notify_parent", "0") or "0") == "1"
@@ -32050,6 +32098,8 @@ tr:hover{background:#fafafa;}
 </style></head><body>
 <div class="topbar">
   <h1>🌟 نظام النقاط — الإدارة</h1>
+  <span style="flex:1;"></span>
+  <a href="/points/bulk-adjust" style="background:linear-gradient(135deg,#FF8F00,#FB8C00);color:#fff;text-decoration:none;padding:8px 14px;border-radius:9px;font-weight:800;font-size:0.85rem;margin-left:8px;">⚙ إدارة سريعة للنقاط</a>
   <a href="/dashboard">← الرئيسية</a>
 </div>
 <div class="tabs">
@@ -32505,6 +32555,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 @keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
 .quick-att-btn{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;border:none;padding:8px 14px;border-radius:9px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.88rem;}
 .quick-att-btn:hover{filter:brightness(1.05);}
+.bulk-adj-btn{background:linear-gradient(135deg,#FF8F00,#FB8C00);color:#fff;text-decoration:none;padding:8px 14px;border-radius:9px;font-weight:800;font-size:0.85rem;}
+.bulk-adj-btn:hover{filter:brightness(1.05);}
 .qa-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:14px;}
 .qa-back.show{display:flex;}
 .qa-box{background:#fff;border-radius:14px;width:100%;max-width:980px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 48px rgba(0,0,0,.4);}
@@ -32525,6 +32577,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
   <h1>🌟 لوحة الصف</h1>
   <select id="grpSel" class="group-pick" onchange="changeGroup(this.value)"></select>
   <button id="quickAttBtn" type="button" class="quick-att-btn" onclick="openQuickAttendance()" style="display:__QA_DISP__;">📋 تسجيل حضور سريع</button>
+  <a class="bulk-adj-btn" href="/points/bulk-adjust">⚙ إدارة سريعة للنقاط</a>
   <a href="__BACK_HREF__">← الرئيسية</a>
 </div>
 <div class="body">
@@ -32764,6 +32817,383 @@ init();
 </body></html>"""
 
 
+# ── Bulk-adjust page (إدارة سريعة للنقاط) ─────────────────────────
+# Lets admin / manager / teacher push a custom signed delta to many
+# students in a group at once. Reuses the shared group-dropdown
+# formatter, the existing /api/points/grant endpoint with a
+# `points_override` parameter, and the seeded "تعديل يدوي" behavior so
+# every adjustment lands in point_events (and the parent-notification
+# pipeline) the same way regular grants do — distinguishable by the
+# behavior name + ✏ icon in reports.
+POINTS_BULK_ADJUST_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>إدارة سريعة للنقاط</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);position:sticky;top:0;z-index:10;}
+.topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:7px 14px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.body{max-width:980px;margin:14px auto;padding:0 14px;}
+.controls{background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 14px rgba(107,63,160,.10);margin-bottom:14px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+.controls label{font-weight:800;color:#4a148c;font-size:0.9rem;}
+.controls select,.controls input[type="text"]{padding:8px 12px;border:1.4px solid #c4a8e8;border-radius:9px;font-family:inherit;font-weight:600;background:#fff;color:#212121;min-width:240px;}
+.note-input{flex:1;min-width:220px;}
+.tbl-wrap{background:#fff;border-radius:14px;box-shadow:0 3px 14px rgba(107,63,160,.10);overflow:hidden;}
+.tbl-head{padding:10px 14px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;font-weight:900;font-size:0.95rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tbl-head .count{background:rgba(255,255,255,.2);padding:3px 10px;border-radius:999px;font-size:0.78rem;}
+.tbl-head .mode{margin-right:auto;font-size:0.78rem;font-weight:700;opacity:0.85;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl thead th{background:#f8f3ff;color:#4a148c;font-weight:800;text-align:right;padding:10px 12px;font-size:0.86rem;border-bottom:2px solid #e1d4ec;position:sticky;top:0;}
+.tbl tbody td{padding:10px 12px;border-bottom:1px solid #f0e7f8;font-size:0.92rem;}
+.tbl tbody tr:nth-child(even){background:#fbf7ff;}
+.tbl tbody tr:hover{background:#f5edff;}
+.av-cell{display:flex;align-items:center;gap:10px;}
+.bal{display:inline-block;background:#ede7f6;color:#4527a0;font-weight:900;border-radius:999px;padding:3px 12px;min-width:54px;text-align:center;font-size:0.92rem;}
+.bal.changed{background:#fff8e1;color:#e65100;animation:flash .55s ease;}
+@keyframes flash{0%{background:#ffd54f;}100%{background:#fff8e1;}}
+.adj-input{width:96px;padding:8px 10px;border:1.6px solid #ffd54f;background:#fff8e1;border-radius:9px;font-family:inherit;font-weight:800;font-size:1rem;text-align:center;color:#212121;}
+.adj-input:focus{outline:none;border-color:#FFA000;box-shadow:0 0 0 3px rgba(255,160,0,.15);}
+.adj-input.pos{color:#1B5E20;}
+.adj-input.neg{color:#c62828;}
+.toggle-sign{margin-right:6px;background:#ede7f6;color:#4527a0;border:1.4px solid #c4a8e8;width:28px;height:28px;border-radius:7px;cursor:pointer;font-weight:900;font-family:inherit;font-size:0.9rem;}
+.toggle-sign:hover{background:#d1c4e9;}
+.actions{display:flex;justify-content:center;gap:10px;margin:18px 0;flex-wrap:wrap;}
+.btn{padding:11px 26px;border:none;border-radius:10px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.95rem;}
+.btn-pri{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;box-shadow:0 4px 12px rgba(46,125,50,.30);}
+.btn-pri:hover{filter:brightness(1.05);transform:translateY(-1px);}
+.btn-pri:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+.btn-sec{background:#fff;color:#666;border:1.4px solid #ddd;}
+.btn-sec:hover{background:#fafafa;}
+.empty{padding:40px;text-align:center;color:#999;font-weight:700;}
+.progress{display:none;background:#fff8e1;color:#e65100;padding:10px 18px;border-radius:10px;font-weight:800;text-align:center;margin:10px 0;border:1.4px solid #ffd54f;}
+.progress.show{display:block;}
+.summary{display:none;background:#e8f5e9;color:#1B5E20;padding:12px 18px;border-radius:10px;font-weight:800;text-align:center;margin:10px 0;border:1.4px solid #66bb6a;}
+.summary.show{display:block;animation:popin .35s ease;}
+@keyframes popin{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
+.toast.show{display:block;animation:tin .25s ease;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+@media (max-width:680px){
+  /* Stacked-card layout for mobile. The table is replaced by per-row cards. */
+  .tbl thead{display:none;}
+  .tbl, .tbl tbody, .tbl tr, .tbl td{display:block;width:100%;}
+  .tbl tr{background:#fff;margin-bottom:10px;border-radius:10px;padding:8px 10px;border:1px solid #eee;}
+  .tbl tr:nth-child(even){background:#fff;}
+  .tbl td{border-bottom:none;padding:5px 0;}
+  .tbl td:before{content:attr(data-label);font-weight:800;color:#4a148c;display:block;font-size:0.78rem;margin-bottom:2px;}
+  .controls select,.controls input[type="text"]{min-width:0;width:100%;}
+  .adj-input{width:120px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .btn-pri:hover{transform:none;}
+  .summary.show,.bal.changed{animation:none;}
+}
+</style></head><body>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
+<div class="topbar">
+  <h1>⚙ إدارة سريعة للنقاط</h1>
+  <a href="__BACK_HREF__">← __BACK_LABEL__</a>
+</div>
+<div class="body">
+  <div class="controls">
+    <label>المجموعة:</label>
+    <select id="bagGroup"><option value="">— جاري التحميل —</option></select>
+    <input id="bagNote" type="text" class="note-input" placeholder="ملاحظة اختيارية تظهر في السجل" maxlength="160">
+  </div>
+
+  <div class="progress" id="bagProgress"></div>
+  <div class="summary"  id="bagSummary"></div>
+
+  <div class="tbl-wrap" id="bagTblWrap" style="display:none;">
+    <div class="tbl-head">
+      <span>الطلاب</span>
+      <span class="count" id="bagCount">0</span>
+      <span class="mode" id="bagModeBadge"></span>
+    </div>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>اسم الطالب</th>
+          <th style="width:120px;">النقاط الحالية</th>
+          <th style="width:170px;">تعديل النقاط</th>
+        </tr>
+      </thead>
+      <tbody id="bagBody"></tbody>
+    </table>
+  </div>
+  <div class="empty" id="bagEmpty">اختر مجموعة لعرض الطلاب</div>
+
+  <div class="actions">
+    <button class="btn btn-pri" id="bagSaveBtn" type="button" onclick="bagSave()" disabled>💾 حفظ كل التغييرات</button>
+    <button class="btn btn-sec" type="button" onclick="bagCancel()">إلغاء</button>
+  </div>
+</div>
+<div class="toast" id="bagToast"></div>
+
+<script>
+var BAG = {
+  manualBhvId: __MANUAL_BID__,
+  group: '',
+  students: []
+};
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function bagToast(msg, ok){
+  var t = document.getElementById('bagToast');
+  t.textContent = msg;
+  t.style.background = (ok === false) ? '#c62828' : '#212121';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function bagInit(){
+  /* SHARED dropdown logic: same endpoint + same formatter as the
+     class board and teacher attendance page. mxFormatGroupOption
+     comes from /mx-helpers.js. */
+  fetch('/api/points/groups', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var sel = document.getElementById('bagGroup');
+      var gs  = (d && d.groups) || [];
+      var names = (d && d.names && d.names.length) ? d.names
+                  : gs.map(function(g){ return (typeof g==='string')?g:(g.name||''); }).filter(Boolean);
+      if (!names.length){
+        sel.innerHTML = '<option value="">— لا توجد مجموعات متاحة —</option>';
+        document.getElementById('bagEmpty').textContent = 'لا توجد مجموعات متاحة لحسابك';
+        return;
+      }
+      var fmt = (typeof window.mxFormatGroupOption === 'function')
+                ? window.mxFormatGroupOption
+                : function(g){ return (typeof g==='string')?g:(g.name||''); };
+      var opts = ['<option value="">— اختر مجموعة —</option>'];
+      gs.forEach(function(g){
+        var name = (typeof g==='string') ? g : (g.name || '');
+        opts.push('<option value="'+_esc(name)+'">'+_esc(fmt(g))+'</option>');
+      });
+      sel.innerHTML = opts.join('');
+      sel.onchange = function(){ bagLoadGroup(sel.value); };
+      var modeLabel = (d && d.mode) ? ('وضع المركز: ' + d.mode) : '';
+      document.getElementById('bagModeBadge').textContent = modeLabel;
+    })
+    .catch(function(){ bagToast('خطأ في تحميل المجموعات', false); });
+}
+
+function bagLoadGroup(g){
+  BAG.group = g || '';
+  document.getElementById('bagSummary').classList.remove('show');
+  if (!g){
+    document.getElementById('bagTblWrap').style.display = 'none';
+    document.getElementById('bagEmpty').style.display = 'block';
+    document.getElementById('bagSaveBtn').disabled = true;
+    return;
+  }
+  document.getElementById('bagEmpty').textContent = 'جاري التحميل...';
+  document.getElementById('bagEmpty').style.display = 'block';
+  document.getElementById('bagTblWrap').style.display = 'none';
+  fetch('/api/points/group?group=' + encodeURIComponent(g), {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok){ bagToast(d.error || 'خطأ في تحميل الطلاب', false); document.getElementById('bagEmpty').textContent = d.error || 'خطأ في تحميل الطلاب'; return; }
+      BAG.students = d.students || [];
+      bagRender();
+    })
+    .catch(function(){ bagToast('خطأ في الاتصال', false); });
+}
+
+function bagRender(){
+  var body = document.getElementById('bagBody');
+  if (!BAG.students.length){
+    document.getElementById('bagTblWrap').style.display = 'none';
+    document.getElementById('bagEmpty').style.display = 'block';
+    document.getElementById('bagEmpty').textContent = 'لا يوجد طلاب في هذه المجموعة';
+    document.getElementById('bagSaveBtn').disabled = true;
+    return;
+  }
+  document.getElementById('bagCount').textContent = BAG.students.length + ' طالب';
+  body.innerHTML = BAG.students.map(function(s){
+    var fp = s.avatar_file_path || '/static/avatars/svg/egg.svg';
+    var avHTML = (typeof window.mxAvatarHTML === 'function')
+      ? window.mxAvatarHTML({ file_path: fp, name: s.avatar_name || s.student_name || '', size: 36 })
+      : '<img src="'+fp+'" style="width:36px;height:36px;border-radius:50%;" alt="">';
+    return '<tr data-sid="'+s.id+'">'
+      + '<td data-label="اسم الطالب"><div class="av-cell">'+avHTML+'<span>'+_esc(s.student_name||'')+'</span></div></td>'
+      + '<td data-label="النقاط الحالية"><span class="bal" id="bag-bal-'+s.id+'">'+(s.balance|0)+'</span></td>'
+      + '<td data-label="تعديل النقاط">'
+        + '<button type="button" class="toggle-sign" onclick="bagToggleSign('+s.id+')" title="عكس الإشارة">±</button>'
+        + '<input type="text" inputmode="numeric" pattern="-?[0-9]*" class="adj-input" id="bag-adj-'+s.id+'" '
+        +   'oninput="bagOnInput('+s.id+')" placeholder="0">'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('bagTblWrap').style.display = '';
+  document.getElementById('bagEmpty').style.display = 'none';
+  document.getElementById('bagSaveBtn').disabled = false;
+}
+
+function bagOnInput(sid){
+  var inp = document.getElementById('bag-adj-' + sid);
+  if (!inp) return;
+  /* Strip everything that isn't a digit or a leading minus. */
+  var v = inp.value;
+  var clean = v.replace(/[^0-9\-]/g, '');
+  /* Only one leading minus allowed. */
+  if (clean.indexOf('-') > 0) clean = clean.replace(/-/g, '');
+  if ((clean.match(/-/g) || []).length > 1) clean = '-' + clean.replace(/-/g, '');
+  if (clean !== v) inp.value = clean;
+  inp.classList.remove('pos','neg');
+  var n = parseInt(clean, 10);
+  if (!isNaN(n)){
+    if (n > 0) inp.classList.add('pos');
+    else if (n < 0) inp.classList.add('neg');
+  }
+}
+
+function bagToggleSign(sid){
+  var inp = document.getElementById('bag-adj-' + sid);
+  if (!inp) return;
+  var v = (inp.value || '').trim();
+  if (!v || v === '-' || parseInt(v,10) === 0){
+    inp.value = '-';
+    inp.focus();
+    return;
+  }
+  if (v.charAt(0) === '-') inp.value = v.substring(1);
+  else                     inp.value = '-' + v;
+  bagOnInput(sid);
+  inp.focus();
+}
+
+function bagCancel(){
+  /* Clear all unsaved adjustment inputs. Balances + group selection
+     stay so the user can re-enter values without re-loading. */
+  var inps = document.querySelectorAll('.adj-input');
+  for (var i=0;i<inps.length;i++){
+    inps[i].value = '';
+    inps[i].classList.remove('pos','neg');
+  }
+  document.getElementById('bagSummary').classList.remove('show');
+  bagToast('تم إلغاء التغييرات غير المحفوظة');
+}
+
+function bagSave(){
+  /* Collect non-empty / non-zero adjustments and post each to
+     /api/points/grant with points_override so the existing
+     validation, point_events row, parent-notification queue, and
+     balance recompute all run as usual. */
+  var deltas = [];
+  for (var i=0;i<BAG.students.length;i++){
+    var s = BAG.students[i];
+    var inp = document.getElementById('bag-adj-' + s.id);
+    var raw = inp ? (inp.value || '').trim() : '';
+    var n = parseInt(raw, 10);
+    if (isNaN(n) || n === 0) continue;
+    if (n < -1000 || n > 1000){
+      bagToast('قيمة خارج النطاق لـ ' + s.student_name + ' (-1000..1000)', false);
+      return;
+    }
+    deltas.push({ sid: s.id, name: s.student_name, delta: n });
+  }
+  if (!deltas.length){
+    bagToast('أدخل قيمة تعديل لطالب واحد على الأقل', false);
+    return;
+  }
+  var note = (document.getElementById('bagNote').value || '').trim();
+  document.getElementById('bagSaveBtn').disabled = true;
+  document.getElementById('bagSummary').classList.remove('show');
+  var prog = document.getElementById('bagProgress');
+  prog.classList.add('show');
+
+  var done = 0, ok = 0, errs = [];
+  function next(){
+    if (done >= deltas.length){
+      prog.classList.remove('show');
+      var sum = document.getElementById('bagSummary');
+      if (errs.length){
+        sum.style.background = '#ffebee';
+        sum.style.color = '#c62828';
+        sum.style.border = '1.4px solid #ef5350';
+        sum.textContent = '⚠ تم تعديل ' + ok + ' من ' + deltas.length + ' • أخطاء: ' + errs.length;
+      } else {
+        sum.style.background = '';
+        sum.style.color = '';
+        sum.style.border = '';
+        sum.textContent = '✅ تم تعديل نقاط ' + ok + ' طالب';
+      }
+      sum.classList.add('show');
+      /* Refresh balances by re-fetching the group. */
+      bagLoadGroup(BAG.group);
+      return;
+    }
+    var d = deltas[done++];
+    prog.textContent = 'حفظ التغييرات... ' + done + ' من ' + deltas.length;
+    fetch('/api/points/grant', {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        student_ids: [d.sid],
+        behavior_id: BAG.manualBhvId,
+        group_name: BAG.group,
+        points_override: d.delta,
+        note: note
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok){
+        ok += 1;
+        var bal = document.getElementById('bag-bal-' + d.sid);
+        var newBal = (res.results && res.results[0] && (typeof res.results[0].balance === 'number')) ? res.results[0].balance : null;
+        if (bal && newBal !== null){
+          bal.textContent = newBal;
+          bal.classList.add('changed');
+        }
+      } else {
+        errs.push({ sid: d.sid, name: d.name, error: (res && res.error) || 'فشل' });
+      }
+      next();
+    })
+    .catch(function(){ errs.push({sid:d.sid, name:d.name, error:'خطأ في الاتصال'}); next(); });
+  }
+  next();
+}
+
+bagInit();
+</script>
+</body></html>"""
+
+
+@app.route('/points/bulk-adjust')
+@login_required
+def points_bulk_adjust_page():
+    user = session.get("user") or {}
+    if _pts_user_role(user) not in ("admin", "manager", "teacher"):
+        return redirect("/dashboard")
+    db = get_db()
+    # Look up the seeded "تعديل يدوي" behavior id. Fallback to 0 means
+    # the page will still render but the save will fail — we surface a
+    # meaningful error in that case rather than silently writing into
+    # the wrong behavior.
+    try:
+        row = db.execute(
+            "SELECT id FROM behaviors WHERE name_ar=? AND is_active=1 ORDER BY id LIMIT 1",
+            ("تعديل يدوي",),
+        ).fetchone()
+        manual_bid = int(dict(row)["id"]) if row else 0
+    except Exception:
+        manual_bid = 0
+    role = (user.get("role") or "").strip().lower()
+    if role == "teacher":
+        back_href, back_label = "/points/board", "لوحة الصف"
+    else:
+        back_href, back_label = "/points/board", "لوحة الصف"
+    return (POINTS_BULK_ADJUST_HTML
+            .replace("__MANUAL_BID__",   str(manual_bid))
+            .replace("__BACK_HREF__",    back_href)
+            .replace("__BACK_LABEL__",   back_label)
+            .replace("USER_ROLE_PLACEHOLDER", role))
+
+
 @app.route('/points/manage')
 @login_required
 def points_manage_page():
@@ -32801,6 +33231,7 @@ def points_board_page(group=None):
 # renders an avatar must pull it in.
 for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   'POINTS_MANAGE_HTML', 'POINTS_BOARD_HTML',
+                  'POINTS_BULK_ADJUST_HTML', 'TEACHER_HUB_HTML',
                   'PORTAL_CHANGE_PW_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
