@@ -15062,6 +15062,139 @@ def api_groups_search():
     return jsonify({"ok": True, "count": len(out), "groups": out})
 
 
+@app.route('/api/groups/<int:gid>/detail', methods=['GET'])
+@login_required
+def api_group_detail(gid):
+    """Detail endpoint for one group. Reuses _payment_compute_plan +
+    _att_normalize_date so figures match what admin sees on /database
+    and the search profile. Same role scoping as /api/groups/search:
+    teacher → only own groups, admin/manager → any."""
+    db = get_db()
+    user = session.get("user") or {}
+    try:
+        grow = db.execute("SELECT * FROM student_groups WHERE id=?", (gid,)).fetchone()
+    except Exception:
+        grow = None
+    if not grow:
+        return jsonify({"ok": False, "error": "group not found"}), 404
+    g = dict(grow)
+    gname = (g.get("group_name") or "").strip()
+    visible = set(_grp_visible_for(db, user))
+    if gname not in visible:
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live = set()
+    has_online = (online_col in live and online_col != in_col)
+    where  = '"' + in_col + '" = ?'
+    params = (gname,)
+    if has_online:
+        where  = '"' + in_col + '" = ? OR "' + online_col + '" = ?'
+        params = (gname, gname)
+    try:
+        srows = db.execute(
+            'SELECT id, student_name, personal_id, whatsapp, mother_phone, father_phone '
+            'FROM students WHERE ' + where + ' ORDER BY student_name', params
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    students = []
+    sum_attendance = 0
+    n_with_attendance = 0
+    n_with_remaining = 0
+    sum_remaining = 0.0
+    for r in srows:
+        sd = dict(r)
+        sid = sd.get("id")
+        nm  = (sd.get("student_name") or "").strip()
+        if not nm:
+            continue
+        try:
+            arows = db.execute(
+                "SELECT attendance_date, group_name, status "
+                "FROM attendance WHERE TRIM(student_name)=TRIM(?)",
+                (nm,),
+            ).fetchall()
+        except Exception:
+            arows = []
+        sessions = set()
+        n_pres = n_abs = n_late = 0
+        for ar in arows:
+            ad = dict(ar)
+            dt = _att_normalize_date(ad.get("attendance_date"))
+            gv = (ad.get("group_name") or "").strip()
+            if dt and gv:
+                sessions.add((dt, gv))
+            st = (ad.get("status") or "").strip()
+            if   st == "حاضر":  n_pres += 1
+            elif st == "غائب":  n_abs  += 1
+            elif st == "متأخر": n_late += 1
+        a_total = len(sessions)
+        a_pct = round((n_pres + n_late) / a_total * 100, 1) if a_total else None
+        if a_pct is not None:
+            sum_attendance += a_pct
+            n_with_attendance += 1
+        pay_status = ""
+        remaining  = None
+        try:
+            plan_payload = _payment_compute_plan(db, sid)
+            if plan_payload and plan_payload.get("plan"):
+                pl = plan_payload["plan"]
+                paid = float(pl.get("total_paid") or 0)
+                rem  = float(pl.get("total_remaining") or 0)
+                course = float(pl.get("course_amount") or 0)
+                remaining = rem
+                if course <= 0:
+                    pay_status = "—"
+                elif rem <= 0:
+                    pay_status = "مدفوع بالكامل"
+                elif paid <= 0:
+                    pay_status = "لم يدفع"
+                else:
+                    pay_status = "متبقي"
+        except Exception:
+            pass
+        if (remaining or 0) > 0:
+            n_with_remaining += 1
+            sum_remaining += float(remaining or 0)
+        students.append({
+            "id":            sid,
+            "student_name":  nm,
+            "personal_id":   sd.get("personal_id") or "",
+            "parent_phone":  sd.get("mother_phone") or sd.get("father_phone") or sd.get("whatsapp") or "",
+            "pay_status":    pay_status,
+            "pay_remaining": remaining if remaining is not None else 0,
+            "att_percent":   a_pct,
+        })
+    avg_att = round(sum_attendance / n_with_attendance, 1) if n_with_attendance else None
+    return jsonify({
+        "ok": True,
+        "group": {
+            "id":               g.get("id"),
+            "group_name":       gname,
+            "teacher_name":     (g.get("teacher_name")     or "").strip(),
+            "level":            (g.get("level_course")     or "").strip(),
+            "study_days":       (_extract_days_from_row(g) or g.get("study_days") or "").strip(),
+            "study_time":       (g.get("study_time")       or "").strip(),
+            "ramadan_time":     (g.get("ramadan_time")     or "").strip(),
+            "online_time":      (g.get("online_time")      or "").strip(),
+            "session_duration": (g.get("session_duration") or "").strip(),
+        },
+        "students": students,
+        "stats": {
+            "student_count":           len(students),
+            "avg_attendance_pct":      avg_att,
+            "students_with_remaining": n_with_remaining,
+            "total_remaining":         sum_remaining,
+        },
+    })
+
+
 @app.route("/api/students", methods=["GET"])
 @login_required
 def api_students_get():
