@@ -15232,24 +15232,30 @@ def api_group_detail(gid):
     visible = set(_grp_visible_for(db, user))
     if gname not in visible:
         return jsonify({"ok": False, "error": "forbidden"}), 403
+    # Pick the right linking column based on the active center mode.
+    # Per spec: حضوري / رمضان → students.group_name_student;
+    #            أونلاين      → students.group_online.
+    # Falls back to group_name_student if the settings-overridden col
+    # doesn't pass _is_safe_ident.
     in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
     online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
     if not _is_safe_ident(in_col):     in_col = 'group_name_student'
     if not _is_safe_ident(online_col): online_col = 'group_online'
     try:
+        _mode = _get_center_mode(db)
+    except Exception:
+        _mode = ""
+    link_col = online_col if _mode == "أونلاين" else in_col
+    try:
         live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
     except Exception:
         live = set()
-    has_online = (online_col in live and online_col != in_col)
-    where  = '"' + in_col + '" = ?'
-    params = (gname,)
-    if has_online:
-        where  = '"' + in_col + '" = ? OR "' + online_col + '" = ?'
-        params = (gname, gname)
+    if link_col not in live:
+        link_col = "group_name_student"
     try:
         srows = db.execute(
             'SELECT id, student_name, personal_id, whatsapp, mother_phone, father_phone '
-            'FROM students WHERE ' + where + ' ORDER BY student_name', params
+            'FROM students WHERE "' + link_col + '" = ? ORDER BY student_name', (gname,),
         ).fetchall()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
