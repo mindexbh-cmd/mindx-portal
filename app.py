@@ -4125,9 +4125,34 @@ function dhCopyParentLink(){
         <div id="sr-details" style="margin-top:10px;"></div>
       </div>
     </div>
-    <!-- Empty placeholder for the new mode (filled in step 4). -->
-    <div class="search-mode-group" style="display:none;padding:30px 16px;text-align:center;color:#888;font-weight:700;font-family:inherit;">
-      &#x642;&#x631;&#x64A;&#x628;&#x627;&#x064B; ...
+    <!-- Group-search pane (Step 4): 5 multi-select dropdowns + fuzzy
+         text input + results container. All wiring is in
+         /static/js/group_search.js — no inline JS to avoid the prior
+         auto-injection bug. -->
+    <div class="search-mode-group" style="display:none;">
+      <div style="padding:12px 16px;background:#faf7ff;border-bottom:1px solid #e0d0f8;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:10px;">
+          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</label>
+            <select id="grp-flt-days" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A;</label>
+            <select id="grp-flt-times" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
+            <select id="grp-flt-names" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649;</label>
+            <select id="grp-flt-levels" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x629;</label>
+            <select id="grp-flt-teachers" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="grp-flt-q" type="text" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x623;&#x64A; &#x643;&#x644;&#x645;&#x629;..." style="flex:1;min-width:200px;padding:9px 12px;border:1.5px solid #c4a8e8;border-radius:9px;font-family:inherit;font-size:13.5px;">
+          <button type="button" id="grp-btn-search" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;font-family:inherit;font-size:13.5px;cursor:pointer;">&#x1F50D; &#x628;&#x62D;&#x62B;</button>
+          <button type="button" id="grp-btn-clear" style="background:#fff;color:#666;border:1.4px solid #ddd;padding:9px 14px;border-radius:9px;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;">&#x645;&#x633;&#x62D;</button>
+        </div>
+      </div>
+      <div class="srm-body">
+        <div id="grp-results" style="padding:6px 0;"></div>
+        <div id="grp-details" style="margin-top:10px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -15082,6 +15107,63 @@ def api_groups_search():
     for g in out:
         g.pop("_score", None)
     return jsonify({"ok": True, "count": len(out), "groups": out})
+
+
+@app.route('/api/groups/filters', methods=['GET'])
+@login_required
+def api_groups_filters():
+    """Distinct values for the 5 group-search dropdowns. Days follow
+    week order; teachers list is augmented with users.role='teacher'
+    so a brand-new teacher shows up before they're assigned to a group."""
+    db = get_db()
+    user = session.get("user") or {}
+    visible = set(_grp_visible_for(db, user))
+    try:
+        rows = db.execute(
+            "SELECT group_name, teacher_name, level_course, study_days, "
+            "       study_time, ramadan_time, online_time "
+            "FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name)<>'' "
+            "ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    rows = [dict(r) for r in rows if (dict(r).get("group_name") or "").strip() in visible]
+    AR_DAYS = ["السبت","الأحد","الإثنين","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"]
+    days_set, times_set, levels_set, teachers_set, names_set = set(), set(), set(), set(), set()
+    for r in rows:
+        ds = _extract_days_from_row(r) or r.get("study_days") or ""
+        for tok in str(ds).replace("،", ",").replace("-", ",").split(","):
+            t = tok.strip()
+            if t and t in AR_DAYS:
+                days_set.add(t)
+        for col in ("study_time", "ramadan_time", "online_time"):
+            v = (r.get(col) or "").strip()
+            if v: times_set.add(v)
+        lvl = (r.get("level_course") or "").strip()
+        if lvl: levels_set.add(lvl)
+        tn  = (r.get("teacher_name") or "").strip()
+        if tn:  teachers_set.add(tn)
+        gn = (r.get("group_name") or "").strip()
+        if gn: names_set.add(gn)
+    try:
+        urows = db.execute(
+            "SELECT name FROM users WHERE LOWER(COALESCE(role,''))='teacher'"
+        ).fetchall()
+        for u in urows:
+            nm = (dict(u).get("name") or "").strip()
+            if nm: teachers_set.add(nm)
+    except Exception:
+        pass
+    day_order = {d: i for i, d in enumerate(AR_DAYS)}
+    return jsonify({
+        "ok": True,
+        "days":     sorted(days_set, key=lambda d: day_order.get(d, 99)),
+        "times":    sorted(times_set),
+        "group_names": sorted(names_set),
+        "levels":   sorted(levels_set),
+        "teachers": sorted(teachers_set),
+    })
 
 
 @app.route('/api/groups/<int:gid>/detail', methods=['GET'])
