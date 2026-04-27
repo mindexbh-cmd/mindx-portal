@@ -8732,6 +8732,20 @@ function tLoadGroups(){
       if (!groups.length){
         sel.innerHTML = '<option value="">— لا توجد مجموعات مسندة لك —</option>';
       }
+      /* Prefill from ?group=... when present (used by the embed-modal
+         flow on the class board so the teacher doesn't pick the group
+         twice). Adds a small additive hook only — the standalone page
+         is functionally unchanged when the param is absent. */
+      try {
+        var qp = new URLSearchParams(window.location.search);
+        var qg = qp.get('group');
+        if (qg && sel.querySelector('option[value="'+qg.replace(/"/g,'\\"')+'"]')){
+          sel.value = qg;
+          /* If a date is also already chosen, surface the table. */
+          var dInp = document.getElementById('t-date');
+          if (dInp && dInp.value && typeof tLoadStudents === 'function') tLoadStudents();
+        }
+      } catch (e) { /* no-op */ }
     })
     .catch(function(){ _tToast('خطأ في الاتصال','error'); });
 }
@@ -13768,7 +13782,7 @@ def login():
     if must_change and role in ("student", "parent"):
         return redirect("/portal/change-password")
     if role == "teacher":
-        return redirect("/teacher/attendance")
+        return redirect("/teacher/hub")
     if role == "student":
         return redirect("/portal/student")
     if role == "parent":
@@ -19850,10 +19864,72 @@ def api_pts_group_board():
 @app.route('/api/points/groups', methods=['GET'])
 @login_required
 def api_pts_visible_groups():
-    """Groups the current user can grant points to."""
+    """Groups the current user can grant points to.
+
+    Shape mirrors /api/teacher/groups so the class board (لوحة الصف)
+    and the teacher attendance page render IDENTICAL options for the
+    same teacher under the same center mode. For teachers we delegate
+    to `_teacher_mode_filtered_groups` (same helper attendance uses).
+    For admin/manager we return every visible group, decorated with
+    schedule strings so the same option formatter works everywhere.
+    """
     db = get_db()
     user = session.get("user") or {}
-    return jsonify({"ok": True, "groups": _pts_visible_groups(db, user)})
+    role = _pts_user_role(user)
+    if role == "teacher":
+        mode = _get_center_mode(db)
+        detailed = _teacher_mode_filtered_groups(db, user, mode)
+        return jsonify({
+            "ok":     True,
+            "mode":   mode,
+            "groups": detailed,
+            "names":  [g["name"] for g in detailed],
+        })
+    # admin / manager: every group, schedule-decorated for the same
+    # client-side formatter that attendance uses.
+    try:
+        rows = db.execute(
+            "SELECT group_name, study_days, study_time, ramadan_time, online_time "
+            "FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+            "ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    mode = _get_center_mode(db)
+    is_online  = (mode == "أونلاين")
+    is_ramadan = (mode == "رمضان")
+    detailed = []
+    for r in rows:
+        rd = dict(r)
+        days = (_extract_days_from_row(rd) or "").strip()
+        if is_online:
+            sched_time = (rd.get("online_time")  or rd.get("study_time") or "").strip()
+        elif is_ramadan:
+            sched_time = (rd.get("ramadan_time") or rd.get("study_time") or "").strip()
+        else:
+            sched_time = (rd.get("study_time")   or "").strip()
+        time_has_days = _value_has_arabic_day(sched_time)
+        if days and sched_time and not time_has_days:
+            sched = days + " - " + sched_time
+        elif days and not sched_time:
+            sched = days
+        else:
+            sched = sched_time
+        detailed.append({
+            "name":         (rd.get("group_name") or "").strip(),
+            "study_days":   days,
+            "study_time":   (rd.get("study_time")   or "").strip(),
+            "ramadan_time": (rd.get("ramadan_time") or "").strip(),
+            "online_time":  (rd.get("online_time")  or "").strip(),
+            "schedule":     (sched or "").strip(),
+        })
+    return jsonify({
+        "ok":     True,
+        "mode":   mode,
+        "groups": detailed,
+        "names":  [g["name"] for g in detailed],
+    })
 
 
 # ── Reports ──────────────────────────────────────────────────────
@@ -21856,6 +21932,95 @@ def teacher_attendance_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip()
     return TEACHER_ATTENDANCE_HTML.replace("USER_PLACEHOLDER", who)
+
+
+# ── Teacher hub (post-login landing) ────────────────────────────────
+# Two-card hub: تسجيل الحضور (links to existing attendance page) +
+# كلاس مايندكس (links to the existing class board / points system).
+# Teachers land here after login (see /login redirect). Other roles
+# get bounced to /dashboard.
+TEACHER_HUB_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>صفحة المعلمة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar .who{color:#6B3FA0;font-weight:700;font-size:0.95rem;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1100px;margin:32px auto;padding:0 18px;}
+.hello{text-align:center;margin-bottom:28px;}
+.hello h2{font-size:1.6rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
+.hello p{color:#666;margin:0;font-size:0.96rem;}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
+.card{background:#fff;border-radius:22px;padding:34px 26px;text-align:center;
+      box-shadow:0 10px 32px rgba(107,63,160,.18);
+      cursor:pointer;text-decoration:none;color:inherit;display:block;
+      transition:transform .18s ease, box-shadow .18s ease;
+      border:2.5px solid transparent;position:relative;overflow:hidden;}
+.card:hover{transform:translateY(-6px);
+            box-shadow:0 18px 42px rgba(107,63,160,.28);
+            border-color:#6B3FA0;}
+.card .ic{font-size:3.4rem;line-height:1;display:block;margin-bottom:14px;}
+.card h3{margin:0 0 8px;font-size:1.4rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.95rem;line-height:1.6;}
+.card.attend::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
+.card.points::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
+@media (max-width:680px){
+  .cards{grid-template-columns:1fr;gap:14px;}
+  .card{padding:26px 20px;}
+  .card .ic{font-size:2.6rem;}
+  .card h3{font-size:1.2rem;}
+}
+@media (prefers-reduced-motion:reduce){
+  .card:hover{transform:none;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>🌟 مايندكس — صفحة المعلمة</h1>
+  <span class="who">USER_PLACEHOLDER</span>
+  <a href="/logout">خروج</a>
+</div>
+<div class="wrap">
+  <div class="hello">
+    <h2>مرحباً USER_PLACEHOLDER</h2>
+    <p>اختاري ما تريدين فعله الآن</p>
+  </div>
+  <div class="cards">
+    <a class="card attend" href="/teacher/attendance">
+      <span class="ic">📋</span>
+      <h3>تسجيل الحضور</h3>
+      <p>تسجيل حضور وغياب الطالبات</p>
+    </a>
+    <a class="card points" href="/points/board">
+      <span class="ic">🌟</span>
+      <h3>كلاس مايندكس</h3>
+      <p>منح النقاط ومتابعة السلوك</p>
+    </a>
+  </div>
+</div>
+</body></html>"""
+
+
+@app.route('/teacher/hub')
+@login_required
+def teacher_hub_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "teacher":
+        return redirect("/dashboard")
+    who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
+    return TEACHER_HUB_HTML.replace("USER_PLACEHOLDER", who)
 
 
 @app.route('/api/teacher/groups-diag', methods=['GET'])
@@ -29080,6 +29245,30 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   window.mxFetchAvatars      = mxFetchAvatars;
   window.mxOpenAvatarPicker  = mxOpenAvatarPicker;
 
+  /* ── Shared teacher group dropdown formatter ────────────────────
+     Used by both the teacher attendance page and the class board
+     (لوحة الصف) so option labels are byte-identical for the same
+     teacher under the same center mode. Object shape (matches
+     /api/teacher/groups + /api/points/groups for teachers):
+       {name, schedule, study_days, study_time, ramadan_time, online_time}
+  */
+  function mxFormatGroupOption(g){
+    if (!g) return '';
+    if (typeof g === 'string') return g;
+    var name = String(g.name || '').trim();
+    var schedule = String(g.schedule || '').trim();
+    if (!schedule){
+      var days = String(g.study_days || '').trim();
+      var time = String(g.study_time || g.ramadan_time || g.online_time || '').trim();
+      if (days && time) schedule = days + ' - ' + time;
+      else if (days)    schedule = days;
+      else if (time)    schedule = time;
+    }
+    var TIME_MISSING = 'لم يُحدد الوقت';
+    return name + ' (' + (schedule || TIME_MISSING) + ')';
+  }
+  window.mxFormatGroupOption = mxFormatGroupOption;
+
   /* ── Global frozen-by-default tables ─────────────────────────────
      Spec: every data table is read-only until the teacher/admin
      clicks "تعديل بيانات الجدول" above it. Save commits all changes;
@@ -32264,18 +32453,29 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:9px;z-index:99;display:none;}
 .toast.show{display:block;animation:tin .25s ease;}
 @keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
+.quick-att-btn{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;border:none;padding:8px 14px;border-radius:9px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.88rem;}
+.quick-att-btn:hover{filter:brightness(1.05);}
+.qa-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:14px;}
+.qa-back.show{display:flex;}
+.qa-box{background:#fff;border-radius:14px;width:100%;max-width:980px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 48px rgba(0,0,0,.4);}
+.qa-head{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:900;}
+.qa-close{background:none;border:none;color:#fff;font-size:1.6rem;line-height:1;cursor:pointer;font-weight:900;padding:0 8px;}
+.qa-frame{flex:1;width:100%;border:0;background:#f5f5f7;}
 @media (max-width:600px){
   .grid{grid-template-columns:repeat(2,1fr);gap:8px;}
   .card{padding:10px 6px;}
   .avatar{transform:scale(0.85);}
   .sname{font-size:0.82rem;min-height:2em;}
   .bal{font-size:1.2rem;}
+  .qa-box{height:94vh;}
+  .quick-att-btn{padding:7px 10px;font-size:0.82rem;}
 }
 </style></head><body>
 <div class="topbar">
   <h1>🌟 لوحة الصف</h1>
   <select id="grpSel" class="group-pick" onchange="changeGroup(this.value)"></select>
-  <a href="/dashboard">← الرئيسية</a>
+  <button id="quickAttBtn" type="button" class="quick-att-btn" onclick="openQuickAttendance()" style="display:__QA_DISP__;">📋 تسجيل حضور سريع</button>
+  <a href="__BACK_HREF__">← الرئيسية</a>
 </div>
 <div class="body">
   <div class="toolbar">
@@ -32286,6 +32486,22 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
     <a href="#" onclick="event.preventDefault();selAll();" style="color:#4a148c;font-weight:700;text-decoration:none;">تحديد الكل</a>
   </div>
   <div id="grid" class="grid"></div>
+</div>
+
+<!-- Quick-attendance modal: embeds the existing /teacher/attendance
+     page in an iframe so we reuse it byte-for-byte (no duplicate
+     form, same backend endpoints, same duplicate-prevention rules,
+     same auto-fill of class duration / type from center mode). The
+     ?group=... query param prefills the selector to whichever group
+     is currently selected on the board. -->
+<div class="qa-back" id="qaBack" role="dialog" aria-modal="true" aria-label="تسجيل حضور سريع">
+  <div class="qa-box">
+    <div class="qa-head">
+      <span>📋 تسجيل حضور سريع</span>
+      <button type="button" class="qa-close" onclick="closeQuickAttendance()" aria-label="إغلاق">×</button>
+    </div>
+    <iframe id="qaFrame" class="qa-frame" src="about:blank" title="نموذج تسجيل الحضور"></iframe>
+  </div>
 </div>
 <div class="menu" id="menu">
   <div class="menu-box">
@@ -32328,16 +32544,29 @@ function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 function toast(msg, ok){var t=document.getElementById('t');t.textContent=msg;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);}
 
 function init(){
+  /* Group dropdown is populated via the SAME endpoint shape and the
+     SAME formatter used by the teacher attendance page so options are
+     byte-identical for the same teacher under the same center mode.
+     The shared formatter mxFormatGroupOption() lives in mx-helpers.js. */
   fetch('/api/points/groups',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
     var sel=document.getElementById('grpSel');
     var gs=(d.groups||[]);
-    if(!gs.length){
-      sel.innerHTML='<option>—</option>';
+    var names=(d.names && d.names.length) ? d.names
+              : gs.map(function(g){return (typeof g==='string')?g:(g.name||'');}).filter(Boolean);
+    if(!names.length){
+      sel.innerHTML='<option value="">— لا توجد مجموعات متاحة —</option>';
       document.getElementById('grid').innerHTML='<div class="empty">لا توجد مجموعات متاحة</div>';
       return;
     }
-    if(!GROUP || gs.indexOf(GROUP)<0) GROUP=gs[0];
-    sel.innerHTML=gs.map(function(g){return '<option '+(g===GROUP?'selected':'')+'>'+_esc(g)+'</option>';}).join('');
+    if(!GROUP || names.indexOf(GROUP)<0) GROUP=names[0];
+    var fmt=(typeof window.mxFormatGroupOption==='function')
+      ? window.mxFormatGroupOption
+      : function(g){return (typeof g==='string')?g:(g.name||'');};
+    sel.innerHTML=gs.map(function(g){
+      var name=(typeof g==='string')?g:(g.name||'');
+      var label=fmt(g);
+      return '<option value="'+_esc(name)+'" '+(name===GROUP?'selected':'')+'>'+_esc(label)+'</option>';
+    }).join('');
     fetch('/api/points/behaviors',{credentials:'include'}).then(function(r){return r.json();}).then(function(d2){
       STATE.behaviors=d2.rows||[];
       loadGroup();
@@ -32445,6 +32674,41 @@ function grant(bid){
     setTimeout(loadGroup,800);
   }).catch(function(){toast('خطأ في الاتصال',false);});
 }
+
+/* ── Quick-attendance modal (embeds /teacher/attendance via iframe) ── */
+function openQuickAttendance(){
+  var url = '/teacher/attendance';
+  if (GROUP) url += '?group=' + encodeURIComponent(GROUP);
+  var fr = document.getElementById('qaFrame');
+  /* Force-reload even if the iframe was opened previously for the
+     same group, so any saved attendance refreshes. */
+  fr.src = 'about:blank';
+  setTimeout(function(){ fr.src = url; }, 0);
+  document.getElementById('qaBack').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeQuickAttendance(){
+  document.getElementById('qaBack').classList.remove('show');
+  document.body.style.overflow = '';
+  /* Free the iframe so it doesn't keep state in the background. */
+  var fr = document.getElementById('qaFrame');
+  if (fr) fr.src = 'about:blank';
+}
+/* Click outside the box closes; ESC closes. */
+(function(){
+  var back = document.getElementById('qaBack');
+  if (back){
+    back.addEventListener('click', function(e){
+      if (e.target === back) closeQuickAttendance();
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && document.getElementById('qaBack').classList.contains('show')){
+      closeQuickAttendance();
+    }
+  });
+})();
+
 init();
 </script>
 </body></html>"""
@@ -32471,9 +32735,14 @@ def points_board_page(group=None):
     g_arg = json.dumps(group or "", ensure_ascii=False)
     snd_on = (get_setting("points", "sound_effects", "1") or "1") == "1"
     snd_arg = "true" if snd_on else "false"
+    role = (user.get("role") or "").strip().lower()
+    back_href = "/teacher/hub" if role == "teacher" else "/dashboard"
+    qa_disp = "inline-block" if role == "teacher" else "none"
     return (POINTS_BOARD_HTML
             .replace("__GROUP_ARG__", g_arg)
-            .replace("__SOUND_ON__",  snd_arg))
+            .replace("__SOUND_ON__",  snd_arg)
+            .replace("__BACK_HREF__", back_href)
+            .replace("__QA_DISP__",   qa_disp))
 
 
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
