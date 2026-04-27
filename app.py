@@ -31147,41 +31147,63 @@ PORTAL_STUDENT_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>منصة الطالب — نظام النقاط</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;padding:14px;color:#212121;}
-.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;max-width:980px;margin-right:auto;margin-left:auto;}
 .topbar h1{margin:0;font-size:1.1rem;color:#4a148c;}
 .logout{background:#fff;color:#4a148c;border:1.5px solid #c4a8e8;padding:7px 14px;border-radius:9px;text-decoration:none;font-weight:700;font-size:0.85rem;}
-.hero{background:#fff;border-radius:22px;padding:24px 22px;text-align:center;box-shadow:0 8px 28px rgba(107,63,160,.14);margin-bottom:14px;}
-.hero .av{display:inline-block;margin-bottom:8px;}
-.hero .nm{font-size:1.5rem;font-weight:900;color:#4a148c;margin-bottom:6px;}
-.hero .pts{font-size:3rem;font-weight:900;color:#6B3FA0;letter-spacing:1px;}
-.hero .ptslbl{font-size:0.9rem;color:#666;margin-top:-4px;}
-.lvl{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:30px;background:#faf7ff;font-weight:800;margin-top:10px;}
-.progress{margin-top:10px;background:#eee;border-radius:10px;height:14px;overflow:hidden;}
+.wrap{max-width:980px;margin:0 auto;}
+.hero{background:#fff;border-radius:22px;padding:26px 22px 22px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.16);margin-bottom:14px;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:auto -20% -60% -20%;height:140%;background:radial-gradient(closest-side,rgba(107,63,160,.06),transparent 70%);pointer-events:none;}
+.hero .av{display:inline-block;margin-bottom:8px;position:relative;}
+.hero .nm{font-size:1.6rem;font-weight:900;color:#4a148c;margin-bottom:4px;position:relative;}
+.hero .meta{color:#666;font-size:0.92rem;margin-bottom:14px;line-height:1.6;position:relative;}
+.hero .meta b{color:#4a148c;}
+.hero .pts{font-size:4rem;font-weight:900;color:#6B3FA0;letter-spacing:1px;line-height:1;position:relative;}
+.hero .ptslbl{font-size:0.95rem;color:#666;margin-top:2px;position:relative;}
+.lvl{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:30px;background:#faf7ff;font-weight:800;margin-top:14px;position:relative;}
+.progress{margin-top:12px;background:#eee;border-radius:10px;height:14px;overflow:hidden;position:relative;}
 .progress > div{height:100%;background:linear-gradient(90deg,#6B3FA0,#FBC02D);transition:width .8s ease;}
+.progress-lbl{font-size:0.82rem;color:#666;margin-top:8px;position:relative;}
 .section{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.06);}
-.section h2{margin:0 0 12px;color:#4a148c;font-size:1.05rem;display:flex;align-items:center;gap:8px;}
-.event{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fafafa;border-radius:10px;margin-bottom:6px;}
+.section h2{margin:0 0 14px;color:#4a148c;font-size:1.05rem;display:flex;align-items:center;gap:8px;font-weight:900;}
+.wsumm{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.wcell{background:#fafafa;border-radius:12px;padding:14px 10px;text-align:center;border:1.4px solid #eee;}
+.wcell .ic{font-size:1.7rem;line-height:1;display:block;margin-bottom:4px;}
+.wcell .num{font-weight:900;font-size:1.4rem;margin:2px 0;}
+.wcell .lbl{color:#666;font-size:0.78rem;font-weight:700;}
+.wcell.pos{background:#e8f5e9;border-color:#a5d6a7;}
+.wcell.pos .num{color:#1B5E20;}
+.wcell.neg{background:#ffebee;border-color:#ef9a9a;}
+.wcell.neg .num{color:#c62828;}
+.wcell.net{background:#ede7f6;border-color:#b39ddb;}
+.wcell.net .num{color:#4527a0;}
+.event{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fafafa;border-radius:10px;margin-bottom:6px;gap:10px;}
 .event b{color:#212121;font-size:0.95rem;}
-.event .meta{color:#777;font-size:0.78rem;}
-.event .pv{font-weight:900;font-size:1.05rem;}
+.event .meta{color:#777;font-size:0.78rem;margin-top:2px;}
+.event .meta .note{color:#5D4037;font-style:italic;font-weight:600;}
+.event .pv{font-weight:900;font-size:1.1rem;flex-shrink:0;}
 .event.pos{background:#e8f5e9;}
 .event.pos .pv{color:#1B5E20;}
 .event.neg{background:#ffebee;}
 .event.neg .pv{color:#c62828;}
-.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-.reward{background:#fafafa;border-radius:14px;padding:14px 10px;text-align:center;border:2px solid #eee;transition:transform .15s;}
-.reward:hover{transform:translateY(-2px);}
+.event.zero{background:#fafafa;border:1px dashed #e0e0e0;}
+.event.zero .pv{color:#666;}
+.chart-wrap{position:relative;width:100%;height:240px;}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.reward{background:#fafafa;border-radius:14px;padding:14px 10px;text-align:center;border:2px solid #eee;transition:transform .15s, box-shadow .15s;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;}
+.reward:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
 .reward .ic{font-size:2.5rem;line-height:1;}
 .reward .nm{font-weight:800;font-size:0.92rem;margin:6px 0 4px;color:#212121;min-height:2.4em;}
-.reward .cost{font-weight:900;color:#FB8C00;margin-bottom:6px;}
-.btn{padding:7px 14px;border:none;border-radius:9px;font-weight:700;font-family:inherit;font-size:0.85rem;cursor:pointer;}
+.reward .cost{font-weight:900;color:#FB8C00;margin-bottom:8px;}
+.btn{padding:8px 14px;border:none;border-radius:9px;font-weight:700;font-family:inherit;font-size:0.85rem;cursor:pointer;}
 .btn-redeem{background:#1B5E20;color:#fff;width:100%;}
 .btn-redeem:disabled{background:#bbb;cursor:not-allowed;}
-.history-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #eee;}
-.status-badge{padding:3px 9px;border-radius:6px;font-size:0.78rem;font-weight:800;}
+.history-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee;gap:8px;}
+.history-row:last-child{border-bottom:none;}
+.status-badge{padding:3px 9px;border-radius:6px;font-size:0.78rem;font-weight:800;flex-shrink:0;}
 .s-pending{background:#fff3e0;color:#E65100;}
 .s-delivered{background:#e8f5e9;color:#1B5E20;}
 .s-cancelled{background:#ffebee;color:#c62828;}
@@ -31194,27 +31216,76 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .modal-box h3{margin:0 0 12px;color:#4a148c;}
 .modal-box .row{display:flex;gap:8px;justify-content:center;margin-top:14px;}
 .empty{text-align:center;color:#888;padding:18px;font-size:0.92rem;}
+@media (max-width:768px){
+  body{padding:10px;}
+  .hero{padding:20px 16px;}
+  .hero .nm{font-size:1.3rem;}
+  .hero .pts{font-size:3rem;}
+  .hero .meta{font-size:0.85rem;}
+  .section{padding:14px;}
+  .wsumm{grid-template-columns:1fr;gap:8px;}
+  .shop{grid-template-columns:1fr;}
+  .chart-wrap{height:200px;}
+  .topbar h1{font-size:0.98rem;}
+}
+@media (prefers-reduced-motion:reduce){
+  .progress > div,.toast,.modal{transition:none !important;animation:none !important;}
+}
 </style></head><body>
 <div class="topbar">
   <h1>🌟 نقاطي</h1>
   <a class="logout" href="/logout">خروج</a>
 </div>
-<div id="root"><div class="empty">جاري التحميل...</div></div>
+<div class="wrap" id="root"><div class="empty">جاري التحميل...</div></div>
 <div class="modal" id="confirm">
   <div class="modal-box">
     <h3 id="cTitle">تأكيد الاستبدال</h3>
     <div id="cBody"></div>
     <div class="row">
-      <button class="btn" style="background:#fafafa;color:#666;border:1px solid #ddd;" onclick="document.getElementById('confirm').classList.remove('show')">إلغاء</button>
-      <button class="btn btn-redeem" id="cOk">تأكيد</button>
+      <button class="btn" style="background:#fafafa;color:#666;border:1px solid #ddd;" onclick="document.getElementById('confirm').classList.remove('show')">لا</button>
+      <button class="btn btn-redeem" id="cOk">نعم</button>
     </div>
   </div>
 </div>
 <div class="toast" id="t"></div>
 <script>
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function toast(m, ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
+function toast(m, ok){var t=document.getElementById('t');t.textContent=m;t.style.background=ok===false?'#c62828':'#212121';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2200);}
 var STATE={};
+var CHART=null;
+
+/* Convert an SQL "YYYY-MM-DD HH:MM:SS" timestamp into a friendly Arabic
+   relative string. Falls back to the date for older events.
+   - within 1 minute  → "الآن"
+   - <60min           → "قبل X دقيقة"
+   - same day         → "اليوم HH:MM"
+   - yesterday        → "أمس HH:MM"
+   - 2-6 days back    → "قبل X يوم/أيام"
+   - 7-13 days back   → "قبل أسبوع"
+   - else             → "YYYY-MM-DD" */
+function relTime(ts){
+  if(!ts) return '';
+  /* Treat as local. Replace space with T for cross-browser parsing. */
+  var iso = String(ts).replace(' ', 'T');
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return String(ts).slice(0,16);
+  var now = new Date();
+  var diffSec = Math.max(0, Math.floor((now - d) / 1000));
+  function pad(n){return n<10?('0'+n):(''+n);}
+  if(diffSec < 60) return 'الآن';
+  if(diffSec < 3600){var m=Math.floor(diffSec/60); return 'قبل '+m+' دقيقة';}
+  /* Same calendar day? */
+  var sameDay = (d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate());
+  if(sameDay) return 'اليوم ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  var yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+  var sameYest = (d.getFullYear()===yesterday.getFullYear() && d.getMonth()===yesterday.getMonth() && d.getDate()===yesterday.getDate());
+  if(sameYest) return 'أمس ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  var diffDays = Math.floor(diffSec / 86400);
+  if(diffDays < 7) return 'قبل ' + diffDays + ' أيام';
+  if(diffDays < 14) return 'قبل أسبوع';
+  if(diffDays < 30) return 'قبل ' + Math.floor(diffDays/7) + ' أسابيع';
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
 
 function load(){
   Promise.all([
@@ -31223,11 +31294,12 @@ function load(){
     fetch('/api/portal/student/redemptions',{credentials:'include'}).then(function(r){return r.json();}),
   ]).then(function(arr){
     var me=arr[0], rew=arr[1], red=arr[2];
-    if(!me.ok){document.getElementById('root').innerHTML='<div class="empty">'+(me.error||'فشل التحميل')+'</div>';return;}
+    if(!me.ok){document.getElementById('root').innerHTML='<div class="section empty">'+_esc(me.error||'فشل التحميل')+'</div>';return;}
     STATE.me=me; STATE.rewards=rew.rows||[]; STATE.redemptions=red.rows||[];
     render();
-  }).catch(function(){document.getElementById('root').innerHTML='<div class="empty">خطأ في الاتصال</div>';});
+  }).catch(function(){document.getElementById('root').innerHTML='<div class="section empty">خطأ في الاتصال</div>';});
 }
+
 function render(){
   var me=STATE.me;
   var s=me.student||{};
@@ -31238,6 +31310,10 @@ function render(){
   var bal=me.balance||0;
   var lvl=me.level||{};
   var nextLvl=me.next_level||null;
+  var groupName = me.group_name || s.group_name_student || '';
+  var teacherName = me.teacher_name || '';
+  var weeklySumm = me.weekly_summary || {positive:0,negative:0,positive_count:0,negative_count:0,net:0};
+  var weekly = me.weekly || [];
   var progress=0;
   if(lvl.min_points!=null && nextLvl && nextLvl.min_points){
     var span=nextLvl.min_points-lvl.min_points;
@@ -31250,32 +31326,75 @@ function render(){
                            size: 110, clickable: true, sid: s.id,
                            avatar_id: avId, target_name: firstName,
                            classes:'mx-av-bounce mx-av-wiggle av'})
-    : '<span class="av"><img src="'+avPath+'" style="width:110px;height:110px;" alt=""/></span>';
-  var html='';
-  html+='<div class="hero">'
-     +avHTML
-     +'<div class="nm">'+_esc(firstName)+'</div>'
-     +'<div class="pts" id="balCount">0</div>'
-     +'<div class="ptslbl">نقطة</div>'
-     +'<div class="lvl" style="color:'+(lvl.color||'#6B3FA0')+';">'+_esc((lvl.badge_icon||'🏅'))+' المستوى: <b>'+_esc(lvl.name_ar||'—')+'</b></div>'
-     +'<div class="progress"><div style="width:'+progress+'%;"></div></div>'
-     +'<div style="font-size:0.78rem;color:#666;margin-top:6px;">'+(nextLvl?('للوصول إلى '+_esc(nextLvl.name_ar)+': '+(nextLvl.min_points-bal)+' نقطة'):'أعلى مستوى! 🎉')+'</div>'
-     +'</div>';
+    : '<span class="av"><img src="'+avPath+'" style="width:110px;height:110px;border-radius:50%;" alt=""/></span>';
 
-  // Recent positive achievements
-  html+='<div class="section"><h2>🏆 إنجازاتي الأخيرة</h2>';
-  var pos=(me.events||[]).filter(function(e){return e.points_value>=0;}).slice(0,5);
-  if(!pos.length){html+='<div class="empty">لم تحصل على إنجازات بعد. ابدأ بمشاركتك في الصف!</div>';}
-  else{
-    pos.forEach(function(e){
-      html+='<div class="event pos">'
-       +'<div><b>'+_esc(e.behavior_name||'')+'</b><div class="meta">'+_esc(e.awarded_by_name||'—')+' • '+((e.awarded_at||'').slice(0,16))+'</div></div>'
-       +'<div class="pv">+'+e.points_value+'</div></div>';
+  var html='';
+
+  /* ── 1. HEADER + 2. POINTS DISPLAY ───────────────────────── */
+  var metaLine = '';
+  if(groupName)   metaLine += '👥 المجموعة: <b>'+_esc(groupName)+'</b>';
+  if(groupName && teacherName) metaLine += '<br>';
+  if(teacherName) metaLine += '👩‍🏫 المعلمة: <b>'+_esc(teacherName)+'</b>';
+  html+='<div class="hero">'
+     + avHTML
+     + '<div class="nm">'+_esc(s.student_name||firstName)+'</div>'
+     + (metaLine ? ('<div class="meta">'+metaLine+'</div>') : '')
+     + '<div class="pts" id="balCount">0</div>'
+     + '<div class="ptslbl">نقطة</div>'
+     + '<div class="lvl" style="color:'+(lvl.color||'#6B3FA0')+';">'+_esc((lvl.badge_icon||'🏅'))+' المستوى: <b style="margin-right:4px;">'+_esc(lvl.name_ar||'—')+'</b></div>'
+     + '<div class="progress"><div style="width:'+progress+'%;"></div></div>'
+     + '<div class="progress-lbl">'+(nextLvl?('للوصول إلى '+_esc(nextLvl.name_ar)+': '+(nextLvl.min_points-bal)+' نقطة'):'أعلى مستوى! 🎉')+'</div>'
+     + '</div>';
+
+  /* ── 3. WEEKLY SUMMARY ───────────────────────────────────── */
+  html+='<div class="section"><h2>📅 ملخص هذا الأسبوع</h2>';
+  var hasAny = (weeklySumm.positive_count + weeklySumm.negative_count) > 0;
+  if(!hasAny){
+    html+='<div class="empty">لم يتم منح نقاط هذا الأسبوع بعد.</div>';
+  } else {
+    var net = weeklySumm.net|0;
+    var netSign = net>0 ? '+' : '';
+    html+='<div class="wsumm">'
+        + '<div class="wcell pos"><span class="ic">⭐</span><div class="num">+'+(weeklySumm.positive|0)+'</div><div class="lbl">إيجابية ('+(weeklySumm.positive_count|0)+')</div></div>'
+        + '<div class="wcell neg"><span class="ic">⚠️</span><div class="num">'+(weeklySumm.negative|0)+'</div><div class="lbl">سلبية ('+(weeklySumm.negative_count|0)+')</div></div>'
+        + '<div class="wcell net"><span class="ic">📊</span><div class="num">'+netSign+net+'</div><div class="lbl">صافي الأسبوع</div></div>'
+        + '</div>';
+  }
+  html+='</div>';
+
+  /* ── 4. RECENT ACTIVITY (15) ─────────────────────────────── */
+  html+='<div class="section"><h2>📜 آخر النشاطات</h2>';
+  var allEvents = me.events || [];
+  if(!allEvents.length){
+    html+='<div class="empty">لا توجد نشاطات بعد. استمر في التميز! 💪</div>';
+  } else {
+    allEvents.forEach(function(e){
+      var pv = e.points_value|0;
+      var cls = pv > 0 ? 'pos' : (pv < 0 ? 'neg' : 'zero');
+      var sign = pv > 0 ? '+' : '';
+      var when = relTime(e.awarded_at);
+      var noteHTML = e.note ? (' • <span class="note">'+_esc(e.note)+'</span>') : '';
+      html+='<div class="event '+cls+'">'
+          + '<div style="min-width:0;flex:1;">'
+          +   '<b>'+_esc(e.behavior_name||'')+'</b>'
+          +   '<div class="meta">'+_esc(when)+(e.awarded_by_name?(' • '+_esc(e.awarded_by_name)):'')+noteHTML+'</div>'
+          + '</div>'
+          + '<div class="pv">'+sign+pv+'</div>'
+          + '</div>';
     });
   }
   html+='</div>';
 
-  // Reward shop
+  /* ── 5. CHART (8-week stacked bar) ───────────────────────── */
+  html+='<div class="section"><h2>📈 تطوري خلال 8 أسابيع</h2>';
+  if(!weekly.length){
+    html+='<div class="empty">لا توجد بيانات كافية للرسم البياني.</div>';
+  } else {
+    html+='<div class="chart-wrap"><canvas id="weeklyChart"></canvas></div>';
+  }
+  html+='</div>';
+
+  /* ── 6. REWARDS SHOP ─────────────────────────────────────── */
   html+='<div class="section"><h2>🎁 متجر المكافآت</h2>';
   if(!STATE.rewards.length){html+='<div class="empty">لا توجد مكافآت متاحة الآن.</div>';}
   else{
@@ -31285,7 +31404,7 @@ function render(){
       html+='<div class="reward">'
         +'<div class="ic">'+_esc(r.icon||'🎁')+'</div>'
         +'<div class="nm">'+_esc(r.name_ar||'')+'</div>'
-        +'<div class="cost">'+r.point_cost+' نقطة</div>'
+        +'<div class="cost">'+(r.point_cost|0)+' نقطة</div>'
         +'<button class="btn btn-redeem" '+(canRedeem?'':'disabled')+' onclick="askRedeem('+r.id+',\''+(r.name_ar||'').replace(/\\/g,'\\\\').replace(/\'/g,'\\\'').replace(/"/g,'\\\"')+'\','+r.point_cost+')">استبدال</button>'
         +'</div>';
     });
@@ -31293,31 +31412,77 @@ function render(){
   }
   html+='</div>';
 
-  // Redemption history
-  html+='<div class="section"><h2>📋 مكافآتي</h2>';
+  /* ── 7. REDEMPTION HISTORY ───────────────────────────────── */
+  html+='<div class="section"><h2>📋 مكافآتي السابقة</h2>';
   if(!STATE.redemptions.length){html+='<div class="empty">لم تستبدل أي مكافأة بعد.</div>';}
   else{
     STATE.redemptions.forEach(function(r){
       var stCls={pending:'s-pending',delivered:'s-delivered',cancelled:'s-cancelled'}[r.status]||'s-pending';
       var stTxt={pending:'بانتظار التسليم',delivered:'تم التسليم',cancelled:'ملغى'}[r.status]||r.status;
       html+='<div class="history-row">'
-       +'<div><b>'+_esc(r.reward_name||'')+'</b><div class="meta" style="color:#777;font-size:0.78rem;">'+((r.redeemed_at||'').slice(0,16))+' • '+r.points_spent+' نقطة</div></div>'
+       +'<div style="min-width:0;flex:1;"><b>'+_esc(r.reward_name||'')+'</b><div class="meta" style="color:#777;font-size:0.78rem;margin-top:2px;">'+relTime(r.redeemed_at)+' • '+(r.points_spent|0)+' نقطة</div></div>'
        +'<span class="status-badge '+stCls+'">'+stTxt+'</span>'
        +'</div>';
     });
   }
   html+='</div>';
   document.getElementById('root').innerHTML=html;
-  // Animate the points counter from 0 → bal
+  /* Animate the points counter from 0 → bal */
   countUp('balCount', bal, 800);
+  /* Render chart after the canvas is in the DOM. */
+  if(weekly.length) drawChart(weekly);
 }
+
+function drawChart(weekly){
+  var canvas = document.getElementById('weeklyChart');
+  if(!canvas || typeof Chart === 'undefined') return;
+  if(CHART){ try { CHART.destroy(); } catch(e){} CHART = null; }
+  var labels = weekly.map(function(w){
+    /* Show MM/DD of week-end for compact RTL labels. */
+    var d = (w.week_end||'').split('-');
+    return d.length===3 ? (d[2]+'/'+d[1]) : (w.week_end||'');
+  });
+  var pos = weekly.map(function(w){ return w.positive|0; });
+  var neg = weekly.map(function(w){ return Math.abs(w.negative|0); });
+  CHART = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'إيجابي', data: pos, backgroundColor: '#43A047', stack:'wk', borderRadius:6 },
+        { label: 'سلبي',   data: neg, backgroundColor: '#E53935', stack:'wk', borderRadius:6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', rtl: true, labels: { font: { family: 'inherit' } } },
+        tooltip: { rtl: true, bodyFont: { family: 'inherit' }, titleFont: { family: 'inherit' },
+          callbacks: {
+            label: function(ctx){
+              var v = ctx.raw|0;
+              var lbl = ctx.dataset.label || '';
+              if(lbl === 'سلبي') v = -v;
+              return lbl + ': ' + (v>0?'+':'') + v + ' نقطة';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { font: { family: 'inherit' } }, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, ticks: { font: { family: 'inherit' }, precision: 0 } }
+      }
+    }
+  });
+}
+
 function countUp(id, target, ms){
   var el=document.getElementById(id);
   if(!el) return;
   var start=performance.now();
   function tick(now){
     var t=Math.min(1,(now-start)/ms);
-    var e=1-Math.pow(1-t,3); // easeOutCubic
+    var e=1-Math.pow(1-t,3); /* easeOutCubic */
     el.textContent=Math.round(target*e);
     if(t<1) requestAnimationFrame(tick); else el.textContent=target;
   }
@@ -31577,9 +31742,96 @@ def portal_student_page():
     return PORTAL_STUDENT_HTML
 
 
+def _pts_weekly_series_for_student(db, sid, weeks=8):
+    """8-week (configurable) positive/negative series for a single
+    student. Same rolling-7-day windows the parent portal uses, hoisted
+    here so the student portal can reuse it without duplicating code."""
+    import datetime as _dt
+    now = _dt.datetime.now()
+    out = []
+    for i in range(weeks - 1, -1, -1):
+        wstart = (now - _dt.timedelta(days=(i + 1) * 7)).strftime("%Y-%m-%d %H:%M:%S")
+        wend   = (now - _dt.timedelta(days=i * 7)).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            pos = db.execute(
+                "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                "WHERE student_id=? AND awarded_at>=? AND awarded_at<? AND points_value > 0",
+                (sid, wstart, wend),
+            ).fetchone()[0] or 0
+            neg = db.execute(
+                "SELECT COALESCE(SUM(points_value),0) FROM point_events "
+                "WHERE student_id=? AND awarded_at>=? AND awarded_at<? AND points_value < 0",
+                (sid, wstart, wend),
+            ).fetchone()[0] or 0
+        except Exception:
+            pos = 0; neg = 0
+        out.append({"week_end": wend[:10], "positive": int(pos), "negative": int(neg)})
+    return out
+
+
+def _pts_weekly_summary_for_student(db, sid):
+    """Single-window summary for the last 7 days: positive sum,
+    negative sum (returned as a negative integer), counts per polarity,
+    net delta. Used by the student portal's "ملخص هذا الأسبوع" block."""
+    import datetime as _dt
+    since = (_dt.datetime.now() - _dt.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        pos = db.execute(
+            "SELECT COALESCE(SUM(points_value),0), COUNT(*) FROM point_events "
+            "WHERE student_id=? AND awarded_at>=? AND points_value > 0",
+            (sid, since),
+        ).fetchone()
+        neg = db.execute(
+            "SELECT COALESCE(SUM(points_value),0), COUNT(*) FROM point_events "
+            "WHERE student_id=? AND awarded_at>=? AND points_value < 0",
+            (sid, since),
+        ).fetchone()
+        pos_sum, pos_n = int(pos[0] or 0), int(pos[1] or 0)
+        neg_sum, neg_n = int(neg[0] or 0), int(neg[1] or 0)
+    except Exception:
+        pos_sum = pos_n = neg_sum = neg_n = 0
+    return {
+        "positive":       pos_sum,
+        "positive_count": pos_n,
+        "negative":       neg_sum,    # negative integer or 0
+        "negative_count": neg_n,
+        "net":            pos_sum + neg_sum,
+        "since":          since[:10],
+    }
+
+
+def _pts_group_meta_for_student(db, sd):
+    """Resolve group display name + assigned teacher for one student."""
+    gn = (sd.get("group_name_student") or "").strip()
+    if not gn:
+        return {"group_name": "", "teacher_name": ""}
+    try:
+        grow = db.execute(
+            "SELECT group_name, teacher_name FROM student_groups "
+            "WHERE TRIM(group_name)=TRIM(?) LIMIT 1",
+            (gn,),
+        ).fetchone()
+    except Exception:
+        grow = None
+    if not grow:
+        return {"group_name": gn, "teacher_name": ""}
+    gd = dict(grow)
+    return {
+        "group_name":   (gd.get("group_name")   or gn).strip(),
+        "teacher_name": (gd.get("teacher_name") or "").strip(),
+    }
+
+
 @app.route('/api/portal/student/me', methods=['GET'])
 @login_required
 def api_portal_student_me():
+    """Returns everything the student portal needs in one round-trip:
+    student record, group + teacher meta, balance, level + next level,
+    avatar, the last 15 point events, weekly summary (last 7 days),
+    and an 8-week positive/negative series for the chart.
+
+    Ownership: forced to session.user.linked_student_id — there is no
+    way to ask for another student's data via this endpoint."""
     user = session.get("user") or {}
     if (user.get("role") or "").strip().lower() != "student":
         return jsonify({"ok": False, "error": "forbidden"}), 403
@@ -31612,15 +31864,22 @@ def api_portal_student_me():
     except Exception:
         all_lvls = []
     av = _pts_resolve_avatar(db, sd.get("avatar_id"))
-    events = _pts_recent_events(db, sid, 12)
+    events  = _pts_recent_events(db, sid, 15)
+    weekly  = _pts_weekly_series_for_student(db, sid, weeks=8)
+    summary = _pts_weekly_summary_for_student(db, sid)
+    grp_meta = _pts_group_meta_for_student(db, sd)
     return jsonify({
-        "ok":         True,
-        "student":    sd,
-        "balance":    bal,
-        "level":      lvl,
-        "next_level": next_lvl,
-        "avatar":     av,
-        "events":     events,
+        "ok":              True,
+        "student":         sd,
+        "group_name":      grp_meta["group_name"],
+        "teacher_name":    grp_meta["teacher_name"],
+        "balance":         bal,
+        "level":           lvl,
+        "next_level":      next_lvl,
+        "avatar":          av,
+        "events":          events,
+        "weekly_summary":  summary,
+        "weekly":          weekly,
     })
 
 
