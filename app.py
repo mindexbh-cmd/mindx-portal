@@ -14050,7 +14050,11 @@ def login():
     if role == "teacher":
         return redirect("/teacher/hub")
     if role == "student":
-        return redirect("/portal/student")
+        # Parents log in with the child's personal ID; the new unified
+        # parent-hub is their landing page. The legacy /portal/student
+        # URL stays alive for backward compatibility (now also linked
+        # from the hub's "النقاط" card).
+        return redirect("/portal/parent-hub")
     if role == "parent":
         return redirect("/portal/parent")
     return redirect("/dashboard")
@@ -31426,7 +31430,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 </style></head><body>
 <div class="topbar">
   <h1>🌟 نقاطي</h1>
-  <a class="logout" href="/logout">خروج</a>
+  <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <a class="logout" href="/portal/parent-hub" style="background:#f3e5f5;border:1.5px solid #c4a8e8;">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </span>
 </div>
 <div class="wrap" id="root"><div class="empty">جاري التحميل...</div></div>
 <div class="modal" id="confirm">
@@ -32095,6 +32102,532 @@ def api_portal_student_redemptions():
         return jsonify({"ok": True, "rows": [dict(r) for r in rows]})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
+
+
+# ── Unified parent-hub portal ────────────────────────────────────
+# Parents log in with their child's personal ID. The hub at
+# /portal/parent-hub is their landing page; three sub-pages
+# (payments / attendance / points) are scoped to the logged-in
+# student's id so URL tampering can never expose another child.
+# The dedicated parent-account portal at /portal/parent (V2,
+# multi-child) is unaffected.
+def _ph_require_student():
+    """Returns (user, student_id) for a logged-in role=student session,
+    or a (None, error_response) tuple for any other state. Centralises
+    ownership enforcement for every parent-hub route + API."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return None, (jsonify({"ok": False, "error": "forbidden"}), 403)
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return None, (jsonify({"ok": False, "error": "account not linked to a student"}), 400)
+    return (user, sid), None
+
+
+def _ph_resolve_student_meta(db, sid):
+    """Return {student, group_name, teacher_name, avatar} for the
+    landing page header. Reuses the student-portal helpers so the
+    hub and the points sub-page show identical metadata."""
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, personal_id, group_name_student, avatar_id "
+            "FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return None
+    sd = dict(srow)
+    grp = _pts_group_meta_for_student(db, sd)
+    av  = _pts_resolve_avatar(db, sd.get("avatar_id"))
+    return {
+        "student":      sd,
+        "group_name":   grp["group_name"],
+        "teacher_name": grp["teacher_name"],
+        "avatar":       av,
+    }
+
+
+@app.route('/api/portal/student/meta', methods=['GET'])
+@login_required
+def api_portal_student_meta():
+    """Header data for the parent-hub landing page + sub-pages."""
+    pair, err = _ph_require_student()
+    if err: return err
+    _user, sid = pair
+    db = get_db()
+    meta = _ph_resolve_student_meta(db, sid)
+    if not meta:
+        return jsonify({"ok": False, "error": "student record missing"}), 404
+    return jsonify({"ok": True, **meta})
+
+
+@app.route('/api/portal/student/payments', methods=['GET'])
+@login_required
+def api_portal_student_payments():
+    """Read-only payment plan + per-installment status for the
+    logged-in student. Reuses _payment_compute_plan +
+    _payment_log_paid_for_student so the numbers match what admin
+    sees in /database and the search profile."""
+    pair, err = _ph_require_student()
+    if err: return err
+    _user, sid = pair
+    db = get_db()
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, personal_id, installment_type "
+            "FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student record missing"}), 404
+    sd = dict(srow)
+    try:
+        plan_payload = _payment_compute_plan(db, sd["id"])
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if plan_payload is None:
+        return jsonify({"ok": False, "error": "could not compute plan"}), 500
+    insts = [i for i in plan_payload["plan"]["installments"]
+             if (i.get("amount") or 0) > 0]
+    paid_pl, pl_dict = _payment_log_paid_for_student(
+        db, sd.get("student_name"), sd.get("personal_id")
+    )
+    plan = plan_payload["plan"]
+    paid_count = sum(1 for i in insts if (i.get("paid") or 0) > 0)
+    return jsonify({
+        "ok": True,
+        "student": {
+            "id":   sd["id"],
+            "name": sd.get("student_name"),
+        },
+        "plan": {
+            "method":           plan.get("method"),
+            "course_amount":    plan.get("course_amount"),
+            "num_installments": plan.get("num_installments"),
+            "total_paid":       plan.get("total_paid"),
+            "total_remaining":  plan.get("total_remaining"),
+            "status":           plan.get("status"),
+        },
+        "summary": {
+            "course_amount":   plan.get("course_amount") or 0,
+            "total_paid":      plan.get("total_paid") or 0,
+            "total_remaining": plan.get("total_remaining") or 0,
+            "num_installments":  plan.get("num_installments") or 0,
+            "paid_installments": paid_count,
+            "remaining_installments": max(0, (plan.get("num_installments") or 0) - paid_count),
+        },
+        "installments": insts,
+        "payments":     pl_dict or {},
+    })
+
+
+@app.route('/api/portal/student/attendance', methods=['GET'])
+@login_required
+def api_portal_student_attendance():
+    """Attendance summary + log (last N rows) for the logged-in
+    student. Read-only; no path param so URL tampering is impossible."""
+    pair, err = _ph_require_student()
+    if err: return err
+    _user, sid = pair
+    try:
+        limit = max(1, min(int(request.args.get("limit") or 50), 200))
+    except Exception:
+        limit = 50
+    db = get_db()
+    try:
+        srow = db.execute(
+            "SELECT id, student_name, personal_id FROM students WHERE id=?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student record missing"}), 404
+    sd = dict(srow)
+    name = (sd.get("student_name") or "").strip()
+    # Pull every row keyed by student_name (legacy data has no FK to
+    # student_id). Filter Python-side so whitespace/normalisation
+    # quirks the existing _att_normalize_date helper handles cleanly.
+    try:
+        rows = db.execute(
+            "SELECT id, attendance_date, group_name, student_name, status, "
+            "       day_name, message, message_status "
+            "FROM attendance WHERE TRIM(student_name)=TRIM(?)",
+            (name,),
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    STATUS_PRESENT = "حاضر"
+    STATUS_ABSENT  = "غائب"
+    STATUS_LATE    = "متأخر"
+    out = []
+    sessions = set()
+    n_present = n_absent = n_late = 0
+    for r in rows:
+        rd = dict(r)
+        d  = _att_normalize_date(rd.get("attendance_date"))
+        g  = (rd.get("group_name") or "").strip()
+        st = (rd.get("status") or "").strip()
+        if d and g:
+            sessions.add((d, g))
+        if   st == STATUS_PRESENT: n_present += 1
+        elif st == STATUS_ABSENT:  n_absent  += 1
+        elif st == STATUS_LATE:    n_late    += 1
+        out.append({
+            "id":              rd.get("id"),
+            "attendance_date": d,
+            "day_name":        rd.get("day_name") or "",
+            "group_name":      g,
+            "status":          st,
+            "message":         rd.get("message") or "",
+        })
+    out.sort(key=lambda x: (x.get("attendance_date") or ""), reverse=True)
+    out = out[:limit]
+    total = len(sessions)
+    pct = round((n_present + n_late) / total * 100, 1) if total else 0.0
+    return jsonify({
+        "ok": True,
+        "student": {"id": sd["id"], "name": name},
+        "summary": {
+            "present": n_present,
+            "absent":  n_absent,
+            "late":    n_late,
+            "total":   total,
+            "percent": pct,
+        },
+        "rows":  out,
+    })
+
+
+# ── Hub landing + sub-page routes ────────────────────────────────
+PORTAL_PARENT_HUB_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>بوابة ولي الأمر — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:14px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1100px;margin:32px auto;padding:0 18px;}
+.hello{background:#fff;border-radius:22px;padding:24px;margin-bottom:28px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;box-shadow:0 8px 28px rgba(107,63,160,.14);}
+.hello .av-wrap{flex-shrink:0;}
+.hello .info h2{font-size:1.45rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
+.hello .info p{color:#666;margin:2px 0;font-size:0.95rem;}
+.hello .info p b{color:#4a148c;}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+.card{background:#fff;border-radius:22px;padding:36px 26px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
+.card:hover{transform:translateY(-6px);box-shadow:0 18px 42px rgba(107,63,160,.28);border-color:#6B3FA0;}
+.card .ic{font-size:3.6rem;line-height:1;display:block;margin-bottom:14px;}
+.card h3{margin:0 0 8px;font-size:1.35rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.95rem;line-height:1.55;}
+.card.pay::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
+.card.att::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#0288D1,#01579B);}
+.card.pts::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
+.empty{text-align:center;color:#888;padding:60px 20px;}
+@media (max-width:760px){
+  .cards{grid-template-columns:1fr;gap:14px;}
+  .card{padding:26px 20px;}
+  .card .ic{font-size:2.8rem;}
+  .card h3{font-size:1.15rem;}
+  .hello{padding:18px;}
+  .hello .info h2{font-size:1.2rem;}
+}
+@media (prefers-reduced-motion:reduce){
+  .card:hover{transform:none;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>🏠 بوابة ولي الأمر — مايندكس</h1>
+  <a href="/logout">تسجيل الخروج</a>
+</div>
+<div class="wrap" id="root">
+  <div class="empty">جاري التحميل...</div>
+</div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+fetch('/api/portal/student/meta',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var root = document.getElementById('root');
+    if(!d.ok){ root.innerHTML='<div class="empty">'+_esc(d.error||'فشل التحميل')+'</div>'; return; }
+    var s = d.student||{}, av = d.avatar||{};
+    var avPath = av.file_path || '/static/avatars/svg/egg.svg';
+    var avName = av.name || '';
+    var firstName = (s.student_name||'').split(' ')[0];
+    var avHTML = (typeof window.mxAvatarHTML === 'function')
+      ? window.mxAvatarHTML({file_path: avPath, name: avName||firstName, size:96, classes:'mx-av-bounce'})
+      : '<img src="'+avPath+'" style="width:96px;height:96px;border-radius:50%;" alt=""/>';
+    var html = ''
+      + '<div class="hello">'
+      +   '<div class="av-wrap">' + avHTML + '</div>'
+      +   '<div class="info" style="flex:1;min-width:200px;">'
+      +     '<h2>مرحباً، ولي أمر ' + _esc(s.student_name||firstName) + '</h2>'
+      +     (d.group_name   ? '<p>👥 المجموعة: <b>' + _esc(d.group_name)   + '</b></p>' : '')
+      +     (d.teacher_name ? '<p>👩‍🏫 المعلمة: <b>' + _esc(d.teacher_name) + '</b></p>' : '')
+      +   '</div>'
+      + '</div>'
+      + '<div class="cards">'
+      +   '<a class="card pay" href="/portal/parent-hub/payments">'
+      +     '<span class="ic">💰</span><h3>الدفع</h3><p>متابعة الأقساط والمدفوعات</p>'
+      +   '</a>'
+      +   '<a class="card att" href="/portal/parent-hub/attendance">'
+      +     '<span class="ic">📋</span><h3>الغياب</h3><p>متابعة سجل الحضور والغياب</p>'
+      +   '</a>'
+      +   '<a class="card pts" href="/portal/parent-hub/points">'
+      +     '<span class="ic">🌟</span><h3>النقاط</h3><p>متابعة نقاط كلاس مايندكس</p>'
+      +   '</a>'
+      + '</div>';
+    root.innerHTML = html;
+  })
+  .catch(function(){
+    document.getElementById('root').innerHTML = '<div class="empty">خطأ في الاتصال</div>';
+  });
+</script>
+</body></html>"""
+
+
+# Shared header CSS + script lifted into a helper to keep the two
+# read-only sub-pages (payments + attendance) consistent without
+# copy-paste drift.
+_PORTAL_HUB_SHARED_CSS = r"""*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:14px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#4a148c;}
+.topbar .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:8px 14px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.topbar a.logout{background:#fff;border:1.5px solid #c4a8e8;}
+.wrap{max-width:1080px;margin:18px auto;padding:0 14px;}
+.section{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.06);}
+.section h2{margin:0 0 14px;color:#4a148c;font-size:1.05rem;font-weight:900;display:flex;align-items:center;gap:8px;}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.scell{background:#fafafa;border-radius:12px;padding:14px 12px;text-align:center;border:1.4px solid #eee;}
+.scell .lbl{color:#666;font-size:0.78rem;font-weight:700;margin-bottom:6px;}
+.scell .num{font-weight:900;font-size:1.45rem;line-height:1;color:#4a148c;}
+.scell.green .num{color:#1B5E20;}
+.scell.green{background:#e8f5e9;border-color:#a5d6a7;}
+.scell.red .num{color:#c62828;}
+.scell.red{background:#ffebee;border-color:#ef9a9a;}
+.scell.amber .num{color:#e65100;}
+.scell.amber{background:#fff8e1;border-color:#ffd54f;}
+.scell.blue .num{color:#01579B;}
+.scell.blue{background:#E1F5FE;border-color:#81D4FA;}
+table.t{width:100%;border-collapse:collapse;}
+table.t th{background:#f8f3ff;color:#4a148c;font-weight:800;text-align:right;padding:10px 12px;font-size:0.86rem;border-bottom:2px solid #e1d4ec;}
+table.t td{padding:10px 12px;border-bottom:1px solid #f0e7f8;font-size:0.92rem;}
+table.t tbody tr:nth-child(even){background:#fbf7ff;}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:0.78rem;font-weight:800;}
+.b-paid{background:#e8f5e9;color:#1B5E20;}
+.b-unpaid{background:#ffebee;color:#c62828;}
+.b-present{background:#e8f5e9;color:#1B5E20;}
+.b-absent{background:#ffebee;color:#c62828;}
+.b-late{background:#fff8e1;color:#e65100;}
+.empty{text-align:center;color:#888;padding:30px;}
+@media (max-width:680px){
+  /* Stacked cards for narrow screens. */
+  table.t thead{display:none;}
+  table.t, table.t tbody, table.t tr, table.t td{display:block;width:100%;}
+  table.t tr{background:#fff;margin-bottom:10px;border-radius:10px;padding:8px 10px;border:1px solid #eee;}
+  table.t tr:nth-child(even){background:#fff;}
+  table.t td{border-bottom:none;padding:5px 0;}
+  table.t td:before{content:attr(data-label);font-weight:800;color:#4a148c;display:block;font-size:0.78rem;margin-bottom:2px;}
+}"""
+
+
+PORTAL_PARENT_PAYMENTS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الدفع — بوابة ولي الأمر</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>__PH_CSS__</style>
+</head><body>
+<div class="topbar">
+  <h1>💰 الدفع</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap" id="root"><div class="section empty">جاري التحميل...</div></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _money(n){var v = Number(n||0); return v.toLocaleString('ar-EG', {maximumFractionDigits:3}) + ' د.ب';}
+
+fetch('/api/portal/student/payments',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var root = document.getElementById('root');
+    if(!d.ok){ root.innerHTML='<div class="section empty">'+_esc(d.error||'فشل التحميل')+'</div>'; return; }
+    var sm = d.summary || {};
+    var insts = d.installments || [];
+    var pays  = d.payments || {};
+    var html = ''
+      + '<div class="section"><h2>📊 الملخص</h2>'
+      +   '<div class="summary">'
+      +     '<div class="scell blue"><div class="lbl">مبلغ الدورة الكامل</div><div class="num">' + _money(sm.course_amount) + '</div></div>'
+      +     '<div class="scell green"><div class="lbl">إجمالي المدفوع</div><div class="num">' + _money(sm.total_paid) + '</div></div>'
+      +     '<div class="scell amber"><div class="lbl">إجمالي المتبقي</div><div class="num">' + _money(sm.total_remaining) + '</div></div>'
+      +     '<div class="scell"><div class="lbl">عدد الأقساط الكلي</div><div class="num">' + (sm.num_installments|0) + '</div></div>'
+      +     '<div class="scell green"><div class="lbl">المدفوعة</div><div class="num">' + (sm.paid_installments|0) + '</div></div>'
+      +     '<div class="scell red"><div class="lbl">المتبقية</div><div class="num">' + (sm.remaining_installments|0) + '</div></div>'
+      +   '</div>'
+      + '</div>';
+    html += '<div class="section"><h2>📋 الأقساط</h2>';
+    if(!insts.length){
+      html += '<div class="empty">لا توجد بيانات أقساط لهذا الطالب.</div>';
+    } else {
+      html += '<table class="t"><thead><tr>'
+        + '<th>رقم القسط</th><th>المبلغ</th><th>تاريخ الاستحقاق</th><th>الحالة</th><th>تاريخ الدفع</th>'
+        + '</tr></thead><tbody>';
+      insts.forEach(function(it){
+        var n   = it.n || it.number || '';
+        var amt = it.amount || 0;
+        var due = it.due_date || it.date || '';
+        var paid = (it.paid|0) > 0;
+        var paidAt = '';
+        var pl = pays[n] || pays[String(n)] || null;
+        if (pl && pl.paid_at) paidAt = pl.paid_at;
+        else if (it.paid_at) paidAt = it.paid_at;
+        var badge = paid
+          ? '<span class="badge b-paid">✅ مدفوع</span>'
+          : '<span class="badge b-unpaid">❌ لم يُدفع</span>';
+        html += '<tr>'
+          + '<td data-label="رقم القسط">' + _esc(n) + '</td>'
+          + '<td data-label="المبلغ">' + _money(amt) + '</td>'
+          + '<td data-label="تاريخ الاستحقاق">' + _esc(due || '—') + '</td>'
+          + '<td data-label="الحالة">' + badge + '</td>'
+          + '<td data-label="تاريخ الدفع">' + _esc((paidAt||'').slice(0,10) || '—') + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+    root.innerHTML = html;
+  })
+  .catch(function(){
+    document.getElementById('root').innerHTML = '<div class="section empty">خطأ في الاتصال</div>';
+  });
+</script>
+</body></html>"""
+
+
+PORTAL_PARENT_ATTENDANCE_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الغياب — بوابة ولي الأمر</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>__PH_CSS__</style>
+</head><body>
+<div class="topbar">
+  <h1>📋 الغياب</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap" id="root"><div class="section empty">جاري التحميل...</div></div>
+<script>
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _statusBadge(st){
+  if(st==='حاضر')  return '<span class="badge b-present">✅ حاضر</span>';
+  if(st==='غائب')  return '<span class="badge b-absent">❌ غائب</span>';
+  if(st==='متأخر') return '<span class="badge b-late">🟠 متأخر</span>';
+  return _esc(st||'—');
+}
+
+fetch('/api/portal/student/attendance?limit=50',{credentials:'include'})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var root = document.getElementById('root');
+    if(!d.ok){ root.innerHTML='<div class="section empty">'+_esc(d.error||'فشل التحميل')+'</div>'; return; }
+    var sm = d.summary || {};
+    var rows = d.rows || [];
+    var html = ''
+      + '<div class="section"><h2>📊 الملخص</h2>'
+      +   '<div class="summary">'
+      +     '<div class="scell green"><div class="lbl">أيام الحضور</div><div class="num">' + (sm.present|0) + '</div></div>'
+      +     '<div class="scell red"><div class="lbl">أيام الغياب</div><div class="num">' + (sm.absent|0) + '</div></div>'
+      +     '<div class="scell amber"><div class="lbl">أيام التأخر</div><div class="num">' + (sm.late|0) + '</div></div>'
+      +     '<div class="scell blue"><div class="lbl">نسبة الحضور</div><div class="num">' + (sm.percent||0) + '%</div></div>'
+      +   '</div>'
+      + '</div>';
+    html += '<div class="section"><h2>📜 سجل الحضور (آخر ' + rows.length + ')</h2>';
+    if(!rows.length){
+      html += '<div class="empty">لا توجد سجلات حضور لهذا الطالب.</div>';
+    } else {
+      html += '<table class="t"><thead><tr>'
+        + '<th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>المجموعة</th><th>الملاحظات</th>'
+        + '</tr></thead><tbody>';
+      rows.forEach(function(r){
+        html += '<tr>'
+          + '<td data-label="التاريخ">' + _esc(r.attendance_date || '—') + '</td>'
+          + '<td data-label="اليوم">'   + _esc(r.day_name || '—') + '</td>'
+          + '<td data-label="الحالة">'  + _statusBadge(r.status) + '</td>'
+          + '<td data-label="المجموعة">' + _esc(r.group_name || '—') + '</td>'
+          + '<td data-label="الملاحظات">' + _esc(r.message || '—') + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+    root.innerHTML = html;
+  })
+  .catch(function(){
+    document.getElementById('root').innerHTML = '<div class="section empty">خطأ في الاتصال</div>';
+  });
+</script>
+</body></html>"""
+
+
+@app.route('/portal/parent-hub')
+@login_required
+def portal_parent_hub_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_HUB_HTML
+
+
+@app.route('/portal/parent-hub/payments')
+@login_required
+def portal_parent_hub_payments_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_PAYMENTS_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
+
+
+@app.route('/portal/parent-hub/attendance')
+@login_required
+def portal_parent_hub_attendance_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_ATTENDANCE_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
+
+
+@app.route('/portal/parent-hub/points')
+@login_required
+def portal_parent_hub_points_page():
+    """Option A: serves the SAME PORTAL_STUDENT_HTML the legacy
+    /portal/student URL serves — so the parent sees the enhanced
+    points view (avatar, balance, weekly summary, 8-week chart,
+    rewards shop, redemption history) under the hub URL with no
+    duplicate code path. /portal/student stays alive for backward
+    compatibility (same HTML, same data)."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_STUDENT_HTML
 
 
 def _pts_parent_children_ids(user):
@@ -33683,7 +34216,10 @@ def points_board_page(group=None):
 for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   'POINTS_MANAGE_HTML', 'POINTS_BOARD_HTML',
                   'POINTS_BULK_ADJUST_HTML', 'TEACHER_HUB_HTML',
-                  'PORTAL_CHANGE_PW_HTML'):
+                  'PORTAL_CHANGE_PW_HTML',
+                  'PORTAL_PARENT_HUB_HTML',
+                  'PORTAL_PARENT_PAYMENTS_HTML',
+                  'PORTAL_PARENT_ATTENDANCE_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
