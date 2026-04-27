@@ -31515,13 +31515,31 @@ setInterval(_bkAutoDlPollOnce, 30000);
 </body>
 </html>"""
 
+def _mx_inject_helpers(html):
+    """Inject the shared mx-helpers.js <script> tag right before the
+    document's closing </body>. CRITICAL: must replace the LAST
+    occurrence only — some inline JS string literals (e.g.
+    `w.document.write('</body></html>')` in /attendance's print-roster
+    helper) contain a `</body>` substring that must NOT be touched.
+    Replacing every occurrence (str.replace's default) injected a
+    literal `</script>` inside that JS string, which the HTML5 parser
+    interpreted as the closer for the surrounding inline script and
+    bled the rest of the script onto the page as plain text — and
+    silently broke the "بحث عن طالب" button along the way."""
+    inject = '<script src="/mx-helpers.js"></script>\n</body>'
+    last = html.rfind('</body>')
+    if last < 0:
+        return html
+    return html[:last] + inject + html[last + len('</body>'):]
+
+
 for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML',
                   'SETTINGS_HTML', 'LOGIN_HTML', 'ADMIN_BACKUPS_HTML',
                   'PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   'POINTS_MANAGE_HTML', 'POINTS_BOARD_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
-        globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
+        globals()[_mxh_name] = _mx_inject_helpers(_mxh_val)
 
 def _pts_compose_daily_digest(db, sid, student_name, since_dt):
     """Return (positive_count, negative_count, balance, lines) summarising
@@ -34877,7 +34895,7 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   'PORTAL_PARENT_ATTENDANCE_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
-        globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
+        globals()[_mxh_name] = _mx_inject_helpers(_mxh_val)
 
 
 if __name__ == "__main__":
