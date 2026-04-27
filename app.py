@@ -15072,12 +15072,24 @@ def api_groups_search():
         ).fetchall()
     except Exception:
         rows = []
+    # Per-group student count, mode-aware. Per CLAUDE.md students may
+    # belong to two groups (in-person via group_name_student, online
+    # via group_online). The active center mode (حضوري/رمضان→in-person,
+    # أونلاين→online) decides which column counts. This keeps the
+    # search count consistent with what the detail view shows.
+    try:
+        _mode = _get_center_mode(db)
+    except Exception:
+        _mode = ""
+    _link_col = "group_online" if _mode == "أونلاين" else "group_name_student"
+    if not _is_safe_ident(_link_col):
+        _link_col = "group_name_student"
     try:
         scount_rows = db.execute(
-            "SELECT TRIM(group_name_student) AS g, COUNT(*) AS n "
-            "FROM students "
-            "WHERE group_name_student IS NOT NULL AND TRIM(group_name_student)<>'' "
-            "GROUP BY TRIM(group_name_student)"
+            'SELECT TRIM("' + _link_col + '") AS g, COUNT(*) AS n '
+            'FROM students '
+            'WHERE "' + _link_col + '" IS NOT NULL AND TRIM("' + _link_col + '")<>\'\' '
+            'GROUP BY TRIM("' + _link_col + '")'
         ).fetchall()
         scount = {dict(r).get("g"): int(dict(r).get("n") or 0) for r in scount_rows}
     except Exception:
