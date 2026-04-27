@@ -14977,6 +14977,35 @@ def _grp_arabic_normalize(s):
     return out.lower().strip()
 
 
+def _grp_norm(s):
+    """Normalisation used SYMMETRICALLY on both sides of every
+    facet/search comparison. Catches the prod-only mismatches that
+    plain str.strip() misses:
+      - Unicode form: NFC-normalise so an Arabic value typed as
+        decomposed (ا + hamza-above U+0654) compares equal to its
+        precomposed form (أ U+0623).
+      - Extended whitespace: NBSP (U+00A0), tab/CR/LF, the bidi
+        marks U+200E/U+200F that often slip into copy-pasted Arabic.
+      - Zero-width characters U+200B..U+200D (zero-width space, ZWNJ,
+        ZWJ) which can hide inside cells imported from Excel/Word.
+    Symmetric: facet output and search comparison BOTH go through
+    this, so the dropdown shows the canonical form and a click always
+    round-trips. ASCII casefold for English level/teacher names so
+    'Bronze' == 'bronze' from typo'd seed data."""
+    if s is None:
+        return ""
+    import unicodedata as _u
+    out = _u.normalize("NFC", str(s))
+    # Drop bidi/zero-width marks that humans can't see but bytes-equal cares about.
+    drop = {0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0xFEFF}
+    out = "".join(c for c in out if ord(c) not in drop)
+    # Treat NBSP and other unicode whitespace as plain space, then collapse
+    # whitespace runs and strip ends.
+    out = "".join(" " if (c.isspace() or ord(c) == 0x00A0) else c for c in out)
+    out = " ".join(out.split())
+    return out.casefold()
+
+
 def _grp_visible_for(db, user):
     """Group names the user is allowed to see. admin/manager → all,
     teacher → only their own groups (reuses _teacher_groups_for)."""
@@ -15095,19 +15124,27 @@ def api_groups_search():
     except Exception:
         scount = {}
     q_tokens = [_grp_arabic_normalize(t) for t in q.split() if t.strip()] if q else []
+    # Pre-normalise the user's selections ONCE so the per-row loop is
+    # cheap. Symmetric normalisation: facet output goes through the
+    # same _grp_norm, so click → URL → server picks up the same form.
+    sel_names_n    = {_grp_norm(v) for v in sel_names}
+    sel_teachers_n = {_grp_norm(v) for v in sel_teachers}
+    sel_levels_n   = {_grp_norm(v) for v in sel_levels}
+    sel_times_n    = {_grp_norm(v) for v in sel_times}
+    visible_n      = {_grp_norm(v) for v in visible}
     out = []
     for r in rows:
         rd = dict(r)
         gn = (rd.get("group_name") or "").strip()
-        if gn not in visible:
+        if _grp_norm(gn) not in visible_n:
             continue
-        if sel_names and gn not in sel_names:
+        if sel_names_n and _grp_norm(gn) not in sel_names_n:
             continue
         teacher = (rd.get("teacher_name") or "").strip()
-        if sel_teachers and teacher not in sel_teachers:
+        if sel_teachers_n and _grp_norm(teacher) not in sel_teachers_n:
             continue
         level = (rd.get("level_course") or "").strip()
-        if sel_levels and level not in sel_levels:
+        if sel_levels_n and _grp_norm(level) not in sel_levels_n:
             continue
         # Day matching: substring search against the canonical week
         # list so any separator format (/, و, comma, dash, whitespace)
@@ -15120,7 +15157,7 @@ def api_groups_search():
         for col in ("study_time", "ramadan_time", "online_time"):
             v = (rd.get(col) or "").strip()
             if v: gtimes.add(v)
-        if sel_times and not (gtimes & sel_times):
+        if sel_times_n and not ({_grp_norm(t) for t in gtimes} & sel_times_n):
             continue
         score = 0
         if q_tokens:
@@ -15154,6 +15191,29 @@ def api_groups_search():
     try:
         import sys as _sys
         _sys.stderr.write("[groups-search] returned " + str(len(out)) + " group(s)\n")
+        # Zero-result forensic: when the user filters and gets nothing,
+        # print up to 10 distinct stored values for the FIRST filter
+        # that's set, alongside the user's pick. The next prod failure
+        # log then tells us exactly why the values didn't match (case,
+        # whitespace, hidden Unicode, etc.) without another roundtrip.
+        if len(out) == 0 and (sel_names or sel_teachers or sel_levels or sel_days or sel_times):
+            picks = []
+            samples = []
+            if   sel_levels:   picks, samples = ("levels",   sel_levels),   [(dict(r).get("level_course") or "").strip() for r in rows[:50]]
+            elif sel_teachers: picks, samples = ("teachers", sel_teachers), [(dict(r).get("teacher_name") or "").strip() for r in rows[:50]]
+            elif sel_names:    picks, samples = ("names",    sel_names),    [(dict(r).get("group_name")   or "").strip() for r in rows[:50]]
+            elif sel_times:    picks, samples = ("times",    sel_times),    [(dict(r).get("study_time")   or "").strip() for r in rows[:50]]
+            elif sel_days:     picks, samples = ("days",     sel_days),     [", ".join(sorted(_grp_extract_days(_extract_days_from_row(dict(r)) or dict(r).get("study_days") or ""))) for r in rows[:50]]
+            seen = []
+            for s in samples:
+                if s and s not in seen: seen.append(s)
+                if len(seen) >= 10: break
+            _sys.stderr.write(
+                "[groups-search] ZERO-RESULT detail: filter=" + str(picks[0]) +
+                " user_picked=" + repr(sorted(picks[1])) +
+                " stored_distinct=" + repr(seen) +
+                " visible_count=" + str(len(visible)) + "\n"
+            )
     except Exception:
         pass
     return jsonify({"ok": True, "count": len(out), "groups": out})
