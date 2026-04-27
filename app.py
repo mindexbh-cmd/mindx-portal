@@ -4125,23 +4125,18 @@ function dhCopyParentLink(){
         <div id="sr-details" style="margin-top:10px;"></div>
       </div>
     </div>
-    <!-- Group-search pane (Step 4): 5 multi-select dropdowns + fuzzy
-         text input + results container. All wiring is in
-         /static/js/group_search.js — no inline JS to avoid the prior
-         auto-injection bug. -->
+    <!-- Group-search pane: chip-style filters + fuzzy text + results.
+         All wiring is in /static/js/group_search.js (no inline JS).
+         Each .grp-chip is a button that toggles a checkbox panel
+         absolute-positioned inside .grp-chip-wrap. Pure HTML/CSS/JS. -->
     <div class="search-mode-group" style="display:none;">
       <div style="padding:12px 16px;background:#faf7ff;border-bottom:1px solid #e0d0f8;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:10px;">
-          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645;</label>
-            <select id="grp-flt-days" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
-          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A;</label>
-            <select id="grp-flt-times" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
-          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label>
-            <select id="grp-flt-names" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
-          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649;</label>
-            <select id="grp-flt-levels" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
-          <div><label style="display:block;font-weight:800;color:#4a148c;font-size:12.5px;margin-bottom:4px;">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x629;</label>
-            <select id="grp-flt-teachers" multiple size="4" style="width:100%;padding:6px;border:1.4px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;"></select></div>
+        <div class="grp-chip-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <div class="grp-chip-wrap" data-filter="days"     style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
+          <div class="grp-chip-wrap" data-filter="times"    style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
+          <div class="grp-chip-wrap" data-filter="names"    style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
+          <div class="grp-chip-wrap" data-filter="levels"   style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
+          <div class="grp-chip-wrap" data-filter="teachers" style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x629; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="grp-flt-q" type="text" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x623;&#x64A; &#x643;&#x644;&#x645;&#x629;..." style="flex:1;min-width:200px;padding:9px 12px;border:1.5px solid #c4a8e8;border-radius:9px;font-family:inherit;font-size:13.5px;">

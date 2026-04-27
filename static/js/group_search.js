@@ -1,4 +1,4 @@
-/* group_search.js — search-mode toggle + group search (steps 3+4).
+/* group_search.js — search-mode toggle + group search.
  *
  * External by design: the previous attempt put inline JS into
  * HOME_HTML and a literal `</body>` substring inside a JS string
@@ -6,14 +6,45 @@
  * closing the surrounding <script> block. External JS is loaded by
  * the browser as its own resource — the auto-injector cannot reach
  * inside it.
+ *
+ * UI: chip-style filters (each chip is a button that toggles a
+ * dropdown panel of checkboxes). Live-search on any change.
  */
 (function () {
   'use strict';
 
-  var FACETS_LOADED = false;
+  /* ── Filter state lives in plain JS (no hidden form fields needed
+        because we only fire fetch() requests, not form submissions). */
+  var STATE = {
+    days:     [],
+    times:    [],
+    names:    [],
+    levels:   [],
+    teachers: []
+  };
+  /* Map our internal STATE keys to the query-param names the
+     /api/groups/search endpoint expects. */
+  var QS_KEY = {
+    days:     'days',
+    times:    'times',
+    names:    'group_names',
+    levels:   'levels',
+    teachers: 'teachers'
+  };
+  /* Cached facet options per filter — populated on first reveal. */
+  var OPTIONS = {
+    days:     [],
+    times:    [],
+    names:    [],
+    levels:   [],
+    teachers: []
+  };
+  var FACETS_LOADED  = false;
   var SEARCH_DEBOUNCE = null;
+  var CSS_INJECTED   = false;
+  var OPEN_FILTER    = null;  /* which filter panel is currently open */
 
-  /* ── HTML escaping (avoid raw user/group text being interpreted) ── */
+  /* ── HTML escaping ───────────────────────────────────────────── */
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -22,7 +53,46 @@
       .replace(/"/g, '&quot;');
   }
 
-  /* ── Toggle handler (step 3) ─────────────────────────────────── */
+  /* ── CSS injection (one-shot) ────────────────────────────────── */
+  function injectCSS() {
+    if (CSS_INJECTED || document.getElementById('grp-search-style')) return;
+    var st = document.createElement('style');
+    st.id = 'grp-search-style';
+    st.textContent = [
+      /* Chip button (the always-visible filter trigger). */
+      '.grp-chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #c4a8e8;color:#4a148c;padding:7px 14px;border-radius:999px;font-weight:800;font-family:inherit;font-size:13px;cursor:pointer;line-height:1;transition:background .12s,box-shadow .12s,border-color .12s;}',
+      '.grp-chip:hover{background:#faf7ff;border-color:#6B3FA0;}',
+      '.grp-chip.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(107,63,160,.30);}',
+      '.grp-chip-count{display:none;background:rgba(255,255,255,.25);color:inherit;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:900;}',
+      '.grp-chip.active .grp-chip-count{display:inline-block;}',
+      '.grp-chip-clear{display:none;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:50%;}',
+      '.grp-chip-clear:hover{background:rgba(255,255,255,.25);}',
+      '.grp-chip.active .grp-chip-clear{display:inline-block;}',
+      '.grp-chip-caret{font-size:10px;opacity:.7;}',
+      /* Dropdown panel (anchored under the chip). */
+      '.grp-chip-panel{position:absolute;top:calc(100% + 6px);right:0;min-width:200px;max-width:280px;max-height:260px;overflow:auto;background:#fff;border:1.5px solid #c4a8e8;border-radius:12px;box-shadow:0 8px 24px rgba(76,29,149,.18);z-index:10001;padding:6px;display:none;}',
+      '.grp-chip-panel.show{display:block;}',
+      '.grp-chip-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:#212121;font-family:inherit;}',
+      '.grp-chip-opt:hover{background:#faf7ff;}',
+      '.grp-chip-opt input[type=checkbox]{accent-color:#6B3FA0;width:14px;height:14px;flex-shrink:0;cursor:pointer;}',
+      '.grp-chip-opt span{flex:1;line-height:1.3;}',
+      '.grp-chip-empty{padding:14px;text-align:center;color:#888;font-size:12px;}',
+      /* Result cards hover. */
+      '.grp-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(107,63,160,.18);border-color:#6B3FA0;}',
+      '.grp-roster-row:hover{background:#faf7ff;}',
+      /* Mobile: chips wrap and stretch full width. */
+      '@media (max-width:560px){',
+      '  .grp-chip-row{gap:6px;}',
+      '  .grp-chip-wrap{flex:1 1 100%;}',
+      '  .grp-chip{width:100%;justify-content:space-between;}',
+      '  .grp-chip-panel{left:0;right:0;max-width:none;}',
+      '}'
+    ].join('\n');
+    document.head.appendChild(st);
+    CSS_INJECTED = true;
+  }
+
+  /* ── Toggle handler (search mode) ────────────────────────────── */
   function applyMode(mode) {
     var modal = document.getElementById('sr-modal');
     if (!modal) return;
@@ -31,8 +101,10 @@
     if (mode === 'group') {
       if (paneStudent) paneStudent.style.display = 'none';
       if (paneGroup)   paneGroup.style.display   = '';
+      injectCSS();
       if (!FACETS_LOADED) loadFacets();
     } else {
+      closeOpenPanel();
       if (paneGroup)   paneGroup.style.display   = 'none';
       if (paneStudent) paneStudent.style.display = '';
     }
@@ -50,59 +122,153 @@
     if (checked) applyMode(checked.value);
   }
 
-  /* ── Facet loading (step 4) ──────────────────────────────────── */
-  function fillSelect(id, values) {
-    var sel = document.getElementById(id);
-    if (!sel) return;
-    sel.innerHTML = '';
-    for (var i = 0; i < values.length; i++) {
-      var v = values[i];
-      var o = document.createElement('option');
-      o.value = v;
-      o.textContent = v;
-      sel.appendChild(o);
-    }
-  }
-
+  /* ── Facet loading ───────────────────────────────────────────── */
   function loadFacets() {
     fetch('/api/groups/filters', { credentials: 'include' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.ok) return;
-        fillSelect('grp-flt-days',     d.days        || []);
-        fillSelect('grp-flt-times',    d.times       || []);
-        fillSelect('grp-flt-names',    d.group_names || []);
-        fillSelect('grp-flt-levels',   d.levels      || []);
-        fillSelect('grp-flt-teachers', d.teachers    || []);
+        OPTIONS.days     = d.days        || [];
+        OPTIONS.times    = d.times       || [];
+        OPTIONS.names    = d.group_names || [];
+        OPTIONS.levels   = d.levels      || [];
+        OPTIONS.teachers = d.teachers    || [];
         FACETS_LOADED = true;
+        /* Pre-render all five chip panels so opening them is instant. */
+        renderAllPanels();
         runSearch();
       })
-      .catch(function () { /* network errors handled in runSearch */ });
+      .catch(function () { /* error states surface in runSearch. */ });
   }
 
-  /* ── Search execution (step 4) ───────────────────────────────── */
-  function selectedValues(id) {
-    var sel = document.getElementById(id);
-    if (!sel) return [];
-    var out = [];
-    for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].selected) out.push(sel.options[i].value);
+  /* ── Chip + panel rendering ──────────────────────────────────── */
+  function renderAllPanels() {
+    var wraps = document.querySelectorAll('.grp-chip-wrap');
+    for (var i = 0; i < wraps.length; i++) {
+      var key = wraps[i].getAttribute('data-filter');
+      ensurePanel(wraps[i], key);
+      updateChip(wraps[i], key);
     }
-    return out;
   }
 
+  function ensurePanel(wrap, key) {
+    var existing = wrap.querySelector('.grp-chip-panel');
+    if (existing) existing.parentNode.removeChild(existing);
+    var panel = document.createElement('div');
+    panel.className = 'grp-chip-panel';
+    var opts = OPTIONS[key] || [];
+    if (!opts.length) {
+      panel.innerHTML = '<div class="grp-chip-empty">لا توجد خيارات</div>';
+    } else {
+      var html = '';
+      for (var i = 0; i < opts.length; i++) {
+        var v = opts[i];
+        var checked = STATE[key].indexOf(v) >= 0 ? ' checked' : '';
+        html += '<label class="grp-chip-opt"><input type="checkbox" data-val="' + esc(v) + '"' + checked + '><span>' + esc(v) + '</span></label>';
+      }
+      panel.innerHTML = html;
+    }
+    wrap.appendChild(panel);
+    /* Wire each checkbox to update STATE + chip + run search. */
+    var boxes = panel.querySelectorAll('input[type=checkbox]');
+    for (var j = 0; j < boxes.length; j++) {
+      boxes[j].addEventListener('change', function (ev) {
+        var val = this.getAttribute('data-val');
+        var arr = STATE[key];
+        var idx = arr.indexOf(val);
+        if (this.checked) {
+          if (idx < 0) arr.push(val);
+        } else {
+          if (idx >= 0) arr.splice(idx, 1);
+        }
+        updateChip(wrap, key);
+        runSearch();
+      });
+    }
+  }
+
+  function updateChip(wrap, key) {
+    var chip = wrap.querySelector('.grp-chip');
+    var count = chip.querySelector('.grp-chip-count');
+    var n = STATE[key].length;
+    if (n > 0) {
+      chip.classList.add('active');
+      if (count) count.textContent = n;
+    } else {
+      chip.classList.remove('active');
+      if (count) count.textContent = '';
+    }
+  }
+
+  function closeOpenPanel() {
+    if (!OPEN_FILTER) return;
+    var wrap = document.querySelector('.grp-chip-wrap[data-filter="' + OPEN_FILTER + '"]');
+    if (wrap) {
+      var p = wrap.querySelector('.grp-chip-panel');
+      if (p) p.classList.remove('show');
+    }
+    OPEN_FILTER = null;
+  }
+
+  function togglePanel(key) {
+    var wrap = document.querySelector('.grp-chip-wrap[data-filter="' + key + '"]');
+    if (!wrap) return;
+    var panel = wrap.querySelector('.grp-chip-panel');
+    if (!panel) return;
+    if (OPEN_FILTER === key) {
+      panel.classList.remove('show');
+      OPEN_FILTER = null;
+    } else {
+      closeOpenPanel();
+      panel.classList.add('show');
+      OPEN_FILTER = key;
+    }
+  }
+
+  function bindChips() {
+    var wraps = document.querySelectorAll('.grp-chip-wrap');
+    for (var i = 0; i < wraps.length; i++) {
+      var wrap = wraps[i];
+      var key  = wrap.getAttribute('data-filter');
+      var chip = wrap.querySelector('.grp-chip');
+      if (!chip) continue;
+      /* Bind the chip click. The clear-X swallows its own click so
+         it doesn't also toggle the panel. */
+      chip.addEventListener('click', (function (k) {
+        return function (ev) {
+          if (ev.target && ev.target.classList && ev.target.classList.contains('grp-chip-clear')) {
+            ev.stopPropagation();
+            ev.preventDefault();
+            STATE[k] = [];
+            updateChip(wrap, k);
+            ensurePanel(wrap, k);   /* re-render to uncheck visible boxes */
+            runSearch();
+            return;
+          }
+          togglePanel(k);
+        };
+      })(key));
+    }
+    /* Click outside any chip-wrap → close. */
+    document.addEventListener('click', function (ev) {
+      if (!OPEN_FILTER) return;
+      var wrap = document.querySelector('.grp-chip-wrap[data-filter="' + OPEN_FILTER + '"]');
+      if (!wrap) return;
+      if (!wrap.contains(ev.target)) closeOpenPanel();
+    });
+    /* ESC → close. */
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') closeOpenPanel();
+    });
+  }
+
+  /* ── Search execution + results ──────────────────────────────── */
   function runSearch() {
     var qs = new URLSearchParams();
-    var pairs = [
-      ['days',     'grp-flt-days'],
-      ['times',    'grp-flt-times'],
-      ['group_names', 'grp-flt-names'],
-      ['levels',   'grp-flt-levels'],
-      ['teachers', 'grp-flt-teachers']
-    ];
-    for (var i = 0; i < pairs.length; i++) {
-      var arr = selectedValues(pairs[i][1]);
-      if (arr.length) qs.set(pairs[i][0], arr.join(','));
+    var keys = ['days','times','names','levels','teachers'];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (STATE[k].length) qs.set(QS_KEY[k], STATE[k].join(','));
     }
     var qInput = document.getElementById('grp-flt-q');
     var q = qInput ? (qInput.value || '').trim() : '';
@@ -127,19 +293,18 @@
 
   function scheduleSearch() {
     if (SEARCH_DEBOUNCE) clearTimeout(SEARCH_DEBOUNCE);
-    SEARCH_DEBOUNCE = setTimeout(runSearch, 220);
+    SEARCH_DEBOUNCE = setTimeout(runSearch, 300);
   }
 
-  /* ── Result cards (step 4) ───────────────────────────────────── */
   function renderResults(groups) {
     var box = document.getElementById('grp-results');
     if (!box) return;
     if (!groups.length) {
-      box.innerHTML = '<div style="padding:14px;color:#888;text-align:center;">لا توجد مجموعات مطابقة</div>';
+      box.innerHTML = '<div style="padding:18px;color:#888;text-align:center;font-weight:700;">لا توجد مجموعات مطابقة. جرّبي تعديل الفلاتر.</div>';
       return;
     }
     var html = '<div style="font-size:12.5px;color:#666;margin-bottom:8px;">عدد النتائج: <b>' + groups.length + '</b></div>';
-    html += '<div class="grp-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
       var time = g.study_time || g.online_time || g.ramadan_time || '—';
@@ -156,14 +321,6 @@
     }
     html += '</div>';
     box.innerHTML = html;
-    /* Hover effect via JS-injected stylesheet (one-shot) */
-    if (!document.getElementById('grp-card-style')) {
-      var st = document.createElement('style');
-      st.id = 'grp-card-style';
-      st.textContent = '.grp-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(107,63,160,.18);border-color:#6B3FA0;}';
-      document.head.appendChild(st);
-    }
-    /* Card click → fetch + render detail view (step 5). */
     var cards = box.querySelectorAll('.grp-card');
     for (var j = 0; j < cards.length; j++) {
       cards[j].addEventListener('click', function () {
@@ -173,7 +330,34 @@
     }
   }
 
-  /* ── Detail view (step 5) ────────────────────────────────────── */
+  function clearAllFilters() {
+    STATE.days     = [];
+    STATE.times    = [];
+    STATE.names    = [];
+    STATE.levels   = [];
+    STATE.teachers = [];
+    var q = document.getElementById('grp-flt-q'); if (q) q.value = '';
+    var det = document.getElementById('grp-details'); if (det) det.innerHTML = '';
+    /* Re-render all panels (uncheck) and update chip badges. */
+    var wraps = document.querySelectorAll('.grp-chip-wrap');
+    for (var i = 0; i < wraps.length; i++) {
+      var key = wraps[i].getAttribute('data-filter');
+      ensurePanel(wraps[i], key);
+      updateChip(wraps[i], key);
+    }
+    runSearch();
+  }
+
+  function bindOuterControls() {
+    var btnSearch = document.getElementById('grp-btn-search');
+    if (btnSearch) btnSearch.addEventListener('click', runSearch);
+    var btnClear  = document.getElementById('grp-btn-clear');
+    if (btnClear)  btnClear.addEventListener('click', clearAllFilters);
+    var qInput    = document.getElementById('grp-flt-q');
+    if (qInput)    qInput.addEventListener('input', scheduleSearch);
+  }
+
+  /* ── Detail view ─────────────────────────────────────────────── */
   function fmtMoney(n) {
     var v = Number(n || 0);
     return v.toLocaleString('ar-EG', { maximumFractionDigits: 3 }) + ' د.ب';
@@ -228,7 +412,6 @@
     if (g.session_duration) parts.push(' &middot; ⏱ ' + esc(g.session_duration));
     parts.push(      '</div>');
     parts.push(    '</div>');
-    /* Bulk actions toolbar (step 6). */
     parts.push(    '<div class="grp-actions" style="display:flex;gap:8px;flex-wrap:wrap;">');
     parts.push(      '<button type="button" class="grp-btn-print" style="background:#fff;color:#4a148c;border:1.5px solid #c4a8e8;padding:7px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;">📋 طباعة قائمة الطلاب</button>');
     parts.push(      '<button type="button" class="grp-btn-wa" data-grp-id="' + (g.id|0) + '" style="background:#25D366;color:#fff;border:none;padding:7px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;">📨 إرسال رسالة لكل أولياء الأمور</button>');
@@ -242,7 +425,6 @@
     parts.push(  '</div>');
     parts.push('</div>');
 
-    /* Roster table — clicking a row opens the existing student profile. */
     parts.push('<div style="margin-top:12px;">');
     if (!students.length) {
       parts.push('<div style="padding:14px;color:#888;text-align:center;">لا يوجد طلاب في هذه المجموعة</div>');
@@ -272,16 +454,6 @@
     parts.push('</div>');
     box.innerHTML = parts.join('');
 
-    /* Hover styling for the roster (one-shot). */
-    if (!document.getElementById('grp-roster-style')) {
-      var st2 = document.createElement('style');
-      st2.id = 'grp-roster-style';
-      st2.textContent = '.grp-roster-row:hover{background:#faf7ff;}';
-      document.head.appendChild(st2);
-    }
-    /* Roster row click → flip toggle to "طالب" mode and call the
-       existing srPick(sid) so we reuse the existing student profile
-       view 1:1. No re-implementation. */
     var rows = box.querySelectorAll('.grp-roster-row');
     for (var k = 0; k < rows.length; k++) {
       rows[k].addEventListener('click', function () {
@@ -292,28 +464,13 @@
         if (typeof window.srPick === 'function') window.srPick(sid);
       });
     }
-
-    /* Bulk action wiring (step 6). */
     var btnPrint = box.querySelector('.grp-btn-print');
-    if (btnPrint) {
-      btnPrint.addEventListener('click', function () {
-        printRoster(g.group_name || '', students);
-      });
-    }
+    if (btnPrint) btnPrint.addEventListener('click', function () { printRoster(g.group_name || '', students); });
     var btnWA = box.querySelector('.grp-btn-wa');
-    if (btnWA) {
-      btnWA.addEventListener('click', function () {
-        bulkMessage(g.group_name || '', students);
-      });
-    }
+    if (btnWA) btnWA.addEventListener('click', function () { bulkMessage(g.group_name || '', students); });
   }
 
-  /* ── Print roster (step 6) ───────────────────────────────────── */
-  /* Note: this code lives in an EXTERNAL .js file, so any literal
-     '</script>' substring inside JS strings here is NOT exposed to
-     the parent page's HTML parser. We still split the closing tag
-     defensively so a copy-paste into an inline context wouldn't
-     re-introduce the bleed bug from before. */
+  /* ── Print roster ────────────────────────────────────────────── */
   function printRoster(groupName, students) {
     var w = window.open('', '_blank');
     if (!w) { alert('فشل فتح نافذة الطباعة. تحقق من إعدادات المتصفح.'); return; }
@@ -352,11 +509,7 @@
     w.document.close();
   }
 
-  /* ── Bulk WhatsApp send (step 6) ─────────────────────────────── */
-  /* Reuses the existing per-row WhatsApp pipeline pattern: open a
-     wa.me link per parent in a small stagger so popup-blockers
-     don't fight us. The user clicks "Send" inside WhatsApp manually
-     for each — same flow as the existing .btn-wa buttons. */
+  /* ── Bulk WhatsApp send ──────────────────────────────────────── */
   function bulkMessage(groupName, students) {
     var withPhone = (students || []).filter(function (s) { return s.parent_phone; });
     if (!withPhone.length) {
@@ -377,43 +530,18 @@
     }
   }
 
-  /* Expose for cross-script callers. */
-  window.grpPickGroup = pickGroup;
-
-  function clearFilters() {
-    var ids = ['grp-flt-days','grp-flt-times','grp-flt-names','grp-flt-levels','grp-flt-teachers'];
-    for (var i = 0; i < ids.length; i++) {
-      var sel = document.getElementById(ids[i]);
-      if (!sel) continue;
-      for (var j = 0; j < sel.options.length; j++) sel.options[j].selected = false;
-    }
-    var q = document.getElementById('grp-flt-q'); if (q) q.value = '';
-    var det = document.getElementById('grp-details'); if (det) det.innerHTML = '';
-    runSearch();
-  }
-
-  function bindGroupSearch() {
-    var btnSearch = document.getElementById('grp-btn-search');
-    if (btnSearch) btnSearch.addEventListener('click', runSearch);
-    var btnClear  = document.getElementById('grp-btn-clear');
-    if (btnClear)  btnClear.addEventListener('click', clearFilters);
-    var qInput    = document.getElementById('grp-flt-q');
-    if (qInput)    qInput.addEventListener('input', scheduleSearch);
-    var selIds = ['grp-flt-days','grp-flt-times','grp-flt-names','grp-flt-levels','grp-flt-teachers'];
-    for (var i = 0; i < selIds.length; i++) {
-      var sel = document.getElementById(selIds[i]);
-      if (sel) sel.addEventListener('change', runSearch);
-    }
-  }
-
   /* Boot */
   function boot() {
     bindToggle();
-    bindGroupSearch();
+    bindChips();
+    bindOuterControls();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
   }
+
+  /* Expose for cross-script callers (testing / debugging). */
+  window.grpPickGroup = pickGroup;
 })();
