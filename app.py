@@ -3247,6 +3247,48 @@ def login_required(f):
         return f(*a, **k)
     return dec
 
+
+# Admin-only gate. Wraps `login_required` so we always have an
+# authenticated user, then enforces role == "admin" — anything else
+# (manager, teacher, reception, student, parent, ...) is rejected with
+# HTTP 403. API endpoints (path starts with /api/) get a JSON body so
+# the frontend can show the Arabic message inline; page routes get a
+# small Arabic 403 HTML so the URL-bar attack stays cleanly blocked.
+#
+# Why a dedicated decorator and not in-handler if-statements: every
+# route that exposes admin-grade data must enforce this server-side
+# (UI hiding alone is bypassable). Wrapping at the decorator level
+# guarantees no handler can accidentally forget the check.
+def admin_required(f):
+    @wraps(f)
+    def dec(*a, **k):
+        if "user" not in session:
+            return redirect("/")
+        u = session.get("user") or {}
+        role = (u.get("role") or "").strip().lower()
+        if role != "admin":
+            msg_ar = "غير مصرح بالوصول"
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": msg_ar}), 403
+            return Response(
+                "<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+                "<title>403</title><style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;"
+                "background:linear-gradient(135deg,#fce4ec,#e1bee7);min-height:100vh;display:flex;"
+                "align-items:center;justify-content:center;margin:0;direction:rtl;color:#212121;}"
+                ".card{background:#fff;border-radius:16px;padding:40px 36px;text-align:center;"
+                "box-shadow:0 12px 32px rgba(0,0,0,.12);max-width:420px;}"
+                ".card h1{margin:0 0 12px;font-size:1.4rem;color:#c62828;}"
+                ".card p{margin:0 0 18px;color:#555;}"
+                ".card a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:10px 20px;"
+                "border-radius:9px;font-weight:800;display:inline-block;}</style></head><body>"
+                "<div class='card'><h1>🚫 " + msg_ar + "</h1>"
+                "<p>هذه الصفحة متاحة فقط للمدير العام.</p>"
+                "<a href='/dashboard'>← العودة إلى الرئيسية</a></div></body></html>",
+                status=403, mimetype="text/html; charset=utf-8",
+            )
+        return f(*a, **k)
+    return dec
+
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -3806,6 +3848,11 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 .srm-auto-lock-banner{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#455a64;color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:0.92rem;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:100002;}
 .srm-auto-lock-banner.show{display:block;}
 
+/* Hide admin-only entry points for non-admin (defense-in-depth: server
+   still 403s any direct URL hit). The body[data-role] is set by the
+   inline <script> at the top of <body> before any card is parsed. */
+body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
+
 </style>
 </head>
 <body>
@@ -3814,7 +3861,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
   <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
   <div class="dh-topbar-right">
     <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
-    <a href="/settings" class="dh-logout" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
+    <a href="/settings" class="dh-logout mx-admin-only" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
     <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
   </div>
 </div>
@@ -3933,7 +3980,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 
   <div class="dh-section-title">&#x26A1; &#x627;&#x644;&#x642;&#x648;&#x627;&#x626;&#x645; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
   <div class="dh-actions-grid">
-    <a href="/database" class="dh-action-card dh-a-purple">
+    <a href="/database" class="dh-action-card dh-a-purple mx-admin-only">
       <div class="dh-action-icon">&#x1F4C1;</div>
       <div class="dh-action-title">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</div>
       <div class="dh-action-desc">&#x62C;&#x645;&#x64A;&#x639; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x648;&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
@@ -3968,7 +4015,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
       <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
-    <a class="dh-action-card" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
+    <a class="dh-action-card mx-admin-only" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
       <div class="dh-action-icon">&#x1F4CE;</div>
       <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
       <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x641;&#x639; &#x627;&#x644;&#x645;&#x631;&#x641;&#x648;&#x639;&#x629;</div>
@@ -3988,7 +4035,7 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
       <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643;&#x064A;&#x627;&#x062A; &#x648;&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x062A; &#x648;&#x627;&#x644;&#x062A;&#x0642;&#x0627;&#x0631;&#x064A;&#x0631;</div>
     </a>
-    <a class="dh-action-card" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
+    <a class="dh-action-card mx-admin-only" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
       <div class="dh-action-icon">&#x1F5C2;</div>
       <div class="dh-action-title">&#x062A;&#x062F;&#x0642;&#x064A;&#x0642; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644;</div>
       <div class="dh-action-desc">&#x062A;&#x0635;&#x0646;&#x064A;&#x0641; &#x0648;&#x062D;&#x0630;&#x0641; &#x0622;&#x0645;&#x0646; &#x0644;&#x644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x063A;&#x064A;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x0629;</div>
@@ -13829,7 +13876,7 @@ def attendance():
     return ATTENDANCE_HTML
 
 @app.route("/database")
-@login_required
+@admin_required
 def database():
     return DATABASE_HTML
 
@@ -14223,12 +14270,12 @@ arLoad();
 </html>"""
 
 @app.route("/admin/receipts")
-@login_required
+@admin_required
 def admin_receipts_page():
     return ADMIN_RECEIPTS_HTML
 
 @app.route("/api/admin/receipts", methods=["GET"])
-@login_required
+@admin_required
 def api_admin_receipts_list():
     db = get_db()
     # Pull live column list so we tolerate older paylog schemas without
@@ -14306,7 +14353,7 @@ def api_admin_receipts_list():
     return jsonify({"ok": True, "receipts": out})
 
 @app.route("/api/admin/receipts/count", methods=["GET"])
-@login_required
+@admin_required
 def api_admin_receipts_count():
     """Quick count of pending receipts for the dashboard badge."""
     db = get_db()
@@ -14320,7 +14367,7 @@ def api_admin_receipts_count():
     return jsonify({"ok": True, "pending": int(n)})
 
 @app.route("/api/admin/receipts/<int:rid>/file", methods=["GET"])
-@login_required
+@admin_required
 def api_admin_receipt_file(rid):
     db = get_db()
     try:
@@ -14344,7 +14391,7 @@ def api_admin_receipt_file(rid):
     })
 
 @app.route("/api/admin/receipts/<int:rid>/status", methods=["POST"])
-@login_required
+@admin_required
 def api_admin_receipt_status(rid):
     d = request.get_json() or {}
     st = (d.get('status') or '').strip()
@@ -14364,7 +14411,7 @@ def api_admin_receipt_status(rid):
 
 
 @app.route("/api/admin/receipts/<int:rid>/confirm", methods=["POST"])
-@login_required
+@admin_required
 def api_admin_receipt_confirm(rid):
     """Approve a receipt AND record the payment in payment_log via the
     existing pay flow. Body: {n: <inst_num>, amount: <paid_amount>}.
@@ -14541,7 +14588,7 @@ def api_admin_receipt_confirm(rid):
 
 
 @app.route("/api/admin/receipts/<int:rid>/reject", methods=["POST"])
-@login_required
+@admin_required
 def api_admin_receipt_reject(rid):
     d = request.get_json() or {}
     reason = (d.get('reason') or '').strip()
@@ -15589,7 +15636,7 @@ def api_groups_bulk():
     return jsonify({"ok": True, "imported": ok_count, "errors": len(errors)})
 
 @app.route("/api/columns", methods=["GET"])
-@login_required
+@admin_required
 def api_columns_get():
     db = get_db()
     db.execute("""CREATE TABLE IF NOT EXISTS column_labels(
@@ -15640,7 +15687,7 @@ def api_columns_get():
     return jsonify({"columns": [dict(r) for r in rows]})
 
 @app.route("/api/columns", methods=["POST"])
-@login_required
+@admin_required
 def api_columns_add():
     d = request.get_json()
     col_key = d.get("col_key","").strip().replace(" ","_").lower()
@@ -15688,7 +15735,7 @@ def api_columns_add():
     except Exception as ex:
         return jsonify({"ok":False,"error":str(ex)}),400
 @app.route("/api/columns/<col_key>", methods=["DELETE"])
-@login_required
+@admin_required
 def api_columns_delete(col_key):
     db = get_db()
     try:
@@ -15703,7 +15750,7 @@ def api_columns_delete(col_key):
         return jsonify({"ok":False,"error":str(ex)}),400
 
 @app.route("/api/columns/<col_key>", methods=["PUT"])
-@login_required
+@admin_required
 def api_columns_update(col_key):
     d = request.get_json()
     new_label = d.get("col_label","").strip()
@@ -15718,14 +15765,14 @@ def api_columns_update(col_key):
         return jsonify({"ok":False,"error":str(ex)}),400
 
 @app.route("/api/group-columns", methods=["GET"])
-@login_required
+@admin_required
 def api_group_columns_get():
     db = get_db()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM group_col_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
 @app.route("/api/group-columns", methods=["POST"])
-@login_required
+@admin_required
 def api_group_columns_add():
     d = request.get_json()
     col_key = d.get("col_key","").strip().replace(" ","_").lower()
@@ -15762,7 +15809,7 @@ def api_group_columns_add():
         return jsonify({"ok":False,"error":str(ex)}),400
 
 @app.route("/api/group-columns/<col_key>", methods=["DELETE"])
-@login_required
+@admin_required
 def api_group_columns_delete(col_key):
     safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
     if not safe_key or safe_key != col_key:
@@ -15777,7 +15824,7 @@ def api_group_columns_delete(col_key):
     return jsonify({"ok": True})
 
 @app.route("/api/group-columns/<col_key>", methods=["PUT"])
-@login_required
+@admin_required
 def api_group_columns_update(col_key):
     d = request.get_json()
     new_label = d.get("col_label","").strip()
@@ -15849,14 +15896,14 @@ def api_payment_log_delete(rid):
         return jsonify({"ok": False, "error": str(ex)}), 400
 
 @app.route("/api/paylog-columns", methods=["GET"])
-@login_required
+@admin_required
 def api_paylog_columns_get():
     db = get_db()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM paylog_col_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
 @app.route("/api/paylog-columns", methods=["POST"])
-@login_required
+@admin_required
 def api_paylog_columns_add():
     d = request.get_json()
     col_key = d.get("col_key","").strip().replace(" ","_").lower()
@@ -15896,7 +15943,7 @@ def api_paylog_columns_add():
         return jsonify({"ok":False,"error":str(ex)}),400
 
 @app.route("/api/paylog-columns/<col_key>", methods=["DELETE"])
-@login_required
+@admin_required
 def api_paylog_columns_delete(col_key):
     safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
     if not safe_key or safe_key != col_key:
@@ -15911,7 +15958,7 @@ def api_paylog_columns_delete(col_key):
     return jsonify({"ok": True})
 
 @app.route("/api/paylog-columns/<col_key>", methods=["PUT"])
-@login_required
+@admin_required
 def api_paylog_columns_update(col_key):
     d = request.get_json()
     new_label = d.get("col_label","").strip()
@@ -16742,7 +16789,7 @@ def _require_admin_response():
 
 
 @app.route('/api/backups/run', methods=['POST'])
-@login_required
+@admin_required
 def api_backups_run():
     err = _require_admin_response()
     if err: return err
@@ -16759,7 +16806,7 @@ def api_backups_run():
 
 
 @app.route('/api/backups', methods=['GET'])
-@login_required
+@admin_required
 def api_backups_list():
     err = _require_admin_response()
     if err: return err
@@ -16785,7 +16832,7 @@ def api_backups_list():
 
 
 @app.route('/api/backups/<int:bid>/report', methods=['GET'])
-@login_required
+@admin_required
 def api_backups_report(bid):
     """Return the saved verification report for a backup_log row."""
     err = _require_admin_response()
@@ -16807,7 +16854,7 @@ def api_backups_report(bid):
 
 
 @app.route('/api/backup/progress', methods=['GET'])
-@login_required
+@admin_required
 def api_backup_progress():
     """Polling endpoint for the run-progress UI. Returns the current
     stage of any running backup (best-effort, last-write-wins)."""
@@ -16817,7 +16864,7 @@ def api_backup_progress():
 
 
 @app.route('/api/backups/<int:bid>/download', methods=['GET'])
-@login_required
+@admin_required
 def api_backups_download(bid):
     err = _require_admin_response()
     if err: return err
@@ -16841,7 +16888,7 @@ def api_backups_download(bid):
 
 
 @app.route('/api/backups/<int:bid>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_backups_delete(bid):
     err = _require_admin_response()
     if err: return err
@@ -16863,7 +16910,7 @@ def api_backups_delete(bid):
 
 
 @app.route('/api/backups/settings', methods=['GET'])
-@login_required
+@admin_required
 def api_backups_settings_get():
     err = _require_admin_response()
     if err: return err
@@ -16879,7 +16926,7 @@ def api_backups_settings_get():
 
 
 @app.route('/api/backups/settings', methods=['PATCH', 'PUT'])
-@login_required
+@admin_required
 def api_backups_settings_set():
     err = _require_admin_response()
     if err: return err
@@ -16908,7 +16955,7 @@ def api_backups_settings_set():
 
 
 @app.route('/api/backup/last', methods=['GET'])
-@login_required
+@admin_required
 def api_backup_last():
     """Return the timestamp of the most recent backup (if any) so the
     settings page can show "آخر نسخة احتياطية: …"."""
@@ -16931,7 +16978,7 @@ def api_backup_last():
 
 
 @app.route('/api/backup/download', methods=['GET'])
-@login_required
+@admin_required
 def api_backup_download():
     """Generate a full backup ZIP in memory and stream it to the client.
 
@@ -17189,7 +17236,7 @@ def api_backup_download():
 
 
 @app.route('/api/backup/excel', methods=['GET'])
-@login_required
+@admin_required
 def api_backup_excel():
     """Build a styled .xlsx that mirrors what the user sees on the
     website: every table on its own sheet with Arabic display labels
@@ -17534,7 +17581,7 @@ def api_backup_excel():
 
 
 @app.route('/api/settings', methods=['GET'])
-@login_required
+@admin_required
 def api_settings_get():
     try:
         db = get_db()
@@ -17558,7 +17605,7 @@ def api_settings_get():
 
 
 @app.route('/api/settings', methods=['PATCH'])
-@login_required
+@admin_required
 def api_settings_patch():
     d = request.get_json() or {}
     page = (d.get('page') or '').strip()
@@ -17626,7 +17673,7 @@ DEFAULT_DUE_REMINDER_TEMPLATE = (
 )
 
 @app.route('/api/messaging/templates', methods=['GET'])
-@login_required
+@admin_required
 def api_messaging_templates_get():
     absent = get_setting('messaging', 'absent_template', '') or DEFAULT_ABSENT_TEMPLATE
     late   = get_setting('messaging', 'late_template',   '') or DEFAULT_LATE_TEMPLATE
@@ -17914,7 +17961,7 @@ def _resolve_template_for_student(template, sid, db):
 
 
 @app.route('/api/vars/tables', methods=['GET'])
-@login_required
+@admin_required
 def api_vars_tables():
     """List every public table with its Arabic display label, sorted
     by label. Used by the variable picker."""
@@ -17946,7 +17993,7 @@ def api_vars_tables():
 
 
 @app.route('/api/vars/columns', methods=['GET'])
-@login_required
+@admin_required
 def api_vars_columns():
     """List every column of the given table with its Arabic display
     label. The column picker uses this; cascading on the table choice."""
@@ -17969,7 +18016,7 @@ def api_vars_columns():
 
 
 @app.route('/api/vars/render-batch', methods=['POST'])
-@login_required
+@admin_required
 def api_vars_render_batch():
     """Resolve a template for many students in one call. Body:
     {template: <string>, student_ids: [int, ...]}.
@@ -18003,7 +18050,7 @@ def api_vars_render_batch():
 
 
 @app.route('/api/messaging/templates', methods=['PUT', 'PATCH'])
-@login_required
+@admin_required
 def api_messaging_templates_put():
     d = request.get_json() or {}
     db = get_db()
@@ -18343,7 +18390,7 @@ def _active_students_filter():
 
 
 @app.route('/api/settings/tables', methods=['GET'])
-@login_required
+@admin_required
 def api_settings_tables():
     names = get_all_tables()
     tables = [{"name": n, "label": _table_display_label(n)} for n in names]
@@ -18351,7 +18398,7 @@ def api_settings_tables():
 
 
 @app.route('/api/settings/columns/<table_name>', methods=['GET'])
-@login_required
+@admin_required
 def api_settings_columns(table_name):
     if not _is_safe_ident(table_name):
         return jsonify({"ok": False, "error": "invalid table name"}), 400
@@ -18536,7 +18583,7 @@ def _derive_unique_col_key(col_label, existing_cols):
 
 
 @app.route('/api/custom-table/<tid>/add-column', methods=['POST'])
-@login_required
+@admin_required
 def api_unified_add_column(tid):
     d = request.get_json() or {}
     col_key_raw = (d.get("col_key") or "").strip()
@@ -18629,7 +18676,7 @@ def api_unified_add_column(tid):
 
 
 @app.route('/api/custom-table/<tid>/rename-column', methods=['PATCH'])
-@login_required
+@admin_required
 def api_unified_rename_column(tid):
     d = request.get_json() or {}
     old_key = (d.get("old_name") or d.get("col_key") or "").strip()
@@ -18712,7 +18759,7 @@ def api_unified_rename_column(tid):
 
 
 @app.route('/api/custom-table/<tid>/reorder-columns', methods=['PATCH'])
-@login_required
+@admin_required
 def api_unified_reorder_columns(tid):
     """Persist a new column order for the given table.
 
@@ -18795,7 +18842,7 @@ def api_unified_reorder_columns(tid):
 
 
 @app.route('/api/custom-table/<tid>/column-type', methods=['PATCH'])
-@login_required
+@admin_required
 def api_unified_set_column_type(tid):
     d = request.get_json() or {}
     col_key = (d.get("col_key") or "").strip()
@@ -18829,7 +18876,7 @@ def api_unified_set_column_type(tid):
 
 
 @app.route('/api/custom-table/<tid>/delete-column/<col_name>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_unified_delete_column(tid, col_name):
     """Drop a column and clean up its label row. The route forks at the
     start based on tid:
@@ -19085,7 +19132,7 @@ def api_unified_delete_column(tid, col_name):
 
 
 @app.route('/api/custom-table/<tid>/rename', methods=['PATCH'])
-@login_required
+@admin_required
 def api_unified_rename_table(tid):
     d = request.get_json() or {}
     new_name = (d.get("new_name") or "").strip()
@@ -19167,14 +19214,14 @@ def api_evaluations_delete(rid):
         return jsonify({"ok": False, "error": str(ex)}), 400
 
 @app.route("/api/eval-columns", methods=["GET"])
-@login_required
+@admin_required
 def api_eval_columns_get():
     db = get_db()
     rows = db.execute("SELECT col_key,col_label,col_order,is_visible FROM eval_col_labels ORDER BY col_order").fetchall()
     return jsonify({"columns": [dict(r) for r in rows]})
 
 @app.route("/api/eval-columns", methods=["POST"])
-@login_required
+@admin_required
 def api_eval_columns_add():
     d = request.get_json()
     col_key = d.get("col_key","").strip().replace(" ","_").lower()
@@ -19214,7 +19261,7 @@ def api_eval_columns_add():
         return jsonify({"ok":False,"error":str(ex)}),400
 
 @app.route("/api/eval-columns/<col_key>", methods=["DELETE"])
-@login_required
+@admin_required
 def api_eval_columns_delete(col_key):
     safe_key = "".join(c for c in col_key if c.isalnum() or c == "_")
     if not safe_key or safe_key != col_key:
@@ -19229,7 +19276,7 @@ def api_eval_columns_delete(col_key):
     return jsonify({"ok": True})
 
 @app.route("/api/eval-columns/<col_key>", methods=["PUT"])
-@login_required
+@admin_required
 def api_eval_columns_update(col_key):
     d = request.get_json()
     new_label = d.get("col_label","").strip()
@@ -20736,7 +20783,7 @@ def _tbl_audit_render_md(report):
 
 
 @app.route('/api/admin/table-audit', methods=['GET'])
-@login_required
+@admin_required
 def api_admin_table_audit():
     err = _require_admin_response()
     if err: return err
@@ -20757,7 +20804,7 @@ def api_admin_table_audit():
 
 
 @app.route('/api/admin/table-audit/<table_name>/approve', methods=['POST'])
-@login_required
+@admin_required
 def api_admin_table_audit_approve(table_name):
     """Mark a Category-D table as approved-keep so it stops appearing
     in the suspicion list."""
@@ -20790,7 +20837,7 @@ def api_admin_table_audit_approve(table_name):
 
 
 @app.route('/api/admin/table-audit/<table_name>/delete', methods=['POST'])
-@login_required
+@admin_required
 def api_admin_table_audit_delete(table_name):
     """Drop a Category-D table after taking an automatic backup. Hard
     refuses any A/B/C table even if the request comes from admin."""
@@ -21203,7 +21250,7 @@ def _docs_admin_or_manager_response():
 
 
 @app.route('/api/docs/pages', methods=['GET'])
-@login_required
+@admin_required
 def api_docs_pages_list():
     """Return all documented pages, grouped under their section."""
     err = _docs_admin_or_manager_response()
@@ -21257,7 +21304,7 @@ def api_docs_pages_list():
 
 
 @app.route('/api/docs/capture/<int:page_id>', methods=['POST'])
-@login_required
+@admin_required
 def api_docs_capture_one(page_id):
     err = _docs_admin_or_manager_response()
     if err: return err
@@ -21286,7 +21333,7 @@ def api_docs_capture_one(page_id):
 
 
 @app.route('/api/docs/capture-all', methods=['POST'])
-@login_required
+@admin_required
 def api_docs_capture_all():
     err = _docs_admin_or_manager_response()
     if err: return err
@@ -21319,7 +21366,7 @@ def api_docs_capture_all():
 
 
 @app.route('/api/docs/upload/<int:page_id>', methods=['POST'])
-@login_required
+@admin_required
 def api_docs_upload(page_id):
     """Manual upload fallback when Playwright isn't available."""
     err = _docs_admin_or_manager_response()
@@ -21358,7 +21405,7 @@ def api_docs_upload(page_id):
 
 
 @app.route('/api/docs/screenshots/<int:page_id>', methods=['GET'])
-@login_required
+@admin_required
 def api_docs_screenshot_history(page_id):
     err = _docs_admin_or_manager_response()
     if err: return err
@@ -21602,12 +21649,8 @@ load();
 
 
 @app.route('/admin/docs')
-@login_required
+@admin_required
 def admin_docs_page():
-    user = session.get("user") or {}
-    role = (user.get("role") or "").strip().lower()
-    if role not in ("admin", "manager"):
-        return redirect("/dashboard")
     return ADMIN_DOCS_HTML
 
 
@@ -22024,7 +22067,7 @@ def teacher_hub_page():
 
 
 @app.route('/api/teacher/groups-diag', methods=['GET'])
-@login_required
+@admin_required
 def api_teacher_groups_diag():
     """Admin-only diagnostic dump for debugging the teacher dropdown.
     Returns the live student_groups schema, the first 20 raw rows,
@@ -22515,7 +22558,7 @@ ATT_DEFAULT_COLS = [
 ]
 
 @app.route('/api/att-columns', methods=['GET'])
-@login_required
+@admin_required
 def api_att_columns_get():
     db = get_db()
     if db.execute("SELECT COUNT(*) FROM att_col_labels").fetchone()[0] == 0:
@@ -22529,7 +22572,7 @@ def api_att_columns_get():
     return jsonify([dict(c) for c in cols])
 
 @app.route('/api/att-columns', methods=['POST'])
-@login_required
+@admin_required
 def api_att_columns_add():
     d = request.get_json()
     col_label = d.get('col_label','').strip()
@@ -22565,7 +22608,7 @@ def api_att_columns_add():
         return jsonify({'ok':False,'error':str(ex)}),400
 
 @app.route('/api/att-columns/<col_key>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_att_columns_delete(col_key):
     # Only allow deleting custom columns (not the 9 default ones)
     default_keys = [c[0] for c in ATT_DEFAULT_COLS]
@@ -22580,7 +22623,7 @@ def api_att_columns_delete(col_key):
         return jsonify({'ok':False,'error':str(ex)}),400
 
 @app.route('/api/att-columns/<col_key>', methods=['PUT'])
-@login_required
+@admin_required
 def api_att_columns_rename(col_key):
     d = request.get_json()
     new_label = d.get('col_label','').strip()
@@ -22598,7 +22641,7 @@ def api_att_columns_rename(col_key):
 # &#x2500;&#x2500;&#x2500; Custom Tables API &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 
 @app.route('/api/custom-tables', methods=['GET'])
-@login_required
+@admin_required
 def api_custom_tables_get():
     db = get_db()
     tables = db.execute("SELECT * FROM custom_tables ORDER BY id").fetchall()
@@ -22616,7 +22659,7 @@ def api_custom_tables_get():
     return jsonify(result)
 
 @app.route('/api/custom-tables', methods=['POST'])
-@login_required
+@admin_required
 def api_custom_tables_create():
     d = request.get_json()
     tbl_name = d.get('tbl_name','').strip()
@@ -22640,7 +22683,7 @@ def api_custom_tables_create():
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_custom_tables_delete(tid):
     # Auto-backup-before-destructive: takes a full backup first; if
     # the backup fails, BLOCK the delete and return the spec error.
@@ -22659,7 +22702,7 @@ def api_custom_tables_delete(tid):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/rows', methods=['POST'])
-@login_required
+@admin_required
 def api_custom_table_row_add(tid):
     d = request.get_json()
     row_data = d.get('row_data', {})
@@ -22673,7 +22716,7 @@ def api_custom_table_row_add(tid):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/rows/<int:rid>', methods=['PUT'])
-@login_required
+@admin_required
 def api_custom_table_row_update(tid, rid):
     d = request.get_json()
     row_data = d.get('row_data', {})
@@ -22686,7 +22729,7 @@ def api_custom_table_row_update(tid, rid):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/rows/<int:rid>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_custom_table_row_delete(tid, rid):
     db = get_db()
     try:
@@ -22697,7 +22740,7 @@ def api_custom_table_row_delete(tid, rid):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/cols', methods=['POST'])
-@login_required
+@admin_required
 def api_custom_table_col_add(tid):
     d = request.get_json()
     col_label = d.get('col_label','').strip()
@@ -22727,7 +22770,7 @@ def api_custom_table_col_add(tid):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/cols/<col_key>', methods=['DELETE'])
-@login_required
+@admin_required
 def api_custom_table_col_delete(tid, col_key):
     try:
         _pre_destructive_backup("custom-table col delete tid=" + str(tid) + " key=" + col_key)
@@ -22742,7 +22785,7 @@ def api_custom_table_col_delete(tid, col_key):
         return jsonify({'ok': False, 'error': str(ex)}), 400
 
 @app.route('/api/custom-tables/<int:tid>/cols/<col_key>', methods=['PUT'])
-@login_required
+@admin_required
 def api_custom_table_col_rename(tid, col_key):
     d = request.get_json()
     new_label = d.get('col_label','').strip()
@@ -23343,7 +23386,7 @@ def _resolve_center_class_meta(db, mode, sid):
 
 
 @app.route("/api/center/exceptions", methods=["GET"])
-@login_required
+@admin_required
 def api_center_exceptions_list():
     db = get_db()
     try:
@@ -23357,7 +23400,7 @@ def api_center_exceptions_list():
 
 
 @app.route("/api/center/exceptions", methods=["POST"])
-@login_required
+@admin_required
 def api_center_exceptions_add():
     user = session.get("user") or {}
     if (user.get("role") or "").strip().lower() != "admin":
@@ -23390,7 +23433,7 @@ def api_center_exceptions_add():
 
 
 @app.route("/api/center/exceptions/<int:eid>", methods=["DELETE"])
-@login_required
+@admin_required
 def api_center_exceptions_delete(eid):
     user = session.get("user") or {}
     if (user.get("role") or "").strip().lower() != "admin":
@@ -23405,7 +23448,7 @@ def api_center_exceptions_delete(eid):
 
 
 @app.route("/api/center/exceptions/replace", methods=["POST"])
-@login_required
+@admin_required
 def api_center_exceptions_replace():
     """Bulk-replace the exceptions list. Body: {exceptions:[{scope,
     key_name, mode}]}. Use case: the admin's confirmation modal sends
@@ -23448,7 +23491,7 @@ def api_center_mode_get():
 
 
 @app.route("/api/center/mode", methods=["PATCH", "PUT"])
-@login_required
+@admin_required
 def api_center_mode_set():
     user = session.get("user") or {}
     role = (user.get("role") or "").strip().lower()
@@ -24598,7 +24641,7 @@ IMPORT_TABLE_SQL = {
 }
 
 @app.route('/api/import', methods=['POST'])
-@login_required
+@admin_required
 def api_import():
     """Generic Excel-import endpoint used by every table on the database page.
 
@@ -26117,7 +26160,7 @@ def api_message_reminders_delete(rid):
 
 
 @app.route('/settings')
-@login_required
+@admin_required
 def settings_page():
     return SETTINGS_HTML
 
@@ -29001,6 +29044,19 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
          + attrs + '>' + inner + '</span>';
   }
 
+  /* Hide admin-only entry points (cards, links, buttons tagged with the
+     mx-admin-only class) for any user whose body[data-role] is not
+     "admin". UI hiding is defense-in-depth on top of the server-side
+     @admin_required gate — direct URL access still 403s. */
+  (function(){
+    if (document.getElementById('mx-admin-only-style')) return;
+    var st = document.createElement('style');
+    st.id = 'mx-admin-only-style';
+    st.textContent =
+      'body:not([data-role="admin"]) .mx-admin-only{display:none !important;}';
+    document.head.appendChild(st);
+  })();
+
   /* Inject CSS once. Bouncing/wiggle animations honor reduce-motion. */
   (function(){
     if (document.getElementById('mx-avatar-style')) return;
@@ -30797,11 +30853,8 @@ except Exception: pass
 
 
 @app.route('/admin/backups')
-@login_required
+@admin_required
 def admin_backups_page():
-    user = session.get("user") or {}
-    if (user.get("role") or "").strip().lower() != "admin":
-        return redirect("/dashboard")
     return ADMIN_BACKUPS_HTML
 
 
@@ -30991,11 +31044,8 @@ loadAudit();
 
 
 @app.route('/admin/table-audit')
-@login_required
+@admin_required
 def admin_table_audit_page():
-    user = session.get("user") or {}
-    if (user.get("role") or "").strip().lower() != "admin":
-        return redirect("/dashboard")
     return TABLE_AUDIT_HTML
 
 
@@ -31575,7 +31625,7 @@ def _pts_random_password(n=8):
 
 # ── Admin: parent account management ─────────────────────────────
 @app.route('/api/admin/parents', methods=['GET'])
-@login_required
+@admin_required
 def api_admin_parents_list():
     err = _require_admin_response()
     if err: return err
@@ -31615,7 +31665,7 @@ def api_admin_parents_list():
 
 
 @app.route('/api/admin/parents', methods=['POST'])
-@login_required
+@admin_required
 def api_admin_parents_create():
     """Body: {phone, student_ids:[int], parent_name?}.
     Creates a parent users row, returns the temporary password and
@@ -31709,7 +31759,7 @@ def api_admin_parents_create():
 
 
 @app.route('/api/admin/parents/<int:pid>', methods=['PATCH'])
-@login_required
+@admin_required
 def api_admin_parents_update(pid):
     """Body: {student_ids?: [int], notify_pref?, name?, deactivate?}."""
     err = _require_admin_response()
@@ -31746,7 +31796,7 @@ def api_admin_parents_update(pid):
 
 
 @app.route('/api/admin/parents/<int:pid>/reset-password', methods=['POST'])
-@login_required
+@admin_required
 def api_admin_parents_reset(pid):
     err = _require_admin_response()
     if err: return err
