@@ -228,6 +228,11 @@
     if (g.session_duration) parts.push(' &middot; ⏱ ' + esc(g.session_duration));
     parts.push(      '</div>');
     parts.push(    '</div>');
+    /* Bulk actions toolbar (step 6). */
+    parts.push(    '<div class="grp-actions" style="display:flex;gap:8px;flex-wrap:wrap;">');
+    parts.push(      '<button type="button" class="grp-btn-print" style="background:#fff;color:#4a148c;border:1.5px solid #c4a8e8;padding:7px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;">📋 طباعة قائمة الطلاب</button>');
+    parts.push(      '<button type="button" class="grp-btn-wa" data-grp-id="' + (g.id|0) + '" style="background:#25D366;color:#fff;border:none;padding:7px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;">📨 إرسال رسالة لكل أولياء الأمور</button>');
+    parts.push(    '</div>');
     parts.push(  '</div>');
     parts.push(  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:8px;">');
     parts.push(    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #eee;"><div style="color:#666;font-size:11px;">عدد الطلاب</div><div style="font-weight:900;color:#4a148c;font-size:20px;">' + (st.student_count|0) + '</div></div>');
@@ -287,8 +292,92 @@
         if (typeof window.srPick === 'function') window.srPick(sid);
       });
     }
+
+    /* Bulk action wiring (step 6). */
+    var btnPrint = box.querySelector('.grp-btn-print');
+    if (btnPrint) {
+      btnPrint.addEventListener('click', function () {
+        printRoster(g.group_name || '', students);
+      });
+    }
+    var btnWA = box.querySelector('.grp-btn-wa');
+    if (btnWA) {
+      btnWA.addEventListener('click', function () {
+        bulkMessage(g.group_name || '', students);
+      });
+    }
   }
-  /* Expose for cross-script callers (none yet). */
+
+  /* ── Print roster (step 6) ───────────────────────────────────── */
+  /* Note: this code lives in an EXTERNAL .js file, so any literal
+     '</script>' substring inside JS strings here is NOT exposed to
+     the parent page's HTML parser. We still split the closing tag
+     defensively so a copy-paste into an inline context wouldn't
+     re-introduce the bleed bug from before. */
+  function printRoster(groupName, students) {
+    var w = window.open('', '_blank');
+    if (!w) { alert('فشل فتح نافذة الطباعة. تحقق من إعدادات المتصفح.'); return; }
+    var head = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+      + '<title>قائمة الطلاب — ' + esc(groupName || '') + '</title>'
+      + '<style>'
+      +   'body{font-family:Tahoma,Arial,sans-serif;padding:20px;direction:rtl;}'
+      +   'h1{font-size:18px;color:#4a148c;margin:0 0 12px;}'
+      +   '.meta{color:#666;font-size:13px;margin-bottom:14px;}'
+      +   'table{width:100%;border-collapse:collapse;}'
+      +   'th,td{border:1px solid #ccc;padding:6px 10px;text-align:right;font-size:13px;}'
+      +   'th{background:#f0f0f0;}'
+      + '</style></head><body>';
+    var body = '<h1>قائمة الطلاب: ' + esc(groupName || '') + '</h1>'
+      + '<div class="meta">عدد الطلاب: ' + (students || []).length + '</div>'
+      + '<table><thead><tr>'
+      +   '<th>#</th><th>اسم الطالب</th><th>الرقم الشخصي</th><th>رقم ولي الأمر</th>'
+      +   '<th>حالة الدفع</th><th>نسبة الحضور</th>'
+      + '</tr></thead><tbody>';
+    for (var i = 0; i < (students || []).length; i++) {
+      var s = students[i];
+      body += '<tr>'
+        + '<td>' + (i+1) + '</td>'
+        + '<td>' + esc(s.student_name || '') + '</td>'
+        + '<td style="direction:ltr;">' + esc(s.personal_id || '—') + '</td>'
+        + '<td style="direction:ltr;">' + esc(s.parent_phone || '—') + '</td>'
+        + '<td>' + esc(s.pay_status || '—') + '</td>'
+        + '<td>' + (s.att_percent == null ? '—' : (s.att_percent + '%')) + '</td>'
+        + '</tr>';
+    }
+    body += '</tbody></table>';
+    /* Split closing tags so even a copy-paste into inline scope can't
+       collide with an outer <script>. */
+    var foot = '<scr' + 'ipt>window.onload=function(){window.print();};<' + '/scr' + 'ipt></body></html>';
+    w.document.write(head + body + foot);
+    w.document.close();
+  }
+
+  /* ── Bulk WhatsApp send (step 6) ─────────────────────────────── */
+  /* Reuses the existing per-row WhatsApp pipeline pattern: open a
+     wa.me link per parent in a small stagger so popup-blockers
+     don't fight us. The user clicks "Send" inside WhatsApp manually
+     for each — same flow as the existing .btn-wa buttons. */
+  function bulkMessage(groupName, students) {
+    var withPhone = (students || []).filter(function (s) { return s.parent_phone; });
+    if (!withPhone.length) {
+      alert('لا يوجد أرقام أولياء أمور لهذه المجموعة');
+      return;
+    }
+    if (!confirm('سيتم فتح ' + withPhone.length + ' محادثة واتساب. متابعة؟')) return;
+    for (var i = 0; i < withPhone.length; i++) {
+      (function (s, idx) {
+        setTimeout(function () {
+          var phone = (s.parent_phone || '').replace(/[^0-9]/g, '');
+          if (phone.charAt(0) === '0') phone = '973' + phone.slice(1);
+          var msg = 'السلام عليكم، بخصوص ابنتكم/ابنكم ' + s.student_name + ' في مجموعة ' + groupName + ' — ';
+          var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+          window.open(url, '_blank');
+        }, idx * 350);
+      })(withPhone[i], i);
+    }
+  }
+
+  /* Expose for cross-script callers. */
   window.grpPickGroup = pickGroup;
 
   function clearFilters() {
