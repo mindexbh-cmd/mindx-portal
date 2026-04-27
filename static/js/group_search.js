@@ -163,17 +163,133 @@
       st.textContent = '.grp-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(107,63,160,.18);border-color:#6B3FA0;}';
       document.head.appendChild(st);
     }
-    /* Card click handler — detail view ships in step 5; for now log. */
+    /* Card click → fetch + render detail view (step 5). */
     var cards = box.querySelectorAll('.grp-card');
     for (var j = 0; j < cards.length; j++) {
       cards[j].addEventListener('click', function () {
         var gid = parseInt(this.getAttribute('data-grp-id'), 10);
-        if (typeof window.grpPickGroup === 'function') {
-          window.grpPickGroup(gid);
-        }
+        pickGroup(gid);
       });
     }
   }
+
+  /* ── Detail view (step 5) ────────────────────────────────────── */
+  function fmtMoney(n) {
+    var v = Number(n || 0);
+    return v.toLocaleString('ar-EG', { maximumFractionDigits: 3 }) + ' د.ب';
+  }
+  function attBadge(p) {
+    if (p == null) return '<span style="color:#999;">—</span>';
+    var col = (p>=75)?'#1B5E20':((p>=50)?'#e65100':'#c62828');
+    var bg  = (p>=75)?'#e8f5e9':((p>=50)?'#fff3e0':'#ffebee');
+    return '<span style="background:'+bg+';color:'+col+';padding:2px 8px;border-radius:8px;font-weight:800;font-size:12px;">' + p + '%</span>';
+  }
+  function payBadge(s) {
+    if (!s) return '<span style="color:#999;">—</span>';
+    if (s === 'مدفوع بالكامل') return '<span style="background:#e8f5e9;color:#1B5E20;padding:2px 8px;border-radius:8px;font-weight:800;font-size:12px;">' + s + '</span>';
+    if (s === 'لم يدفع')        return '<span style="background:#ffebee;color:#c62828;padding:2px 8px;border-radius:8px;font-weight:800;font-size:12px;">' + s + '</span>';
+    if (s === 'متبقي')          return '<span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:8px;font-weight:800;font-size:12px;">' + s + '</span>';
+    return esc(s);
+  }
+
+  function pickGroup(gid) {
+    var box = document.getElementById('grp-details');
+    if (!box) return;
+    box.innerHTML = '<div style="padding:14px;color:#888;text-align:center;">جاري التحميل...</div>';
+    setTimeout(function () { try { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 50);
+    fetch('/api/groups/' + gid + '/detail', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) {
+          box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">' + esc((d && d.error) || 'خطأ') + '</div>';
+          return;
+        }
+        renderDetail(d);
+      })
+      .catch(function () {
+        box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">خطأ في الاتصال</div>';
+      });
+  }
+
+  function renderDetail(d) {
+    var g = d.group || {};
+    var st = d.stats || {};
+    var students = d.students || [];
+    var box = document.getElementById('grp-details');
+    if (!box) return;
+    var parts = [];
+    parts.push('<div style="background:#faf7ff;border:1.5px solid #c4a8e8;border-radius:14px;padding:14px;">');
+    parts.push(  '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">');
+    parts.push(    '<div>');
+    parts.push(      '<div style="font-weight:900;color:#4a148c;font-size:18px;margin-bottom:4px;">' + esc(g.group_name) + '</div>');
+    parts.push(      '<div style="font-size:13px;color:#5d4037;line-height:1.7;">');
+    parts.push(        '👩‍🏫 <b>' + esc(g.teacher_name || '—') + '</b> &middot; 🎓 ' + esc(g.level || '—') + '<br>');
+    parts.push(        '📅 ' + esc(g.study_days || '—') + ' &middot; ⏰ ' + esc(g.study_time || '—'));
+    if (g.session_duration) parts.push(' &middot; ⏱ ' + esc(g.session_duration));
+    parts.push(      '</div>');
+    parts.push(    '</div>');
+    parts.push(  '</div>');
+    parts.push(  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:8px;">');
+    parts.push(    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #eee;"><div style="color:#666;font-size:11px;">عدد الطلاب</div><div style="font-weight:900;color:#4a148c;font-size:20px;">' + (st.student_count|0) + '</div></div>');
+    parts.push(    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #eee;"><div style="color:#666;font-size:11px;">متوسط نسبة الحضور</div><div style="font-weight:900;color:#4a148c;font-size:20px;">' + (st.avg_attendance_pct == null ? '—' : (st.avg_attendance_pct + '%')) + '</div></div>');
+    parts.push(    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #eee;"><div style="color:#666;font-size:11px;">عليهم متبقي</div><div style="font-weight:900;color:#c62828;font-size:20px;">' + (st.students_with_remaining|0) + '</div></div>');
+    parts.push(    '<div style="background:#fff;border-radius:10px;padding:10px;text-align:center;border:1px solid #eee;"><div style="color:#666;font-size:11px;">إجمالي المتبقي</div><div style="font-weight:900;color:#e65100;font-size:18px;">' + fmtMoney(st.total_remaining || 0) + '</div></div>');
+    parts.push(  '</div>');
+    parts.push('</div>');
+
+    /* Roster table — clicking a row opens the existing student profile. */
+    parts.push('<div style="margin-top:12px;">');
+    if (!students.length) {
+      parts.push('<div style="padding:14px;color:#888;text-align:center;">لا يوجد طلاب في هذه المجموعة</div>');
+    } else {
+      parts.push('<table id="grp-roster" style="width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">');
+      parts.push('<thead><tr style="background:#f8f3ff;color:#4a148c;font-size:13px;">');
+      parts.push('<th style="padding:9px 10px;text-align:right;font-weight:800;">#</th>');
+      parts.push('<th style="padding:9px 10px;text-align:right;font-weight:800;">اسم الطالب</th>');
+      parts.push('<th style="padding:9px 10px;text-align:right;font-weight:800;">الرقم الشخصي</th>');
+      parts.push('<th style="padding:9px 10px;text-align:right;font-weight:800;">رقم ولي الأمر</th>');
+      parts.push('<th style="padding:9px 10px;text-align:right;font-weight:800;">حالة الدفع</th>');
+      parts.push('<th style="padding:9px 10px;text-align:center;font-weight:800;">نسبة الحضور</th>');
+      parts.push('</tr></thead><tbody>');
+      for (var i = 0; i < students.length; i++) {
+        var s = students[i];
+        parts.push('<tr class="grp-roster-row" data-sid="' + (s.id|0) + '" style="cursor:pointer;border-bottom:1px solid #f0e7f8;font-size:13px;">');
+        parts.push('<td style="padding:8px 10px;color:#999;">' + (i+1) + '</td>');
+        parts.push('<td style="padding:8px 10px;font-weight:800;color:#212121;">' + esc(s.student_name) + '</td>');
+        parts.push('<td style="padding:8px 10px;direction:ltr;color:#555;">' + esc(s.personal_id || '—') + '</td>');
+        parts.push('<td style="padding:8px 10px;direction:ltr;color:#555;">' + esc(s.parent_phone || '—') + '</td>');
+        parts.push('<td style="padding:8px 10px;">' + payBadge(s.pay_status) + '</td>');
+        parts.push('<td style="padding:8px 10px;text-align:center;">' + attBadge(s.att_percent) + '</td>');
+        parts.push('</tr>');
+      }
+      parts.push('</tbody></table>');
+    }
+    parts.push('</div>');
+    box.innerHTML = parts.join('');
+
+    /* Hover styling for the roster (one-shot). */
+    if (!document.getElementById('grp-roster-style')) {
+      var st2 = document.createElement('style');
+      st2.id = 'grp-roster-style';
+      st2.textContent = '.grp-roster-row:hover{background:#faf7ff;}';
+      document.head.appendChild(st2);
+    }
+    /* Roster row click → flip toggle to "طالب" mode and call the
+       existing srPick(sid) so we reuse the existing student profile
+       view 1:1. No re-implementation. */
+    var rows = box.querySelectorAll('.grp-roster-row');
+    for (var k = 0; k < rows.length; k++) {
+      rows[k].addEventListener('click', function () {
+        var sid = parseInt(this.getAttribute('data-sid'), 10);
+        if (!sid) return;
+        var radio = document.querySelector('input[name="search-mode"][value="student"]');
+        if (radio) { radio.checked = true; applyMode('student'); }
+        if (typeof window.srPick === 'function') window.srPick(sid);
+      });
+    }
+  }
+  /* Expose for cross-script callers (none yet). */
+  window.grpPickGroup = pickGroup;
 
   function clearFilters() {
     var ids = ['grp-flt-days','grp-flt-times','grp-flt-names','grp-flt-levels','grp-flt-teachers'];
