@@ -535,6 +535,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         emoji TEXT,
+        file_path TEXT DEFAULT '',
+        category TEXT DEFAULT '',
         sort_order INTEGER DEFAULT 0)""")
     db.execute("""CREATE TABLE IF NOT EXISTS levels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1678,6 +1680,8 @@ if True:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
                 emoji TEXT,
+                file_path TEXT DEFAULT '',
+                category TEXT DEFAULT '',
                 sort_order INTEGER DEFAULT 0)""")
             db2.execute("""CREATE TABLE IF NOT EXISTS levels(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1863,6 +1867,74 @@ if True:
             except Exception: pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("points_v2",))
+        except Exception: pass
+        db2.commit()
+
+    # avatars_v2 — replace the 30 emoji rows with parametric SVG
+    # monsters and add the default "egg" (id=0). Idempotent: re-uses
+    # the existing 1..30 ids so any student.avatar_id still resolves
+    # to a valid avatar (their emoji becomes a same-id monster). Adds
+    # `file_path` and `category` columns. Generates the SVG files on
+    # disk via the static/avatars/generate_monsters helper. Safe to
+    # re-run; the migration tag prevents redundant work after first
+    # successful boot.
+    if "avatars_v2" not in applied:
+        try:
+            _acols = {r[1] for r in db2.execute("PRAGMA table_info(avatars)").fetchall()}
+        except Exception:
+            _acols = set()
+        if "file_path" not in _acols:
+            try: db2.execute("ALTER TABLE avatars ADD COLUMN file_path TEXT DEFAULT ''")
+            except Exception: pass
+        if "category" not in _acols:
+            try: db2.execute("ALTER TABLE avatars ADD COLUMN category TEXT DEFAULT ''")
+            except Exception: pass
+        # Generate SVG files on disk if they're missing. Cheap if they
+        # already exist (overwrite). Wrapped in try so any FS error
+        # doesn't block schema setup — the catalogue still works for
+        # the picker; falls back to first-initial circle in the UI.
+        try:
+            from static.avatars.generate_monsters import regenerate_all, manifest as _av_manifest
+            try:
+                regenerate_all()
+            except Exception as _ex_gen:
+                import sys
+                sys.stderr.write("[avatars_v2] SVG regeneration warning: " + str(_ex_gen) + "\n")
+            for av_id, av_name, av_path, av_cat in _av_manifest():
+                # UPSERT: try UPDATE first; if no row touched, INSERT.
+                try:
+                    cur = db2.execute(
+                        "UPDATE avatars SET name=?, file_path=?, category=?, sort_order=? WHERE id=?",
+                        (av_name, av_path, av_cat, av_id, av_id),
+                    )
+                    if getattr(cur, "rowcount", 0) == 0:
+                        try:
+                            db2.execute(
+                                "INSERT INTO avatars(id, name, emoji, file_path, category, sort_order) "
+                                "VALUES(?,?,?,?,?,?)",
+                                (av_id, av_name, "", av_path, av_cat, av_id),
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            # Boot-log a one-time summary (visible in Render logs).
+            try:
+                import sys
+                _n_eggs = db2.execute("SELECT COUNT(*) FROM students WHERE COALESCE(avatar_id,0)=0").fetchone()[0]
+                _n_picked = db2.execute("SELECT COUNT(*) FROM students WHERE COALESCE(avatar_id,0)<>0").fetchone()[0]
+                sys.stderr.write(
+                    "[avatars_v2] Monsters generated: 30 | Egg generated: OK | "
+                    "Avatars table rows: " + str(db2.execute("SELECT COUNT(*) FROM avatars").fetchone()[0]) +
+                    " | Existing students with non-egg avatars preserved: " + str(_n_picked) +
+                    " | Students still on egg (default): " + str(_n_eggs) + "\n"
+                )
+            except Exception: pass
+        except Exception as _ex:
+            import sys
+            sys.stderr.write("[avatars_v2] migration warning: " + str(_ex) + "\n")
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("avatars_v2",))
         except Exception: pass
         db2.commit()
 
@@ -5462,12 +5534,20 @@ function _srLoadPoints(sid){
       var bal = d.balance || 0;
       var lvl = d.level || {};
       var av  = d.avatar || {};
-      var avEmoji = av.emoji || '😊';
+      var avPath = av.file_path || '/static/avatars/svg/egg.svg';
+      var avName = av.name || '';
+      var avId   = (av.id != null) ? av.id : 0;
       var lvlBadge = lvl.badge_icon ? (lvl.badge_icon + ' ' + (lvl.name_ar||'')) : '—';
       var lvlColor = lvl.color || '#6B3FA0';
+      var stuName = (d.student && d.student.student_name) || '';
+      var avHTML = (typeof window.mxAvatarHTML === 'function')
+        ? window.mxAvatarHTML({file_path: avPath, name: avName, size: 64,
+                               clickable: true, sid: sid, avatar_id: avId,
+                               target_name: stuName, classes:'mx-av-wiggle'})
+        : '<img src="' + avPath + '" style="width:64px;height:64px;" alt=""/>';
       var html = ''
         + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#faf7ff;border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
-        +   '<div style="font-size:2.4rem;line-height:1;">' + avEmoji + '</div>'
+        +   avHTML
         +   '<div style="flex:1;min-width:140px;">'
         +     '<div style="font-size:0.82rem;color:#666;">الرصيد الحالي</div>'
         +     '<div style="font-size:1.8rem;font-weight:900;color:#4a148c;">' + bal + ' <span style="font-size:1rem;color:#888;font-weight:600;">نقطة</span></div>'
@@ -19472,16 +19552,7 @@ def api_pts_student_summary(sid):
     bal = _pts_balance(db, sid)
     lvl = _pts_level_for(db, bal)
     events = _pts_recent_events(db, sid, 10)
-    av = {}
-    if sd.get("avatar_id"):
-        try:
-            av_row = db.execute(
-                "SELECT id, name, emoji FROM avatars WHERE id=?",
-                (sd["avatar_id"],),
-            ).fetchone()
-            if av_row: av = dict(av_row)
-        except Exception:
-            pass
+    av = _pts_resolve_avatar(db, sd.get("avatar_id"))
     return jsonify({
         "ok":      True,
         "student": sd,
@@ -19495,17 +19566,35 @@ def api_pts_student_summary(sid):
 @app.route('/api/points/student/<int:sid>/avatar', methods=['PATCH'])
 @login_required
 def api_pts_set_avatar(sid):
-    """Set avatar_id for a student. Allowed for any signed-in user
-    who can grant points to that student's group."""
+    """Set avatar_id for a student.
+
+    Permission ladder (most-specific first):
+      * student   — only their own linked_student_id
+      * teacher   — any student in a group they own
+      * admin     — anyone
+
+    avatar_id=0 is the egg (default/unhatched) and is allowed.
+    """
     db = get_db()
     user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
     d = request.get_json(silent=True) or {}
     try:
-        avid = int(d.get("avatar_id") or 0)
+        avid = int(d.get("avatar_id"))
     except Exception:
-        avid = 0
-    if not avid:
         return jsonify({"ok": False, "error": "avatar_id required"}), 400
+    if avid < 0:
+        return jsonify({"ok": False, "error": "invalid avatar_id"}), 400
+    # Validate the avatar exists in the catalogue.
+    try:
+        ar = db.execute(
+            "SELECT id FROM avatars WHERE id=?", (avid,),
+        ).fetchone()
+    except Exception:
+        ar = None
+    if not ar:
+        return jsonify({"ok": False, "error": "avatar not found"}), 404
+    # Permission check.
     try:
         srow = db.execute(
             "SELECT group_name_student FROM students WHERE id=?", (sid,),
@@ -19515,14 +19604,47 @@ def api_pts_set_avatar(sid):
     if not srow:
         return jsonify({"ok": False, "error": "student not found"}), 404
     g = (dict(srow).get("group_name_student") or "").strip()
-    if not _pts_can_grant(db, user, g):
+    if role == "student":
+        if int(user.get("linked_student_id") or 0) != int(sid):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+    elif role == "admin":
+        pass
+    elif not _pts_can_grant(db, user, g):
         return jsonify({"ok": False, "error": "forbidden"}), 403
     try:
         db.execute("UPDATE students SET avatar_id=? WHERE id=?", (avid, sid))
         db.commit()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
-    return jsonify({"ok": True, "avatar_id": avid})
+    return jsonify({"ok": True, "avatar_id": avid,
+                    "avatar": _pts_resolve_avatar(db, avid)})
+
+
+def _pts_resolve_avatar(db, avatar_id):
+    """Return the avatar dict for the given id, including file_path.
+
+    Always returns a usable dict — falls back to the egg (id=0) if the
+    requested id doesn't resolve. Never raises.
+    """
+    try:
+        avid = int(avatar_id or 0)
+    except Exception:
+        avid = 0
+    try:
+        ar = db.execute(
+            "SELECT id, name, emoji, file_path, category "
+            "FROM avatars WHERE id=?", (avid,),
+        ).fetchone()
+    except Exception:
+        ar = None
+    if ar:
+        d = dict(ar)
+        if not d.get("file_path"):
+            d["file_path"] = "/static/avatars/svg/egg.svg" if avid == 0 else ""
+        return d
+    # Avatar id no longer in catalogue. Don't auto-change the student;
+    # return a synthetic record so the UI falls back to the initial-circle.
+    return {"id": avid, "name": "", "emoji": "", "file_path": "", "category": ""}
 
 
 @app.route('/api/points/avatars', methods=['GET'])
@@ -19531,7 +19653,8 @@ def api_pts_avatars():
     db = get_db()
     try:
         rows = db.execute(
-            "SELECT id, name, emoji FROM avatars ORDER BY sort_order, id"
+            "SELECT id, name, emoji, file_path, category "
+            "FROM avatars ORDER BY sort_order, id"
         ).fetchall()
     except Exception:
         rows = []
@@ -19574,22 +19697,17 @@ def api_pts_group_board():
         rd = dict(r)
         bal = _pts_balance(db, rd["id"])
         lvl = _pts_level_for(db, bal)
-        # Resolve avatar emoji
-        emoji = ""
-        if rd.get("avatar_id"):
-            try:
-                ar = db.execute("SELECT emoji FROM avatars WHERE id=?", (rd["avatar_id"],)).fetchone()
-                if ar: emoji = (dict(ar).get("emoji") if hasattr(ar, "keys") else ar[0]) or ""
-            except Exception:
-                pass
+        av  = _pts_resolve_avatar(db, rd.get("avatar_id"))
         students.append({
-            "id":            rd["id"],
-            "student_name":  rd["student_name"],
-            "personal_id":   rd.get("personal_id") or "",
-            "avatar_id":     rd.get("avatar_id") or 0,
-            "avatar_emoji":  emoji,
-            "balance":       bal,
-            "level":         lvl,
+            "id":               rd["id"],
+            "student_name":     rd["student_name"],
+            "personal_id":      rd.get("personal_id") or "",
+            "avatar_id":        int(rd.get("avatar_id") or 0),
+            "avatar_emoji":     av.get("emoji") or "",
+            "avatar_file_path": av.get("file_path") or "",
+            "avatar_name":      av.get("name") or "",
+            "balance":          bal,
+            "level":            lvl,
         })
     return jsonify({"ok": True, "group": g, "students": students})
 
@@ -28534,6 +28652,299 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   window.mxAppendCustomFields      = mxAppendCustomFields;
   window.mxCollectCustomFieldValues = mxCollectCustomFieldValues;
 
+  /* ── Avatar (SVG monsters + egg picker) ─────────────────────────
+     Cross-page helpers that render the new SVG monster avatars and
+     drive the picker modal. Replaces the legacy emoji rendering. */
+  var _MX_AV_PALETTE = [
+    '#2BC4C4','#FF6F61','#A8E063','#B39DDB','#FFB088','#7DE2D1',
+    '#7CC8FF','#FFD93D','#FF6FB5','#9B7EDE','#FF8C42','#5BC0EB',
+    '#C589E8','#5DD39E','#F25F5C'
+  ];
+  function _mxAvPaletteFor(name){
+    var s = String(name||''); var h = 0;
+    for (var i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i))|0; }
+    return _MX_AV_PALETTE[Math.abs(h) % _MX_AV_PALETTE.length];
+  }
+  function _mxAvAttrEsc(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  }
+  function mxAvatarHTML(opts){
+    /* opts: {file_path, name, size, classes, clickable, sid,
+              avatar_id, target_name} */
+    opts = opts || {};
+    var size = opts.size || 64;
+    var fp   = opts.file_path || '';
+    var nm   = opts.name || '';
+    var cls  = 'mx-av' + (opts.classes ? (' ' + opts.classes) : '');
+    var attrs = '';
+    if (opts.clickable && opts.sid){
+      cls += ' mx-av-click';
+      attrs += ' data-mx-av-sid="' + _mxAvAttrEsc(opts.sid) + '"'
+            +  ' data-mx-av-id="'  + _mxAvAttrEsc(opts.avatar_id || 0) + '"'
+            +  ' data-mx-av-file="' + _mxAvAttrEsc(fp) + '"'
+            +  ' data-mx-av-name="' + _mxAvAttrEsc(nm) + '"'
+            +  ' data-mx-av-target="' + _mxAvAttrEsc(opts.target_name || '') + '"'
+            +  ' role="button" tabindex="0" title="اختر شخصية"';
+    }
+    var fb = (nm || opts.target_name || '?').toString().trim().charAt(0) || '?';
+    var inner;
+    if (fp){
+      inner = '<img src="' + _mxAvAttrEsc(fp) + '" alt="" loading="lazy" '
+            + 'onerror="this.parentNode.classList.add(\'mx-av-fail\');this.style.display=\'none\';"/>'
+            + '<span class="mx-av-fb">' + _mxAvAttrEsc(fb) + '</span>';
+    } else {
+      cls += ' mx-av-fail';
+      inner = '<span class="mx-av-fb">' + _mxAvAttrEsc(fb) + '</span>';
+    }
+    return '<span class="' + cls + '" '
+         + 'style="--mxav-size:' + size + 'px;--mxav-bg:' + _mxAvPaletteFor(nm || opts.target_name) + ';"'
+         + attrs + '>' + inner + '</span>';
+  }
+
+  /* Inject CSS once. Bouncing/wiggle animations honor reduce-motion. */
+  (function(){
+    if (document.getElementById('mx-avatar-style')) return;
+    var st = document.createElement('style');
+    st.id = 'mx-avatar-style';
+    st.textContent = [
+      '.mx-av{position:relative;display:inline-block;width:var(--mxav-size,64px);height:var(--mxav-size,64px);border-radius:50%;background:var(--mxav-bg,#B39DDB);overflow:hidden;vertical-align:middle;line-height:0;}',
+      '.mx-av img{display:block;width:100%;height:100%;object-fit:contain;}',
+      '.mx-av .mx-av-fb{display:none;}',
+      '.mx-av.mx-av-fail .mx-av-fb,.mx-av:not(:has(img)) .mx-av-fb{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:#fff;font-weight:900;font-family:inherit;font-size:calc(var(--mxav-size,64px) * 0.45);line-height:1;}',
+      '.mx-av-click{cursor:pointer;transition:transform .18s ease;}',
+      '.mx-av-click:hover{transform:scale(1.06);filter:drop-shadow(0 4px 10px rgba(107,63,160,.30));}',
+      '.mx-av-bounce{animation:mxavBounce 2.6s ease-in-out infinite;}',
+      '@keyframes mxavBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}',
+      '.mx-av-wiggle:hover{animation:mxavWiggle .55s ease;}',
+      '@keyframes mxavWiggle{0%,100%{transform:rotate(0);}25%{transform:rotate(-7deg) scale(1.04);}75%{transform:rotate(7deg) scale(1.04);}}',
+      /* Picker modal */
+      '.mx-avp-back{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;font-family:inherit;direction:rtl;}',
+      '.mx-avp-back.show{display:flex;}',
+      '.mx-avp-box{background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 48px rgba(76,29,149,.35);}',
+      '.mx-avp-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:900;}',
+      '.mx-avp-head h3{margin:0;font-size:1.05rem;}',
+      '.mx-avp-x{cursor:pointer;font-size:1.5rem;line-height:1;background:none;border:none;color:#fff;font-weight:900;}',
+      '.mx-avp-current{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #eee;background:#faf7ff;}',
+      '.mx-avp-current .lbl{flex:1;color:#4a148c;font-weight:800;}',
+      '.mx-avp-filter{padding:8px 18px;background:#f8f3ff;border-bottom:1px solid #eee;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}',
+      '.mx-avp-filter select{padding:7px 12px;border:1.4px solid #c4a8e8;border-radius:9px;font-family:inherit;font-weight:700;background:#fff;color:#4a148c;}',
+      '.mx-avp-grid{padding:14px 18px;overflow:auto;flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}',
+      '@media (max-width:520px){.mx-avp-grid{grid-template-columns:repeat(3,1fr);}}',
+      '.mx-avp-cell{cursor:pointer;border-radius:14px;padding:10px;background:#fff;border:2.4px solid transparent;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;text-align:center;}',
+      '.mx-avp-cell:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(107,63,160,.20);}',
+      '.mx-avp-cell:hover .mx-av{animation:mxavWiggle .55s ease;}',
+      '.mx-avp-cell.sel{border-color:#6B3FA0;background:#faf7ff;box-shadow:0 6px 18px rgba(107,63,160,.30);}',
+      '.mx-avp-cell .nm{margin-top:6px;font-size:0.74rem;color:#666;font-weight:700;line-height:1.2;}',
+      '.mx-avp-actions{padding:12px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;background:#fafafa;}',
+      '.mx-avp-btn{padding:9px 18px;border:none;border-radius:9px;font-family:inherit;font-weight:800;cursor:pointer;}',
+      '.mx-avp-btn.pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;}',
+      '.mx-avp-btn.pri:disabled{opacity:.5;cursor:not-allowed;}',
+      '.mx-avp-btn.sec{background:#eee;color:#333;}',
+      /* Egg-crack reveal animation: shown briefly after a confirm. */
+      '.mx-avp-crack-back{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:10000;}',
+      '.mx-avp-crack-back.show{display:flex;}',
+      '.mx-avp-crack{position:relative;width:240px;height:240px;}',
+      '.mx-avp-crack .egg{position:absolute;inset:0;animation:mxavEggShake .5s ease 0s 3;}',
+      '.mx-avp-crack .reveal{position:absolute;inset:0;opacity:0;transform:scale(.4);animation:mxavReveal .7s ease 1.4s forwards;}',
+      '@keyframes mxavEggShake{0%,100%{transform:rotate(0);}25%{transform:rotate(-9deg);}75%{transform:rotate(9deg);}}',
+      '@keyframes mxavReveal{0%{opacity:0;transform:scale(.4);}60%{opacity:1;transform:scale(1.18);}100%{opacity:1;transform:scale(1);}}',
+      '.mx-avp-crack .egg.gone{animation:mxavEggGone .5s ease 1.4s forwards;}',
+      '@keyframes mxavEggGone{to{opacity:0;transform:scale(.6) rotate(20deg);}}',
+      '@media (prefers-reduced-motion:reduce){',
+      '.mx-av-bounce,.mx-av-wiggle:hover,.mx-avp-cell:hover .mx-av,.mx-avp-crack .egg,.mx-avp-crack .reveal,.mx-avp-crack .egg.gone{animation:none !important;}',
+      '.mx-av-click:hover{transform:none;}',
+      '}'
+    ].join('\n');
+    document.head.appendChild(st);
+  })();
+
+  var _MX_AV_CACHE = null;
+  function mxFetchAvatars(){
+    if (_MX_AV_CACHE) return Promise.resolve(_MX_AV_CACHE);
+    return fetch('/api/points/avatars',{credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        _MX_AV_CACHE = (d && d.ok) ? (d.rows || []) : [];
+        return _MX_AV_CACHE;
+      })
+      .catch(function(){ return []; });
+  }
+
+  function mxOpenAvatarPicker(opts){
+    /* opts: {sid, current_id, current_file_path, current_name, on_save(avatar_obj)} */
+    opts = opts || {};
+    var back = document.getElementById('mx-avp-back');
+    if (!back){
+      back = document.createElement('div');
+      back.id = 'mx-avp-back';
+      back.className = 'mx-avp-back';
+      back.innerHTML = ''
+        + '<div class="mx-avp-box" role="dialog" aria-label="اختيار شخصية">'
+        +   '<div class="mx-avp-head"><h3 id="mx-avp-title">اختر شخصيتك</h3>'
+        +     '<button class="mx-avp-x" type="button" aria-label="إغلاق">×</button></div>'
+        +   '<div class="mx-avp-current" id="mx-avp-current"></div>'
+        +   '<div class="mx-avp-filter">'
+        +     '<label style="font-weight:700;color:#4a148c;">الفئة:</label>'
+        +     '<select id="mx-avp-cat"><option value="">كل الشخصيات</option>'
+        +       '<option value="ذكر">أولاد</option>'
+        +       '<option value="أنثى">بنات</option>'
+        +       '<option value="محايد">محايد</option>'
+        +     '</select>'
+        +   '</div>'
+        +   '<div class="mx-avp-grid" id="mx-avp-grid"></div>'
+        +   '<div class="mx-avp-actions">'
+        +     '<button class="mx-avp-btn sec" type="button" id="mx-avp-cancel">إلغاء</button>'
+        +     '<button class="mx-avp-btn pri" type="button" id="mx-avp-ok" disabled>تأكيد</button>'
+        +   '</div>'
+        + '</div>';
+      document.body.appendChild(back);
+      back.querySelector('.mx-avp-x').onclick = function(){ back.classList.remove('show'); };
+      back.querySelector('#mx-avp-cancel').onclick = function(){ back.classList.remove('show'); };
+      back.addEventListener('click', function(e){ if (e.target === back) back.classList.remove('show'); });
+      back.querySelector('#mx-avp-cat').onchange = function(){ _mxAvpRender(); };
+    }
+    back._opts = opts;
+    back._selected = (opts.current_id != null) ? Number(opts.current_id) : null;
+    back._before = {
+      id: opts.current_id || 0,
+      file_path: opts.current_file_path || '/static/avatars/svg/egg.svg',
+      name: opts.current_name || ''
+    };
+    /* Update title for admin/teacher targeting another student. */
+    var title = back.querySelector('#mx-avp-title');
+    if (opts.target_name){
+      title.textContent = 'اختر شخصية لـ ' + opts.target_name;
+    } else {
+      title.textContent = 'اختر شخصيتك';
+    }
+    /* Populate current preview. */
+    var cur = back.querySelector('#mx-avp-current');
+    cur.innerHTML = mxAvatarHTML({
+      file_path: back._before.file_path, name: back._before.name, size: 88
+    }) + '<div class="lbl">' + (back._before.name || 'بيضة') + '</div>';
+    back.querySelector('#mx-avp-cat').value = '';
+    back.querySelector('#mx-avp-ok').disabled = true;
+    back.classList.add('show');
+    /* Load + render grid. */
+    mxFetchAvatars().then(function(rows){
+      back._rows = rows;
+      _mxAvpRender();
+    });
+    /* Save handler */
+    back.querySelector('#mx-avp-ok').onclick = function(){
+      if (back._selected == null) return;
+      var sel = (back._rows||[]).find(function(r){return Number(r.id)===Number(back._selected);});
+      if (!sel) return;
+      fetch('/api/points/student/' + opts.sid + '/avatar', {
+        method:'PATCH', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({avatar_id: Number(back._selected)})
+      }).then(function(r){return r.json();}).then(function(d){
+        if (!d || !d.ok){
+          alert((d && d.error) || 'خطأ');
+          return;
+        }
+        back.classList.remove('show');
+        /* Crack-egg reveal if user upgraded from egg, else simple confirm. */
+        if (Number(back._before.id||0) === 0 && Number(sel.id) !== 0){
+          _mxAvpCrack(back._before.file_path, sel.file_path);
+        }
+        if (typeof opts.on_save === 'function'){
+          opts.on_save(sel);
+        }
+      }).catch(function(){ alert('خطأ في الاتصال'); });
+    };
+  }
+
+  function _mxAvpRender(){
+    var back = document.getElementById('mx-avp-back'); if (!back) return;
+    var grid = back.querySelector('#mx-avp-grid');
+    var cat  = back.querySelector('#mx-avp-cat').value;
+    var rows = (back._rows || []).filter(function(r){
+      if (!cat) return true;
+      return (r.category||'').indexOf(cat) >= 0;
+    });
+    var sel = back._selected;
+    grid.innerHTML = rows.map(function(r){
+      var isSel = (Number(r.id) === Number(sel));
+      return '<div class="mx-avp-cell ' + (isSel?'sel':'') + '" data-av-id="' + r.id + '">'
+        + mxAvatarHTML({file_path: r.file_path, name: r.name, size: 78})
+        + '<div class="nm">' + (r.name || '') + '</div>'
+        + '</div>';
+    }).join('');
+    Array.prototype.forEach.call(grid.querySelectorAll('.mx-avp-cell'), function(cell){
+      cell.onclick = function(){
+        var id = Number(cell.getAttribute('data-av-id'));
+        back._selected = id;
+        Array.prototype.forEach.call(grid.querySelectorAll('.mx-avp-cell'), function(c){c.classList.remove('sel');});
+        cell.classList.add('sel');
+        back.querySelector('#mx-avp-ok').disabled = false;
+      };
+    });
+  }
+
+  function _mxAvpCrack(eggSrc, monsterSrc){
+    var box = document.getElementById('mx-avp-crack-back');
+    if (!box){
+      box = document.createElement('div');
+      box.id = 'mx-avp-crack-back';
+      box.className = 'mx-avp-crack-back';
+      box.innerHTML = '<div class="mx-avp-crack">'
+        + '<img class="egg" src="" alt=""/>'
+        + '<img class="reveal" src="" alt=""/>'
+        + '</div>';
+      document.body.appendChild(box);
+      box.addEventListener('click', function(){ box.classList.remove('show'); });
+    }
+    box.querySelector('.egg').src = eggSrc || '/static/avatars/svg/egg.svg';
+    box.querySelector('.reveal').src = monsterSrc || '';
+    box.querySelector('.egg').classList.remove('gone');
+    /* Force restart of CSS animations. */
+    void box.offsetWidth;
+    box.querySelector('.egg').classList.add('gone');
+    box.classList.add('show');
+    setTimeout(function(){ box.classList.remove('show'); }, 2500);
+  }
+
+  /* Delegated click — any element with [data-mx-av-sid] opens the picker.
+     The page is responsible for supplying current values on the parent
+     element via data attributes data-mx-av-* OR by passing them at click
+     time through a custom event. */
+  document.addEventListener('click', function(e){
+    var el = e.target;
+    while (el && el !== document.body && !(el.classList && el.classList.contains('mx-av-click'))) el = el.parentNode;
+    if (!el || el === document.body) return;
+    var sid = el.getAttribute('data-mx-av-sid');
+    if (!sid) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof window.mxAvatarRequestOpen === 'function'){
+      window.mxAvatarRequestOpen(sid, el);
+      return;
+    }
+    /* Default: open picker with whatever the element knows about itself. */
+    mxOpenAvatarPicker({
+      sid: sid,
+      current_id: Number(el.getAttribute('data-mx-av-id') || 0),
+      current_file_path: el.getAttribute('data-mx-av-file') || '/static/avatars/svg/egg.svg',
+      current_name: el.getAttribute('data-mx-av-name') || '',
+      target_name: el.getAttribute('data-mx-av-target') || '',
+      on_save: function(av){
+        /* Optimistically update the icon in place. */
+        el.innerHTML = '<img src="' + av.file_path + '" alt="" />'
+                     + '<span class="mx-av-fb">' + ((av.name||'?').trim().charAt(0)) + '</span>';
+        el.setAttribute('data-mx-av-id', av.id);
+        el.setAttribute('data-mx-av-file', av.file_path);
+        el.setAttribute('data-mx-av-name', av.name || '');
+        document.dispatchEvent(new CustomEvent('mx-avatar-changed', {detail:{sid:sid, avatar:av}}));
+      }
+    });
+  }, true);
+
+  window.mxAvatarHTML        = mxAvatarHTML;
+  window.mxFetchAvatars      = mxFetchAvatars;
+  window.mxOpenAvatarPicker  = mxOpenAvatarPicker;
+
   /* ── Global frozen-by-default tables ─────────────────────────────
      Spec: every data table is read-only until the teacher/admin
      clicks "تعديل بيانات الجدول" above it. Save commits all changes;
@@ -29825,7 +30236,10 @@ setInterval(_bkAutoDlPollOnce, 30000);
 </body>
 </html>"""
 
-for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML', 'SETTINGS_HTML', 'LOGIN_HTML', 'ADMIN_BACKUPS_HTML'):
+for _mxh_name in ('HOME_HTML', 'DATABASE_HTML', 'ATTENDANCE_HTML', 'GROUPS_HTML',
+                  'SETTINGS_HTML', 'LOGIN_HTML', 'ADMIN_BACKUPS_HTML',
+                  'PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
+                  'POINTS_MANAGE_HTML', 'POINTS_BOARD_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
@@ -30318,7 +30732,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .topbar h1{margin:0;font-size:1.1rem;color:#4a148c;}
 .logout{background:#fff;color:#4a148c;border:1.5px solid #c4a8e8;padding:7px 14px;border-radius:9px;text-decoration:none;font-weight:700;font-size:0.85rem;}
 .hero{background:#fff;border-radius:22px;padding:24px 22px;text-align:center;box-shadow:0 8px 28px rgba(107,63,160,.14);margin-bottom:14px;}
-.hero .av{font-size:5rem;line-height:1;display:block;margin-bottom:8px;}
+.hero .av{display:inline-block;margin-bottom:8px;}
 .hero .nm{font-size:1.5rem;font-weight:900;color:#4a148c;margin-bottom:6px;}
 .hero .pts{font-size:3rem;font-weight:900;color:#6B3FA0;letter-spacing:1px;}
 .hero .ptslbl{font-size:0.9rem;color:#666;margin-top:-4px;}
@@ -30395,7 +30809,10 @@ function load(){
 function render(){
   var me=STATE.me;
   var s=me.student||{};
-  var av=me.avatar&&me.avatar.emoji?me.avatar.emoji:'😊';
+  var avObj = me.avatar || {};
+  var avPath = avObj.file_path || '/static/avatars/svg/egg.svg';
+  var avName = avObj.name || '';
+  var avId   = (avObj.id != null) ? avObj.id : 0;
   var bal=me.balance||0;
   var lvl=me.level||{};
   var nextLvl=me.next_level||null;
@@ -30406,9 +30823,15 @@ function render(){
     progress=Math.max(0,Math.min(100,Math.round(inLvl/span*100)));
   } else if(lvl.min_points!=null && !nextLvl){progress=100;}
   var firstName=(s.student_name||'').split(' ')[0];
+  var avHTML = (typeof window.mxAvatarHTML === 'function')
+    ? window.mxAvatarHTML({file_path: avPath, name: avName || firstName,
+                           size: 110, clickable: true, sid: s.id,
+                           avatar_id: avId, target_name: firstName,
+                           classes:'mx-av-bounce mx-av-wiggle av'})
+    : '<span class="av"><img src="'+avPath+'" style="width:110px;height:110px;" alt=""/></span>';
   var html='';
   html+='<div class="hero">'
-     +'<span class="av">'+_esc(av)+'</span>'
+     +avHTML
      +'<div class="nm">'+_esc(firstName)+'</div>'
      +'<div class="pts" id="balCount">0</div>'
      +'<div class="ptslbl">نقطة</div>'
@@ -30515,7 +30938,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;
 .child-block.active{display:block;}
 .card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
 .summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.summary .av{font-size:3.2rem;line-height:1;}
+.summary .av{display:inline-block;}
 .summary .nm{font-weight:900;color:#212121;font-size:1.2rem;margin-bottom:2px;}
 .summary .meta{color:#666;font-size:0.88rem;}
 .summary .bal{font-size:2rem;font-weight:900;color:#4a148c;}
@@ -30544,7 +30967,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f5f7;margin:0;
 @keyframes tin{from{opacity:0;transform:translate(-50%,-10px);}to{opacity:1;transform:translate(-50%,0);}}
 @media (max-width:600px){
   .summary .bal{font-size:1.5rem;}
-  .summary .av{font-size:2.4rem;}
 }
 </style></head><body>
 <div class="topbar">
@@ -30585,11 +31007,16 @@ function render(){
   /* Each child block */
   children.forEach(function(c,i){
     var s=c.student||{};
-    var av=(c.avatar&&c.avatar.emoji)?c.avatar.emoji:'😊';
+    var avObj=c.avatar||{};
+    var avPath=avObj.file_path||'/static/avatars/svg/egg.svg';
+    var avName=avObj.name||'';
+    var avHTML=(typeof window.mxAvatarHTML==='function')
+      ? window.mxAvatarHTML({file_path:avPath,name:avName||(s.student_name||''),size:80,classes:'mx-av-bounce'})
+      : '<img src="'+avPath+'" style="width:80px;height:80px;" alt=""/>';
     var lvl=c.level||{};
     html+='<div class="child-block '+(i===0?'active':'')+'" id="child-'+i+'">';
     html+='<div class="card"><div class="summary">'
-       +'<div class="av">'+_esc(av)+'</div>'
+       +'<div class="av">'+avHTML+'</div>'
        +'<div style="flex:1;min-width:140px;">'
          +'<div class="nm">'+_esc(s.student_name||'')+'</div>'
          +'<div class="meta">المجموعة: '+_esc(s.group_name_student||'—')
@@ -30762,12 +31189,7 @@ def api_portal_student_me():
                 next_lvl = L; break
     except Exception:
         all_lvls = []
-    av = {}
-    if sd.get("avatar_id"):
-        try:
-            ar = db.execute("SELECT id, name, emoji FROM avatars WHERE id=?", (sd["avatar_id"],)).fetchone()
-            if ar: av = dict(ar)
-        except Exception: pass
+    av = _pts_resolve_avatar(db, sd.get("avatar_id"))
     events = _pts_recent_events(db, sid, 12)
     return jsonify({
         "ok":         True,
@@ -31053,12 +31475,7 @@ def api_portal_parent_me():
         sd = dict(srow)
         bal = _pts_balance(db, sid)
         lvl = _pts_level_for(db, bal)
-        av  = {}
-        if sd.get("avatar_id"):
-            try:
-                ar = db.execute("SELECT emoji FROM avatars WHERE id=?", (sd["avatar_id"],)).fetchone()
-                if ar: av = {"emoji": (dict(ar) if hasattr(ar, "keys") else {}).get("emoji") or ar[0]}
-            except Exception: pass
+        av  = _pts_resolve_avatar(db, sd.get("avatar_id"))
         events = _pts_recent_events(db, sid, 20)
         # Weekly chart series (last 8 weeks)
         import datetime as _dt
@@ -31681,7 +32098,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 @keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.06);box-shadow:0 8px 24px rgba(76,175,80,.5);}100%{transform:scale(1);}}
 .card.pulse-neg{animation:pulseNeg .55s ease;}
 @keyframes pulseNeg{0%{transform:scale(1);}50%{transform:scale(1.06);box-shadow:0 8px 24px rgba(244,67,54,.5);}100%{transform:scale(1);}}
-.avatar{font-size:3rem;line-height:1;margin-bottom:6px;}
+.avatar{line-height:1;margin-bottom:6px;display:flex;justify-content:center;}
 .sname{font-weight:800;font-size:0.96rem;color:#212121;margin-bottom:4px;line-height:1.25;min-height:2.4em;}
 .bal{font-size:1.6rem;font-weight:900;color:#4a148c;}
 .lvl{font-size:0.78rem;color:#666;font-weight:700;margin-top:2px;}
@@ -31715,7 +32132,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 @media (max-width:600px){
   .grid{grid-template-columns:repeat(2,1fr);gap:8px;}
   .card{padding:10px 6px;}
-  .avatar{font-size:2.2rem;}
+  .avatar{transform:scale(0.85);}
   .sname{font-size:0.82rem;min-height:2em;}
   .bal{font-size:1.2rem;}
 }
@@ -31811,12 +32228,19 @@ function render(){
   var g=document.getElementById('grid');
   if(!STATE.students.length){g.innerHTML='<div class="empty">لا يوجد طلبة في هذه المجموعة</div>';return;}
   g.innerHTML=STATE.students.map(function(s){
-    var av=s.avatar_emoji||'😊';
+    var fp = s.avatar_file_path || '/static/avatars/svg/egg.svg';
+    var avHTML = (typeof window.mxAvatarHTML === 'function')
+      ? window.mxAvatarHTML({file_path: fp, name: s.avatar_name || '',
+                             size: 76, clickable: true, sid: s.id,
+                             avatar_id: s.avatar_id || 0,
+                             target_name: s.student_name || '',
+                             classes:'mx-av-bounce'})
+      : '<img src="'+fp+'" style="width:76px;height:76px;" alt="">';
     var lvl=(s.level&&s.level.name_ar)?(s.level.badge_icon+' '+s.level.name_ar):'';
     var sel=STATE.selected[s.id]?'selected':'';
     return '<div class="card '+sel+'" id="card-'+s.id+'" onclick="toggleSel('+s.id+',event)">'
       +'<div class="checkbox"></div>'
-      +'<div class="avatar">'+_esc(av)+'</div>'
+      +'<div class="avatar">'+avHTML+'</div>'
       +'<div class="sname">'+_esc(s.student_name)+'</div>'
       +'<div class="bal">'+s.balance+'</div>'
       +'<div class="lvl">'+_esc(lvl)+'</div>'
@@ -31915,6 +32339,18 @@ def points_board_page(group=None):
     return (POINTS_BOARD_HTML
             .replace("__GROUP_ARG__", g_arg)
             .replace("__SOUND_ON__",  snd_arg))
+
+
+# Auto-inject mx-helpers.js into HTML blobs that get defined late in the
+# module (after the first injection pass at line ~30239). The shared
+# avatar helpers / picker modal live in mx-helpers.js, so any page that
+# renders an avatar must pull it in.
+for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
+                  'POINTS_MANAGE_HTML', 'POINTS_BOARD_HTML',
+                  'PORTAL_CHANGE_PW_HTML'):
+    _mxh_val = globals().get(_mxh_name)
+    if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
+        globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
 
 
 if __name__ == "__main__":
