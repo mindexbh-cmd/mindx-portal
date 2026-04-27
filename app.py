@@ -15179,23 +15179,66 @@ def api_groups_search():
             "ramadan_time":   (rd.get("ramadan_time") or "").strip(),
             "online_time":    (rd.get("online_time")  or "").strip(),
             "session_duration": (rd.get("session_duration") or "").strip(),
-            "student_count":  scount.get(gn, 0),
-            "_score":         score,
         })
-    if q_tokens:
-        out.sort(key=lambda g: (-g["_score"], g["group_name"]))
-    else:
-        out.sort(key=lambda g: g["group_name"])
-    for g in out:
-        g.pop("_score", None)
+    # Now expand the matching groups into a flat list of STUDENTS,
+    # each row enriched with its group's metadata. The user wanted
+    # direct results — pick a level → see students in that level —
+    # not group cards that need another click.
+    in_col_setting     = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col_setting = get_setting('attendance', 'student_online_group_column',  'group_online')
+    in_col     = in_col_setting     if _is_safe_ident(in_col_setting)     else 'group_name_student'
+    online_col = online_col_setting if _is_safe_ident(online_col_setting) else 'group_online'
+    link_col = online_col if _mode == "أونلاين" else in_col
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live = set()
+    if link_col not in live:
+        link_col = "group_name_student"
+
+    students_out = []
+    if out:
+        # Map group_name (normalised) → metadata for fast lookup.
+        meta_by_name = {}
+        for g in out:
+            meta_by_name[_grp_norm(g["group_name"])] = g
+        try:
+            srows = db.execute(
+                'SELECT id, student_name, personal_id, "' + link_col + '" AS group_ref '
+                'FROM students '
+                'WHERE student_name IS NOT NULL AND TRIM(student_name) <> \'\' '
+                'AND "' + link_col + '" IS NOT NULL AND TRIM("' + link_col + '") <> \'\' '
+                'ORDER BY student_name'
+            ).fetchall()
+        except Exception:
+            srows = []
+        for sr in srows:
+            sd = dict(sr)
+            gref_raw = sd.get("group_ref") or ""
+            meta = meta_by_name.get(_grp_norm(gref_raw))
+            if not meta:
+                continue
+            students_out.append({
+                "id":           sd.get("id"),
+                "student_name": (sd.get("student_name") or "").strip(),
+                "personal_id":  sd.get("personal_id") or "",
+                "group_name":   meta["group_name"],
+                "teacher_name": meta["teacher_name"],
+                "level":        meta["level"],
+                "study_days":   meta["study_days"],
+                "study_time":   meta["study_time"] or meta["online_time"] or meta["ramadan_time"] or "",
+            })
     try:
         import sys as _sys
-        _sys.stderr.write("[groups-search] returned " + str(len(out)) + " group(s)\n")
-        # Zero-result forensic: when the user filters and gets nothing,
-        # print up to 10 distinct stored values for the FIRST filter
-        # that's set, alongside the user's pick. The next prod failure
-        # log then tells us exactly why the values didn't match (case,
-        # whitespace, hidden Unicode, etc.) without another roundtrip.
+        _sys.stderr.write(
+            "[groups-search] " + str(len(out)) + " group(s) matched filters → "
+            + str(len(students_out)) + " student(s) returned\n"
+        )
+        # Zero-result forensic: when the user filters and gets no
+        # GROUPS at all, print up to 10 distinct stored values for
+        # the FIRST filter that's set, alongside the user's pick.
+        # (If groups matched but yielded 0 students, that's a different
+        # signal — empty groups — and is fine in the log.)
         if len(out) == 0 and (sel_names or sel_teachers or sel_levels or sel_days or sel_times):
             picks = []
             samples = []
@@ -15216,7 +15259,7 @@ def api_groups_search():
             )
     except Exception:
         pass
-    return jsonify({"ok": True, "count": len(out), "groups": out})
+    return jsonify({"ok": True, "count": len(students_out), "students": students_out})
 
 
 @app.route('/api/groups/filters', methods=['GET'])

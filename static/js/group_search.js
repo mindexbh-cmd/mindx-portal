@@ -284,7 +284,9 @@
           box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">' + esc((d && d.error) || 'خطأ') + '</div>';
           return;
         }
-        renderResults(d.groups || []);
+        /* Endpoint now returns `students` (joined with group meta);
+           fall back to `groups` only for very-old caches in transit. */
+        renderResults(d.students || d.groups || []);
       })
       .catch(function () {
         box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">خطأ في الاتصال</div>';
@@ -296,36 +298,59 @@
     SEARCH_DEBOUNCE = setTimeout(runSearch, 300);
   }
 
-  function renderResults(groups) {
+  function renderResults(students) {
+    /* The endpoint now returns STUDENTS (each enriched with their
+       group's metadata). One row per student; clicking a row opens
+       the existing student profile via window.srPick(sid). */
     var box = document.getElementById('grp-results');
     if (!box) return;
-    if (!groups.length) {
-      box.innerHTML = '<div style="padding:18px;color:#888;text-align:center;font-weight:700;">لا توجد مجموعات مطابقة. جرّبي تعديل الفلاتر.</div>';
+    if (!students.length) {
+      box.innerHTML = '<div style="padding:18px;color:#888;text-align:center;font-weight:700;">لا يوجد طلاب مطابقون. جرّبي تعديل الفلاتر.</div>';
       return;
     }
-    var html = '<div style="font-size:12.5px;color:#666;margin-bottom:8px;">عدد النتائج: <b>' + groups.length + '</b></div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
-    for (var i = 0; i < groups.length; i++) {
-      var g = groups[i];
-      var time = g.study_time || g.online_time || g.ramadan_time || '—';
-      var days = (g.study_days || []).join('، ') || '—';
-      html += '<div data-grp-id="' + (g.id|0) + '" class="grp-card" style="background:#fff;border:1.6px solid #e0d0f8;border-radius:12px;padding:12px;cursor:pointer;transition:transform .15s, box-shadow .15s, border-color .15s;">'
-        + '<div style="font-weight:900;color:#4a148c;font-size:15px;margin-bottom:4px;">' + esc(g.group_name) + '</div>'
-        + '<div style="font-size:12px;color:#5d4037;line-height:1.65;">'
-        +   '👩‍🏫 <b>' + esc(g.teacher_name || '—') + '</b><br>'
-        +   '🎓 ' + esc(g.level || '—') + '<br>'
-        +   '📅 ' + esc(days) + ' &middot; ⏰ ' + esc(time) + '<br>'
-        +   '👥 عدد الطلاب: <b>' + (g.student_count|0) + '</b>'
-        + '</div>'
-        + '</div>';
+    var html = '<div style="font-size:12.5px;color:#666;margin-bottom:8px;">عدد الطلاب: <b>' + students.length + '</b></div>';
+    html += '<div style="overflow:auto;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);">';
+    html += '<table class="grp-students-tbl" style="width:100%;border-collapse:collapse;">';
+    html += '<thead><tr style="background:#f8f3ff;color:#4a148c;font-size:13px;">'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">#</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">اسم الطالب</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">المجموعة</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">المستوى</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">المعلمة</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">الأيام</th>'
+      + '<th style="padding:9px 10px;text-align:right;font-weight:800;">الوقت</th>'
+      + '</tr></thead><tbody>';
+    for (var i = 0; i < students.length; i++) {
+      var s = students[i];
+      var days = (s.study_days || []).join('، ') || '—';
+      html += '<tr class="grp-student-row" data-sid="' + (s.id|0) + '" style="cursor:pointer;border-bottom:1px solid #f0e7f8;font-size:13px;">'
+        + '<td style="padding:8px 10px;color:#999;">' + (i+1) + '</td>'
+        + '<td style="padding:8px 10px;font-weight:800;color:#212121;">' + esc(s.student_name) + '</td>'
+        + '<td style="padding:8px 10px;color:#4a148c;font-weight:700;">' + esc(s.group_name || '—') + '</td>'
+        + '<td style="padding:8px 10px;color:#5d4037;">' + esc(s.level || '—') + '</td>'
+        + '<td style="padding:8px 10px;color:#5d4037;">' + esc(s.teacher_name || '—') + '</td>'
+        + '<td style="padding:8px 10px;color:#5d4037;">' + esc(days) + '</td>'
+        + '<td style="padding:8px 10px;color:#5d4037;direction:ltr;">' + esc(s.study_time || '—') + '</td>'
+        + '</tr>';
     }
-    html += '</div>';
+    html += '</tbody></table></div>';
     box.innerHTML = html;
-    var cards = box.querySelectorAll('.grp-card');
-    for (var j = 0; j < cards.length; j++) {
-      cards[j].addEventListener('click', function () {
-        var gid = parseInt(this.getAttribute('data-grp-id'), 10);
-        pickGroup(gid);
+    /* One-shot CSS (only adds hover; no other styling change). */
+    if (!document.getElementById('grp-students-tbl-style')) {
+      var st = document.createElement('style');
+      st.id = 'grp-students-tbl-style';
+      st.textContent = '.grp-student-row:hover{background:#faf7ff;}';
+      document.head.appendChild(st);
+    }
+    /* Row click → flip mode toggle to "طالب" and call existing srPick. */
+    var rows = box.querySelectorAll('.grp-student-row');
+    for (var j = 0; j < rows.length; j++) {
+      rows[j].addEventListener('click', function () {
+        var sid = parseInt(this.getAttribute('data-sid'), 10);
+        if (!sid) return;
+        var radio = document.querySelector('input[name="search-mode"][value="student"]');
+        if (radio) { radio.checked = true; applyMode('student'); }
+        if (typeof window.srPick === 'function') window.srPick(sid);
       });
     }
   }
