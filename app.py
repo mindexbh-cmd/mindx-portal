@@ -15116,6 +15116,32 @@ def api_groups_search():
         ).fetchall()
     except Exception:
         rows = []
+    # Beefed-up observability: prints visibility + a small sample of
+    # what's actually stored, so any future "no matching groups" report
+    # can be diagnosed from a single Render-log line. Special warning
+    # when role-scoping has zeroed visibility but the DB has groups.
+    try:
+        import sys as _sys
+        _samples_levels   = sorted({(dict(r).get("level_course")  or "").strip() for r in rows[:200] if (dict(r).get("level_course")  or "").strip()})[:5]
+        _samples_teachers = sorted({(dict(r).get("teacher_name")  or "").strip() for r in rows[:200] if (dict(r).get("teacher_name")  or "").strip()})[:5]
+        _samples_names    = sorted({(dict(r).get("group_name")    or "").strip() for r in rows[:200] if (dict(r).get("group_name")    or "").strip()})[:5]
+        _sys.stderr.write(
+            "[groups-search] context: total_groups=" + str(len(rows)) +
+            " visible_count=" + str(len(visible)) +
+            " sample_levels=" + repr(_samples_levels) +
+            " sample_teachers=" + repr(_samples_teachers) +
+            " sample_names=" + repr(_samples_names) + "\n"
+        )
+        if len(rows) > 0 and len(visible) == 0:
+            _sys.stderr.write(
+                "[groups-search] VISIBILITY-EMPTY warning: DB has " + str(len(rows)) +
+                " groups but role-scoping returned 0 visible names for user=" +
+                str((user or {}).get("username") or "?") + " role=" +
+                str((user or {}).get("role") or "?") +
+                ". Check _teacher_groups_for / _grp_visible_for for this user.\n"
+            )
+    except Exception:
+        pass
     # Per-group student count, mode-aware. Per CLAUDE.md students may
     # belong to two groups (in-person via group_name_student, online
     # via group_online). The active center mode (حضوري/رمضان→in-person,

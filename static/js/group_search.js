@@ -277,9 +277,27 @@
     var box = document.getElementById('grp-results');
     if (!box) return;
     box.innerHTML = '<div style="padding:14px;color:#888;text-align:center;">جاري التحميل...</div>';
-    fetch('/api/groups/search?' + qs.toString(), { credentials: 'include' })
+    var url = '/api/groups/search?' + qs.toString();
+    /* Browser-side observability — one readable line per search in
+       DevTools so user can paste from the console without touching
+       Render logs. Includes the URL sent and a snapshot of STATE. */
+    try {
+      console.info('[group-search] →', url, '| STATE:',
+        JSON.parse(JSON.stringify(STATE)));
+    } catch (e) {}
+    fetch(url, { credentials: 'include' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        try {
+          var summary = {
+            ok: d && d.ok,
+            count: d && d.count,
+            students: (d && d.students) ? d.students.length : null,
+            groups:   (d && d.groups)   ? d.groups.length   : null,
+            error: d && d.error
+          };
+          console.info('[group-search] ←', summary);
+        } catch (e) {}
         if (!d || !d.ok) {
           box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">' + esc((d && d.error) || 'خطأ') + '</div>';
           return;
@@ -288,7 +306,8 @@
            fall back to `groups` only for very-old caches in transit. */
         renderResults(d.students || d.groups || []);
       })
-      .catch(function () {
+      .catch(function (err) {
+        try { console.warn('[group-search] ✗', err); } catch (e) {}
         box.innerHTML = '<div style="padding:14px;color:#c00;text-align:center;">خطأ في الاتصال</div>';
       });
   }
