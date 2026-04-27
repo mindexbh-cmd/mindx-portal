@@ -9127,10 +9127,6 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         <span class="ctrl-label">&#128340; &#x627;&#x644;&#x64A;&#x648;&#x645;</span>
         <div class="day-badge empty" id="dayBadge">&#8212;</div>
       </div>
-      <div class="ctrl-group" style="margin-right:auto;">
-        <span class="ctrl-label">&#x639;&#x631;&#x636; &#x643;&#x644;&#x64A;</span>
-        <button type="button" id="btnAlmOpen" onclick="almOpen()" style="background:linear-gradient(135deg,#FB8C00,#F57C00);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(251,140,0,.30);" title="&#x639;&#x631;&#x636; &#x643;&#x644; &#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x64A;&#x646; &#x648;&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x64A;&#x646; &#x644;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;">&#x1F4CB; &#x639;&#x631;&#x636; &#x643;&#x644; &#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x64A;&#x646; &#x648;&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x64A;&#x646; &#x644;&#x647;&#x630;&#x627; &#x627;&#x644;&#x62A;&#x627;&#x631;&#x64A;&#x62E;</button>
-      </div>
       <span class="student-count" id="studentCount" style="display:none;"></span>
       <div class="spinner" id="checkSpinner"><div class="spin-circle"></div><span>&#1580;&#1575;&#1585;&#1610; &#1575;&#1604;&#1578;&#1581;&#1602;&#1602;...</span></div>
       <button type="button" id="btnEditTemplates" onclick="openMsgTemplatesModal()" style="margin-right:auto;background:linear-gradient(135deg,#0277BD,#0288D1);color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(2,119,189,0.25);">&#x1F4DD; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x642;&#x648;&#x627;&#x644;&#x628; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</button>
@@ -9224,40 +9220,6 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
   </div>
 </div>
 <div class="toast" id="toast"></div>
-
-<!-- ===== Modal: all absent + late on the selected date ===== -->
-<div id="almModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:14px;">
-  <div style="background:#fff;border-radius:14px;width:100%;max-width:1200px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 48px rgba(0,0,0,.4);">
-    <div style="background:linear-gradient(135deg,#FB8C00,#F57C00);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:800;flex-wrap:wrap;gap:8px;">
-      <span style="font-size:1.05rem;">&#x1F4CB; &#x627;&#x644;&#x63A;&#x627;&#x626;&#x628;&#x648;&#x646; &#x648;&#x627;&#x644;&#x645;&#x62A;&#x623;&#x62E;&#x631;&#x648;&#x646; &#x2014; <span id="almDateLabel">&#8212;</span></span>
-      <span id="almSummary" style="font-size:0.85rem;background:rgba(255,255,255,.2);padding:4px 12px;border-radius:999px;"></span>
-      <button type="button" onclick="almClose()" aria-label="إغلاق" style="background:none;border:none;color:#fff;font-size:1.6rem;line-height:1;cursor:pointer;font-weight:900;padding:0 8px;">&times;</button>
-    </div>
-    <div style="overflow:auto;flex:1;background:#fafafa;">
-      <div class="att-table-wrap" style="border-radius:0;box-shadow:none;margin:0;">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>&#1575;&#1604;&#1575;&#1587;&#1605;</th>
-              <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th>
-              <th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th>
-              <th>&#1573;&#1580;&#1585;&#1575;&#1569;</th>
-              <th>&#x62A;&#x645; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</th>
-              <th style="text-align:center;">&#x0627;&#x0644;&#x062D;&#x0635;&#x0629;</th>
-              <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</th>
-              <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</th>
-              <th style="text-align:center;">&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62A;&#x623;&#x62E;&#x64A;&#x631;</th>
-              <th style="text-align:center;">&#x646;&#x633;&#x628;&#x629; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631; %</th>
-            </tr>
-          </thead>
-          <tbody id="almTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 var groupsData = {};
 var AR_DAYS = ['\u0627\u0644\u0623\u062d\u062f','\u0627\u0644\u0627\u062b\u0646\u064a\u0646','\u0627\u0644\u062b\u0644\u0627\u062b\u0627\u0621','\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621','\u0627\u0644\u062e\u0645\u064a\u0633','\u0627\u0644\u062c\u0645\u0639\u0629','\u0627\u0644\u0633\u0628\u062a'];
@@ -9356,37 +9318,19 @@ function onWaSent(link) {
   var cb = row.querySelector('.sent-check');
   var prevChecked = cb ? !!cb.checked : false;
   if (cb) cb.checked = true;
-  /* Modal context — each row already represents a saved attendance
-     row, so we persist via the dedicated mark-sent endpoint instead
-     of running saveAllAttendance (which iterates the per-group
-     #attTableBody and does not see modal rows). */
-  if (row.getAttribute('data-att-context') === 'modal') {
-    var aid = row.getAttribute('data-att-id');
-    if (aid) {
-      fetch('/api/attendance/' + aid + '/mark-sent', {method:'POST', credentials:'include'})
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          if (!d || !d.ok) {
-            if (cb) cb.checked = prevChecked;
-            showToast((d && d.error) || 'فشل تسجيل الإرسال', '#e53935');
-          } else {
-            showToast('تم تسجيل الإرسال', '#2e7d32');
-          }
-        })
-        .catch(function(){
-          if (cb) cb.checked = prevChecked;
-          showToast('فشل الاتصال بالخادم', '#e53935');
-        });
-    }
-    return;
-  }
-  /* Per-group view — preserve the existing fire-and-forget save flow. */
+  /* Save and revert the tick on failure — saveAllAttendance shows
+     a red toast on its own; we just need to roll the visual back so
+     the user sees the actual persisted state. */
   try {
     saveAllAttendance();
+    /* saveAllAttendance is async-but-fire-and-forget; observe the
+       red toast text via the existing toast element to decide
+       whether to revert. The toast text starts with "فشل" on
+       failure. We re-check after a short delay. */
     setTimeout(function(){
       var t = document.getElementById('toast');
       var txt = (t && t.textContent) || '';
-      if (/^\s*فشل/.test(txt) && cb){
+      if (/^\s*\u0641\u0634\u0644/.test(txt) && cb){
         cb.checked = prevChecked;
       }
     }, 2500);
@@ -9441,7 +9385,7 @@ function _attLookupTeacher(){
   return "";
 }
 function _attLookupClassTime(){ return ""; }
-function buildWaMsg(name, status, groupOverride) {
+function buildWaMsg(name, status) {
   var date = document.getElementById("dateInput") ? document.getElementById("dateInput").value : "";
   var dayBadge = document.getElementById("dayBadge");
   var day = (dayBadge && !dayBadge.className.includes("empty")) ? dayBadge.textContent.trim() : "";
@@ -9453,10 +9397,7 @@ function buildWaMsg(name, status, groupOverride) {
   if (day) dateFormatted = day + " " + dateFormatted;
   var isAbsent = (status === "\u063A\u0627\u0626\u0628");
   var tpl = isAbsent ? (_attTpl.absent || _attTpl.defaultAbsent) : (_attTpl.late || _attTpl.defaultLate);
-  /* Modal context: each row carries its own group via the
-     groupOverride arg so multi-group lists pick the right group. */
-  var group = (groupOverride && String(groupOverride).trim()) ||
-              ((document.getElementById("groupSelect") || {}).value || "");
+  var group = (document.getElementById("groupSelect") || {}).value || "";
   return _attRenderTemplate(tpl, {name:name||"", date:dateFormatted, group:group, teacher:_attLookupTeacher(), time:_attLookupClassTime()});
 }
 /* ── Templates modal handlers ── */
@@ -9755,84 +9696,6 @@ function _attLookup(map, name, pid) {
   return '';
 }
 
-/* Single-row builder. Used by the per-group renderTable AND by the
-   "all absent/late" modal (almOpen). One source of truth means the
-   modal row is byte-identical to the per-group row except for the
-   one extra المجموعة column when opts.show_group is true.
-   opts: {show_group?:bool, group_name?:str, context?:'modal',
-          attendance_id?:int} */
-function _attBuildRow(s, savedStatus, savedMsgStatus, st, i, opts) {
-  opts = opts || {};
-  st   = st   || {present:0, absent:0, late:0, total:0, pct:0};
-  var name = s.student_name || '-';
-  var pid  = (s.personal_id || '').toString();
-  var cssClass = 'status-select';
-  if(savedStatus === 'حاضر') cssClass += ' present';
-  else if(savedStatus === 'غائب') cssClass += ' absent';
-  else if(savedStatus === 'متأخر') cssClass += ' late';
-
-  var trAttrs = '';
-  if (opts.context)       trAttrs += ' data-att-context="' + opts.context + '"';
-  if (opts.attendance_id) trAttrs += ' data-att-id="' + opts.attendance_id + '"';
-  if (opts.group_name)    trAttrs += ' data-att-group="' + String(opts.group_name).replace(/"/g,'&quot;') + '"';
-
-  var html = '<tr' + trAttrs + '>';
-  html += '<td>' + (i+1) + '</td>';
-  html += '<td class="student-name-cell">' + name + '</td>';
-  /* Single optional column the spec calls for, placed right after
-     the student name so the employee can immediately see which group
-     each absentee is in. */
-  if (opts.show_group) {
-    html += '<td class="student-name-cell" style="color:#26A69A;">' + (opts.group_name || '') + '</td>';
-  }
-  html += '<td><select class="' + cssClass + '" data-name="' + name.replace(/"/g, '&quot;') + '" data-pid="' + pid.replace(/"/g, '&quot;') + '" onchange="onStatusChange(this)">';
-  html += '<option value="">&#8212; اختر &#8212;</option>';
-  html += '<option value="حاضر"' + (savedStatus==='حاضر'?' selected':'') + '>حاضر</option>';
-  html += '<option value="غائب"' + (savedStatus==='غائب'?' selected':'') + '>غائب</option>';
-  html += '<option value="متأخر"' + (savedStatus==='متأخر'?' selected':'') + '>متأخر</option>';
-  html += '</select></td>';
-  // WhatsApp button cell
-  var wa = s.whatsapp || '';
-  var showWaBtn = (savedStatus === 'غائب' || savedStatus === 'متأخر');
-  html += '<td class="action-cell">';
-  if (wa) {
-    if (showWaBtn) {
-      var msgType = buildWaMsg(name, savedStatus, opts.group_name || '');
-      var waNum = wa.replace(/[^0-9]/g, '');
-      if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
-      var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
-      html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '" onclick="onWaSent(this)">&#128229; إرسال رسالة</a>';
-    } else {
-      html += '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; إرسال رسالة</button>';
-    }
-  } else {
-    html += '<span class="wa-na wa-missing">&#128242; &#10006;</span>';
-  }
-  html += '</td>';
-
-  var _sentChecked = (savedMsgStatus === '1' || (savedMsgStatus || '').trim() === 'تم الإرسال');
-  var _sentExtra = (opts.context === 'modal') ? ' onchange="almOnSentChange(this)"' : '';
-  html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (_sentChecked ? ' checked' : '') + _sentExtra + '></td>';
-  // Class meta cell (duration + type), populated async via
-  // _attLoadMetaForRow once the per-row student id is known.
-  var _sidAttr = (s.id != null) ? (' data-sid="' + s.id + '"') : '';
-  html += '<td class="att-meta-cell"' + _sidAttr + ' data-name="' + name.replace(/"/g,'&quot;') + '" style="text-align:center;font-size:12.5px;color:#37474F;min-width:140px;"><span class="att-meta-text" style="opacity:.6;">&mdash;</span> <button type="button" class="att-meta-edit" onclick="attOpenMetaEditor(this)" title="تخصيص" style="background:#fff3e0;border:1.4px solid #ffb74d;color:#e65100;padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;font-family:inherit;">&#x270F;</button></td>';
-  // Attendance stat cells (present/absent/late/percentage).
-  var pctCls = 'att-stat att-stat-pct';
-  if (st.total) {
-    if (st.pct < 50) pctCls = 'att-stat att-stat-pct-low';
-    else if (st.pct < 75) pctCls = 'att-stat att-stat-pct-mid';
-  }
-  html += '<td class="att-stat att-stat-present">' + st.present + '</td>';
-  html += '<td class="att-stat att-stat-absent">' + st.absent + '</td>';
-  html += '<td class="att-stat att-stat-late">' + st.late + '</td>';
-  html += '<td class="' + pctCls + '">' + (st.total ? (st.pct + '%') : '&mdash;') +
-          (st.total ? '<div class="att-stat-bar"><div class="att-stat-bar-fill" style="width:' + Math.min(100, st.pct) + '%;"></div></div>' : '') +
-          '</td>';
-  html += '</tr>';
-  return html;
-}
-
 function renderTable(students, existingList, stats) {
   stats = stats || {};
   var statusMap = {}; var msgStatusMap = {};
@@ -9843,16 +9706,66 @@ function renderTable(students, existingList, stats) {
 
   var html = '';
   if(!students.length) {
-    html = '<tr><td colspan="9" class="empty-state">لا يوجد طلاب في هذه المجموعة</td></tr>';
+    html = '<tr><td colspan="9" class="empty-state">\u0644\u0627 \u064a\u0648\u062c\u062f \u0637\u0644\u0627\u0628 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u0629</td></tr>';
   } else {
     for(var i=0; i<students.length; i++) {
-      var s = students[i];
-      var name = s.student_name || '-';
-      var pid  = (s.personal_id || '').toString();
+      var name = students[i].student_name || '-';
+      var pid  = (students[i].personal_id || '').toString();
       var savedStatus    = _attLookup(statusMap,    name, pid);
       var savedMsgStatus = _attLookup(msgStatusMap, name, pid);
-      var st = stats[name];
-      html += _attBuildRow(s, savedStatus, savedMsgStatus, st, i);
+      var cssClass = 'status-select';
+      if(savedStatus === '\u062d\u0627\u0636\u0631') cssClass += ' present';
+      else if(savedStatus === '\u063a\u0627\u0626\u0628') cssClass += ' absent';
+      else if(savedStatus === '\u0645\u062a\u0623\u062e\u0631') cssClass += ' late';
+
+      html += '<tr>';
+      html += '<td>' + (i+1) + '</td>';
+      html += '<td class="student-name-cell">' + name + '</td>';
+      html += '<td><select class="' + cssClass + '" data-name="' + name.replace(/"/g, '&quot;') + '" data-pid="' + pid.replace(/"/g, '&quot;') + '" onchange="onStatusChange(this)">';
+      html += '<option value="">&#8212; \u0627\u062e\u062a\u0631 &#8212;</option>';
+      html += '<option value="\u062d\u0627\u0636\u0631"' + (savedStatus==='\u062d\u0627\u0636\u0631'?' selected':'') + '>\u062d\u0627\u0636\u0631</option>';
+      html += '<option value="\u063a\u0627\u0626\u0628"' + (savedStatus==='\u063a\u0627\u0626\u0628'?' selected':'') + '>\u063a\u0627\u0626\u0628</option>';
+      html += '<option value="\u0645\u062a\u0623\u062e\u0631"' + (savedStatus==='\u0645\u062a\u0623\u062e\u0631'?' selected':'') + '>\u0645\u062a\u0623\u062e\u0631</option>';
+      html += '</select></td>';
+      // WhatsApp button cell
+      var wa = students[i].whatsapp || '';
+      var showWaBtn = (savedStatus === '\u063a\u0627\u0626\u0628' || savedStatus === '\u0645\u062a\u0623\u062e\u0631');
+      html += '<td class="action-cell">';
+      if (wa) {
+        if (showWaBtn) {
+          var msgType = buildWaMsg(name, savedStatus);
+          var waNum = wa.replace(/[^0-9]/g, '');
+          if (waNum.charAt(0) === '0') waNum = '973' + waNum.slice(1);
+          var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(msgType);
+          html += '<a class="btn-wa" href="' + waUrl + '" target="_blank" data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '" onclick="onWaSent(this)">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</a>';
+        } else {
+          html += '<button class="btn-wa btn-wa-disabled" disabled data-name="' + name.replace(/"/g,'&quot;') + '" data-wa="' + wa + '">&#128229; \u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629</button>';
+        }
+      } else {
+        html += '<span class="wa-na wa-missing">&#128242; &#10006;</span>';
+      }
+      html += '</td>';
+      
+      var _sentChecked = (savedMsgStatus === '1' || (savedMsgStatus || '').trim() === '\u062A\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644');
+      html += '<td class="sent-cell"><input type="checkbox" class="sent-check"' + (_sentChecked ? ' checked' : '') + '></td>';
+      // Class meta cell (duration + type) — populated async via
+      // _attLoadMetaForRow once the per-row student id is known.
+      var _sidAttr = (students[i].id != null) ? (' data-sid="' + students[i].id + '"') : '';
+      html += '<td class="att-meta-cell"' + _sidAttr + ' data-name="' + name.replace(/"/g,'&quot;') + '" style="text-align:center;font-size:12.5px;color:#37474F;min-width:140px;"><span class="att-meta-text" style="opacity:.6;">&mdash;</span> <button type="button" class="att-meta-edit" onclick="attOpenMetaEditor(this)" title="\u062A\u062E\u0635\u064A\u0635" style="background:#fff3e0;border:1.4px solid #ffb74d;color:#e65100;padding:2px 8px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;font-family:inherit;">&#x270F;</button></td>';
+      // Attendance stat cells (present/absent/late/percentage).
+      var st = stats[name] || {present:0, absent:0, late:0, total:0, pct:0};
+      var pctCls = 'att-stat att-stat-pct';
+      if (st.total) {
+        if (st.pct < 50) pctCls = 'att-stat att-stat-pct-low';
+        else if (st.pct < 75) pctCls = 'att-stat att-stat-pct-mid';
+      }
+      html += '<td class="att-stat att-stat-present">' + st.present + '</td>';
+      html += '<td class="att-stat att-stat-absent">' + st.absent + '</td>';
+      html += '<td class="att-stat att-stat-late">' + st.late + '</td>';
+      html += '<td class="' + pctCls + '">' + (st.total ? (st.pct + '%') : '&mdash;') +
+              (st.total ? '<div class="att-stat-bar"><div class="att-stat-bar-fill" style="width:' + Math.min(100, st.pct) + '%;"></div></div>' : '') +
+              '</td>';
+      html += '</tr>';
     }
   }
   document.getElementById('attTableBody').innerHTML = html;
@@ -10115,111 +10028,6 @@ function attOpenMetaEditor(btn){
   };
 })();
 attLoadCenterMode();
-
-/* ────────────────────────────────────────────────────────────────
-   Modal: عرض كل الغائبين والمتأخرين لهذا التاريخ
-   - Single new button next to the date picker triggers almOpen().
-   - Reuses the EXISTING /api/attendance/by-date-group endpoint with
-     group=__all__ and the SAME _attBuildRow per-row template, just
-     with opts.show_group=true and opts.attendance_id set so that
-     onWaSent + the checkbox onchange (almOnSentChange) hit the
-     existing /api/attendance/<id>/{mark-sent,unmark-sent} endpoints.
-   - Existing per-group view, save flow, and all other handlers are
-     completely unchanged. */
-function almOpen() {
-  var date = document.getElementById('dateInput').value;
-  if (!date) {
-    showToast('اختر تاريخاً أولاً', '#e53935');
-    return;
-  }
-  document.getElementById('almDateLabel').textContent = date;
-  document.getElementById('almSummary').textContent = 'جاري التحميل...';
-  document.getElementById('almTableBody').innerHTML = '<tr><td colspan="11" class="empty-state">جاري التحميل...</td></tr>';
-  document.getElementById('almModal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(date) + '&group=__all__', {credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var rows = (d && d.rows) || [];
-      /* Filter to absent + late only. */
-      var ABSENT = 'غائب';
-      var LATE   = 'متأخر';
-      rows = rows.filter(function(r){
-        var st = (r.status || '').trim();
-        return st === ABSENT || st === LATE;
-      });
-      /* Sort by group then name for stable readable order. */
-      rows.sort(function(a,b){
-        var ga = (a.group_name||''), gb = (b.group_name||'');
-        if (ga !== gb) return ga < gb ? -1 : 1;
-        var na = (a.student_name||''), nb = (b.student_name||'');
-        return na < nb ? -1 : (na > nb ? 1 : 0);
-      });
-      var nAbsent = rows.filter(function(r){return (r.status||'').trim()===ABSENT;}).length;
-      var nLate   = rows.length - nAbsent;
-      document.getElementById('almSummary').textContent = 'غائب: ' + nAbsent + ' · متأخر: ' + nLate;
-      var html = '';
-      if (!rows.length) {
-        html = '<tr><td colspan="11" class="empty-state">لا يوجد غائبون أو متأخرون لهذا التاريخ</td></tr>';
-      } else {
-        for (var i=0; i<rows.length; i++) {
-          var r = rows[i];
-          var s = {
-            student_name: r.student_name || '',
-            personal_id:  '',
-            whatsapp:     r.whatsapp || '',
-            id:           null
-          };
-          html += _attBuildRow(s, r.status || '', r.message_status || '', null, i, {
-            show_group:     true,
-            group_name:     r.group_name || '',
-            context:        'modal',
-            attendance_id:  r.id
-          });
-        }
-      }
-      document.getElementById('almTableBody').innerHTML = html;
-    })
-    .catch(function(){
-      document.getElementById('almTableBody').innerHTML = '<tr><td colspan="11" class="empty-state">خطأ في التحميل</td></tr>';
-      document.getElementById('almSummary').textContent = '';
-    });
-}
-function almClose() {
-  document.getElementById('almModal').style.display = 'none';
-  document.body.style.overflow = '';
-}
-function almOnSentChange(cb) {
-  var row = cb.closest('tr'); if (!row) return;
-  var aid = row.getAttribute('data-att-id');
-  if (!aid) return;
-  var url = cb.checked ? ('/api/attendance/' + aid + '/mark-sent')
-                       : ('/api/attendance/' + aid + '/unmark-sent');
-  var prev = !cb.checked;
-  fetch(url, {method:'POST', credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d || !d.ok) {
-        cb.checked = prev;
-        showToast((d && d.error) || 'فشل الحفظ', '#e53935');
-      }
-    })
-    .catch(function(){
-      cb.checked = prev;
-      showToast('فشل الاتصال', '#e53935');
-    });
-}
-/* Esc to close, click outside to close. */
-document.addEventListener('keydown', function(e){
-  if (e.key === 'Escape' && document.getElementById('almModal').style.display === 'flex') {
-    almClose();
-  }
-});
-document.addEventListener('click', function(e){
-  var m = document.getElementById('almModal');
-  if (m && m.style.display === 'flex' && e.target === m) almClose();
-});
-
 </script>
 </body>
 </html>"""
