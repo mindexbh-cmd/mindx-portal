@@ -14918,6 +14918,150 @@ def api_parent_upload_receipt():
     return jsonify({"ok": True})
 
 
+# ── Group-search backend (Step 1 of the safe re-implementation) ────
+# Backend-only at this stage. No frontend changes anywhere — the
+# UI toggle ships in a later atomic step. See CLAUDE.md "Data
+# sources" — uses existing student_groups, students, users tables.
+def _grp_arabic_normalize(s):
+    """Fold alef variants + strip diacritics so fuzzy matching is
+    insensitive to the usual Arabic input quirks."""
+    if s is None:
+        return ""
+    out = str(s)
+    for ch in "أإآا":
+        out = out.replace(ch, "ا")
+    out = out.replace("ى", "ي").replace("ة", "ه")
+    out = "".join(c for c in out if not (0x064B <= ord(c) <= 0x0652))
+    return out.lower().strip()
+
+
+def _grp_visible_for(db, user):
+    """Group names the user is allowed to see. admin/manager → all,
+    teacher → only their own groups (reuses _teacher_groups_for)."""
+    role = (user.get("role") or "").strip().lower() if user else ""
+    if role == "teacher":
+        try:
+            return _teacher_groups_for(db, user)
+        except Exception:
+            return []
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT group_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name)<>'' "
+            "ORDER BY group_name"
+        ).fetchall()
+        return [(dict(r).get("group_name") or "").strip() for r in rows]
+    except Exception:
+        return []
+
+
+def _grp_qs_list(name):
+    """Tolerate ?days[]=A&days[]=B AND ?days=A,B AND ?days=A&days=B."""
+    out = []
+    for v in request.args.getlist(name) + request.args.getlist(name + "[]"):
+        for tok in str(v).split(","):
+            tok = tok.strip()
+            if tok:
+                out.append(tok)
+    return out
+
+
+@app.route('/api/groups/search', methods=['GET'])
+@login_required
+def api_groups_search():
+    """List endpoint. Multi-select within a field = OR; across fields = AND.
+    Optional fuzzy `q` ANDs across name + level + teacher + days + times
+    after Arabic normalisation. Returns ranked groups with student count."""
+    db = get_db()
+    user = session.get("user") or {}
+    sel_days     = set(_grp_qs_list("days"))
+    sel_times    = set(_grp_qs_list("times"))
+    sel_names    = set(_grp_qs_list("group_names") + _grp_qs_list("names"))
+    sel_levels   = set(_grp_qs_list("levels"))
+    sel_teachers = set(_grp_qs_list("teachers"))
+    q = (request.args.get("q") or "").strip()
+    visible = set(_grp_visible_for(db, user))
+    try:
+        rows = db.execute(
+            "SELECT id, group_name, teacher_name, level_course, "
+            "       study_days, study_time, ramadan_time, online_time, "
+            "       session_duration "
+            "FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name)<>'' "
+            "ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    try:
+        scount_rows = db.execute(
+            "SELECT TRIM(group_name_student) AS g, COUNT(*) AS n "
+            "FROM students "
+            "WHERE group_name_student IS NOT NULL AND TRIM(group_name_student)<>'' "
+            "GROUP BY TRIM(group_name_student)"
+        ).fetchall()
+        scount = {dict(r).get("g"): int(dict(r).get("n") or 0) for r in scount_rows}
+    except Exception:
+        scount = {}
+    q_tokens = [_grp_arabic_normalize(t) for t in q.split() if t.strip()] if q else []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        gn = (rd.get("group_name") or "").strip()
+        if gn not in visible:
+            continue
+        if sel_names and gn not in sel_names:
+            continue
+        teacher = (rd.get("teacher_name") or "").strip()
+        if sel_teachers and teacher not in sel_teachers:
+            continue
+        level = (rd.get("level_course") or "").strip()
+        if sel_levels and level not in sel_levels:
+            continue
+        gdays_raw = _extract_days_from_row(rd) or rd.get("study_days") or ""
+        gdays = set()
+        for tok in str(gdays_raw).replace("،", ",").replace("-", ",").split(","):
+            t = tok.strip()
+            if t: gdays.add(t)
+        if sel_days and not (gdays & sel_days):
+            continue
+        gtimes = set()
+        for col in ("study_time", "ramadan_time", "online_time"):
+            v = (rd.get(col) or "").strip()
+            if v: gtimes.add(v)
+        if sel_times and not (gtimes & sel_times):
+            continue
+        score = 0
+        if q_tokens:
+            blob = _grp_arabic_normalize(
+                gn + " " + teacher + " " + level + " " +
+                " ".join(gdays) + " " + " ".join(gtimes)
+            )
+            matches = sum(1 for t in q_tokens if t and t in blob)
+            if matches != len(q_tokens):
+                continue
+            score = matches
+        out.append({
+            "id":             rd.get("id"),
+            "group_name":     gn,
+            "teacher_name":   teacher,
+            "level":          level,
+            "study_days":     sorted(gdays),
+            "study_time":     (rd.get("study_time")   or "").strip(),
+            "ramadan_time":   (rd.get("ramadan_time") or "").strip(),
+            "online_time":    (rd.get("online_time")  or "").strip(),
+            "session_duration": (rd.get("session_duration") or "").strip(),
+            "student_count":  scount.get(gn, 0),
+            "_score":         score,
+        })
+    if q_tokens:
+        out.sort(key=lambda g: (-g["_score"], g["group_name"]))
+    else:
+        out.sort(key=lambda g: g["group_name"])
+    for g in out:
+        g.pop("_score", None)
+    return jsonify({"ok": True, "count": len(out), "groups": out})
+
+
 @app.route("/api/students", methods=["GET"])
 @login_required
 def api_students_get():
