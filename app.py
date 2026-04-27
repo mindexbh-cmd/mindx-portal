@@ -15192,15 +15192,13 @@ def api_groups_filters():
         if tn:  teachers_set.add(tn)
         gn = (r.get("group_name") or "").strip()
         if gn: names_set.add(gn)
-    try:
-        urows = db.execute(
-            "SELECT name FROM users WHERE LOWER(COALESCE(role,''))='teacher'"
-        ).fetchall()
-        for u in urows:
-            nm = (dict(u).get("name") or "").strip()
-            if nm: teachers_set.add(nm)
-    except Exception:
-        pass
+    # Intentionally NO augmentation from `users.name WHERE role='teacher'`.
+    # The previous augmentation would surface teacher names that exist in
+    # the users table but are not assigned as teacher_name on any group —
+    # picking such a chip option could never match a row, so the user
+    # would always see "لا توجد مجموعات مطابقة" for those teachers. The
+    # filter must only offer values that are guaranteed to round-trip,
+    # i.e. distinct values from student_groups.teacher_name itself.
     day_order = {d: i for i, d in enumerate(_GRP_AR_DAYS)}
     return jsonify({
         "ok": True,
