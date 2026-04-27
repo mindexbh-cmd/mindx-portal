@@ -15013,6 +15013,28 @@ def _grp_qs_list(name):
     return out
 
 
+# Canonical week order. Includes both الإثنين and الاثنين spellings —
+# both appear in real data and either should match.
+_GRP_AR_DAYS = ["السبت","الأحد","الإثنين","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"]
+
+
+def _grp_extract_days(text):
+    """Return the set of canonical day names found inside `text`.
+
+    Substring search instead of separator-tokenization because real
+    data uses every plausible separator: comma, Arabic comma, slash,
+    hyphen, the conjunction 'و', or just whitespace. Substring match
+    catches them all without us having to enumerate separators."""
+    if not text:
+        return set()
+    s = str(text)
+    out = set()
+    for d in _GRP_AR_DAYS:
+        if d and d in s:
+            out.add(d)
+    return out
+
+
 @app.route('/api/groups/search', methods=['GET'])
 @login_required
 def api_groups_search():
@@ -15027,6 +15049,22 @@ def api_groups_search():
     sel_levels   = set(_grp_qs_list("levels"))
     sel_teachers = set(_grp_qs_list("teachers"))
     q = (request.args.get("q") or "").strip()
+    # Tiny diagnostic log (one line per request) so failed searches
+    # can be traced without redeploying. Goes to stderr -> Render logs.
+    try:
+        import sys as _sys
+        _sys.stderr.write(
+            "[groups-search] user=" + str((user or {}).get("username") or "?") +
+            " role=" + str((user or {}).get("role") or "?") +
+            " days=" + str(sorted(sel_days)) +
+            " times=" + str(sorted(sel_times)) +
+            " names=" + str(sorted(sel_names)) +
+            " levels=" + str(sorted(sel_levels)) +
+            " teachers=" + str(sorted(sel_teachers)) +
+            " q=" + repr(q) + "\n"
+        )
+    except Exception:
+        pass
     visible = set(_grp_visible_for(db, user))
     try:
         rows = db.execute(
@@ -15064,11 +15102,11 @@ def api_groups_search():
         level = (rd.get("level_course") or "").strip()
         if sel_levels and level not in sel_levels:
             continue
+        # Day matching: substring search against the canonical week
+        # list so any separator format (/, و, comma, dash, whitespace)
+        # is accepted. Pre-computed via _grp_extract_days.
         gdays_raw = _extract_days_from_row(rd) or rd.get("study_days") or ""
-        gdays = set()
-        for tok in str(gdays_raw).replace("،", ",").replace("-", ",").split(","):
-            t = tok.strip()
-            if t: gdays.add(t)
+        gdays = _grp_extract_days(gdays_raw)
         if sel_days and not (gdays & sel_days):
             continue
         gtimes = set()
@@ -15106,6 +15144,11 @@ def api_groups_search():
         out.sort(key=lambda g: g["group_name"])
     for g in out:
         g.pop("_score", None)
+    try:
+        import sys as _sys
+        _sys.stderr.write("[groups-search] returned " + str(len(out)) + " group(s)\n")
+    except Exception:
+        pass
     return jsonify({"ok": True, "count": len(out), "groups": out})
 
 
@@ -15129,14 +15172,10 @@ def api_groups_filters():
     except Exception:
         rows = []
     rows = [dict(r) for r in rows if (dict(r).get("group_name") or "").strip() in visible]
-    AR_DAYS = ["السبت","الأحد","الإثنين","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"]
     days_set, times_set, levels_set, teachers_set, names_set = set(), set(), set(), set(), set()
     for r in rows:
         ds = _extract_days_from_row(r) or r.get("study_days") or ""
-        for tok in str(ds).replace("،", ",").replace("-", ",").split(","):
-            t = tok.strip()
-            if t and t in AR_DAYS:
-                days_set.add(t)
+        days_set |= _grp_extract_days(ds)
         for col in ("study_time", "ramadan_time", "online_time"):
             v = (r.get(col) or "").strip()
             if v: times_set.add(v)
@@ -15155,7 +15194,7 @@ def api_groups_filters():
             if nm: teachers_set.add(nm)
     except Exception:
         pass
-    day_order = {d: i for i, d in enumerate(AR_DAYS)}
+    day_order = {d: i for i, d in enumerate(_GRP_AR_DAYS)}
     return jsonify({
         "ok": True,
         "days":     sorted(days_set, key=lambda d: day_order.get(d, 99)),
