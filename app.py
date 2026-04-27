@@ -14981,28 +14981,38 @@ def _grp_norm(s):
     """Normalisation used SYMMETRICALLY on both sides of every
     facet/search comparison. Catches the prod-only mismatches that
     plain str.strip() misses:
-      - Unicode form: NFC-normalise so an Arabic value typed as
-        decomposed (ا + hamza-above U+0654) compares equal to its
-        precomposed form (أ U+0623).
-      - Extended whitespace: NBSP (U+00A0), tab/CR/LF, the bidi
-        marks U+200E/U+200F that often slip into copy-pasted Arabic.
-      - Zero-width characters U+200B..U+200D (zero-width space, ZWNJ,
-        ZWJ) which can hide inside cells imported from Excel/Word.
-    Symmetric: facet output and search comparison BOTH go through
-    this, so the dropdown shows the canonical form and a click always
-    round-trips. ASCII casefold for English level/teacher names so
-    'Bronze' == 'bronze' from typo'd seed data."""
+      - Unicode form: NFC-normalise so a value typed as decomposed
+        (ا + hamza-above U+0654) compares equal to its precomposed
+        form (أ U+0623).
+      - Extended whitespace: NBSP, tab/CR/LF, U+200E/U+200F bidi marks.
+      - Zero-width chars U+200B..U+200D, U+FEFF (BOM).
+      - **Arabic spelling variants** that real human data entry
+        produces — stored values often mix أ/إ/آ/ا for the same
+        word, or ة vs ه, or ى vs ي. Fold all of these to a single
+        canonical form for comparison purposes only — the facet
+        endpoint still RETURNS each distinct stored value to the
+        dropdown, so the user picks what they actually see; the
+        comparison treats the variants as equal.
+    Symmetric: facet output (after .strip) AND search comparison
+    BOTH go through this, so the dropdown shows the form the data
+    holds, and a click always round-trips even if other rows store
+    the same word with a different spelling."""
     if s is None:
         return ""
     import unicodedata as _u
     out = _u.normalize("NFC", str(s))
-    # Drop bidi/zero-width marks that humans can't see but bytes-equal cares about.
+    # Drop bidi/zero-width marks.
     drop = {0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0xFEFF}
     out = "".join(c for c in out if ord(c) not in drop)
-    # Treat NBSP and other unicode whitespace as plain space, then collapse
-    # whitespace runs and strip ends.
+    # Treat NBSP / unicode whitespace as plain space; collapse runs.
     out = "".join(" " if (c.isspace() or ord(c) == 0x00A0) else c for c in out)
     out = " ".join(out.split())
+    # Arabic fold: alef variants → ا, ى → ي, ة → ه, strip diacritics.
+    # Use translate for speed.
+    _AR_FOLD = {ord("أ"): "ا", ord("إ"): "ا", ord("آ"): "ا",
+                ord("ى"): "ي", ord("ة"): "ه"}
+    out = out.translate(_AR_FOLD)
+    out = "".join(c for c in out if not (0x064B <= ord(c) <= 0x0652))
     return out.casefold()
 
 
@@ -15047,14 +15057,19 @@ def _grp_extract_days(text):
 
     Substring search instead of separator-tokenization because real
     data uses every plausible separator: comma, Arabic comma, slash,
-    hyphen, the conjunction 'و', or just whitespace. Substring match
-    catches them all without us having to enumerate separators."""
+    hyphen, the conjunction 'و', or just whitespace.
+
+    Match is done on the Arabic-folded form of BOTH sides so a stored
+    'الاحد' (plain alef) still maps to the canonical 'الأحد' (alef
+    with hamza). The set we RETURN holds canonical day names so the
+    facet endpoint always emits the standard spelling regardless of
+    what's stored."""
     if not text:
         return set()
-    s = str(text)
+    s_n = _grp_norm(str(text))
     out = set()
     for d in _GRP_AR_DAYS:
-        if d and d in s:
+        if d and _grp_norm(d) in s_n:
             out.add(d)
     return out
 
