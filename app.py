@@ -13003,26 +13003,64 @@ function renderAttendanceTable(data) {
     applyFreezeToTable('attendance');
     return;
   }
+  function _attEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var fields = ['attendance_date','day_name','group_name','student_name','contact_number','status','message','message_status','study_status'];
   var html = '';
   for(var i=0; i<data.length; i++) {
     var r = data[i];
     html += '<tr>';
     html += '<td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="' + r.id + '" onclick="_bulkUpdate(\\'attendanceBody\\',\\'selectAll_attendance\\',\\'bulkDelBtn_attendance\\')"></td>';
     html += '<td>' + (i+1) + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="attendance_date" onclick="editAttendanceCellEl(this)">' + (r.attendance_date||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="day_name" onclick="editAttendanceCellEl(this)">' + (r.day_name||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="group_name" onclick="editAttendanceCellEl(this)">' + (r.group_name||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="student_name" onclick="editAttendanceCellEl(this)">' + (r.student_name||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="contact_number" onclick="editAttendanceCellEl(this)">' + (r.contact_number||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="status" onclick="editAttendanceCellEl(this)">' + (r.status||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="message" onclick="editAttendanceCellEl(this)">' + (r.message||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="message_status" onclick="editAttendanceCellEl(this)">' + (r.message_status||'') + '</td>';
-    html += '<td class="editable" data-id="' + r.id + '" data-field="study_status" onclick="editAttendanceCellEl(this)">' + (r.study_status||'') + '</td>';
+    for (var f=0; f<fields.length; f++){
+      var fld = fields[f];
+      html += '<td class="editable" contenteditable="true" data-id="' + r.id + '" data-field="' + fld + '" style="padding:8px;min-width:80px;">' + _attEsc(r[fld]||'') + '</td>';
+    }
     html += '<td><button class="btn-del-row" onclick="openAttendanceConfirm(' + r.id + ')">&#128465;</button></td>';
     html += '</tr>';
   }
   tbody.innerHTML = html;
+  tbody.querySelectorAll('.editable[data-field]').forEach(function(td){
+    td.addEventListener('blur', function(){
+      saveAttendanceCell(parseInt(this.dataset.id), this.dataset.field, this);
+    });
+  });
   applyFreezeToTable('attendance');
+}
+
+function saveAttendanceCell(id, field, el) {
+  var val = el.innerText.trim();
+  var rec = null;
+  for (var i=0; i<allAttendance.length; i++) { if (allAttendance[i].id === id) { rec = allAttendance[i]; break; } }
+  if (!rec) return;
+  var oldVal = rec[field] == null ? "" : String(rec[field]);
+  if (val === oldVal) return;
+  var updated = Object.assign({}, rec);
+  updated[field] = val;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, false); }
+  fetch('/api/attendance/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.ok === false) {
+        showToast(j.error || 'حدث خطأ', '#e53935');
+        el.innerText = oldVal;
+        _flashErr();
+        return;
+      }
+      rec[field] = val;
+      /* Server normalises status/date values; reflect the canonical
+         form back into the cell + cache so subsequent blurs see the
+         server's stored value, not the user's pre-normalisation text. */
+      if (j && typeof j === 'object' && j.row && j.row[field] != null) {
+        var canon = String(j.row[field]);
+        if (canon !== val) { el.innerText = canon; rec[field] = canon; }
+      }
+      _flashOk();
+    }).catch(function(){
+      el.innerText = oldVal;
+      _flashErr();
+      showToast('خطأ في الاتصال', '#e53935');
+    });
 }
 function filterAttendanceTable() {
   var q = document.getElementById('attendanceSearchInput').value.toLowerCase();
@@ -23293,7 +23331,11 @@ def api_attendance_update(rid):
     db = get_db()
     try:
         _attendance_dynamic_update(db, rid, body)
-        return jsonify({"ok": True})
+        # Echo the post-normalisation row so per-cell editors can sync
+        # the canonical value (status remap, ISO date, trimmed names)
+        # back into the cell without a full table reload.
+        row = db.execute("SELECT * FROM attendance WHERE id=?", (rid,)).fetchone()
+        return jsonify({"ok": True, "row": dict(row) if row else None})
     except Exception as ex:
         try: db.rollback()
         except Exception: pass
