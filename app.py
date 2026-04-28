@@ -9300,6 +9300,16 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
     </div>
     <div style="overflow:auto;flex:1;background:#fafafa;">
 
+      <!-- Anomaly block (additive) — groups recorded on a day that's
+           not in their schedule. Renders ABOVE the summary block so
+           the alert surfaces first. -->
+      <div id="almAnomalyBlock" style="background:#fff;border-bottom:1px solid #e0e0e0;padding:12px 16px;display:none;">
+        <div style="font-weight:800;color:#bf360c;margin-bottom:10px;font-size:0.98rem;">
+          &#x26A0;&#xFE0F; تنبيهات يوم تسجيل الحضور
+        </div>
+        <div id="almAnomalyContent" style="font-size:0.92rem;color:#5d4037;"></div>
+      </div>
+
       <!-- Summary block (additive) — groups scheduled today + recording status. -->
       <div id="almSummaryBlock" style="background:#fff;border-bottom:1px solid #e0e0e0;padding:12px 16px;display:none;">
         <div style="font-weight:800;color:#5d4037;margin-bottom:10px;font-size:0.98rem;">
@@ -9340,7 +9350,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         </table>
       </div>
 
-      <!-- Mobile-friendly inline CSS for the summary list rows. -->
+      <!-- Mobile-friendly inline CSS for the summary + anomaly list rows. -->
       <style>
         .alm-sum-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:0.92rem;flex-wrap:wrap;}
         .alm-sum-row.recorded{background:#e8f5e9;border:1px solid #a5d6a7;}
@@ -9350,10 +9360,21 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         .alm-sum-row .meta{font-size:0.85rem;color:#5d4037;display:flex;gap:10px;flex-wrap:wrap;}
         .alm-sum-row.recorded .meta{color:#1b5e20;}
         .alm-sum-row.pending  .meta{color:#bf360c;font-weight:700;}
+        /* Anomaly list — soft amber, distinct from the green/orange
+           summary chips so it reads as "heads up" not "error". */
+        .alm-anom-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:0.92rem;flex-wrap:wrap;background:#fff8e1;border:1.5px solid #ffd54f;margin-bottom:6px;}
+        .alm-anom-row .icon{font-size:1.1rem;line-height:1;}
+        .alm-anom-row .nm{font-weight:800;color:#4e342e;flex:1;min-width:150px;}
+        .alm-anom-row .meta{font-size:0.85rem;color:#6d4c41;display:flex;gap:10px;flex-wrap:wrap;}
+        .alm-anom-row .pill{background:rgba(255,143,0,.16);color:#bf360c;padding:1px 8px;border-radius:999px;font-weight:700;}
+        .alm-anom-clear{font-size:0.88rem;color:#1b5e20;background:#e8f5e9;border:1px solid #a5d6a7;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;}
         @media (max-width:680px){
           .alm-sum-row{padding:8px 10px;font-size:0.88rem;}
           .alm-sum-row .nm{flex:1 1 100%;}
           .alm-sum-row .meta{font-size:0.82rem;}
+          .alm-anom-row{padding:8px 10px;font-size:0.88rem;}
+          .alm-anom-row .nm{flex:1 1 100%;}
+          .alm-anom-row .meta{font-size:0.82rem;}
         }
       </style>
     </div>
@@ -10237,13 +10258,19 @@ function almOpen() {
   document.getElementById('almDateLabel').textContent = date;
   document.getElementById('almSummary').textContent = 'جاري التحميل...';
   document.getElementById('almTableBody').innerHTML = '<tr><td colspan="11" class="empty-state">جاري التحميل...</td></tr>';
-  /* Reset the additive summary block; the parallel summary fetch
-     below populates it. The block stays hidden until the response
-     arrives so it doesn't flash an empty state. */
+  /* Reset the additive summary + anomaly blocks; the parallel
+     summary fetch below populates both. They stay hidden until the
+     response arrives so neither flashes an empty state. */
   var sumBlock = document.getElementById('almSummaryBlock');
   if (sumBlock){
     sumBlock.style.display = 'none';
     document.getElementById('almSumList').innerHTML = '';
+  }
+  var anomBlock = document.getElementById('almAnomalyBlock');
+  if (anomBlock){
+    anomBlock.style.display = 'none';
+    var ac = document.getElementById('almAnomalyContent');
+    if (ac) ac.innerHTML = '';
   }
   document.getElementById('almModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -10303,17 +10330,27 @@ function almOpen() {
 function almLoadSummary(date){
   /* Populate the additive summary block — groups scheduled today
      plus their recording status. Pure additive: the existing
-     absentees list below is untouched. */
+     absentees list below is untouched. ALSO populates the anomaly
+     block (groups that recorded attendance on a non-scheduled day)
+     from the same response — one fetch, two adjacent UI sections. */
   var box = document.getElementById('almSummaryBlock');
   var list = document.getElementById('almSumList');
+  var anomBox = document.getElementById('almAnomalyBlock');
+  var anomContent = document.getElementById('almAnomalyContent');
   if (!box || !list) return;
   list.innerHTML = '<div style="color:#888;padding:6px 4px;font-size:0.88rem;">جاري التحميل...</div>';
   box.style.display = 'block';
+  if (anomBox && anomContent){
+    anomBox.style.display = 'block';
+    anomContent.innerHTML = '<div style="color:#888;font-size:0.88rem;">جاري الفحص...</div>';
+  }
+  function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   fetch('/api/attendance/by-date-summary?date=' + encodeURIComponent(date), {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d || !d.ok){
         list.innerHTML = '<div style="color:#c62828;padding:6px 4px;font-size:0.88rem;">تعذر تحميل الملخص</div>';
+        if (anomContent) anomContent.innerHTML = '<div style="color:#c62828;font-size:0.88rem;">تعذر فحص التنبيهات</div>';
         return;
       }
       document.getElementById('almSumDate').textContent = d.date || date;
@@ -10322,6 +10359,47 @@ function almLoadSummary(date){
       document.getElementById('almSumTotal').textContent    = t.scheduled || 0;
       document.getElementById('almSumRecorded').textContent = t.recorded || 0;
       document.getElementById('almSumPending').textContent  = t.not_recorded || 0;
+      /* === Anomaly block === */
+      if (anomContent){
+        var anomalies = d.anomalies || [];
+        if (!anomalies.length){
+          anomContent.innerHTML =
+            '<div class="alm-anom-clear">'
+          +   '<span>✅</span>'
+          +   '<span>لا توجد تنبيهات — كل المجموعات المسجَّلة في يومها الصحيح.</span>'
+          + '</div>';
+        } else {
+          var ahtml = '';
+          for (var ai=0; ai<anomalies.length; ai++){
+            var an = anomalies[ai];
+            var anNm = _esc(an.name || '');
+            if (an.reason === 'missing_group'){
+              /* Attendance recorded for a name that no longer exists in
+                 student_groups. Different shape — surface as a heads-up. */
+              ahtml += '<div class="alm-anom-row">'
+                    +   '<span class="icon">⚠️</span>'
+                    +   '<span class="nm">' + anNm + '</span>'
+                    +   '<span class="meta">'
+                    +     '<span>هذه المجموعة غير موجودة في جدول المجموعات (ربما حُذفت أو أُعيدت تسميتها)</span>'
+                    +     '<span class="pill">سجلات: ' + (an.total||0) + '</span>'
+                    +   '</span>'
+                    + '</div>';
+            } else {
+              ahtml += '<div class="alm-anom-row">'
+                    +   '<span class="icon">⚠️</span>'
+                    +   '<span class="nm">' + anNm + '</span>'
+                    +   '<span class="meta">'
+                    +     '<span>هذه المجموعة لا تجتمع يوم <b>' + _esc(an.selected_day || d.day || '') + '</b></span>'
+                    +     '<span>الأيام المجدولة: <b>' + (_esc(an.scheduled_days || '') || '—') + '</b></span>'
+                    +     '<span class="pill">قد يكون خطأ إدخال — راجع التاريخ</span>'
+                    +   '</span>'
+                    + '</div>';
+            }
+          }
+          anomContent.innerHTML = ahtml;
+        }
+      }
+      /* === Summary block === */
       var groups = d.groups || [];
       if (!groups.length){
         list.innerHTML = '<div style="color:#777;padding:8px 4px;font-size:0.92rem;">لا توجد مجموعات مجدولة في هذا اليوم ضمن وضع المركز الحالي.</div>';
@@ -10330,9 +10408,9 @@ function almLoadSummary(date){
       var html = '';
       for (var i=0; i<groups.length; i++){
         var g = groups[i];
-        var nm = (g.name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        var teacher = g.teacher ? ' · المدرّسة: ' + g.teacher.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
-        var sched   = g.schedule_time ? ' · ' + g.schedule_time.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        var nm = _esc(g.name || '');
+        var teacher = g.teacher ? ' · المدرّسة: ' + _esc(g.teacher) : '';
+        var sched   = g.schedule_time ? ' · ' + _esc(g.schedule_time) : '';
         if (g.recorded){
           html += '<div class="alm-sum-row recorded">'
                +   '<span class="icon">✅</span>'
@@ -10360,6 +10438,7 @@ function almLoadSummary(date){
     })
     .catch(function(){
       list.innerHTML = '<div style="color:#c62828;padding:6px 4px;font-size:0.88rem;">تعذر تحميل الملخص</div>';
+      if (anomContent) anomContent.innerHTML = '<div style="color:#c62828;font-size:0.88rem;">تعذر فحص التنبيهات</div>';
     });
 }
 function almClose() {
@@ -23890,6 +23969,59 @@ def api_attendance_by_date_summary():
             "late":          rc["late"],
         })
 
+    # ── Anomaly detection (additive) ────────────────────────────────
+    # A group is "anomalous" on this date when attendance was recorded
+    # for it BUT the date's day-of-week is not in its scheduled days.
+    # Catches data-entry mistakes like recording الإثنين attendance on
+    # a Sunday. Reuses the same _grp_extract_days helper the schedule
+    # match above uses, so what counts as "scheduled days" for a group
+    # is identical to what the summary block considers scheduled.
+    #
+    # The schema only carries study_days (online_days was dropped in
+    # the 2026-Q1 cleanup, ramadan_days never existed) so the day set
+    # is the same regardless of mode — only the *time* column differs
+    # per mode. Mode-exception groups: if the group is overridden to
+    # a mode that ISN'T the active one, we still flag wrong-day
+    # records for it, so an admin can spot stale records left over
+    # from before the override flipped.
+    group_index = {}  # gname → study_days raw
+    try:
+        idx_rows = db.execute(
+            "SELECT group_name, study_days FROM student_groups"
+        ).fetchall()
+        for r in idx_rows:
+            rd = dict(r)
+            gn = (rd.get("group_name") or "").strip()
+            if gn:
+                group_index[gn] = (rd.get("study_days") or "").strip()
+    except Exception:
+        pass
+
+    anomalies = []
+    for gname in sorted(rec.keys()):
+        if gname not in group_index:
+            # Attendance was recorded for a group that no longer
+            # exists in student_groups (renamed / deleted). That's a
+            # different anomaly — surface it so the admin notices.
+            anomalies.append({
+                "name":           gname,
+                "scheduled_days": "",
+                "selected_day":   target_day,
+                "reason":         "missing_group",
+                "total":          rec[gname]["total"],
+            })
+            continue
+        days_raw = group_index[gname]
+        days_set = _grp_extract_days(days_raw)
+        if target_day and target_day not in days_set:
+            anomalies.append({
+                "name":           gname,
+                "scheduled_days": days_raw,
+                "selected_day":   target_day,
+                "reason":         "wrong_day",
+                "total":          rec[gname]["total"],
+            })
+
     return jsonify({
         "ok": True,
         "date": iso,
@@ -23901,6 +24033,7 @@ def api_attendance_by_date_summary():
             "recorded":     sum(1 for g in out if g["recorded"]),
             "not_recorded": sum(1 for g in out if not g["recorded"]),
         },
+        "anomalies": anomalies,
     })
 
 
