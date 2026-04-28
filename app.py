@@ -23262,14 +23262,23 @@ def api_teacher_students():
     if has_online:
         where = '"' + in_col + '" = ? OR "' + online_col + '" = ?'
         params = (group, group)
-    # Restrict to actively-registered students. The teacher attendance
-    # flow should never show students whose registration_term2_2026
-    # (or whatever settings.students.active_column points at) is empty
-    # / not the configured active value. The filter is identical to
-    # what /api/groups-students already uses on the admin side.
-    act_frag, act_val = _active_students_filter()
-    if act_frag:
-        where = '(' + where + ') AND ' + act_frag
+    # Restrict to actively-registered students. Defensive: don't rely on
+    # _active_students_filter() returning a usable fragment — if the
+    # admin has cleared either setting (or get_setting returns the
+    # default but the helper's column-existence check trips on a quirk),
+    # we still want this gate ON. The teacher attendance flow MUST
+    # never show unregistered students. So we resolve the column +
+    # value here directly, fall back to the canonical defaults if the
+    # settings are missing/blank, and only skip if the column itself
+    # doesn't physically exist on the live `students` table.
+    act_col = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
+              or 'registration_term2_2026'
+    act_val = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
+              or 'تم التسجيل'
+    if not _is_safe_ident(act_col):
+        act_col = 'registration_term2_2026'
+    if act_col in live:
+        where = '(' + where + ') AND TRIM(COALESCE("' + act_col + '", \'\')) = ?'
         params = tuple(list(params) + [act_val])
     try:
         rows = db.execute(
@@ -23599,21 +23608,26 @@ def api_attendance_by_date_group():
     )
     # Active-only filter (رصد الغياب per-group + جميع المجموعات unified
     # list + the absence-messaging modal all consume this endpoint and
-    # should never surface unregistered students). Same column +
-    # active value the admin /api/groups-students endpoint uses, so a
-    # /settings change of active_column / active_value reaches both
-    # surfaces. ?include_inactive=1 opts out for audit / debugging.
-    act_frag, act_val = _active_students_filter()
+    # should never surface unregistered students). Defensive: resolve
+    # the column + value here directly with hardcoded fallbacks so a
+    # cleared /settings entry never silently disables the gate.
+    # ?include_inactive=1 opts out for audit / debugging.
     extra_filter = ''
     extra_params = ()
-    if act_frag and not include_inactive:
-        # Re-target the column reference at the joined alias `s.<col>`.
-        # Pull the column name back out of the helper's fragment
-        # (format is "TRIM(<col>) = ?") so we don't have to duplicate
-        # the get_setting() lookup here.
-        col_name = act_frag.replace("TRIM(", "", 1).split(")")[0]
-        extra_filter = " AND TRIM(COALESCE(s.\"" + col_name + "\",'')) = ?"
-        extra_params = (act_val,)
+    if not include_inactive:
+        act_col = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
+                  or 'registration_term2_2026'
+        act_val = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
+                  or 'تم التسجيل'
+        if not _is_safe_ident(act_col):
+            act_col = 'registration_term2_2026'
+        try:
+            _live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+        except Exception:
+            _live = set()
+        if act_col in _live:
+            extra_filter = " AND TRIM(COALESCE(s.\"" + act_col + "\",'')) = ?"
+            extra_params = (act_val,)
     # Cap the result so "all dates + all groups" doesn't ship the entire
     # attendance history in one response.
     tail = " ORDER BY a.attendance_date DESC, a.group_name, a.student_name LIMIT 1000"
