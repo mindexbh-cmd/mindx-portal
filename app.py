@@ -12395,6 +12395,7 @@ function renderEvalsTable(list){
     applyFreezeToTable('evals');
     return;
   }
+  function _evEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   var html = '';
   for(var i=0;i<list.length;i++){
     var r = list[i];
@@ -12402,13 +12403,47 @@ function renderEvalsTable(list){
     for(var j=0;j<allEvalColumns.length;j++){
       var key = allEvalColumns[j].col_key;
       var val = r[key];
-      if(key==='student_name'){ html += '<td style="font-weight:600;color:#1565C0;text-align:right;">'+(val||'-')+'</td>'; }
-      else { html += '<td>'+(val==null||val===''?'-':val)+'</td>'; }
+      var disp = (val == null || val === '') ? '' : String(val);
+      var extra = (key === 'student_name') ? 'font-weight:600;color:#1565C0;text-align:right;' : '';
+      html += '<td class="editable" contenteditable="true" data-id="'+r.id+'" data-field="'+key+'" style="padding:8px;min-width:80px;'+extra+'">'+_evEsc(disp)+'</td>';
     }
     html += '<td><button class="action-btn btn-edit" style="color:#1565C0;" onclick="openEvalEdit('+r.id+')">\u062a\u0639\u062f\u064a\u0644</button><button class="action-btn btn-del" onclick="askEvalDelete('+r.id+')">\u062d\u0630\u0641</button></td></tr>';
   }
   body.innerHTML = html;
+  body.querySelectorAll('.editable[data-field]').forEach(function(td){
+    td.addEventListener('blur', function(){
+      saveEvalCell(parseInt(this.dataset.id), this.dataset.field, this);
+    });
+  });
   applyFreezeToTable('evals');
+}
+
+function saveEvalCell(id, field, el){
+  var val = el.innerText.trim();
+  var rec = null;
+  for (var i=0; i<allEvals.length; i++) { if (allEvals[i].id === id) { rec = allEvals[i]; break; } }
+  if (!rec) return;
+  var oldVal = rec[field] == null ? "" : String(rec[field]);
+  if (val === oldVal) return;
+  var body = {}; body[field] = val;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, false); }
+  fetch('/api/evaluations/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body)})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.ok === false) {
+        showToast(j.error || '\u062d\u062f\u062b \u062e\u0637\u0623', '#e53935');
+        el.innerText = oldVal;
+        _flashErr();
+        return;
+      }
+      rec[field] = val;
+      _flashOk();
+    }).catch(function(){
+      el.innerText = oldVal;
+      _flashErr();
+      showToast('\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644', '#e53935');
+    });
 }
 function filterEvalsTable(){
   var q = (document.getElementById('evalsSearchInput').value || '').toLowerCase();
