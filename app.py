@@ -15957,6 +15957,267 @@ def _perm_count_admins(db, exclude_id=None):
         return 0
 
 
+# ── /admin/permissions HTML (read-only at this commit) ──────────
+# Edit-mode wiring lands in commits 4-5/6. The page is purely
+# additive — it doesn't modify any other admin page.
+ADMIN_PERMISSIONS_HTML = """<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إدارة الصلاحيات — Mindex</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+body{background:linear-gradient(135deg,#f3eeff 0%,#e8f8fb 100%);min-height:100vh;color:#212121;direction:rtl;}
+.pp-top{background:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;
+        box-shadow:0 2px 8px rgba(107,63,160,.12);position:sticky;top:0;z-index:10;}
+.pp-top h1{font-size:1.1rem;color:#4A148C;font-weight:800;}
+.pp-back{margin-right:auto;background:#f3e5f5;color:#4a148c;padding:8px 14px;
+         border-radius:9px;text-decoration:none;font-weight:700;font-size:0.9rem;}
+.pp-filters{padding:18px 20px 0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.pp-filters input,.pp-filters select{
+  background:#fff;border:1.5px solid #d8c9eb;border-radius:11px;
+  padding:10px 14px;font-size:0.96rem;font-family:inherit;color:#212121;
+  box-shadow:0 2px 6px rgba(107,63,160,.08);}
+.pp-filters input:focus,.pp-filters select:focus{outline:2px solid #6B3FA0;}
+.pp-filters input{flex:1;min-width:200px;}
+.pp-filters select{min-width:160px;}
+.pp-stat{padding:8px 14px;background:#fff;border-radius:11px;font-weight:700;font-size:0.86rem;
+         color:#4A148C;border:1.5px solid #e8d9f5;}
+.pp-main{padding:20px;display:grid;grid-template-columns:1.2fr 1fr;gap:18px;align-items:start;}
+@media (max-width:980px){.pp-main{grid-template-columns:1fr;}}
+.pp-card{background:#fff;border-radius:16px;padding:18px;
+         box-shadow:0 4px 16px rgba(107,63,160,.10);}
+.pp-card h3{font-size:1rem;color:#4A148C;margin-bottom:12px;font-weight:800;}
+.pp-utbl{width:100%;border-collapse:collapse;font-size:0.92rem;}
+.pp-utbl thead th{background:#f3e5f5;color:#4A148C;padding:10px 8px;
+                  font-weight:800;text-align:right;font-size:0.86rem;}
+.pp-utbl tbody td{padding:10px 8px;border-bottom:1px solid #f0e8f7;}
+.pp-utbl tbody tr{cursor:pointer;transition:background .15s;}
+.pp-utbl tbody tr:hover{background:#fafafa;}
+.pp-utbl tbody tr.pp-active{background:#ede7f6;}
+.pp-pill{display:inline-block;padding:3px 9px;border-radius:9px;font-size:0.78rem;font-weight:800;}
+.pp-pill-active{background:#e8f5e9;color:#1b5e20;}
+.pp-pill-disabled{background:#ffebee;color:#b71c1c;}
+.pp-role{padding:3px 9px;border-radius:9px;font-size:0.8rem;font-weight:800;}
+.pp-r-admin{background:#fce4ec;color:#880e4f;}
+.pp-r-manager{background:#fff3e0;color:#bf360c;}
+.pp-r-teacher{background:#e3f2fd;color:#0d47a1;}
+.pp-r-reception{background:#f3e5f5;color:#4a148c;}
+.pp-r-student{background:#e0f7fa;color:#006064;}
+.pp-r-parent{background:#fff8e1;color:#5d4037;}
+.pp-detail-empty{text-align:center;color:#8a8a8a;padding:40px 20px;font-style:italic;}
+.pp-info-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:0.94rem;margin-bottom:18px;}
+.pp-info-grid b{color:#4A148C;font-weight:800;}
+.pp-bgroup{margin-bottom:14px;}
+.pp-bgroup-title{font-size:0.92rem;font-weight:800;color:#4A148C;
+                 border-bottom:1.5px solid #e8d9f5;padding-bottom:6px;margin-bottom:8px;}
+.pp-brow{display:flex;align-items:center;justify-content:space-between;padding:8px 6px;
+         border-bottom:1px solid #f5edfa;font-size:0.92rem;}
+.pp-brow:last-child{border-bottom:none;}
+.pp-bvis{font-weight:700;font-size:0.84rem;padding:3px 9px;border-radius:8px;}
+.pp-bvis-on{background:#e8f5e9;color:#1b5e20;}
+.pp-bvis-off{background:#ffebee;color:#b71c1c;}
+.pp-bovr{font-size:0.74rem;color:#bf360c;font-weight:800;margin-inline-start:6px;}
+.pp-loading{padding:24px;text-align:center;color:#8a8a8a;}
+.pp-count{font-size:0.78rem;font-weight:800;color:#fff;background:#bf360c;
+          padding:2px 8px;border-radius:9px;margin-inline-start:6px;}
+code{font-family:'Consolas','Courier New',monospace;background:#f6f1fb;padding:1px 6px;
+     border-radius:6px;font-size:0.86rem;color:#4a148c;}
+</style>
+</head>
+<body>
+<div class="pp-top">
+  <h1>🛡️ إدارة الصلاحيات</h1>
+  <a href="/dashboard" class="pp-back">← العودة إلى الرئيسية</a>
+</div>
+
+<div class="pp-filters">
+  <input type="text" id="pp-q" placeholder="ابحث عن مستخدم (الاسم أو اسم المستخدم)">
+  <select id="pp-role">
+    <option value="">جميع الأدوار</option>
+  </select>
+  <span class="pp-stat" id="pp-stat">…</span>
+</div>
+
+<div class="pp-main">
+  <div class="pp-card">
+    <h3>قائمة المستخدمين</h3>
+    <div id="pp-utbl-wrap">
+      <table class="pp-utbl"><thead><tr>
+        <th>الاسم</th>
+        <th>اسم المستخدم</th>
+        <th>الدور</th>
+        <th>المخفية</th>
+        <th>الحالة</th>
+      </tr></thead><tbody id="pp-utbody">
+        <tr><td colspan="5" class="pp-loading">جاري التحميل…</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div class="pp-card" id="pp-detail">
+    <div class="pp-detail-empty">اختر مستخدماً من القائمة لعرض تفاصيله</div>
+  </div>
+</div>
+
+<script>
+const PP_ROLE_LABELS = {admin:'مدير عام', manager:'مدير مساعد', teacher:'معلم',
+                        reception:'استقبال', student:'طالب', parent:'ولي أمر'};
+const PP_LANDING_LABELS = {'':'افتراضي حسب الدور', dashboard:'الداشبورد',
+                           teacher_hub:'منصة المعلم', parent_hub:'منصة ولي الأمر',
+                           parent_v1:'منصة ولي الأمر V1', student_portal:'منصة الطالب'};
+const PP_GROUP_ORDER = ['sidebar','dashboard','attendance','database','groups','settings'];
+const PP_GROUP_LABELS = {sidebar:'الشريط الجانبي', dashboard:'الداشبورد',
+                         attendance:'الحضور', database:'قاعدة البيانات',
+                         groups:'المجموعات', settings:'الإعدادات', other:'أخرى'};
+let _PP_USERS = [];
+let _PP_SELECTED = null;
+
+function _ppEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function ppLoadUsers(){
+  let r;
+  try { r = await fetch('/api/admin/users', {credentials:'same-origin'}); }
+  catch (e){
+    document.getElementById('pp-utbody').innerHTML =
+      '<tr><td colspan="5" class="pp-loading">تعذّر الاتصال بالخادم</td></tr>';
+    return;
+  }
+  if (!r.ok){
+    document.getElementById('pp-utbody').innerHTML =
+      '<tr><td colspan="5" class="pp-loading">تعذّر تحميل القائمة (HTTP '+r.status+')</td></tr>';
+    return;
+  }
+  const d = await r.json();
+  _PP_USERS = d.users || [];
+  const sel = document.getElementById('pp-role');
+  for (const role of (d.roles || [])){
+    const o = document.createElement('option');
+    o.value = role; o.textContent = PP_ROLE_LABELS[role] || role;
+    sel.appendChild(o);
+  }
+  ppRender();
+}
+
+function ppRender(){
+  const q = (document.getElementById('pp-q').value || '').trim().toLowerCase();
+  const filterRole = document.getElementById('pp-role').value;
+  let rows = _PP_USERS.slice();
+  if (q){
+    rows = rows.filter(u => (u.name||'').toLowerCase().includes(q) ||
+                            (u.username||'').toLowerCase().includes(q));
+  }
+  if (filterRole){ rows = rows.filter(u => (u.role||'') === filterRole); }
+  const tbody = document.getElementById('pp-utbody');
+  if (rows.length === 0){
+    tbody.innerHTML = '<tr><td colspan="5" class="pp-loading">لا توجد نتائج مطابقة</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(u => {
+      const roleLabel = PP_ROLE_LABELS[u.role] || u.role || '—';
+      const roleClass = 'pp-r-' + (u.role || 'na');
+      const activePill = u.is_active
+        ? '<span class="pp-pill pp-pill-active">نشط</span>'
+        : '<span class="pp-pill pp-pill-disabled">معطّل</span>';
+      const hiddenBadge = (u.hidden_button_count > 0)
+        ? '<span class="pp-count">'+u.hidden_button_count+'</span>'
+        : '<span style="color:#8a8a8a;">—</span>';
+      const cls = (_PP_SELECTED === u.id) ? 'pp-active' : '';
+      return '<tr class="'+cls+'" onclick="ppSelectUser('+u.id+')">'+
+        '<td>'+_ppEsc(u.name || '—')+'</td>'+
+        '<td><code>'+_ppEsc(u.username)+'</code></td>'+
+        '<td><span class="pp-role '+roleClass+'">'+_ppEsc(roleLabel)+'</span></td>'+
+        '<td>'+hiddenBadge+'</td>'+
+        '<td>'+activePill+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+  document.getElementById('pp-stat').textContent =
+    'العدد: '+rows.length+' / '+_PP_USERS.length;
+}
+
+async function ppSelectUser(uid){
+  _PP_SELECTED = uid;
+  ppRender();
+  const detail = document.getElementById('pp-detail');
+  detail.innerHTML = '<div class="pp-loading">جاري تحميل التفاصيل…</div>';
+  let r;
+  try { r = await fetch('/api/admin/users/'+uid+'/permissions',
+                          {credentials:'same-origin'}); }
+  catch (e){
+    detail.innerHTML = '<div class="pp-loading">تعذّر الاتصال بالخادم</div>';
+    return;
+  }
+  if (!r.ok){
+    detail.innerHTML = '<div class="pp-loading">تعذّر تحميل التفاصيل (HTTP '+r.status+')</div>';
+    return;
+  }
+  const d = await r.json();
+  ppRenderDetail(d);
+}
+
+function ppRenderDetail(d){
+  const u = d.user || {};
+  const detail = document.getElementById('pp-detail');
+  const groups = {};
+  for (const b of (d.buttons || [])){
+    const g = b.page_slug || 'other';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(b);
+  }
+  let html = '<h3>تفاصيل المستخدم</h3>';
+  html += '<div class="pp-info-grid">';
+  html += '<b>الاسم:</b><span>'+_ppEsc(u.name || '—')+'</span>';
+  html += '<b>اسم المستخدم:</b><span><code>'+_ppEsc(u.username)+'</code></span>';
+  html += '<b>الدور:</b><span>'+_ppEsc(PP_ROLE_LABELS[u.role] || u.role || '—')+'</span>';
+  html += '<b>الصفحة الرئيسية:</b><span>'+_ppEsc(PP_LANDING_LABELS[u.landing_page||''] || u.landing_page)+'</span>';
+  html += '<b>الحالة:</b><span>'+(u.is_active ? 'نشط' : 'معطّل')+'</span>';
+  html += '</div>';
+  html += '<h3>الأزرار والصلاحيات</h3>';
+  const rendered = new Set();
+  for (const g of PP_GROUP_ORDER){
+    if (!groups[g]) continue;
+    rendered.add(g);
+    html += _ppRenderGroup(PP_GROUP_LABELS[g] || g, groups[g]);
+  }
+  for (const g of Object.keys(groups)){
+    if (rendered.has(g)) continue;
+    html += _ppRenderGroup(PP_GROUP_LABELS[g] || g, groups[g]);
+  }
+  detail.innerHTML = html;
+}
+
+function _ppRenderGroup(title, items){
+  let s = '<div class="pp-bgroup">';
+  s += '<div class="pp-bgroup-title">'+_ppEsc(title)+'</div>';
+  for (const b of items){
+    const visClass = b.is_visible ? 'pp-bvis-on' : 'pp-bvis-off';
+    const visTxt   = b.is_visible ? '✓ ظاهر' : '✗ مخفي';
+    const ovr      = b.has_override ? '<span class="pp-bovr">(مخصّص)</span>' : '';
+    s += '<div class="pp-brow"><span>'+_ppEsc(b.button_label_ar)+ovr+'</span>'+
+         '<span class="pp-bvis '+visClass+'">'+visTxt+'</span></div>';
+  }
+  s += '</div>';
+  return s;
+}
+
+document.getElementById('pp-q').addEventListener('input', ppRender);
+document.getElementById('pp-role').addEventListener('change', ppRender);
+ppLoadUsers();
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/admin/permissions")
+@admin_required
+def admin_permissions_page():
+    return ADMIN_PERMISSIONS_HTML
+
+
 @app.route("/api/admin/users", methods=["GET"])
 @admin_required
 def api_admin_users_list():
