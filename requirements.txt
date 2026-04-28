@@ -8,3 +8,8 @@ qrcode[pil]>=7.4.2
 # binaries), the docs UI gracefully exposes a manual-upload fallback.
 playwright>=1.40
 Pillow>=10.0
+# HEIC / HEIF support for parent-uploaded receipts (iPhone default).
+# Optional — if install fails on the host the receipt-upload path
+# silently falls back to "store original" with a conversion-failed
+# flag, so the deploy never breaks.
+pillow-heif>=0.13

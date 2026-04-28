@@ -3525,7 +3525,7 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
       <button type="button" onclick="ppCancelUpload()" style="background:transparent;border:none;color:#c62828;font-weight:800;cursor:pointer;float:left;font-size:0.85rem;">&times; &#x625;&#x644;&#x63A;&#x627;&#x621;</button>
     </div>
     <label class="pp-upload-zone" id="pp-upload-zone">
-      <input type="file" id="pp-file" accept="image/*" capture="environment" onchange="ppFileChange(this)">
+      <input type="file" id="pp-file" accept="image/*,application/pdf,.heic,.heif,.webp,.avif,.bmp,.tif,.tiff,.gif,.pdf" capture="environment" onchange="ppFileChange(this)">
       <div class="pp-upload-icon">&#x1F4F7;</div>
       <div class="pp-upload-hint">&#x627;&#x636;&#x63A;&#x637; &#x644;&#x627;&#x644;&#x62A;&#x642;&#x627;&#x637; &#x635;&#x648;&#x631;&#x629; &#x623;&#x648; &#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631; &#x645;&#x644;&#x641;</div>
     </label>
@@ -15471,6 +15471,159 @@ def _datetime_now_str():
     return _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+# ── Parent-receipt format normalisation ─────────────────────────────
+# Parents upload from phones — iPhones default to HEIC, Androids often
+# send WEBP, sometimes AVIF. Plenty of staff browsers can't open those
+# inline. _receipt_normalize accepts every common image format and
+# converts the awkward ones to JPEG (quality 90, EXIF orientation
+# baked into pixels so phone-rotated photos look right). PDF + JPEG +
+# PNG are pass-through. On any conversion failure the helper returns
+# the original blob with a `conversion_failed` flag so the upload
+# never blocks — the parent shouldn't pay for our edge cases.
+
+# Register the HEIF / HEIC opener once at module import time. If
+# pillow-heif isn't installed (e.g. Render hadn't picked up the new
+# requirements yet) this is a silent no-op and HEIC files fall through
+# to the conversion-failed path.
+try:
+    import pillow_heif as _pillow_heif
+    try:
+        _pillow_heif.register_heif_opener()
+    except Exception:
+        pass
+except Exception:
+    _pillow_heif = None
+
+
+_IMAGE_MAGIC_PREFIXES = (
+    b"\xff\xd8\xff",                  # JPEG
+    b"\x89PNG\r\n\x1a\n",             # PNG
+    b"GIF87a", b"GIF89a",             # GIF
+    b"BM",                            # BMP
+    b"II*\x00", b"MM\x00*",           # TIFF
+    b"RIFF",                          # WEBP / RIFF-wrapped
+)
+
+def _looks_like_image_by_magic(blob):
+    """Defensive sniffer: returns True if the first bytes match any of
+    the common image format signatures, even if the upload's mime
+    header lied (some phone uploads come through as
+    application/octet-stream). HEIC/AVIF files use an ftyp box at
+    offset 4, handled separately."""
+    if not blob: return False
+    for sig in _IMAGE_MAGIC_PREFIXES:
+        if blob.startswith(sig):
+            return True
+    # ISOBMFF (HEIC, HEIF, AVIF, MIF1, etc.) — major brand at bytes 4..12
+    if len(blob) >= 12 and blob[4:8] == b'ftyp':
+        return True
+    return False
+
+
+def _receipt_format_label(blob, mime):
+    """Best-effort 'human format' label for logs + admin warnings."""
+    m = (mime or '').lower()
+    if m == 'application/pdf' or (blob and blob[:5] == b'%PDF-'):
+        return 'PDF'
+    if not blob: return 'unknown'
+    if blob.startswith(b"\xff\xd8\xff"):    return 'JPEG'
+    if blob.startswith(b"\x89PNG\r\n\x1a\n"): return 'PNG'
+    if blob.startswith(b"GIF87a") or blob.startswith(b"GIF89a"): return 'GIF'
+    if blob.startswith(b"BM"):              return 'BMP'
+    if blob.startswith(b"II*\x00") or blob.startswith(b"MM\x00*"): return 'TIFF'
+    if len(blob) >= 12 and blob[8:12] == b'WEBP':
+        return 'WEBP'
+    if len(blob) >= 12 and blob[4:8] == b'ftyp':
+        brand = blob[8:12]
+        if brand in (b'avif', b'avis'):
+            return 'AVIF'
+        if brand in (b'heic', b'heix', b'heim', b'heis', b'mif1', b'msf1', b'hevc', b'hevx'):
+            return 'HEIC'
+        return 'ISOBMFF/' + brand.decode('latin1', errors='replace')
+    return m or 'unknown'
+
+
+# Anything in this set is fine to ship to the staff browser as-is.
+_RECEIPT_PASSTHROUGH_FORMATS = {'JPEG', 'PNG', 'PDF'}
+
+
+def _receipt_normalize(blob, mime, filename, looks_like_pdf=False):
+    """Decide whether the uploaded blob can ship as-is or needs
+    conversion to JPEG. Returns a dict:
+        blob:              bytes to store
+        mime:              mime to store
+        filename:          filename to store
+        converted_from:    string label of the original format if we
+                           converted, else None
+        original_format:   always set — useful for admin warning text
+        original_blob:     the bytes we received (for log accounting)
+        conversion_failed: True if we wanted to convert but couldn't —
+                           caller should embed a note/warning
+        error:             exception string if conversion_failed
+    """
+    fmt = _receipt_format_label(blob, mime)
+    out = {
+        "blob":              blob,
+        "mime":              mime or 'application/octet-stream',
+        "filename":          filename or 'receipt',
+        "converted_from":    None,
+        "original_format":   fmt,
+        "original_blob":     blob,
+        "conversion_failed": False,
+        "error":             '',
+    }
+    # PDF + already-universal JPG/PNG: pass through.
+    if looks_like_pdf or fmt == 'PDF':
+        out["mime"] = 'application/pdf'
+        if not (out["filename"] or '').lower().endswith('.pdf'):
+            out["filename"] = (out["filename"] or 'receipt') + '.pdf'
+        return out
+    if fmt in _RECEIPT_PASSTHROUGH_FORMATS:
+        # Normalise the mime if Pillow disagrees with the browser.
+        if fmt == 'JPEG': out["mime"] = 'image/jpeg'
+        elif fmt == 'PNG': out["mime"] = 'image/png'
+        return out
+    # Anything else — try Pillow (with HEIF registered if available).
+    try:
+        import io as _io
+        from PIL import Image, ImageOps
+        im = Image.open(_io.BytesIO(blob))
+        # Bake EXIF orientation into pixels so phone-rotated photos
+        # display correctly without depending on viewer EXIF support.
+        try:
+            im = ImageOps.exif_transpose(im)
+        except Exception:
+            pass
+        # JPEG can't carry alpha — flatten onto white if needed.
+        if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
+            bg = Image.new('RGB', im.size, (255, 255, 255))
+            try:
+                rgba = im.convert('RGBA')
+                bg.paste(rgba, mask=rgba.split()[-1])
+            except Exception:
+                bg.paste(im.convert('RGB'))
+            im = bg
+        elif im.mode != 'RGB':
+            im = im.convert('RGB')
+        buf = _io.BytesIO()
+        im.save(buf, format='JPEG', quality=90, optimize=True)
+        new_blob = buf.getvalue()
+        # Filename: drop the original extension, append .jpg.
+        base = (filename or 'receipt').rsplit('.', 1)[0]
+        out["blob"]           = new_blob
+        out["mime"]           = 'image/jpeg'
+        out["filename"]       = (base or 'receipt') + '.jpg'
+        out["converted_from"] = fmt
+        return out
+    except Exception as ex:
+        # Pillow couldn't open it — keep the original bytes so the
+        # parent's upload still succeeds. Admin sees a small warning
+        # in the receipt note.
+        out["conversion_failed"] = True
+        out["error"]             = str(ex)
+        return out
+
+
 @app.route("/api/parent/upload-receipt", methods=["POST"])
 def api_parent_upload_receipt():
     """Public — accepts a multipart upload with an image + note + the
@@ -15545,8 +15698,62 @@ def api_parent_upload_receipt():
     if len(blob) > 5 * 1024 * 1024:
         return jsonify({"ok": False, "error": "الملف أكبر من 5 ميغابايت"}), 400
     mime = f.mimetype or 'application/octet-stream'
-    if not (mime.startswith('image/') or mime == 'application/pdf'):
-        return jsonify({"ok": False, "error": "النوع غير مدعوم — استخدم صورة أو PDF"}), 400
+    in_filename = f.filename or 'receipt'
+    # Accept ANY image format the parent's phone might send, plus PDF.
+    # Anything else (text/zip/etc.) gets the friendly Arabic message.
+    looks_like_pdf = (
+        mime == 'application/pdf'
+        or in_filename.lower().endswith('.pdf')
+        or blob[:5] == b'%PDF-'
+    )
+    if not (mime.startswith('image/') or looks_like_pdf
+            or _looks_like_image_by_magic(blob)):
+        return jsonify({
+            "ok": False,
+            "error": "تعذر التعرف على نوع الملف — حاول رفع صورة واضحة أو ملف PDF.",
+        }), 400
+    # Auto-conversion: HEIC / WEBP / AVIF / TIFF / BMP / GIF arrive
+    # from phones all the time, but not every staff browser opens them
+    # (Windows Edge can't open HEIC, older Chromes don't open AVIF, etc.).
+    # Convert any non-universal image to JPEG so admin always sees it
+    # cleanly. PDF + JPEG + PNG are pass-through. EXIF orientation is
+    # baked into pixels so phone-rotated photos display correctly.
+    norm = _receipt_normalize(blob, mime, in_filename, looks_like_pdf)
+    blob       = norm['blob']
+    final_mime = norm['mime']
+    fname      = norm['filename']
+    if norm.get('converted_from'):
+        try:
+            import sys as _sys
+            print(
+                "[receipt-convert] student_id=" + str(sid)
+                + " inst=" + str(inst_n if inst_n is not None else '?')
+                + " from=" + repr(norm.get('converted_from'))
+                + " to=" + repr(final_mime)
+                + " bytes_in=" + str(len(norm.get('original_blob') or b''))
+                + " bytes_out=" + str(len(blob)),
+                file=_sys.stderr, flush=True,
+            )
+        except Exception:
+            pass
+    if norm.get('conversion_failed'):
+        try:
+            import sys as _sys
+            print(
+                "[receipt-convert] WARNING: conversion failed for student_id="
+                + str(sid) + " inst=" + str(inst_n) + " — storing original "
+                + repr(final_mime) + " (" + str(len(blob)) + " bytes). "
+                + "Reason: " + repr(norm.get('error') or ''),
+                file=_sys.stderr, flush=True,
+            )
+        except Exception:
+            pass
+        # Embed the original format in the note so admin sees the
+        # warning when reviewing the receipt without needing a new
+        # column on parent_receipts.
+        note = (note + (' ' if note else '')
+                + '⚠ صيغة قد لا تُفتح في المتصفح ('
+                + str(norm.get('original_format') or '?') + ')').strip()
     try:
         if USE_PG:
             import psycopg2 as _ps
@@ -15556,7 +15763,7 @@ def api_parent_upload_receipt():
                 "installment_number, installment_amount) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (sid, sname or check[0] or '', pid,
-                 _ps.Binary(blob), mime, f.filename or 'receipt', note,
+                 _ps.Binary(blob), final_mime, fname, note,
                  'قيد المراجعة', inst_n, inst_amt),
             )
         else:
@@ -15566,7 +15773,7 @@ def api_parent_upload_receipt():
                 "installment_number, installment_amount) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (sid, sname or check[0] or '', pid,
-                 blob, mime, f.filename or 'receipt', note,
+                 blob, final_mime, fname, note,
                  'قيد المراجعة', inst_n, inst_amt),
             )
         db.commit()
