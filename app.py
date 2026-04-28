@@ -3558,6 +3558,17 @@ function _ppErr(msg){
 }
 function _ppFmt(v){ return (v == null || v === '') ? '—' : String(v); }
 function _ppEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+/* Arabic ordinal for installment numbers — used by the partial-
+   remainder card title ("المتبقي من القسط الأول"). Falls back to the
+   bare number for n > 12 so unusual taqseet templates still render. */
+var _PP_ORDINALS = ['', 'الأول','الثاني','الثالث','الرابع','الخامس','السادس',
+                    'السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'];
+function _ppOrdinal(n){
+  var k = parseInt(n, 10);
+  if (!isFinite(k) || k < 1) return String(n || '');
+  if (k <= 12) return _PP_ORDINALS[k];
+  return 'رقم ' + k;
+}
 
 function ppLookup(){
   var pid = (document.getElementById('pp-pid').value || '').trim();
@@ -3712,6 +3723,54 @@ function _ppRender(d){
         ph += '</div></details>';
       }
       ph += '</div>';
+
+      /* === Partial-remainder card (additive) ===
+         When the installment is partly paid AND something is still
+         owed, render a dedicated card below it titled "المتبقي من
+         القسط <ordinal>" so the parent doesn't miss the unpaid
+         remainder. Reuses ppPickInstallment(idx) — the SAME upload
+         flow the installment card opens, so the receipt the parent
+         sends is linked to the same installment record. The receipt-
+         status block on the installment card above already covers
+         pending / approved / rejected feedback, so the remainder
+         card only needs the call-to-action button when the parent
+         can actually act (no pending receipt blocking the upload). */
+      if (st === 'partial' && rem > 0){
+        var ordinal = _ppOrdinal(i.n);
+        var canUpload = (rst !== 'قيد المراجعة' && rst !== 'تم التأكيد');
+        ph += '<div class="pp-remainder-card" style="margin:0 0 10px 0;'
+            + 'background:linear-gradient(135deg,#fff8e1,#ffecb3);'
+            + 'border:1.5px solid #ffb300;border-radius:14px;'
+            + 'padding:14px 16px;box-shadow:0 3px 10px rgba(255,152,0,.15);">';
+        ph += '<div style="font-size:0.92rem;font-weight:800;color:#bf360c;'
+            + 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+            + '<span style="font-size:1.2rem;line-height:1;">💡</span>'
+            + '<span>المتبقي من القسط ' + _ppEsc(ordinal) + '</span>'
+            + '</div>';
+        ph += '<div style="font-size:0.82rem;color:#5d4037;margin-top:4px;'
+            + 'margin-bottom:10px;">مبلغ متبقي من القسط بعد دفعة سابقة. '
+            + 'يمكنك إرسال إيصال للجزء المتبقي.</div>';
+        ph += '<div style="display:flex;align-items:center;gap:14px;'
+            + 'flex-wrap:wrap;justify-content:space-between;">';
+        ph += '<div style="font-size:1.6rem;font-weight:900;color:#bf360c;'
+            + 'line-height:1;">' + _ppEsc(String(rem)) + ' '
+            + '<span style="font-size:1rem;font-weight:700;">د.ب</span></div>';
+        if (canUpload){
+          ph += '<button type="button" onclick="event.stopPropagation();'
+              + 'ppPickInstallment(' + idx + ');" '
+              + 'style="background:linear-gradient(135deg,#ef6c00,#f57c00);'
+              + 'color:#fff;border:none;padding:11px 22px;border-radius:11px;'
+              + 'font-weight:800;font-size:0.96rem;cursor:pointer;'
+              + 'box-shadow:0 3px 10px rgba(239,108,0,.35);font-family:inherit;'
+              + 'display:inline-flex;align-items:center;gap:8px;">'
+              + '<span>📤</span><span>ارفع إيصال الدفعة المتبقية</span></button>';
+        } else if (rst === 'قيد المراجعة'){
+          ph += '<span style="background:#fff;color:#bf360c;padding:8px 14px;'
+              + 'border-radius:10px;font-weight:700;font-size:0.88rem;'
+              + 'border:1.5px solid #ffcc80;">⏳ بانتظار مراجعة الإيصال السابق</span>';
+        }
+        ph += '</div></div>';
+      }
     });
     pickList.innerHTML = ph;
     pickCard.style.display = '';
