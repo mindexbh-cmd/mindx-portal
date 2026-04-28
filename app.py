@@ -5227,16 +5227,16 @@ function srFilter(){
     var score = Math.max(scoreName, scorePid);
     if (score > 0) scored.push({ s: s, score: score });
   }
-  /* Registered (is_active=true) students float to the top, but
-     unregistered students still appear in the list — the search is
-     exhaustive, only the ranking changes. */
-  scored.sort(function(a,b){
-    var ad = (a.s && a.s.is_active === false) ? 1 : 0;
-    var bd = (b.s && b.s.is_active === false) ? 1 : 0;
-    if (ad !== bd) return ad - bd;
-    return b.score - a.score;
-  });
-  scored = scored.slice(0, 10);
+  /* Sort purely by text-relevance score. The previous "registered
+     first then slice(0,10)" combination was a silent exclusion — in
+     a DB with ≥10 registered matches, every unregistered match was
+     dropped from the visible list. Now both groups compete on score
+     alone and the cap is generous (50) so the result count tracks
+     what actually matched in the database. Registered/unregistered
+     status is communicated via the row background + tag, NOT via
+     ranking. */
+  scored.sort(function(a,b){ return b.score - a.score; });
+  scored = scored.slice(0, 50);
   if (!scored.length) { results.innerHTML = '<div style="padding:12px;color:#888;">\u0644\u0627 \u062A\u0648\u062C\u062F \u0646\u062A\u0627\u0626\u062C</div>'; return; }
   var html = '';
   for (var i=0; i<scored.length; i++) {
