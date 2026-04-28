@@ -15803,6 +15803,438 @@ def _datetime_now_str():
     return _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+# ── Permissions admin (commit 2/6) ──────────────────────────────────
+# Helper + REST API for the upcoming /admin/permissions page. The
+# UI lands in commits 3-5; commit 6 wires individual buttons to
+# user_can_see_button(...).
+#
+# user_can_see_button(user, button_key) precedence:
+#   1. user_permissions row (per-user override) — wins outright
+#   2. button_registry.default_roles — user.role membership
+#   3. an unregistered button_key → True (fail-open). Buttons we
+#      haven't migrated to the registry stay visible to whoever could
+#      see them before, so adding the helper has zero behavior change
+#      until a button is actually wired up via data-button-key.
+import json as _perm_json
+
+
+def _perm_active_user_dict():
+    return dict(session.get("user") or {})
+
+
+def user_can_see_button(user, button_key):
+    if not button_key:
+        return True
+    db = get_db()
+    uid = None
+    role = ""
+    if user:
+        try: uid = int(user.get("id") or 0) or None
+        except Exception: uid = None
+        role = (user.get("role") or "").strip().lower()
+    if uid:
+        try:
+            row = db.execute(
+                "SELECT is_visible FROM user_permissions "
+                "WHERE user_id=? AND button_key=?",
+                (uid, button_key),
+            ).fetchone()
+        except Exception:
+            row = None
+        if row is not None:
+            try: return bool(int(row[0]))
+            except Exception: return bool(row[0])
+    # Admin role: implicit "sees everything" by default. Per-user
+    # overrides above still win, so an admin can voluntarily hide a
+    # button from their own UI for cleanliness.
+    if role == "admin":
+        return True
+    try:
+        reg = db.execute(
+            "SELECT default_roles FROM button_registry WHERE button_key=?",
+            (button_key,),
+        ).fetchone()
+    except Exception:
+        reg = None
+    if reg is None:
+        return True
+    try:
+        roles = _perm_json.loads(reg[0] or "[]")
+        if not isinstance(roles, list): roles = []
+    except Exception:
+        roles = []
+    return role in {str(r).strip().lower() for r in roles}
+
+
+def _audit(action, target_type=None, target_id=None,
+           old_value=None, new_value=None, details=None):
+    """Append a row to audit_log. Best-effort — must NEVER fail the
+    user-facing action that triggered it. dict/list values are
+    JSON-stringified so the column stays plain TEXT on every DB."""
+    actor = _perm_active_user_dict()
+    db = get_db()
+    def _to_text(v):
+        if v is None: return None
+        if isinstance(v, (dict, list)):
+            try: return _perm_json.dumps(v, ensure_ascii=False)
+            except Exception: return str(v)
+        return str(v)
+    try:
+        db.execute(
+            "INSERT INTO audit_log(actor_id,actor_username,action,target_type,"
+            "target_id,old_value,new_value,details) VALUES(?,?,?,?,?,?,?,?)",
+            (actor.get("id"), actor.get("username") or "", str(action),
+             target_type, str(target_id) if target_id is not None else None,
+             _to_text(old_value), _to_text(new_value), _to_text(details)),
+        )
+        db.commit()
+    except Exception as _ex_audit:
+        try:
+            import sys as _sys
+            _sys.stderr.write("[audit] write failed: " + str(_ex_audit) + "\n")
+        except Exception: pass
+
+
+# Roles the permissions admin understands. Order = display order
+# in the UI dropdowns. Anything else falls back to "حسب الدور".
+_PERM_KNOWN_ROLES = ("admin", "manager", "teacher", "reception", "student", "parent")
+# Original main admin (created in init_db at line 343). Cannot be
+# locked out, demoted, deactivated, or have its username changed
+# in a way that would orphan the sole admin. Match is
+# case-insensitive on `username`.
+_PERM_PROTECTED_ADMIN = "admin"
+
+
+def _perm_role_default_url(role):
+    """Mirror of /login's role dispatch — used when landing_page
+    is NULL/empty. Keep in sync with the login() route."""
+    role = (role or "").strip().lower()
+    if role == "teacher": return "/teacher/hub"
+    if role == "student": return "/portal/parent-hub"
+    if role == "parent":  return "/portal/parent"
+    return "/dashboard"
+
+
+def _perm_landing_url(user):
+    """Resolve effective post-login URL respecting users.landing_page."""
+    if not user: return "/dashboard"
+    role = (user.get("role") or "").strip().lower()
+    landing = (user.get("landing_page") or "").strip()
+    if landing == "dashboard":      return "/dashboard"
+    if landing == "teacher_hub":    return "/teacher/hub"
+    if landing == "parent_hub":     return "/portal/parent-hub"
+    if landing == "parent_v1":      return "/portal/parent"
+    if landing == "student_portal": return "/portal/parent-hub"
+    return _perm_role_default_url(role)
+
+
+def _perm_user_summary(row):
+    if not row: return {}
+    d = dict(row)
+    return {
+        "id":           d.get("id"),
+        "username":     d.get("username") or "",
+        "name":         d.get("name") or "",
+        "role":         (d.get("role") or "").strip().lower(),
+        "landing_page": d.get("landing_page") or "",
+        "is_active":    int(d.get("is_active") or 0) if d.get("is_active") is not None else 1,
+    }
+
+
+def _perm_count_admins(db, exclude_id=None):
+    try:
+        if exclude_id:
+            return int(db.execute(
+                "SELECT COUNT(*) FROM users WHERE LOWER(COALESCE(role,''))='admin' "
+                "AND COALESCE(is_active,1)=1 AND id<>?",
+                (int(exclude_id),)
+            ).fetchone()[0])
+        return int(db.execute(
+            "SELECT COUNT(*) FROM users WHERE LOWER(COALESCE(role,''))='admin' "
+            "AND COALESCE(is_active,1)=1"
+        ).fetchone()[0])
+    except Exception:
+        return 0
+
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def api_admin_users_list():
+    db = get_db()
+    cols = {r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()}
+    sel_cols = ["id", "username", "name", "role"]
+    if "landing_page" in cols: sel_cols.append("landing_page")
+    if "is_active"    in cols: sel_cols.append("is_active")
+    sel = ", ".join(sel_cols)
+    rows = db.execute("SELECT " + sel + " FROM users ORDER BY id").fetchall()
+    out = [_perm_user_summary(r) for r in rows]
+    counts = {}
+    try:
+        for r in db.execute(
+            "SELECT user_id, COUNT(*) FROM user_permissions WHERE is_visible=0 GROUP BY user_id"
+        ).fetchall():
+            counts[int(r[0])] = int(r[1])
+    except Exception: pass
+    for u in out:
+        u["hidden_button_count"] = counts.get(int(u.get("id") or 0), 0)
+    return jsonify({"ok": True, "users": out, "roles": list(_PERM_KNOWN_ROLES)})
+
+
+@app.route("/api/admin/users/<int:uid>/permissions", methods=["GET"])
+@admin_required
+def api_admin_user_permissions_get(uid):
+    db = get_db()
+    user_row = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not user_row:
+        return jsonify({"ok": False, "error": "المستخدم غير موجود"}), 404
+    user = dict(user_row)
+    role = (user.get("role") or "").strip().lower()
+    btns = db.execute(
+        "SELECT button_key,button_label_ar,page_slug,default_roles,sort_order "
+        "FROM button_registry ORDER BY page_slug, sort_order, button_key"
+    ).fetchall()
+    overrides = {}
+    try:
+        for r in db.execute(
+            "SELECT button_key,is_visible FROM user_permissions WHERE user_id=?",
+            (uid,)
+        ).fetchall():
+            overrides[r[0] if not hasattr(r, "keys") else r["button_key"]] = \
+                int(r[1] if not hasattr(r, "keys") else r["is_visible"])
+    except Exception: pass
+    out = []
+    for r in btns:
+        try: roles = _perm_json.loads(r["default_roles"] or "[]")
+        except Exception: roles = []
+        roles_lower = {str(x).strip().lower() for x in roles}
+        # Admin role: implicit visibility on every button (parallels
+        # the short-circuit in user_can_see_button).
+        default_visible = (role == "admin") or (role in roles_lower)
+        ov = overrides.get(r["button_key"])
+        effective = (ov == 1) if ov is not None else default_visible
+        out.append({
+            "button_key":      r["button_key"],
+            "button_label_ar": r["button_label_ar"],
+            "page_slug":       r["page_slug"],
+            "default_roles":   list(roles),
+            "default_visible": bool(default_visible),
+            "has_override":    ov is not None,
+            "is_visible":      bool(effective),
+            "sort_order":      int(r["sort_order"] or 0),
+        })
+    return jsonify({"ok": True, "user": _perm_user_summary(user_row), "buttons": out})
+
+
+@app.route("/api/admin/users/<int:uid>", methods=["PATCH"])
+@admin_required
+def api_admin_user_patch(uid):
+    db = get_db()
+    target = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not target:
+        return jsonify({"ok": False, "error": "المستخدم غير موجود"}), 404
+    target_d = dict(target)
+    me = _perm_active_user_dict()
+    body = request.get_json(silent=True) or {}
+    out_updates = {}
+    audit_old = {}
+    audit_new = {}
+    if "username" in body:
+        new_username = (body.get("username") or "").strip()
+        if len(new_username) < 3:
+            return jsonify({"ok": False, "error": "اسم المستخدم يجب ألا يقل عن 3 أحرف"}), 400
+        if new_username != (target_d.get("username") or ""):
+            dup = db.execute(
+                "SELECT id FROM users WHERE username=? AND id<>?",
+                (new_username, uid)
+            ).fetchone()
+            if dup:
+                return jsonify({"ok": False, "error": "اسم المستخدم مستخدم بالفعل"}), 409
+            # Cannot rename the protected main admin away from "admin"
+            if (target_d.get("username") or "").strip().lower() == _PERM_PROTECTED_ADMIN \
+               and new_username.lower() != _PERM_PROTECTED_ADMIN:
+                return jsonify({"ok": False, "error": "لا يمكن تغيير اسم الحساب الرئيسي للمدير"}), 400
+            out_updates["username"] = new_username
+            audit_old["username"] = target_d.get("username")
+            audit_new["username"] = new_username
+    if "password" in body:
+        new_pw = (body.get("password") or "").strip()
+        if new_pw:
+            if len(new_pw) < 4:
+                return jsonify({"ok": False, "error": "كلمة المرور قصيرة جداً (4 أحرف على الأقل)"}), 400
+            out_updates["password"] = hp(new_pw)
+            audit_old["password"] = "(hidden)"
+            audit_new["password"] = "(reset)"
+    if "role" in body:
+        new_role = (body.get("role") or "").strip().lower()
+        if new_role and new_role not in _PERM_KNOWN_ROLES:
+            return jsonify({"ok": False, "error": "الدور غير صالح"}), 400
+        if new_role and new_role != (target_d.get("role") or "").strip().lower():
+            if (target_d.get("username") or "").strip().lower() == _PERM_PROTECTED_ADMIN \
+               and new_role != "admin":
+                return jsonify({"ok": False, "error": "لا يمكن تخفيض رتبة الحساب الرئيسي للمدير"}), 400
+            if (target_d.get("role") or "").strip().lower() == "admin" and new_role != "admin":
+                if _perm_count_admins(db, exclude_id=uid) == 0:
+                    return jsonify({"ok": False, "error": "لا يمكن تخفيض رتبة آخر مدير في النظام"}), 400
+            out_updates["role"] = new_role
+            audit_old["role"] = target_d.get("role")
+            audit_new["role"] = new_role
+    if "landing_page" in body:
+        raw = body.get("landing_page")
+        new_landing = (raw or "").strip() if raw is not None else None
+        if new_landing == "": new_landing = None
+        if new_landing not in (None, "dashboard", "teacher_hub",
+                                "parent_hub", "parent_v1", "student_portal"):
+            return jsonify({"ok": False, "error": "صفحة هبوط غير صالحة"}), 400
+        if (new_landing or "") != (target_d.get("landing_page") or ""):
+            out_updates["landing_page"] = new_landing
+            audit_old["landing_page"] = target_d.get("landing_page")
+            audit_new["landing_page"] = new_landing
+    if "is_active" in body:
+        try: new_active = int(bool(body.get("is_active")))
+        except Exception: new_active = 1
+        cur_active = int(target_d.get("is_active") or 0) \
+                     if target_d.get("is_active") is not None else 1
+        if new_active != cur_active:
+            if int(me.get("id") or 0) == uid and new_active == 0:
+                return jsonify({"ok": False, "error": "لا يمكن تعطيل حسابك الخاص"}), 400
+            if (target_d.get("username") or "").strip().lower() == _PERM_PROTECTED_ADMIN \
+               and new_active == 0:
+                return jsonify({"ok": False, "error": "لا يمكن تعطيل الحساب الرئيسي للمدير"}), 400
+            if (target_d.get("role") or "").strip().lower() == "admin" and new_active == 0:
+                if _perm_count_admins(db, exclude_id=uid) == 0:
+                    return jsonify({"ok": False, "error": "لا يمكن تعطيل آخر مدير في النظام"}), 400
+            out_updates["is_active"] = new_active
+            audit_old["is_active"] = cur_active
+            audit_new["is_active"] = new_active
+    if not out_updates:
+        return jsonify({"ok": True, "user": _perm_user_summary(target), "no_change": True})
+    set_clause = ", ".join(k + "=?" for k in out_updates.keys())
+    params = list(out_updates.values()) + [uid]
+    try:
+        db.execute("UPDATE users SET " + set_clause + " WHERE id=?", params)
+        db.commit()
+    except Exception as _ex_save:
+        return jsonify({"ok": False, "error": "تعذّر الحفظ: " + str(_ex_save)}), 500
+    _audit("user.update", target_type="users", target_id=uid,
+           old_value=audit_old, new_value=audit_new)
+    fresh = db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    return jsonify({"ok": True, "user": _perm_user_summary(fresh)})
+
+
+@app.route("/api/admin/users/<int:uid>/permissions", methods=["PATCH"])
+@admin_required
+def api_admin_user_permissions_patch(uid):
+    db = get_db()
+    if not db.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone():
+        return jsonify({"ok": False, "error": "المستخدم غير موجود"}), 404
+    body = request.get_json(silent=True) or {}
+    items = body.get("items") if isinstance(body, dict) else None
+    if not isinstance(items, list):
+        return jsonify({"ok": False, "error": "items list required"}), 400
+    valid_keys = {r[0] for r in db.execute("SELECT button_key FROM button_registry").fetchall()}
+    applied = []
+    for it in items:
+        if not isinstance(it, dict): continue
+        bk = (it.get("button_key") or "").strip()
+        if not bk or bk not in valid_keys: continue
+        action = (it.get("action") or "").strip().lower()
+        if action == "reset":
+            try:
+                db.execute(
+                    "DELETE FROM user_permissions WHERE user_id=? AND button_key=?",
+                    (uid, bk)
+                )
+                applied.append({"button_key": bk, "action": "reset"})
+            except Exception: pass
+            continue
+        try: vis = int(bool(it.get("is_visible")))
+        except Exception: vis = 1
+        try:
+            db.execute(
+                "INSERT INTO user_permissions(user_id,button_key,is_visible,updated_at) "
+                "VALUES(?,?,?,CURRENT_TIMESTAMP) "
+                "ON CONFLICT(user_id,button_key) DO UPDATE SET "
+                "is_visible=excluded.is_visible, updated_at=CURRENT_TIMESTAMP",
+                (uid, bk, vis)
+            )
+            applied.append({"button_key": bk, "is_visible": vis})
+        except Exception:
+            try:
+                db.execute(
+                    "DELETE FROM user_permissions WHERE user_id=? AND button_key=?",
+                    (uid, bk)
+                )
+                db.execute(
+                    "INSERT INTO user_permissions(user_id,button_key,is_visible) VALUES(?,?,?)",
+                    (uid, bk, vis)
+                )
+                applied.append({"button_key": bk, "is_visible": vis})
+            except Exception: pass
+    db.commit()
+    _audit("user.permissions.update", target_type="users", target_id=uid,
+           new_value={"applied": applied})
+    return jsonify({"ok": True, "applied": applied})
+
+
+@app.route("/api/admin/users/<int:uid>/reset-permissions", methods=["POST"])
+@admin_required
+def api_admin_user_reset_permissions(uid):
+    db = get_db()
+    if not db.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone():
+        return jsonify({"ok": False, "error": "المستخدم غير موجود"}), 404
+    try:
+        cur = db.execute("DELETE FROM user_permissions WHERE user_id=?", (uid,))
+        n = getattr(cur, "rowcount", 0) or 0
+    except Exception:
+        n = 0
+    db.commit()
+    _audit("user.permissions.reset", target_type="users", target_id=uid,
+           new_value={"removed": n})
+    return jsonify({"ok": True, "removed": n})
+
+
+@app.route("/api/me/permissions", methods=["GET"])
+@login_required
+def api_me_permissions():
+    """Return the current user's effective hidden buttons. Used by
+    the page-load JS in commit 6/6 to remove DOM elements that the
+    user shouldn't see. Server-side enforcement on the actual
+    endpoints is the real security boundary — this only drives
+    UI tidying."""
+    user = _perm_active_user_dict()
+    role = (user.get("role") or "").strip().lower()
+    uid = int(user.get("id") or 0) or None
+    db = get_db()
+    btns = db.execute(
+        "SELECT button_key,default_roles FROM button_registry"
+    ).fetchall()
+    overrides = {}
+    if uid:
+        try:
+            for r in db.execute(
+                "SELECT button_key,is_visible FROM user_permissions WHERE user_id=?",
+                (uid,)
+            ).fetchall():
+                bk = r[0] if not hasattr(r, "keys") else r["button_key"]
+                vv = r[1] if not hasattr(r, "keys") else r["is_visible"]
+                overrides[bk] = int(vv)
+        except Exception: pass
+    hidden = []
+    for r in btns:
+        bk    = r["button_key"]    if hasattr(r, "keys") else r[0]
+        droles= r["default_roles"] if hasattr(r, "keys") else r[1]
+        try: roles = _perm_json.loads(droles or "[]")
+        except Exception: roles = []
+        roles_lower = {str(x).strip().lower() for x in roles}
+        default_visible = (role == "admin") or (role in roles_lower)
+        ov = overrides.get(bk)
+        effective = (ov == 1) if ov is not None else default_visible
+        if not effective:
+            hidden.append(bk)
+    return jsonify({"ok": True, "hidden_buttons": hidden,
+                    "role": role, "username": user.get("username") or ""})
+
+
 # ── Parent-receipt format normalisation ─────────────────────────────
 # Parents upload from phones — iPhones default to HEIC, Androids often
 # send WEBP, sometimes AVIF. Plenty of staff browsers can't open those
