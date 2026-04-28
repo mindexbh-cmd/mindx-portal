@@ -11578,9 +11578,13 @@ function saveTaqseetCell(id, field, el) {
   var val = el.innerText.trim();
   var r = allTaqseet ? allTaqseet.find(function(x){return x.id===id;}) : null;
   if (!r) return;
+  var oldVal = r[field] == null ? "" : String(r[field]);
+  if (val === oldVal) return;
   var updated = {};
   for (var k in r) { updated[k] = r[k]; }
   updated[field] = val;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, false); }
   var affectsInstallments = _tqIsInstField(field) || field === TQ_AMOUNT;
   var installmentCount = 0;
   if (affectsInstallments) {
@@ -11592,7 +11596,8 @@ function saveTaqseetCell(id, field, el) {
     var courseAmt = parseFloat(String(updated[TQ_AMOUNT] || "").replace(/,/g, ""));
     if (!isNaN(courseAmt) && courseAmt > 0 && sum > courseAmt) {
       showToast("\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0623\u0642\u0633\u0627\u0637 (" + sum + ") \u064A\u062A\u062C\u0627\u0648\u0632 \u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0648\u0631\u0629 (" + courseAmt + ")", "#e53935");
-      el.innerText = r[field] == null ? "" : String(r[field]);
+      el.innerText = oldVal;
+      _flashErr();
       updateTaqseetLockState(el.closest("tr"));
       return;
     }
@@ -11603,11 +11608,13 @@ function saveTaqseetCell(id, field, el) {
     .then(function(j){
       if (j && j.ok === false) {
         showToast(j.error || "\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u062D\u0641\u0638", "#e53935");
-        el.innerText = r[field] == null ? "" : String(r[field]);
+        el.innerText = oldVal;
+        _flashErr();
         updateTaqseetLockState(el.closest("tr"));
         return;
       }
       r[field] = val;
+      _flashOk();
       if (affectsInstallments) {
         r[TQ_NUM] = installmentCount;
         var tr = el.closest("tr");
@@ -11616,6 +11623,10 @@ function saveTaqseetCell(id, field, el) {
           if (niCell) niCell.innerText = String(installmentCount);
         }
       }
+    }).catch(function(){
+      el.innerText = oldVal;
+      _flashErr();
+      showToast("خطأ في الاتصال","#e53935");
     });
 }
 
@@ -13112,15 +13123,31 @@ function editAttendanceCell(id, field, tdEl) {
     if(saved) return;
     saved = true;
     var newVal = input.value;
+    if(newVal === oldVal) { tdEl.textContent = oldVal; return; }
     var rec = null;
     for(var i=0; i<allAttendance.length; i++) { if(allAttendance[i].id===id){ rec=allAttendance[i]; break; } }
-    if(!rec) return;
+    if(!rec) { tdEl.textContent = newVal; return; }
     var updated = Object.assign({}, rec);
     updated[field] = newVal;
+    /* Optimistic UI: show the new value immediately. */
+    tdEl.textContent = newVal;
+    function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, true); }
+    function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, false); }
     fetch('/api/attendance/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('&#x62A;&#x645; &#x627;&#x644;&#x62A;&#x62D;&#x62F;&#x64A;&#x62B;','#4CAF50'); loadAttendance(); }
-        else { showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935'); loadAttendance(); }
+        if(d.ok){
+          _flashOk();
+          setTimeout(function(){ loadAttendance(); }, 750);
+        } else {
+          tdEl.textContent = oldVal;
+          _flashErr();
+          showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935');
+          setTimeout(function(){ loadAttendance(); }, 750);
+        }
+      }).catch(function(){
+        tdEl.textContent = oldVal;
+        _flashErr();
+        showToast('&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644;','#e53935');
       });
   }
   input.addEventListener('blur', saveCell);
@@ -13307,18 +13334,36 @@ function editCustomCell(tdEl) {
   function saveCell() {
     if(saved) return; saved = true;
     var newVal = input.value;
+    if(newVal === oldVal) { tdEl.textContent = oldVal; return; }
     var t = null;
     for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
-    if(!t) return;
+    if(!t) { tdEl.textContent = newVal; return; }
     var row = null;
     for(var j=0; j<t.rows.length; j++) { if(t.rows[j].id===rid) { row=t.rows[j]; break; } }
-    if(!row) return;
+    if(!row) { tdEl.textContent = newVal; return; }
     var updated = Object.assign({}, row.row_data);
     updated[ckey] = newVal;
+    /* Optimistic UI: show the new value immediately. */
+    tdEl.textContent = newVal;
+    function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, true); }
+    function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, false); }
     fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
       .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){ showToast('&#x62A;&#x645; &#x627;&#x644;&#x62A;&#x62D;&#x62F;&#x64A;&#x62B;','#4CAF50'); loadCustomTables(); }
-        else{ showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935'); loadCustomTables(); }
+        if(d.ok){
+          _flashOk();
+          /* Reload after the flash so dependent computed columns
+             refresh without killing the visual confirmation. */
+          setTimeout(function(){ loadCustomTables(); }, 750);
+        } else {
+          tdEl.textContent = oldVal;
+          _flashErr();
+          showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935');
+          setTimeout(function(){ loadCustomTables(); }, 750);
+        }
+      }).catch(function(){
+        tdEl.textContent = oldVal;
+        _flashErr();
+        showToast('&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644;','#e53935');
       });
   }
   input.addEventListener('blur', saveCell);
