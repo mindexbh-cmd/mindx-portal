@@ -31049,11 +31049,18 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 
 @app.route('/mx-helpers.js')
 def mx_helpers_js():
+    # The renderer migration that prompted the no-cache reflex on
+    # /database lives INLINE in DATABASE_HTML, not in this file — so
+    # /database alone needs the cache buster. /mx-helpers.js is
+    # 190 KB and is loaded by every page (dashboard, database,
+    # attendance, search, parent, …). When this file was no-cached,
+    # every page navigation re-downloaded it, which the team noticed
+    # as "returning to dashboard from قاعدة البيانات is noticeably
+    # slow". A short explicit max-age keeps within-session navigation
+    # cache-fast while still letting Render-deployed updates propagate
+    # within a few minutes.
     resp = Response(MX_HELPERS_JS, mimetype='application/javascript; charset=utf-8')
-    # See database() — cache-busting so window.mxFlashCell + the freeze-
-    # bar sweep + any future helper updates always reach the browser.
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Cache-Control'] = 'public, max-age=300'
     return resp
 
 ADMIN_BACKUPS_HTML = r"""<!DOCTYPE html>
