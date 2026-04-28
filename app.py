@@ -16264,7 +16264,21 @@ function _ppPaintDetail(){
     html += '<b>الحالة:</b><span>'+(u.is_active ? 'نشط' : 'معطّل')+'</span>';
     html += '</div>';
   }
-  html += '<h3>الأزرار والصلاحيات</h3>';
+  // Buttons section: header + mass-action bar
+  const totalHidden = (d.buttons || []).filter(b => !b.is_visible).length;
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;'
+       +  'margin:14px 0 10px;flex-wrap:wrap;gap:6px;">';
+  html += '<h3 style="margin:0;">الأزرار والصلاحيات';
+  if (totalHidden > 0) html += ' <span class="pp-count">'+totalHidden+' مخفي</span>';
+  html += '</h3>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  html += '<button class="pp-edit-btn" style="padding:6px 12px;font-size:0.82rem;" '
+       +  'onclick="ppMassToggle(1)">إظهار الكل</button>';
+  html += '<button class="pp-edit-btn pp-danger" style="padding:6px 12px;font-size:0.82rem;" '
+       +  'onclick="ppMassToggle(0)">إخفاء الكل</button>';
+  html += '<button class="pp-edit-btn pp-cancel" style="padding:6px 12px;font-size:0.82rem;margin:0;" '
+       +  'onclick="ppResetToDefault()">إعادة لافتراضي الدور</button>';
+  html += '</div></div>';
   const rendered = new Set();
   for (const g of PP_GROUP_ORDER){
     if (!groups[g]) continue;
@@ -16398,14 +16412,106 @@ function _ppRenderGroup(title, items){
   let s = '<div class="pp-bgroup">';
   s += '<div class="pp-bgroup-title">'+_ppEsc(title)+'</div>';
   for (const b of items){
-    const visClass = b.is_visible ? 'pp-bvis-on' : 'pp-bvis-off';
-    const visTxt   = b.is_visible ? '✓ ظاهر' : '✗ مخفي';
-    const ovr      = b.has_override ? '<span class="pp-bovr">(مخصّص)</span>' : '';
-    s += '<div class="pp-brow"><span>'+_ppEsc(b.button_label_ar)+ovr+'</span>'+
-         '<span class="pp-bvis '+visClass+'">'+visTxt+'</span></div>';
+    const ovr = b.has_override
+      ? '<span class="pp-bovr">(مخصّص)</span>'
+      : '<span class="pp-bovr" style="color:#8a8a8a;">(افتراضي)</span>';
+    const checked = b.is_visible ? ' checked' : '';
+    s += '<div class="pp-brow">'+
+         '<span>'+_ppEsc(b.button_label_ar)+ovr+'</span>'+
+         '<label class="pp-toggle" title="'+(b.is_visible?'ظاهر':'مخفي')+'">'+
+           '<input type="checkbox" data-button-key="'+_ppEsc(b.button_key)+'"'+
+             checked+' onchange="ppTogglePerm(this)">'+
+           '<span class="pp-slider"></span>'+
+         '</label></div>';
   }
   s += '</div>';
   return s;
+}
+
+async function ppTogglePerm(input){
+  if (!_PP_DETAIL || !_PP_DETAIL.user) return;
+  const uid = _PP_DETAIL.user.id;
+  const bk  = input.getAttribute('data-button-key');
+  const vis = input.checked ? 1 : 0;
+  input.disabled = true;
+  let r;
+  try { r = await fetch('/api/admin/users/'+uid+'/permissions', {
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({items:[{button_key: bk, is_visible: vis}]})
+      });
+  } catch (e){
+    input.disabled = false;
+    input.checked = !input.checked;
+    _ppMsg('err', 'تعذّر الاتصال بالخادم');
+    return;
+  }
+  if (!r.ok){
+    input.disabled = false;
+    input.checked = !input.checked;
+    let msg = 'تعذّر الحفظ';
+    try { msg = (await r.json()).error || msg; } catch(e){}
+    _ppMsg('err', msg);
+    return;
+  }
+  // Reload the detail panel so has_override flag and the hidden-
+  // count badge stay accurate. Also refresh the user list so the
+  // hidden_button_count badge there is consistent.
+  await ppSelectUser(uid);
+  ppLoadUsers();
+}
+
+async function ppMassToggle(targetVisible){
+  if (!_PP_DETAIL || !_PP_DETAIL.user) return;
+  const uid = _PP_DETAIL.user.id;
+  const which = targetVisible ? 'إظهار جميع الأزرار' : 'إخفاء جميع الأزرار';
+  const ok = await ppConfirm('تأكيد', 'سيتم '+which+' لهذا المستخدم. هل تريد المتابعة؟');
+  if (!ok) return;
+  const items = (_PP_DETAIL.buttons || []).map(b => ({
+    button_key: b.button_key, is_visible: targetVisible
+  }));
+  let r;
+  try { r = await fetch('/api/admin/users/'+uid+'/permissions', {
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({items: items})
+      });
+  } catch (e){ _ppMsg('err','تعذّر الاتصال بالخادم'); return; }
+  if (!r.ok){
+    let msg = 'تعذّر الحفظ';
+    try { msg = (await r.json()).error || msg; } catch(e){}
+    _ppMsg('err', msg);
+    return;
+  }
+  _ppMsg('ok', 'تم تطبيق التغيير على جميع الأزرار.');
+  await ppSelectUser(uid);
+  ppLoadUsers();
+}
+
+async function ppResetToDefault(){
+  if (!_PP_DETAIL || !_PP_DETAIL.user) return;
+  const uid = _PP_DETAIL.user.id;
+  const ok = await ppConfirm('إعادة الضبط',
+    'سيتم حذف جميع التخصيصات الفردية لهذا المستخدم وإرجاع الأزرار '
+   +'إلى الإعدادات الافتراضية للدور. هل تريد المتابعة؟');
+  if (!ok) return;
+  let r;
+  try { r = await fetch('/api/admin/users/'+uid+'/reset-permissions', {
+        method:'POST',
+        credentials:'same-origin'
+      });
+  } catch (e){ _ppMsg('err','تعذّر الاتصال بالخادم'); return; }
+  if (!r.ok){
+    let msg = 'تعذّر الحفظ';
+    try { msg = (await r.json()).error || msg; } catch(e){}
+    _ppMsg('err', msg);
+    return;
+  }
+  _ppMsg('ok', 'تم إعادة الإعدادات إلى الافتراضي للدور.');
+  await ppSelectUser(uid);
+  ppLoadUsers();
 }
 
 document.getElementById('pp-q').addEventListener('input', ppRender);
