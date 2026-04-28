@@ -597,7 +597,8 @@ def init_db():
         reviewed_at DATETIME,
         installment_number INTEGER,
         installment_amount NUMERIC,
-        rejection_reason TEXT)""")
+        rejection_reason TEXT,
+        is_remainder INTEGER DEFAULT 0)""")
     db.execute("""CREATE TABLE IF NOT EXISTS payment_edits(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id INTEGER,
@@ -2406,7 +2407,8 @@ if True:
         reviewed_at DATETIME,
         installment_number INTEGER,
         installment_amount NUMERIC,
-        rejection_reason TEXT)""")
+        rejection_reason TEXT,
+        is_remainder INTEGER DEFAULT 0)""")
     # Migrate older parent_receipts schemas to v2 (installment columns).
     if "parent_receipts_v2" not in applied:
         try:
@@ -2420,6 +2422,25 @@ if True:
                     try: db2.execute(ddl)
                     except Exception: pass
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("parent_receipts_v2",))
+            db2.commit()
+        except Exception: pass
+    # parent_receipts_v3: distinguish remainder uploads from first-time
+    # receipts so the duplicate-prevention can permit a partial-paid
+    # installment to receive a follow-up receipt for the remaining
+    # balance without unblocking already-fully-paid installments.
+    if "parent_receipts_v3" not in applied:
+        try:
+            tq = [r[1] for r in db2.execute(
+                "PRAGMA table_info(parent_receipts)").fetchall()]
+            if "is_remainder" not in tq:
+                try: db2.execute(
+                    "ALTER TABLE parent_receipts ADD COLUMN is_remainder INTEGER DEFAULT 0"
+                )
+                except Exception: pass
+            # Backfill: nothing to mark; pre-existing rows are all
+            # original (non-remainder) receipts by definition.
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("parent_receipts_v3",))
             db2.commit()
         except Exception: pass
     db2.execute("""CREATE TABLE IF NOT EXISTS payment_edits(
@@ -3908,8 +3929,13 @@ function _ppRender(d){
             + 'line-height:1;">' + _ppEsc(String(rem)) + ' '
             + '<span style="font-size:1rem;font-weight:700;">د.ب</span></div>';
         if (canUpload){
+          // ppPickInstallment(idx, true) opens the upload card in
+          // remainder-mode: title + recorded amount become the
+          // remaining balance, and the form posts is_remainder=1 so
+          // the server's relaxed duplicate-prevention permits the
+          // upload alongside the already-approved partial receipt.
           ph += '<button type="button" onclick="event.stopPropagation();'
-              + 'ppPickInstallment(' + idx + ');" '
+              + 'ppPickInstallment(' + idx + ', true);" '
               + 'style="background:linear-gradient(135deg,#ef6c00,#f57c00);'
               + 'color:#fff;border:none;padding:11px 22px;border-radius:11px;'
               + 'font-weight:800;font-size:0.96rem;cursor:pointer;'
@@ -3934,15 +3960,28 @@ function _ppRender(d){
 }
 var _ppInstallments = [];
 var _ppCurrentInst = null;
-function ppPickInstallment(idx){
+/* Set to true by the remainder-card button so ppUpload() submits the
+   remaining balance (not the full installment amount) and tags the
+   request with is_remainder=1. */
+var _ppCurrentInstIsRemainder = false;
+function ppPickInstallment(idx, asRemainder){
   var i = _ppInstallments[idx]; if (!i) return;
   _ppCurrentInst = i;
+  _ppCurrentInstIsRemainder = !!asRemainder;
   var rem = (typeof i.remaining === 'number') ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
-  document.getElementById('pp-upload-title').innerHTML =
-    'ὌE رفع إيصال القسط ' + i.n + ' (' + (i.amount||0) + ' دينار)';
-  document.getElementById('pp-upload-context').innerHTML =
-    '<b>القسط ' + i.n + '</b> — المبلغ المستحق: <b>' + (i.amount||0) + ' د</b>' +
-    (rem !== (i.amount||0) ? ('  •  المتبقي: <b>' + rem + ' د</b>') : '');
+  if (_ppCurrentInstIsRemainder){
+    document.getElementById('pp-upload-title').innerHTML =
+      '📤 رفع إيصال الدفعة المتبقية للقسط ' + i.n + ' (' + rem + ' دينار)';
+    document.getElementById('pp-upload-context').innerHTML =
+      '<b>القسط ' + i.n + '</b> — المتبقي بعد الدفعات السابقة: <b>' + rem + ' د</b>'
+      + ' <span style="color:#bf360c;">(دفعة بقايا)</span>';
+  } else {
+    document.getElementById('pp-upload-title').innerHTML =
+      '📤 رفع إيصال القسط ' + i.n + ' (' + (i.amount||0) + ' دينار)';
+    document.getElementById('pp-upload-context').innerHTML =
+      '<b>القسط ' + i.n + '</b> — المبلغ المستحق: <b>' + (i.amount||0) + ' د</b>' +
+      (rem !== (i.amount||0) ? ('  •  المتبقي: <b>' + rem + ' د</b>') : '');
+  }
   /* Reset file/note. */
   var fi = document.getElementById('pp-file'); if (fi) fi.value = '';
   document.getElementById('pp-note').value = '';
@@ -3955,6 +3994,7 @@ function ppPickInstallment(idx){
 }
 function ppCancelUpload(){
   _ppCurrentInst = null;
+  _ppCurrentInstIsRemainder = false;
   document.getElementById('pp-upload-card').style.display = 'none';
 }
 function ppFileChange(inp){
@@ -3983,7 +4023,20 @@ function ppUpload(){
   fd.append('note', note);
   fd.append('file', f);
   fd.append('installment_number', String(_ppCurrentInst.n || ''));
-  fd.append('installment_amount', String(_ppCurrentInst.amount || 0));
+  /* Remainder uploads claim the remaining balance, not the full
+     installment amount. The server clamps to the live balance as a
+     safety net, but sending the right number from the start keeps
+     the receipts-admin display tidy. */
+  var sendAmount;
+  if (_ppCurrentInstIsRemainder){
+    sendAmount = (typeof _ppCurrentInst.remaining === 'number')
+      ? _ppCurrentInst.remaining
+      : Math.max(0, (_ppCurrentInst.amount || 0) - (_ppCurrentInst.paid || 0));
+    fd.append('is_remainder', '1');
+  } else {
+    sendAmount = _ppCurrentInst.amount || 0;
+  }
+  fd.append('installment_amount', String(sendAmount));
   fetch('/api/parent/upload-receipt', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -17005,10 +17058,30 @@ def api_parent_upload_receipt():
         check = None
     if not check:
         return jsonify({"ok": False, "error": "بيانات الطالب غير صحيحة"}), 400
-    # Duplicate-upload guard. If a receipt for this (student, installment)
-    # is already approved → block ("لا حاجة لرفع إيصال جديد"). If still
-    # pending review → block ("بانتظار المراجعة"). The admin can mark
-    # the existing one as rejected to re-open the slot for a new upload.
+    # Did the parent flag this as a remainder upload? The remainder card
+    # (HOME-rendered partial-installment helper) sets is_remainder=1 so
+    # the duplicate-guard below knows to compare against the live
+    # installment balance instead of refusing every follow-up upload.
+    is_remainder_raw = (request.form.get('is_remainder') or '').strip()
+    is_remainder = is_remainder_raw in ('1', 'true', 'True', 'yes', 'on')
+    # Duplicate-upload guard.
+    #
+    # OLD behavior (broken): block any second upload for
+    # (student, installment) whenever an approved or pending receipt
+    # already exists. That fired even when the previous receipt only
+    # covered part of the installment — see the remainder card on the
+    # parent portal — leaving the parent unable to send proof for the
+    # remaining balance.
+    #
+    # NEW behavior:
+    #   - PENDING receipt → still block. Only one in-flight review at a
+    #     time; admin can reject it to re-open the slot.
+    #   - APPROVED receipt + remaining balance > 0 (partial-paid
+    #     installment) → ALLOW the upload. This is the remainder
+    #     scenario. The new receipt records is_remainder=1 and carries
+    #     the residual amount the parent now claims to be paying.
+    #   - APPROVED receipt + remaining == 0 (fully paid) → still block.
+    #     Nothing left to pay; no reason to send another receipt.
     if inst_n is not None:
         try:
             existing = db.execute(
@@ -17023,17 +17096,42 @@ def api_parent_upload_receipt():
         if existing:
             ex = dict(existing)
             ex_st = (ex.get("status") or "").strip()
-            if ex_st == "تم التأكيد":
+            if ex_st == "قيد المراجعة":
+                return jsonify({
+                    "ok": False,
+                    "blocked": "pending",
+                    "error": "تم رفع إيصال لهذا القسط ويتم مراجعته حالياً. سيظهر القرار قريباً.",
+                }), 409
+            # ex_st == 'تم التأكيد' → check the live balance via
+            # student_payments. If anything is still owed, allow the
+            # upload as a remainder; otherwise block.
+            inst_remaining = None
+            try:
+                row = db.execute(
+                    "SELECT COALESCE(price,0) AS price, COALESCE(paid,0) AS paid "
+                    "FROM student_payments WHERE student_id=? AND inst_num=? "
+                    "ORDER BY id DESC LIMIT 1",
+                    (sid, inst_n),
+                ).fetchone()
+                if row is not None:
+                    pr = float(row[0] if not hasattr(row, "keys") else row["price"]) or 0.0
+                    pd = float(row[1] if not hasattr(row, "keys") else row["paid"])  or 0.0
+                    inst_remaining = max(0.0, pr - pd)
+            except Exception:
+                inst_remaining = None
+            if inst_remaining is None or inst_remaining <= 0.005:
                 return jsonify({
                     "ok": False,
                     "blocked": "approved",
-                    "error": "هذا القسط تم قبول إيصاله مسبقاً. لا حاجة لرفع إيصال جديد.",
+                    "error": "هذا القسط تم سداده بالكامل. لا حاجة لرفع إيصال جديد.",
                 }), 409
-            return jsonify({
-                "ok": False,
-                "blocked": "pending",
-                "error": "تم رفع إيصال لهذا القسط ويتم مراجعته حالياً. سيظهر القرار قريباً.",
-            }), 409
+            # Partial → treat THIS upload as a remainder regardless of
+            # what the client claimed, and clamp the recorded amount to
+            # what's actually owed so the admin's confirm flow doesn't
+            # over-credit.
+            is_remainder = True
+            if (inst_amt is None) or (inst_amt > inst_remaining + 0.005):
+                inst_amt = inst_remaining
     # Cap upload size (the front-end blocks 5MB but defend on server too).
     blob = f.read(6 * 1024 * 1024 + 1)
     if len(blob) > 5 * 1024 * 1024:
@@ -17095,28 +17193,69 @@ def api_parent_upload_receipt():
         note = (note + (' ' if note else '')
                 + '⚠ صيغة قد لا تُفتح في المتصفح ('
                 + str(norm.get('original_format') or '?') + ')').strip()
+    # Tag the row when this is (or was reclassified into) a remainder
+    # receipt — admin sees it in the receipts triage so they know the
+    # parent is paying the leftover balance, not the full installment.
+    if is_remainder and note and 'بقايا' not in note and 'متبقي' not in note:
+        note = (note + ' [دفعة بقايا]').strip()
+    elif is_remainder and not note:
+        note = 'دفعة بقايا'
+    is_remainder_int = 1 if is_remainder else 0
+    # Defensive: older deployments may not have the is_remainder
+    # column yet (the v3 migration runs on import, but if a hot
+    # reload picks up stale schema metadata we still don't want to
+    # crash the upload). Probe the live columns and downgrade the
+    # INSERT to the v2 shape if needed.
+    try:
+        _pr_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(parent_receipts)").fetchall()}
+    except Exception:
+        _pr_cols = set()
+    has_is_remainder = ("is_remainder" in _pr_cols)
     try:
         if USE_PG:
             import psycopg2 as _ps
-            db.execute(
-                "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
-                "file_data, file_mime, filename, note, status, "
-                "installment_number, installment_amount) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (sid, sname or check[0] or '', pid,
-                 _ps.Binary(blob), final_mime, fname, note,
-                 'قيد المراجعة', inst_n, inst_amt),
-            )
+            if has_is_remainder:
+                db.execute(
+                    "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                    "file_data, file_mime, filename, note, status, "
+                    "installment_number, installment_amount, is_remainder) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (sid, sname or check[0] or '', pid,
+                     _ps.Binary(blob), final_mime, fname, note,
+                     'قيد المراجعة', inst_n, inst_amt, is_remainder_int),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                    "file_data, file_mime, filename, note, status, "
+                    "installment_number, installment_amount) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (sid, sname or check[0] or '', pid,
+                     _ps.Binary(blob), final_mime, fname, note,
+                     'قيد المراجعة', inst_n, inst_amt),
+                )
         else:
-            db.execute(
-                "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
-                "file_data, file_mime, filename, note, status, "
-                "installment_number, installment_amount) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (sid, sname or check[0] or '', pid,
-                 blob, final_mime, fname, note,
-                 'قيد المراجعة', inst_n, inst_amt),
-            )
+            if has_is_remainder:
+                db.execute(
+                    "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                    "file_data, file_mime, filename, note, status, "
+                    "installment_number, installment_amount, is_remainder) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (sid, sname or check[0] or '', pid,
+                     blob, final_mime, fname, note,
+                     'قيد المراجعة', inst_n, inst_amt, is_remainder_int),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO parent_receipts(student_id, student_name, personal_id, "
+                    "file_data, file_mime, filename, note, status, "
+                    "installment_number, installment_amount) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (sid, sname or check[0] or '', pid,
+                     blob, final_mime, fname, note,
+                     'قيد المراجعة', inst_n, inst_amt),
+                )
         db.commit()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
