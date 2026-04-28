@@ -9299,6 +9299,26 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
       <button type="button" onclick="almClose()" aria-label="إغلاق" style="background:none;border:none;color:#fff;font-size:1.6rem;line-height:1;cursor:pointer;font-weight:900;padding:0 8px;">&times;</button>
     </div>
     <div style="overflow:auto;flex:1;background:#fafafa;">
+
+      <!-- Summary block (additive) — groups scheduled today + recording status. -->
+      <div id="almSummaryBlock" style="background:#fff;border-bottom:1px solid #e0e0e0;padding:12px 16px;display:none;">
+        <div style="font-weight:800;color:#5d4037;margin-bottom:10px;font-size:0.98rem;">
+          &#x1F4CA; ملخص حالة التسجيل ليوم <span id="almSumDate" style="color:#bf360c;"></span> <span id="almSumDayWrap" style="color:#6d4c41;font-weight:700;"></span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:0.86rem;">
+          <span style="background:#eceff1;color:#37474f;padding:5px 12px;border-radius:999px;font-weight:800;">
+            مجموعات اليوم: <span id="almSumTotal">0</span>
+          </span>
+          <span style="background:#c8e6c9;color:#1b5e20;padding:5px 12px;border-radius:999px;font-weight:800;">
+            تم تسجيلها: <span id="almSumRecorded">0</span>
+          </span>
+          <span style="background:#ffe0b2;color:#bf360c;padding:5px 12px;border-radius:999px;font-weight:800;">
+            لم تُسجَّل: <span id="almSumPending">0</span>
+          </span>
+        </div>
+        <div id="almSumList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
       <div class="att-table-wrap" style="border-radius:0;box-shadow:none;margin:0;">
         <table>
           <thead>
@@ -9319,6 +9339,23 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
           <tbody id="almTableBody"></tbody>
         </table>
       </div>
+
+      <!-- Mobile-friendly inline CSS for the summary list rows. -->
+      <style>
+        .alm-sum-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:0.92rem;flex-wrap:wrap;}
+        .alm-sum-row.recorded{background:#e8f5e9;border:1px solid #a5d6a7;}
+        .alm-sum-row.pending {background:#fff3e0;border:1px solid #ffcc80;}
+        .alm-sum-row .nm{font-weight:800;color:#3e2723;flex:1;min-width:140px;}
+        .alm-sum-row .icon{font-size:1.05rem;line-height:1;}
+        .alm-sum-row .meta{font-size:0.85rem;color:#5d4037;display:flex;gap:10px;flex-wrap:wrap;}
+        .alm-sum-row.recorded .meta{color:#1b5e20;}
+        .alm-sum-row.pending  .meta{color:#bf360c;font-weight:700;}
+        @media (max-width:680px){
+          .alm-sum-row{padding:8px 10px;font-size:0.88rem;}
+          .alm-sum-row .nm{flex:1 1 100%;}
+          .alm-sum-row .meta{font-size:0.82rem;}
+        }
+      </style>
     </div>
   </div>
 </div>
@@ -10200,8 +10237,21 @@ function almOpen() {
   document.getElementById('almDateLabel').textContent = date;
   document.getElementById('almSummary').textContent = 'جاري التحميل...';
   document.getElementById('almTableBody').innerHTML = '<tr><td colspan="11" class="empty-state">جاري التحميل...</td></tr>';
+  /* Reset the additive summary block; the parallel summary fetch
+     below populates it. The block stays hidden until the response
+     arrives so it doesn't flash an empty state. */
+  var sumBlock = document.getElementById('almSummaryBlock');
+  if (sumBlock){
+    sumBlock.style.display = 'none';
+    document.getElementById('almSumList').innerHTML = '';
+  }
   document.getElementById('almModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+  /* Parallel fetch — summary doesn't block the absentees list and
+     vice versa. Reuses the existing per-date attendance endpoint and
+     adds a new summary endpoint that resolves what's scheduled
+     today. */
+  almLoadSummary(date);
   fetch('/api/attendance/by-date-group?date=' + encodeURIComponent(date) + '&group=__all__', {credentials:'include'})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -10248,6 +10298,68 @@ function almOpen() {
     .catch(function(){
       document.getElementById('almTableBody').innerHTML = '<tr><td colspan="11" class="empty-state">خطأ في التحميل</td></tr>';
       document.getElementById('almSummary').textContent = '';
+    });
+}
+function almLoadSummary(date){
+  /* Populate the additive summary block — groups scheduled today
+     plus their recording status. Pure additive: the existing
+     absentees list below is untouched. */
+  var box = document.getElementById('almSummaryBlock');
+  var list = document.getElementById('almSumList');
+  if (!box || !list) return;
+  list.innerHTML = '<div style="color:#888;padding:6px 4px;font-size:0.88rem;">جاري التحميل...</div>';
+  box.style.display = 'block';
+  fetch('/api/attendance/by-date-summary?date=' + encodeURIComponent(date), {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){
+        list.innerHTML = '<div style="color:#c62828;padding:6px 4px;font-size:0.88rem;">تعذر تحميل الملخص</div>';
+        return;
+      }
+      document.getElementById('almSumDate').textContent = d.date || date;
+      document.getElementById('almSumDayWrap').textContent = d.day ? ('(' + d.day + ')') : '';
+      var t = d.totals || {};
+      document.getElementById('almSumTotal').textContent    = t.scheduled || 0;
+      document.getElementById('almSumRecorded').textContent = t.recorded || 0;
+      document.getElementById('almSumPending').textContent  = t.not_recorded || 0;
+      var groups = d.groups || [];
+      if (!groups.length){
+        list.innerHTML = '<div style="color:#777;padding:8px 4px;font-size:0.92rem;">لا توجد مجموعات مجدولة في هذا اليوم ضمن وضع المركز الحالي.</div>';
+        return;
+      }
+      var html = '';
+      for (var i=0; i<groups.length; i++){
+        var g = groups[i];
+        var nm = (g.name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var teacher = g.teacher ? ' · المدرّسة: ' + g.teacher.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        var sched   = g.schedule_time ? ' · ' + g.schedule_time.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+        if (g.recorded){
+          html += '<div class="alm-sum-row recorded">'
+               +   '<span class="icon">✅</span>'
+               +   '<span class="nm">' + nm + '</span>'
+               +   '<span class="meta">'
+               +     '<span>إجمالي الطلبة: <b>' + (g.total||0) + '</b></span>'
+               +     '<span>غائب: <b>' + (g.absent||0) + '</b></span>'
+               +     '<span>متأخر: <b>' + (g.late||0) + '</b></span>'
+               +     (teacher ? '<span>' + teacher.replace(' · ','') + '</span>' : '')
+               +   '</span>'
+               + '</div>';
+        } else {
+          html += '<div class="alm-sum-row pending">'
+               +   '<span class="icon">⚠️</span>'
+               +   '<span class="nm">' + nm + '</span>'
+               +   '<span class="meta">'
+               +     '<span>لم تُسجَّل بعد</span>'
+               +     (teacher ? '<span>' + teacher.replace(' · ','') + '</span>' : '')
+               +     (sched   ? '<span>' + sched.replace(' · ','') + '</span>'   : '')
+               +   '</span>'
+               + '</div>';
+        }
+      }
+      list.innerHTML = html;
+    })
+    .catch(function(){
+      list.innerHTML = '<div style="color:#c62828;padding:6px 4px;font-size:0.88rem;">تعذر تحميل الملخص</div>';
     });
 }
 function almClose() {
@@ -23646,6 +23758,151 @@ def api_attendance_by_date_group():
     rows = db.execute(base + where + extra_filter + tail,
                       params + extra_params).fetchall()
     return jsonify({"rows": [dict(r) for r in rows]})
+
+
+@app.route('/api/attendance/by-date-summary', methods=['GET'])
+@login_required
+def api_attendance_by_date_summary():
+    """For the given date, return the list of groups whose schedule
+    includes that weekday (under the active center mode), each
+    annotated with whether attendance has been recorded on that date
+    plus per-group counts (total, absent, late). Drives the additive
+    summary block above the unified absentees list.
+
+    Reuses the same day-matching helpers (_extract_days_from_row +
+    _grp_extract_days) the group-search facet uses, and the same
+    mode + mode_exceptions handling _teacher_mode_filtered_groups
+    uses, so what shows here matches what the rest of the app
+    considers "scheduled today"."""
+    import datetime as _dt
+    raw_date = (request.args.get('date') or '').strip()
+    iso = _att_normalize_date(raw_date) if raw_date else ''
+    if not iso:
+        return jsonify({"ok": False, "error": "date is required"}), 400
+    try:
+        y, m, d = [int(p) for p in iso.split('-')]
+        py_weekday = _dt.date(y, m, d).weekday()  # Mon=0 .. Sun=6
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+    # Map Python weekday → canonical Arabic day name (matches _GRP_AR_DAYS).
+    _PY_TO_AR_DAY = {
+        0: "الإثنين", 1: "الثلاثاء", 2: "الأربعاء",
+        3: "الخميس", 4: "الجمعة", 5: "السبت", 6: "الأحد",
+    }
+    target_day = _PY_TO_AR_DAY.get(py_weekday, "")
+
+    db = get_db()
+    mode = _get_center_mode(db)
+
+    # Per-group mode exceptions (same handling as the teacher attendance
+    # filter so a group hidden in this mode also doesn't surface here).
+    try:
+        exc_rows = db.execute(
+            "SELECT key_name, mode FROM mode_exceptions WHERE scope='group'"
+        ).fetchall()
+    except Exception:
+        exc_rows = []
+    exc_map = {}
+    for r in exc_rows:
+        rd = dict(r) if hasattr(r, "keys") else {"key_name": r[0], "mode": r[1]}
+        kn = (rd.get("key_name") or "").strip()
+        md = (rd.get("mode")     or "").strip()
+        if kn and md:
+            exc_map[kn] = md
+
+    try:
+        rows = db.execute(
+            "SELECT group_name, teacher_name, study_days, study_time, "
+            "       ramadan_time, online_time "
+            "FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        rows = []
+
+    scheduled = []
+    for r in rows:
+        rd = dict(r)
+        gname = (rd.get("group_name") or "").strip()
+        if not gname:
+            continue
+        # Per-group mode override: only show if the group's exception
+        # mode equals the active center mode.
+        ex = exc_map.get(gname)
+        if ex and ex != mode:
+            continue
+        # Day match — substring search of canonical day names against
+        # whatever separator format the group's study_days uses.
+        days_raw = _extract_days_from_row(rd) or (rd.get("study_days") or "")
+        if target_day not in _grp_extract_days(days_raw):
+            continue
+        # Pick the time field that matches the active mode (display only;
+        # we still include the group whether or not the field is set).
+        if mode == "أونلاين":
+            sched_time = (rd.get("online_time")  or rd.get("study_time") or "").strip()
+        elif mode == "رمضان":
+            sched_time = (rd.get("ramadan_time") or rd.get("study_time") or "").strip()
+        else:
+            sched_time = (rd.get("study_time") or "").strip()
+        scheduled.append({
+            "name":          gname,
+            "teacher":       (rd.get("teacher_name") or "").strip(),
+            "schedule_time": sched_time,
+        })
+
+    scheduled.sort(key=lambda g: g["name"])
+
+    # Per-group attendance counts on the target date. Loose date match
+    # via _att_normalize_date so legacy rows in mixed formats
+    # (D/M/YYYY, with the Arabic era marker, etc.) still resolve.
+    rec = {}
+    try:
+        att_rows = db.execute(
+            "SELECT group_name, status, attendance_date FROM attendance"
+        ).fetchall()
+        for r in att_rows:
+            rd = dict(r)
+            if _att_normalize_date(rd.get("attendance_date") or "") != iso:
+                continue
+            g = (rd.get("group_name") or "").strip()
+            st = (rd.get("status") or "").strip()
+            if not g:
+                continue
+            entry = rec.setdefault(g, {"total": 0, "absent": 0, "late": 0})
+            entry["total"] += 1
+            if st == "غائب":
+                entry["absent"] += 1
+            elif st == "متأخر":
+                entry["late"] += 1
+    except Exception:
+        rec = {}
+
+    out = []
+    for g in scheduled:
+        rc = rec.get(g["name"]) or {"total": 0, "absent": 0, "late": 0}
+        out.append({
+            "name":          g["name"],
+            "teacher":       g["teacher"],
+            "schedule_time": g["schedule_time"],
+            "recorded":      bool(rec.get(g["name"])),
+            "total":         rc["total"],
+            "absent":        rc["absent"],
+            "late":          rc["late"],
+        })
+
+    return jsonify({
+        "ok": True,
+        "date": iso,
+        "day": target_day,
+        "mode": mode,
+        "groups": out,
+        "totals": {
+            "scheduled":    len(out),
+            "recorded":     sum(1 for g in out if g["recorded"]),
+            "not_recorded": sum(1 for g in out if not g["recorded"]),
+        },
+    })
+
 
 @app.route('/api/attendance/<int:rid>/mark-sent', methods=['POST'])
 @login_required
