@@ -29945,6 +29945,17 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       label: (parts[2]||parts[1]||'id').trim()
     };
   }
+  /* In-flight registry — coalesces concurrent callers for the same key
+     so the first call's Promise is reused by everyone else asking for
+     the same options before the network response arrives. Without this
+     a freshly-loaded /database with N rows × M linked dropdowns fires
+     N×M parallel requests for the same options endpoint (a classic
+     cache stampede). The Playwright probe captured >100 simultaneous
+     calls to /api/table/student_groups/linked-options on /database
+     load with 50 students, each blocked behind the others — total
+     /database load time was 4-6 s. After coalescing it's ONE call. */
+  var _LINKED_OPTS_INFLIGHT = window._LINKED_OPTS_INFLIGHT = window._LINKED_OPTS_INFLIGHT || {};
+
   function _loadLinkedOpts(spec){
     var p = _parseLinkedSpec(spec);
     if (!p || !p.table) return Promise.resolve([]);
@@ -29952,18 +29963,26 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     var now = Date.now();
     var c = _LINKED_OPTS_CACHE[key];
     if (c && (now - c.t) < _LINKED_OPTS_TTL_MS) return Promise.resolve(c.list);
+    // Already fetching — share the same Promise.
+    if (_LINKED_OPTS_INFLIGHT[key]) return _LINKED_OPTS_INFLIGHT[key];
     var url = '/api/table/' + encodeURIComponent(p.table) + '/linked-options'
             + '?source=' + encodeURIComponent(p.table)
             + '&value='  + encodeURIComponent(p.value)
             + '&label='  + encodeURIComponent(p.label);
-    return fetch(url, {credentials:'include'})
+    var promise = fetch(url, {credentials:'include'})
       .then(function(r){ return r.json(); })
       .then(function(d){
         var list = (d && d.options) ? d.options : [];
-        _LINKED_OPTS_CACHE[key] = { t: now, list: list };
+        _LINKED_OPTS_CACHE[key] = { t: Date.now(), list: list };
+        delete _LINKED_OPTS_INFLIGHT[key];
         return list;
       })
-      .catch(function(){ return (c && c.list) || []; });
+      .catch(function(){
+        delete _LINKED_OPTS_INFLIGHT[key];
+        return (c && c.list) || [];
+      });
+    _LINKED_OPTS_INFLIGHT[key] = promise;
+    return promise;
   }
   function _invalidateLinkedCache(table){
     if (!table){
