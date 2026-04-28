@@ -11837,25 +11837,110 @@ function renderTable(list){
 var body=document.getElementById('studentsBody');
 var colCount=allColumns.length+3;
 if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#x644;&#x627; &#x62A;&#x648;&#x62C;&#x62F; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;&#x60C; &#x627;&#x636;&#x641; &#x627;&#x648;&#x644; &#x637;&#x627;&#x644;&#x628;</td></tr>';_bulkUpdate('studentsBody','selectAll_students','bulkDelBtn_students');applyFreezeToTable('students');return;}
+function _stEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var STUDENT_DROPDOWN_FIELDS = {
+  'class_name':         { fixed: ['0.3','1','2','3','4','5','6','7','8','9'], emptyLabel: '-- اختر --' },
+  'group_name_student': { source: 'group', emptyLabel: '-- اختر --' },
+  'group_online':       { source: 'group', emptyLabel: '-- لا يوجد --' }
+};
 var html='';
 for(var i=0;i<list.length;i++){
 var s2=list[i];
 var row='<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+s2.id+'" onclick="_bulkUpdate(\\'studentsBody\\',\\'selectAll_students\\',\\'bulkDelBtn_students\\')"></td><td>'+(i+1)+'</td>';
 for(var j=0;j<allColumns.length;j++){
 var key=allColumns[j].col_key;
-var val=s2[key]||'';
-if(key==='personal_id'){row+='<td><b>'+val+'</b></td>';}
-else if(key==='student_name'){row+='<td class="name-cell">'+val+'</td>';}
-else if(key==='final_result'){
-var badge=val==='&#x646;&#x627;&#x62C;&#x62D;'?'badge-pass':val==='&#x631;&#x627;&#x633;&#x628;'?'badge-fail':'badge-pend';
-row+='<td>'+(val?'<span class="badge '+badge+'">'+val+'</span>':'-')+'</td>';
-}else if(key==='installment_type'){var tqDetail=getTaqseetDetail(val);row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option>'+allTaqseetData.map(function(t){var iv=_tqIdValue(t); var lbl=_tqOptionLabel(t); var sel=_tqMatchesStored(t,val)?' selected="selected"':''; return '<option value="'+iv+'"'+sel+'>'+lbl+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';}else{row+='<td>'+(val||'-')+'</td>';}
+var val=s2[key]==null?'':String(s2[key]);
+if(key==='installment_type'){
+  // Existing taqseet-plan dropdown — preserves the updateInstallmentType() flow.
+  var tqDetail=getTaqseetDetail(val);
+  row+='<td class="installment-cell"><select class="installment-select" onchange="updateInstallmentType('+s2.id+',this.value)"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option>'+allTaqseetData.map(function(t){var iv=_tqIdValue(t); var lbl=_tqOptionLabel(t); var sel=_tqMatchesStored(t,val)?' selected="selected"':''; return '<option value="'+iv+'"'+sel+'>'+lbl+'</option>';}).join('')+'</select>'+(tqDetail?'<br><small class="tq-detail">'+tqDetail+'</small>':'')+'</td>';
+} else if (STUDENT_DROPDOWN_FIELDS[key]) {
+  // User-specified dropdowns (المجموعة / المجموعة أونلاين / الصف).
+  // Render with a single placeholder option holding the current
+  // value; the post-render pass replaces it with real options and
+  // wires the change listener.
+  row+='<td class="select-cell" data-id="'+s2.id+'" data-field="'+key+'" style="padding:8px;min-width:80px;"><select class="cell-select" data-id="'+s2.id+'" data-field="'+key+'" data-current="'+_stEsc(val)+'" style="width:100%;padding:5px 6px;border:1px solid #ccc;border-radius:6px;font-family:inherit;background:#fff;"><option value="'+_stEsc(val)+'" selected>'+_stEsc(val)+'</option></select></td>';
+} else {
+  // Plain contenteditable cell — taqseet pattern.
+  var extra='';
+  if(key==='personal_id') extra='font-weight:bold;';
+  else if(key==='student_name') extra='font-weight:600;';
+  row+='<td class="editable" contenteditable="true" data-id="'+s2.id+'" data-field="'+key+'" style="padding:8px;min-width:80px;'+extra+'">'+_stEsc(val)+'</td>';
+}
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
 }
 body.innerHTML=html;
+// Wire taqseet-style blur save on every contenteditable cell.
+body.querySelectorAll('.editable[data-field]').forEach(function(td){
+  td.addEventListener('blur', function(){
+    saveStudentCell(parseInt(this.dataset.id), this.dataset.field, this);
+  });
+});
+// Populate user-specified dropdowns + wire change listeners.
+body.querySelectorAll('.cell-select').forEach(function(sel){
+  var key  = sel.dataset.field;
+  var sid  = parseInt(sel.dataset.id);
+  var cur  = sel.dataset.current || '';
+  var spec = STUDENT_DROPDOWN_FIELDS[key];
+  if (!spec) return;
+  if (spec.fixed) {
+    sel.innerHTML = '';
+    var ph = document.createElement('option');
+    ph.value = ''; ph.textContent = spec.emptyLabel; sel.appendChild(ph);
+    spec.fixed.forEach(function(o){
+      var op = document.createElement('option'); op.value = o; op.textContent = o;
+      if (o === cur) op.selected = true;
+      sel.appendChild(op);
+    });
+  } else if (spec.source === 'group' && typeof window.buildGroupDropdown === 'function') {
+    window.buildGroupDropdown(cur, sel, { allowEmpty:true, emptyLabel: spec.emptyLabel });
+  }
+  sel.addEventListener('change', function(){
+    saveStudentCell(sid, key, this);
+  });
+});
 applyFreezeToTable('students');
+}
+
+function saveStudentCell(id, field, el){
+  var isSelect = (el.tagName === 'SELECT');
+  var val = isSelect ? el.value : el.innerText.trim();
+  var rec = null;
+  for (var i=0; i<allStudents.length; i++) { if (allStudents[i].id === id) { rec = allStudents[i]; break; } }
+  if (!rec) return;
+  var oldVal = rec[field] == null ? "" : String(rec[field]);
+  if (val === oldVal) return;
+  var flashTarget = isSelect ? (el.closest('td') || el) : el;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(flashTarget, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(flashTarget, false); }
+  function _revert(){
+    if (isSelect) el.value = oldVal;
+    else el.innerText = oldVal;
+  }
+  var body = {}; body[field] = val;
+  fetch('/api/students/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body)})
+    .then(function(r){
+      if (r.status === 409) {
+        return r.json().then(function(j){ j.__status409 = true; return j; });
+      }
+      return r.json();
+    })
+    .then(function(j){
+      if (j && j.ok === false) {
+        showToast(j.error || 'حدث خطأ', '#e53935');
+        _revert();
+        _flashErr();
+        return;
+      }
+      rec[field] = val;
+      _flashOk();
+    }).catch(function(){
+      _revert();
+      _flashErr();
+      showToast('خطأ في الاتصال', '#e53935');
+    });
 }
 function filterTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
