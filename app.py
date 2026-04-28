@@ -14935,17 +14935,41 @@ def login():
         # stays consistent with the rest of LOGIN_HTML.
         # Decoded text: "اسم المستخدم أو كلمة المرور غير صحيحة. تأكد من الإدخال وأعد المحاولة."
         return render_login("&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x623;&#x648; &#x643;&#x644;&#x645;&#x629; &#x627;&#x644;&#x645;&#x631;&#x648;&#x631; &#x63A;&#x64A;&#x631; &#x635;&#x62D;&#x64A;&#x62D;&#x629;. &#x62A;&#x623;&#x643;&#x62F; &#x645;&#x646; &#x627;&#x644;&#x625;&#x62F;&#x62E;&#x627;&#x644; &#x648;&#x623;&#x639;&#x62F; &#x627;&#x644;&#x645;&#x62D;&#x627;&#x648;&#x644;&#x629;."), 401
+    # Reject deactivated accounts (commit 4/6 of permissions admin).
+    # Check both presence in the row AND the integer value — the
+    # column was added by permissions_v1 and backfilled to 1, but
+    # be defensive: NULL / missing column → treated as active so
+    # pre-migration deployments never lock anyone out.
+    user_d = dict(user)
+    is_active_val = user_d.get("is_active")
+    if is_active_val is not None:
+        try: is_active_int = int(is_active_val)
+        except Exception: is_active_int = 1
+        if is_active_int == 0:
+            _login_rate_record(username)
+            # Decoded: "هذا الحساب معطّل. يرجى مراجعة المسؤول."
+            return render_login(
+                "&#x647;&#x630;&#x627; &#x627;&#x644;&#x62D;&#x633;&#x627;&#x628; &#x645;&#x639;&#x637;&#x651;&#x644;. "
+                "&#x64A;&#x631;&#x62C;&#x649; &#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x627;&#x644;&#x645;&#x633;&#x624;&#x648;&#x644;."
+            ), 403
     _login_rate_clear(username)
-    session["user"] = dict(user)
-    role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
+    session["user"] = user_d
+    role = (user_d.get("role") or "").strip().lower()
     # Force password change on first login for student/parent accounts.
     must_change = 0
-    try:
-        must_change = int(dict(user).get("must_change_pw") or 0)
-    except Exception:
-        must_change = 0
+    try: must_change = int(user_d.get("must_change_pw") or 0)
+    except Exception: must_change = 0
     if must_change and role in ("student", "parent"):
         return redirect("/portal/change-password")
+    # Custom landing page (per-user override of the role default).
+    # NULL/empty → fall through to role-based dispatch unchanged, so
+    # nobody gets a different post-login experience by accident.
+    landing = (user_d.get("landing_page") or "").strip()
+    if landing == "dashboard":      return redirect("/dashboard")
+    if landing == "teacher_hub":    return redirect("/teacher/hub")
+    if landing == "parent_hub":     return redirect("/portal/parent-hub")
+    if landing == "parent_v1":      return redirect("/portal/parent")
+    if landing == "student_portal": return redirect("/portal/parent-hub")
     if role == "teacher":
         return redirect("/teacher/hub")
     if role == "student":
@@ -16024,6 +16048,43 @@ body{background:linear-gradient(135deg,#f3eeff 0%,#e8f8fb 100%);min-height:100vh
           padding:2px 8px;border-radius:9px;margin-inline-start:6px;}
 code{font-family:'Consolas','Courier New',monospace;background:#f6f1fb;padding:1px 6px;
      border-radius:6px;font-size:0.86rem;color:#4a148c;}
+/* Edit mode (commit 4/6) */
+.pp-edit-btn{background:linear-gradient(135deg,#6B3FA0,#8e44ad);color:#fff;border:none;
+             padding:8px 16px;border-radius:9px;font-weight:700;cursor:pointer;
+             font-family:inherit;font-size:0.88rem;margin-bottom:12px;
+             box-shadow:0 2px 6px rgba(107,63,160,.3);}
+.pp-edit-btn:hover{filter:brightness(1.08);}
+.pp-edit-btn.pp-cancel{background:#fff;color:#4a148c;border:1.5px solid #d8c9eb;
+                       margin-inline-start:6px;box-shadow:none;}
+.pp-edit-btn.pp-danger{background:linear-gradient(135deg,#c62828,#e53935);}
+.pp-edit-btn.pp-save{background:linear-gradient(135deg,#2e7d32,#43a047);}
+.pp-edit-btn:disabled{opacity:.55;cursor:not-allowed;}
+.pp-form-row{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:center;
+             margin-bottom:10px;}
+.pp-form-row label{font-weight:800;color:#4A148C;font-size:0.9rem;}
+.pp-form-row input,.pp-form-row select{
+  background:#fff;border:1.5px solid #d8c9eb;border-radius:9px;padding:8px 12px;
+  font-family:inherit;font-size:0.92rem;color:#212121;}
+.pp-form-row input:focus,.pp-form-row select:focus{outline:2px solid #6B3FA0;}
+.pp-toggle{position:relative;display:inline-block;width:54px;height:28px;}
+.pp-toggle input{opacity:0;width:0;height:0;}
+.pp-toggle .pp-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
+                      background:#d8c9eb;transition:.2s;border-radius:28px;}
+.pp-toggle .pp-slider:before{position:absolute;content:"";height:22px;width:22px;left:3px;
+                             bottom:3px;background:#fff;transition:.2s;border-radius:50%;
+                             box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.pp-toggle input:checked + .pp-slider{background:linear-gradient(135deg,#43a047,#2e7d32);}
+.pp-toggle input:checked + .pp-slider:before{transform:translateX(-26px);}
+.pp-msg{padding:10px 14px;border-radius:9px;margin:8px 0;font-weight:700;font-size:0.9rem;}
+.pp-msg-ok{background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7;}
+.pp-msg-err{background:#ffebee;color:#b71c1c;border:1.5px solid #ef9a9a;}
+.pp-modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);
+             z-index:100;display:flex;align-items:center;justify-content:center;}
+.pp-modal{background:#fff;border-radius:14px;padding:22px 24px;max-width:420px;width:92%;
+          box-shadow:0 12px 40px rgba(0,0,0,.3);}
+.pp-modal h4{color:#4A148C;font-size:1.05rem;margin-bottom:10px;font-weight:800;}
+.pp-modal p{color:#555;margin-bottom:14px;font-size:0.92rem;line-height:1.6;}
+.pp-modal-actions{display:flex;gap:8px;justify-content:flex-end;}
 </style>
 </head>
 <body>
@@ -16158,7 +16219,18 @@ async function ppSelectUser(uid){
   ppRenderDetail(d);
 }
 
+let _PP_DETAIL = null;     // last loaded detail payload {user, buttons}
+let _PP_EDIT_MODE = false; // toggled by ppToggleEdit()
+
 function ppRenderDetail(d){
+  _PP_DETAIL = d;
+  _PP_EDIT_MODE = false;
+  _ppPaintDetail();
+}
+
+function _ppPaintDetail(){
+  if (!_PP_DETAIL){ return; }
+  const d = _PP_DETAIL;
   const u = d.user || {};
   const detail = document.getElementById('pp-detail');
   const groups = {};
@@ -16167,14 +16239,31 @@ function ppRenderDetail(d){
     if (!groups[g]) groups[g] = [];
     groups[g].push(b);
   }
-  let html = '<h3>تفاصيل المستخدم</h3>';
-  html += '<div class="pp-info-grid">';
-  html += '<b>الاسم:</b><span>'+_ppEsc(u.name || '—')+'</span>';
-  html += '<b>اسم المستخدم:</b><span><code>'+_ppEsc(u.username)+'</code></span>';
-  html += '<b>الدور:</b><span>'+_ppEsc(PP_ROLE_LABELS[u.role] || u.role || '—')+'</span>';
-  html += '<b>الصفحة الرئيسية:</b><span>'+_ppEsc(PP_LANDING_LABELS[u.landing_page||''] || u.landing_page)+'</span>';
-  html += '<b>الحالة:</b><span>'+(u.is_active ? 'نشط' : 'معطّل')+'</span>';
+  let html = '';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;'
+       +  'margin-bottom:6px;flex-wrap:wrap;gap:6px;">';
+  html += '<h3 style="margin:0;">تفاصيل المستخدم</h3>';
+  if (!_PP_EDIT_MODE){
+    html += '<button class="pp-edit-btn" onclick="ppToggleEdit()">✏️ تعديل</button>';
+  } else {
+    html += '<div>'
+         +  '<button class="pp-edit-btn pp-save" onclick="ppSaveEdit()">💾 حفظ</button>'
+         +  '<button class="pp-edit-btn pp-cancel" onclick="ppToggleEdit()">إلغاء</button>'
+         +  '</div>';
+  }
   html += '</div>';
+  html += '<div id="pp-msg-slot"></div>';
+  if (_PP_EDIT_MODE){
+    html += _ppRenderEditForm(u);
+  } else {
+    html += '<div class="pp-info-grid">';
+    html += '<b>الاسم:</b><span>'+_ppEsc(u.name || '—')+'</span>';
+    html += '<b>اسم المستخدم:</b><span><code>'+_ppEsc(u.username)+'</code></span>';
+    html += '<b>الدور:</b><span>'+_ppEsc(PP_ROLE_LABELS[u.role] || u.role || '—')+'</span>';
+    html += '<b>الصفحة الرئيسية:</b><span>'+_ppEsc(PP_LANDING_LABELS[u.landing_page||''] || u.landing_page)+'</span>';
+    html += '<b>الحالة:</b><span>'+(u.is_active ? 'نشط' : 'معطّل')+'</span>';
+    html += '</div>';
+  }
   html += '<h3>الأزرار والصلاحيات</h3>';
   const rendered = new Set();
   for (const g of PP_GROUP_ORDER){
@@ -16187,6 +16276,122 @@ function ppRenderDetail(d){
     html += _ppRenderGroup(PP_GROUP_LABELS[g] || g, groups[g]);
   }
   detail.innerHTML = html;
+}
+
+function _ppRenderEditForm(u){
+  let s = '<div class="pp-info-grid" style="grid-template-columns:auto 1fr;">';
+  // username
+  s += '<label>اسم المستخدم</label>'
+    +  '<input id="pp-edit-username" type="text" value="'+_ppEsc(u.username)+'" minlength="3" maxlength="60">';
+  // password (text input — admin-typed reset)
+  s += '<label>كلمة مرور جديدة</label>'
+    +  '<input id="pp-edit-password" type="password" placeholder="اتركه فارغاً للإبقاء على القديمة" autocomplete="new-password">';
+  // role
+  s += '<label>الدور</label><select id="pp-edit-role">';
+  for (const r of Object.keys(PP_ROLE_LABELS)){
+    const sel = (u.role === r) ? ' selected' : '';
+    s += '<option value="'+r+'"'+sel+'>'+_ppEsc(PP_ROLE_LABELS[r])+'</option>';
+  }
+  s += '</select>';
+  // landing
+  s += '<label>الصفحة الرئيسية</label><select id="pp-edit-landing">';
+  for (const k of Object.keys(PP_LANDING_LABELS)){
+    const sel = ((u.landing_page||'') === k) ? ' selected' : '';
+    s += '<option value="'+k+'"'+sel+'>'+_ppEsc(PP_LANDING_LABELS[k])+'</option>';
+  }
+  s += '</select>';
+  // is_active
+  s += '<label>الحالة</label>'
+    +  '<label class="pp-toggle"><input id="pp-edit-active" type="checkbox"'
+    +  (u.is_active ? ' checked' : '')+'><span class="pp-slider"></span></label>';
+  s += '</div>';
+  return s;
+}
+
+function ppToggleEdit(){
+  _PP_EDIT_MODE = !_PP_EDIT_MODE;
+  _ppPaintDetail();
+}
+
+function _ppMsg(kind, text){
+  const slot = document.getElementById('pp-msg-slot');
+  if (!slot) return;
+  slot.innerHTML = '<div class="pp-msg pp-msg-'+(kind==='ok'?'ok':'err')+'">'+_ppEsc(text)+'</div>';
+  if (kind === 'ok'){ setTimeout(()=>{ if (slot) slot.innerHTML=''; }, 3500); }
+}
+
+async function ppSaveEdit(){
+  if (!_PP_DETAIL || !_PP_DETAIL.user) return;
+  const u = _PP_DETAIL.user;
+  const body = {};
+  const newU = (document.getElementById('pp-edit-username').value || '').trim();
+  if (newU !== (u.username || '')) body.username = newU;
+  const pw = document.getElementById('pp-edit-password').value || '';
+  if (pw){ body.password = pw; }
+  const newRole = document.getElementById('pp-edit-role').value;
+  if (newRole !== u.role) body.role = newRole;
+  const newLanding = document.getElementById('pp-edit-landing').value;
+  if ((newLanding || '') !== (u.landing_page || '')) body.landing_page = newLanding;
+  const newActive = document.getElementById('pp-edit-active').checked ? 1 : 0;
+  if (newActive !== (u.is_active ? 1 : 0)) body.is_active = newActive;
+  if (Object.keys(body).length === 0){
+    _ppMsg('ok', 'لا توجد تغييرات للحفظ.');
+    _PP_EDIT_MODE = false; _ppPaintDetail();
+    return;
+  }
+  // Confirmation modal for destructive actions (role change, deactivation, password reset)
+  const needsConfirm = (body.role && body.role !== u.role) ||
+                       (body.is_active === 0) ||
+                       (body.password);
+  if (needsConfirm){
+    const reasons = [];
+    if (body.role && body.role !== u.role)
+      reasons.push('تغيير الدور إلى: ' + (PP_ROLE_LABELS[body.role] || body.role));
+    if (body.is_active === 0) reasons.push('تعطيل الحساب');
+    if (body.password) reasons.push('إعادة تعيين كلمة المرور');
+    const ok = await ppConfirm('تأكيد التغيير', 'سيتم تطبيق ما يلي على المستخدم: '+
+                                reasons.join('، ')+'. هل تريد المتابعة؟');
+    if (!ok) return;
+  }
+  let r;
+  try { r = await fetch('/api/admin/users/'+u.id, {
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+  } catch (e){
+    _ppMsg('err', 'تعذّر الاتصال بالخادم'); return;
+  }
+  let resp = {};
+  try { resp = await r.json(); } catch(e){}
+  if (!r.ok){
+    _ppMsg('err', resp.error || ('خطأ HTTP ' + r.status));
+    return;
+  }
+  _ppMsg('ok', 'تم الحفظ.');
+  _PP_DETAIL.user = resp.user || u;
+  _PP_EDIT_MODE = false;
+  _ppPaintDetail();
+  // Refresh the user list (hidden_button_count, name, role pill).
+  ppLoadUsers();
+}
+
+function ppConfirm(title, body){
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'pp-modal-bg';
+    wrap.innerHTML = '<div class="pp-modal">'+
+      '<h4>'+_ppEsc(title)+'</h4>'+
+      '<p>'+_ppEsc(body)+'</p>'+
+      '<div class="pp-modal-actions">'+
+        '<button class="pp-edit-btn pp-cancel" id="pp-cm-no">إلغاء</button>'+
+        '<button class="pp-edit-btn pp-save" id="pp-cm-yes">تأكيد</button>'+
+      '</div></div>';
+    document.body.appendChild(wrap);
+    document.getElementById('pp-cm-no').onclick = () => { wrap.remove(); resolve(false); };
+    document.getElementById('pp-cm-yes').onclick = () => { wrap.remove(); resolve(true); };
+  });
 }
 
 function _ppRenderGroup(title, items){
