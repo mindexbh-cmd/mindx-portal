@@ -3570,7 +3570,7 @@ function ppLookup(){
     .then(function(r){ return r.json().then(function(d){return {status:r.status, data:d};}); })
     .then(function(o){
       btn.disabled = false; btn.innerHTML = prev;
-      if (o.status === 429){ _ppErr('تم تجاوز الحد الأعلى للمحاولات. الرجاء المحاولة بعد ساعة.'); return; }
+      if (o.status === 429){ _ppErr('تعذر تنفيذ الطلب الآن. الرجاء إعادة المحاولة بعد لحظات.'); return; }
       if (!o.data.ok){ _ppErr(o.data.error || 'الرقم الشخصي غير صحيح'); return; }
       _ppRender(o.data);
     })
@@ -14652,11 +14652,39 @@ def index():
     session.clear()
     return render_login()
 
-# Simple in-memory rate limit for student/parent login (5 fails / 15 min).
+# Simple in-memory rate limit for ADMIN/MANAGER/TEACHER login
+# (5 fails / 15 min). STUDENT/PARENT accounts are never rate-limited:
+# parents sometimes mistype their child's personal_id, and the team
+# decided losing access to attendance/payments matters more than
+# the small brute-force protection a 15-min lockout buys here.
 # Bytes a small dict; not a security boundary against a determined
-# attacker, but enough to block trivial brute-forcing.
+# attacker, but enough to slow trivial dictionary attacks against
+# staff accounts.
 _LOGIN_FAILS = {}
+
+def _login_role_lookup(username):
+    """Best-effort role lookup so the rate-limit gate can skip
+    student/parent accounts entirely. Returns '' on any error."""
+    if not username:
+        return ''
+    try:
+        db = get_db()
+        u = db.execute("SELECT role FROM users WHERE username=?", (username,)).fetchone()
+    except Exception:
+        return ''
+    if not u:
+        return ''
+    try:
+        return (dict(u).get('role') or '').strip().lower()
+    except Exception:
+        return ''
+
 def _login_rate_check(username):
+    """Returns True when the login may proceed. Student/parent role
+    is never blocked. For staff roles, fall through to the original
+    5-fails-in-15-minutes check."""
+    if _login_role_lookup(username) == 'student':
+        return True
     import time as _time
     now = _time.time()
     bucket = _LOGIN_FAILS.get(username) or []
@@ -14664,6 +14692,11 @@ def _login_rate_check(username):
     _LOGIN_FAILS[username] = bucket
     return len(bucket) < 5
 def _login_rate_record(username):
+    # Don't accumulate fails for student/parent accounts — keeps the
+    # bucket clean even if some other code path called record() before
+    # the role check landed.
+    if _login_role_lookup(username) == 'student':
+        return
     import time as _time
     bucket = _LOGIN_FAILS.get(username) or []
     bucket.append(_time.time())
@@ -14685,7 +14718,12 @@ def login():
                       (username, hp(password))).fetchone()
     if not user:
         _login_rate_record(username)
-        return render_login("&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x627;&#x648; &#x643;&#x644;&#x645;&#x629; &#x627;&#x644;&#x645;&#x631;&#x648;&#x631; &#x63A;&#x644;&#x637;"), 401
+        # Helpful, non-blaming message — parents typing their child's
+        # personal_id often miss a digit or use a wrong term's value.
+        # Entity-encoded so the inline-string guidance in CLAUDE.md
+        # stays consistent with the rest of LOGIN_HTML.
+        # Decoded text: "اسم المستخدم أو كلمة المرور غير صحيحة. تأكد من الإدخال وأعد المحاولة."
+        return render_login("&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x62E;&#x62F;&#x645; &#x623;&#x648; &#x643;&#x644;&#x645;&#x629; &#x627;&#x644;&#x645;&#x631;&#x648;&#x631; &#x63A;&#x64A;&#x631; &#x635;&#x62D;&#x64A;&#x62D;&#x629;. &#x62A;&#x623;&#x643;&#x62F; &#x645;&#x646; &#x627;&#x644;&#x625;&#x62F;&#x62E;&#x627;&#x644; &#x648;&#x623;&#x639;&#x62F; &#x627;&#x644;&#x645;&#x62D;&#x627;&#x648;&#x644;&#x629;."), 401
     _login_rate_clear(username)
     session["user"] = dict(user)
     role = (user["role"] or "").strip().lower() if "role" in user.keys() else ""
@@ -14774,17 +14812,29 @@ _PARENT_RATE_WINDOW = 3600
 _PARENT_RATE_MAX = 10
 
 def _parent_rate_check(ip):
-    import time as _time
-    now = _time.time()
+    """Rate-limit was removed at the team's request — parents who
+    mistype the personal_id were getting locked out for an hour
+    and missing time-sensitive payment / attendance info. Function
+    kept as a no-op so existing call sites compile unchanged. The
+    in-memory dict is also cleared on import below so currently-
+    locked IPs can hit the parent portal immediately on the next
+    deploy."""
+    return True
+
+
+# Clear any in-memory locks left over from previous server lifetime —
+# safe to do at module import since the dicts are process-local.
+# Parents/staff currently sitting on a "too many attempts" error get
+# immediate access on the next request after this code deploys.
+try:
+    _LOGIN_FAILS.clear()
+except Exception:
+    pass
+try:
     with _PARENT_RATE_LOCK:
-        hits = _PARENT_RATE.get(ip, [])
-        hits = [t for t in hits if now - t < _PARENT_RATE_WINDOW]
-        if len(hits) >= _PARENT_RATE_MAX:
-            _PARENT_RATE[ip] = hits
-            return False
-        hits.append(now)
-        _PARENT_RATE[ip] = hits
-        return True
+        _PARENT_RATE.clear()
+except Exception:
+    pass
 
 @app.route("/parent")
 def parent_portal():
