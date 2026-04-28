@@ -14404,7 +14404,16 @@ def attendance():
 @app.route("/database")
 @admin_required
 def database():
-    return DATABASE_HTML
+    # No-cache so a fresh deploy's renderTable / saveStudentCell / etc.
+    # land in the browser immediately. Without this, browsers happily
+    # serve the previously-cached page (which still has the old toggle-
+    # edit pattern) and editable cells appear "stuck" until the user
+    # hard-refreshes — visible as "only attendance and taqseet are
+    # directly editable" while the rest still look read-only.
+    resp = Response(DATABASE_HTML, mimetype='text/html; charset=utf-8')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 
 # ─── Parent portal (public, no login) ──────────────────────────────
@@ -31040,7 +31049,12 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
 
 @app.route('/mx-helpers.js')
 def mx_helpers_js():
-    return Response(MX_HELPERS_JS, mimetype='application/javascript; charset=utf-8')
+    resp = Response(MX_HELPERS_JS, mimetype='application/javascript; charset=utf-8')
+    # See database() — cache-busting so window.mxFlashCell + the freeze-
+    # bar sweep + any future helper updates always reach the browser.
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 ADMIN_BACKUPS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl">
