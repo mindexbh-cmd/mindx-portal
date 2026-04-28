@@ -13235,6 +13235,10 @@ function renderAllCustomTables() {
     html += buildCustomTableHTML(t);
   }
   container.innerHTML = html;
+  // Wire taqseet-style blur save on every editable cell.
+  container.querySelectorAll('.editable[data-tid][data-rid][data-ckey]').forEach(function(td){
+    td.addEventListener('blur', function(){ saveCustomCell(this); });
+  });
   // Re-apply saved freeze state on each custom table.
   for (var j = 0; j < allCustomTables.length; j++) {
     applyFreezeToTable('custom_' + allCustomTables[j].id);
@@ -13270,7 +13274,7 @@ function buildCustomTableHTML(t) {
       for(var k=0; k<cols.length; k++) {
         var ck = cols[k].col_key;
         var val = rd[ck] || '';
-        bodyRows += '<td class="editable" data-tid="' + t.id + '" data-rid="' + r.id + '" data-ckey="' + ck + '" onclick="editCustomCell(this)">' + val + '</td>';
+        bodyRows += '<td class="editable" contenteditable="true" data-tid="' + t.id + '" data-rid="' + r.id + '" data-ckey="' + ck + '" style="padding:8px;min-width:80px;">' + val + '</td>';
       }
       bodyRows += '<td><button class="btn-del-row" onclick="deleteCustomRow(' + t.id + ',' + r.id + ')">&#128465;</button></td>';
       bodyRows += '</tr>';
@@ -13355,58 +13359,44 @@ function deleteCustomRow(tid, rid) {
 }
 
 // &#x2500;&#x2500; Inline cell edit &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
-function editCustomCell(tdEl) {
-  if(tdEl.querySelector('input')) return;
+function saveCustomCell(tdEl) {
   var tid = parseInt(tdEl.getAttribute('data-tid'));
   var rid = parseInt(tdEl.getAttribute('data-rid'));
   var ckey = tdEl.getAttribute('data-ckey');
-  var oldVal = tdEl.textContent.trim();
-  var input = document.createElement('input');
-  input.type = 'text';
-  input.value = oldVal;
-  input.style.cssText = 'width:100%;padding:4px;border:1px solid #aaa;border-radius:4px;';
-  tdEl.innerHTML = '';
-  tdEl.appendChild(input);
-  input.focus();
-  var saved = false;
-  function saveCell() {
-    if(saved) return; saved = true;
-    var newVal = input.value;
-    if(newVal === oldVal) { tdEl.textContent = oldVal; return; }
-    var t = null;
-    for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
-    if(!t) { tdEl.textContent = newVal; return; }
-    var row = null;
-    for(var j=0; j<t.rows.length; j++) { if(t.rows[j].id===rid) { row=t.rows[j]; break; } }
-    if(!row) { tdEl.textContent = newVal; return; }
-    var updated = Object.assign({}, row.row_data);
-    updated[ckey] = newVal;
-    /* Optimistic UI: show the new value immediately. */
-    tdEl.textContent = newVal;
-    function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, true); }
-    function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, false); }
-    fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
-      .then(function(r){ return r.json(); }).then(function(d){
-        if(d.ok){
-          _flashOk();
-          /* Reload after the flash so dependent computed columns
-             refresh without killing the visual confirmation. */
-          setTimeout(function(){ loadCustomTables(); }, 750);
-        } else {
-          tdEl.textContent = oldVal;
-          _flashErr();
-          showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935');
-          setTimeout(function(){ loadCustomTables(); }, 750);
-        }
-      }).catch(function(){
-        tdEl.textContent = oldVal;
+  var val = tdEl.innerText.trim();
+  var t = null;
+  for(var i=0; i<allCustomTables.length; i++) { if(allCustomTables[i].id===tid) { t=allCustomTables[i]; break; } }
+  if(!t) return;
+  var row = null;
+  for(var j=0; j<t.rows.length; j++) { if(t.rows[j].id===rid) { row=t.rows[j]; break; } }
+  if(!row) return;
+  var oldVal = (row.row_data && row.row_data[ckey] != null) ? String(row.row_data[ckey]) : '';
+  if(val === oldVal) return;
+  var updated = Object.assign({}, row.row_data || {});
+  updated[ckey] = val;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(tdEl, false); }
+  fetch('/api/custom-tables/' + tid + '/rows/' + rid, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({row_data: updated})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d && d.ok === false){
+        showToast(d.error||'&#x62D;&#x62F;&#x62B; &#x62E;&#x637;&#x623;','#e53935');
+        tdEl.innerText = oldVal;
         _flashErr();
-        showToast('&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644;','#e53935');
-      });
-  }
-  input.addEventListener('blur', saveCell);
-  input.addEventListener('keydown', function(e){ if(e.key==='Enter') input.blur(); });
+        return;
+      }
+      row.row_data = updated;
+      _flashOk();
+    }).catch(function(){
+      tdEl.innerText = oldVal;
+      _flashErr();
+      showToast('&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x627;&#x644;&#x627;&#x62A;&#x635;&#x627;&#x644;','#e53935');
+    });
 }
+/* Backwards-compat alias: legacy handler used to inject an <input>;
+   nothing in this file calls it now, but external code or HTML
+   cached on a long-lived tab might still reference it. Forward the
+   call to the new in-place save. */
+function editCustomCell(tdEl) { saveCustomCell(tdEl); }
 
 // &#x2500;&#x2500; Table edit modal (add/delete/rename cols) &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
 function openCustomTableEditModal(tid) {
