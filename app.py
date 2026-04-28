@@ -3628,12 +3628,17 @@ function _ppRender(d){
     p += '</div>';
   }
   document.getElementById('pp-pay').innerHTML = p;
-  /* Installment picker — only unpaid installments are clickable.
-     "Unpaid" means status is unpaid OR partial; paid + exempt are
-     hidden so the parent only sees what they still owe. */
+  /* Installment picker — show every still-owed installment (unpaid or
+     partial) so the parent can see the receipt status next to each.
+     Approved-but-not-yet-recorded receipts are also surfaced here so
+     the parent gets feedback. */
   _ppInstallments = (pd.installments || []).filter(function(i){
     var st = i.status_label || 'unpaid';
-    return st === 'unpaid' || st === 'partial';
+    if (st === 'unpaid' || st === 'partial') return true;
+    /* Even if the system already marks it "paid", surface it when the
+       receipt is still pending review so the parent can confirm what
+       was sent. */
+    return !!(i.receipt && i.receipt.status === 'قيد المراجعة');
   });
   var pickCard = document.getElementById('pp-pick-card');
   var paidMsg  = document.getElementById('pp-paid-msg');
@@ -3647,16 +3652,66 @@ function _ppRender(d){
   } else {
     var ph = '';
     _ppInstallments.forEach(function(i, idx){
-      var st = i.status_label || 'unpaid';
-      var ic = (st === 'partial') ? '🟡' : '🔴';
+      var st  = i.status_label || 'unpaid';
+      var ic  = (st === 'partial') ? '🟡' : (st === 'paid' ? '✅' : '🔴');
       var rem = (typeof i.remaining === 'number') ? i.remaining : Math.max(0, (i.amount||0) - (i.paid||0));
-      ph += '<button type="button" class="pp-inst ' + st + '" onclick="ppPickInstallment(' + idx + ')" style="cursor:pointer;width:100%;border:1.5px solid;text-align:right;font-family:inherit;display:block;margin-bottom:8px;padding:12px 14px;border-radius:12px;">';
+      var rec = i.receipt || null;
+      var rst = rec ? (rec.status || '') : '';
+      var clickable = (rst !== 'قيد المراجعة' && rst !== 'تم التأكيد');
+      var pid = encodeURIComponent((_ppStudent && _ppStudent.personal_id) || '');
+      var rowStyle = 'cursor:' + (clickable ? 'pointer' : 'default') + ';width:100%;border:1.5px solid;text-align:right;font-family:inherit;display:block;margin-bottom:8px;padding:12px 14px;border-radius:12px;';
+      ph += '<div class="pp-inst ' + st + '" ' + (clickable ? ('onclick="ppPickInstallment(' + idx + ')" role="button" tabindex="0"') : '') + ' style="' + rowStyle + '">';
       ph += '<div class="pp-inst-head" style="font-size:1rem;"><span>القسط ' + i.n + ' — ' + (rem||0) + ' د المتبقي</span><span>' + ic + '</span></div>';
       ph += '<div style="font-size:0.85rem;color:#555;margin-top:2px;">';
       ph += 'المبلغ المستحق: <b>' + (i.amount||0) + ' د</b>';
       if (i.due_date) ph += '  •  تاريخ الاستحقاق: <b>' + _ppEsc(i.due_date) + '</b>';
       if ((i.paid||0) > 0) ph += '<br>المدفوع سابقاً: <b style="color:#1565C0;">' + i.paid + ' د</b>';
-      ph += '</div></button>';
+      ph += '</div>';
+      /* Receipt status block — pending / approved / rejected. */
+      if (rec && rst === 'قيد المراجعة'){
+        ph += '<div style="margin-top:10px;padding:10px 12px;background:#fff8e1;border:1.5px solid #ffd54f;border-radius:10px;font-size:0.88rem;color:#bf360c;font-weight:700;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
+        ph += '<span>⏳ قيد المراجعة</span>';
+        if (rec.uploaded_at) ph += '<span style="color:#5d4037;font-weight:500;">• رُفع في ' + _ppEsc(rec.uploaded_at) + '</span>';
+        ph += '<a href="/api/parent/receipt-file/' + rec.id + '?pid=' + pid + '" target="_blank" rel="noopener" style="color:#1565C0;text-decoration:underline;">عرض الإيصال المرفوع</a>';
+        ph += '<span style="flex:1 1 100%;color:#5d4037;font-weight:500;">لا حاجة لرفع إيصال جديد — جارٍ مراجعة الإيصال السابق.</span>';
+        ph += '</div>';
+      } else if (rec && rst === 'تم التأكيد'){
+        ph += '<div style="margin-top:10px;padding:10px 12px;background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:10px;font-size:0.88rem;color:#1b5e20;font-weight:700;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
+        ph += '<span>✅ تم قبول الإيصال</span>';
+        if (rec.reviewed_at) ph += '<span style="color:#33691e;font-weight:500;">• تم القبول في ' + _ppEsc(rec.reviewed_at) + '</span>';
+        ph += '<a href="/api/parent/receipt-file/' + rec.id + '?pid=' + pid + '" target="_blank" rel="noopener" style="color:#1565C0;text-decoration:underline;">عرض الإيصال</a>';
+        ph += '</div>';
+      } else if (rec && rst === 'مرفوض'){
+        ph += '<div style="margin-top:10px;padding:10px 12px;background:#fce4ec;border:1.5px solid #ef9a9a;border-radius:10px;font-size:0.88rem;color:#b71c1c;font-weight:700;">';
+        ph += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
+        ph += '<span>❌ تم رفض الإيصال السابق</span>';
+        if (rec.reviewed_at) ph += '<span style="color:#5d1a1a;font-weight:500;">• تاريخ الرفض: ' + _ppEsc(rec.reviewed_at) + '</span>';
+        ph += '<a href="/api/parent/receipt-file/' + rec.id + '?pid=' + pid + '" target="_blank" rel="noopener" style="color:#1565C0;text-decoration:underline;">عرض الإيصال السابق المرفوض</a>';
+        ph += '</div>';
+        if (rec.rejection_reason){
+          ph += '<div style="margin-top:6px;font-weight:500;color:#5d1a1a;">سبب الرفض: ' + _ppEsc(rec.rejection_reason) + '</div>';
+        }
+        ph += '<div style="margin-top:6px;font-weight:600;color:#5d1a1a;">يمكنك رفع إيصال جديد بالضغط على هذا القسط.</div>';
+        ph += '</div>';
+      }
+      /* History — older rejected attempts before the current one. */
+      var hist = i.receipt_history || [];
+      if (hist && hist.length){
+        ph += '<details style="margin-top:8px;font-size:0.83rem;color:#5d4037;">';
+        ph += '<summary style="cursor:pointer;font-weight:600;">سجل المحاولات السابقة (' + hist.length + ')</summary>';
+        ph += '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">';
+        hist.forEach(function(h){
+          var hst = h.status || '';
+          var icon = (hst === 'مرفوض') ? '❌' : (hst === 'تم التأكيد' ? '✅' : '⏳');
+          ph += '<div style="background:#fafafa;border:1px solid #eee;border-radius:6px;padding:6px 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">';
+          ph += '<span>' + icon + ' ' + _ppEsc(hst || '—') + '</span>';
+          if (h.uploaded_at) ph += '<span style="color:#666;">• ' + _ppEsc(h.uploaded_at) + '</span>';
+          ph += '<a href="/api/parent/receipt-file/' + h.id + '?pid=' + pid + '" target="_blank" rel="noopener" style="color:#1565C0;text-decoration:underline;">عرض</a>';
+          ph += '</div>';
+        });
+        ph += '</div></details>';
+      }
+      ph += '</div>';
     });
     pickList.innerHTML = ph;
     pickCard.style.display = '';
@@ -3730,8 +3785,15 @@ function ppUpload(){
         document.getElementById('pp-upload-zone').classList.remove('has-file');
         btn.disabled = true;
         ppCancelUpload();
+        /* Refresh the lookup so the new receipt's "قيد المراجعة"
+           status surfaces alongside the installment immediately. */
+        if (typeof ppLookup === 'function') setTimeout(ppLookup, 200);
       } else {
         _ppToast(d.error || 'خطأ في الرفع', 'error');
+        if (d.blocked === 'approved' || d.blocked === 'pending'){
+          ppCancelUpload();
+          if (typeof ppLookup === 'function') setTimeout(ppLookup, 200);
+        }
       }
     })
     .catch(function(){ btn.disabled = false; btn.innerHTML = prev; _ppToast('خطأ في الاتصال', 'error'); });
@@ -14688,6 +14750,36 @@ def api_parent_lookup():
     # Payment plan + per-installment paid/remaining (reuse the helper
     # from the متابعة الدفع feature). Filter out empty plan slots.
     pay_payload = {"has_plan": False}
+    # Receipts the parent has already uploaded for THIS student, grouped
+    # by installment_number. Used to decorate each installment with its
+    # latest receipt status + history of previous attempts (rejected).
+    receipts_by_inst = {}
+    try:
+        rcpt_rows = db.execute(
+            "SELECT id, installment_number, status, upload_date, "
+            "       reviewed_at, rejection_reason, file_mime "
+            "FROM parent_receipts "
+            "WHERE student_id=? AND TRIM(COALESCE(personal_id,''))=? "
+            "ORDER BY id DESC",
+            (sid, pid),
+        ).fetchall()
+        for r in rcpt_rows:
+            rd = dict(r)
+            inst_n = rd.get("installment_number")
+            if inst_n is None: continue
+            try: inst_n = int(inst_n)
+            except Exception: continue
+            entry = {
+                "id":              rd.get("id"),
+                "status":          (rd.get("status") or "").strip() or "قيد المراجعة",
+                "uploaded_at":     str(rd.get("upload_date") or "")[:19],
+                "reviewed_at":     str(rd.get("reviewed_at") or "")[:19],
+                "rejection_reason": (rd.get("rejection_reason") or "").strip(),
+                "is_pdf":          (rd.get("file_mime") or "") == "application/pdf",
+            }
+            receipts_by_inst.setdefault(inst_n, []).append(entry)
+    except Exception:
+        receipts_by_inst = {}
     try:
         plan = _payment_compute_plan(db, sid)
         if plan and plan["plan"]["num_installments"]:
@@ -14702,6 +14794,16 @@ def api_parent_lookup():
                 elif paid <= 0.005: lab = 'unpaid'
                 else: lab = 'partial'
                 inst["status_label"] = lab
+                # Decorate with receipt info — latest receipt becomes the
+                # "current" state, the rest are surfaced as history so
+                # the parent sees their previous rejected attempts.
+                rcpts = receipts_by_inst.get(int(inst.get("n") or 0)) or []
+                if rcpts:
+                    inst["receipt"]         = rcpts[0]    # newest first
+                    inst["receipt_history"] = rcpts[1:]   # older attempts
+                else:
+                    inst["receipt"]         = None
+                    inst["receipt_history"] = []
                 insts_filtered.append(inst)
             pay_payload = {
                 "has_plan":        True,
@@ -15409,6 +15511,35 @@ def api_parent_upload_receipt():
         check = None
     if not check:
         return jsonify({"ok": False, "error": "بيانات الطالب غير صحيحة"}), 400
+    # Duplicate-upload guard. If a receipt for this (student, installment)
+    # is already approved → block ("لا حاجة لرفع إيصال جديد"). If still
+    # pending review → block ("بانتظار المراجعة"). The admin can mark
+    # the existing one as rejected to re-open the slot for a new upload.
+    if inst_n is not None:
+        try:
+            existing = db.execute(
+                "SELECT id, status FROM parent_receipts "
+                "WHERE student_id=? AND installment_number=? "
+                "  AND TRIM(COALESCE(status,'')) IN ('قيد المراجعة', 'تم التأكيد') "
+                "ORDER BY id DESC LIMIT 1",
+                (sid, inst_n),
+            ).fetchone()
+        except Exception:
+            existing = None
+        if existing:
+            ex = dict(existing)
+            ex_st = (ex.get("status") or "").strip()
+            if ex_st == "تم التأكيد":
+                return jsonify({
+                    "ok": False,
+                    "blocked": "approved",
+                    "error": "هذا القسط تم قبول إيصاله مسبقاً. لا حاجة لرفع إيصال جديد.",
+                }), 409
+            return jsonify({
+                "ok": False,
+                "blocked": "pending",
+                "error": "تم رفع إيصال لهذا القسط ويتم مراجعته حالياً. سيظهر القرار قريباً.",
+            }), 409
     # Cap upload size (the front-end blocks 5MB but defend on server too).
     blob = f.read(6 * 1024 * 1024 + 1)
     if len(blob) > 5 * 1024 * 1024:
@@ -15442,6 +15573,49 @@ def api_parent_upload_receipt():
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
     return jsonify({"ok": True})
+
+
+@app.route("/api/parent/receipt-file/<int:rid>", methods=["GET"])
+def api_parent_receipt_file(rid):
+    """Serve the receipt image / PDF back to the parent who uploaded it.
+    Public route — the parent has no session, so ownership is verified
+    via the personal_id query param matching the receipt's stored
+    personal_id. Same per-IP rate limit guards this route as the
+    parent lookup + upload endpoints.
+
+    Returns the raw bytes with the original mime, or 403 if the
+    personal_id doesn't match the receipt's row."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '0').split(',')[0].strip()
+    if not _parent_rate_check(ip):
+        return jsonify({"ok": False, "error": "تم تجاوز الحد الأعلى للمحاولات."}), 429
+    pid = (request.args.get('pid') or '').strip()
+    if not pid:
+        return jsonify({"ok": False, "error": "personal_id is required"}), 400
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT file_data, file_mime, filename, personal_id "
+            "FROM parent_receipts WHERE id=?",
+            (rid,),
+        ).fetchone()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if (rd.get('personal_id') or '').strip() != pid:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    blob = rd.get('file_data')
+    if not blob:
+        return jsonify({"ok": False, "error": "لا يوجد ملف"}), 404
+    mime = rd.get('file_mime') or 'application/octet-stream'
+    # bytes from psycopg's BYTEA come back as memoryview/bytes; both
+    # work as Flask Response body.
+    resp = Response(bytes(blob) if not isinstance(blob, (bytes, bytearray)) else blob, mimetype=mime)
+    fname = (rd.get('filename') or 'receipt').replace('"', '')
+    resp.headers['Content-Disposition'] = 'inline; filename="' + fname + '"'
+    resp.headers['Cache-Control'] = 'private, max-age=60'
+    return resp
 
 
 # ── Group-search backend (Step 1 of the safe re-implementation) ────
