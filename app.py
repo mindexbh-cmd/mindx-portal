@@ -3815,9 +3815,15 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 .srm-body{padding:14px 20px;max-height:70vh;overflow:auto;}
 .srm-result{padding:10px 12px;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:6px;cursor:pointer;background:#fafafa;transition:all .15s;}
 .srm-result:hover{background:#e0f2f1;border-color:#4DB6AC;}
+.srm-result.is-registered{background:#E6F7EA;border-color:#A5D6B0;}
+.srm-result.is-registered:hover{background:#D4F4DD;border-color:#7BC289;}
 .srm-result-name{font-weight:700;color:#00695C;}
 .srm-result-meta{font-size:0.85em;color:#555;margin-top:2px;}
+.srm-tag{display:inline-block;font-size:0.7em;padding:1px 8px;border-radius:999px;font-weight:700;margin-right:6px;vertical-align:middle;}
+.srm-tag.registered{background:#C8E6C9;color:#1B5E20;}
+.srm-tag.unregistered{background:#ECEFF1;color:#546E7A;}
 .srm-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:0;}
+.srm-card.is-registered{background:#E6F7EA;}
 .srm-section{padding:14px 18px;border-bottom:1px solid #eee;}
 .srm-section:last-child{border-bottom:none;}
 .srm-section-title{font-weight:700;color:#00695C;font-size:1.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
@@ -5221,10 +5227,13 @@ function srFilter(){
     var score = Math.max(scoreName, scorePid);
     if (score > 0) scored.push({ s: s, score: score });
   }
+  /* Registered (is_active=true) students float to the top, but
+     unregistered students still appear in the list — the search is
+     exhaustive, only the ranking changes. */
   scored.sort(function(a,b){
     var ad = (a.s && a.s.is_active === false) ? 1 : 0;
     var bd = (b.s && b.s.is_active === false) ? 1 : 0;
-    if (ad !== bd) return ad - bd;  // active first
+    if (ad !== bd) return ad - bd;
     return b.score - a.score;
   });
   scored = scored.slice(0, 10);
@@ -5232,11 +5241,13 @@ function srFilter(){
   var html = '';
   for (var i=0; i<scored.length; i++) {
     var s = scored[i].s;
-    var _inactBadge = (s.is_active === false)
-      ? ' <span style="background:#fce4ec;color:#c62828;font-size:0.7em;padding:1px 7px;border-radius:999px;font-weight:700;margin-right:6px;vertical-align:middle;">\u063A\u064A\u0631 \u0646\u0634\u0637</span>'
-      : '';
-    html += '<div class="srm-result" onclick="srPick('+s.id+')">'
-         +  '<div class="srm-result-name">'+(s.student_name||'-')+_inactBadge+'</div>'
+    var registered = (s.is_active !== false);
+    var rowCls    = registered ? 'srm-result is-registered' : 'srm-result';
+    var statusTag = registered
+      ? ' <span class="srm-tag registered">✓ مسجّل</span>'
+      : ' <span class="srm-tag unregistered">غير مسجّل</span>';
+    html += '<div class="'+rowCls+'" onclick="srPick('+s.id+')">'
+         +  '<div class="srm-result-name">'+(s.student_name||'-')+statusTag+'</div>'
          +  '<div class="srm-result-meta">\u0631\u0642\u0645: '+(s.personal_id||'-')
          +  (s.class_name?(' &middot; \u0627\u0644\u0635\u0641: '+s.class_name):'')
          +  (s.group_name_student?(' &middot; \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629: '+s.group_name_student):'')
@@ -5686,7 +5697,19 @@ function _srRenderCard(d){
   _SR_FIELD_IDS.forEach(function(k){ _srOriginal[k] = (s[k] != null ? String(s[k]) : ''); });
   if (_srIdleTimer){ clearTimeout(_srIdleTimer); _srIdleTimer = null; }
 
-  var html = '<div class="srm-card">';
+  /* Match the search list: registered students get the soft-green
+     card background. is_active is annotated by /api/students; we
+     look it up in the cached search list (loaded on srOpen) since
+     /api/students/<id>/details doesn't echo that flag. Defaults to
+     true so the green still appears if the cache somehow missed. */
+  var _srHit = null;
+  for (var _i=0; _i<(_srStudents||[]).length; _i++){
+    if (_srStudents[_i].id === s.id){ _srHit = _srStudents[_i]; break; }
+  }
+  var _srRegistered = !(_srHit && _srHit.is_active === false);
+  var _srCardCls = _srRegistered ? 'srm-card is-registered' : 'srm-card';
+
+  var html = '<div class="'+_srCardCls+'">';
   html += '<div id="sr-edit-banner" class="srm-edit-banner">⚠ أنت في وضع التعديل — تأكد من صحة البيانات قبل الحفظ</div>';
   /* Receipt-print button — opens the receipt modal pre-filled
      with this student\'s paid-installment list. */
