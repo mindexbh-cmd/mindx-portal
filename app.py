@@ -23575,12 +23575,13 @@ _GROUPS_DAYS_LABEL_TARGET = "\u0623\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u
 
 def _groups_days_column(db):
     """Internal column on student_groups that holds the authoritative
-    'أيام الدراسة' values. Looks up group_col_labels for any column
-    whose label is exactly that string AND whose internal name is a
-    safe identifier AND physically exists on the live table. Cached
-    on flask.g per request so repeated lookups in the same handler
-    are free. Always returns a non-empty string — defaults to
-    'study_days' when no custom-labelled column is found."""
+    'أيام الدراسة' values. Looks up group_col_labels and matches on
+    the FOLDED + ENTITY-DECODED form of the label so a user-added
+    column that the edit-table modal stored with HTML entities
+    (&#x623;&#x64A;&#x627;&#x645; &#x627;&#x644;&#x62F;&#x631;&#x627;&#x633;&#x629; → 'أيام الدراسة')
+    is recognised. Cached on flask.g per request. Always returns a
+    non-empty string — defaults to 'study_days' when no custom-
+    labelled column is found."""
     try:
         from flask import g as _g
     except Exception:
@@ -23594,13 +23595,15 @@ def _groups_days_column(db):
         live = set()
     try:
         rows = db.execute(
-            "SELECT col_key FROM group_col_labels WHERE TRIM(col_label) = ?",
-            (_GROUPS_DAYS_LABEL_TARGET,)
+            "SELECT col_key, col_label FROM group_col_labels"
         ).fetchall()
     except Exception:
         rows = []
+    target_norm = _grp_norm(_GROUPS_DAYS_LABEL_TARGET)
     for r in rows:
-        ck = (dict(r).get("col_key") if hasattr(r, "keys") else r[0]) or ""
+        rd = dict(r) if hasattr(r, "keys") else None
+        ck = (rd["col_key"] if rd else r[0]) or ""
+        cl = (rd["col_label"] if rd else (r[1] if len(r) > 1 else "")) or ""
         ck = ck.strip()
         if not ck or ck == "study_days":
             continue
@@ -23608,8 +23611,16 @@ def _groups_days_column(db):
             continue
         if ck not in live:
             continue
-        resolved = ck
-        break
+        # Compare in folded form, after first decoding HTML numeric
+        # entities (the edit-table modal stores Arabic labels in
+        # entity form, e.g. '&#x623;&#x64A;&#x627;&#x645; ...') so the
+        # raw cell never matches a literal-string compare. _grp_norm
+        # also folds alif / hamza / teh-marbuta variants so a label
+        # typed 'ايام الدراسه' resolves to the same target.
+        decoded = _decode_arabic_entities(cl).strip()
+        if _grp_norm(decoded) == target_norm:
+            resolved = ck
+            break
     if _g is not None:
         try: _g._groups_days_col = resolved
         except Exception: pass
