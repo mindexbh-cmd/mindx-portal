@@ -15914,29 +15914,104 @@ def _grp_qs_list(name):
 
 # Canonical week order. Includes both الإثنين and الاثنين spellings —
 # both appear in real data and either should match.
-_GRP_AR_DAYS = ["السبت","الأحد","الإثنين","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"]
+# One canonical entry per weekday + every spelling variant we've seen
+# in real human data entry. Lookup is by Arabic-folded form so any
+# alif/hamza/diacritic mix maps to the canonical name.
+_GRP_AR_DAY_CANON = ["السبت", "الأحد", "الإثنين", "الثلاثاء",
+                      "الأربعاء", "الخميس", "الجمعة"]
+
+# Legacy alias kept for any code path still importing this list — the
+# canonical 7 plus the legacy duplicate "الاثنين" so old substring
+# code keeps the same observable behaviour while the new parser ignores
+# the duplicate. New code should consume _parse_study_days instead.
+_GRP_AR_DAYS = list(_GRP_AR_DAY_CANON) + ["الاثنين"]
+
+# folded form → canonical day name. Built lazily from _GRP_AR_DAY_CANON
+# plus every known variant. Adding a variant here is enough — the
+# parser auto-picks it up.
+def _grp_days_canon_lookup():
+    try:
+        return _grp_days_canon_lookup._cache
+    except AttributeError:
+        pass
+    variants = {
+        "السبت":   ("السبت",),
+        "الأحد":   ("الأحد", "الاحد"),
+        "الإثنين": ("الإثنين", "الاثنين", "الأثنين", "الاتنين", "الإتنين"),
+        "الثلاثاء":("الثلاثاء", "الثلثاء", "الثلاثا"),
+        "الأربعاء":("الأربعاء", "الاربعاء", "الإربعاء", "الاربعا"),
+        "الخميس":  ("الخميس",),
+        "الجمعة":  ("الجمعة", "الجمعه"),
+    }
+    out = {}
+    for canon, vs in variants.items():
+        for v in vs:
+            out[_grp_norm(v)] = canon
+        # always include the canonical's own folded form
+        out[_grp_norm(canon)] = canon
+    _grp_days_canon_lookup._cache = out
+    return out
+
+
+# Multi-separator splitter: Arabic conjunction " و " (most common),
+# Arabic comma ، Latin comma , slash / hyphen with surrounding
+# whitespace " - " — covers every separator real data has used.
+import re as _re_days
+_GRP_DAYS_SPLIT_RE = _re_days.compile(
+    r"(?:\s+و\s+|[،,/]|\s-\s)"
+)
+
+
+def _parse_study_days(text):
+    """The single source of truth for parsing the 'أيام الدراسة'
+    column (and any other day-list cell) into canonical day names.
+
+    Steps:
+      1. Apply _grp_norm so alef/hamza/teh-marbuta/diacritic spelling
+         differences fold to the same form.
+      2. Split on " و " AND ، AND , AND / AND " - " — every separator
+         real human data entry has produced.
+      3. For each token, look it up in the folded → canonical map.
+         Tokens that don't resolve to a canonical day are skipped
+         silently (no false positives for stray words).
+
+    The resulting set holds canonical day names ("الإثنين" not
+    "الاثنين"), so downstream comparisons see ONE entry per weekday
+    regardless of how the data was typed.
+
+    Empty / None input → empty set."""
+    if not text:
+        return set()
+    raw = str(text)
+    parts = _GRP_DAYS_SPLIT_RE.split(raw)
+    table = _grp_days_canon_lookup()
+    out = set()
+    for tok in parts:
+        if not tok:
+            continue
+        norm = _grp_norm(tok)
+        if not norm:
+            continue
+        # Exact lookup first; fall back to substring scan so a single
+        # cell with no separators ("الجمعة و السبت" already split, but
+        # "الجمعةوالسبت" without spaces lands here) still resolves.
+        canon = table.get(norm)
+        if canon:
+            out.add(canon)
+            continue
+        for folded, c in table.items():
+            if folded and folded in norm:
+                out.add(c)
+    return out
 
 
 def _grp_extract_days(text):
-    """Return the set of canonical day names found inside `text`.
-
-    Substring search instead of separator-tokenization because real
-    data uses every plausible separator: comma, Arabic comma, slash,
-    hyphen, the conjunction 'و', or just whitespace.
-
-    Match is done on the Arabic-folded form of BOTH sides so a stored
-    'الاحد' (plain alef) still maps to the canonical 'الأحد' (alef
-    with hamza). The set we RETURN holds canonical day names so the
-    facet endpoint always emits the standard spelling regardless of
-    what's stored."""
-    if not text:
-        return set()
-    s_n = _grp_norm(str(text))
-    out = set()
-    for d in _GRP_AR_DAYS:
-        if d and _grp_norm(d) in s_n:
-            out.add(d)
-    return out
+    """Backwards-compatible wrapper. Delegates to _parse_study_days
+    so every existing caller (group search facets, summary block,
+    anomaly check, teacher-attendance dropdown, unified-absentees
+    list, …) shares the same robust parser. Returns canonical day
+    names ('الإثنين' not 'الاثنين') — no duplicates per weekday."""
+    return _parse_study_days(text)
 
 
 @app.route('/api/groups/search', methods=['GET'])

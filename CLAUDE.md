@@ -30,6 +30,13 @@ When adding a column, you must update **both** branches: the `CREATE TABLE` in `
 **Tables:** `users`, `students`, `student_groups`, `attendance`, `taqseet` (installment plan templates, keyed by `taqseet_method`), `student_payments` (per-student-per-installment), plus label/visibility tables `column_labels`, `group_col_labels`, `att_col_labels`, and the generic `custom_tables` / `custom_table_cols` / `custom_table_rows` trio (user-defined tables built at runtime via the UI).
 
 **Authoritative scheduled-days column.** The `student_groups` table ships with a canonical `study_days` TEXT column, but the admin's "تعديل الجدول" modal can also add a custom column labelled "أيام الدراسة" (the label is stored in `group_col_labels` with an auto-generated `col_<timestamp>` internal name). Whenever code needs a group's scheduled-days value it MUST go through `_groups_days_column(db)` + `_extract_days_from_row(rd)`:
+
+**أيام الدراسة column format.** Real human data entry mixes:
+- The Arabic conjunction " و " as the day separator (`"الجمعة و السبت"`, `"الإثنين و الاربعاء"`).
+- Legacy commas / Arabic comma `، / ,` and slashes `/` and ` - ` from older imports.
+- Spelling variants — `ا/أ/إ/آ`, `ة/ه`, with/without diacritics — within the same column (`الإثنين` vs `الاثنين`, `الأربعاء` vs `الاربعاء`, `الجمعه` vs `الجمعة`).
+
+Always parse via the shared `_parse_study_days(text)` helper (or its alias `_grp_extract_days(text)`). It Arabic-folds via `_grp_norm`, splits on every separator, and looks each token up in a folded → canonical map so every spelling collapses to ONE canonical name per weekday (`الإثنين` / `الأربعاء` / `الجمعة` / etc.). NEVER hardcode `text.split('،')` or substring-search the raw cell — it produces duplicate weekday entries in the days facet and breaks anomaly detection.
 - `_groups_days_column(db)` resolves which physical column on `student_groups` the admin currently treats as authoritative (custom-labelled column wins; defaults to `study_days`). Result is cached on `flask.g._groups_days_col` per request.
 - `_extract_days_from_row(rd)` runs the resolved column as **Strategy 0** before falling back to `study_days` (Strategy 1) and the legacy heuristics (Strategies 2–4). Self-primes via flask.g if a handler forgot to call `_groups_days_column` first.
 - SELECTs that previously listed `study_days` explicitly must add the resolved column too (search for `extra_days = ('"' + days_col + '", ')` for the established pattern). SELECT * already picks it up automatically.
