@@ -29,6 +29,14 @@ When adding a column, you must update **both** branches: the `CREATE TABLE` in `
 
 **Tables:** `users`, `students`, `student_groups`, `attendance`, `taqseet` (installment plan templates, keyed by `taqseet_method`), `student_payments` (per-student-per-installment), plus label/visibility tables `column_labels`, `group_col_labels`, `att_col_labels`, and the generic `custom_tables` / `custom_table_cols` / `custom_table_rows` trio (user-defined tables built at runtime via the UI).
 
+**Authoritative scheduled-days column.** The `student_groups` table ships with a canonical `study_days` TEXT column, but the admin's "تعديل الجدول" modal can also add a custom column labelled "أيام الدراسة" (the label is stored in `group_col_labels` with an auto-generated `col_<timestamp>` internal name). Whenever code needs a group's scheduled-days value it MUST go through `_groups_days_column(db)` + `_extract_days_from_row(rd)`:
+- `_groups_days_column(db)` resolves which physical column on `student_groups` the admin currently treats as authoritative (custom-labelled column wins; defaults to `study_days`). Result is cached on `flask.g._groups_days_col` per request.
+- `_extract_days_from_row(rd)` runs the resolved column as **Strategy 0** before falling back to `study_days` (Strategy 1) and the legacy heuristics (Strategies 2–4). Self-primes via flask.g if a handler forgot to call `_groups_days_column` first.
+- SELECTs that previously listed `study_days` explicitly must add the resolved column too (search for `extra_days = ('"' + days_col + '", ')` for the established pattern). SELECT * already picks it up automatically.
+- Per-row fallback: `_row_days_authoritative(rd, days_col)` prefers the custom column for THIS row and falls back to study_days when the new column is empty for THIS row, so a partially-migrated table doesn't lose day-of-week info.
+
+The legacy `study_days` column is preserved (do NOT drop it). Reads go through the resolver; writes still target whatever column the user is editing in the database UI.
+
 **Taqseet ↔ student_payments sync.** `POST /api/payments/<sid>/<n>` writes to `student_payments` AND mirrors the paid amount into `taqseet.paidN` for the row whose `taqseet_method` matches the student's `installment_type`. If you touch payment logic, keep that mirroring intact (see recent commit `85f15ed`).
 
 **DB access pattern.** `get_db()` lazily opens a `sqlite3` connection on `g.db` with `Row` factory; `teardown_appcontext` closes it. Passwords hashed via `hp()` (SHA-256, no salt). Auth is a session cookie + `@login_required` decorator; `session["user"]` holds the full user row as a dict. Roles exist (`admin`, `reception`, `teacher`, etc.) but are **not currently enforced** in routes — the decorator only checks login.

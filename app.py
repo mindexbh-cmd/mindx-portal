@@ -15589,9 +15589,11 @@ def api_groups_search():
     except Exception:
         pass
     visible = set(_grp_visible_for(db, user))
+    days_col = _groups_days_column(db)
+    extra_days = ('"' + days_col + '", ') if days_col != 'study_days' else ''
     try:
         rows = db.execute(
-            "SELECT id, group_name, teacher_name, level_course, "
+            "SELECT " + extra_days + "id, group_name, teacher_name, level_course, "
             "       study_days, study_time, ramadan_time, online_time, "
             "       session_duration "
             "FROM student_groups "
@@ -15796,9 +15798,11 @@ def api_groups_filters():
     db = get_db()
     user = session.get("user") or {}
     visible = set(_grp_visible_for(db, user))
+    days_col = _groups_days_column(db)
+    extra_days = ('"' + days_col + '", ') if days_col != 'study_days' else ''
     try:
         rows = db.execute(
-            "SELECT group_name, teacher_name, level_course, study_days, "
+            "SELECT " + extra_days + "group_name, teacher_name, level_course, study_days, "
             "       study_time, ramadan_time, online_time "
             "FROM student_groups "
             "WHERE group_name IS NOT NULL AND TRIM(group_name)<>'' "
@@ -21237,9 +21241,11 @@ def api_pts_visible_groups():
         })
     # admin / manager: every group, schedule-decorated for the same
     # client-side formatter that attendance uses.
+    days_col = _groups_days_column(db)
+    extra_days = ('"' + days_col + '", ') if days_col != 'study_days' else ''
     try:
         rows = db.execute(
-            "SELECT group_name, study_days, study_time, ramadan_time, online_time "
+            "SELECT " + extra_days + "group_name, study_days, study_time, ramadan_time, online_time "
             "FROM student_groups "
             "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
             "ORDER BY group_name"
@@ -23029,6 +23035,70 @@ _COL_NAME_DAY_HINTS_LOWER = ("days", "day_list", "day-list", "days_of_week",
                               "weekdays", "day_of_week", "schedule_days")
 _COL_NAME_DAY_HINTS_AR = ("\u0623\u064A\u0627\u0645", "\u0627\u064A\u0627\u0645",
                            "\u064A\u0648\u0645")
+
+# Authoritative-days resolution. The admin's "تعديل الجدول" modal can
+# add a new column to student_groups and label it "\u0623\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u0627\u0633\u0629" — the
+# label is stored in group_col_labels with an auto-generated col_key
+# like col_<timestamp>. When that happens the user starts typing days
+# into the new column; the legacy `study_days` column may sit stale.
+# _groups_days_column resolves which column on student_groups should
+# be treated as the authoritative source for that request, falling
+# back to the canonical study_days when no custom column is labelled.
+_GROUPS_DAYS_LABEL_TARGET = "\u0623\u064A\u0627\u0645 \u0627\u0644\u062F\u0631\u0627\u0633\u0629"
+
+def _groups_days_column(db):
+    """Internal column on student_groups that holds the authoritative
+    'أيام الدراسة' values. Looks up group_col_labels for any column
+    whose label is exactly that string AND whose internal name is a
+    safe identifier AND physically exists on the live table. Cached
+    on flask.g per request so repeated lookups in the same handler
+    are free. Always returns a non-empty string — defaults to
+    'study_days' when no custom-labelled column is found."""
+    try:
+        from flask import g as _g
+    except Exception:
+        _g = None
+    if _g is not None and hasattr(_g, "_groups_days_col"):
+        return _g._groups_days_col
+    resolved = "study_days"
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(student_groups)").fetchall()}
+    except Exception:
+        live = set()
+    try:
+        rows = db.execute(
+            "SELECT col_key FROM group_col_labels WHERE TRIM(col_label) = ?",
+            (_GROUPS_DAYS_LABEL_TARGET,)
+        ).fetchall()
+    except Exception:
+        rows = []
+    for r in rows:
+        ck = (dict(r).get("col_key") if hasattr(r, "keys") else r[0]) or ""
+        ck = ck.strip()
+        if not ck or ck == "study_days":
+            continue
+        if not _is_safe_ident(ck):
+            continue
+        if ck not in live:
+            continue
+        resolved = ck
+        break
+    if _g is not None:
+        try: _g._groups_days_col = resolved
+        except Exception: pass
+    return resolved
+
+def _row_days_authoritative(rd, days_col=None):
+    """Per-row resolver for the authoritative days value. Prefers
+    `days_col` (the user-added 'أيام الدراسة' column when distinct),
+    falling back to study_days when the preferred column is empty
+    for THIS row — handles partially-migrated tables gracefully."""
+    if days_col and days_col != "study_days":
+        v = rd.get(days_col)
+        if isinstance(v, str): v = v.strip()
+        if v: return v
+    v = rd.get("study_days") or ""
+    return v.strip() if isinstance(v, str) else (str(v) if v else "")
 _BOOL_DAY_COLS = (
     ("day_sat", "\u0627\u0644\u0633\u0628\u062A"),
     ("day_sun", "\u0627\u0644\u0623\u062D\u062F"),
@@ -23073,6 +23143,30 @@ def _extract_days_from_row(rd):
     import os as _os, sys as _sys
     debug = bool(_os.environ.get("MX_DEBUG_GROUPS"))
     name = (rd.get("group_name") or "").strip()
+    # Strategy 0: authoritative column resolved from group_col_labels.
+    # Whichever column the admin labelled "أيام الدراسة" (the canonical
+    # study_days OR a user-added col_<timestamp>) wins, provided the
+    # row dict was fetched with that column included. Resolved per-
+    # request via flask.g; lazily primed here for handlers that didn't
+    # call _groups_days_column themselves.
+    _auth_col = None
+    try:
+        from flask import g as _g, has_request_context
+        if has_request_context():
+            _auth_col = getattr(_g, '_groups_days_col', None)
+            if _auth_col is None:
+                try:
+                    _auth_col = _groups_days_column(get_db())
+                except Exception:
+                    _auth_col = None
+    except Exception:
+        _auth_col = None
+    if _auth_col and _auth_col != 'study_days' and _auth_col in rd:
+        av = rd.get(_auth_col)
+        if isinstance(av, str): av = av.strip()
+        if av:
+            if debug: print("[mx-days] " + name + ": strategy=label-resolved col=" + repr(_auth_col) + " raw=" + repr(av), file=_sys.stderr)
+            return _translate_english_days(_normalize_days_string(av))
     # Strategy 1: canonical study_days.
     v = (rd.get("study_days") or "")
     if isinstance(v, str): v = v.strip()
@@ -23889,9 +23983,13 @@ def api_attendance_by_date_summary():
         if kn and md:
             exc_map[kn] = md
 
+    # Prime the authoritative-days resolver and add its column to the
+    # SELECT so Strategy 0 in _extract_days_from_row can pick it up.
+    days_col = _groups_days_column(db)
+    extra_days = ('"' + days_col + '", ') if days_col != 'study_days' else ''
     try:
         rows = db.execute(
-            "SELECT group_name, teacher_name, study_days, study_time, "
+            "SELECT " + extra_days + "group_name, teacher_name, study_days, study_time, "
             "       ramadan_time, online_time "
             "FROM student_groups "
             "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
@@ -23984,16 +24082,19 @@ def api_attendance_by_date_summary():
     # a mode that ISN'T the active one, we still flag wrong-day
     # records for it, so an admin can spot stale records left over
     # from before the override flipped.
-    group_index = {}  # gname → study_days raw
+    group_index = {}  # gname → authoritative days raw
     try:
         idx_rows = db.execute(
-            "SELECT group_name, study_days FROM student_groups"
+            "SELECT " + extra_days + "group_name, study_days FROM student_groups"
         ).fetchall()
         for r in idx_rows:
             rd = dict(r)
             gn = (rd.get("group_name") or "").strip()
             if gn:
-                group_index[gn] = (rd.get("study_days") or "").strip()
+                # _row_days_authoritative prefers the user-added column
+                # (when distinct from study_days) and falls back per-row
+                # to study_days when the new column is empty.
+                group_index[gn] = _row_days_authoritative(rd, days_col)
     except Exception:
         pass
 
