@@ -11946,22 +11946,55 @@ function renderGroupTable2(list){
   var body=document.getElementById('groupsBody2');
   var colCount=allGroupColumns.length+3;
   if(!list.length){body.innerHTML='<tr><td colspan="'+colCount+'" class="no-data">&#1604;&#1575; &#1578;&#1608;&#1580;&#1583; &#1576;&#1610;&#1575;&#1606;&#1575;&#1578;&#1548; &#1575;&#1590;&#1601; &#1575;&#1608;&#1604; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577;</td></tr>';_bulkUpdate('groupsBody2','selectAll_groups','bulkDelBtn_groups');applyFreezeToTable('groups');return;}
+  function _grpEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   var html='';
   for(var i=0;i<list.length;i++){
     var g=list[i];
     var row='<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+g.id+'" onclick="_bulkUpdate(\\'groupsBody2\\',\\'selectAll_groups\\',\\'bulkDelBtn_groups\\')"></td><td>'+(i+1)+'</td>';
     for(var j=0;j<allGroupColumns.length;j++){
       var key=allGroupColumns[j].col_key;
-      var val=g[key]||'';
-      if(key==='group_name'){row+='<td style="font-weight:600;color:#0097A7;text-align:right;">'+val+'</td>';}
-      else if(key==='group_link'){row+='<td>'+(val?'<a href="'+val+'" target="_blank" style="color:#00BCD4;">&#1601;&#1578;&#1581;</a>':'-')+'</td>';}
-      else{row+='<td>'+(val||'-')+'</td>';}
+      var val=g[key]==null?'':String(g[key]);
+      var extra=(key==='group_name')?'font-weight:600;color:#0097A7;text-align:right;':'';
+      row+='<td class="editable" contenteditable="true" data-id="'+g.id+'" data-field="'+key+'" style="padding:8px;min-width:80px;'+extra+'">'+_grpEsc(val)+'</td>';
     }
     row+='<td><button class="action-btn btn-edit" style="color:#0097A7;" onclick="openGroupEdit2('+g.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askGroupDelete2('+g.id+')">&#128465;</button></td></tr>';
     html+=row;
   }
   body.innerHTML=html;
+  body.querySelectorAll('.editable[data-field]').forEach(function(td){
+    td.addEventListener('blur', function(){
+      saveGroupCell(parseInt(this.dataset.id), this.dataset.field, this);
+    });
+  });
   applyFreezeToTable('groups');
+}
+
+function saveGroupCell(id, field, el){
+  var val = el.innerText.trim();
+  var rec = null;
+  for (var i=0; i<allGroups2.length; i++) { if (allGroups2[i].id === id) { rec = allGroups2[i]; break; } }
+  if (!rec) return;
+  var oldVal = rec[field] == null ? "" : String(rec[field]);
+  if (val === oldVal) return;
+  var body = {}; body[field] = val;
+  function _flashOk(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, true); }
+  function _flashErr(){ if(typeof window.mxFlashCell==='function') window.mxFlashCell(el, false); }
+  fetch('/api/groups/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body)})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.ok === false) {
+        showToast(j.error || 'حدث خطأ', '#e53935');
+        el.innerText = oldVal;
+        _flashErr();
+        return;
+      }
+      rec[field] = val;
+      _flashOk();
+    }).catch(function(){
+      el.innerText = oldVal;
+      _flashErr();
+      showToast('خطأ في الاتصال', '#e53935');
+    });
 }
 function filterGroupTable2(){
   var q=document.getElementById('groupSearchInput').value.toLowerCase();
@@ -24026,7 +24059,13 @@ def api_groups_update(gid):
     d = request.get_json() or {}
     db = get_db()
     try:
-        cols = _student_groups_writable_cols(db)
+        # Partial-update friendly: only touch columns the caller actually
+        # sent. The pencil-button modal sends every field, so its
+        # behaviour is unchanged; per-cell editors send a single field
+        # and won't NULL the rest of the row.
+        cols = [c for c in _student_groups_writable_cols(db) if c in d]
+        if not cols:
+            return jsonify({"ok": True})
         set_clause = ",".join([c + "=?" for c in cols])
         values = tuple(d.get(c) for c in cols) + (gid,)
         db.execute("UPDATE student_groups SET " + set_clause + " WHERE id=?", values)
