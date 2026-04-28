@@ -240,7 +240,9 @@ def init_db():
         linked_student_id INTEGER DEFAULT 0,
         linked_parent_for TEXT DEFAULT '',
         must_change_pw INTEGER DEFAULT 0,
-        notify_pref TEXT DEFAULT 'instant')""")
+        notify_pref TEXT DEFAULT 'instant',
+        landing_page TEXT,
+        is_active INTEGER DEFAULT 1)""")
     db.execute("""CREATE TABLE IF NOT EXISTS students(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         personal_id TEXT UNIQUE,
@@ -732,6 +734,35 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'status_column', 'عمود حالة الدفع', 'payment_status'))
     except Exception:
         pass
+    # ── permissions_v1: granular per-button + per-user permission system
+    db.execute("""CREATE TABLE IF NOT EXISTS button_registry(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        button_key TEXT UNIQUE NOT NULL,
+        button_label_ar TEXT NOT NULL,
+        page_slug TEXT NOT NULL,
+        default_roles TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER DEFAULT 0
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS user_permissions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        button_key TEXT NOT NULL,
+        is_visible INTEGER NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, button_key)
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS audit_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_id INTEGER,
+        actor_username TEXT,
+        action TEXT NOT NULL,
+        target_type TEXT,
+        target_id TEXT,
+        old_value TEXT,
+        new_value TEXT,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     db.commit()
     db.close()
 
@@ -2203,6 +2234,127 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("employee_logins_v1",))
         except Exception: pass
+        db2.commit()
+
+    # ── permissions_v1: granular per-button + per-user permission system.
+    # Idempotent. Adds three new tables (button_registry, user_permissions,
+    # audit_log), extends `users` with `landing_page` (NULL = use role
+    # default) and `is_active` (1 = can login). Seeds button_registry once
+    # via the schema_migrations tag.
+    db2.execute("""CREATE TABLE IF NOT EXISTS button_registry(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        button_key TEXT UNIQUE NOT NULL,
+        button_label_ar TEXT NOT NULL,
+        page_slug TEXT NOT NULL,
+        default_roles TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER DEFAULT 0
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS user_permissions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        button_key TEXT NOT NULL,
+        is_visible INTEGER NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, button_key)
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS audit_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_id INTEGER,
+        actor_username TEXT,
+        action TEXT NOT NULL,
+        target_type TEXT,
+        target_id TEXT,
+        old_value TEXT,
+        new_value TEXT,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.commit()
+    try:
+        _ucols_p = {r[1] for r in db2.execute("PRAGMA table_info(users)").fetchall()}
+    except Exception:
+        _ucols_p = set()
+    for _col, _decl in [
+        ("landing_page", "TEXT"),
+        ("is_active",    "INTEGER DEFAULT 1"),
+    ]:
+        if _col not in _ucols_p:
+            try: db2.execute("ALTER TABLE users ADD COLUMN " + _col + " " + _decl)
+            except Exception: pass
+    # Backfill is_active=1 for any pre-migration row that may have ended
+    # up NULL on Postgres — never lock out an existing user during the
+    # column add.
+    try:
+        db2.execute("UPDATE users SET is_active=1 WHERE is_active IS NULL")
+    except Exception: pass
+    db2.commit()
+
+    if "permissions_v1" not in applied:
+        # Seed the canonical button registry. button_key naming convention:
+        #   "<page_slug>.<feature>"
+        # default_roles is a JSON array string. Roles understood by the
+        # app today: admin, manager, teacher, reception, student, parent.
+        # When the helper user_can_see_button() finds no per-user override
+        # in user_permissions, it falls back to this list.
+        _btn_seed = [
+            # ─── Top-level navigation / sidebar ────────────────────
+            ("sidebar.dashboard",          "الداشبورد",                  "sidebar",   '["admin","manager","reception","teacher"]', 1),
+            ("sidebar.attendance",         "رصد الغياب",                  "sidebar",   '["admin","manager","reception","teacher"]', 2),
+            ("sidebar.groups",             "المجموعات",                   "sidebar",   '["admin","manager","reception","teacher"]', 3),
+            ("sidebar.database",           "قاعدة البيانات",              "sidebar",   '["admin"]',                                  4),
+            ("sidebar.settings",           "الإعدادات",                   "sidebar",   '["admin"]',                                  5),
+            ("sidebar.permissions",        "إدارة الصلاحيات",             "sidebar",   '["admin"]',                                  6),
+            ("sidebar.table_audit",        "تدقيق الجداول",               "sidebar",   '["admin"]',                                  7),
+            ("sidebar.parent_receipts",    "إيصالات أولياء الأمور",       "sidebar",   '["admin","manager","reception"]',            8),
+            ("sidebar.teacher_hub",        "منصة المعلم",                 "sidebar",   '["teacher"]',                                9),
+            ("sidebar.parent_hub",         "منصة ولي الأمر",              "sidebar",   '["parent","student"]',                       10),
+            # ─── Dashboard quick-action buttons ─────────────────────
+            ("dashboard.search_student",   "بحث عن طالب",                  "dashboard", '["admin","manager","reception","teacher"]', 1),
+            ("dashboard.payment_tracking", "متابعة الدفع",                 "dashboard", '["admin","manager","reception"]',            2),
+            ("dashboard.lessons_summary",  "ملخص الحصص",                   "dashboard", '["admin","manager"]',                        3),
+            ("dashboard.lesson_durations", "مدة الحصص",                    "dashboard", '["admin","manager"]',                        4),
+            ("dashboard.send_messages",    "إرسال الرسائل",                "dashboard", '["admin","manager","reception"]',            5),
+            ("dashboard.center_mode",      "حالة المركز (حضوري/أونلاين)", "dashboard", '["admin"]',                                  6),
+            ("dashboard.points_board",     "لوحة الصف — نظام النقاط",      "dashboard", '["admin","manager","teacher"]',              7),
+            ("dashboard.points_manage",    "إدارة نظام النقاط",            "dashboard", '["admin"]',                                  8),
+            ("dashboard.parent_receipts",  "إيصالات أولياء الأمور",       "dashboard", '["admin","manager","reception"]',            9),
+            # ─── Attendance page actions ────────────────────────────
+            ("attendance.take_attendance", "تسجيل الحضور",                 "attendance",'["admin","manager","reception","teacher"]', 1),
+            ("attendance.import_excel",    "استيراد من Excel",             "attendance",'["admin"]',                                  2),
+            ("attendance.export_excel",    "تصدير Excel",                  "attendance",'["admin","manager"]',                        3),
+            # ─── Database page (admin-only by nature) ───────────────
+            ("database.import",            "استيراد من Excel",             "database",  '["admin"]',                                  1),
+            ("database.export",            "تصدير Excel",                  "database",  '["admin","manager"]',                        2),
+            ("database.edit_table",        "تعديل الجدول",                 "database",  '["admin"]',                                  3),
+            ("database.add_table",         "إضافة جدول",                   "database",  '["admin"]',                                  4),
+            ("database.backup_create",     "نسخة احتياطية",                "database",  '["admin"]',                                  5),
+            # ─── Groups page actions ────────────────────────────────
+            ("groups.add_group",           "إضافة مجموعة",                 "groups",    '["admin","manager"]',                        1),
+            ("groups.edit_table",          "تعديل الجدول",                 "groups",    '["admin"]',                                  2),
+            # ─── Settings page actions ──────────────────────────────
+            ("settings.edit",              "تعديل الإعدادات",              "settings",  '["admin"]',                                  1),
+            ("settings.backup_restore",    "النسخ الاحتياطي والاستعادة",  "settings",  '["admin"]',                                  2),
+        ]
+        for _key, _label, _page, _roles, _ord in _btn_seed:
+            try:
+                db2.execute(
+                    "INSERT INTO button_registry(button_key,button_label_ar,page_slug,default_roles,sort_order) "
+                    "VALUES(?,?,?,?,?) ON CONFLICT(button_key) DO NOTHING",
+                    (_key, _label, _page, _roles, _ord),
+                )
+            except Exception:
+                try:
+                    db2.execute(
+                        "INSERT INTO button_registry(button_key,button_label_ar,page_slug,default_roles,sort_order) "
+                        "VALUES(?,?,?,?,?)",
+                        (_key, _label, _page, _roles, _ord),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("permissions_v1",))
+        except Exception:
+            pass
         db2.commit()
 
     # Students table: turn three columns into dropdowns. Linked dropdowns
@@ -22508,6 +22660,9 @@ _TBL_AUDIT_SYSTEM = {
     "eval_col_labels":     "تسميات أعمدة التقييمات",
     "taqseet_col_labels":  "تسميات أعمدة التقسيط",
     "paylog_col_labels":   "تسميات أعمدة سجل الدفع",
+    "button_registry":     "سجل الأزرار القابلة للتقييد بالصلاحيات",
+    "user_permissions":    "تخصيصات الصلاحيات لكل مستخدم",
+    "audit_log":           "سجل تدقيق التغييرات الإدارية",
 }
 
 
