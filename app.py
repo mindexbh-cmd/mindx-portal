@@ -9416,12 +9416,19 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
       <style>
         .alm-sum-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:0.92rem;flex-wrap:wrap;}
         .alm-sum-row.recorded{background:#e8f5e9;border:1px solid #a5d6a7;}
+        .alm-sum-row.partial {background:#fff3e0;border:1.5px solid #ff9800;}
         .alm-sum-row.pending {background:#fff3e0;border:1px solid #ffcc80;}
         .alm-sum-row .nm{font-weight:800;color:#3e2723;flex:1;min-width:140px;}
         .alm-sum-row .icon{font-size:1.05rem;line-height:1;}
-        .alm-sum-row .meta{font-size:0.85rem;color:#5d4037;display:flex;gap:10px;flex-wrap:wrap;}
+        .alm-sum-row .meta{font-size:0.85rem;color:#5d4037;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
         .alm-sum-row.recorded .meta{color:#1b5e20;}
+        .alm-sum-row.partial  .meta{color:#bf360c;font-weight:600;}
         .alm-sum-row.pending  .meta{color:#bf360c;font-weight:700;}
+        .state-pill{font-size:0.78rem;padding:2px 10px;border-radius:999px;font-weight:800;letter-spacing:.2px;}
+        .state-pill.state-complete{background:#c8e6c9;color:#1b5e20;}
+        .state-pill.state-partial {background:#ffcc80;color:#bf360c;}
+        .state-pill.state-none    {background:#ffe0b2;color:#bf360c;}
+        .alm-complete-link:hover{filter:brightness(1.05);}
         /* Anomaly list — soft amber, distinct from the green/orange
            summary chips so it reads as "heads up" not "error". */
         .alm-anom-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:0.92rem;flex-wrap:wrap;background:#fff8e1;border:1.5px solid #ffd54f;margin-bottom:6px;}
@@ -9434,6 +9441,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
           .alm-sum-row{padding:8px 10px;font-size:0.88rem;}
           .alm-sum-row .nm{flex:1 1 100%;}
           .alm-sum-row .meta{font-size:0.82rem;}
+          .alm-missing-list{font-size:0.82rem !important;}
           .alm-anom-row{padding:8px 10px;font-size:0.88rem;}
           .alm-anom-row .nm{flex:1 1 100%;}
           .alm-anom-row .meta{font-size:0.82rem;}
@@ -9748,6 +9756,23 @@ function loadGroups() {
       var totalStudents = Object.values(data).reduce(function(a,b){return a+b.length;},0);
       var inp = document.getElementById('searchInput');
       if(inp) inp.placeholder = '\u0627\u0628\u062d\u062b \u0628\u064a\u0646 ' + totalStudents + ' \u0637\u0627\u0644\u0628...';
+      // Pre-select group + date from URL query params (used by the
+      // "\u0623\u0643\u0645\u0644 \u0627\u0644\u062a\u0633\u062c\u064a\u0644" link on the unified-absentees summary block).
+      // Strictly additive: does nothing if the params are absent or
+      // if the picked group isn't in this admin's visible list.
+      try {
+        var qp = new URLSearchParams(window.location.search);
+        var qg = qp.get('group');
+        var qd = qp.get('date');
+        if (qd){
+          var dInp = document.getElementById('dateInput');
+          if (dInp){ dInp.value = qd; if (typeof updateDayBadge === 'function') updateDayBadge(qd); }
+        }
+        if (qg && sel.querySelector('option[value="' + qg.replace(/"/g, '\\"') + '"]')){
+          sel.value = qg;
+          if (typeof onControlChange === 'function') onControlChange();
+        }
+      } catch(e) { /* no-op */ }
     })
     .catch(function() { showToast('\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a', '#e53935'); });
 }
@@ -10468,28 +10493,74 @@ function almLoadSummary(date){
         return;
       }
       var html = '';
+      var attDate = d.date || date;
       for (var i=0; i<groups.length; i++){
         var g = groups[i];
         var nm = _esc(g.name || '');
         var teacher = g.teacher ? ' · المدرّسة: ' + _esc(g.teacher) : '';
         var sched   = g.schedule_time ? ' · ' + _esc(g.schedule_time) : '';
-        if (g.recorded){
+        /* Three-state classification — تام / غير تام / لم يُرصد. The
+           "complete attendance" link points at /attendance with the
+           group + date as query params; the admin attendance page
+           pre-selects them on load (see _almPreselectFromQS). */
+        var state = g.state || (g.recorded ? 'تام' : 'لم يُرصد');
+        var nReg  = (g.registered_count|0);
+        var nRec  = (g.recorded_count|0);
+        var miss  = g.missing_students || [];
+        var goLink = '/attendance?group=' + encodeURIComponent(g.name||'') +
+                     '&date='   + encodeURIComponent(attDate||'');
+        var actionBtn = '<a href="' + goLink + '" class="alm-complete-link" '
+                       + 'style="background:#fff3e0;color:#bf360c;padding:3px 10px;'
+                       + 'border-radius:999px;text-decoration:none;font-weight:700;'
+                       + 'font-size:0.82rem;border:1px solid #ffcc80;">'
+                       + '✏️ أكمل التسجيل</a>';
+        if (state === 'تام'){
           html += '<div class="alm-sum-row recorded">'
                +   '<span class="icon">✅</span>'
                +   '<span class="nm">' + nm + '</span>'
                +   '<span class="meta">'
-               +     '<span>إجمالي الطلبة: <b>' + (g.total||0) + '</b></span>'
+               +     '<span class="state-pill state-complete">تام</span>'
+               +     '<span>المسجَّلون: <b>' + nRec + '</b> / ' + nReg + '</span>'
                +     '<span>غائب: <b>' + (g.absent||0) + '</b></span>'
                +     '<span>متأخر: <b>' + (g.late||0) + '</b></span>'
                +     (teacher ? '<span>' + teacher.replace(' · ','') + '</span>' : '')
                +   '</span>'
                + '</div>';
+        } else if (state === 'غير تام'){
+          /* Partially recorded — orange tint, missing list inline +
+             a one-click link to complete the attendance. */
+          var nMiss = (g.missing_count|0) || miss.length;
+          html += '<div class="alm-sum-row partial">'
+               +   '<span class="icon">⚠️</span>'
+               +   '<span class="nm">' + nm + '</span>'
+               +   '<span class="meta">'
+               +     '<span class="state-pill state-partial">غير تام</span>'
+               +     '<span>المسجَّلون: <b>' + nRec + '</b> / ' + nReg + '</span>'
+               +     '<span>الناقصون: <b style="color:#bf360c;">' + nMiss + '</b></span>'
+               +     actionBtn
+               +     (teacher ? '<span>' + teacher.replace(' · ','') + '</span>' : '')
+               +   '</span>';
+          if (miss.length){
+            /* Inline list — short. Mobile: wraps into rows. */
+            html += '<div class="alm-missing-list" style="flex:1 1 100%;'
+                 +    'margin-top:6px;padding:6px 10px;background:#fff8f1;'
+                 +    'border:1px dashed #ffb74d;border-radius:8px;'
+                 +    'font-size:0.85rem;color:#5d4037;line-height:1.6;">'
+                 +    '<b>الطلبة الناقصون:</b> '
+                 +    miss.map(_esc).join('، ')
+                 +  '</div>';
+          }
+          html += '</div>';
         } else {
+          /* لم يُرصد — same orange existing-pending look but with the
+             three-state pill + complete-attendance link. */
           html += '<div class="alm-sum-row pending">'
                +   '<span class="icon">⚠️</span>'
                +   '<span class="nm">' + nm + '</span>'
                +   '<span class="meta">'
-               +     '<span>لم تُسجَّل بعد</span>'
+               +     '<span class="state-pill state-none">لم يُرصد</span>'
+               +     (nReg ? '<span>المسجَّلون: <b>0</b> / ' + nReg + '</span>' : '<span>لم تُسجَّل بعد</span>')
+               +     actionBtn
                +     (teacher ? '<span>' + teacher.replace(' · ','') + '</span>' : '')
                +     (sched   ? '<span>' + sched.replace(' · ','') + '</span>'   : '')
                +   '</span>'
@@ -24489,9 +24560,13 @@ def api_attendance_by_date_summary():
     # via _att_normalize_date so legacy rows in mixed formats
     # (D/M/YYYY, with the Arabic era marker, etc.) still resolve.
     rec = {}
+    # student_names that already have an attendance record on this
+    # date, keyed by trimmed group_name. Drives the completeness
+    # check ("تام / غير تام / لم يُرصد").
+    recorded_names_by_group = {}
     try:
         att_rows = db.execute(
-            "SELECT group_name, status, attendance_date FROM attendance"
+            "SELECT group_name, status, attendance_date, student_name FROM attendance"
         ).fetchall()
         for r in att_rows:
             rd = dict(r)
@@ -24507,20 +24582,102 @@ def api_attendance_by_date_summary():
                 entry["absent"] += 1
             elif st == "متأخر":
                 entry["late"] += 1
+            sn = (rd.get("student_name") or "").strip()
+            if sn:
+                recorded_names_by_group.setdefault(g, set()).add(sn)
     except Exception:
         rec = {}
+        recorded_names_by_group = {}
+
+    # ── Completeness check (additive) ──────────────────────────────
+    # For each scheduled group, look up the REGISTERED roster (same
+    # active-only filter the teacher attendance flow uses) and
+    # compute:
+    #   state="تام"      → every registered student has a record;
+    #   state="غير تام"  → some registered students are missing —
+    #                       missing_students[] lists their names;
+    #   state="لم يُرصد"  → zero records for the group on this date.
+    # Reuses the configured group-link columns (in-person + online)
+    # so a student linked via group_online still counts. Active-
+    # column resolution mirrors the teacher attendance fix so an
+    # admin cleared /settings entry doesn't silently disable the gate.
+    in_person_col = get_setting('attendance', 'student_group_column',         'group_name_student')
+    online_col    = get_setting('attendance', 'student_online_group_column',  'group_online')
+    if not _is_safe_ident(in_person_col): in_person_col = 'group_name_student'
+    if not _is_safe_ident(online_col):    online_col    = 'group_online'
+    try:
+        s_live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        s_live = set()
+    has_online = (online_col in s_live and online_col != in_person_col)
+    act_col_eff = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
+                  or 'registration_term2_2026'
+    if not _is_safe_ident(act_col_eff): act_col_eff = 'registration_term2_2026'
+    act_val_eff = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
+                  or 'تم التسجيل'
+    has_active_col = (act_col_eff in s_live)
+
+    # Build a single-shot { group_name → [registered_student_names] }
+    # by selecting once and splitting in Python — cheaper than one
+    # query per group.
+    registered_by_group = {}
+    try:
+        cols_sel = '"' + in_person_col + '"'
+        if has_online:
+            cols_sel += ', "' + online_col + '"'
+        sql = ('SELECT student_name, ' + cols_sel + ' FROM students '
+               'WHERE student_name IS NOT NULL AND TRIM(student_name) <> \'\'')
+        params = ()
+        if has_active_col:
+            sql += ' AND TRIM(COALESCE("' + act_col_eff + '", \'\')) = ?'
+            params = (act_val_eff,)
+        srows = db.execute(sql, params).fetchall()
+        for sr in srows:
+            srd = dict(sr)
+            sn = (srd.get('student_name') or '').strip()
+            if not sn: continue
+            ip = (srd.get(in_person_col) or '').strip() if in_person_col else ''
+            on = (srd.get(online_col) or '').strip() if has_online and online_col else ''
+            for grp in {ip, on} - {''}:
+                registered_by_group.setdefault(grp, []).append(sn)
+    except Exception:
+        registered_by_group = {}
 
     out = []
     for g in scheduled:
         rc = rec.get(g["name"]) or {"total": 0, "absent": 0, "late": 0}
+        registered = registered_by_group.get(g["name"], [])
+        recorded_set = recorded_names_by_group.get(g["name"], set())
+        # Missing names: registered who don't appear in recorded_set.
+        # Whitespace-tolerant comparison.
+        rec_norm = {(n or '').strip() for n in recorded_set}
+        missing = [n for n in registered if (n or '').strip() not in rec_norm]
+        n_reg = len(registered)
+        n_rec = len([n for n in registered if (n or '').strip() in rec_norm])
+        if n_reg == 0:
+            # No registered students at all — fall back to the bare
+            # recorded? indicator so the row isn't silently dropped.
+            state = "تام" if rc["total"] > 0 else "لم يُرصد"
+        elif n_rec == 0:
+            state = "لم يُرصد"
+        elif n_rec >= n_reg:
+            state = "تام"
+        else:
+            state = "غير تام"
         out.append({
-            "name":          g["name"],
-            "teacher":       g["teacher"],
-            "schedule_time": g["schedule_time"],
-            "recorded":      bool(rec.get(g["name"])),
-            "total":         rc["total"],
-            "absent":        rc["absent"],
-            "late":          rc["late"],
+            "name":             g["name"],
+            "teacher":          g["teacher"],
+            "schedule_time":    g["schedule_time"],
+            "recorded":         bool(rec.get(g["name"])),
+            "total":            rc["total"],
+            "absent":           rc["absent"],
+            "late":             rc["late"],
+            # New fields driving the completeness UI.
+            "state":            state,
+            "registered_count": n_reg,
+            "recorded_count":   n_rec,
+            "missing_count":    max(0, n_reg - n_rec),
+            "missing_students": missing,
         })
 
     # ── Anomaly detection (additive) ────────────────────────────────
