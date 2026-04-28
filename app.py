@@ -4296,32 +4296,32 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       <div class="dh-action-title">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
       <div class="dh-action-desc">&#x625;&#x636;&#x627;&#x641;&#x629; &#x623;&#x648; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
     </a>
-    <button class="dh-action-card dh-a-purple" onclick="pmOpen()">
+    <button class="dh-action-card dh-a-purple" data-button-key="dashboard.payment_tracking" onclick="pmOpen()">
       <div class="dh-action-icon">&#x1F4B3;</div>
       <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</div>
       <div class="dh-action-desc">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637; &#x648;&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
-    <button class="dh-action-card dh-a-orange" onclick="ssOpen()">
+    <button class="dh-action-card dh-a-orange" data-button-key="dashboard.lessons_summary" onclick="ssOpen()">
       <div class="dh-action-icon">&#x1F4CA;</div>
       <div class="dh-action-title">&#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
       <div class="dh-action-desc">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x648;&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x648;&#x642;&#x62A;</div>
     </button>
-    <button class="dh-action-card dh-a-blue" onclick="sdOpen()">
+    <button class="dh-action-card dh-a-blue" data-button-key="dashboard.lesson_durations" onclick="sdOpen()">
       <div class="dh-action-icon">&#x23F1;&#xFE0F;</div>
       <div class="dh-action-title">&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
       <div class="dh-action-desc">&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x648;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x645;&#x62F;&#x629; &#x643;&#x644; &#x62D;&#x635;&#x629;</div>
     </button>
-    <button class="dh-action-card dh-a-search" onclick="srOpen()">
+    <button class="dh-action-card dh-a-search" data-button-key="dashboard.search_student" onclick="srOpen()">
       <div class="dh-action-icon">&#x1F50D;</div>
       <div class="dh-action-title">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</div>
       <div class="dh-action-desc">&#x628;&#x62D;&#x62B; &#x633;&#x631;&#x64A;&#x639; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;</div>
     </button>
-    <button class="dh-action-card dh-a-green" onclick="msgOpen()">
+    <button class="dh-action-card dh-a-green" data-button-key="dashboard.send_messages" onclick="msgOpen()">
       <div class="dh-action-icon">&#x1F4E9;</div>
       <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
       <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
-    <a class="dh-action-card mx-admin-only" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
+    <a class="dh-action-card mx-admin-only" data-button-key="dashboard.parent_receipts" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
       <div class="dh-action-icon">&#x1F4CE;</div>
       <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
       <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x641;&#x639; &#x627;&#x644;&#x645;&#x631;&#x641;&#x648;&#x639;&#x629;</div>
@@ -4331,17 +4331,22 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       <div class="dh-action-title">&#x646;&#x633;&#x62E; &#x631;&#x627;&#x628;&#x637; &#x628;&#x648;&#x627;&#x628;&#x629; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</div>
       <div class="dh-action-desc">&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x631;&#x627;&#x628;&#x637; /parent &#x645;&#x639; &#x627;&#x644;&#x623;&#x647;&#x627;&#x644;&#x64A;</div>
     </button>
-    <a class="dh-action-card" href="/points/board" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);">
+    <a class="dh-action-card" data-button-key="dashboard.points_board" href="/points/board" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);">
       <div class="dh-action-icon">&#x1F31F;</div>
       <div class="dh-action-title">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x635;&#x641; &#x2014; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x645;&#x646;&#x62D; &#x646;&#x642;&#x627;&#x637; &#x627;&#x644;&#x633;&#x644;&#x648;&#x643; &#x644;&#x644;&#x637;&#x644;&#x628;&#x629; &#x645;&#x628;&#x627;&#x634;&#x631;&#x629;</div>
     </a>
-    <a class="dh-action-card" href="/points/manage" id="dh-points-manage" style="background:linear-gradient(135deg,#AD1457,#D81B60);display:none;">
+    <a class="dh-action-card" data-button-key="dashboard.points_manage" href="/points/manage" id="dh-points-manage" style="background:linear-gradient(135deg,#AD1457,#D81B60);display:none;">
       <div class="dh-action-icon">&#x2699;&#xFE0F;</div>
       <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643;&#x064A;&#x627;&#x062A; &#x648;&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x062A; &#x648;&#x627;&#x644;&#x062A;&#x0642;&#x0627;&#x0631;&#x064A;&#x0631;</div>
     </a>
-    <a class="dh-action-card mx-admin-only" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
+    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.permissions" id="dh-permissions" href="/admin/permissions" style="background:linear-gradient(135deg,#3F51B5,#5C6BC0);display:none;">
+      <div class="dh-action-icon">&#x1F6E1;&#xFE0F;</div>
+      <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0635;&#x0644;&#x0627;&#x062D;&#x064A;&#x0627;&#x062A;</div>
+      <div class="dh-action-desc">&#x062A;&#x0639;&#x062F;&#x064A;&#x0644; &#x0623;&#x062F;&#x0648;&#x0627;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x064A;&#x0646; &#x0648;&#x0625;&#x0638;&#x0647;&#x0627;&#x0631;/&#x0625;&#x062E;&#x0641;&#x0627;&#x0621; &#x0627;&#x0644;&#x0623;&#x0632;&#x0631;&#x0627;&#x0631;</div>
+    </a>
+    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.table_audit" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
       <div class="dh-action-icon">&#x1F5C2;</div>
       <div class="dh-action-title">&#x062A;&#x062F;&#x0642;&#x064A;&#x0642; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644;</div>
       <div class="dh-action-desc">&#x062A;&#x0635;&#x0646;&#x064A;&#x0641; &#x0648;&#x062D;&#x0630;&#x0641; &#x0622;&#x0645;&#x0646; &#x0644;&#x644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x063A;&#x064A;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x0629;</div>
@@ -4873,7 +4878,7 @@ _dhLoadExceptions();
 (function(){
   var role = (document.body.dataset.role || '').trim().toLowerCase();
   if (role === 'admin'){
-    ['dh-points-manage','dh-table-audit'].forEach(function(id){
+    ['dh-points-manage','dh-table-audit','dh-permissions'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) el.style.display = '';
     });
@@ -33515,6 +33520,91 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   }
   document.addEventListener('touchend', _lpCancel, { passive: true });
   document.addEventListener('touchcancel', _lpCancel, { passive: true });
+
+  /* ──────────────────────────────────────────────────────────────
+   * Permission-driven button visibility (commit 6/6)
+   * Reads /api/me/permissions once on page load and removes every
+   * DOM element whose data-button-key is in the hidden list. This
+   * is purely UI tidying — server-side endpoints remain the actual
+   * security boundary. Buttons WITHOUT data-button-key keep their
+   * existing visibility behavior, so the change is strictly
+   * additive: nothing is hidden until a button is explicitly
+   * tagged. /api/me/permissions is no-op for logged-out sessions
+   * (returns 302 from @login_required), which we silently ignore.
+   * ────────────────────────────────────────────────────────────── */
+  (function(){
+    function applyHidden(keys){
+      try {
+        window._MX_HIDDEN_BUTTONS = new Set(keys || []);
+      } catch (e){ window._MX_HIDDEN_BUTTONS = null; }
+      if (!keys || !keys.length) return;
+      var hide = new Set(keys);
+      var nodes = document.querySelectorAll('[data-button-key]');
+      for (var i = 0; i < nodes.length; i++){
+        var k = nodes[i].getAttribute('data-button-key');
+        if (k && hide.has(k)){
+          // Remove from layout entirely (the spec is "disappear from
+          // the DOM, not just hidden via CSS"). For elements that are
+          // grid items / flex children, display:none collapses cleanly.
+          nodes[i].style.display = 'none';
+          nodes[i].setAttribute('data-button-hidden', '1');
+        }
+      }
+    }
+    function loadPermissions(){
+      try {
+        fetch('/api/me/permissions', { credentials: 'same-origin' })
+          .then(function(r){
+            if (!r.ok) return null;
+            return r.json();
+          })
+          .then(function(d){
+            if (!d || !d.ok) return;
+            applyHidden(d.hidden_buttons || []);
+          })
+          .catch(function(){ /* silent — UI tidying must never throw */ });
+      } catch (e){}
+    }
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', loadPermissions);
+    } else {
+      loadPermissions();
+    }
+    // Re-run whenever something injects new buttons via JS (the
+    // dashboard's role-gated cards toggle their display via
+    // mx-admin-only logic that runs after our load). Cheap MutationObserver
+    // scoped to attribute changes on data-button-key elements.
+    try {
+      var mo = new MutationObserver(function(records){
+        if (!window._MX_HIDDEN_BUTTONS || !window._MX_HIDDEN_BUTTONS.size) return;
+        for (var i = 0; i < records.length; i++){
+          var added = records[i].addedNodes || [];
+          for (var j = 0; j < added.length; j++){
+            var n = added[j];
+            if (!n || n.nodeType !== 1) continue;
+            // Self
+            var sk = n.getAttribute && n.getAttribute('data-button-key');
+            if (sk && window._MX_HIDDEN_BUTTONS.has(sk)){
+              n.style.display = 'none';
+              n.setAttribute('data-button-hidden', '1');
+            }
+            // Descendants
+            if (n.querySelectorAll){
+              var inner = n.querySelectorAll('[data-button-key]');
+              for (var k = 0; k < inner.length; k++){
+                var ik = inner[k].getAttribute('data-button-key');
+                if (ik && window._MX_HIDDEN_BUTTONS.has(ik)){
+                  inner[k].style.display = 'none';
+                  inner[k].setAttribute('data-button-hidden', '1');
+                }
+              }
+            }
+          }
+        }
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+    } catch (e){}
+  })();
 })();
 '''
 
