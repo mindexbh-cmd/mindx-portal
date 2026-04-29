@@ -25956,36 +25956,41 @@ table.tbl tr:hover td{background:#faf5ff;}
     t.classList.add('show');
     setTimeout(function(){ t.classList.remove('show'); }, 2400);
   }
-  function fmtDays(arr){
-    if(!arr || !arr.length) return '';
-    return arr.join(' و ');
-  }
-
+  // Group dropdown: identical source + format to the teacher
+  // attendance page (تسجيل الحضور). Backend endpoint and the
+  // window.mxFmtTeacherGroupOption formatter (mx-helpers.js) match
+  // _tFmtGroupOption inside TEACHER_ATTENDANCE_HTML, so the rendered
+  // options here are byte-for-byte identical for the same teacher
+  // under the same center mode.
   function loadGroups(){
     var sel = document.getElementById('lgroup');
-    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
-      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
-      var groups = (j && j.groups) || [];
-      if(!groups.length){
-        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
-        return;
-      }
-      groups.forEach(function(g){
-        var nm = g.name || '';
-        var d  = fmtDays(g.study_days || []);
-        var t  = (g.study_time || '').trim();
-        var label = nm;
-        if(d || t){
-          label += ' (' + [d, t].filter(Boolean).join(' - ') + ')';
+    fetch('/api/teacher/groups', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
+          return;
         }
-        var opt = document.createElement('option');
-        opt.value = nm;
-        opt.textContent = label;
-        sel.appendChild(opt);
+        var groups = j.groups || [];
+        sel.innerHTML = '<option value="">— اختر مجموعتك —</option>';
+        if(!groups.length){
+          sel.innerHTML = '<option value="">— لا توجد مجموعات مسندة لك —</option>';
+          return;
+        }
+        var fmt = window.mxFmtTeacherGroupOption;
+        for(var i=0;i<groups.length;i++){
+          var g = groups[i];
+          var name = (typeof g === 'string') ? g : (g.name || '');
+          var label = (typeof fmt === 'function') ? fmt(g) : name;
+          var o = document.createElement('option');
+          o.value = name;
+          o.textContent = label;
+          sel.appendChild(o);
+        }
+      })
+      .catch(function(){
+        sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
       });
-    }).catch(function(){
-      sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
-    });
   }
 
   function escapeHtml(s){
@@ -26480,35 +26485,41 @@ table.tbl tr:hover td{background:#fff5f8;}
   function clearErrs(){
     ['pgroup','pcontent','pskills','pbooks'].forEach(function(k){ showErr(k, ''); });
   }
-  function fmtDays(arr){
-    if(!arr || !arr.length) return '';
-    return arr.join(' و ');
-  }
-
-  // ── Group dropdown (uses the shared teacher endpoint) ──
+  // Group dropdown: identical source + format to the teacher
+  // attendance page (تسجيل الحضور). Backend endpoint and the
+  // window.mxFmtTeacherGroupOption formatter (mx-helpers.js) match
+  // _tFmtGroupOption inside TEACHER_ATTENDANCE_HTML, so the rendered
+  // options here are byte-for-byte identical for the same teacher
+  // under the same center mode.
   function loadGroups(){
     var sel = document.getElementById('pgroup');
-    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
-      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
-      var groups = (j && j.groups) || [];
-      if(!groups.length){
-        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
-        return;
-      }
-      groups.forEach(function(g){
-        var nm = g.name || '';
-        var d  = fmtDays(g.study_days || []);
-        var t  = (g.study_time || '').trim();
-        var label = nm;
-        if(d || t){ label += ' (' + [d, t].filter(Boolean).join(' - ') + ')'; }
-        var opt = document.createElement('option');
-        opt.value = nm;
-        opt.textContent = label;
-        sel.appendChild(opt);
+    fetch('/api/teacher/groups', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
+          return;
+        }
+        var groups = j.groups || [];
+        sel.innerHTML = '<option value="">— اختر مجموعتك —</option>';
+        if(!groups.length){
+          sel.innerHTML = '<option value="">— لا توجد مجموعات مسندة لك —</option>';
+          return;
+        }
+        var fmt = window.mxFmtTeacherGroupOption;
+        for(var i=0;i<groups.length;i++){
+          var g = groups[i];
+          var name = (typeof g === 'string') ? g : (g.name || '');
+          var label = (typeof fmt === 'function') ? fmt(g) : name;
+          var o = document.createElement('option');
+          o.value = name;
+          o.textContent = label;
+          sel.appendChild(o);
+        }
+      })
+      .catch(function(){
+        sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
       });
-    }).catch(function(){
-      sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
-    });
   }
 
   // ── Preview ──
@@ -36692,6 +36703,36 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
   window._invalidateLinkedCache   = _invalidateLinkedCache;
   window.buildGroupDropdown       = buildGroupDropdown;
 
+  /* ── mxFmtTeacherGroupOption ──────────────────────────────────
+     Canonical option-label formatter for the teacher group
+     dropdown. Mirrors `_tFmtGroupOption` inside
+     TEACHER_ATTENDANCE_HTML byte-for-byte so every page that calls
+     /api/teacher/groups (lessons-tracking, parent-broadcast, plus
+     attendance via its own local copy) renders IDENTICAL options
+     for the same teacher under the same center mode.
+
+     Input shape (matches the backend's _decorate / shared helper):
+       {name, schedule, study_days, study_time, ramadan_time, online_time}
+     The mode-aware backend pre-builds a clean `schedule` string
+     (days + " - " + time, or just one of them). Fall back to a
+     legacy combo if `schedule` is missing. */
+  function mxFmtTeacherGroupOption(g){
+    if (!g) return '';
+    if (typeof g === 'string') return g;
+    var name = String(g.name || '').trim();
+    var schedule = String(g.schedule || '').trim();
+    if (!schedule){
+      var days = String(g.study_days   || '').trim();
+      var time = String(g.study_time   || g.ramadan_time || g.online_time || '').trim();
+      if (days && time) schedule = days + ' - ' + time;
+      else if (days)    schedule = days;
+      else if (time)    schedule = time;
+    }
+    var TIME_MISSING = 'لم يُحدد الوقت';
+    return name + ' (' + (schedule || TIME_MISSING) + ')';
+  }
+  window.mxFmtTeacherGroupOption = mxFmtTeacherGroupOption;
+
   /* ── Schema-driven extras for إضافة طالب + بحث عن طالب ─────────
      Both surfaces render a static set of fields plus whatever extra
      columns admins have added via the table-edit modal. The schema
@@ -44552,7 +44593,13 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   'PORTAL_CHANGE_PW_HTML',
                   'PORTAL_PARENT_HUB_HTML',
                   'PORTAL_PARENT_PAYMENTS_HTML',
-                  'PORTAL_PARENT_ATTENDANCE_HTML'):
+                  'PORTAL_PARENT_ATTENDANCE_HTML',
+                  # Teacher feature pages — pulled in so the new
+                  # group-dropdown helper (window.mxFmtTeacherGroupOption)
+                  # is available from mx-helpers.js, matching the
+                  # attendance page's option formatter exactly.
+                  'TEACHER_LESSONS_HTML',
+                  'TEACHER_PARENT_MESSAGES_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
