@@ -855,6 +855,44 @@ def init_db():
         read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, student_id)
     )""")
+    # ── curriculum_v1: PDF library (admin/manager uploads, assigned per
+    # group/student/parent/teacher with optional download permission).
+    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_path TEXT NOT NULL,
+        file_size_bytes INTEGER DEFAULT 0,
+        download_default TEXT DEFAULT 'allowed',
+        uploaded_by INTEGER,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_assignments(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        can_download INTEGER,
+        assigned_by INTEGER,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_access_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        user_id INTEGER,
+        action TEXT,
+        accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ip_address TEXT
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_lookup "
+               "ON curriculum_assignments(file_id, target_type, target_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_target "
+               "ON curriculum_assignments(target_type, target_id, is_deleted)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
+               "ON curriculum_files(is_deleted)")
     db.commit()
     db.close()
 
@@ -2945,6 +2983,69 @@ if True:
                 "INSERT INTO schema_migrations(tag) VALUES(?)",
                 ("parent_messages_status_v1",)
             )
+            db2.commit()
+        except Exception: pass
+
+    # ── curriculum_v1: المناهج — central PDF library. Admin/manager
+    # uploads PDFs and assigns each to specific groups, students,
+    # parents, or teachers with configurable view-only or download
+    # permission. PDFs are stored on the persistent disk (Render
+    # /var/data/curriculum, local fallback ./data/curriculum) — the
+    # file_path column holds the absolute path so the binary is
+    # NEVER served from /static. curriculum_assignments is the
+    # join table; target_type ∈ {group, student, parent, teacher}.
+    # Idempotent: CREATE TABLE IF NOT EXISTS unconditionally; no
+    # ALTER block yet (this is a brand-new table set so there are
+    # no legacy columns to backfill).
+    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_path TEXT NOT NULL,
+        file_size_bytes INTEGER DEFAULT 0,
+        download_default TEXT DEFAULT 'allowed',
+        uploaded_by INTEGER,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_assignments(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        can_download INTEGER,
+        assigned_by INTEGER,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_access_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        user_id INTEGER,
+        action TEXT,
+        accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ip_address TEXT
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_lookup "
+                    "ON curriculum_assignments(file_id, target_type, target_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_target "
+                    "ON curriculum_assignments(target_type, target_id, is_deleted)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
+                    "ON curriculum_files(is_deleted)")
+    except Exception: pass
+    try:
+        _cv1 = db2.execute(
+            "SELECT 1 FROM schema_migrations WHERE tag=?",
+            ("curriculum_v1",)
+        ).fetchone()
+    except Exception:
+        _cv1 = None
+    if not _cv1:
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("curriculum_v1",))
             db2.commit()
         except Exception: pass
 
@@ -24755,6 +24856,9 @@ _TBL_AUDIT_FEATURE = {
     "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
     "parent_messages":     ("رسائل المعلمة لأولياء الأمور",  "ماذا تريد أن يعرف ولي الأمر"),
     "parent_message_reads": ("اطّلاع أولياء الأمور على الرسائل", "ماذا تريد أن يعرف ولي الأمر"),
+    "curriculum_files":     ("ملفات المنهج",                  "مكتبة المناهج"),
+    "curriculum_assignments": ("تخصيصات ملفات المنهج",        "مكتبة المناهج"),
+    "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
