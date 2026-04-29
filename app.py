@@ -37638,6 +37638,479 @@ def points_board_page(group=None):
             .replace("__QA_DISP__",   qa_disp))
 
 
+# ──────────────────────────────────────────────────────────────────
+# Lesson tracking — متابعة التقدم في الدروس
+# ──────────────────────────────────────────────────────────────────
+# Teachers log per group per session what was taught and where in the
+# curriculum they reached. Admin/manager sees all entries with
+# statistics, can free-edit lesson_date retroactively (audit-trailed),
+# and gets a notification when an attendance was recorded but no
+# lessons_log entry exists for the same (group_name, date).
+#
+# Permissions:
+#   - Teachers: write own + read/edit/delete own. Cannot edit
+#     lesson_date on existing entries (or create entries with a date
+#     more than 1 day in the past).
+#   - admin/manager: full access incl. lesson_date edits with
+#     audit_log entry.
+
+def _lessons_user_role(user):
+    return ((user or {}).get("role") or "").strip().lower()
+
+def _lessons_can_admin(user):
+    return _lessons_user_role(user) in ("admin", "manager")
+
+def _lessons_can_use(user):
+    return _lessons_user_role(user) in ("admin", "manager", "teacher")
+
+def _lessons_row_to_dict(r):
+    if r is None: return None
+    d = dict(r)
+    return {
+        "id":                  d.get("id"),
+        "teacher_id":          d.get("teacher_id"),
+        "teacher_username":    d.get("teacher_username") or "",
+        "teacher_name":        d.get("teacher_name") or "",
+        "group_name":          d.get("group_name") or "",
+        "lesson_date":         d.get("lesson_date") or "",
+        "lesson_topic":        d.get("lesson_topic") or "",
+        "curriculum_progress": d.get("curriculum_progress") or "",
+        "notes":               d.get("notes") or "",
+        "is_deleted":          int(d.get("is_deleted") or 0),
+        "created_at":          d.get("created_at") or "",
+        "updated_at":          d.get("updated_at") or "",
+    }
+
+
+@app.route('/api/lessons/log', methods=['POST'])
+@login_required
+def api_lessons_log_create():
+    user = session.get("user") or {}
+    if not _lessons_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    group_name          = (body.get("group_name") or "").strip()
+    lesson_date_raw     = (body.get("lesson_date") or "").strip()
+    lesson_topic        = (body.get("lesson_topic") or "").strip()
+    curriculum_progress = (body.get("curriculum_progress") or "").strip()
+    notes               = (body.get("notes") or "").strip()
+    if not group_name:
+        return jsonify({"ok": False, "error": "اسم المجموعة مطلوب"}), 400
+    lesson_date = _att_normalize_date(lesson_date_raw) or lesson_date_raw
+    if not lesson_date:
+        return jsonify({"ok": False, "error": "تاريخ الدرس مطلوب"}), 400
+    # Sanity: ISO YYYY-MM-DD only past _att_normalize_date.
+    import re as _re_l, datetime as _dt_l
+    if not _re_l.match(r"^\d{4}-\d{2}-\d{2}$", lesson_date):
+        return jsonify({"ok": False, "error": "صيغة التاريخ غير صحيحة"}), 400
+    try:
+        _dt_parsed = _dt_l.date.fromisoformat(lesson_date)
+    except Exception:
+        return jsonify({"ok": False, "error": "تاريخ الدرس غير صالح"}), 400
+    today = _dt_l.date.today()
+    # Reject absurd future / past dates outright (any role).
+    if _dt_parsed > today + _dt_l.timedelta(days=1):
+        return jsonify({"ok": False, "error": "لا يمكن تسجيل درس بتاريخ مستقبلي"}), 400
+    if _dt_parsed < today - _dt_l.timedelta(days=365):
+        return jsonify({"ok": False, "error": "تاريخ الدرس قديم جداً"}), 400
+    if not lesson_topic:
+        return jsonify({"ok": False, "error": "حقل الدرس مطلوب"}), 400
+    if not curriculum_progress:
+        return jsonify({"ok": False, "error": "حقل إلى أين وصلت في المنهج مطلوب"}), 400
+    role = _lessons_user_role(user)
+    db = get_db()
+    # Teacher restriction: only today / yesterday + must own the group.
+    if role == "teacher":
+        if _dt_parsed < today - _dt_l.timedelta(days=1):
+            return jsonify({"ok": False, "error":
+                "يمكن للمعلمة تسجيل درس عن اليوم أو الأمس فقط"}), 400
+        own = set(_teacher_groups_for(db, user))
+        if group_name not in own:
+            return jsonify({"ok": False, "error":
+                "هذه المجموعة ليست ضمن مجموعاتك"}), 403
+    teacher_id = None
+    try: teacher_id = int(user.get("id") or 0) or None
+    except Exception: teacher_id = None
+    teacher_username = (user.get("username") or "").strip()
+    teacher_name     = (user.get("name") or teacher_username or "").strip()
+    try:
+        cur = db.execute(
+            "INSERT INTO lessons_log(teacher_id,teacher_username,teacher_name,"
+            "group_name,lesson_date,lesson_topic,curriculum_progress,notes,"
+            "is_deleted,created_at,updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+            (teacher_id, teacher_username, teacher_name,
+             group_name, lesson_date, lesson_topic, curriculum_progress, notes),
+        )
+        db.commit()
+        new_id = None
+        try: new_id = cur.lastrowid
+        except Exception: pass
+        if new_id is None:
+            try:
+                new_id = db.execute(
+                    "SELECT id FROM lessons_log WHERE teacher_username=? AND "
+                    "group_name=? AND lesson_date=? ORDER BY id DESC LIMIT 1",
+                    (teacher_username, group_name, lesson_date)
+                ).fetchone()[0]
+            except Exception: pass
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("lessons_log.create", target_type="lessons_log",
+               target_id=new_id,
+               new_value={"group_name": group_name, "lesson_date": lesson_date,
+                          "lesson_topic": lesson_topic[:120]})
+    except Exception: pass
+    return jsonify({"ok": True, "success": True, "id": new_id})
+
+
+@app.route('/api/lessons/log', methods=['GET'])
+@login_required
+def api_lessons_log_list():
+    user = session.get("user") or {}
+    if not _lessons_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _lessons_user_role(user)
+    db = get_db()
+    where = ["is_deleted=0"]
+    params = []
+    q_group   = (request.args.get("group_name") or "").strip()
+    q_teacher = (request.args.get("teacher_id") or "").strip()
+    q_from    = (request.args.get("date_from")  or "").strip()
+    q_to      = (request.args.get("date_to")    or "").strip()
+    q_search  = (request.args.get("search")     or "").strip()
+    q_limit   = (request.args.get("limit")      or "").strip()
+    if role == "teacher":
+        try: tid = int(user.get("id") or 0)
+        except Exception: tid = 0
+        where.append("teacher_id=?"); params.append(tid)
+    if q_group:
+        where.append("group_name=?"); params.append(q_group)
+    if q_teacher and role != "teacher":
+        try:
+            where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("lesson_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("lesson_date<=?"); params.append(d)
+    if q_search:
+        where.append("(lesson_topic LIKE ? OR notes LIKE ? OR curriculum_progress LIKE ?)")
+        like = "%" + q_search + "%"
+        params.extend([like, like, like])
+    sql = ("SELECT * FROM lessons_log WHERE " + " AND ".join(where) +
+           " ORDER BY lesson_date DESC, id DESC")
+    try:
+        lim = int(q_limit) if q_limit else 0
+    except Exception:
+        lim = 0
+    if lim and lim > 0:
+        sql += " LIMIT " + str(min(lim, 1000))
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = [_lessons_row_to_dict(r) for r in rows]
+    return jsonify({"ok": True, "entries": out, "count": len(out)})
+
+
+@app.route('/api/lessons/log/<int:lid>', methods=['PATCH'])
+@login_required
+def api_lessons_log_update(lid):
+    user = session.get("user") or {}
+    if not _lessons_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _lessons_user_role(user)
+    db = get_db()
+    row = db.execute("SELECT * FROM lessons_log WHERE id=? AND is_deleted=0",
+                     (lid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "الإدخال غير موجود"}), 404
+    rd = dict(row)
+    # Teacher: own entries only.
+    if role == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error":
+                "غير مصرح بتعديل إدخال معلمة أخرى"}), 403
+    body = request.get_json(silent=True) or {}
+    sets = []; params = []
+    audit_changes = {}
+    audit_old = {}
+    audit_reason = (body.get("reason") or "").strip()
+    if "lesson_topic" in body:
+        v = (body.get("lesson_topic") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "حقل الدرس مطلوب"}), 400
+        if v != (rd.get("lesson_topic") or ""):
+            audit_old["lesson_topic"] = rd.get("lesson_topic") or ""
+            audit_changes["lesson_topic"] = v
+        sets.append('lesson_topic=?'); params.append(v)
+    if "curriculum_progress" in body:
+        v = (body.get("curriculum_progress") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error":
+                "حقل إلى أين وصلت في المنهج مطلوب"}), 400
+        if v != (rd.get("curriculum_progress") or ""):
+            audit_old["curriculum_progress"] = rd.get("curriculum_progress") or ""
+            audit_changes["curriculum_progress"] = v
+        sets.append('curriculum_progress=?'); params.append(v)
+    if "notes" in body:
+        v = (body.get("notes") or "").strip()
+        if v != (rd.get("notes") or ""):
+            audit_old["notes"] = rd.get("notes") or ""
+            audit_changes["notes"] = v
+        sets.append('notes=?'); params.append(v)
+    if "lesson_date" in body:
+        if not _lessons_can_admin(user):
+            return jsonify({"ok": False, "error":
+                "يمكن للأدمن فقط تعديل تاريخ الدرس"}), 403
+        raw = (body.get("lesson_date") or "").strip()
+        new_date = _att_normalize_date(raw) or raw
+        import re as _re_l2, datetime as _dt_l2
+        if not _re_l2.match(r"^\d{4}-\d{2}-\d{2}$", new_date):
+            return jsonify({"ok": False, "error": "صيغة التاريخ غير صحيحة"}), 400
+        try: _dt_l2.date.fromisoformat(new_date)
+        except Exception:
+            return jsonify({"ok": False, "error": "تاريخ غير صالح"}), 400
+        if new_date != (rd.get("lesson_date") or ""):
+            audit_old["lesson_date"] = rd.get("lesson_date") or ""
+            audit_changes["lesson_date"] = new_date
+        sets.append('lesson_date=?'); params.append(new_date)
+    if "group_name" in body and _lessons_can_admin(user):
+        v = (body.get("group_name") or "").strip()
+        if v and v != (rd.get("group_name") or ""):
+            audit_old["group_name"] = rd.get("group_name") or ""
+            audit_changes["group_name"] = v
+            sets.append('group_name=?'); params.append(v)
+    if not sets:
+        return jsonify({"ok": True, "success": True, "id": lid,
+                        "entry": _lessons_row_to_dict(row),
+                        "unchanged": True})
+    sets.append("updated_at=CURRENT_TIMESTAMP")
+    params.append(lid)
+    try:
+        db.execute("UPDATE lessons_log SET " + ", ".join(sets) +
+                   " WHERE id=?", tuple(params))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        if audit_changes:
+            details = {"reason": audit_reason} if audit_reason else None
+            _audit("lessons_log.update", target_type="lessons_log",
+                   target_id=lid,
+                   old_value=audit_old, new_value=audit_changes,
+                   details=details)
+    except Exception: pass
+    new_row = db.execute("SELECT * FROM lessons_log WHERE id=?",
+                         (lid,)).fetchone()
+    return jsonify({"ok": True, "success": True, "id": lid,
+                    "entry": _lessons_row_to_dict(new_row)})
+
+
+@app.route('/api/lessons/log/<int:lid>', methods=['DELETE'])
+@login_required
+def api_lessons_log_delete(lid):
+    user = session.get("user") or {}
+    if not _lessons_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _lessons_user_role(user)
+    db = get_db()
+    row = db.execute("SELECT * FROM lessons_log WHERE id=? AND is_deleted=0",
+                     (lid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "الإدخال غير موجود"}), 404
+    rd = dict(row)
+    if role == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error":
+                "غير مصرح بحذف إدخال معلمة أخرى"}), 403
+    try:
+        db.execute("UPDATE lessons_log SET is_deleted=1, "
+                   "updated_at=CURRENT_TIMESTAMP WHERE id=?", (lid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("lessons_log.delete", target_type="lessons_log",
+               target_id=lid,
+               old_value={"group_name":   rd.get("group_name")  or "",
+                          "lesson_date":  rd.get("lesson_date") or "",
+                          "lesson_topic": rd.get("lesson_topic") or ""})
+    except Exception: pass
+    return jsonify({"ok": True, "success": True, "id": lid})
+
+
+@app.route('/api/lessons/stats', methods=['GET'])
+@login_required
+def api_lessons_stats():
+    user = session.get("user") or {}
+    if not _lessons_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    import datetime as _dt_s
+    today = _dt_s.date.today()
+    week_ago  = (today - _dt_s.timedelta(days=7)).isoformat()
+    month_ago = (today - _dt_s.timedelta(days=30)).isoformat()
+    try:
+        total = int(db.execute(
+            "SELECT COUNT(*) FROM lessons_log WHERE is_deleted=0"
+        ).fetchone()[0] or 0)
+        this_week = int(db.execute(
+            "SELECT COUNT(*) FROM lessons_log WHERE is_deleted=0 "
+            "AND lesson_date>=?", (week_ago,)
+        ).fetchone()[0] or 0)
+        this_month = int(db.execute(
+            "SELECT COUNT(*) FROM lessons_log WHERE is_deleted=0 "
+            "AND lesson_date>=?", (month_ago,)
+        ).fetchone()[0] or 0)
+        active_teachers = int(db.execute(
+            "SELECT COUNT(DISTINCT teacher_id) FROM lessons_log "
+            "WHERE is_deleted=0 AND lesson_date>=?", (month_ago,)
+        ).fetchone()[0] or 0)
+        active_groups = int(db.execute(
+            "SELECT COUNT(DISTINCT group_name) FROM lessons_log "
+            "WHERE is_deleted=0 AND lesson_date>=?", (month_ago,)
+        ).fetchone()[0] or 0)
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Per-group last-lesson info.
+    per_group = []
+    try:
+        groups = [r[0] for r in db.execute(
+            "SELECT group_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name)<>'' "
+            "ORDER BY group_name"
+        ).fetchall()]
+    except Exception:
+        groups = []
+    for g in groups:
+        try:
+            n = int(db.execute(
+                "SELECT COUNT(*) FROM lessons_log WHERE is_deleted=0 "
+                "AND group_name=?", (g,)
+            ).fetchone()[0] or 0)
+            last = db.execute(
+                "SELECT lesson_date, lesson_topic, curriculum_progress, "
+                "teacher_name FROM lessons_log WHERE is_deleted=0 "
+                "AND group_name=? ORDER BY lesson_date DESC, id DESC LIMIT 1",
+                (g,)
+            ).fetchone()
+        except Exception:
+            n = 0; last = None
+        last_date = ""
+        last_topic = ""
+        last_curr = ""
+        last_teacher = ""
+        days_since = None
+        if last:
+            ld = dict(last)
+            last_date    = ld.get("lesson_date") or ""
+            last_topic   = ld.get("lesson_topic") or ""
+            last_curr    = ld.get("curriculum_progress") or ""
+            last_teacher = ld.get("teacher_name") or ""
+            try:
+                d_obj = _dt_s.date.fromisoformat(last_date)
+                days_since = (today - d_obj).days
+            except Exception:
+                days_since = None
+        per_group.append({
+            "group_name":       g,
+            "total_lessons":    n,
+            "last_lesson_date": last_date,
+            "last_lesson_topic": last_topic,
+            "last_curriculum":  last_curr,
+            "last_teacher":     last_teacher,
+            "days_since_last":  days_since,
+            "stale":            (days_since is None or days_since > 7),
+        })
+    stale = [g for g in per_group if g["stale"]]
+    return jsonify({
+        "ok": True,
+        "total_lessons":     total,
+        "this_week":         this_week,
+        "this_month":        this_month,
+        "active_teachers":   active_teachers,
+        "active_groups":     active_groups,
+        "per_group":         per_group,
+        "stale_groups":      stale,
+        "today":             today.isoformat(),
+    })
+
+
+@app.route('/api/lessons/missing', methods=['GET'])
+@login_required
+def api_lessons_missing():
+    """Detect (group_name, attendance_date) pairs that have an
+    attendance record but no non-deleted lessons_log entry. Recomputes
+    on every call so an admin's lesson_date edit immediately closes (or
+    opens) the gap."""
+    user = session.get("user") or {}
+    if not _lessons_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    # Build the set of (group, iso_date) pairs that already have a
+    # lesson logged. Pull all rows once, normalise date in Python.
+    have = set()
+    try:
+        for r in db.execute(
+            "SELECT group_name, lesson_date FROM lessons_log "
+            "WHERE is_deleted=0").fetchall():
+            g = (r[0] or "").strip()
+            d = _att_normalize_date(r[1] or "")
+            if g and d:
+                have.add((g, d))
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Pull every distinct (group, date, teacher) seen in attendance.
+    # Pair with the matching student_groups.teacher_name when present
+    # so the admin can poke the right teacher.
+    teacher_by_group = {}
+    try:
+        for r in db.execute(
+            "SELECT group_name, teacher_name FROM student_groups").fetchall():
+            g = (r[0] or "").strip()
+            t = (r[1] or "").strip()
+            if g and g not in teacher_by_group:
+                teacher_by_group[g] = t
+    except Exception: pass
+    missing = []
+    seen_pair = set()
+    try:
+        for r in db.execute(
+            "SELECT DISTINCT group_name, attendance_date "
+            "FROM attendance WHERE group_name IS NOT NULL "
+            "AND attendance_date IS NOT NULL").fetchall():
+            g = (r[0] or "").strip()
+            d_raw = r[1] or ""
+            d = _att_normalize_date(d_raw)
+            if not g or not d:
+                continue
+            pair = (g, d)
+            if pair in seen_pair:
+                continue
+            seen_pair.add(pair)
+            if pair in have:
+                continue
+            missing.append({
+                "group_name":       g,
+                "attendance_date":  d,
+                "teacher_name":     teacher_by_group.get(g, ""),
+            })
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    missing.sort(key=lambda x: (x["attendance_date"], x["group_name"]),
+                 reverse=True)
+    return jsonify({"ok": True, "missing": missing, "count": len(missing)})
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
