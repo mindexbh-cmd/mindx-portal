@@ -4459,12 +4459,6 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
 
 </style>
-<!-- Dashboard redesign — Phase 1 design tokens. Pure foundation: the
-     stylesheet only declares :root custom properties, so linking it
-     changes nothing visual. Phases 2-6 reference these tokens via
-     var(--md-*). Linked ONLY from HOME_HTML — other pages are not
-     affected. -->
-<link rel="stylesheet" href="/static/css/dashboard-redesign.css">
 </head>
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
