@@ -4703,6 +4703,115 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
     }).catch(function(){});
   })();
   </script>
+  <!-- Two-column content (Phase 5): "آخر النشاطات" (audit_log) +
+       "المجموعات النشطة" (student_groups). Populated client-side by the
+       inline script below from /api/dashboard/recent-activity and
+       /api/dashboard/active-groups (small, read-only endpoints added
+       in app.py — purely additive, no existing functionality changed). -->
+  <div class="md-two-col">
+    <div class="md-panel">
+      <div class="md-panel-head">
+        <h3 class="md-panel-title">
+          <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          &#x622;&#x62E;&#x631; &#x627;&#x644;&#x646;&#x634;&#x627;&#x637;&#x627;&#x62A;
+        </h3>
+      </div>
+      <ul class="md-panel-list" id="md-activity-list">
+        <li class="md-panel-empty">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</li>
+      </ul>
+    </div>
+    <div class="md-panel">
+      <div class="md-panel-head">
+        <h3 class="md-panel-title">
+          <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M3 10v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9z"/><path d="M3 10h18"/></svg>
+          &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x646;&#x634;&#x637;&#x629;
+        </h3>
+        <a class="md-panel-link" href="/groups">&#x639;&#x631;&#x636; &#x627;&#x644;&#x643;&#x644;</a>
+      </div>
+      <ul class="md-panel-list" id="md-groups-list">
+        <li class="md-panel-empty">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</li>
+      </ul>
+    </div>
+  </div>
+  <script>
+  (function(){
+    function esc(s){
+      s = s == null ? '' : String(s);
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    /* Map audit_log action keys to short Arabic labels + a status pill. */
+    var ACTION_AR = {
+      'lessons_log.create':       { t: 'تسجيل درس جديد',      pill: 'done',    pillLabel: 'منجزة' },
+      'lessons_log.update':       { t: 'تعديل درس',           pill: 'active',  pillLabel: 'جارية' },
+      'lessons_log.delete':       { t: 'حذف درس',             pill: 'pending', pillLabel: 'محذوف' },
+      'parent_messages.create':   { t: 'إرسال ملخص حصة',      pill: 'done',    pillLabel: 'مُرسل' },
+      'parent_messages.update':   { t: 'تعديل ملخص حصة',      pill: 'active',  pillLabel: 'جارية' },
+      'parent_messages.delete':   { t: 'حذف ملخص حصة',        pill: 'pending', pillLabel: 'محذوف' },
+      'parent_messages.resend':   { t: 'إعادة إرسال ملخص',     pill: 'active',  pillLabel: 'جارية' },
+      'evaluations.create':       { t: 'إضافة تقييم شهري',    pill: 'done',    pillLabel: 'منجزة' },
+      'evaluations.update':       { t: 'تعديل تقييم',         pill: 'active',  pillLabel: 'جارية' },
+      'evaluations.delete':       { t: 'حذف تقييم',           pill: 'pending', pillLabel: 'محذوف' },
+      'evaluations.send_to_parent': { t: 'إرسال تقييم للأهل', pill: 'done',    pillLabel: 'مُرسل' },
+      'user.update':              { t: 'تعديل مستخدم',        pill: 'active',  pillLabel: 'جارية' },
+      'user.permissions.update':  { t: 'تعديل صلاحيات',       pill: 'active',  pillLabel: 'جارية' },
+      'user.permissions.reset':   { t: 'إعادة ضبط صلاحيات',   pill: 'pending', pillLabel: 'افتراضي' }
+    };
+    function fmtDate(iso){
+      if (!iso) return '';
+      var s = String(iso).slice(0, 16).replace('T', ' ');
+      return s;
+    }
+    /* ── آخر النشاطات ── */
+    fetch('/api/dashboard/recent-activity', {credentials:'include'})
+      .then(function(r){ return r.status === 403 ? null : r.json(); })
+      .then(function(j){
+        var ul = document.getElementById('md-activity-list');
+        if (!ul) return;
+        if (!j || !j.ok || !(j.items||[]).length){
+          ul.innerHTML = '<li class="md-panel-empty">لا توجد نشاطات بعد</li>';
+          return;
+        }
+        ul.innerHTML = (j.items || []).map(function(it){
+          var meta = ACTION_AR[it.action] || { t: it.action || '—', pill: 'active', pillLabel: 'جارية' };
+          var sub = (it.actor ? ('بواسطة ' + esc(it.actor)) : '') + ' · ' + esc(fmtDate(it.created_at));
+          return '<li>'+
+            '<div class="md-panel-row-main">'+
+              '<div class="md-panel-row-title">' + esc(meta.t) + '</div>'+
+              '<div class="md-panel-row-sub">' + sub + '</div>'+
+            '</div>'+
+            '<span class="md-pill md-pill-' + meta.pill + '">' + esc(meta.pillLabel) + '</span>'+
+          '</li>';
+        }).join('');
+      }).catch(function(){
+        var ul = document.getElementById('md-activity-list');
+        if (ul) ul.innerHTML = '<li class="md-panel-empty">تعذر التحميل</li>';
+      });
+    /* ── المجموعات النشطة ── */
+    fetch('/api/dashboard/active-groups', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var ul = document.getElementById('md-groups-list');
+        if (!ul) return;
+        if (!j || !j.ok || !(j.items||[]).length){
+          ul.innerHTML = '<li class="md-panel-empty">لا توجد مجموعات</li>';
+          return;
+        }
+        ul.innerHTML = (j.items || []).map(function(it){
+          var sub = [esc(it.teacher_name), esc(it.study_days), esc(it.study_time)].filter(Boolean).join(' · ');
+          return '<li>'+
+            '<div class="md-panel-row-main">'+
+              '<div class="md-panel-row-title">' + esc(it.group_name || '—') + '</div>'+
+              '<div class="md-panel-row-sub">' + sub + '</div>'+
+            '</div>'+
+            '<span class="md-pill md-pill-mint">نشطة</span>'+
+          '</li>';
+        }).join('');
+      }).catch(function(){
+        var ul = document.getElementById('md-groups-list');
+        if (ul) ul.innerHTML = '<li class="md-panel-empty">تعذر التحميل</li>';
+      });
+  })();
+  </script>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid dh-legacy-stats">
     <div class="dh-stat-card teal">
@@ -33326,6 +33435,73 @@ def api_dashboard_stats():
         "attendance_rate": attendance_rate,
         "violations": violations,
     })
+
+
+@app.route("/api/dashboard/recent-activity", methods=["GET"])
+@login_required
+def api_dashboard_recent_activity():
+    """Latest audit_log entries for the dashboard's redesigned
+    "آخر النشاطات" panel. Admin/manager only — audit_log carries
+    actor + change details that are admin-grade. Purely read-only;
+    no other behaviour changed by this endpoint."""
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("admin", "manager"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, action, actor_username, target_type, target_id, "
+            "created_at FROM audit_log ORDER BY id DESC LIMIT 5"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        d = dict(r)
+        out.append({
+            "id":         d.get("id"),
+            "action":     d.get("action") or "",
+            "actor":      d.get("actor_username") or "",
+            "target_type": d.get("target_type") or "",
+            "target_id":  d.get("target_id") or "",
+            "created_at": d.get("created_at") or "",
+        })
+    return jsonify({"ok": True, "items": out})
+
+
+@app.route("/api/dashboard/active-groups", methods=["GET"])
+@login_required
+def api_dashboard_active_groups():
+    """Latest 5 groups for the dashboard's redesigned "المجموعات
+    النشطة" panel. Returns group_name + teacher_name + study_days +
+    study_time. Reads through _groups_days_column so it honours the
+    admin-edited custom 'أيام الدراسة' column when present."""
+    db = get_db()
+    days_col = _groups_days_column(db)
+    extra = ('"' + days_col + '", ') if days_col != "study_days" else ""
+    try:
+        rows = db.execute(
+            "SELECT " + extra + "id, group_name, teacher_name, study_days, "
+            "study_time FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+            "ORDER BY id DESC LIMIT 5"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        days_val = (rd.get(days_col) or rd.get("study_days") or "").strip()
+        out.append({
+            "id":           rd.get("id"),
+            "group_name":   (rd.get("group_name")   or "").strip(),
+            "teacher_name": (rd.get("teacher_name") or "").strip(),
+            "study_days":   days_val,
+            "study_time":   (rd.get("study_time")   or "").strip(),
+        })
+    return jsonify({"ok": True, "items": out})
+
 
 @app.route("/api/attendance/student-stats", methods=["GET"])
 @login_required
