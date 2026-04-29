@@ -9810,6 +9810,9 @@ select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
 .pill.p{background:#e8f5e9;color:#1b5e20;}
 .pill.a{background:#ffebee;color:#c62828;}
 .pill.l{background:#fff3e0;color:#e65100;}
+.t-unreg-badge{display:inline-block;margin-right:6px;padding:1px 8px;border-radius:999px;background:#eceff1;color:#546e7a;font-size:10.5px;font-weight:800;border:1px solid #cfd8dc;vertical-align:middle;}
+.t-row-unreg td{background:#fafafa;}
+.t-row-unreg td:first-child{color:#90a4ae;}
 @media (max-width:600px){
   .main{padding:14px;}
   .topbar{padding:12px 14px;}
@@ -9929,9 +9932,12 @@ function _tRender(){
     var s = _tStudents[i];
     var st = s.status || '';
     var cls = _tStatusClass(st);
-    html += '<tr>';
+    var badge = (s.is_registered === false)
+      ? ' <span class="t-unreg-badge" title="هذه الطالبة غير مسجّلة في الفصل الحالي">غير مسجّل</span>'
+      : '';
+    html += '<tr' + (s.is_registered === false ? ' class="t-row-unreg"' : '') + '>';
     html += '<td class="idx-col">' + (i+1) + '</td>';
-    html += '<td><b>' + _tEsc(s.name) + '</b></td>';
+    html += '<td><b>' + _tEsc(s.name) + '</b>' + badge + '</td>';
     html += '<td>'
       + '<select class="status-sel ' + cls + '" data-i="' + i + '" onchange="_tStatusChanged(this)">'
       + '<option value=""' + (st === '' ? ' selected' : '') + '>— اختر —</option>'
@@ -10088,7 +10094,8 @@ function tLoadStudents(){
         id:      s.id || 0,
         name:    s.name,
         contact: s.whatsapp || '',
-        status:  p ? (p.status || '') : ''
+        status:  p ? (p.status || '') : '',
+        is_registered: (s.is_registered !== false)
       };
     });
     _tExisting = existsList.length > 0;
@@ -10308,6 +10315,9 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .status-select.absent{border-color:#e53935;background:#fce4ec;color:#c62828;}
 .status-select.late{border-color:#FB8C00;background:#fff3e0;color:#e65100;}
 .empty-state{text-align:center;padding:48px 20px;color:#aaa;font-size:15px;}
+.att-unreg-badge{display:inline-block;margin-right:6px;padding:1px 8px;border-radius:999px;background:#eceff1;color:#546e7a;font-size:10.5px;font-weight:800;border:1px solid #cfd8dc;vertical-align:middle;}
+.att-row-unreg td{background:#fafafa;}
+.att-row-unreg td:first-child{color:#90a4ae;}
 .att-stat{text-align:center;font-weight:700;font-variant-numeric:tabular-nums;}
 .att-stat-present{color:#2e7d32;}
 .att-stat-absent{color:#c62828;}
@@ -11088,9 +11098,14 @@ function _attBuildRow(s, savedStatus, savedMsgStatus, st, i, opts) {
   if (opts.attendance_id) trAttrs += ' data-att-id="' + opts.attendance_id + '"';
   if (opts.group_name)    trAttrs += ' data-att-group="' + String(opts.group_name).replace(/"/g,'&quot;') + '"';
 
+  var _unreg = (s && s.is_registered === false);
+  if (_unreg) trAttrs += ' class="att-row-unreg"';
+  var _unregBadge = _unreg
+    ? ' <span class="att-unreg-badge" title="هذه الطالبة غير مسجّلة في الفصل الحالي">غير مسجّل</span>'
+    : '';
   var html = '<tr' + trAttrs + '>';
   html += '<td>' + (i+1) + '</td>';
-  html += '<td class="student-name-cell">' + name + '</td>';
+  html += '<td class="student-name-cell">' + name + _unregBadge + '</td>';
   /* Single optional column the spec calls for, placed right after
      the student name so the employee can immediately see which group
      each absentee is in. */
@@ -31707,17 +31722,13 @@ def api_teacher_groups():
 
 @app.route('/api/teacher/students', methods=['GET'])
 @login_required
-# ROOT-CAUSE MARKER (attendance-students-and-scroll-fix-20260429):
-# Teacher أ. کوثر شعبان reported that not all of her students appear in
-# رصد الغياب. Root cause: the registration filter below silently drops
-# any student whose registration_term2_2026 is NULL / empty / not the
-# exact literal "تم التسجيل". Same gate is replicated in
-# /api/attendance/by-date-group (~line 32074) for the unified absentees
-# list. The fix in the next commit removes the gate here and on the
-# unified-absentees route, switches the response to include an
-# is_registered flag per row, and surfaces unregistered students with
-# a grey "غير مسجّل" badge in the UI (matching the بحث عن طالب pattern).
 def api_teacher_students():
+    # Returns every student attached to the teacher's group via the
+    # in-person OR online column. Each row carries an is_registered
+    # boolean derived from settings.students.active_column / active_value
+    # (defaults: registration_term2_2026 = "تم التسجيل") so the UI can
+    # tag unregistered students with a grey "غير مسجّل" badge instead of
+    # silently hiding them. Mirrors the بحث عن طالب pattern.
     user, err = _require_teacher()
     if err: return err
     group = (request.args.get('group') or '').strip()
@@ -31741,36 +31752,41 @@ def api_teacher_students():
     if has_online:
         where = '"' + in_col + '" = ? OR "' + online_col + '" = ?'
         params = (group, group)
-    # Restrict to actively-registered students. Defensive: don't rely on
-    # _active_students_filter() returning a usable fragment — if the
-    # admin has cleared either setting (or get_setting returns the
-    # default but the helper's column-existence check trips on a quirk),
-    # we still want this gate ON. The teacher attendance flow MUST
-    # never show unregistered students. So we resolve the column +
-    # value here directly, fall back to the canonical defaults if the
-    # settings are missing/blank, and only skip if the column itself
-    # doesn't physically exist on the live `students` table.
+    # Resolve the active-registration column once — used to compute the
+    # per-row is_registered flag, NOT to filter rows out.
     act_col = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
               or 'registration_term2_2026'
     act_val = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
               or 'تم التسجيل'
     if not _is_safe_ident(act_col):
         act_col = 'registration_term2_2026'
-    if act_col in live:
-        where = '(' + where + ') AND TRIM(COALESCE("' + act_col + '", \'\')) = ?'
-        params = tuple(list(params) + [act_val])
+    has_act_col = act_col in live
+    select_cols = 'id, student_name, whatsapp'
+    if has_act_col:
+        select_cols += ', "' + act_col + '" AS _reg_value'
     try:
         rows = db.execute(
-            'SELECT id, student_name, whatsapp FROM students WHERE ' + where +
+            'SELECT ' + select_cols + ' FROM students WHERE ' + where +
             ' ORDER BY student_name', params
         ).fetchall()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
     out = []
     for r in rows:
-        nm = (r[1] or '').strip()
+        rd = dict(r) if hasattr(r, 'keys') else None
+        nm = ((rd['student_name'] if rd else r[1]) or '').strip()
         if not nm: continue
-        out.append({"id": r[0], "name": nm, "whatsapp": r[2] or ''})
+        if has_act_col:
+            reg_raw = (rd.get('_reg_value') if rd else r[3]) or ''
+            is_reg = (str(reg_raw).strip() == act_val)
+        else:
+            is_reg = True
+        out.append({
+            "id": (rd['id'] if rd else r[0]),
+            "name": nm,
+            "whatsapp": (rd.get('whatsapp') if rd else r[2]) or '',
+            "is_registered": bool(is_reg),
+        })
     return jsonify({"ok": True, "students": out, "group": group})
 
 
@@ -32066,7 +32082,12 @@ def api_attendance_delete(rid):
 def api_attendance_by_date_group():
     date = request.args.get('date', '')
     group = request.args.get('group', '')
-    include_inactive = (request.args.get('include_inactive') or '') in ('1', 'true', 'yes')
+    # ?include_inactive=1 retained for backwards compat; this endpoint
+    # now always returns every recorded attendance row regardless of the
+    # student's registration status, and the per-row is_registered flag
+    # below lets the UI display a grey "غير مسجّل" badge instead of
+    # silently hiding the row (matching the بحث عن طالب pattern).
+    _ = (request.args.get('include_inactive') or '')
     # date or group (or both) may be the sentinel '__all__' meaning "drop that
     # filter". Empty group is treated like __all__ for backwards-compatibility.
     all_dates  = (date  == '__all__')
@@ -32074,9 +32095,24 @@ def api_attendance_by_date_group():
     if not date and not all_dates:
         return jsonify({"rows": []})
     db = get_db()
+    # Resolve the active-registration column once so we can JOIN it for
+    # the per-row is_registered flag — but we no longer USE it to filter
+    # rows out. Falls back to canonical defaults if /settings is cleared.
+    act_col = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
+              or 'registration_term2_2026'
+    act_val = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
+              or 'تم التسجيل'
+    if not _is_safe_ident(act_col):
+        act_col = 'registration_term2_2026'
+    try:
+        _live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        _live = set()
+    has_act_col = act_col in _live
+    reg_select = ('s."' + act_col + '" AS _reg_value, ') if has_act_col else ''
     base = (
         "SELECT a.id, a.attendance_date, a.group_name, a.student_name, a.status, "
-        "       a.message_status, s.whatsapp, ml.last_sent "
+        "       a.message_status, s.whatsapp, " + reg_select + "ml.last_sent "
         "  FROM attendance a "
         "  LEFT JOIN students s ON s.student_name = a.student_name "
         "  LEFT JOIN ( "
@@ -32085,28 +32121,6 @@ def api_attendance_by_date_group():
         "       GROUP BY student_name "
         "  ) ml ON ml.student_name = a.student_name "
     )
-    # Active-only filter (رصد الغياب per-group + جميع المجموعات unified
-    # list + the absence-messaging modal all consume this endpoint and
-    # should never surface unregistered students). Defensive: resolve
-    # the column + value here directly with hardcoded fallbacks so a
-    # cleared /settings entry never silently disables the gate.
-    # ?include_inactive=1 opts out for audit / debugging.
-    extra_filter = ''
-    extra_params = ()
-    if not include_inactive:
-        act_col = (get_setting('students', 'active_column', 'registration_term2_2026') or '').strip() \
-                  or 'registration_term2_2026'
-        act_val = (get_setting('students', 'active_value',  'تم التسجيل') or '').strip() \
-                  or 'تم التسجيل'
-        if not _is_safe_ident(act_col):
-            act_col = 'registration_term2_2026'
-        try:
-            _live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
-        except Exception:
-            _live = set()
-        if act_col in _live:
-            extra_filter = " AND TRIM(COALESCE(s.\"" + act_col + "\",'')) = ?"
-            extra_params = (act_val,)
     # Cap the result so "all dates + all groups" doesn't ship the entire
     # attendance history in one response.
     tail = " ORDER BY a.attendance_date DESC, a.group_name, a.student_name LIMIT 1000"
@@ -32122,9 +32136,17 @@ def api_attendance_by_date_group():
     else:
         where = "WHERE a.attendance_date=? AND a.group_name=?"
         params = (date, group)
-    rows = db.execute(base + where + extra_filter + tail,
-                      params + extra_params).fetchall()
-    return jsonify({"rows": [dict(r) for r in rows]})
+    rows = db.execute(base + where + tail, params).fetchall()
+    out = []
+    for r in rows:
+        rd = dict(r)
+        if has_act_col:
+            rv = rd.pop('_reg_value', None)
+            rd['is_registered'] = (str(rv or '').strip() == act_val)
+        else:
+            rd['is_registered'] = True
+        out.append(rd)
+    return jsonify({"rows": out})
 
 
 @app.route('/api/attendance/by-date-summary', methods=['GET'])
