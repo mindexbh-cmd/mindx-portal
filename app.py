@@ -42813,7 +42813,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .hello .info h2{font-size:1.45rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello .info p{color:#666;margin:2px 0;font-size:0.95rem;}
 .hello .info p b{color:#4a148c;}
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
 .card{background:#fff;border-radius:20px;padding:26px 18px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
 .card:hover{transform:translateY(-6px);box-shadow:0 18px 42px rgba(107,63,160,.28);border-color:#6B3FA0;}
 .card .ic{font-size:2.6rem;line-height:1;display:block;margin-bottom:10px;}
@@ -42825,6 +42825,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .card.pts::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
 .card.msg::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
 .card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
+.card.crc::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
 .empty{text-align:center;color:#888;padding:60px 20px;}
 @media (max-width:1280px){
   .cards{grid-template-columns:repeat(3,1fr);gap:16px;}
@@ -42892,6 +42893,10 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +   '<a class="card evals" href="/portal/parent-hub/evaluations">'
       +     '<span class="ic">📊</span><h3>التقييمات</h3>'
       +     '<p>تقييمات ' + _esc(s.student_name||firstName) + ' الشهرية</p>'
+      +   '</a>'
+      +   '<a class="card crc" href="/portal/parent-hub/curriculum">'
+      +     '<span class="ic">📚</span><h3>كتب المنهج</h3>'
+      +     '<p>الكتب والمناهج المتاحة لـ ' + _esc(firstName) + '</p>'
       +   '</a>'
       + '</div>';
     root.innerHTML = html;
@@ -43112,6 +43117,113 @@ def portal_parent_hub_page():
     if int(user.get("must_change_pw") or 0):
         return redirect("/portal/change-password")
     return PORTAL_PARENT_HUB_HTML
+
+
+# ── Parent curriculum library — view assigned PDFs ────────────────
+PORTAL_PARENT_CURRICULUM_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>كتب المنهج — بوابة ولي الأمر</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>__PH_CSS__
+.crc-search{display:flex;gap:8px;margin-bottom:16px;}
+.crc-search input{flex:1;padding:10px 14px;border-radius:10px;border:1.5px solid #d8c8ec;background:#fff;font-family:inherit;font-size:.95rem;}
+.crc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media (max-width:980px){.crc-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.crc-grid{grid-template-columns:1fr;}}
+.crc-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 8px 24px rgba(107,63,160,.14);
+          display:flex;flex-direction:column;gap:10px;border:2px solid transparent;transition:all .18s ease;}
+.crc-card:hover{border-color:#6B3FA0;box-shadow:0 14px 32px rgba(107,63,160,.22);}
+.crc-card .ic{font-size:2.4rem;line-height:1;color:#1565C0;}
+.crc-card h3{margin:0;font-size:1.05rem;color:#4a148c;font-weight:900;line-height:1.4;}
+.crc-card .desc{color:#666;font-size:.86rem;line-height:1.5;flex:1;}
+.crc-card .meta{font-size:.78rem;color:#888;}
+.crc-card .lock{display:inline-flex;align-items:center;gap:4px;color:#FB8C00;font-size:.82rem;font-weight:800;}
+.crc-card .acts{display:flex;gap:8px;flex-wrap:wrap;}
+.crc-btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+         color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.88rem;cursor:pointer;font-family:inherit;}
+.crc-btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.crc-btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.crc-empty{background:#fff;border-radius:18px;padding:60px 24px;text-align:center;color:#666;
+           box-shadow:0 8px 24px rgba(107,63,160,.12);}
+.crc-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
+</style>
+</head><body>
+<div class="topbar">
+  <h1>📚 كتب المنهج</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap">
+  <div class="section" style="background:transparent;box-shadow:none;padding:0;">
+    <div class="crc-search">
+      <input type="text" id="crc-q" placeholder="ابحث عن كتاب...">
+    </div>
+    <div id="crc-list-box"><div class="empty">جاري التحميل...</div></div>
+  </div>
+</div>
+<script>
+(function(){
+  function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  var T;
+  function load(){
+    var q = document.getElementById('crc-q').value || '';
+    var url = '/api/curriculum/list' + (q ? ('?search=' + encodeURIComponent(q)) : '');
+    fetch(url, {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('crc-list-box');
+        if(!j || !j.ok){ box.innerHTML='<div class="crc-empty">تعذر التحميل</div>'; return; }
+        var arr = j.files || [];
+        if(!arr.length){
+          box.innerHTML = '<div class="crc-empty"><span class="em-ic">📚</span>'+
+                          '<div>لا توجد كتب متاحة حالياً.</div>'+
+                          '<div style="margin-top:6px;color:#999;font-size:.86rem;">سيتم إضافة المناهج هنا عند جاهزيتها.</div></div>';
+          return;
+        }
+        var html = '<div class="crc-grid">';
+        arr.forEach(function(e){
+          var lock = e.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+          var dl = e.can_download
+            ? '<a class="crc-btn dl" href="/api/curriculum/download/' + e.id + '">⬇ تحميل</a>'
+            : '';
+          html += '<div class="crc-card">'+
+            '<span class="ic">📄</span>'+
+            '<h3>'+_esc(e.title)+'</h3>'+
+            '<div class="desc">'+_esc((e.description||'').slice(0,140))+((e.description||'').length>140?'...':'')+'</div>'+
+            '<div class="meta">'+_esc((e.uploaded_at||'').slice(0,10))+' · '+lock+'</div>'+
+            '<div class="acts">'+
+              '<a class="crc-btn" href="/portal/curriculum/view/'+e.id+'" target="_blank" rel="noopener">📖 عرض الكتاب</a>'+
+              dl +
+            '</div>'+
+          '</div>';
+        });
+        html += '</div>';
+        box.innerHTML = html;
+      })
+      .catch(function(){
+        document.getElementById('crc-list-box').innerHTML = '<div class="crc-empty">تعذر التحميل</div>';
+      });
+  }
+  document.getElementById('crc-q').addEventListener('input', function(){
+    clearTimeout(T); T = setTimeout(load, 300);
+  });
+  load();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/portal/parent-hub/curriculum')
+@login_required
+def portal_parent_hub_curriculum_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_CURRICULUM_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
 
 
 @app.route('/portal/parent-hub/payments')
