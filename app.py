@@ -47056,6 +47056,773 @@ def api_mev_export():
                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ──────────────────────────────────────────────────────────────────
+# Curriculum library (المناهج) — shared backend helpers + REST API
+# ──────────────────────────────────────────────────────────────────
+# Storage: PDFs live OUTSIDE /static so the binary URL is never
+# directly browsable. On Render the persistent disk is mounted at
+# /var/data; locally we fall back to ./data/curriculum/ next to
+# app.py. Files are stored under their SHA-256 to dedupe and avoid
+# any user-controlled path component.
+
+import hashlib as _crypto_hash, mimetypes as _mt
+
+def _curriculum_storage_dir():
+    """Resolve and ensure the curriculum storage directory exists.
+    Production (Render): /var/data/curriculum (persistent disk).
+    Local dev: ./data/curriculum next to app.py."""
+    candidates = []
+    if os.path.isdir("/var/data"):
+        candidates.append("/var/data/curriculum")
+    candidates.append(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "curriculum"))
+    for c in candidates:
+        try:
+            os.makedirs(c, exist_ok=True)
+            return c
+        except Exception:
+            continue
+    # Last-resort tmp fallback so uploads don't 500 the server even on
+    # a misconfigured host.
+    fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "curriculum")
+    try: os.makedirs(fallback, exist_ok=True)
+    except Exception: pass
+    return fallback
+
+
+def _curriculum_can_manage(user):
+    """admin OR manager — same gate as parent_messages admin views."""
+    return ((user or {}).get("role") or "").strip().lower() in ("admin", "manager")
+
+
+def _curriculum_user_role(user):
+    return ((user or {}).get("role") or "").strip().lower()
+
+
+def _curriculum_visible_file_ids(db, user):
+    """List of curriculum_files.id values the given user should see.
+
+    - admin / manager  → every non-deleted file (no filtering).
+    - teacher          → assignments with target_type='teacher' AND
+                          target_id=str(user.id) OR target_type='group'
+                          AND target_id IN (teacher's groups).
+    - student / parent → assignments where target_type='student' AND
+                          target_id=str(linked_student_id) OR
+                          target_type='parent' AND target_id=str(user.id)
+                          OR target_type='group' AND target_id IN
+                          (student's group_name_student / group_online).
+    Returns a set[int]. Empty set when the user matches nothing."""
+    role = _curriculum_user_role(user)
+    if role in ("admin", "manager"):
+        try:
+            rows = db.execute(
+                "SELECT id FROM curriculum_files WHERE COALESCE(is_deleted,0)=0"
+            ).fetchall()
+        except Exception:
+            rows = []
+        return {int(dict(r).get("id") or 0) for r in rows
+                if int(dict(r).get("id") or 0)}
+
+    targets = []  # list of (target_type, target_id) tuples
+    try: my_id = int(user.get("id") or 0)
+    except Exception: my_id = 0
+
+    if role == "teacher":
+        if my_id:
+            targets.append(("teacher", str(my_id)))
+        try:
+            for g in _teacher_groups_for(db, user):
+                if g: targets.append(("group", g))
+        except Exception:
+            pass
+
+    elif role in ("student", "parent"):
+        if my_id:
+            targets.append(("parent", str(my_id)))
+        sid = 0
+        try: sid = int(user.get("linked_student_id") or 0)
+        except Exception: sid = 0
+        if sid:
+            targets.append(("student", str(sid)))
+            # Also resolve the linked student's groups so a file
+            # assigned to "مجموعة 01" reaches every parent in that
+            # group without needing per-parent assignments.
+            try:
+                srow = db.execute(
+                    "SELECT group_name_student, group_online "
+                    "FROM students WHERE id=?", (sid,)
+                ).fetchone()
+            except Exception:
+                srow = None
+            if srow:
+                sd = dict(srow)
+                for k in ("group_name_student", "group_online"):
+                    v = (sd.get(k) or "").strip()
+                    if v: targets.append(("group", v))
+
+    if not targets:
+        return set()
+
+    # Build the OR-of-pairs WHERE — keep it parameterised, no string
+    # interpolation of identifiers.
+    where_parts = []
+    params = []
+    for tt, ti in targets:
+        where_parts.append("(target_type=? AND target_id=?)")
+        params.extend([tt, ti])
+    sql = (
+        "SELECT DISTINCT a.file_id FROM curriculum_assignments a "
+        "JOIN curriculum_files f ON f.id=a.file_id "
+        "WHERE COALESCE(a.is_deleted,0)=0 "
+        "AND COALESCE(f.is_deleted,0)=0 AND ("
+        + " OR ".join(where_parts) + ")"
+    )
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception:
+        return set()
+    return {int(dict(r).get("file_id") or 0) for r in rows
+            if int(dict(r).get("file_id") or 0)}
+
+
+def _curriculum_resolve_download(db, user, file_id):
+    """Returns (can_view: bool, can_download: bool) for this user/file
+    pair. can_view is True iff there is at least one matching
+    assignment (or the user is admin/manager). can_download is True
+    iff:
+      - admin/manager (always), OR
+      - any matching assignment row has can_download=1, OR
+      - file.download_default='allowed' AND no matching assignment
+        has explicitly overridden it to can_download=0.
+    """
+    role = _curriculum_user_role(user)
+    try:
+        f = db.execute(
+            "SELECT id, download_default, is_deleted FROM curriculum_files "
+            "WHERE id=?", (int(file_id),)
+        ).fetchone()
+    except Exception:
+        return False, False
+    if not f:
+        return False, False
+    fd = dict(f)
+    if int(fd.get("is_deleted") or 0):
+        return False, False
+    default_allowed = ((fd.get("download_default") or "allowed") == "allowed")
+
+    if role in ("admin", "manager"):
+        return True, True
+
+    # User must match at least one assignment to view at all.
+    visible_ids = _curriculum_visible_file_ids(db, user)
+    if int(file_id) not in visible_ids:
+        return False, False
+
+    # Pull every matching assignment to compute the resolved flag.
+    targets = []
+    try: my_id = int(user.get("id") or 0)
+    except Exception: my_id = 0
+    if role == "teacher":
+        if my_id: targets.append(("teacher", str(my_id)))
+        try:
+            for g in _teacher_groups_for(db, user):
+                if g: targets.append(("group", g))
+        except Exception: pass
+    elif role in ("student", "parent"):
+        if my_id: targets.append(("parent", str(my_id)))
+        sid = 0
+        try: sid = int(user.get("linked_student_id") or 0)
+        except Exception: sid = 0
+        if sid:
+            targets.append(("student", str(sid)))
+            try:
+                srow = db.execute(
+                    "SELECT group_name_student, group_online "
+                    "FROM students WHERE id=?", (sid,)
+                ).fetchone()
+            except Exception: srow = None
+            if srow:
+                sd = dict(srow)
+                for k in ("group_name_student", "group_online"):
+                    v = (sd.get(k) or "").strip()
+                    if v: targets.append(("group", v))
+    if not targets:
+        return False, False
+    where_parts = []
+    params = [int(file_id)]
+    for tt, ti in targets:
+        where_parts.append("(target_type=? AND target_id=?)")
+        params.extend([tt, ti])
+    sql = (
+        "SELECT can_download FROM curriculum_assignments "
+        "WHERE file_id=? AND COALESCE(is_deleted,0)=0 AND ("
+        + " OR ".join(where_parts) + ")"
+    )
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception:
+        return True, default_allowed  # we know they can view
+    has_explicit_yes = False
+    has_explicit_no = False
+    has_inherit = False
+    for r in rows:
+        rd = dict(r)
+        cd = rd.get("can_download")
+        if cd is None:
+            has_inherit = True
+        else:
+            try: cdi = int(cd)
+            except Exception: cdi = 0
+            if cdi == 1: has_explicit_yes = True
+            else: has_explicit_no = True
+    if has_explicit_yes:
+        return True, True
+    if has_explicit_no and not has_inherit:
+        return True, False
+    # Inherit-or-no-override → fall back to the file default.
+    return True, default_allowed
+
+
+def _curriculum_log_access(db, file_id, user, action):
+    """Append a curriculum_access_log row. Best-effort — never raises."""
+    try:
+        uid = int((user or {}).get("id") or 0) or None
+    except Exception:
+        uid = None
+    try:
+        ip = (request.remote_addr or "")[:64]
+    except Exception:
+        ip = ""
+    try:
+        db.execute(
+            "INSERT INTO curriculum_access_log(file_id, user_id, action, "
+            "accessed_at, ip_address) VALUES(?,?,?,CURRENT_TIMESTAMP,?)",
+            (int(file_id), uid, str(action or "view")[:32], ip),
+        )
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+
+
+def _curriculum_count_assignments(db, file_id):
+    """Returns dict {groups, students, parents, teachers} for the
+    summary line on the admin list."""
+    out = {"group": 0, "student": 0, "parent": 0, "teacher": 0}
+    try:
+        rows = db.execute(
+            "SELECT target_type, COUNT(*) AS n FROM curriculum_assignments "
+            "WHERE file_id=? AND COALESCE(is_deleted,0)=0 "
+            "GROUP BY target_type", (int(file_id),)
+        ).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        rd = dict(r)
+        tt = (rd.get("target_type") or "").strip()
+        try: n = int(rd.get("n") or 0)
+        except Exception: n = 0
+        if tt in out: out[tt] = n
+    return out
+
+
+def _curriculum_row_to_dict(r, *, current_user_can_download=None,
+                             counts=None):
+    if r is None: return None
+    d = dict(r)
+    out = {
+        "id":                int(d.get("id") or 0),
+        "title":             d.get("title") or "",
+        "description":       d.get("description") or "",
+        "file_size_bytes":   int(d.get("file_size_bytes") or 0),
+        "download_default":  d.get("download_default") or "allowed",
+        "uploaded_by":       int(d.get("uploaded_by") or 0),
+        "uploaded_at":       d.get("uploaded_at") or "",
+        "is_deleted":        int(d.get("is_deleted") or 0),
+    }
+    if current_user_can_download is not None:
+        out["can_download"] = bool(current_user_can_download)
+    if counts is not None:
+        out["assignment_summary"] = counts
+    return out
+
+
+_CURRICULUM_PDF_MAGIC = b"%PDF-"
+_CURRICULUM_MAX_BYTES = 50 * 1024 * 1024  # 50 MB cap per file
+
+
+@app.route('/api/curriculum/upload', methods=['POST'])
+@login_required
+def api_curriculum_upload():
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    download_default = (request.form.get("download_default") or "allowed").strip()
+    if download_default not in ("allowed", "view_only"):
+        download_default = "allowed"
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+
+    if "pdf_file" not in request.files:
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    upload = request.files["pdf_file"]
+    if not upload or not (upload.filename or "").strip():
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    raw = upload.read()
+    if not raw:
+        return jsonify({"ok": False, "error": "الملف فارغ"}), 400
+    if len(raw) > _CURRICULUM_MAX_BYTES:
+        return jsonify({"ok": False, "error":
+            "حجم الملف يتجاوز 50 ميجابايت"}), 413
+    if not raw.startswith(_CURRICULUM_PDF_MAGIC):
+        return jsonify({"ok": False, "error":
+            "الملف ليس PDF صالحاً"}), 400
+
+    db = get_db()
+    # Reject duplicate titles among non-deleted files.
+    try:
+        existing = db.execute(
+            "SELECT id FROM curriculum_files WHERE TRIM(title)=TRIM(?) "
+            "AND COALESCE(is_deleted,0)=0 LIMIT 1", (title,)
+        ).fetchone()
+    except Exception:
+        existing = None
+    if existing:
+        return jsonify({"ok": False, "error":
+            "يوجد ملف بنفس العنوان مسبقاً"}), 409
+
+    # Persist binary keyed by SHA-256 (dedupes identical uploads).
+    digest = _crypto_hash.sha256(raw).hexdigest()
+    storage_dir = _curriculum_storage_dir()
+    file_path = os.path.join(storage_dir, digest + ".pdf")
+    try:
+        if not os.path.exists(file_path):
+            with open(file_path, "wb") as fh:
+                fh.write(raw)
+    except Exception as ex:
+        return jsonify({"ok": False, "error":
+            "فشل حفظ الملف على القرص: " + str(ex)}), 500
+
+    try: uploader_id = int(user.get("id") or 0) or None
+    except Exception: uploader_id = None
+    try:
+        cur = db.execute(
+            "INSERT INTO curriculum_files(title, description, file_path, "
+            "file_size_bytes, download_default, uploaded_by, uploaded_at, "
+            "is_deleted, updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,0,"
+            "CURRENT_TIMESTAMP)",
+            (title, description, file_path, len(raw),
+             download_default, uploader_id),
+        )
+        db.commit()
+        new_id = None
+        try: new_id = cur.lastrowid
+        except Exception: pass
+        if new_id is None:
+            try:
+                new_id = db.execute(
+                    "SELECT id FROM curriculum_files WHERE file_path=? "
+                    "ORDER BY id DESC LIMIT 1", (file_path,)
+                ).fetchone()[0]
+            except Exception:
+                pass
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    # Parse assignments JSON. Each entry: {target_type, target_id,
+    # can_download (true|false|null)}.
+    raw_assignments = request.form.get("assignments") or "[]"
+    try:
+        assignments = json.loads(raw_assignments) or []
+        if not isinstance(assignments, list):
+            assignments = []
+    except Exception:
+        assignments = []
+    inserted_assignments = 0
+    for a in assignments:
+        if not isinstance(a, dict): continue
+        tt = (a.get("target_type") or "").strip().lower()
+        ti = (a.get("target_id") or "")
+        if tt not in ("group", "student", "parent", "teacher"):
+            continue
+        ti = str(ti).strip()
+        if not ti: continue
+        cd_raw = a.get("can_download")
+        if cd_raw is None:
+            cd = None
+        else:
+            cd = 1 if bool(cd_raw) else 0
+        try:
+            db.execute(
+                "INSERT INTO curriculum_assignments(file_id, target_type, "
+                "target_id, can_download, assigned_by, assigned_at, "
+                "is_deleted) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP,0)",
+                (int(new_id), tt, ti, cd, uploader_id),
+            )
+            inserted_assignments += 1
+        except Exception:
+            continue
+    db.commit()
+
+    try:
+        _audit("curriculum.upload", target_type="curriculum_files",
+               target_id=new_id,
+               new_value={"title": title,
+                          "size_bytes": len(raw),
+                          "download_default": download_default,
+                          "assignments": inserted_assignments})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "success": True, "id": int(new_id or 0),
+                    "assignments": inserted_assignments,
+                    "size_bytes": len(raw)})
+
+
+@app.route('/api/curriculum/list', methods=['GET'])
+@login_required
+def api_curriculum_list():
+    user = session.get("user") or {}
+    db = get_db()
+    visible = _curriculum_visible_file_ids(db, user)
+    if not visible:
+        return jsonify({"ok": True, "files": [], "count": 0})
+    q = (request.args.get("search") or "").strip()
+    placeholders = ",".join("?" for _ in visible)
+    sql = ("SELECT * FROM curriculum_files "
+           "WHERE id IN (" + placeholders + ") AND COALESCE(is_deleted,0)=0")
+    params = list(visible)
+    if q:
+        # Case-insensitive substring match on title + description.
+        # Arabic-fold not strictly necessary here since LIKE is binary
+        # in SQLite by default but Postgres is case-insensitive with
+        # ILIKE — we keep LIKE for portability and let the small
+        # mismatch be acceptable on this admin-facing search.
+        sql += " AND (LOWER(COALESCE(title,'')) LIKE ? OR LOWER(COALESCE(description,'')) LIKE ?)"
+        like = "%" + q.lower() + "%"
+        params.extend([like, like])
+    sql += " ORDER BY uploaded_at DESC, id DESC"
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = []
+    for r in rows:
+        fid = int(dict(r).get("id") or 0)
+        _, can_download = _curriculum_resolve_download(db, user, fid)
+        counts = _curriculum_count_assignments(db, fid)
+        out.append(_curriculum_row_to_dict(
+            r, current_user_can_download=can_download, counts=counts))
+    return jsonify({"ok": True, "files": out, "count": len(out)})
+
+
+def _curriculum_send(file_id, *, as_attachment, action_label):
+    """Shared streamer for view/download endpoints. Permission gate +
+    file existence + access-log + correct headers."""
+    from flask import send_file as _send_c
+    user = session.get("user") or {}
+    db = get_db()
+    can_view, can_download = _curriculum_resolve_download(db, user, file_id)
+    if not can_view:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    if as_attachment and not can_download:
+        return jsonify({"ok": False, "error":
+            "هذا الملف للقراءة فقط"}), 403
+    try:
+        row = db.execute(
+            "SELECT id, title, file_path FROM curriculum_files WHERE id=?",
+            (int(file_id),)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    path = rd.get("file_path") or ""
+    if not path or not os.path.isfile(path):
+        return jsonify({"ok": False, "error":
+            "الملف غير موجود على القرص"}), 410
+    _curriculum_log_access(db, file_id, user, action_label)
+    safe_title = ((rd.get("title") or "ملف") + ".pdf")
+    resp = _send_c(path, mimetype="application/pdf",
+                   as_attachment=as_attachment,
+                   download_name=safe_title,
+                   conditional=False)
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception:
+        pass
+    return resp
+
+
+@app.route('/api/curriculum/view/<int:file_id>', methods=['GET'])
+@login_required
+def api_curriculum_view(file_id):
+    return _curriculum_send(file_id, as_attachment=False, action_label="view")
+
+
+@app.route('/api/curriculum/download/<int:file_id>', methods=['GET'])
+@login_required
+def api_curriculum_download(file_id):
+    return _curriculum_send(file_id, as_attachment=True, action_label="download")
+
+
+@app.route('/api/curriculum/<int:file_id>', methods=['GET'])
+@login_required
+def api_curriculum_get_one(file_id):
+    """Single-row fetch for the admin edit modal — pulls the file row
+    plus the full list of active assignments + the recent access log
+    (last 50 entries)."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    db = get_db()
+    try:
+        f = db.execute(
+            "SELECT * FROM curriculum_files WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(file_id),)).fetchone()
+    except Exception:
+        f = None
+    if not f:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    out = _curriculum_row_to_dict(
+        f, current_user_can_download=True,
+        counts=_curriculum_count_assignments(db, file_id))
+    try:
+        a_rows = db.execute(
+            "SELECT id, target_type, target_id, can_download "
+            "FROM curriculum_assignments WHERE file_id=? "
+            "AND COALESCE(is_deleted,0)=0 "
+            "ORDER BY target_type, target_id",
+            (int(file_id),)
+        ).fetchall()
+    except Exception:
+        a_rows = []
+    out["assignments"] = [dict(r) for r in a_rows]
+    try:
+        log_rows = db.execute(
+            "SELECT a.action, a.accessed_at, a.user_id, a.ip_address, "
+            "       COALESCE(u.name, u.username, '') AS user_label "
+            "FROM curriculum_access_log a "
+            "LEFT JOIN users u ON u.id = a.user_id "
+            "WHERE a.file_id=? "
+            "ORDER BY a.accessed_at DESC LIMIT 50",
+            (int(file_id),)
+        ).fetchall()
+    except Exception:
+        log_rows = []
+    out["recent_access"] = [dict(r) for r in log_rows]
+    return jsonify({"ok": True, "entry": out})
+
+
+@app.route('/api/curriculum/<int:file_id>', methods=['PATCH'])
+@login_required
+def api_curriculum_update(file_id):
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM curriculum_files WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(file_id),)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    sets = []; params = []
+    audit_old = {}; audit_new = {}
+    for k in ("title", "description", "download_default"):
+        if k in body:
+            v = (body.get(k) or "").strip()
+            if k == "title" and not v:
+                return jsonify({"ok": False, "error":
+                    "العنوان مطلوب"}), 400
+            if k == "download_default" and v not in ("allowed", "view_only"):
+                v = "allowed"
+            if v != (rd.get(k) or ""):
+                audit_old[k] = rd.get(k) or ""
+                audit_new[k] = v
+                sets.append(k + "=?"); params.append(v)
+    if sets:
+        sets.append("updated_at=CURRENT_TIMESTAMP")
+        params.append(int(file_id))
+        try:
+            db.execute("UPDATE curriculum_files SET " + ", ".join(sets) +
+                       " WHERE id=?", tuple(params))
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+    # Replace assignments wholesale if supplied.
+    if "assignments" in body and isinstance(body["assignments"], list):
+        try:
+            db.execute(
+                "UPDATE curriculum_assignments SET is_deleted=1 "
+                "WHERE file_id=?", (int(file_id),)
+            )
+            try: assigned_by = int(user.get("id") or 0) or None
+            except Exception: assigned_by = None
+            for a in body["assignments"]:
+                if not isinstance(a, dict): continue
+                tt = (a.get("target_type") or "").strip().lower()
+                ti = (a.get("target_id") or "")
+                if tt not in ("group","student","parent","teacher"): continue
+                ti = str(ti).strip()
+                if not ti: continue
+                cd_raw = a.get("can_download")
+                if cd_raw is None: cd = None
+                else: cd = 1 if bool(cd_raw) else 0
+                db.execute(
+                    "INSERT INTO curriculum_assignments(file_id, target_type, "
+                    "target_id, can_download, assigned_by, assigned_at, "
+                    "is_deleted) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP,0)",
+                    (int(file_id), tt, ti, cd, assigned_by),
+                )
+            db.commit()
+            audit_new["assignments_replaced"] = True
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        if audit_new:
+            _audit("curriculum.update", target_type="curriculum_files",
+                   target_id=int(file_id),
+                   old_value=audit_old, new_value=audit_new)
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(file_id)})
+
+
+@app.route('/api/curriculum/<int:file_id>', methods=['DELETE'])
+@login_required
+def api_curriculum_delete(file_id):
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM curriculum_files WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(file_id),)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    try:
+        db.execute(
+            "UPDATE curriculum_files SET is_deleted=1, updated_at=CURRENT_TIMESTAMP "
+            "WHERE id=?", (int(file_id),)
+        )
+        db.execute(
+            "UPDATE curriculum_assignments SET is_deleted=1 "
+            "WHERE file_id=?", (int(file_id),)
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("curriculum.delete", target_type="curriculum_files",
+               target_id=int(file_id),
+               old_value={"title": dict(row).get("title") or ""})
+    except Exception: pass
+    # Physical PDF stays on disk for audit; cleanup is a separate concern.
+    return jsonify({"ok": True, "id": int(file_id)})
+
+
+@app.route('/api/curriculum/targets/students', methods=['GET'])
+@login_required
+def api_curriculum_targets_students():
+    """Autocomplete source for the assignment builder — returns
+    students rows (id + name + group) for the admin/manager UI."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    q = (request.args.get("q") or "").strip()
+    db = get_db()
+    sql = ("SELECT id, student_name, group_name_student, group_online "
+           "FROM students WHERE COALESCE(student_name,'')<>''")
+    params = []
+    if q:
+        sql += " AND student_name LIKE ?"
+        params.append("%" + q + "%")
+    sql += " ORDER BY student_name LIMIT 100"
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        d = dict(r)
+        out.append({
+            "id":    d.get("id"),
+            "name":  (d.get("student_name") or "").strip(),
+            "group": (d.get("group_name_student") or d.get("group_online") or "").strip(),
+        })
+    return jsonify({"ok": True, "students": out})
+
+
+@app.route('/api/curriculum/targets/users', methods=['GET'])
+@login_required
+def api_curriculum_targets_users():
+    """Autocomplete source — teachers and parents/students for the
+    assignment builder. Returns role-filtered list."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    role_filter = (request.args.get("role") or "").strip().lower()
+    if role_filter not in ("teacher", "parent", "student"):
+        return jsonify({"ok": False, "error": "role required"}), 400
+    q = (request.args.get("q") or "").strip()
+    db = get_db()
+    if role_filter == "teacher":
+        sql = ("SELECT id, COALESCE(name,'') AS name, "
+               "COALESCE(username,'') AS username "
+               "FROM users WHERE role='teacher' "
+               "AND COALESCE(is_active,1)<>0")
+    else:
+        # student/parent are interchangeable account roles in this app.
+        sql = ("SELECT id, COALESCE(name,'') AS name, "
+               "COALESCE(username,'') AS username "
+               "FROM users WHERE role IN ('student','parent') "
+               "AND COALESCE(is_active,1)<>0")
+    params = []
+    if q:
+        sql += " AND (name LIKE ? OR username LIKE ?)"
+        params.extend(["%" + q + "%", "%" + q + "%"])
+    sql += " ORDER BY name LIMIT 200"
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True,
+                    "users": [dict(r) for r in rows]})
+
+
+@app.route('/api/curriculum/targets/groups', methods=['GET'])
+@login_required
+def api_curriculum_targets_groups():
+    """Autocomplete source — list of group_name strings from
+    student_groups for the assignment builder."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT group_name FROM student_groups "
+            "WHERE COALESCE(group_name,'')<>'' ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True,
+                    "groups": [dict(r).get("group_name") or "" for r in rows]})
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
