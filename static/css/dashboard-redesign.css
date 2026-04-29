@@ -515,3 +515,66 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
 /* Hide the legacy 8-stat grid via class flag (markup preserved so
    existing dhLoadStats() JS continues to populate IDs without errors) */
 .dh-legacy-stats { display: none !important; }
+
+/* ==========================================================================
+   Phase 6 — Smart alerts banner (conditional)
+   ========================================================================== */
+.md-alerts {
+  background: var(--md-warning-bg);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-inline-end: 4px solid var(--md-warning); /* RTL: visible right edge */
+  border-radius: var(--md-rad-md);
+  padding: var(--md-sp-4);
+  margin: 0 0 var(--md-sp-5);
+  color: var(--md-warning-text);
+  display: none;
+}
+.md-alerts.has-items { display: block; }
+.md-alerts-title {
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-bold);
+  margin: 0 0 var(--md-sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--md-sp-2);
+  color: var(--md-warning-text);
+}
+.md-alerts-list { list-style: none; margin: 0; padding: 0; }
+.md-alerts-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md-sp-3);
+  padding: var(--md-sp-2) 0;
+  border-top: 1px solid rgba(245, 158, 11, 0.18);
+  font-size: var(--md-fz-sm);
+  color: var(--md-warning-text);
+}
+.md-alerts-list .md-alerts-item:first-child { border-top: none; }
+.md-alerts-item-text {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sp-2);
+  min-width: 0;
+}
+.md-alerts-item-text strong { font-weight: var(--md-fw-black); }
+.md-alerts-item-link {
+  flex-shrink: 0;
+  color: var(--md-brand-deep);
+  text-decoration: none;
+  font-weight: var(--md-fw-semi);
+  font-size: var(--md-fz-xs);
+  padding: 4px 12px;
+  border-radius: var(--md-rad-md);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(245, 158, 11, 0.40);
+  transition: background var(--md-motion-fast);
+}
+.md-alerts-item-link:hover { background: #fff; }
+
+/* Hide the legacy missing-lessons banner — superseded by md-alerts.
+   The DOM element + its JS populator stay intact (display:none cannot
+   be flipped back on by the JS's inline-style assignment because of
+   the !important here). */
+#dh-missing-lessons { display: none !important; }

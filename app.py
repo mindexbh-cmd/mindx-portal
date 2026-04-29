@@ -4901,6 +4901,48 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       }).catch(function(){});
   })();
   </script>
+  <!-- Phase 6 — Smart alerts banner (conditional). Hidden by default,
+       reveals when /api/teacher-deliveries/summary returns alerts with
+       count > 0. Reuses the existing summary endpoint's 6 alert types
+       (titles, counts, tab, filter) directly — no new SQL. -->
+  <div class="md-alerts" id="md-alerts" role="alert" aria-live="polite">
+    <div class="md-alerts-title">
+      <span aria-hidden="true">&#x26A0;</span>
+      <span>&#x62A;&#x646;&#x628;&#x64A;&#x647;&#x627;&#x62A; &#x62A;&#x62D;&#x62A;&#x627;&#x62C; &#x627;&#x646;&#x62A;&#x628;&#x627;&#x647;&#x643;</span>
+    </div>
+    <ul class="md-alerts-list" id="md-alerts-list"></ul>
+  </div>
+  <script>
+  (function(){
+    /* Populate the smart alerts banner from the existing
+       /api/teacher-deliveries/summary endpoint. Non-staff sessions
+       silently skip on 403 — banner stays hidden. */
+    function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    fetch('/api/teacher-deliveries/summary', {credentials:'include'})
+      .then(function(r){ return r.status === 403 ? null : r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        var alerts = (d.alerts || []).filter(function(a){ return (a.count || 0) > 0; });
+        if (!alerts.length) return;  /* banner stays display:none */
+        var box = document.getElementById('md-alerts-list');
+        if (!box) return;
+        box.innerHTML = alerts.slice(0, 5).map(function(a){
+          var url = '/admin/teacher-deliveries?tab=' + (a.tab || 'alerts');
+          if (a.filter) url += '&filter=' + encodeURIComponent(a.filter);
+          return '<li class="md-alerts-item">' +
+            '<span class="md-alerts-item-text">' +
+              '<span aria-hidden="true">&#x26A0;</span>' +
+              '<span><strong>' + (a.count|0) + '</strong> ' + esc(a.title) + '</span>' +
+            '</span>' +
+            '<a class="md-alerts-item-link" href="' + esc(url) + '">' +
+              '&#x639;&#x631;&#x636;' +
+            '</a>' +
+          '</li>';
+        }).join('');
+        document.getElementById('md-alerts').classList.add('has-items');
+      }).catch(function(){});
+  })();
+  </script>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid dh-legacy-stats">
     <div class="dh-stat-card teal">
