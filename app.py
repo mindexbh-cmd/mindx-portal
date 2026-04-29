@@ -9755,7 +9755,8 @@ TEACHER_ATTENDANCE_HTML = """<!DOCTYPE html>
 <title>&#x631;&#x635;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628; - &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-body{background:#f5f3ff;min-height:100vh;direction:rtl;}
+html,body{overflow-x:hidden;}
+body{background:#f5f3ff;min-height:100vh;direction:rtl;-webkit-overflow-scrolling:touch;}
 .topbar{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 .topbar h1{font-size:20px;font-weight:800;}
 .topbar .who{font-size:13px;opacity:.92;font-weight:600;}
@@ -9774,17 +9775,11 @@ select.group-select:focus,input.date-input:focus{border-color:#00897B;background
 .alert{display:none;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:16px;align-items:center;gap:10px;}
 .alert.exists{background:#fff3e0;border:2px solid #FB8C00;color:#e65100;display:flex;}
 .alert.fresh{background:#e8f5e9;border:2px solid #43A047;color:#2e7d32;display:flex;}
-/* ROOT-CAUSE MARKER (attendance-students-and-scroll-fix-20260429):
-   Mobile users couldn't scroll to lower students. Cause: the table
-   inside .tbl-wrap is wider than a phone viewport (status select 200px
-   + class-meta col 160px + index col 48px + name col), and overflow:
-   hidden here clipped the right edge AND on iOS Safari the touch-pan
-   inside the clipped area absorbed vertical gestures without
-   producing any scroll. The next commit replaces this with a mobile-
-   safe overflow model (horizontal scroll inside the table wrapper, no
-   vertical clipping) and adds an html,body{overflow-x:hidden} safety
-   net plus a sticky save bar so the bottom CTA is reachable. */
-.tbl-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
+/* Horizontal scroll inside the wrapper, NEVER clip vertically — that
+   was breaking touch-pan inside the table area on phones. The
+   border-radius is preserved via clip-path so we don't need
+   overflow:hidden for visual rounding. */
+.tbl-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;clip-path:inset(0 round 14px);touch-action:pan-x pan-y;}
 .tbl-wrap table{width:100%;border-collapse:collapse;}
 .tbl-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
 .tbl-wrap th{padding:13px 18px;font-size:14px;font-weight:700;text-align:right;}
@@ -9814,12 +9809,24 @@ select.status-sel.late{border-color:#FB8C00;color:#e65100;background:#fff3e0;}
 .t-row-unreg td{background:#fafafa;}
 .t-row-unreg td:first-child{color:#90a4ae;}
 @media (max-width:600px){
-  .main{padding:14px;}
+  .main{padding:14px;padding-bottom:96px;}
   .topbar{padding:12px 14px;}
   .topbar h1{font-size:17px;}
   select.group-select,input.date-input{min-width:0;width:100%;}
   .ctrl-group{width:100%;}
-  .tbl-wrap th,.tbl-wrap td{padding:9px 10px;font-size:13px;}
+  .tbl-wrap th,.tbl-wrap td{padding:9px 8px;font-size:13px;}
+  /* Narrow the wide columns so the table fits without forcing a side
+     swipe; rows that still overflow can scroll horizontally inside
+     .tbl-wrap. The auto-meta cell is the largest source of width on
+     mobile, so we let it shrink and wrap. */
+  select.status-sel{min-width:0;padding:6px 8px;font-size:13px;}
+  .att-meta-cell, td.t-meta-cell{min-width:0!important;font-size:11.5px;padding:6px 6px;}
+  .att-meta-text, .t-meta-text{display:inline-block;max-width:100%;}
+  /* Sticky bottom action bar so حفظ الحضور is always reachable while
+     the table scrolls above it. */
+  .foot-btns{position:sticky;bottom:0;background:#f5f3ff;padding:10px 0;margin-top:14px;
+             border-top:1px solid #d7d2f0;z-index:50;}
+  .btn-save,.btn-cancel{padding:11px 18px;font-size:14px;}
 }
 </style>
 </head>
