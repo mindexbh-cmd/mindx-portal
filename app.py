@@ -4458,21 +4458,314 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
    which the spec grants to both roles. Server still gates the URL. */
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
 
+/* ================================================================
+   Phase 1 dashboard restyle — Mindex purple brand identity.
+   Appended to the existing stylesheet so later rules win the
+   cascade. Touches ONLY visual styling: colors, spacing, borders,
+   typography, hover. No DOM-level structural reset; the new layout
+   for action cards is achieved purely via CSS grid + ::after
+   chevron (no markup change).
+   ================================================================ */
+:root {
+  --mx-brand:           #6b2c91;
+  --mx-brand-hover:     #553c9a;
+  --mx-brand-light:     #f3eafa;
+  --mx-brand-lighter:   #faf7fc;
+  --mx-brand-border:    #e5d5ed;
+  --mx-brand-divider:   #f0e6f5;
+
+  --mx-bg-page:         #f3eef5;
+  --mx-bg-card:         #ffffff;
+  --mx-text-primary:    #1f2937;
+  --mx-text-secondary:  #6b7280;
+  --mx-text-muted:      #9ca3af;
+
+  --mx-warning:         #f59e0b;
+  --mx-warning-bg:      #fef3c7;
+  --mx-warning-text:    #92400e;
+  --mx-success:         #10b981;
+  --mx-success-bg:      #d1fae5;
+  --mx-success-text:    #065f46;
+  --mx-danger:          #ef4444;
+  --mx-danger-bg:       #fee2e2;
+  --mx-danger-text:     #991b1b;
+  --mx-info:            #3b82f6;
+  --mx-info-bg:         #dbeafe;
+  --mx-info-text:       #1e40af;
+}
+
+body { background: var(--mx-bg-page) !important; color: var(--mx-text-primary); }
+
+/* ── Generic SVG icon class ──────────────────────────────── */
+.mx-i {
+  display: inline-block;
+  vertical-align: -2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.dh-topbar {
+  background: linear-gradient(135deg, var(--mx-brand), var(--mx-brand-hover)) !important;
+  box-shadow: 0 1px 3px rgba(107, 44, 145, 0.12) !important;
+}
+.dh-topbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px;
+}
+.dh-topbar-title .mx-i { width: 22px; height: 22px; }
+.dh-topbar-right .dh-logout {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+  padding: 7px 14px !important;
+  font-weight: 600 !important;
+}
+.dh-topbar-right .dh-logout:hover { background: rgba(255, 255, 255, 0.28) !important; }
+.dh-topbar-right .dh-logout .mx-i { width: 14px; height: 14px; }
+
+/* ── Center-mode card ────────────────────────────────────── */
+#dh-center-mode-card {
+  background: var(--mx-bg-card) !important;
+  border: 1px solid var(--mx-brand-border) !important;
+  border-right: 3px solid var(--mx-brand) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 12px 16px !important;
+}
+#dh-center-mode-card > div:first-child {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--mx-brand) !important;
+}
+#dh-center-mode-card > div:first-child .mx-i { color: var(--mx-brand); }
+
+/* ── Section titles → small uppercase brand labels ──────── */
+.dh-section-title {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--mx-brand) !important;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 24px 0 12px !important;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--mx-brand-divider);
+}
+.dh-section-title:not(:first-child) { margin-top: 28px !important; }
+.dh-section-title .mx-i { width: 14px; height: 14px; color: var(--mx-brand); }
+
+/* ── Stats grid + cards ─────────────────────────────────── */
+.dh-stat-card {
+  background: var(--mx-bg-card) !important;
+  border: 1px solid var(--mx-brand-border) !important;
+  border-radius: 8px !important;
+  padding: 12px 14px !important;
+  box-shadow: none !important;
+  position: relative;
+  overflow: visible !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+/* Replace the rainbow side-bar with a 3px top border. The
+   existing ::before is set to `top:0;right:0;width:5px;height:100%`
+   — we override to a top stripe in a single brand color. Per-color
+   class overrides (red / indigo) carry the semantic accent. */
+.dh-stat-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: 0 !important;
+  width: auto !important;
+  height: 3px !important;
+  background: var(--mx-brand) !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+/* Semantic accents based on metric meaning */
+.dh-stat-card.red::before    { background: var(--mx-danger) !important; }
+.dh-stat-card.indigo::before { background: var(--mx-success) !important; }
+.dh-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 44, 145, 0.10);
+  border-color: var(--mx-brand-light) !important;
+}
+.dh-stat-top { margin-bottom: 6px !important; }
+.dh-stat-icon {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px;
+  background: var(--mx-brand-light);
+  color: var(--mx-brand);
+  font-size: 14px !important;
+  opacity: 1 !important;
+}
+.dh-stat-icon .mx-i { width: 14px; height: 14px; }
+.dh-stat-card.red    .dh-stat-icon { background: var(--mx-danger-bg);  color: var(--mx-danger-text); }
+.dh-stat-card.indigo .dh-stat-icon { background: var(--mx-success-bg); color: var(--mx-success-text); }
+.dh-stat-number {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--mx-text-primary) !important;
+  line-height: 1.15 !important;
+  margin-top: 4px;
+}
+.dh-stat-label {
+  font-size: 12px !important;
+  color: var(--mx-text-secondary) !important;
+  font-weight: 500 !important;
+  margin-top: 2px;
+}
+
+/* ── Action grid → clean vertical list ─────────────────── */
+.dh-actions-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+  background: var(--mx-bg-card);
+  border: 1px solid var(--mx-brand-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dh-action-card {
+  background: var(--mx-bg-card) !important;
+  color: var(--mx-text-primary) !important;
+  display: grid !important;
+  grid-template-columns: 36px 1fr 16px;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "icon title chevron"
+    "icon desc  chevron";
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 0;
+  padding: 12px 14px !important;
+  min-height: auto !important;
+  border: none !important;
+  border-bottom: 1px solid var(--mx-brand-divider) !important;
+  border-right: 3px solid transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-align: right;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-right-color 0.15s ease, color 0.15s ease;
+  position: relative;
+}
+.dh-actions-grid > .dh-action-card:last-child { border-bottom: none !important; }
+.dh-action-card:hover {
+  background: var(--mx-brand-lighter) !important;
+  border-right-color: var(--mx-brand) !important;
+  transform: none !important;
+  box-shadow: none !important;
+  color: var(--mx-text-primary) !important;
+}
+.dh-action-card:hover .dh-action-title { color: var(--mx-brand) !important; }
+.dh-action-card:focus-visible {
+  outline: 2px solid var(--mx-brand);
+  outline-offset: -2px;
+}
+.dh-action-icon {
+  grid-area: icon;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 6px;
+  background: var(--mx-brand-light);
+  color: var(--mx-brand) !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px !important;
+  margin: 0 !important;
+}
+.dh-action-icon .mx-i { width: 16px; height: 16px; }
+.dh-action-title {
+  grid-area: title;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--mx-text-primary) !important;
+}
+.dh-action-desc {
+  grid-area: desc;
+  font-size: 12px !important;
+  color: var(--mx-text-secondary) !important;
+  font-weight: 400 !important;
+  opacity: 1 !important;
+  margin-top: 1px;
+}
+/* Chevron pointing inline-end (left edge in RTL). Rendered as a
+   masked element so its color follows currentColor / hover. */
+.dh-action-card::after {
+  content: '';
+  grid-area: chevron;
+  width: 14px;
+  height: 14px;
+  align-self: center;
+  background-color: var(--mx-text-muted);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='15 18 9 12 15 6'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='15 18 9 12 15 6'/></svg>") center / contain no-repeat;
+}
+.dh-action-card:hover::after { background-color: var(--mx-brand); }
+
+/* Badges inside action titles (receipts / teacher-deliveries).
+   Keep the JS-driven display:none default; only restyle visuals. */
+#dh-receipts-badge, #dh-td-badge {
+  background: var(--mx-danger) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+  padding: 1px 8px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  margin-right: 6px !important;
+  vertical-align: middle;
+}
+
+/* ── Missing-lessons alert ──────────────────────────────── */
+#dh-missing-lessons {
+  background: var(--mx-warning-bg) !important;
+  border: 1px solid var(--mx-warning) !important;
+  border-radius: 8px !important;
+  color: var(--mx-warning-text) !important;
+  box-shadow: none !important;
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+}
+#dh-missing-lessons .mx-i { width: 18px; height: 18px; color: var(--mx-warning); }
+#dh-missing-lessons span[style*="background"] {
+  background: var(--mx-warning) !important;
+  color: #fff !important;
+}
+
 </style>
 </head>
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <div class="dh-topbar">
-  <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
+  <div class="dh-topbar-title"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg> MINDEX EDUCATION &amp; TRAINING CENTRE</div>
   <div class="dh-topbar-right">
     <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
-    <a href="/settings" class="dh-logout mx-admin-only" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
+    <a href="/settings" class="dh-logout mx-admin-only" style="margin-left:8px;"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/><circle cx="12" cy="12" r="3"/></svg> &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
     <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
   </div>
 </div>
 <div class="dh-main">
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
-    <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
+    <div style="font-weight:800;color:#4a148c;font-size:15px;"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
     <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
     <div id="dh-center-mode-exceptions" style="font-size:12.5px;color:#5d4037;font-weight:700;"></div>
     <div id="dh-center-mode-controls" style="display:DH_CTRL_DISP_PLACEHOLDER;align-items:center;gap:8px;margin-right:auto;">
@@ -4549,126 +4842,126 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
             box-shadow:0 3px 12px rgba(251,140,0,.15);align-items:center;
             justify-content:space-between;gap:12px;flex-wrap:wrap;">
     <span style="display:inline-flex;align-items:center;gap:10px;font-size:1rem;">
-      <span style="font-size:1.4rem;">&#x26A0;</span>
+      <span style="font-size:1.4rem;display:inline-flex;align-items:center;"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
       <span><span id="dh-missing-count">0</span> &#x62D;&#x635;&#x629; &#x645;&#x631;&#x635;&#x648;&#x62F;&#x629; &#x628;&#x62F;&#x648;&#x646; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x62F;&#x631;&#x633;</span>
     </span>
     <span style="background:#fb8c00;color:#fff;padding:6px 14px;border-radius:8px;font-size:.86rem;">
       &#x639;&#x631;&#x636; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x2190;
     </span>
   </a>
-  <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
+  <div class="dh-section-title"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid">
     <div class="dh-stat-card teal">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F1EC;&#x1F1E7;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span></div>
       <div class="dh-stat-number" id="stat-english-students">&ndash;</div>
       <div class="dh-stat-label">&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x625;&#x646;&#x62C;&#x644;&#x64A;&#x632;&#x64A;</div>
     </div>
     <div class="dh-stat-card purple">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F9EE;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/></svg></span></div>
       <div class="dh-stat-number" id="stat-math-students">&ndash;</div>
       <div class="dh-stat-label">&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x631;&#x64A;&#x627;&#x636;&#x64A;&#x627;&#x62A;</div>
     </div>
     <div class="dh-stat-card blue">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F465;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
       <div class="dh-stat-number" id="stat-groups">&ndash;</div>
       <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </div>
     <div class="dh-stat-card green">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F468;&#x200D;&#x1F3EB;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span></div>
       <div class="dh-stat-number" id="stat-teachers">&ndash;</div>
       <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62F;&#x631;&#x633;&#x64A;&#x646;</div>
     </div>
     <div class="dh-stat-card orange">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4BC;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span></div>
       <div class="dh-stat-number" id="stat-staff">&ndash;</div>
       <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;&#x64A;&#x646;</div>
     </div>
     <div class="dh-stat-card pink">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4D8;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span></div>
       <div class="dh-stat-number" id="stat-english-levels">&ndash;</div>
       <div class="dh-stat-label">&#x645;&#x633;&#x62A;&#x648;&#x64A;&#x627;&#x62A; &#x627;&#x644;&#x625;&#x646;&#x62C;&#x644;&#x64A;&#x632;&#x64A;</div>
     </div>
     <div class="dh-stat-card indigo">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F4C5;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg></span></div>
       <div class="dh-stat-number" id="stat-attendance-rate">&ndash;</div>
       <div class="dh-stat-label">&#x646;&#x633;&#x628;&#x629; &#x627;&#x644;&#x627;&#x644;&#x62A;&#x632;&#x627;&#x645; &#x628;&#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
     </div>
     <div class="dh-stat-card red">
-      <div class="dh-stat-top"><span class="dh-stat-icon">&#x26A0;&#xFE0F;</span></div>
+      <div class="dh-stat-top"><span class="dh-stat-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span></div>
       <div class="dh-stat-number" id="stat-violations">&ndash;</div>
       <div class="dh-stat-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</div>
     </div>
   </div>
 
-  <div class="dh-section-title">&#x26A1; &#x627;&#x644;&#x642;&#x648;&#x627;&#x626;&#x645; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
+  <div class="dh-section-title"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> &#x627;&#x644;&#x642;&#x648;&#x627;&#x626;&#x645; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
   <div class="dh-actions-grid">
     <a href="/database" class="dh-action-card dh-a-purple mx-admin-only">
-      <div class="dh-action-icon">&#x1F4C1;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
       <div class="dh-action-title">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</div>
       <div class="dh-action-desc">&#x62C;&#x645;&#x64A;&#x639; &#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629; &#x648;&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </a>
     <a href="/attendance" class="dh-action-card dh-a-teal">
-      <div class="dh-action-icon">&#x1F4C5;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg></div>
       <div class="dh-action-title">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
       <div class="dh-action-desc">&#x625;&#x636;&#x627;&#x641;&#x629; &#x623;&#x648; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x633;&#x62C;&#x644; &#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
     </a>
     <button class="dh-action-card dh-a-purple" data-button-key="dashboard.payment_tracking" onclick="pmOpen()">
-      <div class="dh-action-icon">&#x1F4B3;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
       <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</div>
       <div class="dh-action-desc">&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637; &#x648;&#x627;&#x644;&#x645;&#x62F;&#x641;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
     <button class="dh-action-card dh-a-orange" data-button-key="dashboard.lessons_summary" onclick="ssOpen()">
-      <div class="dh-action-icon">&#x1F4CA;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div>
       <div class="dh-action-title">&#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
       <div class="dh-action-desc">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x62D;&#x635;&#x635; &#x648;&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x648;&#x642;&#x62A;</div>
     </button>
     <button class="dh-action-card dh-a-blue" data-button-key="dashboard.lesson_durations" onclick="sdOpen()">
-      <div class="dh-action-icon">&#x23F1;&#xFE0F;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></svg></div>
       <div class="dh-action-title">&#x645;&#x62F;&#x629; &#x627;&#x644;&#x62D;&#x635;&#x635;</div>
       <div class="dh-action-desc">&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x648;&#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x645;&#x62F;&#x629; &#x643;&#x644; &#x62D;&#x635;&#x629;</div>
     </button>
     <button class="dh-action-card dh-a-search" data-button-key="dashboard.search_student" onclick="srOpen()">
-      <div class="dh-action-icon">&#x1F50D;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
       <div class="dh-action-title">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</div>
       <div class="dh-action-desc">&#x628;&#x62D;&#x62B; &#x633;&#x631;&#x64A;&#x639; &#x628;&#x627;&#x644;&#x627;&#x633;&#x645; &#x623;&#x648; &#x627;&#x644;&#x631;&#x642;&#x645; &#x627;&#x644;&#x634;&#x62E;&#x635;&#x64A;</div>
     </button>
     <button class="dh-action-card dh-a-green" data-button-key="dashboard.send_messages" onclick="msgOpen()">
-      <div class="dh-action-icon">&#x1F4E9;</div>
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
       <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
       <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
-    <a class="dh-action-card mx-staff-only" href="/admin/teacher-deliveries" style="background:linear-gradient(135deg,#5E35B1,#7E57C2);">
-      <div class="dh-action-icon">&#x1F4CA;</div>
-      <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x62A;&#x633;&#x644;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x64A;&#x646; <span id="dh-td-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
+    <a class="dh-action-card mx-staff-only" href="/admin/teacher-deliveries">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg></div>
+      <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x62A;&#x633;&#x644;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x64A;&#x646; <span id="dh-td-badge" style="display:none;">0</span></div>
       <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x642;&#x628;&#x629; &#x627;&#x644;&#x62F;&#x631;&#x648;&#x633;&#x60C; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;&#x60C; &#x648;&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A; &#x641;&#x64A; &#x645;&#x643;&#x627;&#x646; &#x648;&#x627;&#x62D;&#x62F;</div>
     </a>
-    <a class="dh-action-card mx-admin-only" data-button-key="dashboard.parent_receipts" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
-      <div class="dh-action-icon">&#x1F4CE;</div>
-      <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
+    <a class="dh-action-card mx-admin-only" data-button-key="dashboard.parent_receipts" href="/admin/receipts">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></div>
+      <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;">0</span></div>
       <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x62C;&#x639;&#x629; &#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x627;&#x644;&#x62F;&#x641;&#x639; &#x627;&#x644;&#x645;&#x631;&#x641;&#x648;&#x639;&#x629;</div>
     </a>
-    <button type="button" class="dh-action-card" onclick="dhCopyParentLink()" style="background:linear-gradient(135deg,#00897B,#26A69A);">
-      <div class="dh-action-icon">&#x1F517;</div>
+    <button type="button" class="dh-action-card" onclick="dhCopyParentLink()">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
       <div class="dh-action-title">&#x646;&#x633;&#x62E; &#x631;&#x627;&#x628;&#x637; &#x628;&#x648;&#x627;&#x628;&#x629; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</div>
       <div class="dh-action-desc">&#x645;&#x634;&#x627;&#x631;&#x643;&#x629; &#x631;&#x627;&#x628;&#x637; /parent &#x645;&#x639; &#x627;&#x644;&#x623;&#x647;&#x627;&#x644;&#x64A;</div>
     </button>
-    <a class="dh-action-card" data-button-key="dashboard.points_board" href="/points/board" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);">
-      <div class="dh-action-icon">&#x1F31F;</div>
+    <a class="dh-action-card" data-button-key="dashboard.points_board" href="/points/board">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
       <div class="dh-action-title">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x635;&#x641; &#x2014; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x645;&#x646;&#x62D; &#x646;&#x642;&#x627;&#x637; &#x627;&#x644;&#x633;&#x644;&#x648;&#x643; &#x644;&#x644;&#x637;&#x644;&#x628;&#x629; &#x645;&#x628;&#x627;&#x634;&#x631;&#x629;</div>
     </a>
-    <a class="dh-action-card" data-button-key="dashboard.points_manage" href="/points/manage" id="dh-points-manage" style="background:linear-gradient(135deg,#AD1457,#D81B60);display:none;">
-      <div class="dh-action-icon">&#x2699;&#xFE0F;</div>
+    <a class="dh-action-card" data-button-key="dashboard.points_manage" href="/points/manage" id="dh-points-manage" style="display:none;">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/><circle cx="12" cy="12" r="3"/></svg></div>
       <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</div>
       <div class="dh-action-desc">&#x627;&#x644;&#x633;&#x644;&#x648;&#x643;&#x064A;&#x627;&#x062A; &#x648;&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x062A; &#x648;&#x627;&#x644;&#x062A;&#x0642;&#x0627;&#x0631;&#x064A;&#x0631;</div>
     </a>
-    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.permissions" id="dh-permissions" href="/admin/permissions" style="background:linear-gradient(135deg,#3F51B5,#5C6BC0);display:none;">
-      <div class="dh-action-icon">&#x1F6E1;&#xFE0F;</div>
+    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.permissions" id="dh-permissions" href="/admin/permissions" style="display:none;">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
       <div class="dh-action-title">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0635;&#x0644;&#x0627;&#x062D;&#x064A;&#x0627;&#x062A;</div>
       <div class="dh-action-desc">&#x062A;&#x0639;&#x062F;&#x064A;&#x0644; &#x0623;&#x062F;&#x0648;&#x0627;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x064A;&#x0646; &#x0648;&#x0625;&#x0638;&#x0647;&#x0627;&#x0631;/&#x0625;&#x062E;&#x0641;&#x0627;&#x0621; &#x0627;&#x0644;&#x0623;&#x0632;&#x0631;&#x0627;&#x0631;</div>
     </a>
-    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.table_audit" href="/admin/table-audit" id="dh-table-audit" style="background:linear-gradient(135deg,#5D4037,#795548);display:none;">
-      <div class="dh-action-icon">&#x1F5C2;</div>
+    <a class="dh-action-card mx-admin-only" data-button-key="sidebar.table_audit" href="/admin/table-audit" id="dh-table-audit" style="display:none;">
+      <div class="dh-action-icon"><svg class="mx-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
       <div class="dh-action-title">&#x062A;&#x062F;&#x0642;&#x064A;&#x0642; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644;</div>
       <div class="dh-action-desc">&#x062A;&#x0635;&#x0646;&#x064A;&#x0641; &#x0648;&#x062D;&#x0630;&#x0641; &#x0622;&#x0645;&#x0646; &#x0644;&#x644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x063A;&#x064A;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x0629;</div>
     </a>
