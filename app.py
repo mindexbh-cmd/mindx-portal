@@ -25416,7 +25416,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .hello{text-align:center;margin-bottom:28px;}
 .hello h2{font-size:1.6rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello p{color:#666;margin:0;font-size:0.96rem;}
-.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
 .card{background:#fff;border-radius:22px;padding:34px 26px;text-align:center;
       box-shadow:0 10px 32px rgba(107,63,160,.18);
       cursor:pointer;text-decoration:none;color:inherit;display:block;
@@ -25432,6 +25432,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                      height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
 .card.points::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
+.card.lessons::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
+@media (max-width:980px){
+  .cards{grid-template-columns:repeat(2,1fr);}
+}
 @media (max-width:680px){
   .cards{grid-template-columns:1fr;gap:14px;}
   .card{padding:26px 20px;}
@@ -25463,6 +25468,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <h3>كلاس مايندكس</h3>
       <p>منح النقاط ومتابعة السلوك</p>
     </a>
+    <a class="card lessons" href="/teacher/lessons">
+      <span class="ic">📚</span>
+      <h3>متابعة التقدم في الدروس</h3>
+      <p>تسجيل الدرس المُعطى اليوم</p>
+    </a>
   </div>
 </div>
 </body></html>"""
@@ -25477,6 +25487,449 @@ def teacher_hub_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
     return TEACHER_HUB_HTML.replace("USER_PLACEHOLDER", who)
+
+
+# ── /teacher/lessons — lesson tracking form for teachers ──────────────
+# Date input is clamped to today/yesterday only. Form posts to
+# /api/lessons/log; the server enforces the same restriction. Recent
+# entries table shows last 5 entries by this teacher with edit/delete
+# (date field locked for teacher role).
+TEACHER_LESSONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>متابعة التقدم في الدروس — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar .who{color:#6B3FA0;font-weight:700;font-size:0.95rem;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:980px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:16px;padding:22px;
+       box-shadow:0 8px 24px rgba(107,63,160,.15);margin-bottom:18px;}
+h2.head{margin:0 0 14px;color:#4a148c;font-size:1.25rem;font-weight:900;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-weight:700;color:#4a148c;font-size:.92rem;}
+.field input,.field select,.field textarea{
+  padding:10px 12px;border:2px solid #e7d8f3;border-radius:10px;
+  font-family:inherit;font-size:1rem;background:#fafafe;
+  transition:border-color .15s ease;}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:#6B3FA0;background:#fff;}
+.field input[readonly]{background:#f4f0fa;color:#666;}
+.field textarea{resize:vertical;min-height:70px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:680px){.row2{grid-template-columns:1fr;}}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+     border:none;border-radius:10px;padding:12px 22px;font-weight:800;
+     font-size:1rem;cursor:pointer;display:inline-flex;align-items:center;
+     gap:8px;transition:transform .12s ease, box-shadow .12s ease;
+     font-family:inherit;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.err{color:#c62828;font-size:.85rem;margin-top:4px;display:none;}
+.err.show{display:block;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.92rem;}
+table.tbl th{background:#f3e5f5;color:#4a148c;padding:10px 8px;
+             text-align:right;font-weight:800;}
+table.tbl td{padding:9px 8px;border-bottom:1px solid #f0e6f8;}
+table.tbl tr:hover td{background:#faf5ff;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.hint{color:#666;font-size:.82rem;margin-top:4px;}
+.act-btn{padding:5px 10px;border-radius:8px;border:none;cursor:pointer;
+         font-size:.82rem;font-weight:700;font-family:inherit;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;}
+.act-btn.edit:hover{background:#bbdefb;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:4px;}
+.act-btn.del:hover{background:#ffcdd2;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:16px;padding:22px;max-width:540px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+@media (max-width:680px){
+  table.tbl{font-size:.85rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #ede0f5;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#4a148c;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 مايندكس — متابعة التقدم في الدروس</h1>
+  <span class="who">USER_PLACEHOLDER</span>
+  <a href="/teacher/hub">رجوع</a>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h2 class="head">تسجيل درس جديد</h2>
+    <form id="lessonForm" onsubmit="return submitLesson(event);">
+      <div class="row2">
+        <div class="field">
+          <label for="ldate">تاريخ الدرس</label>
+          <input type="date" id="ldate" required>
+          <span class="err" id="err-ldate"></span>
+          <span class="hint" id="hint-date">يمكن اختيار اليوم أو الأمس فقط</span>
+        </div>
+        <div class="field">
+          <label for="lteacher">المعلمة</label>
+          <input type="text" id="lteacher" readonly value="USER_PLACEHOLDER">
+        </div>
+      </div>
+      <div class="field">
+        <label for="lgroup">المجموعة</label>
+        <select id="lgroup" required>
+          <option value="">— اختاري المجموعة —</option>
+        </select>
+        <span class="err" id="err-lgroup"></span>
+      </div>
+      <div class="field">
+        <label for="ltopic">الدرس الذي تم اليوم</label>
+        <input type="text" id="ltopic" required maxlength="500"
+               placeholder="مثال: درس عن الكسور — الجمع والطرح">
+        <span class="err" id="err-ltopic"></span>
+      </div>
+      <div class="field">
+        <label for="lcurr">إلى أين وصلتُ في المنهج اليوم</label>
+        <input type="text" id="lcurr" required maxlength="500"
+               placeholder="مثال: الفصل الثالث — صفحة 45">
+        <span class="err" id="err-lcurr"></span>
+      </div>
+      <div class="field">
+        <label for="lnotes">ملاحظات (اختياري)</label>
+        <textarea id="lnotes" rows="3" maxlength="2000"
+                  placeholder="أي ملاحظات خاصة بالدرس"></textarea>
+      </div>
+      <button type="submit" class="btn" id="submitBtn">💾 حفظ</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 class="head">آخر 5 إدخالات</h2>
+    <div id="recentBox">
+      <div class="empty">جاري التحميل...</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeEdit()">
+  <div class="modal">
+    <h3>تعديل الإدخال</h3>
+    <div class="field">
+      <label>تاريخ الدرس</label>
+      <input type="date" id="edate" disabled
+             title="يمكن للأدمن فقط تعديل التاريخ">
+      <span class="hint">يمكن للأدمن فقط تعديل التاريخ</span>
+    </div>
+    <div class="field">
+      <label>المجموعة</label>
+      <input type="text" id="egroup" disabled>
+    </div>
+    <div class="field">
+      <label>الدرس الذي تم</label>
+      <input type="text" id="etopic" maxlength="500">
+      <span class="err" id="err-etopic"></span>
+    </div>
+    <div class="field">
+      <label>إلى أين وصلتُ في المنهج</label>
+      <input type="text" id="ecurr" maxlength="500">
+      <span class="err" id="err-ecurr"></span>
+    </div>
+    <div class="field">
+      <label>ملاحظات</label>
+      <textarea id="enotes" rows="3" maxlength="2000"></textarea>
+    </div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">إلغاء</button>
+      <button class="btn" id="saveEditBtn" onclick="saveEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل أنتِ متأكدة من حذف هذا الإدخال؟ لا يمكن التراجع.</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDel()">إلغاء</button>
+      <button class="btn btn-danger" id="confirmDelBtn" onclick="confirmDel()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // Date pickers limited to today/yesterday for teacher role.
+  function isoToday(){
+    var d = new Date();
+    var p = function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  function isoYesterday(){
+    var d = new Date(); d.setDate(d.getDate()-1);
+    var p = function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  var di = document.getElementById('ldate');
+  di.value = isoToday();
+  di.max  = isoToday();
+  di.min  = isoYesterday();
+
+  function showErr(id, msg){
+    var el = document.getElementById('err-'+id);
+    if(!el) return;
+    if(msg){ el.textContent = msg; el.classList.add('show'); }
+    else { el.textContent = ''; el.classList.remove('show'); }
+  }
+  function clearErrs(){
+    ['ldate','lgroup','ltopic','lcurr','etopic','ecurr'].forEach(function(k){
+      showErr(k, '');
+    });
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  function fmtDays(arr){
+    if(!arr || !arr.length) return '';
+    return arr.join(' و ');
+  }
+
+  function loadGroups(){
+    var sel = document.getElementById('lgroup');
+    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
+      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
+      var groups = (j && j.groups) || [];
+      if(!groups.length){
+        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
+        return;
+      }
+      groups.forEach(function(g){
+        var nm = g.name || '';
+        var d  = fmtDays(g.study_days || []);
+        var t  = (g.study_time || '').trim();
+        var label = nm;
+        if(d || t){
+          label += ' (' + [d, t].filter(Boolean).join(' - ') + ')';
+        }
+        var opt = document.createElement('option');
+        opt.value = nm;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    }).catch(function(){
+      sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
+    });
+  }
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function loadRecent(){
+    var box = document.getElementById('recentBox');
+    fetch('/api/lessons/log?limit=5').then(function(r){return r.json();}).then(function(j){
+      if(!j || !j.ok){
+        box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+        return;
+      }
+      var entries = j.entries || [];
+      if(!entries.length){
+        box.innerHTML = '<div class="empty">لا توجد إدخالات بعد</div>';
+        return;
+      }
+      var html = '<table class="tbl"><thead><tr>'+
+        '<th>التاريخ</th><th>المجموعة</th><th>الدرس</th>'+
+        '<th>إلى أين وصلت</th><th>ملاحظات</th><th>إجراءات</th>'+
+        '</tr></thead><tbody>';
+      entries.forEach(function(e){
+        html += '<tr>'+
+          '<td data-label="التاريخ">'+escapeHtml(e.lesson_date)+'</td>'+
+          '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
+          '<td data-label="الدرس">'+escapeHtml(e.lesson_topic)+'</td>'+
+          '<td data-label="إلى أين وصلت">'+escapeHtml(e.curriculum_progress)+'</td>'+
+          '<td data-label="ملاحظات">'+escapeHtml(e.notes)+'</td>'+
+          '<td data-label="إجراءات">'+
+            '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+            '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
+          '</td></tr>';
+      });
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    }).catch(function(){
+      box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+    });
+  }
+
+  window.submitLesson = function(ev){
+    ev.preventDefault();
+    clearErrs();
+    var ldate = document.getElementById('ldate').value;
+    var lgrp  = document.getElementById('lgroup').value;
+    var lt    = document.getElementById('ltopic').value.trim();
+    var lc    = document.getElementById('lcurr').value.trim();
+    var ln    = document.getElementById('lnotes').value.trim();
+    var ok = true;
+    if(!ldate){ showErr('ldate', 'التاريخ مطلوب'); ok = false; }
+    if(!lgrp){ showErr('lgroup', 'اختاري المجموعة'); ok = false; }
+    if(!lt){ showErr('ltopic', 'حقل الدرس مطلوب'); ok = false; }
+    if(!lc){ showErr('lcurr', 'حقل المنهج مطلوب'); ok = false; }
+    if(!ok) return false;
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+    fetch('/api/lessons/log', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        group_name: lgrp, lesson_date: ldate,
+        lesson_topic: lt, curriculum_progress: lc, notes: ln
+      })
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = '💾 حفظ';
+      if(j && j.ok){
+        toast('تم تسجيل الدرس بنجاح ✓');
+        document.getElementById('lessonForm').reset();
+        document.getElementById('ldate').value = isoToday();
+        document.getElementById('lteacher').value = 'USER_PLACEHOLDER';
+        loadRecent();
+      } else {
+        toast((j && j.error) || 'تعذر الحفظ', true);
+      }
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '💾 حفظ';
+      toast('تعذر الحفظ', true);
+    });
+    return false;
+  };
+
+  // ── Edit modal state ─────────────────────────────────────
+  var _editId = null;
+  window.openEdit = function(id){
+    fetch('/api/lessons/log?limit=200').then(function(r){return r.json();}).then(function(j){
+      var entry = (j.entries || []).find(function(e){return e.id===id;});
+      if(!entry){ toast('الإدخال غير موجود', true); return; }
+      _editId = id;
+      document.getElementById('edate').value  = entry.lesson_date || '';
+      document.getElementById('egroup').value = entry.group_name || '';
+      document.getElementById('etopic').value = entry.lesson_topic || '';
+      document.getElementById('ecurr').value  = entry.curriculum_progress || '';
+      document.getElementById('enotes').value = entry.notes || '';
+      document.getElementById('editBack').classList.add('show');
+    });
+  };
+  window.closeEdit = function(){
+    document.getElementById('editBack').classList.remove('show');
+    _editId = null;
+  };
+  window.saveEdit = function(){
+    if(!_editId) return;
+    var t = document.getElementById('etopic').value.trim();
+    var c = document.getElementById('ecurr').value.trim();
+    var n = document.getElementById('enotes').value.trim();
+    var ok = true;
+    if(!t){ showErr('etopic', 'حقل الدرس مطلوب'); ok = false; }
+    else { showErr('etopic', ''); }
+    if(!c){ showErr('ecurr', 'حقل المنهج مطلوب'); ok = false; }
+    else { showErr('ecurr', ''); }
+    if(!ok) return;
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = '⏳ جاري...';
+    fetch('/api/lessons/log/' + _editId, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        lesson_topic: t, curriculum_progress: c, notes: n
+      })
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        toast('تم التعديل ✓');
+        closeEdit();
+        loadRecent();
+      } else {
+        toast((j && j.error) || 'تعذر التعديل', true);
+      }
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      toast('تعذر التعديل', true);
+    });
+  };
+
+  // ── Delete confirm ───────────────────────────────────────
+  var _delId = null;
+  window.openDel = function(id){
+    _delId = id;
+    document.getElementById('delBack').classList.add('show');
+  };
+  window.closeDel = function(){
+    document.getElementById('delBack').classList.remove('show');
+    _delId = null;
+  };
+  window.confirmDel = function(){
+    if(!_delId) return;
+    var btn = document.getElementById('confirmDelBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    fetch('/api/lessons/log/' + _delId, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        btn.disabled = false; btn.textContent = 'حذف';
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeDel();
+          loadRecent();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      }).catch(function(){
+        btn.disabled = false; btn.textContent = 'حذف';
+        toast('تعذر الحذف', true);
+      });
+  };
+
+  loadGroups();
+  loadRecent();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/lessons')
+@login_required
+def teacher_lessons_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("teacher", "admin", "manager"):
+        return redirect("/dashboard")
+    who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
+    return TEACHER_LESSONS_HTML.replace("USER_PLACEHOLDER", who)
 
 
 @app.route('/api/teacher/groups-diag', methods=['GET'])
