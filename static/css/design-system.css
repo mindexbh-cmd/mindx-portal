@@ -68,3 +68,16 @@
   --radius-md:            8px;
   --radius-lg:            12px;
 }
+
+/* ==========================================================================
+   Phase 2 (font commit) — apply Cairo / Tajawal globally.
+   The auto-injector links the font files in <head> immediately before
+   this stylesheet, so the font is downloaded by the time this rule
+   takes effect. The rule sits in the design-system stylesheet (loaded
+   last in <head>) so it wins the cascade over any earlier inline
+   `body { font-family: 'Segoe UI', ... }` declarations the legacy
+   pages still ship.
+   ========================================================================== */
+body {
+  font-family: var(--font-family-ar);
+}
