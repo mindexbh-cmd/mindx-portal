@@ -27428,6 +27428,608 @@ def admin_lessons_page():
     return ADMIN_LESSONS_HTML
 
 
+# ── /admin/parent-messages — admin oversight for parent broadcasts ──
+ADMIN_PARENT_MESSAGES_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>رسائل أولياء الأمور — إدارة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1280px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:14px;padding:18px;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.panel-title{font-weight:900;color:#4a148c;font-size:1.05rem;margin:0 0 12px;}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+@media (max-width:980px){.filters{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.filters{grid-template-columns:1fr;}}
+.filters label{display:block;font-size:.82rem;color:#4a148c;font-weight:700;
+               margin-bottom:4px;}
+.filters input,.filters select{width:100%;padding:8px 10px;border:1.5px solid #d8c8ec;
+                                border-radius:8px;font-family:inherit;font-size:.92rem;
+                                background:#fafafe;}
+.filter-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn{background:linear-gradient(135deg,#E91E63,#C2185B);color:#fff;border:none;
+     border-radius:8px;padding:9px 16px;font-weight:800;font-size:.92rem;
+     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{box-shadow:0 4px 14px rgba(233,30,99,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-warn{background:linear-gradient(135deg,#fb8c00,#ef6c00);}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.btn-export{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+@media (max-width:980px){.cards{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.cards{grid-template-columns:1fr;}}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06);
+      border-right:4px solid #C2185B;}
+.card h4{margin:0 0 6px;font-size:.82rem;color:#666;font-weight:700;}
+.card .num{font-size:1.7rem;font-weight:900;color:#4a148c;line-height:1.1;}
+.card.warn{border-right-color:#e53935;}
+.card.warn .num{color:#c62828;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.9rem;}
+table.tbl th{background:#fce4ec;color:#880e4f;padding:10px 8px;text-align:right;
+             font-weight:800;cursor:pointer;user-select:none;}
+table.tbl th:hover{background:#f8bbd0;}
+table.tbl td{padding:8px;border-bottom:1px solid #f8e1ec;vertical-align:top;}
+table.tbl tr:hover td{background:#fff5f8;}
+.act-btn{padding:5px 10px;border-radius:7px;border:none;cursor:pointer;
+         font-size:.8rem;font-weight:700;font-family:inherit;}
+.act-btn.view{background:#fce4ec;color:#880e4f;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;margin-right:4px;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:4px;}
+.act-btn.resend{background:#fff8e1;color:#f57c00;margin-right:4px;}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:6px;
+             font-size:.78rem;font-weight:800;}
+.status-pill.sent{background:#c8e6c9;color:#1b5e20;}
+.status-pill.failed{background:#ffcdd2;color:#b71c1c;}
+.status-pill.queued{background:#fff8e1;color:#f57c00;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.pagination{display:flex;gap:6px;justify-content:center;align-items:center;
+            margin-top:14px;flex-wrap:wrap;}
+.pagination button{padding:6px 11px;border-radius:7px;border:1.5px solid #d8c8ec;
+                   background:#fff;cursor:pointer;font-weight:700;color:#4a148c;
+                   font-family:inherit;}
+.pagination button.active{background:#C2185B;color:#fff;border-color:#C2185B;}
+.pagination button:disabled{opacity:.4;cursor:not-allowed;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:680px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal.lg{max-width:820px;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-weight:700;color:#4a148c;font-size:.86rem;
+             margin-bottom:4px;}
+.field input,.field textarea{
+  width:100%;padding:9px 12px;border:1.6px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.95rem;background:#fafafe;}
+.field textarea{resize:vertical;min-height:60px;}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.recipient-row{display:flex;justify-content:space-between;align-items:center;
+               padding:8px 12px;border-bottom:1px solid #f0e6f8;font-size:.9rem;}
+.recipient-row .nm{font-weight:700;color:#4a148c;}
+.recipient-row .ph{color:#666;font-size:.82rem;direction:ltr;}
+.recipient-row .st{font-size:.78rem;font-weight:700;color:#2E7D32;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+@media (max-width:680px){
+  table.tbl{font-size:.82rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #f8e1ec;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#880e4f;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📨 إدارة رسائل أولياء الأمور</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h3 class="panel-title">المرشحات</h3>
+    <div class="filters">
+      <div><label>من تاريخ</label><input type="date" id="f-from"></div>
+      <div><label>إلى تاريخ</label><input type="date" id="f-to"></div>
+      <div><label>المعلمة</label>
+        <select id="f-teacher"><option value="">— الكل —</option></select>
+      </div>
+      <div><label>المجموعة</label>
+        <select id="f-group"><option value="">— الكل —</option></select>
+      </div>
+      <div><label>بحث (المحتوى / المهارات / الكتب)</label>
+        <input type="text" id="f-search" placeholder="نص للبحث...">
+      </div>
+    </div>
+    <div class="filter-acts">
+      <button class="btn" onclick="applyFilters()">🔍 تطبيق</button>
+      <button class="btn btn-ghost" onclick="resetFilters()">↺ مسح</button>
+      <button class="btn btn-export" onclick="exportXlsx()">📊 تصدير إلى Excel</button>
+    </div>
+  </div>
+
+  <div class="cards" id="statsCards">
+    <div class="card"><h4>هذا الأسبوع</h4><div class="num" id="s-week">—</div></div>
+    <div class="card"><h4>هذا الشهر</h4><div class="num" id="s-month">—</div></div>
+    <div class="card"><h4>المعلمات النشطات</h4><div class="num" id="s-teach">—</div></div>
+    <div class="card warn"><h4>رسائل بمشاكل إرسال</h4><div class="num" id="s-fail">—</div></div>
+  </div>
+
+  <div class="panel">
+    <h3 class="panel-title">سجل رسائل أولياء الأمور</h3>
+    <div id="tableBox">
+      <div class="empty">جاري التحميل...</div>
+    </div>
+    <div class="pagination" id="pagBox"></div>
+  </div>
+
+</div>
+
+<!-- View modal -->
+<div class="modal-back" id="viewBack" onclick="if(event.target===this)closeView()">
+  <div class="modal lg">
+    <h3 id="viewTitle">تفاصيل الرسالة</h3>
+    <div id="viewBody"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeView()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeEdit()">
+  <div class="modal lg">
+    <h3>تعديل الرسالة</h3>
+    <div class="field"><label>التاريخ</label><input type="date" id="edate"></div>
+    <div class="field"><label>المجموعة</label><input type="text" id="egroup"></div>
+    <div class="field"><label>المحتوى</label><textarea id="econtent"></textarea></div>
+    <div class="field"><label>المهارات</label><textarea id="eskills"></textarea></div>
+    <div class="field"><label>الكتب</label><textarea id="ebooks"></textarea></div>
+    <div class="field"><label>الواجب</label><textarea id="ehomework"></textarea></div>
+    <div class="field"><label>ملاحظات</label><textarea id="enotes"></textarea></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">إلغاء</button>
+      <button class="btn btn-danger" onclick="deleteFromEdit()">حذف</button>
+      <button class="btn" id="saveEditBtn" onclick="saveEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Resend progress modal -->
+<div class="modal-back" id="resendBack">
+  <div class="modal">
+    <h3 id="resendTitle">إعادة الإرسال...</h3>
+    <p id="resendStatus">— من —</p>
+    <div id="resendList" style="max-height:40vh;overflow:auto;margin-top:14px;"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" id="resendCloseBtn"
+              onclick="closeResend()" style="display:none;">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذه الرسالة؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDel()">إلغاء</button>
+      <button class="btn btn-danger" id="confirmDelBtn" onclick="confirmDel()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var ALL = []; var PAGE = 1; var PER = 20;
+  var SORT = {col:'sent_date', dir:'desc'};
+  var GROUPS = []; var TEACHERS = [];
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  function getFilters(){
+    return {
+      date_from: document.getElementById('f-from').value,
+      date_to:   document.getElementById('f-to').value,
+      teacher_id: document.getElementById('f-teacher').value,
+      group_name: document.getElementById('f-group').value,
+      search:    document.getElementById('f-search').value
+    };
+  }
+  function buildQs(f){
+    var p = [];
+    Object.keys(f).forEach(function(k){
+      if(f[k]) p.push(encodeURIComponent(k)+'='+encodeURIComponent(f[k]));
+    });
+    return p.length ? ('?' + p.join('&')) : '';
+  }
+
+  function loadFilterOpts(){
+    return Promise.all([
+      fetch('/api/parent-messages/teachers').then(function(r){return r.json();}),
+      fetch('/api/teacher/groups').then(function(r){return r.json();}).catch(function(){return null;}),
+    ]).then(function(arr){
+      var tr = arr[0] || {}; var gr = arr[1] || {};
+      TEACHERS = tr.teachers || [];
+      var ts = document.getElementById('f-teacher');
+      ts.innerHTML = '<option value="">— الكل —</option>';
+      TEACHERS.forEach(function(t){
+        var o = document.createElement('option');
+        o.value = t.id; o.textContent = t.name || ('#'+t.id);
+        ts.appendChild(o);
+      });
+      GROUPS = (gr.groups || []).map(function(g){return g.name;});
+    });
+  }
+  function buildGroupFilter(entries){
+    var gs = document.getElementById('f-group');
+    var prev = gs.value;
+    var seen = {};
+    var src = GROUPS.slice();
+    (entries || []).forEach(function(e){ if(e.group_name) src.push(e.group_name); });
+    src.sort();
+    gs.innerHTML = '<option value="">— الكل —</option>';
+    src.forEach(function(g){
+      if(!g || seen[g]) return;
+      seen[g] = 1;
+      var o = document.createElement('option');
+      o.value = g; o.textContent = g;
+      gs.appendChild(o);
+    });
+    gs.value = prev || '';
+  }
+
+  function loadData(){
+    var f = getFilters();
+    var box = document.getElementById('tableBox');
+    box.innerHTML = '<div class="empty">جاري التحميل...</div>';
+    fetch('/api/parent-messages' + buildQs(f))
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+        ALL = j.entries || [];
+        buildGroupFilter(ALL);
+        PAGE = 1;
+        renderTable();
+      });
+  }
+  function loadStats(){
+    fetch('/api/parent-messages/stats')
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return;
+        document.getElementById('s-week').textContent  = j.this_week || 0;
+        document.getElementById('s-month').textContent = j.this_month || 0;
+        document.getElementById('s-teach').textContent = j.active_teachers || 0;
+        document.getElementById('s-fail').textContent  = j.with_failures || 0;
+      });
+  }
+
+  function renderTable(){
+    var box = document.getElementById('tableBox');
+    if(!ALL.length){
+      box.innerHTML = '<div class="empty">لا توجد رسائل بالشروط المحددة</div>';
+      document.getElementById('pagBox').innerHTML = '';
+      return;
+    }
+    var arr = ALL.slice();
+    arr.sort(function(a,b){
+      var av = a[SORT.col] || ''; var bv = b[SORT.col] || '';
+      if(av<bv) return SORT.dir==='asc' ? -1 : 1;
+      if(av>bv) return SORT.dir==='asc' ? 1 : -1;
+      return 0;
+    });
+    var totalPages = Math.max(1, Math.ceil(arr.length / PER));
+    if(PAGE > totalPages) PAGE = totalPages;
+    var start = (PAGE-1)*PER;
+    var slice = arr.slice(start, start+PER);
+    var html = '<table class="tbl"><thead><tr>'+
+      th('sent_date','التاريخ')+
+      th('teacher_name','المعلمة')+
+      th('group_name','المجموعة')+
+      '<th>المحتوى (مختصر)</th>'+
+      th('whatsapp_status','الحالة')+
+      '<th>تم الإرسال</th>'+
+      '<th>إجراءات</th></tr></thead><tbody>';
+    slice.forEach(function(e){
+      var trunc = (e.content_covered || '').slice(0, 70);
+      if((e.content_covered||'').length > 70) trunc += '...';
+      var cls = (e.whatsapp_status === 'sent') ? 'sent' :
+                (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
+      var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
+                (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
+      html += '<tr>'+
+        '<td data-label="التاريخ">'+escapeHtml(e.sent_date)+'</td>'+
+        '<td data-label="المعلمة">'+escapeHtml(e.teacher_name)+'</td>'+
+        '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
+        '<td data-label="المحتوى">'+escapeHtml(trunc)+'</td>'+
+        '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
+        '<td data-label="تم الإرسال">'+(e.whatsapp_sent_count||0)+'/'+(e.whatsapp_total_count||0)+'</td>'+
+        '<td data-label="إجراءات">'+
+          '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
+          '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+          '<button class="act-btn resend" onclick="doResend('+e.id+')">إعادة إرسال</button>'+
+          '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    renderPag(totalPages);
+  }
+  function th(col, label){
+    var arrow = '';
+    if(SORT.col===col) arrow = SORT.dir==='asc' ? ' ▲' : ' ▼';
+    return '<th onclick="sortBy(\''+col+'\')">'+label+arrow+'</th>';
+  }
+  function renderPag(total){
+    var p = document.getElementById('pagBox');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="goPage(1)" '+(PAGE===1?'disabled':'')+'>«</button>';
+    html += '<button onclick="goPage('+(PAGE-1)+')" '+(PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="goPage('+i+')" class="'+(i===PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="goPage('+(PAGE+1)+')" '+(PAGE===total?'disabled':'')+'>›</button>';
+    html += '<button onclick="goPage('+total+')" '+(PAGE===total?'disabled':'')+'>»</button>';
+    p.innerHTML = html;
+  }
+  window.sortBy = function(col){
+    if(SORT.col===col){ SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc'; }
+    else { SORT.col = col; SORT.dir = 'desc'; }
+    renderTable();
+  };
+  window.goPage = function(p){ PAGE = p; renderTable();
+    window.scrollTo({top:0,behavior:'smooth'}); };
+  window.applyFilters = function(){ loadData(); };
+  window.resetFilters = function(){
+    ['f-from','f-to','f-teacher','f-group','f-search'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    loadData();
+  };
+  window.exportXlsx = function(){
+    var f = getFilters();
+    location.href = '/api/parent-messages/export' + buildQs(f);
+  };
+
+  // ── view modal ──
+  window.openView = function(id){
+    fetch('/api/parent-messages/'+id).then(function(r){return r.json();}).then(function(j){
+      if(!j || !j.ok){ toast((j&&j.error)||'تعذر التحميل', true); return; }
+      var e = j.entry || {};
+      document.getElementById('viewTitle').textContent =
+        'رسالة بتاريخ ' + (e.sent_date||'') + ' لمجموعة ' + (e.group_name||'');
+      var dlv = (e.deliveries||[]).map(function(d){
+        return '<div class="recipient-row"><span class="nm">'+
+                escapeHtml(d.student_name||'')+
+               '</span><span class="ph">'+escapeHtml(d.student_whatsapp||'')+
+               '</span><span class="st">'+escapeHtml((d.sent_at||'').slice(0,16))+
+               '</span></div>';
+      }).join('');
+      document.getElementById('viewBody').innerHTML =
+        '<div style="margin-bottom:12px;"><b>المعلمة:</b> '+escapeHtml(e.teacher_name||'')+'</div>'+
+        '<div style="margin-bottom:14px;"><b>المحتوى:</b><div>'+escapeHtml(e.content_covered||'')+'</div></div>'+
+        '<div style="margin-bottom:14px;"><b>المهارات:</b><div>'+escapeHtml(e.skills_focused||'')+'</div></div>'+
+        '<div style="margin-bottom:14px;"><b>الكتب:</b><div>'+escapeHtml(e.books_used||'')+'</div></div>'+
+        (e.homework ? '<div style="margin-bottom:14px;background:#fff8e1;padding:10px;border-radius:8px;"><b>الواجب:</b><div>'+escapeHtml(e.homework)+'</div></div>' : '')+
+        (e.parent_notes ? '<div style="margin-bottom:14px;"><b>ملاحظات:</b><div>'+escapeHtml(e.parent_notes)+'</div></div>' : '')+
+        '<div style="margin-top:18px;"><b>سجل الإرسال ('+ (e.deliveries||[]).length +'):</b></div>'+
+        '<div>'+(dlv || '<div class="empty">لا يوجد سجل</div>')+'</div>';
+      document.getElementById('viewBack').classList.add('show');
+    });
+  };
+  window.closeView = function(){
+    document.getElementById('viewBack').classList.remove('show');
+  };
+
+  // ── edit modal (admin can edit anything including date + group) ──
+  var _editId = null;
+  window.openEdit = function(id){
+    var e = ALL.find(function(x){return x.id===id;});
+    if(!e){ toast('غير موجود', true); return; }
+    _editId = id;
+    document.getElementById('edate').value     = e.sent_date    || '';
+    document.getElementById('egroup').value    = e.group_name   || '';
+    document.getElementById('econtent').value  = e.content_covered || '';
+    document.getElementById('eskills').value   = e.skills_focused  || '';
+    document.getElementById('ebooks').value    = e.books_used      || '';
+    document.getElementById('ehomework').value = e.homework        || '';
+    document.getElementById('enotes').value    = e.parent_notes    || '';
+    document.getElementById('editBack').classList.add('show');
+  };
+  window.closeEdit = function(){
+    document.getElementById('editBack').classList.remove('show');
+    _editId = null;
+  };
+  window.saveEdit = function(){
+    if(!_editId) return;
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var body = {
+      sent_date:       document.getElementById('edate').value,
+      group_name:      document.getElementById('egroup').value.trim(),
+      content_covered: document.getElementById('econtent').value.trim(),
+      skills_focused:  document.getElementById('eskills').value.trim(),
+      books_used:      document.getElementById('ebooks').value.trim(),
+      homework:        document.getElementById('ehomework').value.trim(),
+      parent_notes:    document.getElementById('enotes').value.trim()
+    };
+    fetch('/api/parent-messages/'+_editId, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        toast('تم الحفظ ✓');
+        closeEdit(); loadData(); loadStats();
+      } else {
+        toast((j && j.error) || 'تعذر التعديل', true);
+      }
+    });
+  };
+  window.deleteFromEdit = function(){
+    if(!_editId) return;
+    if(!confirm('هل ترغبين في حذف هذه الرسالة؟')) return;
+    var id = _editId;
+    fetch('/api/parent-messages/'+id, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeEdit(); loadData(); loadStats();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  // ── delete confirm ──
+  var _delId = null;
+  window.openDel = function(id){
+    _delId = id;
+    document.getElementById('delBack').classList.add('show');
+  };
+  window.closeDel = function(){
+    document.getElementById('delBack').classList.remove('show');
+    _delId = null;
+  };
+  window.confirmDel = function(){
+    if(!_delId) return;
+    fetch('/api/parent-messages/'+_delId, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeDel(); loadData(); loadStats();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  // ── resend ──
+  window.doResend = function(id){
+    if(!confirm('هل ترغبين في إعادة إرسال هذه الرسالة؟ سيتم فتح روابط واتساب لكل ولي أمر.')) return;
+    fetch('/api/parent-messages/'+id+'/resend', {method:'POST'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){ toast((j&&j.error)||'تعذر إعادة الإرسال', true); return; }
+        var ps = {id:id, recipients:j.recipients||[], total:j.total_count||0};
+        document.getElementById('resendBack').classList.add('show');
+        document.getElementById('resendTitle').textContent = 'جاري إعادة الإرسال...';
+        document.getElementById('resendStatus').textContent = '0 من ' + ps.total;
+        document.getElementById('resendCloseBtn').style.display = 'none';
+        var box = document.getElementById('resendList');
+        box.innerHTML = ps.recipients.map(function(r, i){
+          return '<div class="recipient-row" id="rs-'+i+'">'+
+            '<span class="nm">'+escapeHtml(r.student_name)+'</span>'+
+            '<span class="ph">'+escapeHtml(r.whatsapp_raw||'-')+'</span>'+
+            '<span class="st" id="rs-st-'+i+'">قيد الانتظار</span>'+
+          '</div>';
+        }).join('');
+        if(!ps.recipients.length){
+          finishSweep(0, 0, ps.id);
+          return;
+        }
+        var sentCount = 0;
+        var idx = 0;
+        function step(){
+          if(idx >= ps.recipients.length){
+            finishSweep(sentCount, ps.total, ps.id);
+            return;
+          }
+          var r = ps.recipients[idx];
+          var stEl = document.getElementById('rs-st-'+idx);
+          if(!r.whatsapp){
+            if(stEl){ stEl.textContent = 'لا يوجد رقم'; stEl.style.color='#c62828'; }
+            idx++;
+            document.getElementById('resendStatus').textContent = idx + ' من ' + ps.total;
+            setTimeout(step, 250);
+            return;
+          }
+          var url = 'https://wa.me/' + r.whatsapp + '?text=' + encodeURIComponent(r.text);
+          try { window.open(url, '_blank'); } catch(e){}
+          sentCount++;
+          if(stEl){ stEl.textContent = 'تم الفتح'; stEl.style.color='#2E7D32'; }
+          idx++;
+          document.getElementById('resendStatus').textContent = idx + ' من ' + ps.total;
+          setTimeout(step, 600);
+        }
+        step();
+        function finishSweep(sent, total, mid){
+          document.getElementById('resendTitle').textContent = 'انتهت إعادة الإرسال';
+          document.getElementById('resendStatus').textContent =
+            '✅ تم فتح ' + sent + ' من ' + total + ' رسالة';
+          document.getElementById('resendCloseBtn').style.display = 'inline-flex';
+          fetch('/api/parent-messages/' + mid + '/finalize', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({sent_count: sent, total_count: total})
+          }).then(function(){ loadData(); loadStats(); });
+        }
+      });
+  };
+  window.closeResend = function(){
+    document.getElementById('resendBack').classList.remove('show');
+  };
+
+  (function init(){
+    var t = new Date();
+    var p = function(n){return (n<10?'0':'')+n;};
+    var to = t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate());
+    var f30 = new Date(); f30.setDate(f30.getDate()-30);
+    var fr = f30.getFullYear()+'-'+p(f30.getMonth()+1)+'-'+p(f30.getDate());
+    document.getElementById('f-from').value = fr;
+    document.getElementById('f-to').value   = to;
+    loadFilterOpts().then(function(){
+      loadData(); loadStats();
+    });
+  })();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/parent-messages')
+@login_required
+def admin_parent_messages_page():
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return redirect("/dashboard")
+    return ADMIN_PARENT_MESSAGES_HTML
+
+
 @app.route('/api/teacher/groups-diag', methods=['GET'])
 @admin_required
 def api_teacher_groups_diag():
