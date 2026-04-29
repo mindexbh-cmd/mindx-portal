@@ -46221,5 +46221,30 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
 
 
+# ── Phase 1 of the UI redesign: link the design-system stylesheet
+# into every HTML page constant in the module. Purely additive — the
+# file at /static/css/design-system.css only declares :root custom
+# properties, so nothing visually changes until later phases opt in.
+# We scan all globals matching '*_HTML' (instead of an explicit list)
+# so future pages pick the link up automatically; idempotent via a
+# check that the link tag isn't already present. The replace targets
+# the closing </head> tag — the codebase's pages each carry their own
+# <head>...</head>, no Jinja base template exists.
+_DESIGN_SYSTEM_LINK = (
+    '<link rel="stylesheet" href="/static/css/design-system.css">\n</head>'
+)
+for _ds_name in list(globals().keys()):
+    if not _ds_name.endswith('_HTML'):
+        continue
+    _ds_val = globals().get(_ds_name)
+    if not isinstance(_ds_val, str):
+        continue
+    if '</head>' not in _ds_val:
+        continue
+    if '/static/css/design-system.css' in _ds_val:
+        continue
+    globals()[_ds_name] = _ds_val.replace('</head>', _DESIGN_SYSTEM_LINK, 1)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
