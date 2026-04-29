@@ -1,0 +1,97 @@
+/* ==========================================================================
+   Mindex dashboard redesign — design tokens
+   ==========================================================================
+   Phase 1 of the dashboard redesign brief. Pure foundation: declares the
+   CSS custom properties (brand colors, typography, spacing, shadow,
+   radius) that Phases 2-6 will reference via var(--token).
+
+   Scope:
+     • Linked ONLY from HOME_HTML's <head>. Other pages are not affected.
+     • All declarations live inside :root (and one prefers-color-scheme
+       guard for completeness). No element selectors here, so linking
+       this file changes ZERO pixels on the dashboard until later
+       phases opt-in.
+
+   Anchor:
+     The brand keeps the existing app primary purple #7F77DD that has
+     been in use across the dashboard, sidebar gradient, and modals.
+     The redesign brief explicitly preserves this anchor.
+   ========================================================================== */
+
+:root {
+  /* ── Brand palette ─────────────────────────────────────── */
+  --md-brand:               #7F77DD;   /* existing app primary purple */
+  --md-brand-deep:          #6B5FD3;   /* welcome banner deep purple   */
+  --md-brand-soft:          #ECEAFB;   /* light brand tint              */
+  --md-brand-border:        #DDD9F5;   /* subtle brand border           */
+
+  /* ── Surfaces ──────────────────────────────────────────── */
+  --md-bg-page:             #F4F2F8;   /* very light gray-purple page  */
+  --md-bg-card:             #FFFFFF;   /* white card                    */
+  --md-bg-soft:             #F8F7FB;   /* card alt / hover row tint    */
+  --md-bg-muted:            #EEEDF4;   /* divider lane                  */
+
+  /* ── Stats card accent palette (per the brief) ────────── */
+  --md-stat-yellow:         #F4C430;   /* دفعات معلقة — money / gold   */
+  --md-stat-yellow-soft:    #FEF6D8;
+  --md-stat-green:          #22C55E;   /* مهام معلقة — checkmark        */
+  --md-stat-green-soft:     #DCFCE7;
+  --md-stat-red:            #EF4444;   /* غائبون اليوم — clipboard      */
+  --md-stat-red-soft:       #FEE2E2;
+  --md-stat-purple:         #7F77DD;   /* طالب نشط — people / brand    */
+  --md-stat-purple-soft:    #EDEBFB;
+
+  /* ── Status pills (tasks / groups panels in phase 5) ──── */
+  --md-status-pending:      #F59E0B;
+  --md-status-pending-bg:   #FEF3C7;
+  --md-status-active:       #2563EB;
+  --md-status-active-bg:    #DBEAFE;
+  --md-status-done:         #16A34A;
+  --md-status-done-bg:      #DCFCE7;
+  --md-status-mint:         #14B8A6;
+  --md-status-mint-bg:      #CCFBF1;
+
+  /* ── Text ──────────────────────────────────────────────── */
+  --md-text-primary:        #1F2937;   /* near-black                    */
+  --md-text-secondary:      #6B7280;   /* gray                          */
+  --md-text-muted:          #9CA3AF;   /* lighter gray                  */
+  --md-text-on-brand:       #FFFFFF;   /* text over the deep purple    */
+
+  /* ── Typography (keeps existing app Arabic font stack) ── */
+  --md-font-stack:          'Segoe UI', Tahoma, Arial, sans-serif;
+  --md-fz-xs:               12px;
+  --md-fz-sm:               14px;
+  --md-fz-base:             15px;
+  --md-fz-md:               16px;
+  --md-fz-lg:               18px;
+  --md-fz-xl:               22px;
+  --md-fz-2xl:              28px;
+  --md-fz-3xl:              36px;
+  --md-fz-4xl:              48px;
+  --md-fw-medium:           500;
+  --md-fw-semi:             600;
+  --md-fw-bold:             700;
+  --md-fw-black:            800;
+
+  /* ── Spacing ───────────────────────────────────────────── */
+  --md-sp-1:                4px;
+  --md-sp-2:                8px;
+  --md-sp-3:                12px;
+  --md-sp-4:                16px;
+  --md-sp-5:                20px;
+  --md-sp-6:                24px;
+  --md-sp-7:                32px;
+  --md-sp-8:                40px;
+
+  /* ── Radius ────────────────────────────────────────────── */
+  --md-rad-sm:              8px;
+  --md-rad-md:              12px;
+  --md-rad-lg:              16px;
+  --md-rad-pill:            999px;
+
+  /* ── Shadows (soft, matching the reference) ───────────── */
+  --md-shadow-sm:           0 1px 2px  rgba(0, 0, 0, 0.04);
+  --md-shadow-md:           0 2px 8px  rgba(0, 0, 0, 0.05);
+  --md-shadow-lg:           0 8px 24px rgba(0, 0, 0, 0.07);
+  --md-shadow-brand:        0 6px 18px rgba(127, 119, 221, 0.20);
+}
