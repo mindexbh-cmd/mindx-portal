@@ -4469,13 +4469,66 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <div class="dh-topbar">
-  <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
-  <div class="dh-topbar-right">
-    <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
-    <a href="/settings" class="dh-logout mx-admin-only" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
-    <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
+  <!-- RTL right-anchored: user identity + actions. Settings + logout
+       preserved as icon buttons (no functionality removed). -->
+  <div class="md-tb-user">
+    <div class="md-tb-avatar" id="md-tb-avatar" aria-hidden="true">M</div>
+    <div class="md-tb-user-info">
+      <div class="md-tb-user-name">USER_PLACEHOLDER</div>
+      <div class="md-tb-user-role" id="md-tb-user-role">&mdash;</div>
+    </div>
+    <div class="md-tb-user-actions">
+      <a href="/settings" class="md-tb-icon-btn mx-admin-only" title="&#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;" aria-label="&#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;">
+        <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/><circle cx="12" cy="12" r="3"/></svg>
+      </a>
+      <a href="/api/logout" class="md-tb-icon-btn" title="&#x62E;&#x631;&#x648;&#x62C;" aria-label="&#x62E;&#x631;&#x648;&#x62C;">
+        <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Centered motto -->
+  <div class="md-tb-motto">Play &middot; Enjoy &middot; Learn</div>
+
+  <!-- RTL left-anchored: brand identity -->
+  <div class="md-tb-brand">
+    <div class="md-tb-brand-text">
+      <div class="md-tb-brand-name">Mindex Portal</div>
+      <div class="md-tb-brand-sub">EDUCATION &amp; TRAINING CENTRE</div>
+    </div>
+    <div class="md-tb-cap-icon">
+      <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+    </div>
   </div>
 </div>
+<script>
+/* Top header populator — derives the avatar letter and the
+   role label from the existing USER_PLACEHOLDER + window._mxUserRole
+   already set by the inline script just above. */
+(function(){
+  var ROLE_AR = {
+    'admin':     'الإدارة العامة',
+    'manager':   'مدير',
+    'teacher':   'معلمة',
+    'reception': 'استقبال',
+    'staff':     'موظف',
+    'student':   'ولي أمر',
+    'parent':    'ولي أمر'
+  };
+  var avEl   = document.getElementById('md-tb-avatar');
+  var roleEl = document.getElementById('md-tb-user-role');
+  var nameEl = document.querySelector('.md-tb-user-name');
+  if (avEl && nameEl) {
+    var n = (nameEl.textContent || '').trim();
+    var first = n ? n.charAt(0).toUpperCase() : 'M';
+    avEl.textContent = first;
+  }
+  if (roleEl && window._mxUserRole) {
+    var label = ROLE_AR[(window._mxUserRole + '').toLowerCase()] || '—';
+    roleEl.textContent = label;
+  }
+})();
+</script>
 <div class="dh-main">
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
