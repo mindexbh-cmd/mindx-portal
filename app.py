@@ -25932,6 +25932,634 @@ def teacher_lessons_page():
     return TEACHER_LESSONS_HTML.replace("USER_PLACEHOLDER", who)
 
 
+# ── /admin/lessons — admin/manager view of all lesson entries ────────
+# Filters, statistics cards, sortable table, free lesson_date editing
+# with audit_log trail, per-group timeline modal, Excel export, and
+# (wired in commit 5) optional ?filter=missing to surface attendance
+# rows with no logged lesson. Reads /api/lessons/* exclusively.
+ADMIN_LESSONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>متابعة التقدم في الدروس — إدارة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1280px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:14px;padding:18px;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.panel-title{font-weight:900;color:#4a148c;font-size:1.05rem;margin:0 0 12px;}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+@media (max-width:980px){.filters{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.filters{grid-template-columns:1fr;}}
+.filters label{display:block;font-size:.82rem;color:#4a148c;font-weight:700;
+               margin-bottom:4px;}
+.filters input,.filters select{width:100%;padding:8px 10px;border:1.5px solid #d8c8ec;
+                                border-radius:8px;font-family:inherit;font-size:.92rem;
+                                background:#fafafe;}
+.filter-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;
+     border-radius:8px;padding:9px 16px;font-weight:800;font-size:.92rem;
+     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-warn{background:linear-gradient(135deg,#fb8c00,#ef6c00);}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.btn-export{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+@media (max-width:980px){.cards{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.cards{grid-template-columns:1fr;}}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06);
+      border-right:4px solid #6B3FA0;}
+.card h4{margin:0 0 6px;font-size:.82rem;color:#666;font-weight:700;}
+.card .num{font-size:1.7rem;font-weight:900;color:#4a148c;line-height:1.1;}
+.card.warn{border-right-color:#e53935;}
+.card.warn .num{color:#c62828;}
+.stale-list{margin-top:8px;font-size:.82rem;color:#c62828;line-height:1.7;
+            max-height:120px;overflow:auto;}
+.stale-list .pill{display:inline-block;background:#ffebee;color:#c62828;
+                  padding:3px 8px;border-radius:6px;margin:2px;font-weight:700;
+                  cursor:pointer;border:1px solid #ffcdd2;}
+.stale-list .pill:hover{background:#ffcdd2;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.9rem;}
+table.tbl th{background:#f3e5f5;color:#4a148c;padding:10px 8px;text-align:right;
+             font-weight:800;cursor:pointer;user-select:none;}
+table.tbl th:hover{background:#e1bee7;}
+table.tbl td{padding:8px;border-bottom:1px solid #f0e6f8;vertical-align:top;}
+table.tbl tr:hover td{background:#faf5ff;}
+.act-btn{padding:5px 10px;border-radius:7px;border:none;cursor:pointer;
+         font-size:.8rem;font-weight:700;font-family:inherit;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:4px;}
+.act-btn.tl{background:#fff8e1;color:#f57c00;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.pagination{display:flex;gap:6px;justify-content:center;align-items:center;
+            margin-top:14px;flex-wrap:wrap;}
+.pagination button{padding:6px 11px;border-radius:7px;border:1.5px solid #d8c8ec;
+                   background:#fff;cursor:pointer;font-weight:700;color:#4a148c;
+                   font-family:inherit;}
+.pagination button.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.pagination button:disabled{opacity:.4;cursor:not-allowed;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:600px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal.lg{max-width:780px;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-weight:700;color:#4a148c;font-size:.86rem;
+             margin-bottom:4px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:9px 12px;border:1.6px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.95rem;background:#fafafe;}
+.field input[disabled]{background:#eee;color:#666;}
+.field textarea{resize:vertical;min-height:60px;}
+.warn-bar{background:#fff8e1;border:1.5px solid #ffe082;border-radius:8px;
+          padding:10px 12px;color:#e65100;font-weight:700;font-size:.86rem;
+          margin-bottom:10px;display:none;}
+.warn-bar.show{display:block;}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.tl-list{max-height:60vh;overflow:auto;border:1px solid #ede0f5;border-radius:10px;}
+.tl-row{padding:10px 14px;border-bottom:1px solid #f0e6f8;}
+.tl-row:last-child{border-bottom:none;}
+.tl-row .d{color:#6B3FA0;font-weight:900;font-size:.92rem;}
+.tl-row .t{color:#212121;margin-top:4px;}
+.tl-row .c{color:#666;font-size:.86rem;margin-top:2px;}
+.tl-row .by{color:#888;font-size:.78rem;margin-top:4px;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+@media (max-width:680px){
+  table.tbl{font-size:.82rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #ede0f5;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#4a148c;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 إدارة متابعة التقدم في الدروس</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel" id="panel-filters">
+    <h3 class="panel-title">المرشحات</h3>
+    <div class="filters">
+      <div>
+        <label>من تاريخ</label>
+        <input type="date" id="f-from">
+      </div>
+      <div>
+        <label>إلى تاريخ</label>
+        <input type="date" id="f-to">
+      </div>
+      <div>
+        <label>المعلمة</label>
+        <select id="f-teacher"><option value="">— الكل —</option></select>
+      </div>
+      <div>
+        <label>المجموعة</label>
+        <select id="f-group"><option value="">— الكل —</option></select>
+      </div>
+      <div>
+        <label>بحث (الدرس / الملاحظات)</label>
+        <input type="text" id="f-search" placeholder="نص للبحث...">
+      </div>
+    </div>
+    <div class="filter-acts">
+      <button class="btn" onclick="applyFilters()">🔍 تطبيق</button>
+      <button class="btn btn-ghost" onclick="resetFilters()">↺ مسح</button>
+      <button class="btn btn-export" onclick="exportXlsx()">📊 تصدير إلى Excel</button>
+    </div>
+  </div>
+
+  <div class="cards" id="statsCards">
+    <div class="card"><h4>هذا الأسبوع</h4><div class="num" id="s-week">—</div></div>
+    <div class="card"><h4>هذا الشهر</h4><div class="num" id="s-month">—</div></div>
+    <div class="card"><h4>المعلمات النشطات</h4><div class="num" id="s-teach">—</div></div>
+    <div class="card"><h4>المجموعات النشطة</h4><div class="num" id="s-grp">—</div></div>
+  </div>
+
+  <div class="panel">
+    <h3 class="panel-title">مجموعات بدون درس مسجَّل خلال 7 أيام</h3>
+    <div class="stale-list" id="staleList">
+      <div class="empty">— جارٍ التحميل —</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3 class="panel-title" id="tableTitle">سجل الدروس</h3>
+    <div id="tableBox">
+      <div class="empty">جاري التحميل...</div>
+    </div>
+    <div class="pagination" id="pagBox"></div>
+  </div>
+
+</div>
+
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeEdit()">
+  <div class="modal">
+    <h3>تعديل إدخال درس</h3>
+    <div class="warn-bar" id="dateWarn"></div>
+    <div class="field">
+      <label>تاريخ تسليم الدرس</label>
+      <input type="date" id="edate">
+    </div>
+    <div class="field">
+      <label>المجموعة</label>
+      <input type="text" id="egroup">
+    </div>
+    <div class="field">
+      <label>الدرس الذي تم</label>
+      <input type="text" id="etopic" maxlength="500">
+    </div>
+    <div class="field">
+      <label>إلى أين وصلت في المنهج</label>
+      <input type="text" id="ecurr" maxlength="500">
+    </div>
+    <div class="field">
+      <label>ملاحظات</label>
+      <textarea id="enotes" rows="3" maxlength="2000"></textarea>
+    </div>
+    <div class="field" id="reasonWrap" style="display:none;">
+      <label>سبب التعديل (اختياري — يُحفظ في سجل التدقيق)</label>
+      <input type="text" id="ereason" maxlength="300"
+             placeholder="مثال: تصحيح خطأ في التاريخ">
+    </div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">إلغاء</button>
+      <button class="btn btn-danger" onclick="deleteFromEdit()">حذف</button>
+      <button class="btn" id="saveEditBtn" onclick="saveEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="tlBack" onclick="if(event.target===this)closeTl()">
+  <div class="modal lg">
+    <h3 id="tlTitle">تسلسل دروس المجموعة</h3>
+    <div class="tl-list" id="tlList">
+      <div class="empty">جاري التحميل...</div>
+    </div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeTl()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذا الإدخال؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDel()">إلغاء</button>
+      <button class="btn btn-danger" id="confirmDelBtn" onclick="confirmDel()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var ALL = []; // current filtered entries
+  var PAGE = 1; var PER = 20;
+  var SORT = {col:'lesson_date', dir:'desc'};
+  var GROUPS = []; var TEACHERS = [];
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2500);
+  }
+  function qs(name){
+    var m = (location.search || '').match(new RegExp('[?&]'+name+'=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g,' ')) : '';
+  }
+
+  function loadFilterOpts(){
+    return Promise.all([
+      fetch('/api/lessons/teachers').then(function(r){return r.json();}),
+      fetch('/api/teacher/groups').then(function(r){return r.json();}).catch(function(){return null;}),
+    ]).then(function(arr){
+      var tr = arr[0] || {}; var gr = arr[1] || {};
+      TEACHERS = tr.teachers || [];
+      var ts = document.getElementById('f-teacher');
+      ts.innerHTML = '<option value="">— الكل —</option>';
+      TEACHERS.forEach(function(t){
+        var o = document.createElement('option');
+        o.value = t.id; o.textContent = t.name || ('#'+t.id);
+        ts.appendChild(o);
+      });
+      // Groups: pull from /api/teacher/groups (admin sees all because
+      // _teacher_mode_filtered_groups returns all groups for non-teacher
+      // roles in practice — fallback below pulls them from the lesson
+      // entries themselves if that endpoint returns nothing).
+      GROUPS = (gr.groups || []).map(function(g){return g.name;});
+    });
+  }
+
+  function buildGroupFilter(entries){
+    var gs = document.getElementById('f-group');
+    var prev = gs.value;
+    var seen = {};
+    var src = GROUPS.slice();
+    (entries || []).forEach(function(e){ if(e.group_name) src.push(e.group_name); });
+    src.sort();
+    gs.innerHTML = '<option value="">— الكل —</option>';
+    src.forEach(function(g){
+      if(!g || seen[g]) return;
+      seen[g] = 1;
+      var o = document.createElement('option');
+      o.value = g; o.textContent = g;
+      gs.appendChild(o);
+    });
+    gs.value = prev || '';
+  }
+
+  function getFilters(){
+    return {
+      date_from: document.getElementById('f-from').value,
+      date_to:   document.getElementById('f-to').value,
+      teacher_id: document.getElementById('f-teacher').value,
+      group_name: document.getElementById('f-group').value,
+      search:    document.getElementById('f-search').value
+    };
+  }
+  function buildQs(f){
+    var p = [];
+    Object.keys(f).forEach(function(k){
+      if(f[k]) p.push(encodeURIComponent(k)+'='+encodeURIComponent(f[k]));
+    });
+    return p.length ? ('?' + p.join('&')) : '';
+  }
+
+  function loadData(){
+    var f = getFilters();
+    var box = document.getElementById('tableBox');
+    box.innerHTML = '<div class="empty">جاري التحميل...</div>';
+    fetch('/api/lessons/log' + buildQs(f))
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){
+          box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+          return;
+        }
+        ALL = j.entries || [];
+        buildGroupFilter(ALL);
+        PAGE = 1;
+        renderTable();
+      });
+  }
+  function loadStats(){
+    fetch('/api/lessons/stats')
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return;
+        document.getElementById('s-week').textContent  = j.this_week || 0;
+        document.getElementById('s-month').textContent = j.this_month || 0;
+        document.getElementById('s-teach').textContent = j.active_teachers || 0;
+        document.getElementById('s-grp').textContent   = j.active_groups || 0;
+        var stale = j.stale_groups || [];
+        var sl = document.getElementById('staleList');
+        if(!stale.length){
+          sl.innerHTML = '<div style="color:#43a047;">جميع المجموعات النشطة لها دروس مسجَّلة خلال آخر 7 أيام ✓</div>';
+        } else {
+          sl.innerHTML = stale.map(function(g){
+            var d = (g.days_since_last == null) ? '∞' : g.days_since_last;
+            return '<span class="pill" onclick="openTl('+
+                   '\''+escapeHtml(g.group_name).replace(/\'/g,"\\'")+'\''+
+                   ')">'+ escapeHtml(g.group_name) +
+                   ' — '+ (g.days_since_last==null ? 'لم يُسجَّل أبداً' : (d+' يوم'))+
+                   '</span>';
+          }).join('');
+        }
+      });
+  }
+  function renderTable(){
+    var box = document.getElementById('tableBox');
+    if(!ALL.length){
+      box.innerHTML = '<div class="empty">لا توجد إدخالات بالشروط المحددة</div>';
+      document.getElementById('pagBox').innerHTML = '';
+      return;
+    }
+    var arr = ALL.slice();
+    arr.sort(function(a,b){
+      var av = a[SORT.col] || ''; var bv = b[SORT.col] || '';
+      if(av<bv) return SORT.dir==='asc' ? -1 : 1;
+      if(av>bv) return SORT.dir==='asc' ? 1 : -1;
+      return 0;
+    });
+    var totalPages = Math.max(1, Math.ceil(arr.length / PER));
+    if(PAGE > totalPages) PAGE = totalPages;
+    var start = (PAGE-1)*PER;
+    var slice = arr.slice(start, start+PER);
+    var html = '<table class="tbl"><thead><tr>'+
+      th('lesson_date','التاريخ')+
+      th('teacher_name','المعلمة')+
+      th('group_name','المجموعة')+
+      th('lesson_topic','الدرس')+
+      th('curriculum_progress','إلى أين وصلت')+
+      th('notes','ملاحظات')+
+      th('created_at','تاريخ الإدخال')+
+      '<th>إجراءات</th></tr></thead><tbody>';
+    slice.forEach(function(e){
+      var grp = escapeHtml(e.group_name);
+      html += '<tr>'+
+        '<td data-label="التاريخ">'+escapeHtml(e.lesson_date)+'</td>'+
+        '<td data-label="المعلمة">'+escapeHtml(e.teacher_name)+'</td>'+
+        '<td data-label="المجموعة"><a href="javascript:void(0)" onclick="openTl(\''+grp.replace(/\'/g,"\\'")+'\')" style="color:#6B3FA0;font-weight:700;">'+grp+'</a></td>'+
+        '<td data-label="الدرس">'+escapeHtml(e.lesson_topic)+'</td>'+
+        '<td data-label="إلى أين وصلت">'+escapeHtml(e.curriculum_progress)+'</td>'+
+        '<td data-label="ملاحظات">'+escapeHtml(e.notes)+'</td>'+
+        '<td data-label="تاريخ الإدخال">'+escapeHtml((e.created_at||'').slice(0,16))+'</td>'+
+        '<td data-label="إجراءات">'+
+          '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+          '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    renderPag(totalPages);
+  }
+  function th(col, label){
+    var arrow = '';
+    if(SORT.col===col) arrow = SORT.dir==='asc' ? ' ▲' : ' ▼';
+    return '<th onclick="sortBy(\''+col+'\')">'+label+arrow+'</th>';
+  }
+  function renderPag(total){
+    var p = document.getElementById('pagBox');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="goPage(1)" '+(PAGE===1?'disabled':'')+'>«</button>';
+    html += '<button onclick="goPage('+(PAGE-1)+')" '+(PAGE===1?'disabled':'')+'>‹</button>';
+    var start = Math.max(1, PAGE-2);
+    var end = Math.min(total, start+4);
+    if(end-start < 4) start = Math.max(1, end-4);
+    for(var i=start;i<=end;i++){
+      html += '<button onclick="goPage('+i+')" class="'+(i===PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="goPage('+(PAGE+1)+')" '+(PAGE===total?'disabled':'')+'>›</button>';
+    html += '<button onclick="goPage('+total+')" '+(PAGE===total?'disabled':'')+'>»</button>';
+    p.innerHTML = html;
+  }
+  window.sortBy = function(col){
+    if(SORT.col===col){ SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc'; }
+    else { SORT.col = col; SORT.dir = 'desc'; }
+    renderTable();
+  };
+  window.goPage = function(p){ PAGE = p; renderTable(); window.scrollTo({top:0,behavior:'smooth'}); };
+  window.applyFilters = function(){ loadData(); };
+  window.resetFilters = function(){
+    ['f-from','f-to','f-teacher','f-group','f-search'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    loadData();
+  };
+  window.exportXlsx = function(){
+    var f = getFilters();
+    location.href = '/api/lessons/export' + buildQs(f);
+  };
+
+  // ── edit modal ──
+  var _editOriginal = null;
+  window.openEdit = function(id){
+    var e = ALL.find(function(x){return x.id===id;});
+    if(!e){ toast('غير موجود', true); return; }
+    _editOriginal = e;
+    document.getElementById('edate').value  = e.lesson_date || '';
+    document.getElementById('egroup').value = e.group_name  || '';
+    document.getElementById('etopic').value = e.lesson_topic|| '';
+    document.getElementById('ecurr').value  = e.curriculum_progress || '';
+    document.getElementById('enotes').value = e.notes || '';
+    document.getElementById('ereason').value = '';
+    document.getElementById('reasonWrap').style.display = 'none';
+    document.getElementById('dateWarn').classList.remove('show');
+    document.getElementById('editBack').classList.add('show');
+  };
+  document.addEventListener('change', function(ev){
+    if(ev.target && ev.target.id === 'edate' && _editOriginal){
+      var nv = ev.target.value;
+      if(nv && nv !== (_editOriginal.lesson_date || '')){
+        document.getElementById('dateWarn').textContent =
+          '⚠ سيتم تعديل تاريخ تسليم الدرس من ' +
+          (_editOriginal.lesson_date || '—') + ' إلى ' + nv;
+        document.getElementById('dateWarn').classList.add('show');
+        document.getElementById('reasonWrap').style.display = 'block';
+      } else {
+        document.getElementById('dateWarn').classList.remove('show');
+        document.getElementById('reasonWrap').style.display = 'none';
+      }
+    }
+  });
+  window.closeEdit = function(){
+    document.getElementById('editBack').classList.remove('show');
+    _editOriginal = null;
+  };
+  window.saveEdit = function(){
+    if(!_editOriginal) return;
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var body = {
+      lesson_topic: document.getElementById('etopic').value.trim(),
+      curriculum_progress: document.getElementById('ecurr').value.trim(),
+      notes: document.getElementById('enotes').value.trim(),
+      lesson_date: document.getElementById('edate').value,
+      group_name: document.getElementById('egroup').value.trim(),
+      reason: document.getElementById('ereason').value.trim()
+    };
+    fetch('/api/lessons/log/' + _editOriginal.id, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        toast('تم الحفظ ✓');
+        closeEdit();
+        loadData(); loadStats();
+      } else {
+        toast((j && j.error) || 'تعذر التعديل', true);
+      }
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      toast('تعذر التعديل', true);
+    });
+  };
+  window.deleteFromEdit = function(){
+    if(_editOriginal && confirm('هل ترغبين في حذف هذا الإدخال؟')){
+      var id = _editOriginal.id;
+      fetch('/api/lessons/log/' + id, {method:'DELETE'})
+        .then(function(r){return r.json();}).then(function(j){
+          if(j && j.ok){
+            toast('تم الحذف ✓');
+            closeEdit();
+            loadData(); loadStats();
+          } else {
+            toast((j && j.error) || 'تعذر الحذف', true);
+          }
+        });
+    }
+  };
+
+  // ── delete confirm (from table row) ──
+  var _delId = null;
+  window.openDel = function(id){
+    _delId = id;
+    document.getElementById('delBack').classList.add('show');
+  };
+  window.closeDel = function(){
+    document.getElementById('delBack').classList.remove('show');
+    _delId = null;
+  };
+  window.confirmDel = function(){
+    if(!_delId) return;
+    fetch('/api/lessons/log/' + _delId, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeDel();
+          loadData(); loadStats();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  // ── timeline modal ──
+  window.openTl = function(grp){
+    document.getElementById('tlTitle').textContent =
+      'تسلسل دروس المجموعة: ' + grp;
+    var box = document.getElementById('tlList');
+    box.innerHTML = '<div class="empty">جاري التحميل...</div>';
+    document.getElementById('tlBack').classList.add('show');
+    fetch('/api/lessons/log?group_name=' + encodeURIComponent(grp) + '&limit=500')
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+        var entries = (j.entries || []).slice().sort(function(a,b){
+          if(a.lesson_date < b.lesson_date) return -1;
+          if(a.lesson_date > b.lesson_date) return 1;
+          return 0;
+        });
+        if(!entries.length){
+          box.innerHTML = '<div class="empty">لا توجد دروس مسجَّلة لهذه المجموعة</div>';
+          return;
+        }
+        box.innerHTML = entries.map(function(e){
+          return '<div class="tl-row">'+
+            '<div class="d">'+escapeHtml(e.lesson_date)+'</div>'+
+            '<div class="t">'+escapeHtml(e.lesson_topic)+'</div>'+
+            '<div class="c">'+escapeHtml(e.curriculum_progress)+'</div>'+
+            '<div class="by">'+escapeHtml(e.teacher_name)+
+            (e.notes ? ' — ' + escapeHtml(e.notes) : '') + '</div>'+
+          '</div>';
+        }).join('');
+      });
+  };
+  window.closeTl = function(){
+    document.getElementById('tlBack').classList.remove('show');
+  };
+
+  // Pre-fill date range (last 30 days) and read URL filter param.
+  (function init(){
+    var t = new Date();
+    var p = function(n){return (n<10?'0':'')+n;};
+    var to = t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate());
+    var f30 = new Date(); f30.setDate(f30.getDate()-30);
+    var fr = f30.getFullYear()+'-'+p(f30.getMonth()+1)+'-'+p(f30.getDate());
+    document.getElementById('f-from').value = fr;
+    document.getElementById('f-to').value   = to;
+    var preGroup = qs('group');
+    var preFrom  = qs('from');
+    var preTo    = qs('to');
+    if(preGroup) document.getElementById('f-group').value = preGroup;
+    if(preFrom)  document.getElementById('f-from').value  = preFrom;
+    if(preTo)    document.getElementById('f-to').value    = preTo;
+    loadFilterOpts().then(function(){
+      if(preGroup){
+        // Make sure selection holds even if dropdown wasn't populated yet.
+        document.getElementById('f-group').value = preGroup;
+      }
+      loadData(); loadStats();
+    });
+  })();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/lessons')
+@login_required
+def admin_lessons_page():
+    user = session.get("user") or {}
+    if not _lessons_can_admin(user):
+        return redirect("/dashboard")
+    return ADMIN_LESSONS_HTML
+
+
 @app.route('/api/teacher/groups-diag', methods=['GET'])
 @admin_required
 def api_teacher_groups_diag():
@@ -38562,6 +39190,134 @@ def api_lessons_missing():
     missing.sort(key=lambda x: (x["attendance_date"], x["group_name"]),
                  reverse=True)
     return jsonify({"ok": True, "missing": missing, "count": len(missing)})
+
+
+@app.route('/api/lessons/teachers', methods=['GET'])
+@login_required
+def api_lessons_teachers():
+    """List of distinct teachers for the admin dropdown. Pulled from
+    both lessons_log (anyone who has logged at least one lesson) and
+    users WHERE role='teacher' (so a teacher with no entries yet can
+    still be filtered to confirm a zero-count). Admin/manager only —
+    teachers don't see this dropdown."""
+    user = session.get("user") or {}
+    if not _lessons_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    by_id = {}
+    try:
+        for r in db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE role='teacher' AND COALESCE(is_active,1)<>0 "
+            "ORDER BY name"
+        ).fetchall():
+            tid = int(dict(r).get("id") or 0)
+            if tid:
+                by_id[tid] = {
+                    "id": tid,
+                    "name": (dict(r).get("name") or "").strip()
+                            or (dict(r).get("username") or "").strip(),
+                }
+    except Exception: pass
+    try:
+        for r in db.execute(
+            "SELECT DISTINCT teacher_id, COALESCE(teacher_name,'') AS tn "
+            "FROM lessons_log WHERE teacher_id IS NOT NULL"
+        ).fetchall():
+            tid = int(dict(r).get("teacher_id") or 0)
+            if tid and tid not in by_id:
+                by_id[tid] = {"id": tid,
+                              "name": (dict(r).get("tn") or "").strip()}
+    except Exception: pass
+    out = sorted(by_id.values(), key=lambda x: (x["name"] or "", x["id"]))
+    return jsonify({"ok": True, "teachers": out})
+
+
+@app.route('/api/lessons/export', methods=['GET'])
+@login_required
+def api_lessons_export():
+    """Excel export of the filtered lesson list. Admin/manager only.
+    Honours the same filter params as GET /api/lessons/log."""
+    user = session.get("user") or {}
+    if not _lessons_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+    except Exception:
+        return jsonify({"ok": False, "error":
+            "openpyxl غير مثبّت — أضيفي openpyxl إلى requirements.txt"}), 500
+    db = get_db()
+    where = ["is_deleted=0"]; params = []
+    q_group   = (request.args.get("group_name") or "").strip()
+    q_teacher = (request.args.get("teacher_id") or "").strip()
+    q_from    = (request.args.get("date_from")  or "").strip()
+    q_to      = (request.args.get("date_to")    or "").strip()
+    q_search  = (request.args.get("search")     or "").strip()
+    if q_group:
+        where.append("group_name=?"); params.append(q_group)
+    if q_teacher:
+        try:
+            where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("lesson_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("lesson_date<=?"); params.append(d)
+    if q_search:
+        where.append("(lesson_topic LIKE ? OR notes LIKE ? OR curriculum_progress LIKE ?)")
+        like = "%" + q_search + "%"
+        params.extend([like, like, like])
+    sql = ("SELECT lesson_date, teacher_name, group_name, lesson_topic, "
+           "curriculum_progress, notes, created_at FROM lessons_log "
+           "WHERE " + " AND ".join(where) +
+           " ORDER BY lesson_date DESC, id DESC")
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    wb = Workbook()
+    ws = wb.active
+    try: ws.sheet_view.rightToLeft = True
+    except Exception: pass
+    ws.title = "سجل الدروس"
+    headers = ["التاريخ", "المعلمة", "المجموعة", "الدرس",
+               "إلى أين وصلت", "ملاحظات", "تاريخ الإدخال"]
+    HF = PatternFill("solid", fgColor="6B3FA0")
+    HFONT = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+    BFONT = Font(name="Arial", size=10)
+    A_RTL = Alignment(horizontal="right", vertical="center", wrap_text=True,
+                      readingOrder=2)
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.fill = HF; c.font = HFONT; c.alignment = A_RTL
+    for ridx, r in enumerate(rows, start=2):
+        d = dict(r)
+        vals = [d.get("lesson_date") or "",
+                d.get("teacher_name") or "",
+                d.get("group_name") or "",
+                d.get("lesson_topic") or "",
+                d.get("curriculum_progress") or "",
+                d.get("notes") or "",
+                d.get("created_at") or ""]
+        for cidx, v in enumerate(vals, start=1):
+            cc = ws.cell(row=ridx, column=cidx, value=v)
+            cc.font = BFONT; cc.alignment = A_RTL
+    widths = [12, 22, 22, 36, 28, 28, 18]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.row_dimensions[1].height = 24
+    import io as _io_x
+    buf = _io_x.BytesIO()
+    wb.save(buf); buf.seek(0)
+    from flask import send_file as _send
+    return _send(buf, as_attachment=True,
+                 download_name="lessons_log.xlsx",
+                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
