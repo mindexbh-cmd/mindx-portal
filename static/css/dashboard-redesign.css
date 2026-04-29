@@ -520,3 +520,158 @@
 .md-pill-active  { background: var(--md-status-active-bg);  color: var(--md-status-active); }
 .md-pill-done    { background: var(--md-status-done-bg);    color: var(--md-status-done); }
 .md-pill-mint    { background: var(--md-status-mint-bg);    color: var(--md-status-mint); }
+
+/* ==========================================================================
+   Phase 6 — Right sidebar navigation (RTL right-anchored)
+   ========================================================================== */
+.md-sidebar {
+  position: fixed;
+  top: 72px;
+  inset-inline-end: 0;          /* visually right edge in RTL */
+  bottom: 0;
+  width: 240px;
+  background: var(--md-bg-card);
+  border-inline-start: 1px solid var(--md-bg-muted);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--md-font-stack);
+  transition: transform 0.25s ease;
+}
+.md-sidebar-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--md-sp-3) 0;
+  scrollbar-width: thin;
+}
+.md-sidebar-group { padding: var(--md-sp-2) 0; }
+.md-sidebar-group-label {
+  padding: var(--md-sp-2) var(--md-sp-5) var(--md-sp-1);
+  font-size: var(--md-fz-xs);
+  color: var(--md-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: var(--md-fw-medium);
+}
+.md-sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md-sp-3);
+  padding: var(--md-sp-3) var(--md-sp-5);
+  color: var(--md-text-primary);
+  text-decoration: none;
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-medium);
+  border-inline-end: 3px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  cursor: pointer;
+}
+.md-sidebar-link:hover {
+  background: var(--md-brand-soft);
+  color: var(--md-brand-deep);
+}
+.md-sidebar-link.active {
+  background: var(--md-brand-soft);
+  color: var(--md-brand-deep);
+  font-weight: var(--md-fw-bold);
+  border-inline-end-color: var(--md-brand);
+}
+.md-sidebar-link-text { line-height: 1.4; }
+.md-sidebar-link-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--md-brand);
+  flex-shrink: 0;
+}
+
+.md-sidebar-foot {
+  flex-shrink: 0;
+  padding: var(--md-sp-4) var(--md-sp-5);
+  border-top: 1px solid var(--md-bg-muted);
+  background: var(--md-bg-soft);
+}
+.md-sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--md-sp-2);
+  width: 100%;
+  padding: var(--md-sp-3);
+  background: var(--md-stat-red-soft);
+  color: var(--md-stat-red);
+  border: 1px solid transparent;
+  border-radius: var(--md-rad-sm);
+  text-decoration: none;
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-bold);
+  font-family: inherit;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.md-sidebar-logout:hover {
+  background: var(--md-stat-red);
+  color: #fff;
+}
+.md-sidebar-logout .md-i { width: 16px; height: 16px; }
+
+/* Desktop content shift */
+@media (min-width: 1024px) {
+  body.md-sb-on .dh-main {
+    padding-inline-end: 240px;
+  }
+}
+
+/* Mobile drawer */
+@media (max-width: 1023px) {
+  .md-sidebar {
+    top: 0;
+    transform: translateX(100%);   /* off-screen on the side it lives on */
+    z-index: 1102;
+  }
+  .md-sidebar.open {
+    transform: translateX(0);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+  }
+  .md-sidebar-trigger {
+    display: inline-flex !important;
+  }
+}
+html[dir="rtl"] .md-sidebar { transform: translateX(100%); }
+html[dir="rtl"] .md-sidebar.open { transform: translateX(0); }
+
+/* Hamburger trigger — fixed-position floating button (mobile only) */
+.md-sidebar-trigger {
+  display: none;
+  position: fixed;
+  top: 18px;
+  inset-inline-end: 18px;
+  z-index: 1103;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-rad-sm);
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  color: #fff;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.md-sidebar-trigger .md-i { width: 20px; height: 20px; }
+.md-sidebar-trigger:hover { background: rgba(255, 255, 255, 0.28); }
+
+.md-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1101;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.md-sidebar-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}

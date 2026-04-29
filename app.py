@@ -4529,6 +4529,72 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
   }
 })();
 </script>
+<!-- Right sidebar (Phase 6) — sits between dh-topbar and dh-main in DOM.
+     Maps to existing routes only. Role visibility mirrored via the same
+     mx-admin-only / mx-staff-only classes used elsewhere. -->
+<button type="button" class="md-sidebar-trigger" id="md-sidebar-trigger" aria-label="&#x641;&#x62A;&#x62D; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629;" aria-controls="md-sidebar">
+  <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+<div class="md-sidebar-backdrop" id="md-sidebar-backdrop" aria-hidden="true"></div>
+<aside class="md-sidebar" id="md-sidebar" role="navigation" aria-label="&#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x627;&#x644;&#x62C;&#x627;&#x646;&#x628;&#x64A;&#x629;">
+  <nav class="md-sidebar-nav">
+    <div class="md-sidebar-group">
+      <div class="md-sidebar-group-label">&#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</div>
+      <a class="md-sidebar-link active" href="/dashboard">
+        <span class="md-sidebar-link-text">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x62A;&#x62D;&#x643;&#x645;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+      </a>
+      <a class="md-sidebar-link mx-admin-only" href="/database">
+        <span class="md-sidebar-link-text">&#x627;&#x644;&#x637;&#x644;&#x627;&#x628;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </a>
+      <a class="md-sidebar-link" href="/attendance">
+        <span class="md-sidebar-link-text">&#x627;&#x644;&#x62D;&#x636;&#x648;&#x631; &#x648;&#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
+      </a>
+      <a class="md-sidebar-link mx-admin-only" href="/admin/receipts">
+        <span class="md-sidebar-link-text">&#x627;&#x644;&#x645;&#x627;&#x644;&#x64A;&#x629; &#x648;&#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </a>
+    </div>
+    <div class="md-sidebar-group">
+      <div class="md-sidebar-group-label">&#x627;&#x644;&#x625;&#x062F;&#x0627;&#x0631;&#x0629;</div>
+      <a class="md-sidebar-link mx-staff-only" href="/admin/lessons">
+        <span class="md-sidebar-link-text">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </a>
+      <a class="md-sidebar-link mx-staff-only" href="/admin/evaluations">
+        <span class="md-sidebar-link-text">&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A;</span>
+        <svg class="md-sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </a>
+    </div>
+  </nav>
+  <div class="md-sidebar-foot">
+    <a class="md-sidebar-logout" href="/api/logout">
+      <svg class="md-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x62E;&#x631;&#x648;&#x62C;</span>
+    </a>
+  </div>
+</aside>
+<script>
+/* Right sidebar — Phase 6. Adds md-sb-on to <body> so the desktop
+   layout shift activates, wires the hamburger / backdrop / Escape
+   for the mobile drawer. The .active class is pre-applied to لوحة
+   التحكم since the sidebar only appears on the dashboard. */
+(function(){
+  document.body.classList.add('md-sb-on');
+  var sb = document.getElementById('md-sidebar');
+  var bd = document.getElementById('md-sidebar-backdrop');
+  var hb = document.getElementById('md-sidebar-trigger');
+  function open(){ if(sb) sb.classList.add('open'); if(bd) bd.classList.add('open'); }
+  function close(){ if(sb) sb.classList.remove('open'); if(bd) bd.classList.remove('open'); }
+  if (hb) hb.addEventListener('click', open);
+  if (bd) bd.addEventListener('click', close);
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape') close();
+  });
+})();
+</script>
 <div class="dh-main">
   <!-- Welcome banner (Phase 3): deep purple gradient hero with the user's
        first name (extracted from the topbar's name element via JS) and
