@@ -3726,6 +3726,52 @@ def login_required(f):
     return dec
 
 
+# Cache-Control hardening for authenticated views. Without this header
+# the browser's BFCache (back/forward navigation) can re-show a fully-
+# rendered protected page after the user has clicked logout — the
+# server has cleared the session, but the cached HTML is still in the
+# tab. no-store also blocks intermediate caches.
+#
+# Applied via an after_request hook so we don't have to retrofit every
+# handler. Static assets (CSS/JS/images) and the public login pages
+# stay cacheable. Anything under the listed prefixes is treated as
+# protected. JSON API responses already get the no-store treatment
+# implicitly because clients don't cache JSON, but adding the header
+# makes the contract explicit.
+_PROTECTED_PATH_PREFIXES = (
+    "/dashboard",
+    "/database",
+    "/attendance",
+    "/groups",
+    "/settings",
+    "/admin/",
+    "/teacher/",
+    "/portal/",
+    "/api/",
+    "/points/",
+)
+def _is_protected_path(p):
+    if not p:
+        return False
+    for px in _PROTECTED_PATH_PREFIXES:
+        if p.startswith(px):
+            return True
+    return False
+
+@app.after_request
+def _no_store_on_protected(resp):
+    try:
+        p = (request.path or "")
+        if _is_protected_path(p):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+    except Exception:
+        # Never let header injection break the response.
+        pass
+    return resp
+
+
 # Admin-only gate. Wraps `login_required` so we always have an
 # authenticated user, then enforces role == "admin" — anything else
 # (manager, teacher, reception, student, parent, ...) is rejected with
@@ -15950,24 +15996,28 @@ def api_me():
     })
 
 
-# SECURITY MARKER (logout-security-fix-20260429):
-# A teacher (personal_id 960302557, أ. کوثر شعبان) reported seeing the
-# full admin dashboard. Root cause: this handler only enforces
-# @login_required — no role check — so any authenticated user receives
-# HOME_HTML in full. The page uses mx-admin-only / mx-staff-only CSS
-# classes for client-side hiding, but that markup is still shipped to
-# the browser. Combined with the post-login landing_page='dashboard'
-# override (line ~15915) and the lack of Cache-Control: no-store
-# headers on protected pages, a teacher could land here on login and
-# see admin content even after clicking logout (browser cache).
-# The fix in the next commit role-gates this route server-side and
-# adds no-store headers to every protected page response.
 @app.route("/dashboard")
 @login_required
 def dashboard():
     user = session.get("user") or {}
     username = user.get("username") or user.get("name") or ""
     role = (user.get("role") or "").strip().lower()
+    # Server-side role gate. The HOME_HTML body uses mx-admin-only /
+    # mx-staff-only CSS classes for client-side hiding, but those
+    # protect display only — the markup is still in the response. So
+    # teacher / student / parent roles must NEVER receive this body,
+    # regardless of how they ended up at this URL (manual URL bar,
+    # landing_page='dashboard' on their user row, broken nav link).
+    # Admin / manager / reception keep the existing dashboard view —
+    # reception is a staff role that needs the ops surface; the
+    # DH_CTRL_DISP_PLACEHOLDER substitution below already hides
+    # admin-only controls for them.
+    if role == "teacher":
+        return redirect("/teacher/hub")
+    if role == "student":
+        return redirect("/portal/parent-hub")
+    if role == "parent":
+        return redirect("/portal/parent")
     return (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
