@@ -28752,6 +28752,8 @@ table.tbl tr:hover td{background:#fff5f8;}
 .status-pill.sent{background:#c8e6c9;color:#1b5e20;}
 .status-pill.failed{background:#ffcdd2;color:#b71c1c;}
 .status-pill.queued{background:#fff8e1;color:#f57c00;}
+.status-pill.draft{background:#eceff1;color:#455a64;}
+.act-btn.send{background:#e8f5e9;color:#1b5e20;margin-right:4px;}
 .empty{text-align:center;color:#888;padding:24px;font-style:italic;}
 .pagination{display:flex;gap:6px;justify-content:center;align-items:center;
             margin-top:14px;flex-wrap:wrap;}
@@ -29023,10 +29025,18 @@ table.tbl tr:hover td{background:#fff5f8;}
     slice.forEach(function(e){
       var trunc = (e.content_covered || '').slice(0, 70);
       if((e.content_covered||'').length > 70) trunc += '...';
-      var cls = (e.whatsapp_status === 'sent') ? 'sent' :
-                (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
-      var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
-                (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
+      var st = (e.status || 'draft');
+      var cls, lbl;
+      if (st === 'draft') { cls = 'draft'; lbl = 'مسودة'; }
+      else if (st === 'sent') {
+        if (e.whatsapp_status === 'failed') { cls = 'failed'; lbl = 'فشل'; }
+        else { cls = 'sent'; lbl = 'تم الإرسال'; }
+      } else { cls = 'queued'; lbl = 'قيد الانتظار'; }
+      // Drafts get a green إرسال button (calls /send). Already-sent
+      // rows get the existing إعادة الإرسال action.
+      var sendBtn = (st === 'draft')
+        ? '<button class="act-btn send"   onclick="doSend('+e.id+')">إرسال</button>'
+        : '<button class="act-btn resend" onclick="doResend('+e.id+')">إعادة إرسال</button>';
       html += '<tr>'+
         '<td data-label="التاريخ">'+escapeHtml(e.sent_date)+'</td>'+
         '<td data-label="المعلمة">'+escapeHtml(e.teacher_name)+'</td>'+
@@ -29037,7 +29047,7 @@ table.tbl tr:hover td{background:#fff5f8;}
         '<td data-label="إجراءات">'+
           '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
           '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
-          '<button class="act-btn resend" onclick="doResend('+e.id+')">إعادة إرسال</button>'+
+          sendBtn +
           '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
         '</td></tr>';
     });
@@ -29198,15 +29208,16 @@ table.tbl tr:hover td{background:#fff5f8;}
       });
   };
 
-  // ── resend ──
-  window.doResend = function(id){
-    if(!confirm('هل ترغبين في إعادة إرسال هذه الرسالة؟ سيتم فتح روابط واتساب لكل ولي أمر.')) return;
-    fetch('/api/parent-messages/'+id+'/resend', {method:'POST'})
+  // ── send / resend ──
+  // Shared sweep helper. opts: {id, endpoint, title, confirmMsg}.
+  function _runSendSweep(opts){
+    if(opts.confirmMsg && !confirm(opts.confirmMsg)) return;
+    fetch(opts.endpoint, {method:'POST'})
       .then(function(r){return r.json();}).then(function(j){
-        if(!j || !j.ok){ toast((j&&j.error)||'تعذر إعادة الإرسال', true); return; }
-        var ps = {id:id, recipients:j.recipients||[], total:j.total_count||0};
+        if(!j || !j.ok){ toast((j&&j.error)||'تعذر الإرسال', true); return; }
+        var ps = {id:opts.id, recipients:j.recipients||[], total:j.total_count||0};
         document.getElementById('resendBack').classList.add('show');
-        document.getElementById('resendTitle').textContent = 'جاري إعادة الإرسال...';
+        document.getElementById('resendTitle').textContent = opts.title;
         document.getElementById('resendStatus').textContent = '0 من ' + ps.total;
         document.getElementById('resendCloseBtn').style.display = 'none';
         var box = document.getElementById('resendList');
@@ -29247,7 +29258,7 @@ table.tbl tr:hover td{background:#fff5f8;}
         }
         step();
         function finishSweep(sent, total, mid){
-          document.getElementById('resendTitle').textContent = 'انتهت إعادة الإرسال';
+          document.getElementById('resendTitle').textContent = 'انتهى الإرسال';
           document.getElementById('resendStatus').textContent =
             '✅ تم فتح ' + sent + ' من ' + total + ' رسالة';
           document.getElementById('resendCloseBtn').style.display = 'inline-flex';
@@ -29258,6 +29269,22 @@ table.tbl tr:hover td{background:#fff5f8;}
           }).then(function(){ loadData(); loadStats(); });
         }
       });
+  }
+  window.doSend = function(id){
+    _runSendSweep({
+      id: id,
+      endpoint: '/api/parent-messages/'+id+'/send',
+      title: 'جاري الإرسال...',
+      confirmMsg: 'هل ترغبين في إرسال هذه المسودة لجميع الأهالي؟ سيتم فتح روابط واتساب.'
+    });
+  };
+  window.doResend = function(id){
+    _runSendSweep({
+      id: id,
+      endpoint: '/api/parent-messages/'+id+'/resend',
+      title: 'جاري إعادة الإرسال...',
+      confirmMsg: 'هل ترغبين في إعادة إرسال هذه الرسالة؟ سيتم فتح روابط واتساب لكل ولي أمر.'
+    });
   };
   window.closeResend = function(){
     document.getElementById('resendBack').classList.remove('show');
@@ -30232,6 +30259,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .status-pill.sent{background:#c8e6c9;color:#1b5e20;}
 .status-pill.failed{background:#ffcdd2;color:#b71c1c;}
 .status-pill.queued{background:#fff8e1;color:#f57c00;}
+.status-pill.draft{background:#eceff1;color:#455a64;}
 .toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
         font-size:.82rem;font-weight:700;}
 .toggle input{cursor:pointer;}
@@ -30816,11 +30844,19 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     slice.forEach(function(e){
       var trunc = (e.content_covered || '').slice(0, 80);
       if((e.content_covered||'').length > 80) trunc += '...';
-      var cls = (e.whatsapp_status === 'sent') ? 'sent' :
-                (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
-      var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
-                (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
-      var canResend = (e.whatsapp_status === 'failed');
+      var st = (e.status || 'draft');
+      var cls, lbl;
+      if (st === 'draft') { cls = 'draft'; lbl = 'مسودة'; }
+      else if (st === 'sent') {
+        if (e.whatsapp_status === 'failed') { cls = 'failed'; lbl = 'فشل'; }
+        else { cls = 'sent'; lbl = 'تم الإرسال'; }
+      } else { cls = 'queued'; lbl = 'قيد الانتظار'; }
+      var actionBtn = '';
+      if (st === 'draft') {
+        actionBtn = '<button class="act-btn send" onclick="event.stopPropagation();msgSend('+e.id+')">إرسال</button>';
+      } else if (e.whatsapp_status === 'failed') {
+        actionBtn = '<button class="act-btn resend" onclick="event.stopPropagation();msgResend('+e.id+')">إعادة إرسال</button>';
+      }
       html += '<tr>'+
         '<td data-label="التاريخ" onclick="msgView('+e.id+')">'+window.tdEscape(e.sent_date)+'</td>'+
         '<td data-label="المعلمة" onclick="msgView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
@@ -30830,7 +30866,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
         '<td data-label="إجراءات">'+
           '<button class="act-btn view"  onclick="event.stopPropagation();msgView('+e.id+')">عرض</button>'+
-          (canResend ? '<button class="act-btn resend" onclick="event.stopPropagation();msgResend('+e.id+')">إعادة إرسال</button>' : '')+
+          actionBtn +
           '<button class="act-btn del"   onclick="event.stopPropagation();msgDelete('+e.id+')">حذف</button>'+
         '</td></tr>';
     });
@@ -30885,11 +30921,13 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         document.getElementById('viewBack').classList.add('show');
       });
   };
-  window.msgResend = function(id){
-    if(!confirm('هل ترغبين في إعادة إرسال الرسالة لجميع الأهالي؟')) return;
-    fetch('/api/parent-messages/'+id+'/resend', {method:'POST', credentials:'include'})
+  // Shared send-sweep used by both msgSend (drafts) and msgResend
+  // (already-sent rows). Keeps the wa.me + finalize flow in one place.
+  function _msgRunSweep(id, endpoint, confirmMsg, doneToast){
+    if(confirmMsg && !confirm(confirmMsg)) return;
+    fetch(endpoint, {method:'POST', credentials:'include'})
       .then(function(r){return r.json();}).then(function(j){
-        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر إعادة الإرسال', true); return; }
+        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر الإرسال', true); return; }
         var ps = j.recipients || [];
         if(!ps.length){ window.tdToast('لا يوجد أولياء أمور لإرسال الرسالة', true); return; }
         var sent = 0;
@@ -30904,7 +30942,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
                 headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({sent_count: sent, total_count: ps.length})
               }).then(function(){
-                window.tdToast('تم إعادة الإرسال ✓');
+                window.tdToast(doneToast);
                 STATE.cache.messages = null;
                 msgLoad().then(function(rows){ msgRender(rows); });
               });
@@ -30912,6 +30950,22 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
           }, i * 600);
         });
       });
+  }
+  window.msgSend = function(id){
+    _msgRunSweep(
+      id,
+      '/api/parent-messages/'+id+'/send',
+      'هل ترغبين في إرسال هذه المسودة لجميع الأهالي؟',
+      'تم الإرسال ✓'
+    );
+  };
+  window.msgResend = function(id){
+    _msgRunSweep(
+      id,
+      '/api/parent-messages/'+id+'/resend',
+      'هل ترغبين في إعادة إرسال الرسالة لجميع الأهالي؟',
+      'تم إعادة الإرسال ✓'
+    );
   };
   var _delMsgId = null;
   window.msgDelete = function(id){
