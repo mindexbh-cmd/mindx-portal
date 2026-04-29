@@ -43181,6 +43181,14 @@ PORTAL_PARENT_HUB_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>بوابة ولي الأمر — مايندكس</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Deploy marker — the curriculum library card was added in
+     commit d14e55e ("Curriculum library (4/6): parent portal
+     sub-page"). If you can read this comment in View Source but
+     don't see the كتب المنهج card on the rendered page, the JS
+     fetch to /api/portal/student/meta failed — see <noscript>
+     fallback nav at the bottom for direct links to every hub
+     sub-page. -->
+<meta name="x-build" content="curriculum-library-v1">
 <style>
 *{box-sizing:border-box;}
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
@@ -43224,21 +43232,60 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 @media (prefers-reduced-motion:reduce){
   .card:hover{transform:none;}
 }
-</style></head><body>
+.fallback-nav{display:none;list-style:none;padding:0;margin:14px 0 0;}
+.fallback-nav li{margin-bottom:8px;}
+.fallback-nav a{display:inline-block;background:#fff;color:#4a148c;text-decoration:none;
+                padding:10px 16px;border-radius:9px;font-weight:700;
+                box-shadow:0 4px 12px rgba(107,63,160,.14);}
+.fallback-nav a:hover{background:#f3e5f5;}
+noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
+</style></head><body data-build="curriculum-library-v1">
 <div class="topbar">
   <h1>🏠 بوابة ولي الأمر — مايندكس</h1>
   <a href="/logout">تسجيل الخروج</a>
 </div>
 <div class="wrap" id="root">
   <div class="empty">جاري التحميل...</div>
+  <!-- Fallback nav: shown if JS fails or fetch errors out, and
+       always shown to <noscript> users. Listing every hub
+       destination here (including the curriculum library) means
+       the new pages remain reachable even when the dynamic
+       cards-block doesn't render. -->
+  <noscript>
+    <ul class="fallback-nav">
+      <li><a href="/portal/parent-hub/payments">💰 الدفع</a></li>
+      <li><a href="/portal/parent-hub/attendance">📋 الغياب</a></li>
+      <li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>
+      <li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>
+      <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
+      <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
+    </ul>
+  </noscript>
 </div>
 <script>
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Fallback HTML when the meta fetch fails — surfaces the same
+// six destinations as the dynamic cards block so a slow API or a
+// transient error never strands the parent on a blank page. The
+// curriculum entry is intentionally last to mirror the dynamic
+// ordering exactly.
+function _renderFallbackNav(reason){
+  var root = document.getElementById('root');
+  root.classList.add('fallback-on');
+  root.innerHTML = '<div class="empty">'+_esc(reason||'تعذر تحميل ملخص حسابك. الروابط أدناه ما تزال متاحة.')+'</div>'+
+    '<ul class="fallback-nav">'+
+      '<li><a href="/portal/parent-hub/payments">💰 الدفع</a></li>'+
+      '<li><a href="/portal/parent-hub/attendance">📋 الغياب</a></li>'+
+      '<li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>'+
+      '<li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>'+
+      '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
+      '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
+    '</ul>';
+}
 fetch('/api/portal/student/meta',{credentials:'include'})
   .then(function(r){return r.json();})
   .then(function(d){
-    var root = document.getElementById('root');
-    if(!d.ok){ root.innerHTML='<div class="empty">'+_esc(d.error||'فشل التحميل')+'</div>'; return; }
+    if(!d || !d.ok){ _renderFallbackNav(d && d.error); return; }
     var s = d.student||{}, av = d.avatar||{};
     var avPath = av.file_path || '/static/avatars/svg/egg.svg';
     var avName = av.name || '';
@@ -43291,7 +43338,7 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       }).catch(function(){});
   })
   .catch(function(){
-    document.getElementById('root').innerHTML = '<div class="empty">خطأ في الاتصال</div>';
+    _renderFallbackNav('خطأ في الاتصال — استخدم الروابط أدناه للوصول لكل قسم.');
   });
 </script>
 </body></html>"""
