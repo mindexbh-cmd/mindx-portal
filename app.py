@@ -37695,16 +37695,21 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .hello .info h2{font-size:1.45rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello .info p{color:#666;margin:2px 0;font-size:0.95rem;}
 .hello .info p b{color:#4a148c;}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-.card{background:#fff;border-radius:22px;padding:36px 26px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
+.card{background:#fff;border-radius:22px;padding:30px 22px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
 .card:hover{transform:translateY(-6px);box-shadow:0 18px 42px rgba(107,63,160,.28);border-color:#6B3FA0;}
-.card .ic{font-size:3.6rem;line-height:1;display:block;margin-bottom:14px;}
-.card h3{margin:0 0 8px;font-size:1.35rem;color:#4a148c;font-weight:900;}
-.card p{margin:0;color:#555;font-size:0.95rem;line-height:1.55;}
+.card .ic{font-size:3rem;line-height:1;display:block;margin-bottom:12px;}
+.card h3{margin:0 0 8px;font-size:1.2rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.9rem;line-height:1.55;}
+.card .badge{position:absolute;top:14px;left:14px;background:#e91e63;color:#fff;font-size:.78rem;font-weight:900;padding:3px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(233,30,99,.3);min-width:26px;text-align:center;}
 .card.pay::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
 .card.att::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#0288D1,#01579B);}
 .card.pts::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
+.card.msg::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
 .empty{text-align:center;color:#888;padding:60px 20px;}
+@media (max-width:1100px){
+  .cards{grid-template-columns:repeat(2,1fr);gap:18px;}
+}
 @media (max-width:760px){
   .cards{grid-template-columns:1fr;gap:14px;}
   .card{padding:26px 20px;}
@@ -37757,8 +37762,22 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +   '<a class="card pts" href="/portal/parent-hub/points">'
       +     '<span class="ic">🌟</span><h3>النقاط</h3><p>متابعة نقاط كلاس مايندكس</p>'
       +   '</a>'
+      +   '<a class="card msg" href="/portal/parent-hub/messages" id="ph-msg-card">'
+      +     '<span class="badge" id="ph-msg-badge" style="display:none;">0</span>'
+      +     '<span class="ic">📨</span><h3>رسائل المعلمة</h3>'
+      +     '<p>ملخصات الحصص من معلمة ' + _esc(s.student_name||firstName) + '</p>'
+      +   '</a>'
       + '</div>';
     root.innerHTML = html;
+    // Poll the unread count once and surface the badge if non-zero.
+    fetch('/api/parent-messages/parent-unread-count', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j && j.ok && (j.unread||0) > 0){
+          var b = document.getElementById('ph-msg-badge');
+          if(b){ b.textContent = j.unread; b.style.display = 'inline-block'; }
+        }
+      }).catch(function(){});
   })
   .catch(function(){
     document.getElementById('root').innerHTML = '<div class="empty">خطأ في الاتصال</div>';
@@ -38006,6 +38025,274 @@ def portal_parent_hub_points_page():
     if int(user.get("must_change_pw") or 0):
         return redirect("/portal/change-password")
     return PORTAL_STUDENT_HTML
+
+
+# ── /portal/parent-hub/messages — parent view of broadcasts ──────────
+PORTAL_PARENT_MESSAGES_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>رسائل المعلمة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#4a148c;}
+.topbar .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;padding:8px 14px;
+          border-radius:9px;font-weight:700;font-size:0.85rem;}
+.topbar a.logout{background:#fff;border:1.5px solid #c4a8e8;}
+.wrap{max-width:980px;margin:24px auto;padding:0 16px;}
+.head{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
+      box-shadow:0 4px 16px rgba(0,0,0,.06);}
+.head h2{margin:0 0 6px;color:#4a148c;font-size:1.2rem;font-weight:900;}
+.head p{margin:0;color:#666;font-size:.92rem;}
+.search-box{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.search-box input{flex:1;min-width:200px;padding:9px 12px;border:1.5px solid #d8c8ec;
+                  border-radius:9px;font-family:inherit;font-size:.95rem;
+                  background:#fafafe;}
+.empty{text-align:center;color:#888;padding:40px 20px;font-style:italic;}
+.msg-card{background:#fff;border-radius:16px;padding:18px 20px;margin-bottom:14px;
+          box-shadow:0 6px 18px rgba(0,0,0,.08);position:relative;
+          border-right:5px solid #C2185B;}
+.msg-card.unread{border-right-color:#FF5722;background:linear-gradient(90deg,#fff8f5,#fff);}
+.msg-card.unread::before{content:'جديد';position:absolute;top:14px;left:14px;
+                          background:#FF5722;color:#fff;font-size:.74rem;
+                          font-weight:900;padding:2px 10px;border-radius:999px;}
+.msg-head{display:flex;justify-content:space-between;align-items:flex-start;
+          flex-wrap:wrap;gap:10px;margin-bottom:10px;padding-bottom:10px;
+          border-bottom:1px dashed #f0e6f8;}
+.msg-head .d{color:#4a148c;font-weight:900;font-size:1.05rem;}
+.msg-head .by{color:#888;font-size:.84rem;margin-top:3px;}
+.msg-section{margin-bottom:12px;}
+.msg-section .lbl{font-weight:800;color:#4a148c;font-size:.92rem;display:flex;
+                  align-items:center;gap:6px;margin-bottom:4px;}
+.msg-section .val{color:#333;line-height:1.7;white-space:pre-wrap;}
+.msg-section.hw{background:#fff8e1;border:1.5px solid #ffe082;
+                border-radius:10px;padding:12px;margin:10px 0;}
+.msg-section.hw .lbl{color:#e65100;}
+.msg-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;
+          padding-top:10px;border-top:1px dashed #f0e6f8;}
+.read-toggle{padding:6px 14px;border:1.5px solid #c4a8e8;background:#fff;
+             color:#4a148c;border-radius:8px;font-weight:700;font-size:.85rem;
+             cursor:pointer;font-family:inherit;display:inline-flex;
+             align-items:center;gap:6px;}
+.read-toggle.read{background:#e8f5e9;border-color:#a5d6a7;color:#1b5e20;}
+.read-toggle:hover{background:#f3e5f5;}
+.pag{display:flex;gap:6px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+.pag button{padding:6px 12px;border-radius:7px;border:1.5px solid #c4a8e8;
+            background:#fff;cursor:pointer;font-weight:700;color:#4a148c;
+            font-family:inherit;}
+.pag button.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.pag button:disabled{opacity:.4;cursor:not-allowed;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+@media (max-width:680px){
+  .msg-head .d{font-size:.96rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📨 رسائل المعلمة</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap">
+
+  <div class="head">
+    <h2 id="head-title">رسائل المعلمة</h2>
+    <p id="head-sub">ملخصات الحصص من المعلمة لمتابعة تقدّم طفلك في الحصة.</p>
+    <div class="search-box">
+      <input type="text" id="search" placeholder="ابحث في المحتوى..." />
+    </div>
+  </div>
+
+  <div id="listBox">
+    <div class="empty">جاري التحميل...</div>
+  </div>
+  <div class="pag" id="pagBox"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var ALL = []; var FILTERED = [];
+  var PAGE = 1; var PER = 8;
+  var GROUP_NAME = '';
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  function loadGroup(){
+    return fetch('/api/portal/student/meta', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d && d.ok){
+          GROUP_NAME = (d.group_name || '');
+          var t = document.getElementById('head-title');
+          var s = d.student || {};
+          var firstName = (s.student_name || '').split(' ')[0];
+          if(GROUP_NAME){
+            t.textContent = 'رسائل معلمة مجموعة: ' + GROUP_NAME;
+          } else {
+            t.textContent = 'رسائل المعلمة';
+          }
+          if(firstName){
+            document.getElementById('head-sub').textContent =
+              'ملخصات الحصص من معلمة ' + firstName + '.';
+          }
+        }
+      });
+  }
+
+  function load(){
+    return fetch('/api/parent-messages?limit=200', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){
+          document.getElementById('listBox').innerHTML =
+            '<div class="empty">تعذر التحميل</div>';
+          return;
+        }
+        ALL = j.entries || [];
+        applySearch();
+      });
+  }
+
+  function applySearch(){
+    var q = (document.getElementById('search').value || '').trim().toLowerCase();
+    if(!q){ FILTERED = ALL.slice(); }
+    else {
+      FILTERED = ALL.filter(function(e){
+        return ((e.content_covered||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.skills_focused ||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.books_used     ||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.homework       ||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.parent_notes   ||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.sent_date      ||'').toLowerCase().indexOf(q) >= 0);
+      });
+    }
+    PAGE = 1;
+    render();
+  }
+
+  function render(){
+    var box = document.getElementById('listBox');
+    if(!FILTERED.length){
+      box.innerHTML = '<div class="empty">لا توجد رسائل بعد</div>';
+      document.getElementById('pagBox').innerHTML = '';
+      return;
+    }
+    var totalPages = Math.max(1, Math.ceil(FILTERED.length / PER));
+    if(PAGE > totalPages) PAGE = totalPages;
+    var start = (PAGE-1)*PER;
+    var slice = FILTERED.slice(start, start+PER);
+    var html = slice.map(function(e){
+      var unreadCls = e.is_read ? '' : 'unread';
+      var teacherLine = '';
+      if(e.teacher_name) teacherLine = '👩‍🏫 ' + escapeHtml(e.teacher_name);
+      var sec = function(label, val, icon, cls){
+        if(!val) return '';
+        return '<div class="msg-section '+(cls||'')+'">'+
+                 '<div class="lbl">'+icon+' '+label+'</div>'+
+                 '<div class="val">'+escapeHtml(val)+'</div>'+
+               '</div>';
+      };
+      var btnLbl = e.is_read ? '✓ تم الاطلاع' : 'تحديد كمقروءة';
+      var btnCls = e.is_read ? 'read-toggle read' : 'read-toggle';
+      return '<div class="msg-card '+unreadCls+'" id="m-'+e.id+'">'+
+        '<div class="msg-head">'+
+          '<div><div class="d">📅 '+escapeHtml(e.sent_date)+'</div>'+
+            '<div class="by">'+teacherLine+'</div></div>'+
+        '</div>'+
+        sec('المحتوى الذي تم تغطيته', e.content_covered, '✏️', '') +
+        sec('المهارات التي تم التركيز عليها', e.skills_focused, '🎯', '') +
+        sec('الكتب المستخدمة', e.books_used, '📖', '') +
+        sec('الواجب المنزلي', e.homework, '📝', 'hw') +
+        sec('ملاحظات لولي الأمر', e.parent_notes, '📌', '') +
+        '<div class="msg-foot">'+
+          '<button class="'+btnCls+'" onclick="toggleRead('+e.id+', '+(e.is_read?'true':'false')+')">'+
+            btnLbl+
+          '</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    box.innerHTML = html;
+    renderPag(totalPages);
+  }
+  function renderPag(total){
+    var p = document.getElementById('pagBox');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="goPage('+(PAGE-1)+')" '+(PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="goPage('+i+')" class="'+(i===PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="goPage('+(PAGE+1)+')" '+(PAGE===total?'disabled':'')+'>›</button>';
+    p.innerHTML = html;
+  }
+  window.goPage = function(p){ PAGE = p; render();
+    window.scrollTo({top:0,behavior:'smooth'}); };
+
+  window.toggleRead = function(id, currentIsRead){
+    var newState = !currentIsRead;
+    fetch('/api/parent-messages/' + id + '/read', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body: JSON.stringify({is_read: newState})
+    }).then(function(r){return r.json();}).then(function(j){
+      if(j && j.ok){
+        var m = ALL.find(function(x){return x.id===id;});
+        if(m) m.is_read = newState;
+        toast(newState ? 'تم وضع علامة مقروءة ✓' : 'تم إلغاء العلامة');
+        applySearch();
+      } else {
+        toast((j && j.error) || 'تعذر التحديث', true);
+      }
+    }).catch(function(){ toast('تعذر التحديث', true); });
+  };
+
+  document.getElementById('search').addEventListener('input', applySearch);
+
+  loadGroup().then(load);
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/portal/parent-hub/messages')
+@login_required
+def portal_parent_hub_messages_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_MESSAGES_HTML
 
 
 def _pts_parent_children_ids(user):
