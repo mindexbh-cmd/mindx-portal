@@ -764,6 +764,22 @@ def init_db():
         details TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS lessons_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER,
+        teacher_username TEXT,
+        teacher_name TEXT,
+        group_name TEXT,
+        lesson_date TEXT,
+        lesson_topic TEXT,
+        curriculum_progress TEXT,
+        notes TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_lessons_log_group_date "
+               "ON lessons_log(group_name, lesson_date)")
     db.commit()
     db.close()
 
@@ -2704,6 +2720,54 @@ if True:
             db2.commit()
         except Exception:
             pass
+
+    # ── lessons_v1: lesson tracking. Teachers log per group per session
+    # what was taught + curriculum progress. Admin sees all entries with
+    # statistics, gets a notification when an attendance was recorded
+    # but no lesson_log entry was created, and can free-edit lesson_date
+    # retroactively (audit-trailed). Idempotent: CREATE TABLE + CREATE
+    # INDEX are both IF NOT EXISTS so safe on every boot. ALTER TABLE
+    # ADD COLUMN block handles older deploys that pre-date a column.
+    db2.execute("""CREATE TABLE IF NOT EXISTS lessons_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER,
+        teacher_username TEXT,
+        teacher_name TEXT,
+        group_name TEXT,
+        lesson_date TEXT,
+        lesson_topic TEXT,
+        curriculum_progress TEXT,
+        notes TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_lessons_log_group_date "
+                    "ON lessons_log(group_name, lesson_date)")
+    except Exception: pass
+    try:
+        _ll_cols = {r[1] for r in db2.execute(
+            "PRAGMA table_info(lessons_log)").fetchall()}
+    except Exception:
+        _ll_cols = set()
+    for _col, _decl in [
+        ("teacher_id",          "INTEGER"),
+        ("teacher_username",    "TEXT"),
+        ("teacher_name",        "TEXT"),
+        ("group_name",          "TEXT"),
+        ("lesson_date",         "TEXT"),
+        ("lesson_topic",        "TEXT"),
+        ("curriculum_progress", "TEXT"),
+        ("notes",               "TEXT"),
+        ("is_deleted",          "INTEGER DEFAULT 0"),
+        ("created_at",          "DATETIME"),
+        ("updated_at",          "DATETIME"),
+    ]:
+        if _col not in _ll_cols:
+            try: db2.execute("ALTER TABLE lessons_log ADD COLUMN " + _col + " " + _decl)
+            except Exception: pass
+    db2.commit()
 
     # ── column_labels: backfill any rows that were inserted without
     # table_name (legacy auto-add behaviour pre-v4 unified schema).
@@ -21401,6 +21465,7 @@ BUILT_IN_TABLE_LABELS = {
     "custom_tables":     "الجداول المخصّصة",
     "custom_table_cols": "أعمدة الجداول المخصّصة",
     "custom_table_rows": "صفوف الجداول المخصّصة",
+    "lessons_log":       "سجل الدروس",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -23796,6 +23861,7 @@ _TBL_AUDIT_FEATURE = {
     "mode_exceptions":     ("استثناءات حالة المركز",        "حالة المركز"),
     "docs_pages":          ("صفحات دليل الموقع",            "نظام التوثيق"),
     "docs_screenshots":    ("لقطات الصفحات",                 "نظام التوثيق"),
+    "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
