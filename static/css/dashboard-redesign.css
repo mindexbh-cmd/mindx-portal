@@ -1,0 +1,110 @@
+/* ==========================================================================
+   Mindex dashboard redesign — Phase 1 design tokens (foundation only)
+   ==========================================================================
+   FOUNDATION ONLY. This file contains :root custom properties and ZERO
+   element selectors. Linking it from the dashboard's <head> changes no
+   pixels. Phases 2-8 reference these tokens via var(--md-*).
+
+   Scope:
+     • Loaded ONLY from HOME_HTML <head> (the /dashboard page).
+     • No other page is affected.
+
+   Spec source:
+     The Mindex full-dashboard-redesign brief, "DESIGN SPECIFICATION"
+     section. The brand keeps the existing app primary purple #7F77DD
+     as the secondary anchor + introduces #5B4FCC as the deep primary.
+   ========================================================================== */
+
+:root {
+  /* ── Brand palette ───────────────────────────────────────── */
+  --md-brand-deep:        #5B4FCC;   /* primary brand purple (deep)         */
+  --md-brand:             #7F77DD;   /* existing secondary brand (kept)     */
+  --md-brand-soft:        #ECEAFB;   /* light brand tint                    */
+  --md-brand-border:      #DDD9F5;   /* subtle brand border                 */
+
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --md-bg-page:           #F8F9FB;   /* page background                     */
+  --md-bg-card:           #FFFFFF;   /* card background                     */
+  --md-bg-soft:           #F5F4FA;   /* hover row tint                      */
+  --md-bg-muted:          #EEEDF4;   /* subtle divider lane                 */
+
+  /* ── Status palette (calm, not saturated) ───────────────── */
+  --md-success:           #10B981;
+  --md-success-bg:        #D1FAE5;
+  --md-success-text:      #065F46;
+  --md-warning:           #F59E0B;
+  --md-warning-bg:        #FEF3C7;
+  --md-warning-text:      #92400E;
+  --md-danger:            #EF4444;
+  --md-danger-bg:         #FEE2E2;
+  --md-danger-text:       #991B1B;
+  --md-info:              #3B82F6;
+  --md-info-bg:           #DBEAFE;
+  --md-info-text:         #1E40AF;
+  --md-mint-bg:           #CCFBF1;
+  --md-mint-text:         #115E59;
+
+  /* ── Text ────────────────────────────────────────────────── */
+  --md-text-primary:      #1F2937;
+  --md-text-secondary:    #6B7280;
+  --md-text-muted:        #9CA3AF;
+  --md-text-on-brand:     #FFFFFF;
+
+  /* ── Typography ──────────────────────────────────────────── */
+  /* Tajawal/Cairo are loaded by a Google Fonts <link> in the dashboard
+     <head>. font-display:swap on the <link> means we render with the
+     fallback first and swap once Tajawal arrives — no FOIT. */
+  --md-font-stack:        'Tajawal', 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+
+  /* H1 page titles 24px / H2 sections 18px / Body 15px / Stat 36px / 13px label */
+  --md-fz-xs:             12px;
+  --md-fz-sm:             13px;
+  --md-fz-base:           15px;
+  --md-fz-md:             16px;
+  --md-fz-lg:             18px;
+  --md-fz-xl:             20px;
+  --md-fz-2xl:            24px;
+  --md-fz-3xl:            30px;
+  --md-fz-stat:           36px;
+
+  --md-fw-medium:         500;
+  --md-fw-semi:           600;
+  --md-fw-bold:           700;
+  --md-fw-black:          800;
+
+  /* ── Spacing scale ───────────────────────────────────────── */
+  --md-sp-1:              4px;
+  --md-sp-2:              8px;
+  --md-sp-3:              12px;
+  --md-sp-4:              16px;
+  --md-sp-5:              20px;
+  --md-sp-6:              24px;
+  --md-sp-7:              32px;
+  --md-sp-8:              40px;
+
+  /* ── Layout fixed dimensions ─────────────────────────────── */
+  --md-header-h:          64px;     /* fixed top header                    */
+  --md-sidebar-w:         260px;    /* sidebar expanded                    */
+  --md-sidebar-w-c:       64px;     /* sidebar collapsed                   */
+
+  /* ── Radius ──────────────────────────────────────────────── */
+  --md-rad-sm:            6px;
+  --md-rad-md:            8px;      /* buttons                             */
+  --md-rad-lg:            12px;     /* cards                               */
+  --md-rad-pill:          999px;
+
+  /* ── Shadows (calm) ──────────────────────────────────────── */
+  --md-shadow-sm:         0 1px 2px  rgba(0, 0, 0, 0.03);
+  --md-shadow-md:         0 2px 8px  rgba(0, 0, 0, 0.04);
+  --md-shadow-lg:         0 8px 24px rgba(0, 0, 0, 0.06);
+  --md-shadow-edge:       -4px 0 12px rgba(0, 0, 0, 0.03);  /* sidebar     */
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --md-motion-fast:       150ms ease;
+  --md-motion-base:       200ms ease;
+
+  /* ── Z-index scale ───────────────────────────────────────── */
+  --md-z-sidebar:         50;
+  --md-z-header:          60;
+  --md-z-modal:           1100;
+}

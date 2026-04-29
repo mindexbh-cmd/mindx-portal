@@ -4459,6 +4459,16 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
 
 </style>
+<!-- Dashboard redesign — Phase 1 design tokens. Foundation only:
+     /static/css/dashboard-redesign.css declares :root variables, no
+     element selectors. Linking it changes ZERO pixels. Phases 2-8
+     opt-in via var(--md-*). Tajawal + Cairo loaded with preconnect +
+     font-display: swap so the fallback renders first and the new
+     font swaps in without FOIT. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/dashboard-redesign.css">
 </head>
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
