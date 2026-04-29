@@ -30246,6 +30246,184 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       });
   }
 
+  // ── messages tab ──────────────────────────────────────────────
+  // Reuses GET /api/parent-messages, the per-row preview/resend
+  // helpers, and the message_log delivery view — same endpoints the
+  // existing /admin/parent-messages page uses.
+  var MSG_PAGE = 1; var MSG_PER = 20;
+  var MSG_SORT = {col:'sent_date', dir:'desc'};
+  function msgLoad(){
+    if(STATE.cache.messages) return Promise.resolve(STATE.cache.messages);
+    return fetch('/api/parent-messages' + window.tdBuildQs(), {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return [];
+        STATE.cache.messages = (j.entries || []).filter(window.tdMatchesFilters);
+        return STATE.cache.messages;
+      });
+  }
+  window.tdRenderMessages = function(box){
+    box.innerHTML = '<div class="tab-head">'+
+      '<h3>📨 رسائل المعلمات لأولياء الأمور</h3>'+
+      '<div class="links">'+
+        '<a class="full-link" href="/admin/parent-messages" target="_blank" rel="noopener">إدارة كاملة ↗</a>'+
+      '</div></div>'+
+      '<div id="msg-table"><div class="empty">جاري التحميل...</div></div>'+
+      '<div class="pagination" id="msg-pag"></div>';
+    msgLoad().then(function(rows){ msgRender(rows); });
+  };
+  function msgRender(rows){
+    var box = document.getElementById('msg-table');
+    if(!box) return;
+    if(!rows.length){
+      box.innerHTML = '<div class="empty">لا توجد رسائل بالشروط المحددة</div>';
+      document.getElementById('msg-pag').innerHTML = '';
+      return;
+    }
+    var arr = rows.slice();
+    arr.sort(function(a,b){
+      var av = a[MSG_SORT.col] || ''; var bv = b[MSG_SORT.col] || '';
+      if(av<bv) return MSG_SORT.dir==='asc' ? -1 : 1;
+      if(av>bv) return MSG_SORT.dir==='asc' ? 1 : -1;
+      return 0;
+    });
+    var totalPages = Math.max(1, Math.ceil(arr.length / MSG_PER));
+    if(MSG_PAGE > totalPages) MSG_PAGE = totalPages;
+    var start = (MSG_PAGE-1) * MSG_PER;
+    var slice = arr.slice(start, start + MSG_PER);
+    function th(c, l){
+      var arrow = MSG_SORT.col===c ? (MSG_SORT.dir==='asc' ? ' ▲' : ' ▼') : '';
+      return '<th onclick="msgSortBy(\''+c+'\')">'+l+arrow+'</th>';
+    }
+    var html = '<table class="tbl"><thead><tr>'+
+      th('sent_date','التاريخ')+
+      th('teacher_name','المعلمة')+
+      th('group_name','المجموعة')+
+      '<th>المحتوى</th>'+
+      '<th>عدد المرسل إليهم</th>'+
+      th('whatsapp_status','الحالة')+
+      '<th>إجراءات</th></tr></thead><tbody>';
+    slice.forEach(function(e){
+      var trunc = (e.content_covered || '').slice(0, 80);
+      if((e.content_covered||'').length > 80) trunc += '...';
+      var cls = (e.whatsapp_status === 'sent') ? 'sent' :
+                (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
+      var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
+                (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
+      var canResend = (e.whatsapp_status === 'failed');
+      html += '<tr>'+
+        '<td data-label="التاريخ" onclick="msgView('+e.id+')">'+window.tdEscape(e.sent_date)+'</td>'+
+        '<td data-label="المعلمة" onclick="msgView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
+        '<td data-label="المجموعة" onclick="msgView('+e.id+')">'+window.tdEscape(e.group_name)+'</td>'+
+        '<td data-label="المحتوى" onclick="msgView('+e.id+')">'+window.tdEscape(trunc)+'</td>'+
+        '<td data-label="عدد المرسل إليهم">'+(e.whatsapp_sent_count||0)+'/'+(e.whatsapp_total_count||0)+'</td>'+
+        '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
+        '<td data-label="إجراءات">'+
+          '<button class="act-btn view"  onclick="event.stopPropagation();msgView('+e.id+')">عرض</button>'+
+          (canResend ? '<button class="act-btn resend" onclick="event.stopPropagation();msgResend('+e.id+')">إعادة إرسال</button>' : '')+
+          '<button class="act-btn del"   onclick="event.stopPropagation();msgDelete('+e.id+')">حذف</button>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    msgRenderPag(totalPages);
+  }
+  function msgRenderPag(total){
+    var p = document.getElementById('msg-pag');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="msgGoPage(1)" '+(MSG_PAGE===1?'disabled':'')+'>«</button>';
+    html += '<button onclick="msgGoPage('+(MSG_PAGE-1)+')" '+(MSG_PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, MSG_PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="msgGoPage('+i+')" class="'+(i===MSG_PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="msgGoPage('+(MSG_PAGE+1)+')" '+(MSG_PAGE===total?'disabled':'')+'>›</button>';
+    html += '<button onclick="msgGoPage('+total+')" '+(MSG_PAGE===total?'disabled':'')+'>»</button>';
+    p.innerHTML = html;
+  }
+  window.msgSortBy = function(col){
+    if(MSG_SORT.col===col){ MSG_SORT.dir = MSG_SORT.dir==='asc'?'desc':'asc'; }
+    else { MSG_SORT.col = col; MSG_SORT.dir = 'desc'; }
+    msgRender(STATE.cache.messages || []);
+  };
+  window.msgGoPage = function(p){ MSG_PAGE = p; msgRender(STATE.cache.messages || []); window.scrollTo({top:0,behavior:'smooth'}); };
+  window.msgView = function(id){
+    fetch('/api/parent-messages/'+id, {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر التحميل', true); return; }
+        var e = j.entry || {};
+        var dlv = (e.deliveries||[]).map(function(d){
+          return '<div class="recipient-row"><span class="nm">'+
+                  window.tdEscape(d.student_name||'')+
+                 '</span><span class="ph">'+window.tdEscape(d.student_whatsapp||'')+
+                 '</span><span class="st">'+window.tdEscape((d.sent_at||'').slice(0,16))+
+                 '</span></div>';
+        }).join('');
+        document.getElementById('viewTitle').textContent =
+          'رسالة بتاريخ ' + (e.sent_date||'') + ' لمجموعة ' + (e.group_name||'');
+        document.getElementById('viewBody').innerHTML =
+          '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+window.tdEscape(e.teacher_name||'')+'</div>'+
+          '<div style="margin-bottom:14px;"><b>المحتوى:</b><div>'+window.tdEscape(e.content_covered||'')+'</div></div>'+
+          '<div style="margin-bottom:14px;"><b>المهارات:</b><div>'+window.tdEscape(e.skills_focused||'')+'</div></div>'+
+          '<div style="margin-bottom:14px;"><b>الكتب:</b><div>'+window.tdEscape(e.books_used||'')+'</div></div>'+
+          (e.homework ? '<div style="margin-bottom:14px;background:#fff8e1;padding:10px;border-radius:8px;"><b>الواجب:</b><div>'+window.tdEscape(e.homework)+'</div></div>' : '')+
+          (e.parent_notes ? '<div style="margin-bottom:14px;"><b>ملاحظات:</b><div>'+window.tdEscape(e.parent_notes)+'</div></div>' : '')+
+          '<div style="margin-top:18px;"><b>سجل الإرسال ('+ (e.deliveries||[]).length +'):</b></div>'+
+          '<div>'+(dlv || '<div class="empty">لا يوجد سجل</div>')+'</div>';
+        document.getElementById('viewBack').classList.add('show');
+      });
+  };
+  window.msgResend = function(id){
+    if(!confirm('هل ترغبين في إعادة إرسال الرسالة لجميع الأهالي؟')) return;
+    fetch('/api/parent-messages/'+id+'/resend', {method:'POST', credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر إعادة الإرسال', true); return; }
+        var ps = j.recipients || [];
+        if(!ps.length){ window.tdToast('لا يوجد أولياء أمور لإرسال الرسالة', true); return; }
+        var sent = 0;
+        ps.forEach(function(r, i){
+          if(!r.whatsapp) return;
+          setTimeout(function(){
+            try { window.open('https://wa.me/' + r.whatsapp + '?text=' + encodeURIComponent(r.text), '_blank'); } catch(e){}
+            sent++;
+            if(i === ps.length-1){
+              fetch('/api/parent-messages/'+id+'/finalize', {
+                method:'POST', credentials:'include',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({sent_count: sent, total_count: ps.length})
+              }).then(function(){
+                window.tdToast('تم إعادة الإرسال ✓');
+                STATE.cache.messages = null;
+                msgLoad().then(function(rows){ msgRender(rows); });
+              });
+            }
+          }, i * 600);
+        });
+      });
+  };
+  var _delMsgId = null;
+  window.msgDelete = function(id){
+    _delMsgId = id;
+    document.getElementById('delConfirmBtn').onclick = msgConfirmDelete;
+    document.getElementById('delBack').classList.add('show');
+  };
+  function msgConfirmDelete(){
+    if(!_delMsgId) return;
+    fetch('/api/parent-messages/'+_delMsgId, {method:'DELETE', credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          window.tdToast('تم الحذف ✓');
+          closeModal('delBack');
+          STATE.cache.messages = null;
+          msgLoad().then(function(rows){ msgRender(rows); });
+        } else {
+          window.tdToast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  }
+
   // Per-tab JS files attach themselves to window.tdRender* before
   // the first renderTab call below.
   document.addEventListener('DOMContentLoaded', function(){
