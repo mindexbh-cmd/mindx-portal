@@ -25638,8 +25638,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .hello{text-align:center;margin-bottom:28px;}
 .hello h2{font-size:1.6rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello p{color:#666;margin:0;font-size:0.96rem;}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
-.card{background:#fff;border-radius:22px;padding:30px 22px;text-align:center;
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.card{background:#fff;border-radius:20px;padding:26px 18px;text-align:center;
       box-shadow:0 10px 32px rgba(107,63,160,.18);
       cursor:pointer;text-decoration:none;color:inherit;display:block;
       transition:transform .18s ease, box-shadow .18s ease;
@@ -25647,9 +25647,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .card:hover{transform:translateY(-6px);
             box-shadow:0 18px 42px rgba(107,63,160,.28);
             border-color:#6B3FA0;}
-.card .ic{font-size:3rem;line-height:1;display:block;margin-bottom:12px;}
-.card h3{margin:0 0 8px;font-size:1.2rem;color:#4a148c;font-weight:900;}
-.card p{margin:0;color:#555;font-size:0.9rem;line-height:1.55;}
+.card .ic{font-size:2.6rem;line-height:1;display:block;margin-bottom:10px;}
+.card h3{margin:0 0 6px;font-size:1.05rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.84rem;line-height:1.5;}
 .card.attend::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
 .card.points::before{content:'';position:absolute;top:0;right:0;width:6px;
@@ -25658,8 +25658,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                      height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
 .card.parents::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
-@media (max-width:1180px){
-  .cards{grid-template-columns:repeat(2,1fr);}
+.card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
+@media (max-width:1280px){
+  .cards{grid-template-columns:repeat(3,1fr);}
 }
 @media (max-width:980px){
   .cards{grid-template-columns:repeat(2,1fr);}
@@ -25704,6 +25706,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <span class="ic">📨</span>
       <h3>ماذا تريد أن يعرف ولي الأمر</h3>
       <p>إرسال ملخص الحصة لأولياء أمور المجموعة</p>
+    </a>
+    <a class="card evals" href="/teacher/evaluations">
+      <span class="ic">📊</span>
+      <h3>استمارة التقييم الشهري</h3>
+      <p>تقييم شهري للطالبات</p>
     </a>
   </div>
 </div>
@@ -26822,6 +26829,600 @@ def teacher_parent_messages_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
     return TEACHER_PARENT_MESSAGES_HTML.replace("USER_PLACEHOLDER", who)
+
+
+# ── /teacher/evaluations — monthly evaluation slider form ────────────
+TEACHER_EVALUATIONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>استمارة التقييم الشهري — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fff8e1,#ffe0b2,#ffccbc);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#e65100;}
+.topbar .who{color:#F57C00;font-weight:700;font-size:.92rem;}
+.topbar a{color:#e65100;text-decoration:none;background:#fff3e0;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1080px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:16px;padding:22px;
+       box-shadow:0 8px 24px rgba(245,124,0,.15);margin-bottom:18px;}
+h2.head{margin:0 0 6px;color:#e65100;font-size:1.3rem;font-weight:900;}
+h2.head .month{color:#F57C00;}
+.head-sub{color:#666;font-size:.92rem;margin:0 0 14px;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-weight:700;color:#e65100;font-size:.92rem;}
+.field input,.field select,.field textarea{
+  padding:10px 12px;border:2px solid #ffe0b2;border-radius:10px;
+  font-family:inherit;font-size:1rem;background:#fffaf2;
+  transition:border-color .15s ease;}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:#FB8C00;background:#fff;}
+.field input[readonly]{background:#fff8e1;color:#666;}
+.field textarea{resize:vertical;min-height:60px;}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media (max-width:760px){.row3{grid-template-columns:1fr;}}
+.note-box{background:#fff8e1;border:1.5px dashed #FB8C00;border-radius:10px;
+          padding:12px 14px;color:#e65100;font-size:.92rem;font-weight:700;
+          line-height:1.6;margin-bottom:14px;}
+.section{background:#fffaf2;border:1.5px solid #ffe0b2;border-radius:14px;
+         padding:18px;margin-bottom:14px;}
+.section .sect-head{display:flex;justify-content:space-between;align-items:center;
+                    cursor:pointer;user-select:none;}
+.section .sect-title{color:#e65100;font-weight:900;font-size:1.05rem;}
+.section .sect-toggle{font-size:.92rem;color:#F57C00;}
+.section .sect-body{margin-top:14px;}
+.section.collapsed .sect-body{display:none;}
+.slider-row{display:flex;align-items:center;gap:14px;margin-bottom:14px;
+            flex-wrap:wrap;}
+.slider-row .lbl{flex:0 0 180px;font-weight:700;color:#5d4037;}
+.slider-row .ctrl{flex:1;min-width:200px;position:relative;}
+.slider-row input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:5px;
+  background:linear-gradient(90deg,#e53935 0%,#fdd835 50%,#43a047 100%);
+  outline:none;cursor:pointer;}
+.slider-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:24px;height:24px;border-radius:50%;
+  background:#fff;border:3px solid #FB8C00;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);}
+.slider-row input[type=range]::-moz-range-thumb{
+  width:24px;height:24px;border-radius:50%;background:#fff;
+  border:3px solid #FB8C00;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);}
+.slider-row .val{flex:0 0 56px;font-size:1.6rem;font-weight:900;
+                 color:#e65100;text-align:center;
+                 background:#fff;border:2px solid #ffe0b2;
+                 border-radius:10px;padding:4px 10px;line-height:1;}
+.slider-row .val.low{color:#c62828;border-color:#ef9a9a;}
+.slider-row .val.mid{color:#f57c00;border-color:#ffcc80;}
+.slider-row .val.high{color:#2e7d32;border-color:#a5d6a7;}
+.ticks{display:flex;justify-content:space-between;font-size:.74rem;
+       color:#999;margin-top:4px;padding:0 12px;}
+.overall-box{background:linear-gradient(135deg,#fff3e0,#ffe0b2);
+             border:2px solid #FB8C00;border-radius:14px;padding:14px 18px;
+             display:flex;align-items:center;justify-content:space-between;
+             margin-bottom:14px;}
+.overall-box .o-lbl{font-weight:800;color:#e65100;font-size:1.05rem;}
+.overall-box .o-val{font-size:2rem;font-weight:900;color:#e65100;}
+.overall-box .o-val small{font-size:.92rem;color:#888;font-weight:600;}
+.btn{background:linear-gradient(135deg,#FB8C00,#EF6C00);color:#fff;
+     border:none;border-radius:10px;padding:12px 22px;font-weight:800;
+     font-size:1rem;cursor:pointer;display:inline-flex;align-items:center;
+     gap:8px;transition:transform .12s ease, box-shadow .12s ease;
+     font-family:inherit;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(251,140,0,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-ghost{background:#fff3e0;color:#e65100;}
+.btn-ghost:hover{background:#ffe0b2;}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.err{color:#c62828;font-size:.85rem;margin-top:4px;display:none;}
+.err.show{display:block;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;
+       max-width:90vw;text-align:center;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.92rem;}
+table.tbl th{background:#fff3e0;color:#e65100;padding:10px 8px;text-align:right;
+             font-weight:800;}
+table.tbl td{padding:9px 8px;border-bottom:1px solid #ffe0b2;}
+table.tbl tr:hover td{background:#fff8e1;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.act-btn{padding:5px 10px;border-radius:8px;border:none;cursor:pointer;
+         font-size:.82rem;font-weight:700;font-family:inherit;}
+.act-btn.edit{background:#fff3e0;color:#e65100;}
+.act-btn.edit:hover{background:#ffe0b2;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:16px;padding:22px;max-width:600px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal h3{margin:0 0 14px;color:#e65100;font-weight:900;}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;
+              background:#fff8e1;padding:12px;border-radius:10px;
+              margin-bottom:12px;font-size:.92rem;}
+.summary-grid div{padding:4px 0;}
+.summary-grid b{color:#e65100;}
+@media (max-width:680px){
+  .slider-row{flex-direction:column;align-items:stretch;gap:6px;}
+  .slider-row .lbl{flex:auto;}
+  .slider-row .val{align-self:flex-end;}
+  table.tbl{font-size:.85rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #ffe0b2;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#e65100;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📊 مايندكس — استمارة التقييم الشهري</h1>
+  <span class="who">USER_PLACEHOLDER</span>
+  <a href="/teacher/hub">رجوع</a>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h2 class="head">استمارة التقييم الشهري لشهر <span class="month" id="mlabel">—</span></h2>
+    <p class="head-sub">تقييم شهري للطالبات باستخدام مقياس من 1 إلى 10.</p>
+    <div class="row3">
+      <div class="field">
+        <label for="emonth">الشهر</label>
+        <input type="month" id="emonth" required>
+      </div>
+      <div class="field">
+        <label for="edate">التاريخ</label>
+        <input type="date" id="edate" required>
+      </div>
+      <div class="field">
+        <label for="eteacher">المعلمة</label>
+        <input type="text" id="eteacher" readonly value="USER_PLACEHOLDER">
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field" style="grid-column:span 2;">
+        <label for="egroup">المجموعة</label>
+        <select id="egroup" required>
+          <option value="">— اختاري المجموعة —</option>
+        </select>
+        <span class="err" id="err-egroup"></span>
+      </div>
+      <div class="field">
+        <label for="estudent">الطالبة</label>
+        <select id="estudent" required disabled>
+          <option value="">— اختاري المجموعة أولاً —</option>
+        </select>
+        <span class="err" id="err-estudent"></span>
+      </div>
+    </div>
+
+    <div class="note-box">
+      ℹ️ يرجى تعبئة التقييم باستخدام مقياس خطي من 1 إلى 10
+      (1 = ضعيف جداً، 10 = ممتاز).
+    </div>
+
+    <form id="evalForm" onsubmit="return submitForm(event);">
+      <div class="section" id="sec-int">
+        <div class="sect-head" onclick="toggleSec('sec-int')">
+          <span class="sect-title">أولاً: التفاعل</span>
+          <span class="sect-toggle">▼</span>
+        </div>
+        <div class="sect-body">
+          <!-- Slider rows added in JS so we can map score-field names cleanly -->
+          <div id="sliders-int"></div>
+          <div class="field">
+            <label for="nbeh">ملاحظات على السلوك</label>
+            <textarea id="nbeh" rows="2" maxlength="1500"
+                      placeholder="ملاحظاتكِ على سلوك الطالبة..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" id="sec-lang">
+        <div class="sect-head" onclick="toggleSec('sec-lang')">
+          <span class="sect-title">ثانياً: المهارات اللغوية</span>
+          <span class="sect-toggle">▼</span>
+        </div>
+        <div class="sect-body">
+          <div id="sliders-lang"></div>
+          <div class="field">
+            <label for="nlang">ملاحظات على المهارات اللغوية</label>
+            <textarea id="nlang" rows="2" maxlength="1500"
+                      placeholder="ملاحظاتكِ على القراءة، الإملاء، الإلخ..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="overall-box">
+        <span class="o-lbl">التقييم العام:</span>
+        <span class="o-val"><span id="overall-val">—</span><small> /10</small></span>
+      </div>
+      <div class="field">
+        <label for="ngen">ملاحظات عامة</label>
+        <textarea id="ngen" rows="2" maxlength="1500"
+                  placeholder="ملاحظات إضافية..."></textarea>
+      </div>
+      <button type="submit" class="btn" id="saveBtn">💾 حفظ التقييم</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 class="head" style="font-size:1.1rem;">آخر 10 تقييمات</h2>
+    <div id="recentBox"><div class="empty">جاري التحميل...</div></div>
+  </div>
+
+</div>
+
+<!-- Confirm summary modal -->
+<div class="modal-back" id="confBack" onclick="if(event.target===this)closeConf()">
+  <div class="modal">
+    <h3>تأكيد حفظ التقييم</h3>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <p style="color:#888;font-size:.86rem;margin:0;">سيتم حفظ التقييم. يمكن للأدمن مراجعته ونشره للأهل بعد ذلك.</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeConf()">إلغاء</button>
+      <button class="btn" id="confirmSaveBtn" onclick="confirmSave()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate-conflict modal -->
+<div class="modal-back" id="dupBack" onclick="if(event.target===this)closeDup()">
+  <div class="modal">
+    <h3>تقييم سابق موجود</h3>
+    <p>يوجد تقييم سابق لهذه الطالبة في هذا الشهر. هل تريدين تعديله؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDup()">إلغاء</button>
+      <button class="btn" onclick="editExisting()">✎ تعديل السابق</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var SCORE_FIELDS_INT = [
+    {k:'score_participation', l:'المشاركة داخل الصف'},
+    {k:'score_behavior',      l:'السلوك العام'}
+  ];
+  var SCORE_FIELDS_LANG = [
+    {k:'score_reading',     l:'القراءة'},
+    {k:'score_dictation',   l:'الإملاء'},
+    {k:'score_vocabulary',  l:'معاني المصطلحات'},
+    {k:'score_conversation',l:'المحادثة'},
+    {k:'score_expression',  l:'التعبير'},
+    {k:'score_grammar',     l:'القواعد'}
+  ];
+  var AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+                   'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+  function isoToday(){
+    var d = new Date(); var p = function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  function isoMonth(){
+    var d = new Date(); var p = function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1);
+  }
+  function arMonthLabel(yyyy_mm){
+    if(!yyyy_mm) return '';
+    var p = String(yyyy_mm).split('-');
+    if(p.length<2) return yyyy_mm;
+    var idx = parseInt(p[1],10)-1;
+    if(idx<0||idx>11) return yyyy_mm;
+    return AR_MONTHS[idx]+' '+p[0];
+  }
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  function showErr(id, msg){
+    var el = document.getElementById('err-'+id); if(!el) return;
+    if(msg){ el.textContent=msg; el.classList.add('show'); }
+    else { el.textContent=''; el.classList.remove('show'); }
+  }
+  function clearErrs(){ ['egroup','estudent'].forEach(function(k){ showErr(k,''); }); }
+
+  document.getElementById('edate').value  = isoToday();
+  document.getElementById('emonth').value = isoMonth();
+  document.getElementById('mlabel').textContent = arMonthLabel(isoMonth());
+  document.getElementById('emonth').addEventListener('change', function(){
+    document.getElementById('mlabel').textContent = arMonthLabel(this.value);
+  });
+
+  function buildSliders(containerId, list, defaultVal){
+    var box = document.getElementById(containerId);
+    box.innerHTML = list.map(function(s){
+      return '<div class="slider-row">'+
+        '<label class="lbl" for="sl-'+s.k+'">'+s.l+'</label>'+
+        '<div class="ctrl">'+
+          '<input type="range" id="sl-'+s.k+'" min="1" max="10" step="1" value="'+defaultVal+'" data-k="'+s.k+'">'+
+          '<div class="ticks"><span>1</span><span>5</span><span>10</span></div>'+
+        '</div>'+
+        '<div class="val mid" id="vl-'+s.k+'">'+defaultVal+'</div>'+
+      '</div>';
+    }).join('');
+    list.forEach(function(s){
+      var inp = document.getElementById('sl-'+s.k);
+      var v   = document.getElementById('vl-'+s.k);
+      inp.addEventListener('input', function(){
+        v.textContent = inp.value;
+        v.className = 'val ' + (inp.value<=4 ? 'low' : (inp.value<=7 ? 'mid' : 'high'));
+        recomputeOverall();
+      });
+    });
+  }
+  function recomputeOverall(){
+    var all = SCORE_FIELDS_INT.concat(SCORE_FIELDS_LANG);
+    var vals = all.map(function(s){
+      var inp = document.getElementById('sl-'+s.k);
+      return inp ? parseInt(inp.value,10) : null;
+    }).filter(function(x){ return x != null; });
+    if(!vals.length){ document.getElementById('overall-val').textContent='—'; return; }
+    var avg = Math.round(vals.reduce(function(a,b){return a+b;},0) / vals.length);
+    document.getElementById('overall-val').textContent = avg;
+  }
+  function getAllScores(){
+    var out = {};
+    SCORE_FIELDS_INT.concat(SCORE_FIELDS_LANG).forEach(function(s){
+      var inp = document.getElementById('sl-'+s.k);
+      out[s.k] = inp ? parseInt(inp.value,10) : 5;
+    });
+    return out;
+  }
+  function setAllScores(obj){
+    SCORE_FIELDS_INT.concat(SCORE_FIELDS_LANG).forEach(function(s){
+      var inp = document.getElementById('sl-'+s.k);
+      var v   = document.getElementById('vl-'+s.k);
+      var nv  = obj && obj[s.k] != null ? obj[s.k] : 5;
+      if(inp){ inp.value = nv; }
+      if(v){
+        v.textContent = nv;
+        v.className = 'val ' + (nv<=4 ? 'low' : (nv<=7 ? 'mid' : 'high'));
+      }
+    });
+    recomputeOverall();
+  }
+
+  buildSliders('sliders-int', SCORE_FIELDS_INT, 5);
+  buildSliders('sliders-lang', SCORE_FIELDS_LANG, 5);
+  recomputeOverall();
+
+  window.toggleSec = function(id){
+    document.getElementById(id).classList.toggle('collapsed');
+  };
+
+  // ── group + student dropdowns ──
+  function fmtDays(arr){
+    if(!arr || !arr.length) return '';
+    return arr.join(' و ');
+  }
+  function loadGroups(){
+    var sel = document.getElementById('egroup');
+    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
+      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
+      var groups = (j && j.groups) || [];
+      if(!groups.length){
+        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
+        return;
+      }
+      groups.forEach(function(g){
+        var nm = g.name || '';
+        var d  = fmtDays(g.study_days || []);
+        var t  = (g.study_time || '').trim();
+        var label = nm + (d || t ? ' (' + [d,t].filter(Boolean).join(' - ') + ')' : '');
+        var opt = document.createElement('option');
+        opt.value = nm; opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    });
+  }
+  function loadStudents(group){
+    var sel = document.getElementById('estudent');
+    sel.innerHTML = '<option value="">جاري التحميل...</option>';
+    sel.disabled = true;
+    if(!group){
+      sel.innerHTML = '<option value="">— اختاري المجموعة أولاً —</option>';
+      return;
+    }
+    fetch('/api/monthly-evaluations/group-students?group=' + encodeURIComponent(group))
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){
+          sel.innerHTML = '<option value="">— تعذر التحميل —</option>'; return;
+        }
+        var arr = j.students || [];
+        if(!arr.length){
+          sel.innerHTML = '<option value="">— لا توجد طالبات في المجموعة —</option>';
+          return;
+        }
+        sel.innerHTML = '<option value="">— اختاري الطالبة —</option>';
+        arr.forEach(function(s){
+          var opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = s.name;
+          sel.appendChild(opt);
+        });
+        sel.disabled = false;
+      });
+  }
+  document.getElementById('egroup').addEventListener('change', function(){
+    loadStudents(this.value);
+  });
+
+  // ── recent table ──
+  function loadRecent(){
+    var box = document.getElementById('recentBox');
+    fetch('/api/monthly-evaluations?limit=10').then(function(r){return r.json();}).then(function(j){
+      if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+      var entries = j.entries || [];
+      if(!entries.length){ box.innerHTML = '<div class="empty">لا توجد تقييمات بعد</div>'; return; }
+      var html = '<table class="tbl"><thead><tr>'+
+        '<th>التاريخ</th><th>الشهر</th><th>المجموعة</th><th>الطالبة</th>'+
+        '<th>التقييم العام</th><th>إجراءات</th>'+
+        '</tr></thead><tbody>';
+      entries.forEach(function(e){
+        html += '<tr>'+
+          '<td data-label="التاريخ">'+escapeHtml(e.evaluation_date)+'</td>'+
+          '<td data-label="الشهر">'+escapeHtml(e.month_label||e.evaluation_month)+'</td>'+
+          '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
+          '<td data-label="الطالبة">'+escapeHtml(e.student_name)+'</td>'+
+          '<td data-label="التقييم العام">'+(e.overall_score==null?'—':(e.overall_score+'/10'))+'</td>'+
+          '<td data-label="إجراءات">'+
+            '<button class="act-btn edit" onclick="loadIntoForm('+e.id+')">تعديل</button>'+
+          '</td></tr>';
+      });
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    });
+  }
+  window.loadIntoForm = function(id){
+    fetch('/api/monthly-evaluations?limit=200').then(function(r){return r.json();}).then(function(j){
+      var e = (j.entries||[]).find(function(x){return x.id===id;});
+      if(!e){ toast('غير موجود', true); return; }
+      _editId = id;
+      document.getElementById('emonth').value = e.evaluation_month || '';
+      document.getElementById('edate').value  = e.evaluation_date  || '';
+      document.getElementById('mlabel').textContent = arMonthLabel(e.evaluation_month);
+      document.getElementById('egroup').value = e.group_name || '';
+      loadStudents(e.group_name);
+      // Wait briefly then set student.
+      setTimeout(function(){
+        document.getElementById('estudent').value = e.student_id;
+      }, 700);
+      setAllScores(e);
+      document.getElementById('nbeh').value  = e.notes_behavior || '';
+      document.getElementById('nlang').value = e.notes_language || '';
+      document.getElementById('ngen').value  = e.general_notes || '';
+      document.getElementById('saveBtn').textContent = '💾 حفظ التعديلات';
+      window.scrollTo({top:0, behavior:'smooth'});
+      toast('تم تحميل التقييم للتعديل');
+    });
+  };
+
+  // ── submit + duplicate flow ──
+  var _editId = null;
+  var _draft = null;
+  var _dupExistingId = null;
+  window.submitForm = function(ev){
+    ev.preventDefault();
+    clearErrs();
+    var grp = document.getElementById('egroup').value.trim();
+    var sid = document.getElementById('estudent').value;
+    if(!grp){ showErr('egroup', 'اختاري المجموعة'); return false; }
+    if(!sid){ showErr('estudent', 'اختاري الطالبة'); return false; }
+    var scores = getAllScores();
+    _draft = {
+      group_name: grp,
+      student_id: parseInt(sid,10),
+      evaluation_date:  document.getElementById('edate').value,
+      evaluation_month: document.getElementById('emonth').value,
+      notes_behavior:   document.getElementById('nbeh').value.trim(),
+      notes_language:   document.getElementById('nlang').value.trim(),
+      general_notes:    document.getElementById('ngen').value.trim()
+    };
+    Object.keys(scores).forEach(function(k){ _draft[k] = scores[k]; });
+    // Show summary modal.
+    var sName = document.getElementById('estudent').options[
+      document.getElementById('estudent').selectedIndex].textContent;
+    var grid = document.getElementById('summaryGrid');
+    var html = '<div><b>الطالبة:</b> '+escapeHtml(sName)+'</div>'+
+               '<div><b>المجموعة:</b> '+escapeHtml(grp)+'</div>'+
+               '<div><b>الشهر:</b> '+arMonthLabel(_draft.evaluation_month)+'</div>'+
+               '<div><b>التقييم العام:</b> '+document.getElementById('overall-val').textContent+'/10</div>';
+    SCORE_FIELDS_INT.concat(SCORE_FIELDS_LANG).forEach(function(s){
+      html += '<div><b>'+s.l+':</b> '+_draft[s.k]+'/10</div>';
+    });
+    grid.innerHTML = html;
+    document.getElementById('confBack').classList.add('show');
+    return false;
+  };
+  window.closeConf = function(){
+    document.getElementById('confBack').classList.remove('show');
+  };
+  window.confirmSave = function(){
+    var btn = document.getElementById('confirmSaveBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var url = '/api/monthly-evaluations';
+    var method = 'POST';
+    if(_editId){
+      url = '/api/monthly-evaluations/' + _editId;
+      method = 'PATCH';
+    }
+    fetch(url, {
+      method: method,
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(_draft)
+    }).then(function(r){
+      return r.json().then(function(j){ return {status:r.status, body:j}; });
+    }).then(function(o){
+      btn.disabled = false; btn.textContent = '💾 حفظ';
+      if(o.status === 409 && o.body && o.body.duplicate){
+        _dupExistingId = o.body.existing_id;
+        closeConf();
+        document.getElementById('dupBack').classList.add('show');
+        return;
+      }
+      if(!o.body || !o.body.ok){
+        toast((o.body && o.body.error) || 'تعذر الحفظ', true);
+        return;
+      }
+      closeConf();
+      toast('تم حفظ التقييم بنجاح ✓');
+      // Reset form (keep group selected).
+      var keepGroup = document.getElementById('egroup').value;
+      setAllScores({});
+      ['nbeh','nlang','ngen'].forEach(function(k){
+        document.getElementById(k).value = '';
+      });
+      document.getElementById('estudent').value = '';
+      _editId = null; _draft = null;
+      document.getElementById('saveBtn').textContent = '💾 حفظ التقييم';
+      loadRecent();
+    });
+  };
+  window.closeDup = function(){
+    document.getElementById('dupBack').classList.remove('show');
+    _dupExistingId = null;
+  };
+  window.editExisting = function(){
+    if(!_dupExistingId) return;
+    closeDup();
+    loadIntoForm(_dupExistingId);
+  };
+
+  loadGroups();
+  loadRecent();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/evaluations')
+@login_required
+def teacher_evaluations_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("teacher", "admin", "manager"):
+        return redirect("/dashboard")
+    who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
+    return TEACHER_EVALUATIONS_HTML.replace("USER_PLACEHOLDER", who)
 
 
 # ── /admin/lessons — admin/manager view of all lesson entries ────────
