@@ -46221,30 +46221,17 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
 
 
-# ── Phase 1+ of the UI redesign: inject the design-system foundation
-# (Google Fonts preconnects + Cairo/Tajawal stylesheet + the design
-# tokens at /static/css/design-system.css) into every HTML page
-# constant in the module. Purely additive — the file at
-# /static/css/design-system.css declares :root custom properties plus
-# a global `body { font-family: var(--font-family-ar) }` rule that
-# sits last in <head> source order, so it wins the cascade over the
-# legacy inline `body { font-family: 'Segoe UI', ... }` declarations
-# the existing pages still ship.
-#
+# ── Phase 1 of the UI redesign: link the design-system stylesheet
+# into every HTML page constant in the module. Purely additive — the
+# file at /static/css/design-system.css only declares :root custom
+# properties, so nothing visually changes until later phases opt in.
 # We scan all globals matching '*_HTML' (instead of an explicit list)
 # so future pages pick the link up automatically; idempotent via a
-# check that the design-system link isn't already present. The
-# replace targets the closing </head> tag — the codebase's pages each
-# carry their own <head>...</head>, no Jinja base template exists.
-_DESIGN_SYSTEM_HEAD = (
-    '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link href="https://fonts.googleapis.com/css2?'
-    'family=Cairo:wght@400;500;600;700'
-    '&family=Tajawal:wght@400;500;700'
-    '&display=swap" rel="stylesheet">\n'
-    '<link rel="stylesheet" href="/static/css/design-system.css">\n'
-    '</head>'
+# check that the link tag isn't already present. The replace targets
+# the closing </head> tag — the codebase's pages each carry their own
+# <head>...</head>, no Jinja base template exists.
+_DESIGN_SYSTEM_LINK = (
+    '<link rel="stylesheet" href="/static/css/design-system.css">\n</head>'
 )
 for _ds_name in list(globals().keys()):
     if not _ds_name.endswith('_HTML'):
@@ -46256,7 +46243,7 @@ for _ds_name in list(globals().keys()):
         continue
     if '/static/css/design-system.css' in _ds_val:
         continue
-    globals()[_ds_name] = _ds_val.replace('</head>', _DESIGN_SYSTEM_HEAD, 1)
+    globals()[_ds_name] = _ds_val.replace('</head>', _DESIGN_SYSTEM_LINK, 1)
 
 
 if __name__ == "__main__":
