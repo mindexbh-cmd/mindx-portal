@@ -5042,6 +5042,35 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       });
   })();
   </script>
+  <!-- Phase 8 — Quick action shortcuts. Each card targets an existing
+       route or an existing dashboard JS modal trigger. No new
+       mutations, no new endpoints. -->
+  <div class="md-quick">
+    <button type="button" class="md-quick-card" onclick="if(typeof srOpen==='function')srOpen();">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F50D;</span>
+      <span class="md-quick-label">&#x628;&#x62D;&#x62B; &#x637;&#x627;&#x644;&#x628;</span>
+    </button>
+    <button type="button" class="md-quick-card mx-admin-only" onclick="if(typeof srOpenAddStudent==='function')srOpenAddStudent();">
+      <span class="md-quick-emoji" aria-hidden="true">&#x2795;</span>
+      <span class="md-quick-label">&#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</span>
+    </button>
+    <a class="md-quick-card" href="/attendance">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F4CB;</span>
+      <span class="md-quick-label">&#x631;&#x635;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
+    </a>
+    <button type="button" class="md-quick-card" onclick="if(typeof pmOpen==='function')pmOpen();">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F4B0;</span>
+      <span class="md-quick-label">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+    </button>
+    <a class="md-quick-card" href="/points/board">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F31F;</span>
+      <span class="md-quick-label">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</span>
+    </a>
+    <a class="md-quick-card mx-staff-only" href="/admin/teacher-deliveries">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F4CA;</span>
+      <span class="md-quick-label">&#x627;&#x644;&#x62A;&#x642;&#x627;&#x631;&#x64A;&#x631;</span>
+    </a>
+  </div>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid dh-legacy-stats">
     <div class="dh-stat-card teal">

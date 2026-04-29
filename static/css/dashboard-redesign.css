@@ -682,3 +682,49 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
 .md-pill-info    { background: var(--md-info-bg);    color: var(--md-info-text); }
 .md-pill-warning { background: var(--md-warning-bg); color: var(--md-warning-text); }
 .md-pill-muted   { background: var(--md-bg-muted);   color: var(--md-text-secondary); }
+
+/* ==========================================================================
+   Phase 8 — Quick action shortcuts row
+   ========================================================================== */
+.md-quick {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--md-sp-3);
+  margin: 0 0 var(--md-sp-5);
+}
+@media (max-width: 1023px) { .md-quick { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 540px)  { .md-quick { grid-template-columns: repeat(2, 1fr); } }
+
+.md-quick-card {
+  background: var(--md-bg-card);
+  border-radius: var(--md-rad-lg);
+  box-shadow: var(--md-shadow-sm);
+  padding: var(--md-sp-4) var(--md-sp-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--md-sp-2);
+  text-decoration: none;
+  color: var(--md-text-primary);
+  font-family: inherit;
+  border: 1px solid var(--md-bg-muted);
+  cursor: pointer;
+  transition: transform var(--md-motion-fast), box-shadow var(--md-motion-fast), border-color var(--md-motion-fast);
+  text-align: center;
+  font-size: inherit;
+  min-height: 96px;
+}
+.md-quick-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--md-shadow-md);
+  border-color: var(--md-brand-border);
+  color: var(--md-brand-deep);
+}
+.md-quick-emoji {
+  font-size: 26px;
+  line-height: 1;
+}
+.md-quick-label {
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-medium);
+}
