@@ -42028,6 +42028,806 @@ def api_parent_messages_export():
                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ──────────────────────────────────────────────────────────────────
+# Monthly evaluations — استمارة التقييم الشهري
+# ──────────────────────────────────────────────────────────────────
+# Teachers fill an 8-score 1-10 slider form per student per month.
+# Admin reviews, flips released_to_parent so the parent portal shows
+# the row, and separately sends a personalised WhatsApp message
+# (logged in message_log). Two independent decisions: portal release
+# and WhatsApp send.
+
+_EV_SCORE_FIELDS = (
+    "score_participation", "score_behavior",
+    "score_reading", "score_dictation", "score_vocabulary",
+    "score_conversation", "score_expression", "score_grammar",
+)
+_EV_AR_MONTHS = ("يناير","فبراير","مارس","أبريل","مايو","يونيو",
+                 "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر")
+
+def _ev_user_role(user):
+    return ((user or {}).get("role") or "").strip().lower()
+
+def _ev_can_admin(user):
+    return _ev_user_role(user) in ("admin", "manager")
+
+def _ev_can_use(user):
+    return _ev_user_role(user) in ("admin", "manager", "teacher")
+
+def _ev_clamp_score(v):
+    """Coerce to int 1-10. Anything outside the range or non-numeric
+    raises a ValueError so the caller can return a 400."""
+    try: n = int(v)
+    except Exception: raise ValueError("invalid score")
+    if n < 1 or n > 10: raise ValueError("score must be 1-10")
+    return n
+
+def _ev_compute_overall(d):
+    """Average of the 8 sliders, rounded to nearest integer."""
+    vals = []
+    for k in _EV_SCORE_FIELDS:
+        v = d.get(k)
+        if v is None: continue
+        try: vals.append(int(v))
+        except Exception: pass
+    if not vals: return None
+    return int(round(sum(vals) / len(vals)))
+
+def _ev_normalise_month(s):
+    """Accept YYYY-MM, YYYY/MM, or full YYYY-MM-DD. Return YYYY-MM."""
+    if not s: return ""
+    s = str(s).strip()
+    import re as _re_m
+    m = _re_m.match(r'^(\d{4})[\-/](\d{1,2})', s)
+    if not m: return ""
+    y = m.group(1); mo = m.group(2)
+    return "%s-%02d" % (y, int(mo))
+
+def _ev_arabic_month_label(yyyy_mm):
+    """'2026-04' → 'أبريل 2026'. Falls back to raw on parse failure."""
+    if not yyyy_mm: return ""
+    parts = str(yyyy_mm).split("-")
+    if len(parts) < 2: return yyyy_mm
+    try: idx = int(parts[1]) - 1
+    except Exception: return yyyy_mm
+    if idx < 0 or idx > 11: return yyyy_mm
+    return _EV_AR_MONTHS[idx] + " " + parts[0]
+
+def _ev_row_to_dict(r):
+    if r is None: return None
+    d = dict(r)
+    out = {
+        "id":                   d.get("id"),
+        "evaluation_date":      d.get("evaluation_date") or d.get("form_fill_date") or "",
+        "evaluation_month":     d.get("evaluation_month") or "",
+        "month_label":          _ev_arabic_month_label(d.get("evaluation_month") or ""),
+        "group_name":           d.get("group_name") or "",
+        "student_id":           d.get("student_id"),
+        "student_name":         d.get("student_name") or "",
+        "teacher_id":           d.get("teacher_id"),
+        "teacher_name":         d.get("teacher_name") or "",
+        "notes_behavior":       d.get("notes_behavior") or d.get("behavior_notes") or "",
+        "notes_language":       d.get("notes_language") or "",
+        "general_notes":        d.get("general_notes") or d.get("notes") or "",
+        "overall_score":        d.get("overall_score"),
+        "released_to_parent":   int(d.get("released_to_parent") or 0),
+        "whatsapp_sent_at":     d.get("whatsapp_sent_at") or "",
+        "whatsapp_sent_by":     d.get("whatsapp_sent_by"),
+        "is_deleted":           int(d.get("is_deleted") or 0),
+        "created_at":           d.get("created_at") or "",
+        "updated_at":           d.get("updated_at") or "",
+    }
+    for k in _EV_SCORE_FIELDS:
+        out[k] = d.get(k)
+    return out
+
+def _ev_render_message(row_dict):
+    """Build the templated Arabic WhatsApp text. row_dict is the dict
+    returned by _ev_row_to_dict, with numeric scores 1-10."""
+    name  = row_dict.get("student_name") or "الطالب/ة"
+    month = row_dict.get("month_label") or row_dict.get("evaluation_month") or ""
+    def s(k):
+        v = row_dict.get(k)
+        return ("—" if v is None else str(int(v))) + "/10"
+    lines = []
+    lines.append("السلام عليكم،")
+    lines.append("تقييم " + name + " لشهر " + month + ":")
+    lines.append("")
+    lines.append("التفاعل:")
+    lines.append("- المشاركة: " + s("score_participation"))
+    lines.append("- السلوك: "   + s("score_behavior"))
+    lines.append("")
+    lines.append("المهارات اللغوية:")
+    lines.append("- القراءة: "  + s("score_reading"))
+    lines.append("- الإملاء: "  + s("score_dictation"))
+    lines.append("- المفردات: " + s("score_vocabulary"))
+    lines.append("- المحادثة: " + s("score_conversation"))
+    lines.append("- التعبير: "  + s("score_expression"))
+    lines.append("- القواعد: "  + s("score_grammar"))
+    lines.append("")
+    overall = row_dict.get("overall_score")
+    lines.append("التقييم العام: " +
+                 (("—" if overall is None else str(int(overall))) + "/10"))
+    notes = (row_dict.get("general_notes") or "").strip()
+    if notes:
+        lines.append("")
+        lines.append("ملاحظات: " + notes)
+    lines.append("")
+    teacher = (row_dict.get("teacher_name") or "").strip()
+    if teacher:
+        lines.append("— المعلمة: " + teacher)
+    lines.append("مايندكس")
+    return "\n".join(lines).strip()
+
+def _ev_resolve_student_phone(db, student_id):
+    """Return (phone_clean, raw, student_name, group_name) tuple."""
+    if not student_id: return ("", "", "", "")
+    try:
+        r = db.execute(
+            "SELECT id, student_name, COALESCE(whatsapp,'') AS whatsapp, "
+            "COALESCE(mother_phone,'') AS mother_phone, "
+            "COALESCE(father_phone,'') AS father_phone, "
+            "COALESCE(group_name_student,'') AS group_name_student "
+            "FROM students WHERE id=?", (int(student_id),)
+        ).fetchone()
+    except Exception: return ("", "", "", "")
+    if not r: return ("", "", "", "")
+    d = dict(r)
+    raw = (d.get("whatsapp") or d.get("mother_phone") or
+           d.get("father_phone") or "").strip()
+    return (_pm_clean_phone(raw), raw,
+            d.get("student_name") or "",
+            d.get("group_name_student") or "")
+
+
+@app.route('/api/monthly-evaluations', methods=['POST'])
+@login_required
+def api_mev_create():
+    user = session.get("user") or {}
+    if not _ev_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    group_name      = (body.get("group_name") or "").strip()
+    student_id_raw  = body.get("student_id") or 0
+    eval_date_raw   = (body.get("evaluation_date") or "").strip()
+    eval_month_raw  = (body.get("evaluation_month") or "").strip()
+    notes_behavior  = (body.get("notes_behavior") or "").strip()
+    notes_language  = (body.get("notes_language") or "").strip()
+    general_notes   = (body.get("general_notes")  or "").strip()
+    if not group_name:
+        return jsonify({"ok": False, "error": "اسم المجموعة مطلوب"}), 400
+    try: student_id = int(student_id_raw or 0)
+    except Exception: student_id = 0
+    if not student_id:
+        return jsonify({"ok": False, "error": "اختاري الطالبة"}), 400
+    eval_date = _att_normalize_date(eval_date_raw) or eval_date_raw
+    if not eval_date:
+        import datetime as _dt_e
+        eval_date = _dt_e.date.today().isoformat()
+    eval_month = _ev_normalise_month(eval_month_raw or eval_date)
+    if not eval_month:
+        return jsonify({"ok": False, "error": "صيغة الشهر غير صحيحة (YYYY-MM)"}), 400
+    # Validate scores.
+    score_vals = {}
+    try:
+        for k in _EV_SCORE_FIELDS:
+            score_vals[k] = _ev_clamp_score(body.get(k))
+    except ValueError:
+        return jsonify({"ok": False,
+            "error": "جميع الدرجات يجب أن تكون من 1 إلى 10"}), 400
+    overall = _ev_compute_overall(score_vals)
+    role = _ev_user_role(user)
+    db = get_db()
+    if role == "teacher":
+        own = set(_teacher_groups_for(db, user))
+        if group_name not in own:
+            return jsonify({"ok": False, "error":
+                "هذه المجموعة ليست ضمن مجموعاتك"}), 403
+    # Resolve student name from id (defensive — UI may have shifted).
+    try:
+        srow = db.execute(
+            "SELECT student_name, COALESCE(group_name_student,'') AS gns, "
+            "COALESCE(group_online,'') AS go FROM students WHERE id=?",
+            (student_id,)
+        ).fetchone()
+    except Exception: srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "الطالبة غير موجودة"}), 404
+    sd = dict(srow)
+    student_name = (sd.get("student_name") or "").strip()
+    # Duplicate guard: same (student_id, evaluation_month) non-deleted.
+    try:
+        dup = db.execute(
+            "SELECT id FROM evaluations WHERE student_id=? AND "
+            "evaluation_month=? AND COALESCE(is_deleted,0)=0 LIMIT 1",
+            (student_id, eval_month)
+        ).fetchone()
+    except Exception: dup = None
+    if dup:
+        return jsonify({
+            "ok": False, "duplicate": True, "existing_id": dict(dup)["id"],
+            "error": "يوجد تقييم سابق لهذا الطالب في هذا الشهر"
+        }), 409
+    teacher_id = None
+    try: teacher_id = int(user.get("id") or 0) or None
+    except Exception: teacher_id = None
+    teacher_name = (user.get("name") or user.get("username") or "").strip()
+    cols = ["evaluation_date","evaluation_month","group_name","student_id",
+            "student_name","teacher_id","teacher_name",
+            "notes_behavior","notes_language","general_notes",
+            "overall_score","released_to_parent","is_deleted",
+            "form_fill_date",
+            "created_at","updated_at"] + list(_EV_SCORE_FIELDS)
+    placeholders = ",".join("?" for _ in cols[:-2-len(_EV_SCORE_FIELDS)] +
+                            cols[-len(_EV_SCORE_FIELDS):])
+    # Build the INSERT manually so the ORDER stays explicit and the
+    # placeholders count matches.
+    sql = (
+        "INSERT INTO evaluations(evaluation_date,evaluation_month,group_name,"
+        "student_id,student_name,teacher_id,teacher_name,"
+        "notes_behavior,notes_language,general_notes,"
+        "overall_score,released_to_parent,is_deleted,form_fill_date,"
+        "created_at,updated_at," + ",".join(_EV_SCORE_FIELDS) + ") "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,0,0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP," +
+        ",".join("?" for _ in _EV_SCORE_FIELDS) + ")"
+    )
+    params = [eval_date, eval_month, group_name, student_id, student_name,
+              teacher_id, teacher_name, notes_behavior, notes_language,
+              general_notes, overall, eval_date]
+    for k in _EV_SCORE_FIELDS:
+        params.append(score_vals[k])
+    try:
+        cur = db.execute(sql, tuple(params))
+        db.commit()
+        new_id = None
+        try: new_id = cur.lastrowid
+        except Exception: pass
+        if new_id is None:
+            try:
+                new_id = db.execute(
+                    "SELECT id FROM evaluations WHERE student_id=? AND "
+                    "evaluation_month=? ORDER BY id DESC LIMIT 1",
+                    (student_id, eval_month)
+                ).fetchone()[0]
+            except Exception: pass
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("evaluations.create", target_type="evaluations",
+               target_id=new_id,
+               new_value={"student_id": student_id,
+                          "evaluation_month": eval_month,
+                          "overall_score": overall})
+    except Exception: pass
+    return jsonify({"ok": True, "success": True, "id": new_id,
+                    "overall_score": overall})
+
+
+@app.route('/api/monthly-evaluations', methods=['GET'])
+@login_required
+def api_mev_list():
+    user = session.get("user") or {}
+    role = _ev_user_role(user)
+    db = get_db()
+    where = ["COALESCE(is_deleted,0)=0", "evaluation_month IS NOT NULL"]
+    params = []
+    q_student   = (request.args.get("student_id") or "").strip()
+    q_group     = (request.args.get("group_name") or "").strip()
+    q_teacher   = (request.args.get("teacher_id") or "").strip()
+    q_month     = (request.args.get("evaluation_month") or "").strip()
+    q_from      = (request.args.get("date_from")  or "").strip()
+    q_to        = (request.args.get("date_to")    or "").strip()
+    q_min       = (request.args.get("score_min")  or "").strip()
+    q_max       = (request.args.get("score_max")  or "").strip()
+    q_sent      = (request.args.get("sent")       or "").strip()
+    q_released  = (request.args.get("released")   or "").strip()
+    q_limit     = (request.args.get("limit")      or "").strip()
+    if role == "teacher":
+        try: tid = int(user.get("id") or 0)
+        except Exception: tid = 0
+        where.append("teacher_id=?"); params.append(tid)
+    elif role == "student":
+        sid = int(user.get("linked_student_id") or 0)
+        if not sid:
+            return jsonify({"ok": True, "entries": []})
+        where.append("student_id=?"); params.append(sid)
+        where.append("released_to_parent=1")
+    elif not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    if q_student:
+        try: where.append("student_id=?"); params.append(int(q_student))
+        except Exception: pass
+    if q_group:
+        where.append("group_name=?"); params.append(q_group)
+    if q_teacher and role != "teacher":
+        try: where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_month:
+        m = _ev_normalise_month(q_month) or q_month
+        where.append("evaluation_month=?"); params.append(m)
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("evaluation_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("evaluation_date<=?"); params.append(d)
+    if q_min:
+        try: where.append("overall_score>=?"); params.append(int(q_min))
+        except Exception: pass
+    if q_max:
+        try: where.append("overall_score<=?"); params.append(int(q_max))
+        except Exception: pass
+    if q_sent == "yes":
+        where.append("whatsapp_sent_at IS NOT NULL")
+    elif q_sent == "no":
+        where.append("whatsapp_sent_at IS NULL")
+    if q_released == "yes":
+        where.append("released_to_parent=1")
+    elif q_released == "no":
+        where.append("COALESCE(released_to_parent,0)=0")
+    sql = ("SELECT * FROM evaluations WHERE " + " AND ".join(where) +
+           " ORDER BY evaluation_date DESC, id DESC")
+    try: lim = int(q_limit) if q_limit else 0
+    except Exception: lim = 0
+    if lim and lim > 0: sql += " LIMIT " + str(min(lim, 1000))
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = [_ev_row_to_dict(r) for r in rows]
+    return jsonify({"ok": True, "entries": out, "count": len(out)})
+
+
+@app.route('/api/monthly-evaluations/<int:eid>', methods=['PATCH'])
+@login_required
+def api_mev_update(eid):
+    user = session.get("user") or {}
+    if not _ev_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _ev_user_role(user)
+    db = get_db()
+    row = db.execute("SELECT * FROM evaluations WHERE id=? AND "
+                     "COALESCE(is_deleted,0)=0", (eid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if role == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+        # Teachers: only within 7 days of creation.
+        try:
+            import datetime as _dt_pe
+            created = rd.get("created_at") or ""
+            try:
+                ts = _dt_pe.datetime.fromisoformat(str(created).replace(" ", "T"))
+            except Exception:
+                ts = None
+            if ts is not None:
+                if (_dt_pe.datetime.utcnow() - ts).total_seconds() > 7*86400:
+                    return jsonify({"ok": False, "error":
+                        "لا يمكن التعديل بعد مرور 7 أيام"}), 403
+        except Exception: pass
+    body = request.get_json(silent=True) or {}
+    sets = []; params = []
+    audit_old = {}; audit_new = {}
+    for k in _EV_SCORE_FIELDS:
+        if k in body:
+            try: v = _ev_clamp_score(body.get(k))
+            except ValueError:
+                return jsonify({"ok": False,
+                    "error": "الدرجات يجب أن تكون من 1 إلى 10"}), 400
+            if v != (rd.get(k) or 0):
+                audit_old[k] = rd.get(k); audit_new[k] = v
+            sets.append(k + "=?"); params.append(v)
+    for k in ("notes_behavior", "notes_language", "general_notes"):
+        if k in body:
+            v = (body.get(k) or "").strip()
+            if v != (rd.get(k) or ""):
+                audit_old[k] = rd.get(k) or ""; audit_new[k] = v
+            sets.append(k + "=?"); params.append(v)
+    if "evaluation_date" in body and _ev_can_admin(user):
+        raw = (body.get("evaluation_date") or "").strip()
+        nv = _att_normalize_date(raw) or raw
+        if nv and nv != (rd.get("evaluation_date") or ""):
+            audit_old["evaluation_date"] = rd.get("evaluation_date") or ""
+            audit_new["evaluation_date"] = nv
+            sets.append("evaluation_date=?"); params.append(nv)
+    if "evaluation_month" in body and _ev_can_admin(user):
+        nm = _ev_normalise_month(body.get("evaluation_month") or "")
+        if nm and nm != (rd.get("evaluation_month") or ""):
+            audit_old["evaluation_month"] = rd.get("evaluation_month") or ""
+            audit_new["evaluation_month"] = nm
+            sets.append("evaluation_month=?"); params.append(nm)
+    if "released_to_parent" in body and _ev_can_admin(user):
+        try: nv = 1 if int(body.get("released_to_parent")) else 0
+        except Exception: nv = 0
+        if nv != int(rd.get("released_to_parent") or 0):
+            audit_old["released_to_parent"] = int(rd.get("released_to_parent") or 0)
+            audit_new["released_to_parent"] = nv
+            sets.append("released_to_parent=?"); params.append(nv)
+    if not sets:
+        return jsonify({"ok": True, "id": eid, "unchanged": True,
+                        "entry": _ev_row_to_dict(row)})
+    # Recompute overall_score if any score changed.
+    have_score_change = any(k in audit_new for k in _EV_SCORE_FIELDS)
+    if have_score_change:
+        merged = dict(rd)
+        for k in _EV_SCORE_FIELDS:
+            if k in audit_new: merged[k] = audit_new[k]
+        new_overall = _ev_compute_overall(merged)
+        if new_overall != rd.get("overall_score"):
+            audit_old["overall_score"] = rd.get("overall_score")
+            audit_new["overall_score"] = new_overall
+            sets.append("overall_score=?"); params.append(new_overall)
+    sets.append("updated_at=CURRENT_TIMESTAMP")
+    params.append(eid)
+    try:
+        db.execute("UPDATE evaluations SET " + ", ".join(sets) +
+                   " WHERE id=?", tuple(params))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        if audit_new:
+            _audit("evaluations.update", target_type="evaluations",
+                   target_id=eid, old_value=audit_old, new_value=audit_new)
+    except Exception: pass
+    new_row = db.execute("SELECT * FROM evaluations WHERE id=?", (eid,)).fetchone()
+    return jsonify({"ok": True, "id": eid, "entry": _ev_row_to_dict(new_row)})
+
+
+@app.route('/api/monthly-evaluations/<int:eid>', methods=['DELETE'])
+@login_required
+def api_mev_delete(eid):
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM evaluations WHERE id=? AND "
+                     "COALESCE(is_deleted,0)=0", (eid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    try:
+        db.execute("UPDATE evaluations SET is_deleted=1, "
+                   "updated_at=CURRENT_TIMESTAMP WHERE id=?", (eid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("evaluations.delete", target_type="evaluations",
+               target_id=eid,
+               old_value={"student_id": rd.get("student_id"),
+                          "evaluation_month": rd.get("evaluation_month") or ""})
+    except Exception: pass
+    return jsonify({"ok": True, "id": eid})
+
+
+@app.route('/api/monthly-evaluations/preview-message/<int:eid>', methods=['GET'])
+@login_required
+def api_mev_preview_message(eid):
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM evaluations WHERE id=? AND "
+                     "COALESCE(is_deleted,0)=0", (eid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    entry = _ev_row_to_dict(row)
+    text = _ev_render_message(entry)
+    phone, raw, sname, gname = _ev_resolve_student_phone(
+        db, entry.get("student_id"))
+    return jsonify({
+        "ok": True, "entry": entry, "text": text,
+        "parent_phone_raw": raw, "parent_phone_clean": phone,
+        "student_name": sname, "group_name": gname,
+    })
+
+
+@app.route('/api/monthly-evaluations/<int:eid>/send-to-parent', methods=['POST'])
+@login_required
+def api_mev_send_to_parent(eid):
+    """Admin-only. Builds the templated text (or uses custom_message
+    from the body if provided), inserts a message_log row, marks
+    whatsapp_sent_at + whatsapp_sent_by on the evaluations row, and
+    returns the wa.me-ready phone + text so the client can fire the
+    open in the user gesture (matches the existing absence-message
+    flow)."""
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM evaluations WHERE id=? AND "
+                     "COALESCE(is_deleted,0)=0", (eid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    entry = _ev_row_to_dict(row)
+    body = request.get_json(silent=True) or {}
+    custom = (body.get("custom_message") or "").strip()
+    text = custom if custom else _ev_render_message(entry)
+    phone, raw, sname, gname = _ev_resolve_student_phone(
+        db, entry.get("student_id"))
+    if not phone:
+        return jsonify({"ok": False, "error":
+            "رقم ولي الأمر غير موجود لهذا الطالب"}), 400
+    # Insert message_log row up front so admin tools see it.
+    template_marker = "evaluation/" + str(eid)
+    msg_log_id = 0
+    try:
+        db.execute(
+            "INSERT INTO message_log(student_name, student_whatsapp, "
+            "template_name) VALUES(?,?,?)",
+            (sname or entry.get("student_name") or "", phone, template_marker),
+        )
+        try:
+            msg_log_id = int(db.execute(
+                "SELECT last_insert_rowid()").fetchone()[0])
+        except Exception: pass
+    except Exception: pass
+    # Mark the evaluation as sent.
+    try:
+        db.execute(
+            "UPDATE evaluations SET whatsapp_sent_at=CURRENT_TIMESTAMP, "
+            "whatsapp_sent_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (int(user.get("id") or 0) or None, eid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("evaluations.send_to_parent", target_type="evaluations",
+               target_id=eid,
+               new_value={"phone_clean": phone, "custom": bool(custom)})
+    except Exception: pass
+    return jsonify({
+        "ok": True, "success": True, "id": eid,
+        "sent_at":   "now",
+        "message_id": msg_log_id,
+        "phone":     phone,
+        "text":      text,
+        "wa_url":    "https://wa.me/" + phone + "?text=" +
+                      __import__("urllib.parse", fromlist=["quote"]).quote(text),
+    })
+
+
+@app.route('/api/monthly-evaluations/stats/<int:sid>', methods=['GET'])
+@login_required
+def api_mev_student_trend(sid):
+    """Per-student trend across months. Admin/teacher: all rows.
+    Parent (student-role): only released rows for their own child."""
+    user = session.get("user") or {}
+    role = _ev_user_role(user)
+    db = get_db()
+    where = ["COALESCE(is_deleted,0)=0", "student_id=?",
+             "evaluation_month IS NOT NULL"]
+    params = [sid]
+    if role == "student":
+        my_sid = int(user.get("linked_student_id") or 0)
+        if my_sid != sid:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+        where.append("released_to_parent=1")
+    elif role == "teacher":
+        try: tid = int(user.get("id") or 0)
+        except Exception: tid = 0
+        where.append("teacher_id=?"); params.append(tid)
+    elif not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    sql = ("SELECT * FROM evaluations WHERE " + " AND ".join(where) +
+           " ORDER BY evaluation_month ASC")
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = [_ev_row_to_dict(r) for r in rows]
+    return jsonify({"ok": True, "entries": out, "count": len(out)})
+
+
+@app.route('/api/monthly-evaluations/admin-stats', methods=['GET'])
+@login_required
+def api_mev_admin_stats():
+    """Aggregate stats for the admin dashboard cards."""
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    import datetime as _dt_es
+    today = _dt_es.date.today()
+    cur_month = today.strftime("%Y-%m")
+    try:
+        total_month = int(db.execute(
+            "SELECT COUNT(*) FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month=?", (cur_month,)).fetchone()[0] or 0)
+        avg_overall = db.execute(
+            "SELECT AVG(overall_score) FROM evaluations "
+            "WHERE COALESCE(is_deleted,0)=0 AND evaluation_month=? "
+            "AND overall_score IS NOT NULL", (cur_month,)
+        ).fetchone()[0]
+        avg_overall = float(avg_overall) if avg_overall is not None else None
+        active_t = int(db.execute(
+            "SELECT COUNT(DISTINCT teacher_id) FROM evaluations "
+            "WHERE COALESCE(is_deleted,0)=0 AND evaluation_month=?",
+            (cur_month,)).fetchone()[0] or 0)
+        pending = int(db.execute(
+            "SELECT COUNT(*) FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND COALESCE(released_to_parent,0)=0").fetchone()[0] or 0)
+        top_rows = db.execute(
+            "SELECT student_name, group_name, overall_score, evaluation_month "
+            "FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month=? AND overall_score IS NOT NULL "
+            "ORDER BY overall_score DESC, student_name LIMIT 5",
+            (cur_month,)).fetchall()
+        bot_rows = db.execute(
+            "SELECT student_name, group_name, overall_score, evaluation_month "
+            "FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month=? AND overall_score IS NOT NULL "
+            "ORDER BY overall_score ASC, student_name LIMIT 5",
+            (cur_month,)).fetchall()
+        active_teachers = db.execute(
+            "SELECT teacher_name, teacher_id, COUNT(*) AS n "
+            "FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month=? GROUP BY teacher_id, teacher_name "
+            "ORDER BY n DESC LIMIT 5",
+            (cur_month,)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({
+        "ok": True, "month": cur_month,
+        "month_label": _ev_arabic_month_label(cur_month),
+        "total_this_month":  total_month,
+        "avg_overall":       (round(avg_overall, 1) if avg_overall is not None else None),
+        "active_teachers":   active_t,
+        "pending_releases":  pending,
+        "top_5":     [dict(r) for r in top_rows],
+        "bottom_5":  [dict(r) for r in bot_rows],
+        "active_teacher_list": [dict(r) for r in active_teachers],
+    })
+
+
+@app.route('/api/monthly-evaluations/teachers', methods=['GET'])
+@login_required
+def api_mev_teachers():
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    by_id = {}
+    try:
+        for r in db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE role='teacher' AND COALESCE(is_active,1)<>0 "
+            "ORDER BY name").fetchall():
+            d = dict(r); tid = int(d.get("id") or 0)
+            if tid:
+                by_id[tid] = {"id": tid,
+                              "name": (d.get("name") or "").strip()
+                                      or (d.get("username") or "").strip()}
+    except Exception: pass
+    try:
+        for r in db.execute(
+            "SELECT DISTINCT teacher_id, COALESCE(teacher_name,'') AS tn "
+            "FROM evaluations WHERE teacher_id IS NOT NULL").fetchall():
+            d = dict(r); tid = int(d.get("teacher_id") or 0)
+            if tid and tid not in by_id:
+                by_id[tid] = {"id": tid, "name": (d.get("tn") or "").strip()}
+    except Exception: pass
+    out = sorted(by_id.values(), key=lambda x: (x["name"] or "", x["id"]))
+    return jsonify({"ok": True, "teachers": out})
+
+
+@app.route('/api/monthly-evaluations/group-students', methods=['GET'])
+@login_required
+def api_mev_group_students():
+    """Active-registered students for a given group. Used by the
+    teacher form's student-dropdown loader. Honours the same active
+    filter the attendance flow uses."""
+    user = session.get("user") or {}
+    if not _ev_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    group = (request.args.get("group") or "").strip()
+    if not group:
+        return jsonify({"ok": False, "error": "اسم المجموعة مطلوب"}), 400
+    db = get_db()
+    role = _ev_user_role(user)
+    if role == "teacher":
+        own = set(_teacher_groups_for(db, user))
+        if group not in own:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    students = _pm_group_recipients(db, group)
+    out = [{"id": s["student_id"], "name": s["student_name"],
+            "has_phone": bool(s.get("whatsapp"))} for s in students]
+    return jsonify({"ok": True, "students": out, "group": group})
+
+
+@app.route('/api/monthly-evaluations/export', methods=['GET'])
+@login_required
+def api_mev_export():
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+    except Exception:
+        return jsonify({"ok": False, "error":
+            "openpyxl غير مثبّت — أضيفي openpyxl إلى requirements.txt"}), 500
+    db = get_db()
+    where = ["COALESCE(is_deleted,0)=0", "evaluation_month IS NOT NULL"]
+    params = []
+    q_group = (request.args.get("group_name") or "").strip()
+    q_teacher = (request.args.get("teacher_id") or "").strip()
+    q_month = (request.args.get("evaluation_month") or "").strip()
+    q_from = (request.args.get("date_from") or "").strip()
+    q_to = (request.args.get("date_to") or "").strip()
+    if q_group: where.append("group_name=?"); params.append(q_group)
+    if q_teacher:
+        try: where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_month:
+        m = _ev_normalise_month(q_month) or q_month
+        where.append("evaluation_month=?"); params.append(m)
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("evaluation_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("evaluation_date<=?"); params.append(d)
+    sql = ("SELECT * FROM evaluations WHERE " + " AND ".join(where) +
+           " ORDER BY evaluation_date DESC, id DESC")
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    wb = Workbook(); ws = wb.active
+    try: ws.sheet_view.rightToLeft = True
+    except Exception: pass
+    ws.title = "التقييم الشهري"
+    headers = ["التاريخ", "الشهر", "المعلمة", "المجموعة", "الطالب",
+               "المشاركة", "السلوك", "القراءة", "الإملاء", "المفردات",
+               "المحادثة", "التعبير", "القواعد", "التقييم العام",
+               "ملاحظات السلوك", "ملاحظات اللغة", "ملاحظات عامة",
+               "منشور؟", "تم الإرسال للأهل؟"]
+    HF = PatternFill("solid", fgColor="6B3FA0")
+    HFONT = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+    BFONT = Font(name="Arial", size=10)
+    A_RTL = Alignment(horizontal="right", vertical="center",
+                      wrap_text=True, readingOrder=2)
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.fill = HF; c.font = HFONT; c.alignment = A_RTL
+    for ridx, r in enumerate(rows, start=2):
+        d = _ev_row_to_dict(r)
+        vals = [d.get("evaluation_date") or "",
+                d.get("month_label") or d.get("evaluation_month") or "",
+                d.get("teacher_name") or "", d.get("group_name") or "",
+                d.get("student_name") or ""]
+        for k in _EV_SCORE_FIELDS:
+            vals.append(d.get(k) if d.get(k) is not None else "")
+        vals.append(d.get("overall_score") if d.get("overall_score") is not None else "")
+        vals += [d.get("notes_behavior") or "", d.get("notes_language") or "",
+                 d.get("general_notes") or "",
+                 ("نعم" if d.get("released_to_parent") else "لا"),
+                 ("نعم" if d.get("whatsapp_sent_at") else "لا")]
+        for cidx, v in enumerate(vals, start=1):
+            cc = ws.cell(row=ridx, column=cidx, value=v)
+            cc.font = BFONT; cc.alignment = A_RTL
+    widths = [12, 14, 22, 22, 22, 10, 10, 10, 10, 10, 10, 10, 10, 12,
+              22, 22, 22, 10, 12]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.row_dimensions[1].height = 24
+    import io as _io_e
+    buf = _io_e.BytesIO(); wb.save(buf); buf.seek(0)
+    from flask import send_file as _send_e
+    return _send_e(buf, as_attachment=True,
+                   download_name="evaluations.xlsx",
+                   mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
