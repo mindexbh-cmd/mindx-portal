@@ -48235,34 +48235,15 @@ def _curriculum_user_role(user):
     return ((user or {}).get("role") or "").strip().lower()
 
 
-def _curriculum_visible_file_ids(db, user):
-    """List of curriculum_files.id values the given user should see.
-
-    - admin / manager  → every non-deleted file (no filtering).
-    - teacher          → assignments with target_type='teacher' AND
-                          target_id=str(user.id) OR target_type='group'
-                          AND target_id IN (teacher's groups).
-    - student / parent → assignments where target_type='student' AND
-                          target_id=str(linked_student_id) OR
-                          target_type='parent' AND target_id=str(user.id)
-                          OR target_type='group' AND target_id IN
-                          (student's group_name_student / group_online).
-    Returns a set[int]. Empty set when the user matches nothing."""
+def _curriculum_user_targets(db, user):
+    """Resolve the (target_type, target_id) tuples this user matches
+    against curriculum_assignments. Pure read; no DB writes. Used by
+    both the visibility resolver and the per-file download resolver
+    so the two stay in lock-step."""
     role = _curriculum_user_role(user)
-    if role in ("admin", "manager"):
-        try:
-            rows = db.execute(
-                "SELECT id FROM curriculum_files WHERE COALESCE(is_deleted,0)=0"
-            ).fetchall()
-        except Exception:
-            rows = []
-        return {int(dict(r).get("id") or 0) for r in rows
-                if int(dict(r).get("id") or 0)}
-
-    targets = []  # list of (target_type, target_id) tuples
+    targets = []
     try: my_id = int(user.get("id") or 0)
     except Exception: my_id = 0
-
     if role == "teacher":
         if my_id:
             targets.append(("teacher", str(my_id)))
@@ -48271,7 +48252,6 @@ def _curriculum_visible_file_ids(db, user):
                 if g: targets.append(("group", g))
         except Exception:
             pass
-
     elif role in ("student", "parent"):
         if my_id:
             targets.append(("parent", str(my_id)))
@@ -48280,9 +48260,6 @@ def _curriculum_visible_file_ids(db, user):
         except Exception: sid = 0
         if sid:
             targets.append(("student", str(sid)))
-            # Also resolve the linked student's groups so a file
-            # assigned to "مجموعة 01" reaches every parent in that
-            # group without needing per-parent assignments.
             try:
                 srow = db.execute(
                     "SELECT group_name_student, group_online "
@@ -48295,19 +48272,69 @@ def _curriculum_visible_file_ids(db, user):
                 for k in ("group_name_student", "group_online"):
                     v = (sd.get(k) or "").strip()
                     if v: targets.append(("group", v))
+    return targets
 
+
+def _curriculum_visible_file_ids(db, user):
+    """List of curriculum_files.id values the given user should see.
+
+    - admin / manager  → every non-deleted file (no filtering).
+    - teacher          → assignments with target_type='teacher' AND
+                          target_id=str(user.id) OR target_type='group'
+                          AND target_id matches (Arabic-folded) one of
+                          the teacher's groups.
+    - student / parent → assignments where target_type='student' AND
+                          target_id=str(linked_student_id) OR
+                          target_type='parent' AND target_id=str(user.id)
+                          OR target_type='group' AND target_id matches
+                          (Arabic-folded) the student's
+                          group_name_student / group_online.
+
+    Group-name matching uses _grp_norm() so أ/إ/آ/ا, ى/ي, ة/ه, NBSP,
+    zero-width marks, and trailing whitespace all compare equal —
+    real-world data drift between students.group_name_student and
+    student_groups.group_name (the source the admin picker pulls
+    from) silently broke visibility before this fix.
+
+    Returns a set[int]. Empty set when the user matches nothing."""
+    role = _curriculum_user_role(user)
+    if role in ("admin", "manager"):
+        try:
+            rows = db.execute(
+                "SELECT id FROM curriculum_files WHERE COALESCE(is_deleted,0)=0"
+            ).fetchall()
+        except Exception:
+            rows = []
+        return {int(dict(r).get("id") or 0) for r in rows
+                if int(dict(r).get("id") or 0)}
+
+    targets = _curriculum_user_targets(db, user)
     if not targets:
         return set()
 
-    # Build the OR-of-pairs WHERE — keep it parameterised, no string
-    # interpolation of identifiers.
+    # Split: non-group targets (parent/student/teacher) match SQL
+    # exactly because their target_id is a numeric user/student id
+    # and isn't subject to spelling drift. Group targets need the
+    # Arabic-fold filter, applied in Python after pulling every
+    # candidate row.
+    exact_targets = [(tt, ti) for tt, ti in targets if tt != "group"]
+    my_groups_norm = {_grp_norm(ti) for tt, ti in targets if tt == "group"}
+
     where_parts = []
     params = []
-    for tt, ti in targets:
-        where_parts.append("(target_type=? AND target_id=?)")
-        params.extend([tt, ti])
+    if exact_targets:
+        for tt, ti in exact_targets:
+            where_parts.append("(target_type=? AND target_id=?)")
+            params.extend([tt, ti])
+    if my_groups_norm:
+        # Pull every group-typed assignment so we can fold-compare
+        # in Python.
+        where_parts.append("target_type='group'")
+    if not where_parts:
+        return set()
     sql = (
-        "SELECT DISTINCT a.file_id FROM curriculum_assignments a "
+        "SELECT a.file_id, a.target_type, a.target_id "
+        "FROM curriculum_assignments a "
         "JOIN curriculum_files f ON f.id=a.file_id "
         "WHERE COALESCE(a.is_deleted,0)=0 "
         "AND COALESCE(f.is_deleted,0)=0 AND ("
@@ -48317,8 +48344,23 @@ def _curriculum_visible_file_ids(db, user):
         rows = db.execute(sql, tuple(params)).fetchall()
     except Exception:
         return set()
-    return {int(dict(r).get("file_id") or 0) for r in rows
-            if int(dict(r).get("file_id") or 0)}
+    out = set()
+    for r in rows:
+        rd = dict(r)
+        try: fid = int(rd.get("file_id") or 0)
+        except Exception: fid = 0
+        if not fid:
+            continue
+        tt = (rd.get("target_type") or "").strip()
+        ti = (rd.get("target_id") or "").strip()
+        if tt == "group":
+            if _grp_norm(ti) in my_groups_norm:
+                out.add(fid)
+        else:
+            # SQL already gated this row to one of exact_targets, so
+            # by reaching this branch it matched.
+            out.add(fid)
+    return out
 
 
 def _curriculum_resolve_download(db, user, file_id):
@@ -48354,43 +48396,30 @@ def _curriculum_resolve_download(db, user, file_id):
     if int(file_id) not in visible_ids:
         return False, False
 
-    # Pull every matching assignment to compute the resolved flag.
-    targets = []
-    try: my_id = int(user.get("id") or 0)
-    except Exception: my_id = 0
-    if role == "teacher":
-        if my_id: targets.append(("teacher", str(my_id)))
-        try:
-            for g in _teacher_groups_for(db, user):
-                if g: targets.append(("group", g))
-        except Exception: pass
-    elif role in ("student", "parent"):
-        if my_id: targets.append(("parent", str(my_id)))
-        sid = 0
-        try: sid = int(user.get("linked_student_id") or 0)
-        except Exception: sid = 0
-        if sid:
-            targets.append(("student", str(sid)))
-            try:
-                srow = db.execute(
-                    "SELECT group_name_student, group_online "
-                    "FROM students WHERE id=?", (sid,)
-                ).fetchone()
-            except Exception: srow = None
-            if srow:
-                sd = dict(srow)
-                for k in ("group_name_student", "group_online"):
-                    v = (sd.get(k) or "").strip()
-                    if v: targets.append(("group", v))
+    # Pull every matching assignment for this file to compute the
+    # resolved download flag. Group target_id values are matched via
+    # the same Arabic-fold helper used by the visibility resolver,
+    # so a row with target_type='group', target_id='مجموعة 01' on the
+    # canonical side matches a student stored as 'مجموعه 01' (heh).
+    targets = _curriculum_user_targets(db, user)
     if not targets:
         return False, False
+    exact_targets = [(tt, ti) for tt, ti in targets if tt != "group"]
+    my_groups_norm = {_grp_norm(ti) for tt, ti in targets if tt == "group"}
+
     where_parts = []
     params = [int(file_id)]
-    for tt, ti in targets:
-        where_parts.append("(target_type=? AND target_id=?)")
-        params.extend([tt, ti])
+    if exact_targets:
+        for tt, ti in exact_targets:
+            where_parts.append("(target_type=? AND target_id=?)")
+            params.extend([tt, ti])
+    if my_groups_norm:
+        where_parts.append("target_type='group'")
+    if not where_parts:
+        return True, default_allowed  # we know they can view
     sql = (
-        "SELECT can_download FROM curriculum_assignments "
+        "SELECT target_type, target_id, can_download "
+        "FROM curriculum_assignments "
         "WHERE file_id=? AND COALESCE(is_deleted,0)=0 AND ("
         + " OR ".join(where_parts) + ")"
     )
@@ -48403,6 +48432,14 @@ def _curriculum_resolve_download(db, user, file_id):
     has_inherit = False
     for r in rows:
         rd = dict(r)
+        tt = (rd.get("target_type") or "").strip()
+        ti = (rd.get("target_id") or "").strip()
+        # Skip group rows that don't fold-match any of my groups —
+        # SQL pulled every group-typed assignment for this file, but
+        # only the ones whose target_id folds equal to mine count.
+        if tt == "group":
+            if _grp_norm(ti) not in my_groups_norm:
+                continue
         cd = rd.get("can_download")
         if cd is None:
             has_inherit = True
@@ -48937,6 +48974,139 @@ def api_curriculum_targets_users():
         rows = []
     return jsonify({"ok": True,
                     "users": [dict(r) for r in rows]})
+
+
+@app.route('/api/curriculum/diag', methods=['GET'])
+@login_required
+def api_curriculum_diag():
+    """Admin/manager-only diagnostic: explain why a given student sees
+    (or doesn't see) curriculum files. Walks through:
+      1. The student row + linked parent users.
+      2. Every (target_type, target_id) the parent's session would
+         resolve to via _curriculum_user_targets.
+      3. Every group-typed assignment in the DB and whether its
+         target_id folds equal to one of the student's groups.
+      4. The resolved file_ids that should be visible.
+    Pass ?personal_id=... or ?student_id=... to pick the student.
+    Use this to verify what production data says when the parent
+    logs in and reports they don't see anything."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    db = get_db()
+    pid = (request.args.get("personal_id") or "").strip()
+    sid_raw = (request.args.get("student_id") or "").strip()
+    student_row = None
+    if sid_raw:
+        try:
+            student_row = db.execute(
+                "SELECT * FROM students WHERE id=?", (int(sid_raw),)
+            ).fetchone()
+        except Exception:
+            student_row = None
+    if not student_row and pid:
+        try:
+            student_row = db.execute(
+                "SELECT * FROM students WHERE personal_id=?", (pid,)
+            ).fetchone()
+        except Exception:
+            student_row = None
+    if not student_row:
+        return jsonify({"ok": False,
+                        "error": "student not found",
+                        "hint": "pass ?personal_id=… or ?student_id=…"}), 404
+    s = dict(student_row)
+    sid = int(s.get("id") or 0)
+
+    # Find any user accounts linked to this student (the parent
+    # session uses one of these).
+    try:
+        linked_users = [dict(r) for r in db.execute(
+            "SELECT id, username, role, name, COALESCE(is_active,1) AS is_active "
+            "FROM users WHERE linked_student_id=? "
+            "ORDER BY id", (sid,)).fetchall()]
+    except Exception:
+        linked_users = []
+
+    # Build the "what would a parent of this student match?" target
+    # list by simulating a session for the first linked parent user
+    # (or using a synthetic dict if there's no linked user yet).
+    # Always force linked_student_id=sid because the SELECT in the
+    # users-lookup above intentionally drops that column to keep the
+    # response slim — but _curriculum_user_targets needs it to walk
+    # the student's group.
+    if linked_users:
+        sim_user = dict(linked_users[0])
+        sim_user["linked_student_id"] = sid
+    else:
+        sim_user = {"id": 0, "role": "student", "linked_student_id": sid}
+    sim_targets = _curriculum_user_targets(db, sim_user)
+
+    # Pull every group-typed assignment so we can show fold-matches.
+    try:
+        all_group_assigns = [dict(r) for r in db.execute(
+            "SELECT a.id, a.file_id, a.target_id, a.can_download, "
+            "       f.title AS file_title, "
+            "       COALESCE(f.is_deleted,0) AS file_is_deleted, "
+            "       COALESCE(a.is_deleted,0) AS assign_is_deleted "
+            "FROM curriculum_assignments a "
+            "JOIN curriculum_files f ON f.id=a.file_id "
+            "WHERE a.target_type='group' "
+            "ORDER BY a.file_id"
+        ).fetchall()]
+    except Exception:
+        all_group_assigns = []
+
+    my_groups_norm = {_grp_norm(ti) for tt, ti in sim_targets if tt == "group"}
+    student_group_strings = [ti for tt, ti in sim_targets if tt == "group"]
+    group_match_diagnostics = []
+    for a in all_group_assigns:
+        ti = (a.get("target_id") or "").strip()
+        is_alive = (int(a.get("file_is_deleted") or 0) == 0
+                    and int(a.get("assign_is_deleted") or 0) == 0)
+        folded = _grp_norm(ti)
+        matched_norm = (folded in my_groups_norm)
+        # Find which student-side group it folded against, if any
+        matched_against = ""
+        for sg in student_group_strings:
+            if _grp_norm(sg) == folded:
+                matched_against = sg
+                break
+        group_match_diagnostics.append({
+            "assignment_id":   a.get("id"),
+            "file_id":         a.get("file_id"),
+            "file_title":      a.get("file_title"),
+            "alive":           is_alive,
+            "target_id_raw":   ti,
+            "target_id_bytes": ti.encode("utf-8").hex(),
+            "target_id_folded": folded,
+            "matches_student":  matched_norm and is_alive,
+            "matched_against_group": matched_against,
+        })
+
+    visible = list(_curriculum_visible_file_ids(db, sim_user))
+
+    return jsonify({
+        "ok": True,
+        "student": {
+            "id":                  s.get("id"),
+            "personal_id":         s.get("personal_id"),
+            "student_name":        s.get("student_name"),
+            "group_name_student":  s.get("group_name_student"),
+            "group_online":        s.get("group_online"),
+        },
+        "linked_user_accounts":     linked_users,
+        "simulated_targets":        [
+            {"target_type": tt, "target_id": ti,
+             "target_id_bytes": (ti.encode("utf-8").hex()
+                                 if isinstance(ti, str) else "")}
+            for tt, ti in sim_targets
+        ],
+        "student_groups_folded":    sorted(my_groups_norm),
+        "group_match_diagnostics":  group_match_diagnostics,
+        "visible_file_ids":         visible,
+        "visible_count":            len(visible),
+    })
 
 
 @app.route('/api/curriculum/targets/groups', methods=['GET'])
