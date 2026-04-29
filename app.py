@@ -46259,57 +46259,5 @@ for _ds_name in list(globals().keys()):
     globals()[_ds_name] = _ds_val.replace('</head>', _DESIGN_SYSTEM_HEAD, 1)
 
 
-# ── Phase 2: auto-inject the redesigned admin sidebar (CSS + JS)
-# only into admin / staff page constants. Login, parent portal,
-# teacher hub and per-teacher pages keep their existing layouts —
-# they don't get the sidebar. The JS module also re-checks the URL on
-# the client side as defense-in-depth, so even if a future page is
-# added to this list by mistake the sidebar still won't appear on
-# non-admin URLs.
-_SIDEBAR_HEAD = (
-    '<link rel="stylesheet" href="/static/css/mx-sidebar.css">\n</head>'
-)
-_SIDEBAR_BODY = (
-    '<script src="/static/js/mx-sidebar.js" defer></script>\n</body>'
-)
-_SIDEBAR_PAGES = (
-    'HOME_HTML',                       # /dashboard
-    'DATABASE_HTML',                   # /database
-    'ATTENDANCE_HTML',                 # /attendance
-    'GROUPS_HTML',                     # /groups
-    'SETTINGS_HTML',                   # /settings
-    'ADMIN_BACKUPS_HTML',              # /admin/backups
-    'ADMIN_LESSONS_HTML',              # /admin/lessons
-    'ADMIN_PARENT_MESSAGES_HTML',      # /admin/parent-messages
-    'ADMIN_EVALUATIONS_HTML',          # /admin/evaluations
-    'ADMIN_TEACHER_DELIVERIES_HTML',   # /admin/teacher-deliveries
-    'TABLE_AUDIT_HTML',                # /admin/table-audit
-    'POINTS_MANAGE_HTML',              # /points/manage
-    'POINTS_BULK_ADJUST_HTML',         # /points/bulk-adjust
-    # /admin/permissions, /admin/docs, /admin/receipts use distinct
-    # constants — picked up below by glob if their names match.
-)
-_SIDEBAR_GLOB = ('ADMIN_PERMISSIONS', 'ADMIN_DOCS', 'ADMIN_RECEIPTS')
-_sidebar_targets = set(_SIDEBAR_PAGES)
-for _g_name in list(globals().keys()):
-    if not _g_name.endswith('_HTML'):
-        continue
-    for _prefix in _SIDEBAR_GLOB:
-        if _g_name.startswith(_prefix):
-            _sidebar_targets.add(_g_name)
-            break
-for _sb_name in _sidebar_targets:
-    _sb_val = globals().get(_sb_name)
-    if not isinstance(_sb_val, str):
-        continue
-    if '</head>' not in _sb_val or '</body>' not in _sb_val:
-        continue
-    if '/static/css/mx-sidebar.css' in _sb_val:
-        continue
-    _sb_val = _sb_val.replace('</head>', _SIDEBAR_HEAD, 1)
-    _sb_val = _sb_val.replace('</body>', _SIDEBAR_BODY, 1)
-    globals()[_sb_name] = _sb_val
-
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
