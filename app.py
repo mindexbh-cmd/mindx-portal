@@ -4454,6 +4454,9 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
    still 403s any direct URL hit). The body[data-role] is set by the
    inline <script> at the top of <body> before any card is parsed. */
 body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
+/* Visible to admin AND manager — used by /admin/teacher-deliveries
+   which the spec grants to both roles. Server still gates the URL. */
+body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
 
 </style>
 </head>
@@ -4634,6 +4637,11 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       <div class="dh-action-title">&#x625;&#x631;&#x633;&#x627;&#x644; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;</div>
       <div class="dh-action-desc">&#x642;&#x648;&#x627;&#x644;&#x628; &#x631;&#x633;&#x627;&#x626;&#x644; &#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x644;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
     </button>
+    <a class="dh-action-card mx-staff-only" href="/admin/teacher-deliveries" style="background:linear-gradient(135deg,#5E35B1,#7E57C2);">
+      <div class="dh-action-icon">&#x1F4CA;</div>
+      <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x62A;&#x633;&#x644;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x64A;&#x646; <span id="dh-td-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
+      <div class="dh-action-desc">&#x645;&#x631;&#x627;&#x642;&#x628;&#x629; &#x627;&#x644;&#x62F;&#x631;&#x648;&#x633;&#x60C; &#x627;&#x644;&#x631;&#x633;&#x627;&#x626;&#x644;&#x60C; &#x648;&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A; &#x641;&#x64A; &#x645;&#x643;&#x627;&#x646; &#x648;&#x627;&#x62D;&#x62F;</div>
+    </a>
     <a class="dh-action-card mx-admin-only" data-button-key="dashboard.parent_receipts" href="/admin/receipts" style="background:linear-gradient(135deg,#0277BD,#0288D1);">
       <div class="dh-action-icon">&#x1F4CE;</div>
       <div class="dh-action-title">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631; <span id="dh-receipts-badge" style="display:none;background:#ff5252;color:#fff;padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:900;margin-right:6px;">0</span></div>
@@ -4676,6 +4684,24 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       if (d && d.ok && d.pending > 0){
         var b = document.getElementById('dh-receipts-badge');
         if (b){ b.textContent = d.pending; b.style.display = 'inline-block'; }
+      }
+    }).catch(function(){});
+})();
+/* Teacher-deliveries open-alerts badge: same one-shot poll pattern.
+   Endpoint returns 403 for non-admin/manager — those roles have the
+   card hidden by CSS already, so a 403 just stays silent. */
+(function(){
+  fetch('/api/teacher-deliveries/summary', {credentials:'include'})
+    .then(function(r){
+      if (r.status === 403) return null;
+      return r.json();
+    })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      var n = (d.stats && d.stats.alerts_total) || 0;
+      if (n > 0){
+        var b = document.getElementById('dh-td-badge');
+        if (b){ b.textContent = n; b.style.display = 'inline-block'; }
       }
     }).catch(function(){});
 })();
