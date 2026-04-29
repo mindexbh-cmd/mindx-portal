@@ -30726,6 +30726,116 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       });
   }
 
+  // ── alerts tab + summary loader ───────────────────────────────
+  // Single backend call /api/teacher-deliveries/summary fills the
+  // four top stats AND the alerts tab, so a page open is ONE
+  // round-trip for everything dashboard-level. Per-tab content still
+  // hits its own endpoint when the user clicks into it.
+  function summaryLoad(force){
+    if(!force && STATE.cache.summary) return Promise.resolve(STATE.cache.summary);
+    return fetch('/api/teacher-deliveries/summary', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return null;
+        STATE.cache.summary = j;
+        return j;
+      });
+  }
+  window.tdLoadSummary = function(){
+    summaryLoad(true).then(function(s){
+      if(!s) return;
+      var st = s.stats || {};
+      document.getElementById('s-lessons-today').textContent  = st.lessons_today  || 0;
+      document.getElementById('s-messages-today').textContent = st.messages_today || 0;
+      document.getElementById('s-evals-month').textContent    = st.evals_month    || 0;
+      document.getElementById('s-alerts-total').textContent   = st.alerts_total   || 0;
+      var badge = document.getElementById('tab-alerts-badge');
+      if(badge){
+        if(st.alerts_total > 0){
+          badge.textContent = st.alerts_total;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+      // If the alerts tab is currently active, re-render with fresh
+      // data.
+      if(STATE.tab === 'alerts'){
+        var box = document.getElementById('tab-content');
+        if(box && typeof window.tdRenderAlerts === 'function')
+          window.tdRenderAlerts(box);
+      }
+    });
+  };
+  function alertOnClick(alert){
+    // Navigate to the appropriate tab with the spec's deep-link
+    // filter. URL ?filter= stays in the address bar so refreshes
+    // preserve the view.
+    var p = new URLSearchParams(location.search);
+    p.set('tab', alert.tab);
+    if(alert.filter) p.set('filter', alert.filter);
+    else p.delete('filter');
+    history.replaceState(null, '', '?' + p.toString());
+    STATE.cache.lessons = null;
+    STATE.cache.messages = null;
+    STATE.cache.evaluations = null;
+    STATE.tab = alert.tab;
+    window.tdRenderActiveTab();
+  }
+  window.tdRenderAlerts = function(box){
+    box.innerHTML = '<div class="tab-head"><h3>⚠ التنبيهات</h3></div>'+
+      '<div id="alerts-body"><div class="empty">جاري التحميل...</div></div>';
+    summaryLoad().then(function(s){
+      var body = document.getElementById('alerts-body');
+      if(!s){
+        body.innerHTML = '<div class="empty">تعذر تحميل التنبيهات</div>';
+        return;
+      }
+      var alerts = (s.alerts || []).slice();
+      var nonzero = alerts.filter(function(a){ return (a.count || 0) > 0; });
+      if(!nonzero.length){
+        body.innerHTML = '<div class="alerts-empty">✅ لا توجد تنبيهات حالياً. كل الميزات محدّثة.</div>';
+        return;
+      }
+      var html = '<div class="alerts-list">';
+      alerts.forEach(function(a){
+        var zero = (a.count || 0) === 0;
+        var sampleStr = '';
+        if(!zero && a.samples && a.samples.length){
+          sampleStr = a.samples.map(function(s){
+            if(s.group_name && s.date) return s.group_name+' — '+s.date;
+            if(s.group_name) return s.group_name + (s.last_date ? ' (آخر: '+s.last_date+')' : '');
+            if(s.teacher_name) return s.teacher_name + (s.last_date ? ' (آخر: '+s.last_date+')' : '');
+            if(s.student_name) return s.student_name;
+            return '';
+          }).filter(Boolean).join(' • ');
+        }
+        html += '<div class="alert-card '+(zero ? 'zero' : '')+'">'+
+          '<div class="a-info">'+
+            '<span class="a-icon">'+(zero ? '✓' : window.tdEscape(a.icon || '⚠'))+'</span>'+
+            '<div>'+
+              '<div class="a-text">'+window.tdEscape(a.title || '')+'</div>'+
+              (sampleStr ? '<div style="color:#888;font-size:.84rem;margin-top:4px;">'+window.tdEscape(sampleStr)+(a.count > a.samples.length ? ' …':'')+'</div>' : '')+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
+            '<span class="a-count">'+a.count+'</span>'+
+            (zero ? '' : '<button class="btn btn-ghost" data-akey="'+window.tdEscape(a.key||'')+'">عرض القائمة</button>')+
+          '</div>'+
+        '</div>';
+      });
+      html += '</div>';
+      body.innerHTML = html;
+      body.querySelectorAll('button[data-akey]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var k = btn.getAttribute('data-akey');
+          var a = (s.alerts || []).find(function(x){ return x.key === k; });
+          if(a) alertOnClick(a);
+        });
+      });
+    });
+  };
+
   // Per-tab JS files attach themselves to window.tdRender* before
   // the first renderTab call below.
   document.addEventListener('DOMContentLoaded', function(){
@@ -30758,6 +30868,232 @@ def admin_teacher_deliveries_page():
             "<h1>غير مصرح</h1><p>هذه الصفحة للأدمن أو المدير فقط.</p></body></html>",
             status=403, mimetype="text/html; charset=utf-8")
     return ADMIN_TEACHER_DELIVERIES_HTML
+
+
+@app.route('/api/teacher-deliveries/summary', methods=['GET'])
+@login_required
+def api_teacher_deliveries_summary():
+    """Single round-trip aggregator for the dashboard:
+        • 3 top-row stats (lessons today, messages today, evaluations
+          this month)
+        • 6 alert counts (the spec's exact list)
+    Computed once per request — caller invalidates by reissuing.
+    Admin/manager only."""
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    import datetime as _dt_td
+    today = _dt_td.date.today().isoformat()
+    cur_month = _dt_td.date.today().strftime("%Y-%m")
+    cutoff_3d = (_dt_td.date.today() - _dt_td.timedelta(days=3)).isoformat()
+    cutoff_7d = (_dt_td.date.today() - _dt_td.timedelta(days=7)).isoformat()
+
+    # ── Top stats ─────────────────────────────────────────────
+    try:
+        lessons_today = int(db.execute(
+            "SELECT COUNT(*) FROM lessons_log WHERE COALESCE(is_deleted,0)=0 "
+            "AND lesson_date=?", (today,)).fetchone()[0] or 0)
+    except Exception: lessons_today = 0
+    try:
+        messages_today = int(db.execute(
+            "SELECT COUNT(*) FROM parent_messages WHERE COALESCE(is_deleted,0)=0 "
+            "AND sent_date=?", (today,)).fetchone()[0] or 0)
+    except Exception: messages_today = 0
+    try:
+        evals_month = int(db.execute(
+            "SELECT COUNT(*) FROM evaluations WHERE COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month=?", (cur_month,)).fetchone()[0] or 0)
+    except Exception: evals_month = 0
+
+    # ── Alert 1: attendance recorded but no lessons_log entry ─
+    have_lessons = set()
+    try:
+        for r in db.execute(
+            "SELECT group_name, lesson_date FROM lessons_log "
+            "WHERE COALESCE(is_deleted,0)=0").fetchall():
+            g = (r[0] or "").strip()
+            d = _att_normalize_date(r[1] or "")
+            if g and d: have_lessons.add((g, d))
+    except Exception: pass
+    a1_count = 0
+    a1_pairs = []
+    seen_att = set()
+    try:
+        for r in db.execute(
+            "SELECT DISTINCT group_name, attendance_date "
+            "FROM attendance WHERE group_name IS NOT NULL "
+            "AND attendance_date IS NOT NULL").fetchall():
+            g = (r[0] or "").strip()
+            d = _att_normalize_date(r[1] or "")
+            if not g or not d: continue
+            if (g, d) in seen_att: continue
+            seen_att.add((g, d))
+            if (g, d) not in have_lessons:
+                a1_count += 1
+                if len(a1_pairs) < 5:
+                    a1_pairs.append({"group_name": g, "date": d})
+    except Exception: pass
+
+    # ── Alert 2: evaluations not yet released ────────────────
+    try:
+        a2_count = int(db.execute(
+            "SELECT COUNT(*) FROM evaluations "
+            "WHERE COALESCE(is_deleted,0)=0 AND COALESCE(released_to_parent,0)=0"
+        ).fetchone()[0] or 0)
+    except Exception: a2_count = 0
+
+    # ── Alert 3: released but not WhatsApp-sent ──────────────
+    try:
+        a3_count = int(db.execute(
+            "SELECT COUNT(*) FROM evaluations "
+            "WHERE COALESCE(is_deleted,0)=0 AND released_to_parent=1 "
+            "AND whatsapp_sent_at IS NULL"
+        ).fetchone()[0] or 0)
+    except Exception: a3_count = 0
+
+    # ── Alert 4: teachers silent on lessons_log >3 days ──────
+    a4_count = 0; a4_names = []
+    try:
+        active_t = db.execute(
+            "SELECT id, COALESCE(name,'') AS name FROM users "
+            "WHERE role='teacher' AND COALESCE(is_active,1)<>0"
+        ).fetchall()
+        for r in active_t:
+            d = dict(r)
+            tid = int(d.get("id") or 0)
+            tname = (d.get("name") or "").strip()
+            if not tid: continue
+            last = db.execute(
+                "SELECT MAX(lesson_date) FROM lessons_log "
+                "WHERE COALESCE(is_deleted,0)=0 AND teacher_id=?",
+                (tid,)).fetchone()
+            last_d = (last[0] if last else None) or ""
+            if not last_d or last_d < cutoff_3d:
+                a4_count += 1
+                if len(a4_names) < 5:
+                    a4_names.append({"teacher_id": tid, "teacher_name": tname,
+                                     "last_date": last_d})
+    except Exception: pass
+
+    # ── Alert 5: groups silent on parent_messages >7 days ────
+    a5_count = 0; a5_names = []
+    try:
+        groups = db.execute(
+            "SELECT group_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name)<>''"
+        ).fetchall()
+        for r in groups:
+            gn = (dict(r).get("group_name") or "").strip()
+            if not gn: continue
+            last = db.execute(
+                "SELECT MAX(sent_date) FROM parent_messages "
+                "WHERE COALESCE(is_deleted,0)=0 AND group_name=?",
+                (gn,)).fetchone()
+            last_d = (last[0] if last else None) or ""
+            if not last_d or last_d < cutoff_7d:
+                a5_count += 1
+                if len(a5_names) < 5:
+                    a5_names.append({"group_name": gn, "last_date": last_d})
+    except Exception: pass
+
+    # ── Alert 6: registered students missing this-month eval ─
+    a6_count = 0; a6_names = []
+    act_col = (get_setting('students', 'active_column',
+                            'registration_term2_2026') or '').strip() \
+              or 'registration_term2_2026'
+    act_val = (get_setting('students', 'active_value', 'تم التسجيل') or '').strip() \
+              or 'تم التسجيل'
+    if not _is_safe_ident(act_col): act_col = 'registration_term2_2026'
+    try:
+        live = {r[1] for r in db.execute("PRAGMA table_info(students)").fetchall()}
+    except Exception: live = set()
+    if act_col in live:
+        try:
+            already = set()
+            for r in db.execute(
+                "SELECT DISTINCT student_id FROM evaluations "
+                "WHERE COALESCE(is_deleted,0)=0 AND evaluation_month=?",
+                (cur_month,)).fetchall():
+                sid = int(dict(r).get("student_id") or 0)
+                if sid: already.add(sid)
+            for r in db.execute(
+                'SELECT id, student_name FROM students '
+                'WHERE TRIM(COALESCE("' + act_col + '", \'\')) = ? '
+                'ORDER BY student_name', (act_val,)
+            ).fetchall():
+                d = dict(r)
+                sid = int(d.get("id") or 0)
+                if sid and sid not in already:
+                    a6_count += 1
+                    if len(a6_names) < 5:
+                        a6_names.append({"student_id": sid,
+                                         "student_name": d.get("student_name") or ""})
+        except Exception: pass
+
+    alerts_total = a1_count + a2_count + a3_count + a4_count + a5_count + a6_count
+    return jsonify({
+        "ok": True,
+        "today":     today,
+        "month":     cur_month,
+        "stats": {
+            "lessons_today":   lessons_today,
+            "messages_today":  messages_today,
+            "evals_month":     evals_month,
+            "alerts_total":    alerts_total,
+        },
+        "alerts": [
+            {
+                "key":   "missing_lessons",
+                "icon":  "⚠",
+                "title": "حصص رُصد حضورها بدون تسجيل درس",
+                "count": a1_count,
+                "tab":   "lessons",
+                "filter": "missing",
+                "samples": a1_pairs,
+            },
+            {
+                "key":   "unreleased_evals",
+                "icon":  "⚠",
+                "title": "تقييمات شهرية لم تُنشر للأهالي",
+                "count": a2_count,
+                "tab":   "evaluations",
+                "filter": "unreleased",
+            },
+            {
+                "key":   "sent_pending_evals",
+                "icon":  "⚠",
+                "title": "تقييمات نُشرت ولم تُرسل عبر واتساب",
+                "count": a3_count,
+                "tab":   "evaluations",
+                "filter": "sent_pending",
+            },
+            {
+                "key":   "silent_teachers",
+                "icon":  "⚠",
+                "title": "معلمات لم يسجلوا أي درس آخر 3 أيام",
+                "count": a4_count,
+                "tab":   "lessons",
+                "samples": a4_names,
+            },
+            {
+                "key":   "silent_groups",
+                "icon":  "⚠",
+                "title": "مجموعات نشطة لم يصلها رسالة منذ 7 أيام",
+                "count": a5_count,
+                "tab":   "messages",
+                "samples": a5_names,
+            },
+            {
+                "key":   "missing_evals",
+                "icon":  "⚠",
+                "title": "طلاب بدون تقييم لهذا الشهر",
+                "count": a6_count,
+                "tab":   "evaluations",
+                "samples": a6_names,
+            },
+        ],
+    })
 
 
 @app.route('/api/teacher/groups-diag', methods=['GET'])
