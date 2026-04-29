@@ -400,3 +400,47 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
     opacity: 1; pointer-events: auto;
   }
 }
+
+/* ==========================================================================
+   Phase 4 — Welcome banner
+   ========================================================================== */
+.md-welcome {
+  background: linear-gradient(135deg, var(--md-brand) 0%, var(--md-brand-deep) 100%);
+  color: var(--md-text-on-brand);
+  border-radius: var(--md-rad-lg);
+  padding: var(--md-sp-6) var(--md-sp-7);
+  margin: var(--md-sp-5) 0 var(--md-sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--md-shadow-md);
+  flex-wrap: wrap;
+  gap: var(--md-sp-4);
+  min-height: 96px;
+}
+.md-welcome-greeting {
+  font-size: var(--md-fz-2xl);
+  font-weight: var(--md-fw-black);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sp-3);
+  flex-wrap: wrap;
+  line-height: 1.2;
+}
+.md-welcome-wave {
+  font-size: var(--md-fz-2xl);
+  display: inline-block;
+  transform: rotate(-10deg);
+}
+.md-welcome-date {
+  font-size: var(--md-fz-base);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: var(--md-fw-medium);
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .md-welcome { padding: var(--md-sp-5); min-height: auto; }
+  .md-welcome-greeting { font-size: var(--md-fz-xl); }
+  .md-welcome-date { font-size: var(--md-fz-sm); }
+}

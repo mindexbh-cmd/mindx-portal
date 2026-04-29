@@ -4732,6 +4732,39 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 })();
 </script>
 <div class="dh-main">
+  <!-- Phase 4 — Welcome banner. Time-aware greeting + Arabic date,
+       populated by the inline script below. -->
+  <div class="md-welcome" role="banner">
+    <div class="md-welcome-greeting">
+      <span id="md-welcome-greeting-text">&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B;!</span>
+      <span class="md-welcome-wave" aria-hidden="true">&#x1F44B;</span>
+    </div>
+    <div class="md-welcome-date" id="md-welcome-date">&mdash;</div>
+  </div>
+  <script>
+  (function(){
+    /* Greeting time-aware: morning <12, evening otherwise.
+       Date formatted via Intl.DateTimeFormat('ar', long form). */
+    var nameSrc = document.querySelector('.md-tb-avatar-name');
+    var greetEl = document.getElementById('md-welcome-greeting-text');
+    var dateEl  = document.getElementById('md-welcome-date');
+    var firstName = '';
+    if (nameSrc) firstName = ((nameSrc.textContent || '').trim().split(/\s+/)[0] || '');
+    if (greetEl) {
+      var h = (new Date()).getHours();
+      var prefix = (h >= 5 && h < 12) ? 'صباح الخير' : 'مساء الخير';
+      greetEl.textContent = prefix + (firstName ? '، ' + firstName + '!' : '!');
+    }
+    if (dateEl) {
+      try {
+        var f = new Intl.DateTimeFormat('ar', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        });
+        dateEl.textContent = 'اليوم: ' + f.format(new Date());
+      } catch(e) {}
+    }
+  })();
+  </script>
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
     <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
