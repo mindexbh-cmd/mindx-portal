@@ -15950,6 +15950,18 @@ def api_me():
     })
 
 
+# SECURITY MARKER (logout-security-fix-20260429):
+# A teacher (personal_id 960302557, أ. کوثر شعبان) reported seeing the
+# full admin dashboard. Root cause: this handler only enforces
+# @login_required — no role check — so any authenticated user receives
+# HOME_HTML in full. The page uses mx-admin-only / mx-staff-only CSS
+# classes for client-side hiding, but that markup is still shipped to
+# the browser. Combined with the post-login landing_page='dashboard'
+# override (line ~15915) and the lack of Cache-Control: no-store
+# headers on protected pages, a teacher could land here on login and
+# see admin content even after clicking logout (browser cache).
+# The fix in the next commit role-gates this route server-side and
+# adds no-store headers to every protected page response.
 @app.route("/dashboard")
 @login_required
 def dashboard():
