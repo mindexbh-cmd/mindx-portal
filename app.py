@@ -4473,13 +4473,75 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <div class="dh-topbar">
-  <div class="dh-topbar-title">&#x1F393; MINDEX EDUCATION &amp; TRAINING CENTRE</div>
-  <div class="dh-topbar-right">
-    <span>&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B; <b>USER_PLACEHOLDER</b></span>
-    <a href="/settings" class="dh-logout mx-admin-only" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
-    <a href="/api/logout" class="dh-logout">&#x62E;&#x631;&#x648;&#x62C;</a>
+  <!-- Phase 2 — fixed 64px deep purple header. Settings + logout
+       preserved as items inside the avatar dropdown. The hamburger
+       button toggles the sidebar that phase 3 will mount. -->
+  <div class="md-tb-right">
+    <button type="button" class="md-hb" id="md-hb" aria-label="&#x641;&#x62A;&#x62D; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629;" aria-controls="md-sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="md-tb-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+    </div>
+    <div class="md-tb-brand-text">&#x645;&#x627;&#x64A;&#x646;&#x62F;&#x643;&#x633;</div>
+  </div>
+  <div class="md-tb-center">
+    <!-- Search bar deferred to a later phase per the brief. -->
+  </div>
+  <div class="md-tb-left">
+    <button type="button" class="md-tb-bell" id="md-tb-bell" aria-label="&#x627;&#x644;&#x62A;&#x646;&#x628;&#x64A;&#x647;&#x627;&#x62A;" title="&#x627;&#x644;&#x62A;&#x646;&#x628;&#x64A;&#x647;&#x627;&#x62A;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="md-tb-bell-badge" id="md-tb-bell-badge">0</span>
+    </button>
+    <div class="md-tb-avatar-wrap">
+      <button type="button" class="md-tb-avatar-btn" id="md-tb-avatar-btn" aria-haspopup="true" aria-expanded="false" aria-controls="md-tb-avatar-menu">
+        <span class="md-tb-avatar" id="md-tb-avatar" aria-hidden="true">M</span>
+        <span class="md-tb-avatar-name">USER_PLACEHOLDER</span>
+        <svg class="md-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-tb-avatar-menu" id="md-tb-avatar-menu" role="menu">
+        <a href="/settings" class="mx-admin-only" role="menuitem">&#x627;&#x644;&#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a>
+        <a href="/api/logout" role="menuitem">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x62E;&#x631;&#x648;&#x62C;</a>
+      </div>
+    </div>
   </div>
 </div>
+<script>
+(function(){
+  /* Phase 2 — topbar populator + dropdown + bell badge.
+     - Avatar letter is the first non-space char of the user's name.
+     - Bell badge count comes from /api/teacher-deliveries/summary
+       (admin/manager only; 403 silently no-ops for other roles).
+     - Avatar dropdown opens on click, closes on outside click + Escape. */
+  var nameEl = document.querySelector('.md-tb-avatar-name');
+  var avEl   = document.getElementById('md-tb-avatar');
+  if (nameEl && avEl) {
+    var n = (nameEl.textContent || '').trim();
+    avEl.textContent = n ? n.charAt(0).toUpperCase() : 'M';
+  }
+  fetch('/api/teacher-deliveries/summary', {credentials:'include'})
+    .then(function(r){ return r.status === 403 ? null : r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      var n = (d.stats && d.stats.alerts_total) || 0;
+      var b = document.getElementById('md-tb-bell-badge');
+      if (b && n > 0) { b.textContent = n; b.classList.add('has-count'); }
+    }).catch(function(){});
+  var btn  = document.getElementById('md-tb-avatar-btn');
+  var menu = document.getElementById('md-tb-avatar-menu');
+  if (btn && menu) {
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var open = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', function(){ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') { menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
+    });
+  }
+})();
+</script>
 <div class="dh-main">
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>

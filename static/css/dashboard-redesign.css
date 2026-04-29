@@ -108,3 +108,161 @@
   --md-z-header:          60;
   --md-z-modal:           1100;
 }
+
+/* ==========================================================================
+   Phase 2 — Top header bar (fixed, 64px, deep purple)
+   ==========================================================================
+   Restyles the existing dh-topbar in place: same wrapper, new inner
+   structure (3 zones). Settings + logout preserved as items inside the
+   avatar dropdown — no functionality removed.
+   ========================================================================== */
+body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
+
+.dh-topbar {
+  position: fixed !important;
+  top: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  height: var(--md-header-h);
+  background: var(--md-brand-deep) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 var(--md-sp-5) !important;
+  gap: var(--md-sp-4);
+  font-family: var(--md-font-stack);
+  z-index: var(--md-z-header);
+  box-shadow: var(--md-shadow-sm) !important;
+  color: var(--md-text-on-brand) !important;
+  flex-wrap: nowrap !important;
+}
+
+.md-tb-right, .md-tb-center, .md-tb-left {
+  display: flex;
+  align-items: center;
+  gap: var(--md-sp-3);
+}
+.md-tb-right { flex-shrink: 0; }
+.md-tb-center { flex: 1 1 auto; min-width: 0; }
+.md-tb-left { flex-shrink: 0; gap: var(--md-sp-2); }
+
+/* Hamburger / logo / brand */
+.md-hb,
+.md-tb-bell {
+  width: 40px; height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--md-text-on-brand);
+  border-radius: var(--md-rad-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition: background var(--md-motion-fast);
+}
+.md-hb:hover, .md-tb-bell:hover { background: rgba(255, 255, 255, 0.22); }
+.md-hb svg, .md-tb-bell svg { width: 20px; height: 20px; }
+.md-i-svg { display: inline-block; }
+
+.md-tb-logo {
+  width: 36px; height: 36px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--md-rad-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.md-tb-logo svg { width: 22px; height: 22px; color: var(--md-text-on-brand); }
+.md-tb-brand-text {
+  font-size: var(--md-fz-md);
+  font-weight: var(--md-fw-bold);
+  color: var(--md-text-on-brand);
+  letter-spacing: 0.2px;
+}
+
+/* Notifications bell */
+.md-tb-bell-badge {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  min-width: 16px; height: 16px;
+  border-radius: var(--md-rad-pill);
+  background: var(--md-danger);
+  color: var(--md-text-on-brand);
+  font-size: 10px;
+  font-weight: var(--md-fw-bold);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+.md-tb-bell-badge.has-count { display: inline-flex; }
+
+/* Avatar */
+.md-tb-avatar-wrap { position: relative; }
+.md-tb-avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sp-2);
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: var(--md-rad-md);
+  padding: var(--md-sp-1) var(--md-sp-2) var(--md-sp-1) var(--md-sp-3);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--md-text-on-brand);
+  transition: background var(--md-motion-fast);
+}
+.md-tb-avatar-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.md-tb-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--md-text-on-brand);
+  color: var(--md-brand-deep);
+  font-weight: var(--md-fw-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.md-tb-avatar-name {
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-medium);
+  color: var(--md-text-on-brand);
+}
+.md-tb-avatar-btn .md-chev { width: 14px; height: 14px; opacity: 0.85; }
+
+.md-tb-avatar-menu {
+  position: absolute;
+  top: calc(100% + var(--md-sp-2));
+  inset-inline-end: 0;
+  background: var(--md-bg-card);
+  color: var(--md-text-primary);
+  min-width: 180px;
+  border-radius: var(--md-rad-md);
+  box-shadow: var(--md-shadow-lg);
+  padding: var(--md-sp-2) 0;
+  display: none;
+  z-index: calc(var(--md-z-header) + 1);
+  border: 1px solid var(--md-bg-muted);
+}
+.md-tb-avatar-menu.open { display: block; }
+.md-tb-avatar-menu a {
+  display: block;
+  padding: var(--md-sp-2) var(--md-sp-4);
+  text-decoration: none;
+  color: inherit;
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-medium);
+  transition: background var(--md-motion-fast);
+}
+.md-tb-avatar-menu a:hover { background: var(--md-bg-soft); color: var(--md-brand-deep); }
+
+@media (max-width: 640px) {
+  .md-tb-brand-text { display: none; }
+  .md-tb-avatar-name { display: none; }
+  .md-tb-avatar-btn { padding: var(--md-sp-1); }
+}
