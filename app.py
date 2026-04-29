@@ -28712,6 +28712,790 @@ def admin_parent_messages_page():
     return ADMIN_PARENT_MESSAGES_HTML
 
 
+# ── /admin/evaluations — admin oversight + send-to-parent ──────────
+ADMIN_EVALUATIONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>التقييم الشهري — إدارة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fff8e1,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#e65100;}
+.topbar a{color:#e65100;text-decoration:none;background:#fff3e0;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1320px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:14px;padding:18px;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.panel-title{font-weight:900;color:#e65100;font-size:1.05rem;margin:0 0 12px;}
+.filters{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+@media (max-width:1100px){.filters{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:680px){.filters{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.filters{grid-template-columns:1fr;}}
+.filters label{display:block;font-size:.82rem;color:#e65100;font-weight:700;
+               margin-bottom:4px;}
+.filters input,.filters select{width:100%;padding:8px 10px;border:1.5px solid #ffe0b2;
+                                border-radius:8px;font-family:inherit;font-size:.92rem;
+                                background:#fffaf2;}
+.filter-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn{background:linear-gradient(135deg,#FB8C00,#EF6C00);color:#fff;border:none;
+     border-radius:8px;padding:9px 16px;font-weight:800;font-size:.92rem;
+     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{box-shadow:0 4px 14px rgba(251,140,0,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#fff3e0;color:#e65100;}
+.btn-ghost:hover{background:#ffe0b2;}
+.btn-warn{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.btn-export{background:linear-gradient(135deg,#1976D2,#0D47A1);}
+.btn-bulk{background:linear-gradient(135deg,#26A69A,#00695C);}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px;}
+@media (max-width:1100px){.cards{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:680px){.cards{grid-template-columns:repeat(2,1fr);}}
+.card{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.06);
+      border-right:4px solid #FB8C00;}
+.card h4{margin:0 0 6px;font-size:.78rem;color:#666;font-weight:700;}
+.card .num{font-size:1.6rem;font-weight:900;color:#e65100;line-height:1.1;}
+.card.warn{border-right-color:#e53935;}
+.card.warn .num{color:#c62828;}
+.card.ok{border-right-color:#2E7D32;}
+.card.ok .num{color:#2E7D32;}
+.card.lead{grid-column:span 2;}
+.lead-list{font-size:.82rem;color:#333;margin-top:8px;line-height:1.7;
+           max-height:120px;overflow:auto;}
+.lead-list .pill{display:inline-block;background:#fff3e0;border:1px solid #ffcc80;
+                  border-radius:6px;padding:3px 8px;margin:2px;font-weight:700;
+                  color:#e65100;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.9rem;}
+table.tbl th{background:#fff3e0;color:#e65100;padding:10px 8px;text-align:right;
+             font-weight:800;cursor:pointer;user-select:none;}
+table.tbl th:hover{background:#ffe0b2;}
+table.tbl td{padding:8px;border-bottom:1px solid #fff3e0;vertical-align:top;}
+table.tbl tr:hover td{background:#fff8e1;}
+.act-btn{padding:5px 9px;border-radius:7px;border:none;cursor:pointer;
+         font-size:.78rem;font-weight:700;font-family:inherit;}
+.act-btn.view{background:#fff3e0;color:#e65100;margin-right:3px;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;margin-right:3px;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:3px;}
+.act-btn.send{background:#e8f5e9;color:#1b5e20;margin-right:3px;}
+.act-btn.send:disabled{background:#eee;color:#999;cursor:not-allowed;}
+.act-btn.send.sent{background:#fff8e1;color:#f57c00;}
+.toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+        font-size:.82rem;font-weight:700;}
+.toggle input{cursor:pointer;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.86rem;}
+.bar-row .b-lbl{flex:0 0 130px;color:#5d4037;}
+.bar-row .b-bar{flex:1;height:14px;background:#fff3e0;border-radius:7px;overflow:hidden;
+               border:1px solid #ffe0b2;}
+.bar-row .b-bar > div{height:100%;background:linear-gradient(90deg,#e53935,#fdd835,#43a047);
+                      border-radius:7px;}
+.bar-row .b-val{flex:0 0 40px;text-align:left;font-weight:800;color:#e65100;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.pagination{display:flex;gap:6px;justify-content:center;align-items:center;
+            margin-top:14px;flex-wrap:wrap;}
+.pagination button{padding:6px 11px;border-radius:7px;border:1.5px solid #ffe0b2;
+                   background:#fff;cursor:pointer;font-weight:700;color:#e65100;
+                   font-family:inherit;}
+.pagination button.active{background:#FB8C00;color:#fff;border-color:#FB8C00;}
+.pagination button:disabled{opacity:.4;cursor:not-allowed;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:680px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal.lg{max-width:820px;}
+.modal h3{margin:0 0 14px;color:#e65100;font-weight:900;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-weight:700;color:#e65100;font-size:.86rem;
+             margin-bottom:4px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:9px 12px;border:1.6px solid #ffe0b2;border-radius:8px;
+  font-family:inherit;font-size:.95rem;background:#fffaf2;}
+.field textarea{resize:vertical;min-height:60px;}
+.preview-text{background:#fff8e1;border:1.5px solid #ffe0b2;border-radius:10px;
+              padding:12px 14px;font-family:'Segoe UI',monospace;
+              white-space:pre-wrap;color:#5d4037;line-height:1.65;font-size:.92rem;
+              max-height:50vh;overflow:auto;}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+.tt{position:relative;}
+.tt[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:100%;
+                            right:0;background:#333;color:#fff;padding:6px 10px;
+                            border-radius:6px;font-size:.78rem;white-space:nowrap;
+                            z-index:30;pointer-events:none;}
+.score-pill{display:inline-block;padding:3px 10px;border-radius:6px;font-weight:800;
+            font-size:.86rem;}
+.score-pill.high{background:#c8e6c9;color:#1b5e20;}
+.score-pill.mid{background:#fff8e1;color:#f57c00;}
+.score-pill.low{background:#ffcdd2;color:#b71c1c;}
+@media (max-width:680px){
+  table.tbl{font-size:.82rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #ffe0b2;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#e65100;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📊 إدارة التقييم الشهري</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h3 class="panel-title">المرشحات</h3>
+    <div class="filters">
+      <div><label>الشهر</label><input type="month" id="f-month"></div>
+      <div><label>المعلمة</label><select id="f-teacher"><option value="">— الكل —</option></select></div>
+      <div><label>المجموعة</label><select id="f-group"><option value="">— الكل —</option></select></div>
+      <div><label>الطالب</label><select id="f-student"><option value="">— الكل —</option></select></div>
+      <div><label>أدنى تقييم</label>
+        <select id="f-min"><option value="">—</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+      </div>
+      <div><label>الإرسال</label>
+        <select id="f-sent"><option value="">— الكل —</option><option value="yes">تم الإرسال</option><option value="no">لم يُرسل</option></select>
+      </div>
+    </div>
+    <div class="filter-acts">
+      <button class="btn" onclick="applyFilters()">🔍 تطبيق</button>
+      <button class="btn btn-ghost" onclick="resetFilters()">↺ مسح</button>
+      <button class="btn btn-bulk" onclick="bulkSend()">📨 إرسال للجميع (المنشورة وغير المُرسلة)</button>
+      <button class="btn btn-export" onclick="exportXlsx()">📊 تصدير إلى Excel</button>
+    </div>
+  </div>
+
+  <div class="cards" id="statsCards">
+    <div class="card"><h4>هذا الشهر</h4><div class="num" id="s-month-tot">—</div></div>
+    <div class="card ok"><h4>المتوسط العام</h4><div class="num" id="s-avg">—</div></div>
+    <div class="card"><h4>المعلمات النشطات</h4><div class="num" id="s-teach">—</div></div>
+    <div class="card warn"><h4>بانتظار النشر للأهالي</h4><div class="num" id="s-pending">—</div></div>
+    <div class="card lead">
+      <h4>أعلى 5 طالبات (الشهر الحالي)</h4>
+      <div class="lead-list" id="s-top">—</div>
+    </div>
+    <div class="card lead">
+      <h4>أدنى 5 طالبات (الشهر الحالي)</h4>
+      <div class="lead-list" id="s-bottom">—</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3 class="panel-title">سجل التقييمات</h3>
+    <div id="tableBox"><div class="empty">جاري التحميل...</div></div>
+    <div class="pagination" id="pagBox"></div>
+  </div>
+
+</div>
+
+<!-- View modal -->
+<div class="modal-back" id="viewBack" onclick="if(event.target===this)closeView()">
+  <div class="modal lg">
+    <h3 id="viewTitle">تفاصيل التقييم</h3>
+    <div id="viewBody"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeView()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal (admin: all fields) -->
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeEdit()">
+  <div class="modal lg">
+    <h3>تعديل التقييم</h3>
+    <div class="field"><label>التاريخ</label><input type="date" id="e-date"></div>
+    <div class="field"><label>الشهر</label><input type="month" id="e-month"></div>
+    <div id="e-sliders"></div>
+    <div class="field"><label>ملاحظات السلوك</label><textarea id="e-nbeh"></textarea></div>
+    <div class="field"><label>ملاحظات اللغة</label><textarea id="e-nlang"></textarea></div>
+    <div class="field"><label>ملاحظات عامة</label><textarea id="e-ngen"></textarea></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">إلغاء</button>
+      <button class="btn btn-danger" onclick="deleteFromEdit()">حذف</button>
+      <button class="btn" id="saveEditBtn" onclick="saveEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Send-to-parent modal -->
+<div class="modal-back" id="sendBack" onclick="if(event.target===this)closeSend()">
+  <div class="modal lg">
+    <h3 id="sendTitle">إرسال التقييم لولي الأمر</h3>
+    <div class="field">
+      <label>رقم ولي الأمر</label>
+      <input type="text" id="s-phone" readonly>
+    </div>
+    <div class="field">
+      <label>نص الرسالة (يمكنكِ التعديل قبل الإرسال)</label>
+      <textarea id="s-text" rows="14"></textarea>
+    </div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeSend()">إلغاء</button>
+      <button class="btn btn-warn" id="sendBtn" onclick="confirmSend()">📨 إرسال عبر الواتساب</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk send progress modal -->
+<div class="modal-back" id="bulkBack">
+  <div class="modal">
+    <h3 id="bulkTitle">إرسال جماعي</h3>
+    <p id="bulkStatus">— من —</p>
+    <div id="bulkList" style="max-height:40vh;overflow:auto;margin-top:10px;
+         font-size:.86rem;line-height:1.7;"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" id="bulkCloseBtn" style="display:none;"
+              onclick="closeBulk()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذا التقييم؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDel()">إلغاء</button>
+      <button class="btn btn-danger" id="confirmDelBtn" onclick="confirmDel()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var SCORE_FIELDS = [
+    {k:'score_participation', l:'المشاركة'},
+    {k:'score_behavior',      l:'السلوك'},
+    {k:'score_reading',       l:'القراءة'},
+    {k:'score_dictation',     l:'الإملاء'},
+    {k:'score_vocabulary',    l:'المفردات'},
+    {k:'score_conversation',  l:'المحادثة'},
+    {k:'score_expression',    l:'التعبير'},
+    {k:'score_grammar',       l:'القواعد'}
+  ];
+  var ALL = []; var PAGE = 1; var PER = 20;
+  var SORT = {col:'evaluation_date', dir:'desc'};
+  var GROUPS = []; var STUDENTS_INDEX = {}; var TEACHERS = [];
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2500);
+  }
+  function scoreCls(v){
+    if(v == null) return 'mid';
+    if(v >= 8) return 'high';
+    if(v <= 4) return 'low';
+    return 'mid';
+  }
+
+  function getFilters(){
+    return {
+      evaluation_month: document.getElementById('f-month').value,
+      teacher_id: document.getElementById('f-teacher').value,
+      group_name: document.getElementById('f-group').value,
+      student_id: document.getElementById('f-student').value,
+      score_min:  document.getElementById('f-min').value,
+      sent:       document.getElementById('f-sent').value
+    };
+  }
+  function buildQs(f){
+    var p = [];
+    Object.keys(f).forEach(function(k){
+      if(f[k]) p.push(encodeURIComponent(k)+'='+encodeURIComponent(f[k]));
+    });
+    return p.length ? ('?' + p.join('&')) : '';
+  }
+
+  function loadFilterOpts(){
+    return Promise.all([
+      fetch('/api/monthly-evaluations/teachers').then(function(r){return r.json();}),
+      fetch('/api/teacher/groups').then(function(r){return r.json();}).catch(function(){return null;}),
+    ]).then(function(arr){
+      var tr = arr[0] || {}; var gr = arr[1] || {};
+      TEACHERS = tr.teachers || [];
+      var ts = document.getElementById('f-teacher');
+      ts.innerHTML = '<option value="">— الكل —</option>';
+      TEACHERS.forEach(function(t){
+        var o = document.createElement('option');
+        o.value = t.id; o.textContent = t.name || ('#'+t.id);
+        ts.appendChild(o);
+      });
+      GROUPS = (gr.groups || []).map(function(g){return g.name;});
+    });
+  }
+  function rebuildAuxFilters(entries){
+    // Group filter from entries (admin sees all groups in data).
+    var gs = document.getElementById('f-group');
+    var prevG = gs.value;
+    var seenG = {};
+    var srcG = GROUPS.slice();
+    (entries || []).forEach(function(e){ if(e.group_name) srcG.push(e.group_name); });
+    srcG.sort();
+    gs.innerHTML = '<option value="">— الكل —</option>';
+    srcG.forEach(function(g){
+      if(!g || seenG[g]) return; seenG[g] = 1;
+      var o = document.createElement('option');
+      o.value = g; o.textContent = g;
+      gs.appendChild(o);
+    });
+    gs.value = prevG || '';
+    // Student filter from entries.
+    var ss = document.getElementById('f-student');
+    var prevS = ss.value;
+    var seenS = {};
+    ss.innerHTML = '<option value="">— الكل —</option>';
+    (entries || []).forEach(function(e){
+      if(!e.student_id || seenS[e.student_id]) return;
+      seenS[e.student_id] = 1;
+      var o = document.createElement('option');
+      o.value = e.student_id;
+      o.textContent = e.student_name + (e.group_name ? ' — '+e.group_name : '');
+      ss.appendChild(o);
+    });
+    ss.value = prevS || '';
+  }
+
+  function loadData(){
+    var f = getFilters();
+    var box = document.getElementById('tableBox');
+    box.innerHTML = '<div class="empty">جاري التحميل...</div>';
+    fetch('/api/monthly-evaluations' + buildQs(f))
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+        ALL = j.entries || [];
+        rebuildAuxFilters(ALL);
+        PAGE = 1;
+        renderTable();
+      });
+  }
+  function loadStats(){
+    fetch('/api/monthly-evaluations/admin-stats')
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return;
+        document.getElementById('s-month-tot').textContent = j.total_this_month || 0;
+        document.getElementById('s-avg').textContent = j.avg_overall != null ? j.avg_overall : '—';
+        document.getElementById('s-teach').textContent = j.active_teachers || 0;
+        document.getElementById('s-pending').textContent = j.pending_releases || 0;
+        var top = j.top_5 || [];
+        var bot = j.bottom_5 || [];
+        document.getElementById('s-top').innerHTML = top.length ?
+          top.map(function(r){
+            return '<span class="pill">'+escapeHtml(r.student_name||'')+
+                   ' — '+(r.overall_score||0)+'/10</span>';
+          }).join('') : '<span style="color:#888;">لا توجد بيانات</span>';
+        document.getElementById('s-bottom').innerHTML = bot.length ?
+          bot.map(function(r){
+            return '<span class="pill" style="background:#ffebee;border-color:#ffcdd2;color:#c62828;">'+
+                   escapeHtml(r.student_name||'')+' — '+(r.overall_score||0)+'/10</span>';
+          }).join('') : '<span style="color:#888;">لا توجد بيانات</span>';
+      });
+  }
+
+  function renderTable(){
+    var box = document.getElementById('tableBox');
+    if(!ALL.length){
+      box.innerHTML = '<div class="empty">لا توجد تقييمات بالشروط المحددة</div>';
+      document.getElementById('pagBox').innerHTML = '';
+      return;
+    }
+    var arr = ALL.slice();
+    arr.sort(function(a,b){
+      var av = a[SORT.col]; var bv = b[SORT.col];
+      if(av==null) av = '';
+      if(bv==null) bv = '';
+      if(av<bv) return SORT.dir==='asc' ? -1 : 1;
+      if(av>bv) return SORT.dir==='asc' ? 1 : -1;
+      return 0;
+    });
+    var totalPages = Math.max(1, Math.ceil(arr.length / PER));
+    if(PAGE > totalPages) PAGE = totalPages;
+    var start = (PAGE-1)*PER;
+    var slice = arr.slice(start, start+PER);
+    var html = '<table class="tbl"><thead><tr>'+
+      th('evaluation_date','التاريخ')+
+      th('evaluation_month','الشهر')+
+      th('teacher_name','المعلمة')+
+      th('group_name','المجموعة')+
+      th('student_name','الطالبة')+
+      th('overall_score','التقييم العام')+
+      '<th>منشور للأهالي؟</th>'+
+      '<th>تم الإرسال؟</th>'+
+      '<th>إجراءات</th></tr></thead><tbody>';
+    slice.forEach(function(e){
+      var sentLbl = e.whatsapp_sent_at ? ('تم في ' +
+        (e.whatsapp_sent_at||'').slice(0,10)) : 'لم يُرسل';
+      var sendDisabled = !e.released_to_parent;
+      var sendCls = e.whatsapp_sent_at ? 'send sent' : 'send';
+      var sendLbl = e.whatsapp_sent_at ? '↻ إعادة إرسال' : '📨 إرسال للأهل';
+      var sendTip = sendDisabled ? 'يرجى نشر التقييم للأهالي أولاً' : '';
+      var sCls = scoreCls(e.overall_score);
+      html += '<tr>'+
+        '<td data-label="التاريخ">'+escapeHtml(e.evaluation_date)+'</td>'+
+        '<td data-label="الشهر">'+escapeHtml(e.month_label||e.evaluation_month)+'</td>'+
+        '<td data-label="المعلمة">'+escapeHtml(e.teacher_name)+'</td>'+
+        '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
+        '<td data-label="الطالبة">'+escapeHtml(e.student_name)+'</td>'+
+        '<td data-label="التقييم العام"><span class="score-pill '+sCls+'">'+
+            (e.overall_score==null?'—':(e.overall_score+'/10'))+'</span></td>'+
+        '<td data-label="منشور؟">'+
+          '<label class="toggle"><input type="checkbox" '+
+            (e.released_to_parent?'checked':'')+
+            ' onchange="toggleRelease('+e.id+', this.checked)"> '+
+            (e.released_to_parent?'منشور':'غير منشور')+'</label></td>'+
+        '<td data-label="حالة الإرسال">'+escapeHtml(sentLbl)+'</td>'+
+        '<td data-label="إجراءات">'+
+          '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
+          '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+          '<span class="tt" '+(sendDisabled?('data-tip="'+sendTip+'"'):'')+'>'+
+            '<button class="act-btn '+sendCls+'" '+
+              (sendDisabled?'disabled':'')+
+              ' onclick="openSend('+e.id+')">'+sendLbl+'</button>'+
+          '</span>'+
+          '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    renderPag(totalPages);
+  }
+  function th(col, label){
+    var arrow = '';
+    if(SORT.col===col) arrow = SORT.dir==='asc' ? ' ▲' : ' ▼';
+    return '<th onclick="sortBy(\''+col+'\')">'+label+arrow+'</th>';
+  }
+  function renderPag(total){
+    var p = document.getElementById('pagBox');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="goPage(1)" '+(PAGE===1?'disabled':'')+'>«</button>';
+    html += '<button onclick="goPage('+(PAGE-1)+')" '+(PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="goPage('+i+')" class="'+(i===PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="goPage('+(PAGE+1)+')" '+(PAGE===total?'disabled':'')+'>›</button>';
+    html += '<button onclick="goPage('+total+')" '+(PAGE===total?'disabled':'')+'>»</button>';
+    p.innerHTML = html;
+  }
+
+  window.sortBy = function(col){
+    if(SORT.col===col){ SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc'; }
+    else { SORT.col = col; SORT.dir = 'desc'; }
+    renderTable();
+  };
+  window.goPage = function(p){ PAGE = p; renderTable();
+    window.scrollTo({top:0,behavior:'smooth'}); };
+  window.applyFilters = function(){ loadData(); };
+  window.resetFilters = function(){
+    ['f-month','f-teacher','f-group','f-student','f-min','f-sent'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    loadData();
+  };
+  window.exportXlsx = function(){
+    var f = getFilters();
+    location.href = '/api/monthly-evaluations/export' + buildQs(f);
+  };
+
+  // ── release toggle ──
+  window.toggleRelease = function(id, val){
+    fetch('/api/monthly-evaluations/'+id, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({released_to_parent: val ? 1 : 0})
+    }).then(function(r){return r.json();}).then(function(j){
+      if(j && j.ok){
+        toast(val ? 'تم النشر للأهالي ✓' : 'تم إلغاء النشر');
+        loadData(); loadStats();
+      } else {
+        toast((j && j.error) || 'تعذر التحديث', true);
+        loadData();
+      }
+    });
+  };
+
+  // ── view modal ──
+  window.openView = function(id){
+    var e = ALL.find(function(x){return x.id===id;});
+    if(!e){ toast('غير موجود', true); return; }
+    var bars = SCORE_FIELDS.map(function(s){
+      var v = e[s.k];
+      var pct = v == null ? 0 : Math.round((v/10)*100);
+      return '<div class="bar-row">'+
+        '<span class="b-lbl">'+s.l+'</span>'+
+        '<span class="b-bar"><div style="width:'+pct+'%;"></div></span>'+
+        '<span class="b-val">'+(v==null?'—':v)+'</span>'+
+      '</div>';
+    }).join('');
+    var sentLine = e.whatsapp_sent_at ?
+      '<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;margin-bottom:10px;color:#f57c00;font-weight:700;">📨 تم الإرسال للأهل في '+
+      (e.whatsapp_sent_at||'').slice(0,16)+'</div>' : '';
+    document.getElementById('viewTitle').textContent =
+      'تقييم ' + (e.student_name||'') + ' — ' + (e.month_label||e.evaluation_month||'');
+    document.getElementById('viewBody').innerHTML =
+      sentLine +
+      '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+escapeHtml(e.teacher_name||'')+'</div>'+
+      '<div style="margin-bottom:10px;"><b>المجموعة:</b> '+escapeHtml(e.group_name||'')+'</div>'+
+      '<div style="margin-bottom:14px;"><b>التقييم العام:</b> <span class="score-pill '+
+        scoreCls(e.overall_score)+'">'+(e.overall_score==null?'—':e.overall_score+'/10')+'</span></div>'+
+      bars +
+      (e.notes_behavior ? '<div style="margin-top:14px;"><b>ملاحظات السلوك:</b><div>'+escapeHtml(e.notes_behavior)+'</div></div>' : '')+
+      (e.notes_language ? '<div style="margin-top:10px;"><b>ملاحظات اللغة:</b><div>'+escapeHtml(e.notes_language)+'</div></div>' : '')+
+      (e.general_notes ? '<div style="margin-top:10px;"><b>ملاحظات عامة:</b><div>'+escapeHtml(e.general_notes)+'</div></div>' : '');
+    document.getElementById('viewBack').classList.add('show');
+  };
+  window.closeView = function(){
+    document.getElementById('viewBack').classList.remove('show');
+  };
+
+  // ── edit modal ──
+  var _editId = null;
+  function buildEditSliders(values){
+    var html = '<div style="margin-bottom:12px;font-weight:800;color:#e65100;">الدرجات (1-10):</div>';
+    SCORE_FIELDS.forEach(function(s){
+      var v = (values && values[s.k] != null) ? values[s.k] : 5;
+      html += '<div class="bar-row">'+
+        '<span class="b-lbl">'+s.l+'</span>'+
+        '<input type="range" min="1" max="10" step="1" value="'+v+'" '+
+          'data-k="'+s.k+'" class="ev-edit-sl" oninput="this.nextElementSibling.textContent=this.value;">'+
+        '<span class="b-val" style="flex:0 0 30px;">'+v+'</span>'+
+      '</div>';
+    });
+    document.getElementById('e-sliders').innerHTML = html;
+  }
+  window.openEdit = function(id){
+    var e = ALL.find(function(x){return x.id===id;});
+    if(!e){ toast('غير موجود', true); return; }
+    _editId = id;
+    document.getElementById('e-date').value  = e.evaluation_date  || '';
+    document.getElementById('e-month').value = e.evaluation_month || '';
+    buildEditSliders(e);
+    document.getElementById('e-nbeh').value = e.notes_behavior || '';
+    document.getElementById('e-nlang').value= e.notes_language || '';
+    document.getElementById('e-ngen').value = e.general_notes || '';
+    document.getElementById('editBack').classList.add('show');
+  };
+  window.closeEdit = function(){
+    document.getElementById('editBack').classList.remove('show');
+    _editId = null;
+  };
+  window.saveEdit = function(){
+    if(!_editId) return;
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var body = {
+      evaluation_date:  document.getElementById('e-date').value,
+      evaluation_month: document.getElementById('e-month').value,
+      notes_behavior:   document.getElementById('e-nbeh').value.trim(),
+      notes_language:   document.getElementById('e-nlang').value.trim(),
+      general_notes:    document.getElementById('e-ngen').value.trim()
+    };
+    document.querySelectorAll('.ev-edit-sl').forEach(function(sl){
+      body[sl.getAttribute('data-k')] = parseInt(sl.value, 10);
+    });
+    fetch('/api/monthly-evaluations/'+_editId, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        toast('تم الحفظ ✓');
+        closeEdit(); loadData(); loadStats();
+      } else {
+        toast((j && j.error) || 'تعذر التعديل', true);
+      }
+    });
+  };
+  window.deleteFromEdit = function(){
+    if(!_editId) return;
+    if(!confirm('هل ترغبين في حذف هذا التقييم؟')) return;
+    var id = _editId;
+    fetch('/api/monthly-evaluations/'+id, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeEdit(); loadData(); loadStats();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  // ── delete from row ──
+  var _delId = null;
+  window.openDel = function(id){
+    _delId = id;
+    document.getElementById('delBack').classList.add('show');
+  };
+  window.closeDel = function(){
+    document.getElementById('delBack').classList.remove('show');
+    _delId = null;
+  };
+  window.confirmDel = function(){
+    if(!_delId) return;
+    fetch('/api/monthly-evaluations/'+_delId, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeDel(); loadData(); loadStats();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  // ── send-to-parent modal ──
+  var _sendId = null;
+  window.openSend = function(id){
+    _sendId = id;
+    fetch('/api/monthly-evaluations/preview-message/'+id)
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){ toast((j && j.error)||'تعذر التحميل', true); return; }
+        var e = j.entry || {};
+        document.getElementById('sendTitle').textContent =
+          'إرسال تقييم ' + (e.student_name||'') + ' لولي الأمر';
+        document.getElementById('s-phone').value =
+          j.parent_phone_raw || j.parent_phone_clean || '';
+        document.getElementById('s-text').value = j.text || '';
+        var btn = document.getElementById('sendBtn');
+        if(!j.parent_phone_clean){
+          btn.disabled = true;
+          btn.textContent = '⚠ رقم ولي الأمر غير موجود';
+        } else {
+          btn.disabled = false;
+          btn.textContent = '📨 إرسال عبر الواتساب';
+        }
+        document.getElementById('sendBack').classList.add('show');
+      });
+  };
+  window.closeSend = function(){
+    document.getElementById('sendBack').classList.remove('show');
+    _sendId = null;
+  };
+  window.confirmSend = function(){
+    if(!_sendId) return;
+    var btn = document.getElementById('sendBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var custom = document.getElementById('s-text').value;
+    fetch('/api/monthly-evaluations/'+_sendId+'/send-to-parent', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({custom_message: custom})
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = '📨 إرسال عبر الواتساب';
+      if(!j || !j.ok){
+        toast((j && j.error) || 'تعذر الإرسال', true); return;
+      }
+      // Open wa.me URL in new tab — user gesture is the click that
+      // triggered confirmSend, so the popup goes through.
+      try { window.open(j.wa_url, '_blank'); } catch(e){}
+      toast('تم الإرسال للأهل ✓');
+      closeSend();
+      loadData(); loadStats();
+    });
+  };
+
+  // ── bulk send ──
+  window.bulkSend = function(){
+    var eligible = ALL.filter(function(e){
+      return e.released_to_parent && !e.whatsapp_sent_at;
+    });
+    if(!eligible.length){
+      toast('لا توجد تقييمات منشورة وغير مُرسلة', true); return;
+    }
+    if(!confirm('سيتم إرسال '+eligible.length+' رسالة. متابعة؟')) return;
+    document.getElementById('bulkBack').classList.add('show');
+    document.getElementById('bulkTitle').textContent = 'إرسال جماعي...';
+    document.getElementById('bulkStatus').textContent = '0 من ' + eligible.length;
+    document.getElementById('bulkCloseBtn').style.display = 'none';
+    var box = document.getElementById('bulkList');
+    box.innerHTML = eligible.map(function(e, i){
+      return '<div id="bk-'+i+'" style="padding:6px 10px;border-bottom:1px solid #ffe0b2;">'+
+        '<b>'+escapeHtml(e.student_name)+'</b> — '+
+        '<span id="bk-st-'+i+'" style="color:#888;">قيد الانتظار</span></div>';
+    }).join('');
+    var idx = 0; var sent = 0;
+    function step(){
+      if(idx >= eligible.length){
+        document.getElementById('bulkTitle').textContent = 'انتهى الإرسال';
+        document.getElementById('bulkStatus').textContent =
+          '✅ تم إرسال '+sent+' من '+eligible.length;
+        document.getElementById('bulkCloseBtn').style.display = 'inline-flex';
+        loadData(); loadStats();
+        return;
+      }
+      var e = eligible[idx];
+      var stEl = document.getElementById('bk-st-'+idx);
+      fetch('/api/monthly-evaluations/'+e.id+'/send-to-parent', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({})
+      }).then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){
+          if(stEl){ stEl.textContent = '❌ ' + ((j&&j.error)||'فشل'); stEl.style.color='#c62828'; }
+        } else {
+          try { window.open(j.wa_url, '_blank'); } catch(e2){}
+          sent++;
+          if(stEl){ stEl.textContent = '✓ تم الفتح'; stEl.style.color='#2E7D32'; }
+        }
+        idx++;
+        document.getElementById('bulkStatus').textContent = idx + ' من ' + eligible.length;
+        setTimeout(step, 700);
+      });
+    }
+    step();
+  };
+  window.closeBulk = function(){
+    document.getElementById('bulkBack').classList.remove('show');
+  };
+
+  (function init(){
+    var d = new Date(); var p = function(n){return (n<10?'0':'')+n;};
+    document.getElementById('f-month').value =
+      d.getFullYear()+'-'+p(d.getMonth()+1);
+    loadFilterOpts().then(function(){
+      loadData(); loadStats();
+    });
+  })();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/evaluations')
+@login_required
+def admin_evaluations_page():
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return redirect("/dashboard")
+    return ADMIN_EVALUATIONS_HTML
+
+
 @app.route('/api/teacher/groups-diag', methods=['GET'])
 @admin_required
 def api_teacher_groups_diag():
