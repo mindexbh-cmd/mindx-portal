@@ -26417,7 +26417,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .hello{text-align:center;margin-bottom:28px;}
 .hello h2{font-size:1.6rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello p{color:#666;margin:0;font-size:0.96rem;}
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
 .card{background:#fff;border-radius:20px;padding:26px 18px;text-align:center;
       box-shadow:0 10px 32px rgba(107,63,160,.18);
       cursor:pointer;text-decoration:none;color:inherit;display:block;
@@ -26439,6 +26439,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                      height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
 .card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
+.card.crc::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#00897B,#00695C);}
 @media (max-width:1280px){
   .cards{grid-template-columns:repeat(3,1fr);}
 }
@@ -26491,6 +26493,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <h3>استمارة التقييم الشهري</h3>
       <p>تقييم شهري للطالبات</p>
     </a>
+    <a class="card crc" href="/teacher/curriculum">
+      <span class="ic">📚</span>
+      <h3>المناهج</h3>
+      <p>كتب المنهج المتاحة لمجموعاتك</p>
+    </a>
   </div>
 </div>
 </body></html>"""
@@ -26505,6 +26512,123 @@ def teacher_hub_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
     return TEACHER_HUB_HTML.replace("USER_PLACEHOLDER", who)
+
+
+# ── /teacher/curriculum — teacher-side library view ────────────────
+# Same grid layout as /portal/parent-hub/curriculum, just with the
+# teacher-flavoured topbar and a back link to /teacher/hub. The
+# backend filter via _curriculum_visible_file_ids() already narrows
+# the list to {target_type='teacher' AND target_id=user.id} OR
+# {target_type='group' AND target_id IN teacher's groups}.
+TEACHER_CURRICULUM_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>المناهج — صفحة المعلمة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px;}
+.tools{display:flex;gap:8px;margin-bottom:16px;}
+.tools input{flex:1;padding:10px 14px;border-radius:10px;border:1.5px solid #d8c8ec;background:#fff;font-family:inherit;font-size:.95rem;}
+.crc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media (max-width:980px){.crc-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.crc-grid{grid-template-columns:1fr;}}
+.crc-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 8px 24px rgba(107,63,160,.14);
+          display:flex;flex-direction:column;gap:10px;border:2px solid transparent;transition:all .18s ease;}
+.crc-card:hover{border-color:#00897B;box-shadow:0 14px 32px rgba(0,137,123,.22);}
+.crc-card .ic{font-size:2.4rem;line-height:1;color:#00897B;}
+.crc-card h3{margin:0;font-size:1.05rem;color:#4a148c;font-weight:900;line-height:1.4;}
+.crc-card .desc{color:#666;font-size:.86rem;line-height:1.5;flex:1;}
+.crc-card .meta{font-size:.78rem;color:#888;}
+.crc-card .lock{display:inline-flex;align-items:center;gap:4px;color:#FB8C00;font-size:.82rem;font-weight:800;}
+.crc-card .acts{display:flex;gap:8px;flex-wrap:wrap;}
+.crc-btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#00897B,#00695C);
+         color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.88rem;cursor:pointer;font-family:inherit;}
+.crc-btn:hover{box-shadow:0 4px 14px rgba(0,137,123,.3);}
+.crc-btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.crc-empty{background:#fff;border-radius:18px;padding:60px 24px;text-align:center;color:#666;
+           box-shadow:0 8px 24px rgba(107,63,160,.12);}
+.crc-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 المناهج — صفحة المعلمة</h1>
+  <div><a href="/teacher/hub">← العودة لصفحة المعلمة</a></div>
+</div>
+<div class="wrap">
+  <div class="tools">
+    <input type="text" id="crc-q" placeholder="ابحث عن كتاب...">
+  </div>
+  <div id="crc-list-box"><div class="crc-empty">جاري التحميل...</div></div>
+</div>
+<script>
+(function(){
+  function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  var T;
+  function load(){
+    var q = document.getElementById('crc-q').value || '';
+    var url = '/api/curriculum/list' + (q ? ('?search=' + encodeURIComponent(q)) : '');
+    fetch(url, {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('crc-list-box');
+        if(!j || !j.ok){ box.innerHTML='<div class="crc-empty">تعذر التحميل</div>'; return; }
+        var arr = j.files || [];
+        if(!arr.length){
+          box.innerHTML = '<div class="crc-empty"><span class="em-ic">📚</span>'+
+                          '<div>لا توجد كتب مخصصة لمجموعاتك حالياً.</div>'+
+                          '<div style="margin-top:6px;color:#999;font-size:.86rem;">سيتم إضافة المناهج هنا عند جاهزيتها.</div></div>';
+          return;
+        }
+        var html = '<div class="crc-grid">';
+        arr.forEach(function(e){
+          var lock = e.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+          var dl = e.can_download
+            ? '<a class="crc-btn dl" href="/api/curriculum/download/' + e.id + '">⬇ تحميل</a>'
+            : '';
+          html += '<div class="crc-card">'+
+            '<span class="ic">📄</span>'+
+            '<h3>'+_esc(e.title)+'</h3>'+
+            '<div class="desc">'+_esc((e.description||'').slice(0,140))+((e.description||'').length>140?'...':'')+'</div>'+
+            '<div class="meta">'+_esc((e.uploaded_at||'').slice(0,10))+' · '+lock+'</div>'+
+            '<div class="acts">'+
+              '<a class="crc-btn" href="/portal/curriculum/view/'+e.id+'" target="_blank" rel="noopener">📖 عرض الكتاب</a>'+
+              dl +
+            '</div>'+
+          '</div>';
+        });
+        html += '</div>';
+        box.innerHTML = html;
+      })
+      .catch(function(){
+        document.getElementById('crc-list-box').innerHTML = '<div class="crc-empty">تعذر التحميل</div>';
+      });
+  }
+  document.getElementById('crc-q').addEventListener('input', function(){
+    clearTimeout(T); T = setTimeout(load, 300);
+  });
+  load();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/curriculum')
+@login_required
+def teacher_curriculum_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "teacher":
+        return redirect("/dashboard")
+    return TEACHER_CURRICULUM_HTML
 
 
 # ── /teacher/lessons — lesson tracking form for teachers ──────────────
