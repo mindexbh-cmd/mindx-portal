@@ -9774,6 +9774,16 @@ select.group-select:focus,input.date-input:focus{border-color:#00897B;background
 .alert{display:none;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:16px;align-items:center;gap:10px;}
 .alert.exists{background:#fff3e0;border:2px solid #FB8C00;color:#e65100;display:flex;}
 .alert.fresh{background:#e8f5e9;border:2px solid #43A047;color:#2e7d32;display:flex;}
+/* ROOT-CAUSE MARKER (attendance-students-and-scroll-fix-20260429):
+   Mobile users couldn't scroll to lower students. Cause: the table
+   inside .tbl-wrap is wider than a phone viewport (status select 200px
+   + class-meta col 160px + index col 48px + name col), and overflow:
+   hidden here clipped the right edge AND on iOS Safari the touch-pan
+   inside the clipped area absorbed vertical gestures without
+   producing any scroll. The next commit replaces this with a mobile-
+   safe overflow model (horizontal scroll inside the table wrapper, no
+   vertical clipping) and adds an html,body{overflow-x:hidden} safety
+   net plus a sticky save bar so the bottom CTA is reachable. */
 .tbl-wrap{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,137,123,.1);overflow:hidden;}
 .tbl-wrap table{width:100%;border-collapse:collapse;}
 .tbl-wrap thead tr{background:linear-gradient(135deg,#00897B,#26A69A);color:#fff;}
@@ -31697,6 +31707,16 @@ def api_teacher_groups():
 
 @app.route('/api/teacher/students', methods=['GET'])
 @login_required
+# ROOT-CAUSE MARKER (attendance-students-and-scroll-fix-20260429):
+# Teacher أ. کوثر شعبان reported that not all of her students appear in
+# رصد الغياب. Root cause: the registration filter below silently drops
+# any student whose registration_term2_2026 is NULL / empty / not the
+# exact literal "تم التسجيل". Same gate is replicated in
+# /api/attendance/by-date-group (~line 32074) for the unified absentees
+# list. The fix in the next commit removes the gate here and on the
+# unified-absentees route, switches the response to include an
+# is_registered flag per row, and surfaces unregistered students with
+# a grey "غير مسجّل" badge in the UI (matching the بحث عن طالب pattern).
 def api_teacher_students():
     user, err = _require_teacher()
     if err: return err
