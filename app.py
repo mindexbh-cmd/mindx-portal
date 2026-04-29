@@ -4850,8 +4850,59 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       &#x639;&#x631;&#x636; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x2190;
     </span>
   </a>
-  <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
-  <div class="dh-stats-grid">
+  <!-- Phase 5 — 4 colored stats cards row. Each card is an <a> linking
+       to an existing route (no new mutations). Numbers populated from
+       /api/dashboard/stats and /api/teacher-deliveries/summary, both
+       existing endpoints. -->
+  <div class="md-stats-row">
+    <a class="md-stat-card is-green" href="/database">
+      <span class="md-stat-emoji" aria-hidden="true">&#x1F7E2;</span>
+      <span class="md-stat-num" id="md-s-active">&mdash;</span>
+      <span class="md-stat-label">&#x637;&#x627;&#x644;&#x628; &#x646;&#x634;&#x637;</span>
+    </a>
+    <a class="md-stat-card is-amber" href="/admin/teacher-deliveries?tab=evaluations&amp;filter=unreleased">
+      <span class="md-stat-emoji" aria-hidden="true">&#x1F7E1;</span>
+      <span class="md-stat-num" id="md-s-pending">&mdash;</span>
+      <span class="md-stat-label">&#x62A;&#x646;&#x628;&#x64A;&#x647;&#x627;&#x62A; &#x645;&#x639;&#x644;&#x642;&#x629;</span>
+    </a>
+    <a class="md-stat-card is-blue" href="/admin/teacher-deliveries?tab=alerts">
+      <span class="md-stat-emoji" aria-hidden="true">&#x1F535;</span>
+      <span class="md-stat-num" id="md-s-missing">&mdash;</span>
+      <span class="md-stat-label">&#x62D;&#x635;&#x629; &#x628;&#x62F;&#x648;&#x646; &#x62F;&#x631;&#x633; &#x645;&#x633;&#x62C;&#x644;</span>
+    </a>
+    <a class="md-stat-card is-red" href="/attendance">
+      <span class="md-stat-emoji" aria-hidden="true">&#x1F534;</span>
+      <span class="md-stat-num" id="md-s-violations">&mdash;</span>
+      <span class="md-stat-label">&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
+    </a>
+  </div>
+  <script>
+  (function(){
+    /* Populate the 4 cards from existing endpoints (no new SQL).
+       /api/dashboard/stats is open to all logged-in roles.
+       /api/teacher-deliveries/summary is admin/manager only — non-staff
+       sessions just keep the placeholder dashes. */
+    function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+    fetch('/api/dashboard/stats', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if (!d || !d.ok) return;
+        set('md-s-active', (d.english_students || 0) + (d.math_students || 0));
+        set('md-s-violations', d.violations || 0);
+      }).catch(function(){});
+    fetch('/api/teacher-deliveries/summary', {credentials:'include'})
+      .then(function(r){ return r.status === 403 ? null : r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        var alerts = d.alerts || [];
+        var byKey = {}; alerts.forEach(function(a){ byKey[a.key] = a.count || 0; });
+        set('md-s-missing', byKey['missing_lessons'] || 0);
+        set('md-s-pending', (byKey['unreleased_evals'] || 0) + (byKey['sent_pending_evals'] || 0));
+      }).catch(function(){});
+  })();
+  </script>
+  <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
+  <div class="dh-stats-grid dh-legacy-stats">
     <div class="dh-stat-card teal">
       <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F1EC;&#x1F1E7;</span></div>
       <div class="dh-stat-number" id="stat-english-students">&ndash;</div>

@@ -444,3 +444,74 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
   .md-welcome-greeting { font-size: var(--md-fz-xl); }
   .md-welcome-date { font-size: var(--md-fz-sm); }
 }
+
+/* ==========================================================================
+   Phase 5 — 4 stats cards row (clickable)
+   ========================================================================== */
+.md-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--md-sp-4);
+  margin: 0 0 var(--md-sp-5);
+}
+@media (max-width: 1023px) { .md-stats-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px)  { .md-stats-row { grid-template-columns: 1fr; } }
+
+.md-stat-card {
+  background: var(--md-bg-card);
+  border-radius: var(--md-rad-lg);
+  box-shadow: var(--md-shadow-md);
+  padding: var(--md-sp-6);
+  position: relative;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md-sp-3);
+  min-height: 132px;
+  transition: transform var(--md-motion-fast), box-shadow var(--md-motion-fast);
+  overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  text-align: start;
+  width: 100%;
+}
+.md-stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--md-shadow-lg);
+}
+.md-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  inset-inline-end: 0;
+  width: 5px;
+  border-radius: 0 var(--md-rad-lg) var(--md-rad-lg) 0;
+}
+.md-stat-card.is-green::before { background: var(--md-success); }
+.md-stat-card.is-amber::before { background: var(--md-warning); }
+.md-stat-card.is-blue::before  { background: var(--md-info); }
+.md-stat-card.is-red::before   { background: var(--md-danger); }
+
+.md-stat-emoji { font-size: 28px; line-height: 1; }
+.md-stat-num {
+  font-size: var(--md-fz-stat);
+  font-weight: var(--md-fw-black);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.md-stat-card.is-green .md-stat-num { color: var(--md-success-text); }
+.md-stat-card.is-amber .md-stat-num { color: var(--md-warning-text); }
+.md-stat-card.is-blue  .md-stat-num { color: var(--md-info-text); }
+.md-stat-card.is-red   .md-stat-num { color: var(--md-danger-text); }
+.md-stat-label {
+  font-size: var(--md-fz-base);
+  color: var(--md-text-secondary);
+  font-weight: var(--md-fw-medium);
+  margin-top: auto;
+}
+
+/* Hide the legacy 8-stat grid via class flag (markup preserved so
+   existing dhLoadStats() JS continues to populate IDs without errors) */
+.dh-legacy-stats { display: none !important; }
