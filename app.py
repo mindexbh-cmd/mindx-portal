@@ -29563,6 +29563,549 @@ def admin_evaluations_page():
     return ADMIN_EVALUATIONS_HTML
 
 
+# ── /admin/teacher-deliveries — admin oversight aggregator ───────────
+# Aggregates the three teacher feature areas (lessons_log,
+# parent_messages, evaluations) into a single dashboard with tabs +
+# alerts + summary stats. Admin/manager only. PURELY a UI layer over
+# the existing API — no new tables, no new mutations.
+def _td_can_view(user):
+    return ((user or {}).get("role") or "").strip().lower() in ("admin", "manager")
+
+
+ADMIN_TEACHER_DELIVERIES_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>متابعة تسليمات المعلمين — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+        position:sticky;top:0;z-index:50;}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1400px;margin:18px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:14px;padding:16px;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+           margin-bottom:14px;}
+@media (max-width:980px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.stats-row{grid-template-columns:1fr;}}
+.stat-card{background:#fff;border-radius:14px;padding:14px 16px;
+           box-shadow:0 4px 14px rgba(0,0,0,.06);border-right:5px solid #6B3FA0;}
+.stat-card.lessons{border-right-color:#1E88E5;}
+.stat-card.messages{border-right-color:#E91E63;}
+.stat-card.evals{border-right-color:#FB8C00;}
+.stat-card.alerts{border-right-color:#e53935;}
+.stat-card h4{margin:0 0 6px;font-size:.82rem;color:#666;font-weight:700;}
+.stat-card .num{font-size:1.7rem;font-weight:900;color:#4a148c;line-height:1.1;}
+.stat-card.alerts .num{color:#c62828;}
+.tabs{display:flex;gap:6px;background:#fff;padding:8px;border-radius:14px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.04);margin-bottom:14px;
+      overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;
+      position:sticky;top:62px;z-index:40;}
+.tab{padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:800;
+     font-size:.95rem;color:#555;background:#f4f4f8;border:2px solid transparent;
+     transition:all .15s ease;user-select:none;white-space:nowrap;
+     font-family:inherit;}
+.tab:hover{background:#eceff5;}
+.tab.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+            border-color:transparent;box-shadow:0 3px 10px rgba(107,63,160,0.3);}
+.tab .badge{display:inline-block;background:#e53935;color:#fff;border-radius:999px;
+            padding:1px 8px;font-size:.74rem;margin-right:4px;font-weight:900;}
+.filters-toggle{display:none;background:#fff;border:1.5px solid #d8c8ec;
+                border-radius:10px;padding:10px 14px;font-weight:700;
+                color:#4a148c;cursor:pointer;width:100%;margin-bottom:10px;
+                font-family:inherit;font-size:.95rem;}
+.filters-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+             align-items:end;}
+@media (max-width:980px){.filters-row{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:680px){
+  .filters-toggle{display:block;}
+  .filters-row{display:none;grid-template-columns:1fr;}
+  .filters-row.show{display:grid;}
+}
+.filters-row label{display:block;font-size:.82rem;color:#4a148c;font-weight:700;
+                   margin-bottom:4px;}
+.filters-row input,.filters-row select{width:100%;padding:8px 10px;
+                                        border:1.5px solid #d8c8ec;border-radius:8px;
+                                        font-family:inherit;font-size:.92rem;
+                                        background:#fafafe;}
+.filter-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;
+     border-radius:8px;padding:9px 16px;font-weight:800;font-size:.92rem;
+     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-warn{background:linear-gradient(135deg,#fb8c00,#ef6c00);}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.btn-export{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.tab-head{display:flex;justify-content:space-between;align-items:center;
+          margin-bottom:12px;flex-wrap:wrap;gap:10px;}
+.tab-head h3{margin:0;color:#4a148c;font-weight:900;font-size:1.05rem;}
+.tab-head .links{display:flex;gap:8px;flex-wrap:wrap;}
+.tab-head a.full-link{background:#f3e5f5;color:#4a148c;padding:7px 14px;
+                       border-radius:8px;text-decoration:none;font-weight:700;
+                       font-size:.85rem;}
+.tab-head a.full-link:hover{background:#e1bee7;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.9rem;}
+table.tbl th{background:#f3e5f5;color:#4a148c;padding:10px 8px;text-align:right;
+             font-weight:800;cursor:pointer;user-select:none;}
+table.tbl th:hover{background:#e1bee7;}
+table.tbl td{padding:8px;border-bottom:1px solid #f0e6f8;vertical-align:top;}
+table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
+.act-btn{padding:5px 9px;border-radius:7px;border:none;cursor:pointer;
+         font-size:.78rem;font-weight:700;font-family:inherit;}
+.act-btn.view{background:#fce4ec;color:#880e4f;margin-right:3px;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;margin-right:3px;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:3px;}
+.act-btn.send{background:#e8f5e9;color:#1b5e20;margin-right:3px;}
+.act-btn.send:disabled{background:#eee;color:#999;cursor:not-allowed;}
+.act-btn.send.sent{background:#fff8e1;color:#f57c00;}
+.act-btn.resend{background:#fff8e1;color:#f57c00;margin-right:3px;}
+.empty{text-align:center;color:#888;padding:30px 20px;font-style:italic;}
+.pagination{display:flex;gap:6px;justify-content:center;align-items:center;
+            margin-top:14px;flex-wrap:wrap;}
+.pagination button{padding:6px 11px;border-radius:7px;border:1.5px solid #d8c8ec;
+                   background:#fff;cursor:pointer;font-weight:700;color:#4a148c;
+                   font-family:inherit;}
+.pagination button.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.pagination button:disabled{opacity:.4;cursor:not-allowed;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:680px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal.lg{max-width:820px;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-weight:700;color:#4a148c;font-size:.86rem;
+             margin-bottom:4px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:9px 12px;border:1.6px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.95rem;background:#fafafe;}
+.field textarea{resize:vertical;min-height:60px;}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;
+       max-width:90vw;text-align:center;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+.alerts-list{display:flex;flex-direction:column;gap:10px;}
+.alert-card{background:#fff;border:1.5px solid #ffcdd2;border-left:5px solid #e53935;
+            border-radius:10px;padding:14px 16px;display:flex;
+            justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.alert-card.zero{border-color:#c8e6c9;border-left-color:#43a047;background:#f1f8e9;}
+.alert-card .a-info{display:flex;align-items:center;gap:10px;flex:1;min-width:200px;}
+.alert-card .a-icon{font-size:1.6rem;flex-shrink:0;}
+.alert-card .a-text{color:#5d4037;font-weight:700;line-height:1.5;}
+.alert-card .a-count{background:#e53935;color:#fff;border-radius:999px;
+                      padding:3px 14px;font-weight:900;font-size:.88rem;}
+.alert-card.zero .a-count{background:#43a047;}
+.alerts-empty{text-align:center;padding:40px 20px;color:#43a047;font-weight:800;
+              font-size:1.1rem;}
+.score-pill{display:inline-block;padding:3px 10px;border-radius:6px;font-weight:800;
+            font-size:.86rem;}
+.score-pill.high{background:#c8e6c9;color:#1b5e20;}
+.score-pill.mid{background:#fff8e1;color:#f57c00;}
+.score-pill.low{background:#ffcdd2;color:#b71c1c;}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:6px;
+             font-size:.78rem;font-weight:800;}
+.status-pill.sent{background:#c8e6c9;color:#1b5e20;}
+.status-pill.failed{background:#ffcdd2;color:#b71c1c;}
+.status-pill.queued{background:#fff8e1;color:#f57c00;}
+.toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+        font-size:.82rem;font-weight:700;}
+.toggle input{cursor:pointer;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.86rem;}
+.bar-row .b-lbl{flex:0 0 130px;color:#5d4037;font-weight:700;}
+.bar-row .b-bar{flex:1;height:14px;background:#fff3e0;border-radius:7px;overflow:hidden;
+                border:1px solid #ffe0b2;}
+.bar-row .b-bar > div{height:100%;background:linear-gradient(90deg,#e53935,#fdd835,#43a047);
+                      border-radius:7px;}
+.bar-row .b-val{flex:0 0 40px;text-align:left;font-weight:800;color:#e65100;}
+.recipient-row{display:flex;justify-content:space-between;align-items:center;
+               padding:8px 12px;border-bottom:1px solid #f0e6f8;font-size:.9rem;}
+.recipient-row .nm{font-weight:700;color:#4a148c;}
+.recipient-row .ph{color:#666;font-size:.82rem;direction:ltr;}
+.recipient-row .st{font-size:.78rem;font-weight:700;color:#2E7D32;}
+@media (max-width:680px){
+  .topbar h1{font-size:.95rem;}
+  table.tbl{font-size:.82rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #d8c8ec;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#4a148c;}
+  .stat-card .num{font-size:1.4rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📊 متابعة تسليمات المعلمين</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <!-- Top stats row (always visible) -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card lessons">
+      <h4>📚 دروس اليوم</h4>
+      <div class="num" id="s-lessons-today">—</div>
+    </div>
+    <div class="stat-card messages">
+      <h4>📨 رسائل اليوم</h4>
+      <div class="num" id="s-messages-today">—</div>
+    </div>
+    <div class="stat-card evals">
+      <h4>📊 تقييمات الشهر</h4>
+      <div class="num" id="s-evals-month">—</div>
+    </div>
+    <div class="stat-card alerts">
+      <h4>⚠ تنبيهات</h4>
+      <div class="num" id="s-alerts-total">—</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs-row">
+    <button class="tab" data-tab="lessons" onclick="switchTab('lessons')">📚 الدروس</button>
+    <button class="tab" data-tab="messages" onclick="switchTab('messages')">📨 الرسائل</button>
+    <button class="tab" data-tab="evaluations" onclick="switchTab('evaluations')">📊 التقييمات</button>
+    <button class="tab" data-tab="alerts" onclick="switchTab('alerts')">⚠ التنبيهات
+      <span class="badge" id="tab-alerts-badge" style="display:none;">0</span>
+    </button>
+  </div>
+
+  <!-- Filter row -->
+  <div class="panel">
+    <button class="filters-toggle" id="ft-toggle" onclick="toggleFilters()">🔽 الفلاتر</button>
+    <div class="filters-row" id="filters-row">
+      <div>
+        <label>من تاريخ</label>
+        <input type="date" id="f-from">
+      </div>
+      <div>
+        <label>إلى تاريخ</label>
+        <input type="date" id="f-to">
+      </div>
+      <div>
+        <label>المعلمة</label>
+        <select id="f-teacher" multiple size="1" style="height:38px;">
+          <option value="">— الكل —</option>
+        </select>
+      </div>
+      <div>
+        <label>المجموعة</label>
+        <select id="f-group" multiple size="1" style="height:38px;">
+          <option value="">— الكل —</option>
+        </select>
+      </div>
+    </div>
+    <div class="filters-row" style="margin-top:10px;grid-template-columns:1fr;">
+      <div>
+        <label>بحث</label>
+        <input type="text" id="f-search" placeholder="ابحث في المحتوى / الملاحظات...">
+      </div>
+    </div>
+    <div class="filter-acts">
+      <button class="btn" onclick="applyFilters()">🔍 تطبيق</button>
+      <button class="btn btn-ghost" onclick="resetFilters()">↺ مسح</button>
+    </div>
+  </div>
+
+  <!-- Tab content area -->
+  <div class="panel" id="tab-content">
+    <div class="empty">جاري التحميل...</div>
+  </div>
+
+</div>
+
+<!-- Reused modals: view / edit / delete / send -->
+<div class="modal-back" id="viewBack" onclick="if(event.target===this)closeModal('viewBack')">
+  <div class="modal lg"><h3 id="viewTitle">تفاصيل</h3>
+    <div id="viewBody"></div>
+    <div class="acts"><button class="btn btn-ghost" onclick="closeModal('viewBack')">إغلاق</button></div>
+  </div>
+</div>
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeModal('editBack')">
+  <div class="modal lg"><h3 id="editTitle">تعديل</h3>
+    <div id="editBody"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal('editBack')">إلغاء</button>
+      <button class="btn btn-danger" id="editDelBtn" onclick="editDelete()">حذف</button>
+      <button class="btn" id="editSaveBtn" onclick="editSave()">حفظ</button>
+    </div>
+  </div>
+</div>
+<div class="modal-back" id="sendBack" onclick="if(event.target===this)closeModal('sendBack')">
+  <div class="modal lg"><h3 id="sendTitle">إرسال للأهل</h3>
+    <div class="field"><label>رقم ولي الأمر</label><input type="text" id="s-phone" readonly></div>
+    <div class="field"><label>نص الرسالة</label><textarea id="s-text" rows="14"></textarea></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal('sendBack')">إلغاء</button>
+      <button class="btn btn-warn" id="sendBtn" onclick="confirmSend()">📨 إرسال</button>
+    </div>
+  </div>
+</div>
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeModal('delBack')">
+  <div class="modal"><h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذا السجل؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal('delBack')">إلغاء</button>
+      <button class="btn btn-danger" id="delConfirmBtn" onclick="confirmDelete()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // ── shared state ──
+  var STATE = {
+    tab: 'alerts',
+    filters: {
+      date_from: '', date_to: '',
+      teachers: [], groups: [],
+      search: ''
+    },
+    cache: { lessons: null, messages: null, evaluations: null, alerts: null, summary: null },
+    teachers: [], groups: []
+  };
+
+  // Surface for sub-tab JS (commits 2-5).
+  window.TD_STATE = STATE;
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  window.tdEscape = escapeHtml;
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  window.tdToast = toast;
+  window.tdCloseModal = function(id){
+    document.getElementById(id).classList.remove('show');
+  };
+  window.closeModal = window.tdCloseModal;
+
+  // ── URL param handling ──
+  function qs(name){
+    var m = (location.search || '').match(new RegExp('[?&]'+name+'=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g,' ')) : '';
+  }
+  function updateUrl(){
+    var p = new URLSearchParams();
+    p.set('tab', STATE.tab);
+    if(STATE.filters.date_from) p.set('from', STATE.filters.date_from);
+    if(STATE.filters.date_to)   p.set('to',   STATE.filters.date_to);
+    if(STATE.filters.search)    p.set('q',    STATE.filters.search);
+    if(STATE.filters.teachers.length) p.set('teachers', STATE.filters.teachers.join(','));
+    if(STATE.filters.groups.length)   p.set('groups',   STATE.filters.groups.join(','));
+    var subFilter = qs('filter'); if(subFilter) p.set('filter', subFilter);
+    history.replaceState(null, '', '?' + p.toString());
+  }
+  window.tdUpdateUrl = updateUrl;
+
+  function readFiltersFromUrl(){
+    STATE.filters.date_from = qs('from');
+    STATE.filters.date_to   = qs('to');
+    STATE.filters.search    = qs('q');
+    var t = qs('teachers'); STATE.filters.teachers = t ? t.split(',').filter(Boolean) : [];
+    var g = qs('groups');   STATE.filters.groups   = g ? g.split(',').filter(Boolean) : [];
+    document.getElementById('f-from').value   = STATE.filters.date_from;
+    document.getElementById('f-to').value     = STATE.filters.date_to;
+    document.getElementById('f-search').value = STATE.filters.search;
+  }
+
+  function readFiltersFromForm(){
+    STATE.filters.date_from = document.getElementById('f-from').value;
+    STATE.filters.date_to   = document.getElementById('f-to').value;
+    STATE.filters.search    = document.getElementById('f-search').value;
+    var ts = document.getElementById('f-teacher');
+    STATE.filters.teachers = Array.from(ts.selectedOptions || [])
+      .map(function(o){return o.value;}).filter(Boolean);
+    var gs = document.getElementById('f-group');
+    STATE.filters.groups = Array.from(gs.selectedOptions || [])
+      .map(function(o){return o.value;}).filter(Boolean);
+  }
+  window.tdReadFiltersFromForm = readFiltersFromForm;
+
+  function applyMultiSelect(elId, values){
+    var el = document.getElementById(elId);
+    if(!el) return;
+    Array.from(el.options).forEach(function(o){
+      if(!o.value) return;
+      o.selected = values.indexOf(o.value) >= 0;
+    });
+  }
+
+  // Build query-string for backend list endpoints. Multi-selects are
+  // applied client-side by the per-tab renderer because the backend
+  // endpoints accept only single teacher_id / group_name. We pass the
+  // FIRST selected value (if any) to narrow server output, then
+  // filter the rest in JS — keeps payloads small without expanding
+  // the existing endpoints.
+  window.tdBuildQs = function(extra){
+    var f = STATE.filters;
+    var p = [];
+    if(f.date_from) p.push('date_from=' + encodeURIComponent(f.date_from));
+    if(f.date_to)   p.push('date_to='   + encodeURIComponent(f.date_to));
+    if(f.search)    p.push('search='    + encodeURIComponent(f.search));
+    if(f.teachers.length === 1) p.push('teacher_id=' + encodeURIComponent(f.teachers[0]));
+    if(f.groups.length   === 1) p.push('group_name=' + encodeURIComponent(f.groups[0]));
+    if(extra && typeof extra === 'object'){
+      Object.keys(extra).forEach(function(k){
+        if(extra[k] != null && extra[k] !== '')
+          p.push(encodeURIComponent(k)+'='+encodeURIComponent(extra[k]));
+      });
+    }
+    return p.length ? ('?' + p.join('&')) : '';
+  };
+
+  // Multi-select client-side filter helper (post-fetch refine).
+  window.tdMatchesFilters = function(row){
+    var f = STATE.filters;
+    if(f.teachers.length){
+      var t = row.teacher_id ? String(row.teacher_id) : '';
+      if(f.teachers.indexOf(t) < 0) return false;
+    }
+    if(f.groups.length){
+      var g = row.group_name || '';
+      if(f.groups.indexOf(g) < 0) return false;
+    }
+    return true;
+  };
+
+  // ── tab switching ──
+  function renderTab(){
+    var box = document.getElementById('tab-content');
+    document.querySelectorAll('.tab').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab') === STATE.tab);
+    });
+    if(STATE.tab === 'alerts'){
+      if(typeof window.tdRenderAlerts === 'function') window.tdRenderAlerts(box);
+      else box.innerHTML = '<div class="empty">قسم التنبيهات قيد التحميل...</div>';
+    } else if(STATE.tab === 'lessons'){
+      if(typeof window.tdRenderLessons === 'function') window.tdRenderLessons(box);
+      else box.innerHTML = '<div class="empty">قسم الدروس قيد التحميل...</div>';
+    } else if(STATE.tab === 'messages'){
+      if(typeof window.tdRenderMessages === 'function') window.tdRenderMessages(box);
+      else box.innerHTML = '<div class="empty">قسم الرسائل قيد التحميل...</div>';
+    } else if(STATE.tab === 'evaluations'){
+      if(typeof window.tdRenderEvaluations === 'function') window.tdRenderEvaluations(box);
+      else box.innerHTML = '<div class="empty">قسم التقييمات قيد التحميل...</div>';
+    }
+  }
+  window.switchTab = function(name){
+    STATE.tab = name;
+    updateUrl();
+    renderTab();
+  };
+  window.tdRenderActiveTab = renderTab;
+
+  window.applyFilters = function(){
+    readFiltersFromForm();
+    // Invalidate cached fetches so the new filters take effect.
+    STATE.cache = { lessons:null, messages:null, evaluations:null, alerts:null, summary:null };
+    updateUrl();
+    renderTab();
+    if(typeof window.tdLoadSummary === 'function') window.tdLoadSummary();
+  };
+  window.resetFilters = function(){
+    document.getElementById('f-from').value = '';
+    document.getElementById('f-to').value   = '';
+    document.getElementById('f-search').value = '';
+    var ts = document.getElementById('f-teacher');
+    Array.from(ts.options).forEach(function(o){ o.selected = !o.value; });
+    var gs = document.getElementById('f-group');
+    Array.from(gs.options).forEach(function(o){ o.selected = !o.value; });
+    applyFilters();
+  };
+  window.toggleFilters = function(){
+    document.getElementById('filters-row').classList.toggle('show');
+  };
+
+  // ── filter dropdown population ──
+  function loadFilterOpts(){
+    return Promise.all([
+      fetch('/api/lessons/teachers', {credentials:'include'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch('/api/teacher/groups', {credentials:'include'}).then(function(r){return r.json();}).catch(function(){return null;})
+    ]).then(function(arr){
+      var tr = arr[0] || {}; var gr = arr[1] || {};
+      STATE.teachers = tr.teachers || [];
+      STATE.groups   = (gr.groups || []).map(function(g){
+        return typeof g === 'string' ? g : (g.name || '');
+      }).filter(Boolean);
+      var ts = document.getElementById('f-teacher');
+      ts.innerHTML = '<option value="">— الكل —</option>';
+      STATE.teachers.forEach(function(t){
+        var o = document.createElement('option');
+        o.value = String(t.id); o.textContent = t.name || ('#'+t.id);
+        ts.appendChild(o);
+      });
+      var gs = document.getElementById('f-group');
+      gs.innerHTML = '<option value="">— الكل —</option>';
+      STATE.groups.forEach(function(name){
+        var o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        gs.appendChild(o);
+      });
+      // Apply URL-driven preselect.
+      applyMultiSelect('f-teacher', STATE.filters.teachers);
+      applyMultiSelect('f-group',   STATE.filters.groups);
+    });
+  }
+
+  // Per-tab JS files attach themselves to window.tdRender* before
+  // the first renderTab call below.
+  document.addEventListener('DOMContentLoaded', function(){
+    // Read URL state first.
+    var qTab = qs('tab') || 'alerts';
+    if(['lessons','messages','evaluations','alerts'].indexOf(qTab) >= 0){
+      STATE.tab = qTab;
+    }
+    readFiltersFromUrl();
+    loadFilterOpts().then(function(){
+      if(typeof window.tdLoadSummary === 'function') window.tdLoadSummary();
+      renderTab();
+    });
+  });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/teacher-deliveries')
+@login_required
+def admin_teacher_deliveries_page():
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='font-family:Segoe UI,Tahoma,Arial,sans-serif;"
+            "padding:40px;text-align:center;color:#c62828;'>"
+            "<h1>غير مصرح</h1><p>هذه الصفحة للأدمن أو المدير فقط.</p></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    return ADMIN_TEACHER_DELIVERIES_HTML
+
+
 @app.route('/api/teacher/groups-diag', methods=['GET'])
 @admin_required
 def api_teacher_groups_diag():
