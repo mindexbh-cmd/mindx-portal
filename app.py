@@ -825,6 +825,7 @@ def init_db():
         whatsapp_status TEXT DEFAULT 'queued',
         whatsapp_sent_count INTEGER DEFAULT 0,
         whatsapp_total_count INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'draft',
         is_deleted INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -2880,6 +2881,7 @@ if True:
         ("whatsapp_status",       "TEXT DEFAULT 'queued'"),
         ("whatsapp_sent_count",   "INTEGER DEFAULT 0"),
         ("whatsapp_total_count",  "INTEGER DEFAULT 0"),
+        ("status",                "TEXT DEFAULT 'draft'"),
         ("is_deleted",            "INTEGER DEFAULT 0"),
         ("created_at",            "DATETIME"),
         ("updated_at",            "DATETIME"),
@@ -2896,6 +2898,39 @@ if True:
         UNIQUE(message_id, student_id)
     )""")
     db2.commit()
+
+    # ── parent_messages_status_v1: introduce explicit status (draft|sent
+    # |failed) so teacher saves no longer trigger immediate WhatsApp send.
+    # Backfill: every existing row predates this column and was always
+    # sent on submission under the old flow, so mark them all as 'sent'
+    # regardless of their downstream whatsapp_status delivery state.
+    # New rows from teacher UI default to 'draft' (the column DEFAULT
+    # above takes care of inserts that don't supply a value). Idempotent
+    # via the schema_migrations tag so the backfill runs exactly once.
+    #
+    # IMPORTANT: the UPDATE is UNCONDITIONAL (no WHERE on status). On
+    # Postgres an `ALTER TABLE ... ADD COLUMN ... DEFAULT 'draft'`
+    # immediately materialises the default value on existing rows, so
+    # `WHERE status IS NULL` would match nothing and existing legacy
+    # rows would silently stay as 'draft'. The migration runs at import
+    # time (before any HTTP request), so no genuine new draft can exist
+    # at this point — the unconditional UPDATE is safe.
+    try:
+        _mig = db2.execute(
+            "SELECT 1 FROM schema_migrations WHERE tag=?",
+            ("parent_messages_status_v1",)
+        ).fetchone()
+    except Exception:
+        _mig = None
+    if not _mig:
+        try:
+            db2.execute("UPDATE parent_messages SET status='sent'")
+            db2.execute(
+                "INSERT INTO schema_migrations(tag) VALUES(?)",
+                ("parent_messages_status_v1",)
+            )
+            db2.commit()
+        except Exception: pass
 
     # ── evaluations_v2: monthly evaluation form (1-10 sliders).
     # The evaluations table predates this feature (see legacy CREATE
@@ -45228,6 +45263,7 @@ def _pm_row_to_dict(r):
         "whatsapp_status":      d.get("whatsapp_status") or "queued",
         "whatsapp_sent_count":  int(d.get("whatsapp_sent_count") or 0),
         "whatsapp_total_count": int(d.get("whatsapp_total_count") or 0),
+        "status":               (d.get("status") or "draft").strip() or "draft",
         "is_deleted":           int(d.get("is_deleted") or 0),
         "created_at":           d.get("created_at") or "",
         "updated_at":           d.get("updated_at") or "",
@@ -45383,6 +45419,20 @@ def _pm_assemble_recipients(db, row, log_to_message_log=True):
 @app.route('/api/parent-messages', methods=['POST'])
 @login_required
 def api_parent_messages_create():
+    """Create a parent broadcast row.
+
+    Body params:
+      group_name, sent_date, content_covered, skills_focused, books_used,
+      homework, parent_notes — content fields.
+      action — "save" (default) stores the row as a DRAFT and returns
+               without recipients. "send" is admin/manager only and
+               additionally returns the recipient list so the client can
+               fire wa.me links immediately.
+
+    Teachers can ONLY save (status='draft'). The send capability was
+    moved to the admin-only POST /<id>/send endpoint as part of the
+    permission split (parent_messages_status_v1 migration).
+    """
     user = session.get("user") or {}
     if not _pm_can_use(user):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
@@ -45394,6 +45444,9 @@ def api_parent_messages_create():
     books_used      = (body.get("books_used")      or "").strip()
     homework        = (body.get("homework")        or "").strip()
     parent_notes    = (body.get("parent_notes")    or "").strip()
+    action          = (body.get("action") or "save").strip().lower()
+    if action not in ("save", "send"):
+        action = "save"
     if not group_name:
         return jsonify({"ok": False, "error": "اسم المجموعة مطلوب"}), 400
     sent_date = _att_normalize_date(sent_date_raw) or sent_date_raw
@@ -45407,6 +45460,11 @@ def api_parent_messages_create():
     if not books_used:
         return jsonify({"ok": False, "error": "حقل الكتب مطلوب"}), 400
     role = _pm_user_role(user)
+    # Teachers cannot send — force save regardless of what the client
+    # asked for. The admin/manager UI is the only path that may set
+    # action="send" and skip the draft step.
+    if role == "teacher" and action == "send":
+        action = "save"
     db = get_db()
     if role == "teacher":
         own = set(_teacher_groups_for(db, user))
@@ -45421,18 +45479,19 @@ def api_parent_messages_create():
     # Compute total recipient count up-front so the row's stored
     # total_count is meaningful even if the client never finalises.
     total_count = len(_pm_group_recipients(db, group_name))
+    new_status = "draft"  # always created as draft; admin can send later.
     try:
         cur = db.execute(
             "INSERT INTO parent_messages(teacher_id,teacher_username,"
             "teacher_name,group_name,sent_date,content_covered,"
             "skills_focused,books_used,homework,parent_notes,"
             "whatsapp_status,whatsapp_sent_count,whatsapp_total_count,"
-            "is_deleted,created_at,updated_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,'queued',0,?,0,"
+            "status,is_deleted,created_at,updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,'queued',0,?,?,0,"
             "CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
             (teacher_id, teacher_username, teacher_name,
              group_name, sent_date, content_covered, skills_focused,
-             books_used, homework, parent_notes, total_count),
+             books_used, homework, parent_notes, total_count, new_status),
         )
         db.commit()
         new_id = None
@@ -45448,35 +45507,87 @@ def api_parent_messages_create():
             except Exception: pass
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
-    # Build the per-recipient payload + insert a message_log row per
-    # parent (delivery is fired from the client; the log entry exists
-    # so the existing /api/message-log inspection tools see them).
-    fresh = db.execute("SELECT * FROM parent_messages WHERE id=?",
-                       (new_id,)).fetchone()
-    recipients = _pm_assemble_recipients(db, fresh, log_to_message_log=True)
-    db.commit()
     try:
         _audit("parent_messages.create", target_type="parent_messages",
                target_id=new_id,
                new_value={"group_name": group_name, "sent_date": sent_date,
-                          "total_count": total_count})
+                          "total_count": total_count, "status": new_status,
+                          "action": action})
     except Exception: pass
+    # action="save" path (always for teachers, default for admin):
+    # draft is persisted, NO recipients returned, NO message_log rows
+    # written — admin will trigger send later via /<id>/send.
+    if action == "save":
+        return jsonify({
+            "ok": True, "success": True, "id": new_id,
+            "status": new_status, "total_count": total_count,
+            "recipients": [],
+        })
+    # action="send" — admin/manager opted to send immediately. Build
+    # the recipient payload + log a message_log row per parent, same
+    # as the legacy single-step flow. The row stays status='draft'
+    # until the client calls /finalize, which flips it to 'sent'.
+    fresh = db.execute("SELECT * FROM parent_messages WHERE id=?",
+                       (new_id,)).fetchone()
+    recipients = _pm_assemble_recipients(db, fresh, log_to_message_log=True)
+    db.commit()
     return jsonify({
         "ok": True, "success": True, "id": new_id,
-        "total_count": total_count,
+        "status": new_status, "total_count": total_count,
         "recipients":  recipients,
     })
+
+
+@app.route('/api/parent-messages/<int:mid>/send', methods=['POST'])
+@login_required
+def api_parent_messages_send(mid):
+    """Admin/manager-only: trigger the WhatsApp send for a draft row.
+    Returns the recipient list so the client can fire wa.me links from
+    the browser (same model as /resend). The row's status stays 'draft'
+    until the client posts to /finalize, which flips it to 'sent'."""
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if (rd.get("status") or "draft") == "sent":
+        return jsonify({"ok": False, "error":
+            "تم إرسال هذه الرسالة من قبل. استخدم إعادة الإرسال."}), 400
+    recipients = _pm_assemble_recipients(db, row, log_to_message_log=True)
+    try:
+        db.execute(
+            "UPDATE parent_messages SET whatsapp_status='queued', "
+            "whatsapp_total_count=?, updated_at=CURRENT_TIMESTAMP "
+            "WHERE id=?",
+            (len(recipients), mid),
+        )
+        db.commit()
+    except Exception: pass
+    try:
+        _audit("parent_messages.resend", target_type="parent_messages",
+               target_id=mid,
+               new_value={"send_initiated_by": user.get("username") or "",
+                          "total_count": len(recipients)})
+    except Exception: pass
+    return jsonify({"ok": True, "id": mid, "status": "draft",
+                    "total_count": len(recipients),
+                    "recipients":  recipients})
 
 
 @app.route('/api/parent-messages/<int:mid>/finalize', methods=['POST'])
 @login_required
 def api_parent_messages_finalize(mid):
-    """Client calls this after iterating through wa.me opens. Sets
-    whatsapp_status to 'sent' (or 'failed' if sent_count==0) and
-    persists the actual sent_count / total_count."""
+    """Admin/manager-only: client calls this after iterating through
+    wa.me opens. Sets whatsapp_status to 'sent' / 'failed' AND flips
+    the editorial status to 'sent' so the row leaves the draft queue.
+    Teachers cannot call this — they have no send capability."""
     user = session.get("user") or {}
-    if not _pm_can_use(user):
-        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
     body = request.get_json(silent=True) or {}
     try: sent_count = int(body.get("sent_count") or 0)
     except Exception: sent_count = 0
@@ -45488,23 +45599,26 @@ def api_parent_messages_finalize(mid):
     if not row:
         return jsonify({"ok": False, "error": "الرسالة غير موجودة"}), 404
     rd = dict(row)
-    if _pm_user_role(user) == "teacher":
-        try: my_id = int(user.get("id") or 0)
-        except Exception: my_id = 0
-        if int(rd.get("teacher_id") or 0) != my_id:
-            return jsonify({"ok": False, "error": "غير مصرح"}), 403
-    status = "sent" if sent_count > 0 else "failed"
+    wa_status = "sent" if sent_count > 0 else "failed"
+    # Editorial status flips to 'sent' as soon as the admin has tried
+    # to send (regardless of how many wa.me links actually opened) so
+    # the row leaves the draft queue. Failed delivery is captured by
+    # whatsapp_status alongside, and the admin can use إعادة الإرسال.
+    new_status = "sent"
     try:
         db.execute(
             "UPDATE parent_messages SET whatsapp_status=?, "
             "whatsapp_sent_count=?, whatsapp_total_count=?, "
-            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (status, sent_count, total_count or rd.get("whatsapp_total_count") or 0, mid),
+            "status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (wa_status, sent_count,
+             total_count or rd.get("whatsapp_total_count") or 0,
+             new_status, mid),
         )
         db.commit()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
-    return jsonify({"ok": True, "id": mid, "status": status,
+    return jsonify({"ok": True, "id": mid, "status": new_status,
+                    "whatsapp_status": wa_status,
                     "sent_count": sent_count, "total_count": total_count})
 
 
@@ -45657,21 +45771,12 @@ def api_parent_messages_update(mid):
         except Exception: my_id = 0
         if int(rd.get("teacher_id") or 0) != my_id:
             return jsonify({"ok": False, "error": "غير مصرح"}), 403
-        # Teacher edits limited to within 1 hour of creation.
-        try:
-            import datetime as _dt_e
-            created = rd.get("created_at") or ""
-            # SQLite timestamps come back as 'YYYY-MM-DD HH:MM:SS'.
-            try:
-                ts = _dt_e.datetime.fromisoformat(str(created).replace(" ", "T"))
-            except Exception:
-                ts = None
-            if ts is not None:
-                elapsed = (_dt_e.datetime.utcnow() - ts).total_seconds()
-                if elapsed > 3600:
-                    return jsonify({"ok": False, "error":
-                        "لا يمكن التعديل بعد مرور ساعة على الإرسال"}), 403
-        except Exception: pass
+        # Teachers may only edit DRAFTS that admin hasn't sent yet.
+        # Once a draft has been sent (status='sent'), editing requires
+        # admin/manager.
+        if (rd.get("status") or "draft") == "sent":
+            return jsonify({"ok": False, "error":
+                "لا يمكن التعديل بعد إرسال الرسالة"}), 403
     body = request.get_json(silent=True) or {}
     sets = []; params = []
     audit_old = {}; audit_new = {}
@@ -45738,19 +45843,10 @@ def api_parent_messages_delete(mid):
         except Exception: my_id = 0
         if int(rd.get("teacher_id") or 0) != my_id:
             return jsonify({"ok": False, "error": "غير مصرح"}), 403
-        try:
-            import datetime as _dt_e
-            created = rd.get("created_at") or ""
-            try:
-                ts = _dt_e.datetime.fromisoformat(str(created).replace(" ", "T"))
-            except Exception:
-                ts = None
-            if ts is not None:
-                elapsed = (_dt_e.datetime.utcnow() - ts).total_seconds()
-                if elapsed > 3600:
-                    return jsonify({"ok": False, "error":
-                        "لا يمكن الحذف بعد مرور ساعة على الإرسال"}), 403
-        except Exception: pass
+        # Teachers may only delete DRAFTS that admin hasn't sent yet.
+        if (rd.get("status") or "draft") == "sent":
+            return jsonify({"ok": False, "error":
+                "لا يمكن الحذف بعد إرسال الرسالة"}), 403
     try:
         db.execute("UPDATE parent_messages SET is_deleted=1, "
                    "updated_at=CURRENT_TIMESTAMP WHERE id=?", (mid,))
