@@ -27405,7 +27405,16 @@ h2.head .month{color:#F57C00;}
 .slider-row .ctrl{flex:1;min-width:200px;position:relative;}
 .slider-row input[type=range]{
   -webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:5px;
-  background:linear-gradient(90deg,#e53935 0%,#fdd835 50%,#43a047 100%);
+  /* RTL slider: native <input type=range> flips visually so value=1 sits
+     on the right and value=10 on the left. Gradient direction "to left"
+     paints 0% on the right edge → red on right, yellow middle, green
+     on left. Stops are pinned at 11% / 50% / 89% (the centres of the
+     1, 5, 10 thumb positions on a 10-step scale) so each tick lands
+     in a clearly-coloured zone instead of a smeared blend. */
+  background:linear-gradient(to left,
+    #EF4444 0%, #EF4444 11%,
+    #F59E0B 50%,
+    #10B981 89%, #10B981 100%);
   outline:none;cursor:pointer;}
 .slider-row input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;width:24px;height:24px;border-radius:50%;
@@ -27686,7 +27695,10 @@ table.tbl tr:hover td{background:#fff8e1;}
       var v   = document.getElementById('vl-'+s.k);
       inp.addEventListener('input', function(){
         v.textContent = inp.value;
-        v.className = 'val ' + (inp.value<=4 ? 'low' : (inp.value<=7 ? 'mid' : 'high'));
+        // 1-3 → red, 4-6 → amber, 7-10 → green. Matches the slider
+        // track gradient: red right, yellow centre, green left (RTL).
+        var nv = parseInt(inp.value, 10);
+        v.className = 'val ' + (nv <= 3 ? 'low' : (nv <= 6 ? 'mid' : 'high'));
         recomputeOverall();
       });
     });
@@ -27717,7 +27729,7 @@ table.tbl tr:hover td{background:#fff8e1;}
       if(inp){ inp.value = nv; }
       if(v){
         v.textContent = nv;
-        v.className = 'val ' + (nv<=4 ? 'low' : (nv<=7 ? 'mid' : 'high'));
+        v.className = 'val ' + (nv <= 3 ? 'low' : (nv <= 6 ? 'mid' : 'high'));
       }
     });
     recomputeOverall();
