@@ -4357,6 +4357,23 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       </div>
     </div>
   </div>
+  <!-- Missing-lessons alert: shown only when lessons_log has gaps for
+       attendance rows. Hidden by default; the loader below toggles it
+       on after polling /api/lessons/missing. -->
+  <a id="dh-missing-lessons" href="/admin/lessons?filter=missing" class="mx-admin-only"
+     style="display:none;background:linear-gradient(135deg,#fff3e0,#ffe0b2);
+            border:1.5px solid #fb8c00;border-radius:12px;padding:14px 18px;
+            margin-bottom:16px;text-decoration:none;color:#e65100;font-weight:800;
+            box-shadow:0 3px 12px rgba(251,140,0,.15);align-items:center;
+            justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <span style="display:inline-flex;align-items:center;gap:10px;font-size:1rem;">
+      <span style="font-size:1.4rem;">&#x26A0;</span>
+      <span><span id="dh-missing-count">0</span> &#x62D;&#x635;&#x629; &#x645;&#x631;&#x635;&#x648;&#x62F;&#x629; &#x628;&#x62F;&#x648;&#x646; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x62F;&#x631;&#x633;</span>
+    </span>
+    <span style="background:#fb8c00;color:#fff;padding:6px 14px;border-radius:8px;font-size:.86rem;">
+      &#x639;&#x631;&#x636; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x2190;
+    </span>
+  </a>
   <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
   <div class="dh-stats-grid">
     <div class="dh-stat-card teal">
@@ -4480,6 +4497,28 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
       if (d && d.ok && d.pending > 0){
         var b = document.getElementById('dh-receipts-badge');
         if (b){ b.textContent = d.pending; b.style.display = 'inline-block'; }
+      }
+    }).catch(function(){});
+})();
+/* Missing-lessons block: admin/manager only. /api/lessons/missing
+   returns 403 for other roles, so a denied response is treated as
+   "no block to show" and we just leave the element hidden. The block
+   re-runs the detection on every dashboard load so an admin who just
+   fixed a lesson_date sees the count drop on next visit. */
+(function(){
+  fetch('/api/lessons/missing', {credentials:'include'})
+    .then(function(r){
+      if (r.status === 403) return null;
+      return r.json();
+    })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      var n = d.count || 0;
+      if (n > 0){
+        var box = document.getElementById('dh-missing-lessons');
+        var c   = document.getElementById('dh-missing-count');
+        if (c) c.textContent = n;
+        if (box) box.style.display = 'flex';
       }
     }).catch(function(){});
 })();
@@ -26523,6 +26562,55 @@ table.tbl tr:hover td{background:#faf5ff;}
     document.getElementById('tlBack').classList.remove('show');
   };
 
+  // ── missing view ────────────────────────────────────────
+  function renderMissing(items){
+    var box = document.getElementById('tableBox');
+    document.getElementById('pagBox').innerHTML = '';
+    document.getElementById('tableTitle').textContent =
+      'حصص مرصودة بدون تسجيل درس';
+    if(!items.length){
+      box.innerHTML = '<div class="empty">جميع الحصص لها دروس مسجَّلة ✓</div>';
+      return;
+    }
+    var html = '<table class="tbl"><thead><tr>'+
+      '<th>التاريخ</th><th>المجموعة</th><th>المعلمة</th>'+
+      '<th>إجراء</th></tr></thead><tbody>';
+    items.forEach(function(m){
+      var msg = 'مرحباً ' + (m.teacher_name || '') +
+                '، يُرجى تسجيل درس مجموعة "' + m.group_name +
+                '" بتاريخ ' + m.attendance_date + ' في نظام مايندكس. شكراً.';
+      var enc = encodeURIComponent(msg);
+      // wa.me without phone opens WhatsApp with the text only — admin
+      // picks the contact. Existing teacher-phone storage was not
+      // available, so this is the safest fallback.
+      var url = 'https://wa.me/?text=' + enc;
+      html += '<tr>'+
+        '<td data-label="التاريخ">'+escapeHtml(m.attendance_date)+'</td>'+
+        '<td data-label="المجموعة">'+escapeHtml(m.group_name)+'</td>'+
+        '<td data-label="المعلمة">'+escapeHtml(m.teacher_name || '—')+'</td>'+
+        '<td data-label="إجراء">'+
+          '<a href="'+url+'" target="_blank" rel="noopener" '+
+          'class="btn btn-warn" style="padding:6px 12px;font-size:.85rem;">'+
+          '💬 تذكير المعلمة بتسجيل الدرس</a>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+  }
+  function loadMissing(){
+    var box = document.getElementById('tableBox');
+    box.innerHTML = '<div class="empty">جاري التحميل...</div>';
+    fetch('/api/lessons/missing')
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){
+          box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+          return;
+        }
+        renderMissing(j.missing || []);
+      });
+  }
+
   // Pre-fill date range (last 30 days) and read URL filter param.
   (function init(){
     var t = new Date();
@@ -26535,15 +26623,23 @@ table.tbl tr:hover td{background:#faf5ff;}
     var preGroup = qs('group');
     var preFrom  = qs('from');
     var preTo    = qs('to');
+    var preFilter= qs('filter');
     if(preGroup) document.getElementById('f-group').value = preGroup;
     if(preFrom)  document.getElementById('f-from').value  = preFrom;
     if(preTo)    document.getElementById('f-to').value    = preTo;
     loadFilterOpts().then(function(){
       if(preGroup){
-        // Make sure selection holds even if dropdown wasn't populated yet.
         document.getElementById('f-group').value = preGroup;
       }
-      loadData(); loadStats();
+      if(preFilter === 'missing'){
+        // Hide stats panel + filters that don't apply to the missing
+        // view. Stats are still computed for the cards above so the
+        // admin retains context.
+        loadStats();
+        loadMissing();
+      } else {
+        loadData(); loadStats();
+      }
     });
   })();
 })();
