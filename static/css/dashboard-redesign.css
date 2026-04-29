@@ -578,3 +578,107 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
    be flipped back on by the JS's inline-style assignment because of
    the !important here). */
 #dh-missing-lessons { display: none !important; }
+
+/* ==========================================================================
+   Phase 7 — Two-column content (recent activity + groups today)
+   ========================================================================== */
+.md-twocol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--md-sp-4);
+  margin: 0 0 var(--md-sp-5);
+}
+@media (max-width: 900px) { .md-twocol { grid-template-columns: 1fr; } }
+
+.md-panel {
+  background: var(--md-bg-card);
+  border-radius: var(--md-rad-lg);
+  box-shadow: var(--md-shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.md-panel-head {
+  padding: var(--md-sp-4) var(--md-sp-5);
+  border-bottom: 1px solid var(--md-bg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md-sp-3);
+}
+.md-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--md-sp-2);
+  font-size: var(--md-fz-md);
+  font-weight: var(--md-fw-bold);
+  color: var(--md-brand-deep);
+  margin: 0;
+}
+.md-panel-link {
+  font-size: var(--md-fz-xs);
+  color: var(--md-brand-deep);
+  text-decoration: none;
+  font-weight: var(--md-fw-semi);
+  padding: 4px 10px;
+  border-radius: var(--md-rad-pill);
+  border: 1px solid var(--md-brand-border);
+  background: var(--md-bg-card);
+  white-space: nowrap;
+}
+.md-panel-link:hover { background: var(--md-brand-soft); }
+.md-panel-list { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; }
+.md-panel-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md-sp-3);
+  padding: var(--md-sp-3) var(--md-sp-5);
+  border-bottom: 1px solid var(--md-bg-muted);
+  font-size: var(--md-fz-sm);
+  transition: background var(--md-motion-fast);
+}
+.md-panel-list li:last-child { border-bottom: none; }
+.md-panel-list li:hover { background: var(--md-bg-soft); }
+.md-panel-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.md-panel-row-title {
+  font-weight: var(--md-fw-semi);
+  color: var(--md-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-panel-row-sub {
+  font-size: var(--md-fz-xs);
+  color: var(--md-text-secondary);
+  margin-top: 2px;
+}
+.md-panel-empty {
+  padding: var(--md-sp-6);
+  text-align: center;
+  color: var(--md-text-muted);
+  font-size: var(--md-fz-sm);
+  font-style: italic;
+}
+.md-panel-row-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--md-brand);
+  flex-shrink: 0;
+  margin-inline-end: var(--md-sp-2);
+}
+.md-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--md-rad-pill);
+  font-size: var(--md-fz-xs);
+  font-weight: var(--md-fw-bold);
+  white-space: nowrap;
+}
+.md-pill-success { background: var(--md-success-bg); color: var(--md-success-text); }
+.md-pill-info    { background: var(--md-info-bg);    color: var(--md-info-text); }
+.md-pill-warning { background: var(--md-warning-bg); color: var(--md-warning-text); }
+.md-pill-muted   { background: var(--md-bg-muted);   color: var(--md-text-secondary); }
