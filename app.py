@@ -4530,52 +4530,6 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 })();
 </script>
 <div class="dh-main">
-  <!-- Welcome banner (Phase 3): deep purple gradient hero with the user's
-       first name (extracted from the topbar's name element via JS) and
-       today's date in Arabic. The speech-bubble decoration is an inline
-       SVG so we don't ship a new image asset. -->
-  <div class="md-welcome">
-    <div class="md-welcome-text">
-      <div class="md-welcome-greeting">
-        <span id="md-welcome-name">&#x645;&#x631;&#x62D;&#x628;&#x627;&#x64B;!</span>
-        <span class="md-welcome-wave" aria-hidden="true">&#x1F44B;</span>
-      </div>
-      <p class="md-welcome-subtitle" id="md-welcome-sub">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x62A;&#x62D;&#x643;&#x645; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</p>
-    </div>
-    <div class="md-welcome-bubble" aria-hidden="true">
-      <svg viewBox="0 0 130 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22 30 Q22 14 40 14 L92 14 Q110 14 110 30 L110 56 Q110 72 92 72 L66 72 L52 88 L57 72 L40 72 Q22 72 22 56 Z"
-              fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.45)" stroke-width="1.8"/>
-        <circle cx="50" cy="42" r="3.5" fill="rgba(255,255,255,0.65)"/>
-        <circle cx="66" cy="42" r="3.5" fill="rgba(255,255,255,0.65)"/>
-        <circle cx="82" cy="42" r="3.5" fill="rgba(255,255,255,0.65)"/>
-      </svg>
-    </div>
-  </div>
-  <script>
-  (function(){
-    /* Welcome banner populator: pulls first name from the topbar's
-       .md-tb-user-name (already filled by USER_PLACEHOLDER), formats
-       today's date in Arabic via Intl.DateTimeFormat. */
-    var nameSrc = document.querySelector('.md-tb-user-name');
-    var nameOut = document.getElementById('md-welcome-name');
-    if (nameSrc && nameOut) {
-      var full = (nameSrc.textContent || '').trim();
-      var first = (full.split(/\s+/)[0] || '').trim();
-      nameOut.textContent = first ? ('مرحباً، ' + first + '!') : 'مرحباً!';
-    }
-    var subOut = document.getElementById('md-welcome-sub');
-    if (subOut) {
-      try {
-        var d  = new Date();
-        var f  = new Intl.DateTimeFormat('ar', {
-          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-        });
-        subOut.textContent = 'لوحة التحكم الرئيسية — ' + f.format(d);
-      } catch(e) { /* no-op: keep the static fallback subtitle */ }
-    }
-  })();
-  </script>
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
     <div id="dh-center-mode-badge" style="padding:6px 16px;border-radius:999px;font-weight:800;font-size:14px;background:#ede7f6;color:#4527a0;">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
