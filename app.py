@@ -4,6 +4,22 @@ from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mindx2026secret")
+
+# Session cookie hardening. HttpOnly is on by Flask default but we
+# set it explicitly so the contract is auditable from this file.
+# SameSite=Lax blocks CSRF from third-party sites while keeping
+# top-level navigations (the user clicking a /login link from an
+# email, etc.) working. Secure is gated on a production indicator
+# so local HTTP dev still gets a session cookie — Render sets
+# RENDER=true, and any deployment that exposes the app over HTTPS
+# can opt in by setting COOKIE_SECURE=1 in its env.
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+_cookie_secure_env = (os.environ.get("COOKIE_SECURE") or "").strip().lower()
+app.config["SESSION_COOKIE_SECURE"] = (
+    _cookie_secure_env in ("1", "true", "yes")
+    or bool(os.environ.get("RENDER"))
+)
 DB = os.environ.get("DB_PATH", "mindx.db")
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_PG = bool(DATABASE_URL)
