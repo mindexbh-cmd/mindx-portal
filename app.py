@@ -452,8 +452,38 @@ def init_db():
         expression TEXT,
         grammar TEXT,
         notes TEXT,
+        evaluation_date TEXT,
+        evaluation_month TEXT,
+        student_id INTEGER,
+        teacher_id INTEGER,
+        teacher_name TEXT,
+        score_participation INTEGER,
+        score_behavior INTEGER,
+        notes_behavior TEXT,
+        score_reading INTEGER,
+        score_dictation INTEGER,
+        score_vocabulary INTEGER,
+        score_conversation INTEGER,
+        score_expression INTEGER,
+        score_grammar INTEGER,
+        notes_language TEXT,
+        overall_score INTEGER,
+        general_notes TEXT,
+        released_to_parent INTEGER DEFAULT 0,
+        whatsapp_sent_at DATETIME,
+        whatsapp_sent_by INTEGER,
+        is_deleted INTEGER DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    # Index references student_id which doesn't exist on legacy
+    # evaluations schemas — guard so init_db() doesn't crash on
+    # pre-evaluations_v2 DBs. The else-branch migration recreates the
+    # index after ALTER TABLE adds the column.
+    try:
+        db.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_student_month "
+                   "ON evaluations(student_id, evaluation_month)")
+    except Exception: pass
     db.execute("""CREATE TABLE IF NOT EXISTS eval_col_labels(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         col_key TEXT UNIQUE,
@@ -2865,6 +2895,57 @@ if True:
         read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, student_id)
     )""")
+    db2.commit()
+
+    # ── evaluations_v2: monthly evaluation form (1-10 sliders).
+    # The evaluations table predates this feature (see legacy CREATE
+    # above with form_fill_date / class_participation / etc. columns).
+    # We keep every legacy column intact and add the v2 columns as
+    # extras: integer 1-10 score_* fields, evaluation_date /
+    # evaluation_month / student_id / teacher_id / teacher_name for
+    # cleaner joins, overall_score (computed average), released_to_parent
+    # for portal visibility, whatsapp_sent_at + whatsapp_sent_by for
+    # delivery audit, is_deleted + updated_at for the standard
+    # soft-delete + audit pattern. Idempotent ALTER TABLE ADD COLUMN
+    # only — the legacy columns stay readable so existing rows are
+    # untouched.
+    try:
+        _ev_cols = {r[1] for r in db2.execute(
+            "PRAGMA table_info(evaluations)").fetchall()}
+    except Exception:
+        _ev_cols = set()
+    for _col, _decl in [
+        ("evaluation_date",     "TEXT"),
+        ("evaluation_month",    "TEXT"),
+        ("student_id",          "INTEGER"),
+        ("teacher_id",          "INTEGER"),
+        ("teacher_name",        "TEXT"),
+        ("score_participation", "INTEGER"),
+        ("score_behavior",      "INTEGER"),
+        ("notes_behavior",      "TEXT"),
+        ("score_reading",       "INTEGER"),
+        ("score_dictation",     "INTEGER"),
+        ("score_vocabulary",    "INTEGER"),
+        ("score_conversation",  "INTEGER"),
+        ("score_expression",    "INTEGER"),
+        ("score_grammar",       "INTEGER"),
+        ("notes_language",      "TEXT"),
+        ("overall_score",       "INTEGER"),
+        ("general_notes",       "TEXT"),
+        ("released_to_parent",  "INTEGER DEFAULT 0"),
+        ("whatsapp_sent_at",    "DATETIME"),
+        ("whatsapp_sent_by",    "INTEGER"),
+        ("is_deleted",          "INTEGER DEFAULT 0"),
+        ("updated_at",          "DATETIME"),
+    ]:
+        if _col not in _ev_cols:
+            try: db2.execute("ALTER TABLE evaluations ADD COLUMN " +
+                             _col + " " + _decl)
+            except Exception: pass
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_student_month "
+                    "ON evaluations(student_id, evaluation_month)")
+    except Exception: pass
     db2.commit()
 
     # ── column_labels: backfill any rows that were inserted without
