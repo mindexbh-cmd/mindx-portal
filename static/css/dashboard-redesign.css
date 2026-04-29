@@ -266,3 +266,137 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
   .md-tb-avatar-name { display: none; }
   .md-tb-avatar-btn { padding: var(--md-sp-1); }
 }
+
+/* ==========================================================================
+   Phase 3 — Right sidebar navigation
+   ========================================================================== */
+.md-sidebar {
+  position: fixed;
+  top: var(--md-header-h);
+  right: 0;                       /* RTL: visual right edge */
+  bottom: 0;
+  width: var(--md-sidebar-w);
+  background: var(--md-bg-card);
+  z-index: var(--md-z-sidebar);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--md-font-stack);
+  box-shadow: var(--md-shadow-edge);
+  transition: width var(--md-motion-base), transform var(--md-motion-base);
+  overflow: hidden;
+}
+.md-sb-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--md-sp-2) 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-bg-muted) transparent;
+}
+.md-sb-nav::-webkit-scrollbar { width: 4px; }
+.md-sb-nav::-webkit-scrollbar-thumb { background: var(--md-bg-muted); border-radius: 2px; }
+
+.md-sb-section { border-bottom: 1px solid var(--md-bg-muted); }
+.md-sb-section:last-child { border-bottom: none; }
+
+.md-sb-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--md-sp-2);
+  width: 100%;
+  padding: var(--md-sp-3) var(--md-sp-4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--md-fz-sm);
+  font-weight: var(--md-fw-semi);
+  color: var(--md-text-secondary);
+  text-align: start;
+  transition: background var(--md-motion-fast);
+}
+.md-sb-section-header:hover { background: var(--md-bg-soft); }
+.md-sb-section-icon { font-size: 16px; flex-shrink: 0; }
+.md-sb-section-title { flex: 1; }
+.md-sb-chev {
+  width: 14px; height: 14px;
+  transition: transform var(--md-motion-base);
+  color: var(--md-text-muted);
+  flex-shrink: 0;
+}
+.md-sb-section.collapsed .md-sb-chev { transform: rotate(-90deg); }
+.md-sb-section.collapsed .md-sb-items { display: none; }
+
+.md-sb-items { padding: 0 0 var(--md-sp-2); list-style: none; margin: 0; }
+.md-sb-link {
+  display: flex;
+  align-items: center;
+  gap: var(--md-sp-3);
+  padding: 9px var(--md-sp-7) 9px var(--md-sp-4);
+  color: var(--md-text-primary);
+  text-decoration: none;
+  font-size: var(--md-fz-sm);
+  border-inline-end: 3px solid transparent;
+  transition: background var(--md-motion-fast), color var(--md-motion-fast);
+  cursor: pointer;
+  font-family: inherit;
+  background: transparent;
+  border-top: none;
+  border-bottom: none;
+  border-inline-start: none;
+  text-align: start;
+  width: 100%;
+}
+.md-sb-link:hover { background: var(--md-bg-soft); color: var(--md-brand-deep); }
+.md-sb-link.active {
+  background: var(--md-brand-soft);
+  color: var(--md-brand-deep);
+  font-weight: var(--md-fw-semi);
+  border-inline-end-color: var(--md-brand-deep);
+}
+.md-sb-link-icon {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  color: var(--md-brand-deep);
+}
+.md-sb-link-text { flex: 1 1 auto; min-width: 0; line-height: 1.4; }
+
+/* Desktop: body shift (only on dashboard via .md-sb-on guard) */
+@media (min-width: 1024px) {
+  body.md-sb-on { padding-right: var(--md-sidebar-w); }
+  body.md-sb-on.md-sb-collapsed { padding-right: var(--md-sidebar-w-c); }
+  body.md-sb-on.md-sb-collapsed .md-sidebar { width: var(--md-sidebar-w-c); }
+  body.md-sb-on.md-sb-collapsed .md-sb-section-title,
+  body.md-sb-on.md-sb-collapsed .md-sb-chev,
+  body.md-sb-on.md-sb-collapsed .md-sb-link-text {
+    display: none;
+  }
+  body.md-sb-on.md-sb-collapsed .md-sb-section-header,
+  body.md-sb-on.md-sb-collapsed .md-sb-link {
+    justify-content: center;
+    padding-inline-start: 0;
+    padding-inline-end: 0;
+  }
+}
+
+/* Mobile drawer */
+@media (max-width: 1023px) {
+  .md-sidebar { transform: translateX(100%); }
+  body.md-sb-open .md-sidebar { transform: translateX(0); }
+}
+.md-sidebar-backdrop {
+  position: fixed;
+  top: var(--md-header-h);
+  left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: calc(var(--md-z-sidebar) - 1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-motion-base);
+}
+@media (max-width: 1023px) {
+  body.md-sb-open .md-sidebar-backdrop {
+    opacity: 1; pointer-events: auto;
+  }
+}

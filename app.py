@@ -4542,6 +4542,195 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
   }
 })();
 </script>
+<!-- Phase 3 — Right sidebar navigation. Maps existing routes ONLY,
+     mirrors role visibility via mx-admin-only / mx-staff-only. The
+     hamburger from the topbar toggles it. Modal-trigger items use
+     onclick to call the existing dashboard JS functions (srOpen,
+     pmOpen, ssOpen, sdOpen, msgOpen) since the sidebar lives on the
+     dashboard page where those modals are defined. -->
+<div class="md-sidebar-backdrop" id="md-sidebar-backdrop" aria-hidden="true"></div>
+<aside class="md-sidebar" id="md-sidebar" role="navigation" aria-label="&#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x627;&#x644;&#x62C;&#x627;&#x646;&#x628;&#x64A;&#x629;">
+  <nav class="md-sb-nav">
+    <!-- 📊 الرئيسية -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="main">
+        <span class="md-sb-section-icon">&#x1F4CA;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link active" href="/dashboard">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span class="md-sb-link-text">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x62A;&#x62D;&#x643;&#x645;</span>
+        </a>
+      </div>
+    </div>
+    <!-- 📋 الطلاب والمجموعات -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="students">
+        <span class="md-sb-section-icon">&#x1F4CB;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x637;&#x644;&#x627;&#x628; &#x648;&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <button type="button" class="md-sb-link" onclick="if(typeof srOpen==='function')srOpen();">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="md-sb-link-text">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</span>
+        </button>
+        <a class="md-sb-link" href="/groups">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="md-sb-link-text">&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</span>
+        </a>
+        <button type="button" class="md-sb-link mx-admin-only" onclick="if(typeof srOpenAddStudent==='function')srOpenAddStudent();">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          <span class="md-sb-link-text">&#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;</span>
+        </button>
+      </div>
+    </div>
+    <!-- ✅ الحضور والغياب -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="attendance">
+        <span class="md-sb-section-icon">&#x2705;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x62D;&#x636;&#x648;&#x631; &#x648;&#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link" href="/attendance">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
+          <span class="md-sb-link-text">&#x631;&#x635;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</span>
+        </a>
+        <button type="button" class="md-sb-link" onclick="if(typeof ssOpen==='function')ssOpen();">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          <span class="md-sb-link-text">&#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x635;</span>
+        </button>
+      </div>
+    </div>
+    <!-- 💰 المالية -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="finance">
+        <span class="md-sb-section-icon">&#x1F4B0;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x645;&#x627;&#x644;&#x64A;&#x629;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <button type="button" class="md-sb-link" onclick="if(typeof pmOpen==='function')pmOpen();">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span class="md-sb-link-text">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x641;&#x639;</span>
+        </button>
+        <a class="md-sb-link mx-admin-only" href="/admin/receipts">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span class="md-sb-link-text">&#x625;&#x64A;&#x635;&#x627;&#x644;&#x627;&#x62A; &#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x627;&#x644;&#x623;&#x645;&#x648;&#x631;</span>
+        </a>
+      </div>
+    </div>
+    <!-- 📚 التعليم والتقييم -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="teaching">
+        <span class="md-sb-section-icon">&#x1F4DA;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x62A;&#x639;&#x644;&#x64A;&#x645; &#x648;&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link mx-staff-only" href="/admin/lessons">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span class="md-sb-link-text">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62F;&#x631;&#x648;&#x633;</span>
+        </a>
+        <a class="md-sb-link mx-staff-only" href="/admin/evaluations">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;&#x629;</span>
+        </a>
+        <a class="md-sb-link mx-staff-only" href="/admin/parent-messages">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span class="md-sb-link-text">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x627;&#x62A;</span>
+        </a>
+      </div>
+    </div>
+    <!-- 🌟 نظام النقاط -->
+    <div class="md-sb-section">
+      <button type="button" class="md-sb-section-header" data-sb-section="points">
+        <span class="md-sb-section-icon">&#x1F31F;</span>
+        <span class="md-sb-section-title">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link" href="/points/board">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="md-sb-link-text">&#x644;&#x648;&#x62D;&#x629; &#x627;&#x644;&#x635;&#x641;</span>
+        </a>
+        <a class="md-sb-link mx-admin-only" href="/points/manage">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span class="md-sb-link-text">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</span>
+        </a>
+      </div>
+    </div>
+    <!-- 📊 الإدارة والمراقبة (admin/manager) -->
+    <div class="md-sb-section mx-staff-only">
+      <button type="button" class="md-sb-section-header" data-sb-section="admin">
+        <span class="md-sb-section-icon">&#x1F4CA;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0648;&#x0627;&#x0644;&#x0645;&#x0631;&#x0627;&#x0642;&#x0628;&#x0629;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link mx-staff-only" href="/admin/teacher-deliveries">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg>
+          <span class="md-sb-link-text">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x62A;&#x633;&#x644;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x64A;&#x646;</span>
+        </a>
+        <a class="md-sb-link mx-admin-only" href="/admin/permissions">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span class="md-sb-link-text">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0635;&#x0644;&#x0627;&#x062D;&#x064A;&#x0627;&#x062A;</span>
+        </a>
+      </div>
+    </div>
+    <!-- ⚙️ النظام (admin only) -->
+    <div class="md-sb-section mx-admin-only">
+      <button type="button" class="md-sb-section-header" data-sb-section="system">
+        <span class="md-sb-section-icon">&#x2699;</span>
+        <span class="md-sb-section-title">&#x627;&#x644;&#x646;&#x638;&#x627;&#x645;</span>
+        <svg class="md-sb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="md-sb-items">
+        <a class="md-sb-link" href="/database">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+          <span class="md-sb-link-text">&#x642;&#x627;&#x639;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A;</span>
+        </a>
+        <a class="md-sb-link" href="/admin/backups">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x646;&#x633;&#x062E; &#x627;&#x644;&#x0627;&#x062D;&#x062A;&#x064A;&#x0627;&#x0637;&#x064A;&#x0629;</span>
+        </a>
+        <a class="md-sb-link" href="/settings">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x625;&#x639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A;</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+</aside>
+<script>
+(function(){
+  /* Phase 3 — sidebar mount + hamburger toggle + section collapse. */
+  document.body.classList.add('md-sb-on');
+  var sb = document.getElementById('md-sidebar');
+  var bd = document.getElementById('md-sidebar-backdrop');
+  var hb = document.getElementById('md-hb');
+  function isMobile(){ return window.innerWidth < 1024; }
+  function toggleSidebar(){
+    if (isMobile()) {
+      document.body.classList.toggle('md-sb-open');
+    } else {
+      document.body.classList.toggle('md-sb-collapsed');
+    }
+  }
+  if (hb) hb.addEventListener('click', toggleSidebar);
+  if (bd) bd.addEventListener('click', function(){ document.body.classList.remove('md-sb-open'); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') document.body.classList.remove('md-sb-open');
+  });
+  // Section collapse toggles
+  document.querySelectorAll('.md-sb-section-header').forEach(function(h){
+    h.addEventListener('click', function(){ h.parentElement.classList.toggle('collapsed'); });
+  });
+})();
+</script>
 <div class="dh-main">
   <div id="dh-center-mode-card" style="background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 3px 14px rgba(107,63,160,.08);margin-bottom:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-right:4px solid #6B3FA0;">
     <div style="font-weight:800;color:#4a148c;font-size:15px;">&#x1F3DB;&#xFE0F; &#x062D;&#x0627;&#x0644;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0643;&#x0632; &#x0627;&#x0644;&#x062D;&#x0627;&#x0644;&#x064A;&#x0629;:</div>
