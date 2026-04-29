@@ -26871,6 +26871,7 @@ table.tbl tr:hover td{background:#fff5f8;}
 .status-pill.sent{background:#c8e6c9;color:#1b5e20;}
 .status-pill.failed{background:#ffcdd2;color:#b71c1c;}
 .status-pill.queued{background:#fff8e1;color:#f57c00;}
+.status-pill.draft{background:#eceff1;color:#455a64;}
 .progress-bar{height:8px;background:#fce4ec;border-radius:4px;overflow:hidden;
               margin-top:8px;}
 .progress-bar > div{height:100%;background:linear-gradient(90deg,#E91E63,#C2185B);
@@ -26951,8 +26952,10 @@ table.tbl tr:hover td{background:#fff5f8;}
       </div>
       <div class="btn-row">
         <button type="button" class="btn btn-ghost" onclick="openPreview()">👁️ معاينة الرسالة</button>
-        <button type="submit" class="btn" id="sendBtn">📨 إرسال للأهالي</button>
+        <button type="submit" class="btn" id="sendBtn">💾 حفظ الرسالة</button>
       </div>
+      <p style="margin-top:10px;color:#6B3FA0;font-size:.85rem;line-height:1.55;">
+        ℹ️ ستتم مراجعة الرسالة من قبل الإدارة قبل إرسالها لأولياء الأمور.</p>
     </form>
   </div>
 
@@ -26974,32 +26977,6 @@ table.tbl tr:hover td{background:#fff5f8;}
     <div class="preview-box" id="prevText">—</div>
     <div class="acts">
       <button class="btn btn-ghost" onclick="closePreview()">إغلاق</button>
-    </div>
-  </div>
-</div>
-
-<!-- Confirm-send modal -->
-<div class="modal-back" id="confBack" onclick="if(event.target===this)closeConf()">
-  <div class="modal">
-    <h3>تأكيد الإرسال</h3>
-    <p id="confText">سيتم الإرسال لـ <b id="confCount">0</b> ولي أمر في المجموعة. متابعة؟</p>
-    <div class="acts">
-      <button class="btn btn-ghost" onclick="closeConf()">إلغاء</button>
-      <button class="btn" id="confirmSendBtn" onclick="confirmSend()">📨 تأكيد الإرسال</button>
-    </div>
-  </div>
-</div>
-
-<!-- Sending progress modal -->
-<div class="modal-back" id="progBack">
-  <div class="modal">
-    <h3 id="progTitle">جاري الإرسال...</h3>
-    <p id="progStatus">— من —</p>
-    <div class="progress-bar"><div id="progBar"></div></div>
-    <div id="progRecipients" style="max-height:40vh;overflow:auto;margin-top:14px;"></div>
-    <div class="acts">
-      <button class="btn btn-ghost" id="progCloseBtn"
-              onclick="closeProgress()" style="display:none;">إغلاق</button>
     </div>
   </div>
 </div>
@@ -27183,21 +27160,31 @@ table.tbl tr:hover td{background:#fff5f8;}
       entries.forEach(function(e){
         var trunc = (e.content_covered || '').slice(0, 60);
         if((e.content_covered||'').length > 60) trunc += '...';
-        var cls = (e.whatsapp_status === 'sent') ? 'sent' :
-                  (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
-        var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
-                  (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
+        // Editorial status takes precedence over WhatsApp delivery
+        // state — a draft never displays as "sent" even if a stale
+        // whatsapp_status field says so.
+        var st = (e.status || 'draft');
+        var cls, lbl;
+        if (st === 'draft') { cls = 'draft'; lbl = 'مسودة'; }
+        else if (st === 'sent') {
+          if (e.whatsapp_status === 'failed') { cls = 'failed'; lbl = 'فشل'; }
+          else { cls = 'sent'; lbl = 'تم الإرسال'; }
+        } else { cls = 'queued'; lbl = 'قيد الانتظار'; }
+        // Teachers can edit/delete only DRAFTS — once admin sends the
+        // message the row is locked from teacher modification.
+        var isDraft = (st === 'draft');
+        var actions = '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>';
+        if (isDraft) {
+          actions += '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+                     '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>';
+        }
         html += '<tr>'+
           '<td data-label="التاريخ">'+escapeHtml(e.sent_date)+'</td>'+
           '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
           '<td data-label="المحتوى">'+escapeHtml(trunc)+'</td>'+
           '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
           '<td data-label="تم الإرسال">'+e.whatsapp_sent_count+'/'+e.whatsapp_total_count+'</td>'+
-          '<td data-label="إجراءات">'+
-            '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
-            '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
-            '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
-          '</td></tr>';
+          '<td data-label="إجراءات">'+actions+'</td></tr>';
       });
       html += '</tbody></table>';
       box.innerHTML = html;
@@ -27207,7 +27194,10 @@ table.tbl tr:hover td{background:#fff5f8;}
   }
 
   // ── Submit form ──
-  var _draftBody = null;
+  // Teachers can DRAFT only — sending is admin/manager action via the
+  // /admin/parent-messages page. The button posts {action:"save"};
+  // the server stores the row as status='draft' and never opens any
+  // WhatsApp links from the teacher session.
   window.submitForm = function(ev){
     ev.preventDefault();
     clearErrs();
@@ -27224,121 +27214,33 @@ table.tbl tr:hover td{background:#fff5f8;}
     if(!skills){ showErr('pskills', 'حقل المهارات مطلوب'); ok = false; }
     if(!books){ showErr('pbooks', 'حقل الكتب مطلوب'); ok = false; }
     if(!ok) return false;
-    _draftBody = {
-      group_name: grp, sent_date: date,
-      content_covered: content, skills_focused: skills,
-      books_used: books, homework: hw, parent_notes: notes
-    };
-    // Step 1 — POST to create the row + get recipients (server logs
-    // each recipient in message_log automatically).
     var btn = document.getElementById('sendBtn');
-    btn.disabled = true; btn.textContent = '⏳ تجهيز...';
+    btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
     fetch('/api/parent-messages', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(_draftBody)
+      body: JSON.stringify({
+        action: 'save',
+        group_name: grp, sent_date: date,
+        content_covered: content, skills_focused: skills,
+        books_used: books, homework: hw, parent_notes: notes
+      })
     }).then(function(r){return r.json();}).then(function(j){
-      btn.disabled = false; btn.textContent = '📨 إرسال للأهالي';
+      btn.disabled = false; btn.textContent = '💾 حفظ الرسالة';
       if(!j || !j.ok){
-        toast((j && j.error) || 'تعذر التجهيز', true);
+        toast((j && j.error) || 'تعذر الحفظ', true);
         return;
       }
-      _pendingSend = {
-        id: j.id,
-        recipients: j.recipients || [],
-        total: j.total_count || (j.recipients||[]).length
-      };
-      document.getElementById('confCount').textContent = _pendingSend.total;
-      document.getElementById('confBack').classList.add('show');
+      toast('تم حفظ الرسالة. سيتم إرسالها للأهالي بعد مراجعة الإدارة.');
+      document.getElementById('pmForm').reset();
+      document.getElementById('pdate').value = isoToday();
+      document.getElementById('pteacher').value = 'USER_PLACEHOLDER';
+      loadRecent();
     }).catch(function(){
-      btn.disabled = false; btn.textContent = '📨 إرسال للأهالي';
-      toast('تعذر التجهيز', true);
+      btn.disabled = false; btn.textContent = '💾 حفظ الرسالة';
+      toast('تعذر الحفظ', true);
     });
     return false;
-  };
-
-  // ── Confirm + sending sweep ──
-  var _pendingSend = null;
-  window.closeConf = function(){
-    document.getElementById('confBack').classList.remove('show');
-    // Don't soft-delete the row if user cancels — finalize with 0
-    // sent so the entry is recorded as 'failed'/'queued'.
-  };
-  window.confirmSend = function(){
-    document.getElementById('confBack').classList.remove('show');
-    if(!_pendingSend) return;
-    var ps = _pendingSend;
-    document.getElementById('progBack').classList.add('show');
-    document.getElementById('progTitle').textContent = 'جاري الإرسال...';
-    document.getElementById('progStatus').textContent = '0 من ' + ps.total;
-    document.getElementById('progBar').style.width = '0%';
-    document.getElementById('progCloseBtn').style.display = 'none';
-    var box = document.getElementById('progRecipients');
-    box.innerHTML = ps.recipients.map(function(r, i){
-      return '<div class="recipient-row" id="rcp-'+i+'">'+
-        '<span class="nm">'+escapeHtml(r.student_name)+'</span>'+
-        '<span class="ph">'+escapeHtml(r.whatsapp_raw||'-')+'</span>'+
-        '<span class="st pending" id="rcp-st-'+i+'">قيد الانتظار</span>'+
-      '</div>';
-    }).join('');
-    if(!ps.recipients.length){
-      finishSweep(0, 0);
-      return;
-    }
-    var sentCount = 0;
-    var idx = 0;
-    function step(){
-      if(idx >= ps.recipients.length){
-        finishSweep(sentCount, ps.total);
-        return;
-      }
-      var r = ps.recipients[idx];
-      var stEl = document.getElementById('rcp-st-'+idx);
-      if(!r.whatsapp){
-        if(stEl){ stEl.textContent = 'لا يوجد رقم'; stEl.className = 'st no'; }
-        idx++;
-        document.getElementById('progStatus').textContent = idx + ' من ' + ps.total;
-        document.getElementById('progBar').style.width = ((idx/ps.total)*100)+'%';
-        setTimeout(step, 250);
-        return;
-      }
-      var url = 'https://wa.me/' + r.whatsapp + '?text=' + encodeURIComponent(r.text);
-      // Open in a new tab. Browser may block popups beyond the first
-      // unless they fire inside the same gesture; we mitigate with a
-      // small delay between opens.
-      try { window.open(url, '_blank'); } catch(e){}
-      sentCount++;
-      if(stEl){ stEl.textContent = 'تم الفتح'; stEl.className = 'st ok'; }
-      idx++;
-      document.getElementById('progStatus').textContent = idx + ' من ' + ps.total;
-      document.getElementById('progBar').style.width = ((idx/ps.total)*100)+'%';
-      // Stagger so popup blockers don't nuke them.
-      setTimeout(step, 600);
-    }
-    step();
-    function finishSweep(sent, total){
-      document.getElementById('progTitle').textContent = 'انتهى الإرسال';
-      document.getElementById('progStatus').textContent =
-        '✅ تم فتح ' + sent + ' من ' + total + ' رسالة';
-      document.getElementById('progBar').style.width = '100%';
-      document.getElementById('progCloseBtn').style.display = 'inline-flex';
-      // Tell server.
-      fetch('/api/parent-messages/' + ps.id + '/finalize', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({sent_count: sent, total_count: total})
-      }).then(function(r){return r.json();}).then(function(){
-        toast('تم تسجيل الإرسال ✓');
-        document.getElementById('pmForm').reset();
-        document.getElementById('pdate').value = isoToday();
-        document.getElementById('pteacher').value = 'USER_PLACEHOLDER';
-        loadRecent();
-      });
-    }
-  };
-  window.closeProgress = function(){
-    document.getElementById('progBack').classList.remove('show');
-    _pendingSend = null;
   };
 
   // ── View / edit / delete ──
