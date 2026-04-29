@@ -30072,6 +30072,180 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     });
   }
 
+  // ── lessons tab ────────────────────────────────────────────────
+  // Reuses GET /api/lessons/log + the existing PATCH/DELETE/audit_log
+  // endpoints. No new mutations.
+  var LESSONS_PAGE = 1; var LESSONS_PER = 20;
+  var LESSONS_SORT = {col:'lesson_date', dir:'desc'};
+  function lessonsLoad(){
+    if(STATE.cache.lessons) return Promise.resolve(STATE.cache.lessons);
+    return fetch('/api/lessons/log' + window.tdBuildQs(), {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok) return [];
+        STATE.cache.lessons = (j.entries || []).filter(window.tdMatchesFilters);
+        return STATE.cache.lessons;
+      });
+  }
+  window.tdRenderLessons = function(box){
+    box.innerHTML = '<div class="tab-head">'+
+      '<h3>📚 سجل الدروس</h3>'+
+      '<div class="links">'+
+        '<a class="full-link" href="/admin/lessons" target="_blank" rel="noopener">إدارة كاملة ↗</a>'+
+      '</div></div>'+
+      '<div id="lessons-table"><div class="empty">جاري التحميل...</div></div>'+
+      '<div class="pagination" id="lessons-pag"></div>';
+    lessonsLoad().then(function(rows){
+      lessonsRender(rows);
+    });
+  };
+  function lessonsRender(rows){
+    var box = document.getElementById('lessons-table');
+    if(!box) return;
+    if(!rows.length){
+      box.innerHTML = '<div class="empty">لا توجد دروس بالشروط المحددة</div>';
+      document.getElementById('lessons-pag').innerHTML = '';
+      return;
+    }
+    var arr = rows.slice();
+    arr.sort(function(a,b){
+      var av = a[LESSONS_SORT.col] || ''; var bv = b[LESSONS_SORT.col] || '';
+      if(av<bv) return LESSONS_SORT.dir==='asc' ? -1 : 1;
+      if(av>bv) return LESSONS_SORT.dir==='asc' ? 1 : -1;
+      return 0;
+    });
+    var totalPages = Math.max(1, Math.ceil(arr.length / LESSONS_PER));
+    if(LESSONS_PAGE > totalPages) LESSONS_PAGE = totalPages;
+    var start = (LESSONS_PAGE-1) * LESSONS_PER;
+    var slice = arr.slice(start, start + LESSONS_PER);
+    function th(c, l){
+      var arrow = LESSONS_SORT.col===c ? (LESSONS_SORT.dir==='asc' ? ' ▲' : ' ▼') : '';
+      return '<th onclick="lessonsSortBy(\''+c+'\')">'+l+arrow+'</th>';
+    }
+    var html = '<table class="tbl"><thead><tr>'+
+      th('lesson_date','التاريخ')+
+      th('teacher_name','المعلمة')+
+      th('group_name','المجموعة')+
+      th('lesson_topic','الدرس')+
+      th('curriculum_progress','إلى أين وصلت')+
+      '<th>ملاحظات</th><th>إجراءات</th></tr></thead><tbody>';
+    slice.forEach(function(e){
+      html += '<tr>'+
+        '<td data-label="التاريخ" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.lesson_date)+'</td>'+
+        '<td data-label="المعلمة" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
+        '<td data-label="المجموعة" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.group_name)+'</td>'+
+        '<td data-label="الدرس" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.lesson_topic||'').slice(0,80))+'</td>'+
+        '<td data-label="إلى أين وصلت" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.curriculum_progress||'').slice(0,80))+'</td>'+
+        '<td data-label="ملاحظات" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.notes||'').slice(0,60))+'</td>'+
+        '<td data-label="إجراءات">'+
+          '<button class="act-btn view" onclick="event.stopPropagation();lessonsView('+e.id+')">عرض</button>'+
+          '<button class="act-btn edit" onclick="event.stopPropagation();lessonsEdit('+e.id+')">تعديل</button>'+
+          '<button class="act-btn del"  onclick="event.stopPropagation();lessonsDelete('+e.id+')">حذف</button>'+
+        '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    lessonsRenderPag(totalPages);
+  }
+  function lessonsRenderPag(total){
+    var p = document.getElementById('lessons-pag');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="lessonsGoPage(1)" '+(LESSONS_PAGE===1?'disabled':'')+'>«</button>';
+    html += '<button onclick="lessonsGoPage('+(LESSONS_PAGE-1)+')" '+(LESSONS_PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, LESSONS_PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="lessonsGoPage('+i+')" class="'+(i===LESSONS_PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="lessonsGoPage('+(LESSONS_PAGE+1)+')" '+(LESSONS_PAGE===total?'disabled':'')+'>›</button>';
+    html += '<button onclick="lessonsGoPage('+total+')" '+(LESSONS_PAGE===total?'disabled':'')+'>»</button>';
+    p.innerHTML = html;
+  }
+  window.lessonsSortBy = function(col){
+    if(LESSONS_SORT.col===col){ LESSONS_SORT.dir = LESSONS_SORT.dir==='asc'?'desc':'asc'; }
+    else { LESSONS_SORT.col = col; LESSONS_SORT.dir = 'desc'; }
+    lessonsRender(STATE.cache.lessons || []);
+  };
+  window.lessonsGoPage = function(p){ LESSONS_PAGE = p; lessonsRender(STATE.cache.lessons || []); window.scrollTo({top:0,behavior:'smooth'}); };
+  window.lessonsView = function(id){
+    var e = (STATE.cache.lessons || []).find(function(x){return x.id===id;});
+    if(!e){ window.tdToast('غير موجود', true); return; }
+    document.getElementById('viewTitle').textContent =
+      'درس بتاريخ ' + (e.lesson_date||'');
+    document.getElementById('viewBody').innerHTML =
+      '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+window.tdEscape(e.teacher_name||'')+'</div>'+
+      '<div style="margin-bottom:10px;"><b>المجموعة:</b> '+window.tdEscape(e.group_name||'')+'</div>'+
+      '<div style="margin-bottom:10px;"><b>الدرس:</b><div>'+window.tdEscape(e.lesson_topic||'')+'</div></div>'+
+      '<div style="margin-bottom:10px;"><b>إلى أين وصلت في المنهج:</b><div>'+window.tdEscape(e.curriculum_progress||'')+'</div></div>'+
+      (e.notes ? '<div style="margin-bottom:10px;"><b>ملاحظات:</b><div>'+window.tdEscape(e.notes)+'</div></div>' : '')+
+      '<div style="color:#888;font-size:.84rem;margin-top:14px;">📅 أُدخل في '+window.tdEscape((e.created_at||'').slice(0,16))+'</div>';
+    document.getElementById('viewBack').classList.add('show');
+  };
+  var _editingLesson = null;
+  window.lessonsEdit = function(id){
+    var e = (STATE.cache.lessons || []).find(function(x){return x.id===id;});
+    if(!e){ window.tdToast('غير موجود', true); return; }
+    _editingLesson = e;
+    document.getElementById('editTitle').textContent = 'تعديل درس';
+    document.getElementById('editBody').innerHTML =
+      '<div class="field"><label>التاريخ</label><input type="date" id="edl-date" value="'+window.tdEscape(e.lesson_date||'')+'"></div>'+
+      '<div class="field"><label>الدرس</label><input type="text" id="edl-topic" value="'+window.tdEscape(e.lesson_topic||'')+'" maxlength="500"></div>'+
+      '<div class="field"><label>إلى أين وصلت</label><input type="text" id="edl-curr" value="'+window.tdEscape(e.curriculum_progress||'')+'" maxlength="500"></div>'+
+      '<div class="field"><label>ملاحظات</label><textarea id="edl-notes" rows="3" maxlength="2000">'+window.tdEscape(e.notes||'')+'</textarea></div>'+
+      '<div class="field"><label>سبب التعديل (اختياري)</label><input type="text" id="edl-reason" maxlength="300"></div>';
+    document.getElementById('editSaveBtn').onclick = lessonsSaveEdit;
+    document.getElementById('editDelBtn').onclick = function(){ closeModal('editBack'); lessonsDelete(id); };
+    document.getElementById('editBack').classList.add('show');
+  };
+  function lessonsSaveEdit(){
+    if(!_editingLesson) return;
+    var btn = document.getElementById('editSaveBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    var body = {
+      lesson_date:  document.getElementById('edl-date').value,
+      lesson_topic: document.getElementById('edl-topic').value.trim(),
+      curriculum_progress: document.getElementById('edl-curr').value.trim(),
+      notes:        document.getElementById('edl-notes').value.trim(),
+      reason:       document.getElementById('edl-reason').value.trim()
+    };
+    fetch('/api/lessons/log/' + _editingLesson.id, {
+      method:'PATCH', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        window.tdToast('تم الحفظ ✓');
+        closeModal('editBack');
+        STATE.cache.lessons = null;
+        lessonsLoad().then(function(rows){ lessonsRender(rows); });
+      } else {
+        window.tdToast((j && j.error) || 'تعذر التعديل', true);
+      }
+    });
+  }
+  var _delLessonId = null;
+  window.lessonsDelete = function(id){
+    _delLessonId = id;
+    document.getElementById('delConfirmBtn').onclick = lessonsConfirmDelete;
+    document.getElementById('delBack').classList.add('show');
+  };
+  function lessonsConfirmDelete(){
+    if(!_delLessonId) return;
+    fetch('/api/lessons/log/' + _delLessonId, {method:'DELETE', credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          window.tdToast('تم الحذف ✓');
+          closeModal('delBack');
+          STATE.cache.lessons = null;
+          lessonsLoad().then(function(rows){ lessonsRender(rows); });
+        } else {
+          window.tdToast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  }
+
   // Per-tab JS files attach themselves to window.tdRender* before
   // the first renderTab call below.
   document.addEventListener('DOMContentLoaded', function(){
