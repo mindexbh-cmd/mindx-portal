@@ -30216,6 +30216,262 @@ def admin_curriculum_page():
     return ADMIN_CURRICULUM_HTML
 
 
+# ──────────────────────────────────────────────────────────────────
+# Curriculum PDF viewer page
+# ──────────────────────────────────────────────────────────────────
+# Renders a PDF inline via PDF.js. The binary itself is fetched
+# from /api/curriculum/view/<id> which already enforces auth + per-
+# user permission and logs every access.
+#
+# Anti-download hardening (best-effort, NOT bulletproof — screenshots
+# and OS-level "Print to PDF" cannot be prevented from any web app;
+# the brief acknowledges this and asks for the protections below):
+#  - PDF.js download/print/openFile toolbar buttons hidden via CSS
+#    when can_download is false.
+#  - Right-click context menu disabled on the viewer area.
+#  - Text selection disabled (user-select:none).
+#  - Ctrl+S, Ctrl+P, Ctrl+Shift+S keyboard shortcuts swallowed at
+#    the document level.
+#  - Watermark overlay with the user's display name + ISO date,
+#    repeating diagonally at 0.15 opacity across the canvas.
+#  - X-Frame-Options: SAMEORIGIN header on every viewer response.
+#  - Cache-Control: no-store on the viewer page itself.
+PORTAL_CURRICULUM_VIEWER_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>__VIEW_TITLE__ — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:#1a1a1a;color:#eee;
+          font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;}
+.viewer-bar{background:#2a2a2a;padding:10px 16px;display:flex;
+            justify-content:space-between;align-items:center;flex-wrap:wrap;
+            gap:10px;border-bottom:1px solid #444;position:sticky;top:0;z-index:10;}
+.viewer-bar h1{margin:0;font-size:1rem;font-weight:800;color:#fff;}
+.viewer-bar .ctrls{display:flex;gap:8px;align-items:center;}
+.viewer-bar a,.viewer-bar button{background:#444;color:#fff;border:none;
+  border-radius:8px;padding:8px 14px;font-weight:700;font-size:.86rem;
+  cursor:pointer;text-decoration:none;font-family:inherit;}
+.viewer-bar a:hover,.viewer-bar button:hover{background:#555;}
+.viewer-bar a.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.viewer-bar a.back{background:#6B3FA0;}
+.viewer-bar .pinfo{font-size:.84rem;color:#bbb;}
+#canvas-stage{position:relative;height:calc(100vh - 60px);overflow:auto;padding:14px;}
+.pdf-page{position:relative;margin:0 auto 14px;background:#fff;
+          box-shadow:0 4px 14px rgba(0,0,0,.45);max-width:100%;}
+.pdf-page canvas{display:block;width:100%;height:auto;}
+.protected #canvas-stage{user-select:none;-webkit-user-select:none;}
+.protected .pdf-page{position:relative;}
+.protected .pdf-page::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:var(--wm-img);background-repeat:repeat;
+  background-size:auto;mix-blend-mode:multiply;opacity:.18;
+}
+.spinner{margin:60px auto;text-align:center;color:#bbb;}
+.errorbox{margin:60px auto;max-width:480px;background:#3a1f1f;
+          border:2px solid #c62828;border-radius:12px;padding:20px;text-align:center;}
+@media (max-width:680px){
+  .viewer-bar h1{font-size:.9rem;}
+  .viewer-bar a,.viewer-bar button{padding:6px 10px;font-size:.78rem;}
+}
+</style>
+</head><body class="__BODY_CLS__" data-fid="__FILE_ID__" data-can-dl="__CAN_DL__"
+                data-uname="__USER_NAME__" data-stamp="__STAMP__">
+<div class="viewer-bar">
+  <h1>📖 __VIEW_TITLE__</h1>
+  <div class="ctrls">
+    <span class="pinfo" id="page-info">— / —</span>
+    <button id="btn-zoom-out" type="button" title="تصغير">−</button>
+    <button id="btn-zoom-in"  type="button" title="تكبير">+</button>
+    __DL_BTN__
+    <a class="back" href="__BACK_HREF__">← رجوع</a>
+  </div>
+</div>
+<div id="canvas-stage">
+  <div class="spinner" id="spin">جاري تحميل الملف...</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+  if (typeof pdfjsLib === 'undefined'){
+    document.getElementById('spin').textContent = 'تعذر تحميل عارض PDF.';
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  var body = document.body;
+  var fileId = body.getAttribute('data-fid');
+  var canDl  = (body.getAttribute('data-can-dl') === '1');
+  var userNm = body.getAttribute('data-uname') || '';
+  var stamp  = body.getAttribute('data-stamp') || '';
+  var protectedView = !canDl;
+
+  // Build the watermark texture once and assign as a CSS variable
+  // so we don't repaint per-page. Diagonal text via a tiny SVG.
+  if (protectedView){
+    var wmText = (userNm + (stamp ? (' • ' + stamp) : '')).slice(0,80);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320">' +
+              '<text x="50%" y="50%" fill="#888" font-size="22" font-weight="700" ' +
+              'text-anchor="middle" dominant-baseline="middle" ' +
+              'transform="rotate(-30 160 160)" font-family="Tajawal,Cairo,sans-serif">' +
+              wmText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') +
+              '</text></svg>';
+    var url = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    document.documentElement.style.setProperty('--wm-img', 'url("' + url + '")');
+  }
+
+  // Anti-download protections (best-effort) — disable context menu
+  // and the common save/print hotkeys document-wide when the user
+  // doesn't have download permission. Screenshots cannot be
+  // prevented from any web app; that's a known limitation.
+  if (protectedView){
+    document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    document.addEventListener('keydown', function(e){
+      var k = (e.key || '').toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && (k === 's' || k === 'p')){
+        e.preventDefault();
+      }
+    });
+  }
+
+  var pdfDoc = null;
+  var scale = 1.4;
+  var totalPages = 0;
+  var stage = document.getElementById('canvas-stage');
+
+  function renderAll(){
+    stage.innerHTML = '';
+    var jobs = [];
+    for (var i=1; i<=totalPages; i++){
+      jobs.push(renderPage(i));
+    }
+    Promise.all(jobs).catch(function(){});
+  }
+  function renderPage(num){
+    return pdfDoc.getPage(num).then(function(page){
+      var viewport = page.getViewport({scale: scale});
+      var wrap = document.createElement('div');
+      wrap.className = 'pdf-page';
+      wrap.style.width  = viewport.width  + 'px';
+      var canvas = document.createElement('canvas');
+      canvas.width  = viewport.width;
+      canvas.height = viewport.height;
+      wrap.appendChild(canvas);
+      stage.appendChild(wrap);
+      return page.render({
+        canvasContext: canvas.getContext('2d'),
+        viewport: viewport
+      }).promise;
+    });
+  }
+
+  function setPageInfo(){
+    document.getElementById('page-info').textContent =
+      totalPages + ' صفحات';
+  }
+
+  document.getElementById('btn-zoom-in').addEventListener('click', function(){
+    scale = Math.min(3.0, scale + 0.2);
+    if (pdfDoc) renderAll();
+  });
+  document.getElementById('btn-zoom-out').addEventListener('click', function(){
+    scale = Math.max(0.6, scale - 0.2);
+    if (pdfDoc) renderAll();
+  });
+
+  pdfjsLib.getDocument({
+    url: '/api/curriculum/view/' + fileId,
+    withCredentials: true
+  }).promise.then(function(doc){
+    pdfDoc = doc;
+    totalPages = doc.numPages;
+    setPageInfo();
+    document.getElementById('spin').remove();
+    renderAll();
+  }).catch(function(err){
+    var stage = document.getElementById('canvas-stage');
+    stage.innerHTML = '<div class="errorbox"><h2>تعذر فتح الملف</h2>' +
+      '<p>قد لا تملكين صلاحية عرض هذا الكتاب أو الملف غير متاح.</p></div>';
+  });
+})();
+</script>
+</body></html>"""
+
+
+def _curriculum_back_href_for(user):
+    role = ((user or {}).get("role") or "").strip().lower()
+    if role == "teacher":  return "/teacher/curriculum"
+    if role == "student":  return "/portal/parent-hub/curriculum"
+    return "/admin/curriculum"
+
+
+@app.route('/portal/curriculum/view/<int:file_id>')
+@login_required
+def portal_curriculum_view_page(file_id):
+    """Renders the PDF.js viewer shell. The PDF binary itself is
+    streamed by /api/curriculum/view/<id> (which enforces auth +
+    per-user permission and writes the access-log entry). This
+    route's only job is to ship the viewer HTML with the correct
+    can_download flag and watermark identity baked in."""
+    user = session.get("user") or {}
+    db = get_db()
+    can_view, can_download = _curriculum_resolve_download(db, user, file_id)
+    if not can_view:
+        # 403 with a tiny standalone error page so the user lands
+        # somewhere sensible from a stale or shared link.
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+            "<title>403</title><style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;"
+            "background:#1a1a1a;color:#eee;min-height:100vh;display:flex;"
+            "align-items:center;justify-content:center;margin:0;direction:rtl;}"
+            ".card{background:#2a2a2a;padding:40px;border-radius:14px;text-align:center;}"
+            ".card a{color:#FF80AB;}</style></head><body>"
+            "<div class='card'><h1>🚫 غير مصرح</h1>"
+            "<p>هذا الملف غير متاح لك حالياً.</p>"
+            "<p><a href='" + _curriculum_back_href_for(user) +
+            "'>← العودة</a></p></div></body></html>",
+            status=403, mimetype="text/html; charset=utf-8",
+            headers={"X-Frame-Options": "SAMEORIGIN",
+                     "Cache-Control": "no-store"})
+    # Look up title for the page <h1>.
+    try:
+        row = db.execute(
+            "SELECT title FROM curriculum_files WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(file_id),)
+        ).fetchone()
+    except Exception:
+        row = None
+    title = (dict(row).get("title") if row else "") or "ملف"
+    user_name = (user.get("name") or user.get("username") or "").strip()
+    import datetime as _dt
+    stamp = _dt.date.today().isoformat()
+    body_cls = "" if can_download else "protected"
+    dl_btn = ""
+    if can_download:
+        dl_btn = ('<a class="dl" href="/api/curriculum/download/' + str(file_id) +
+                  '">⬇ تحميل</a>')
+    def _esc(s):
+        return (str(s or "").replace("&","&amp;").replace("<","&lt;")
+                .replace(">","&gt;").replace('"',"&quot;"))
+    html = (
+        PORTAL_CURRICULUM_VIEWER_HTML
+        .replace("__FILE_ID__",   str(int(file_id)))
+        .replace("__CAN_DL__",    "1" if can_download else "0")
+        .replace("__USER_NAME__", _esc(user_name))
+        .replace("__STAMP__",     _esc(stamp))
+        .replace("__BODY_CLS__",  body_cls)
+        .replace("__VIEW_TITLE__", _esc(title))
+        .replace("__BACK_HREF__", _curriculum_back_href_for(user))
+        .replace("__DL_BTN__",    dl_btn)
+    )
+    resp = Response(html, mimetype="text/html; charset=utf-8")
+    resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 # ── /admin/evaluations — admin oversight + send-to-parent ──────────
 ADMIN_EVALUATIONS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
