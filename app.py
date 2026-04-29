@@ -27222,58 +27222,114 @@ table.tbl tr:hover td{background:#fff8e1;}
   };
 
   // ── group + student dropdowns ──
-  function fmtDays(arr){
-    if(!arr || !arr.length) return '';
-    return arr.join(' و ');
-  }
+  // Group dropdown: identical source + format to the teacher
+  // attendance page (تسجيل الحضور). Uses window.mxFmtTeacherGroupOption
+  // from mx-helpers.js so options match _tFmtGroupOption exactly.
   function loadGroups(){
     var sel = document.getElementById('egroup');
-    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
-      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
-      var groups = (j && j.groups) || [];
-      if(!groups.length){
-        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
-        return;
-      }
-      groups.forEach(function(g){
-        var nm = g.name || '';
-        var d  = fmtDays(g.study_days || []);
-        var t  = (g.study_time || '').trim();
-        var label = nm + (d || t ? ' (' + [d,t].filter(Boolean).join(' - ') + ')' : '');
-        var opt = document.createElement('option');
-        opt.value = nm; opt.textContent = label;
-        sel.appendChild(opt);
+    fetch('/api/teacher/groups', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
+          return;
+        }
+        var groups = j.groups || [];
+        sel.innerHTML = '<option value="">— اختر مجموعتك —</option>';
+        if(!groups.length){
+          sel.innerHTML = '<option value="">— لا توجد مجموعات مسندة لك —</option>';
+          return;
+        }
+        var fmt = window.mxFmtTeacherGroupOption;
+        for(var i=0;i<groups.length;i++){
+          var g = groups[i];
+          var name = (typeof g === 'string') ? g : (g.name || '');
+          var label = (typeof fmt === 'function') ? fmt(g) : name;
+          var o = document.createElement('option');
+          o.value = name;
+          o.textContent = label;
+          sel.appendChild(o);
+        }
+      })
+      .catch(function(){
+        sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
       });
-    });
   }
+  // Student dropdown: fresh fetch every time the group changes (no
+  // cache — student rosters update from قاعدة البيانات when admins
+  // add / activate students). Reuses the shared
+  // /api/monthly-evaluations/group-students endpoint, which uses the
+  // same _pm_group_recipients helper that honours the attendance
+  // settings (student_group_column / student_online_group_column)
+  // plus the registration filter (registration_term2_2026 =
+  // "تم التسجيل") — i.e. ONLY actively-registered students appear,
+  // matching the teacher attendance student loader exactly.
+  var _evLastGroupReq = 0;
   function loadStudents(group){
     var sel = document.getElementById('estudent');
-    sel.innerHTML = '<option value="">جاري التحميل...</option>';
-    sel.disabled = true;
     if(!group){
       sel.innerHTML = '<option value="">— اختاري المجموعة أولاً —</option>';
+      sel.disabled = true;
       return;
     }
-    fetch('/api/monthly-evaluations/group-students?group=' + encodeURIComponent(group))
-      .then(function(r){return r.json();}).then(function(j){
+    var reqId = ++_evLastGroupReq;
+    sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
+    sel.disabled = true;
+    fetch('/api/monthly-evaluations/group-students?group=' + encodeURIComponent(group),
+          {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        // Drop responses from any earlier request — the user may
+        // have re-selected before this one resolved.
+        if(reqId !== _evLastGroupReq) return;
         if(!j || !j.ok){
-          sel.innerHTML = '<option value="">— تعذر التحميل —</option>'; return;
+          sel.innerHTML = '<option value="">— تعذر تحميل قائمة الطلاب —</option>';
+          showStudentRetry(group);
+          return;
         }
         var arr = j.students || [];
         if(!arr.length){
-          sel.innerHTML = '<option value="">— لا توجد طالبات في المجموعة —</option>';
+          sel.innerHTML = '<option value="">— لا يوجد طلاب مسجّلون في هذه المجموعة —</option>';
+          sel.disabled = true;
           return;
         }
         sel.innerHTML = '<option value="">— اختاري الطالبة —</option>';
-        arr.forEach(function(s){
+        for(var i=0;i<arr.length;i++){
+          var s = arr[i];
           var opt = document.createElement('option');
-          opt.value = s.id; opt.textContent = s.name;
+          opt.value = s.id;
+          opt.textContent = s.name;
           sel.appendChild(opt);
-        });
+        }
         sel.disabled = false;
+      })
+      .catch(function(){
+        if(reqId !== _evLastGroupReq) return;
+        sel.innerHTML = '<option value="">— تعذر تحميل قائمة الطلاب —</option>';
+        showStudentRetry(group);
       });
   }
+  function showStudentRetry(group){
+    // Surface a small retry control next to the dropdown; created
+    // on demand, swept on next successful load.
+    var sel = document.getElementById('estudent');
+    var prev = document.getElementById('ev-stu-retry');
+    if(prev) prev.parentNode.removeChild(prev);
+    var btn = document.createElement('button');
+    btn.id = 'ev-stu-retry';
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost';
+    btn.style.cssText = 'margin-top:6px;padding:6px 14px;font-size:.86rem;';
+    btn.textContent = '↻ إعادة المحاولة';
+    btn.onclick = function(){
+      btn.parentNode && btn.parentNode.removeChild(btn);
+      loadStudents(group);
+    };
+    sel.parentNode.appendChild(btn);
+  }
   document.getElementById('egroup').addEventListener('change', function(){
+    var prev = document.getElementById('ev-stu-retry');
+    if(prev) prev.parentNode.removeChild(prev);
     loadStudents(this.value);
   });
 
@@ -44599,7 +44655,8 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
                   # is available from mx-helpers.js, matching the
                   # attendance page's option formatter exactly.
                   'TEACHER_LESSONS_HTML',
-                  'TEACHER_PARENT_MESSAGES_HTML'):
+                  'TEACHER_PARENT_MESSAGES_HTML',
+                  'TEACHER_EVALUATIONS_HTML'):
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
