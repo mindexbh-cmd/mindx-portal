@@ -39518,6 +39518,876 @@ def api_lessons_export():
                  mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ──────────────────────────────────────────────────────────────────
+# Parent broadcast — ماذا تريد أن يعرف ولي الأمر
+# ──────────────────────────────────────────────────────────────────
+# Teachers fill a structured form (content_covered / skills_focused /
+# books_used / homework / parent_notes) per group; the server inserts
+# a parent_messages row, builds one personalised message per parent,
+# inserts a message_log row per parent (existing WhatsApp pipeline),
+# and returns the recipient list. The client opens wa.me URLs in the
+# user gesture, then calls /api/parent-messages/<id>/finalize so the
+# parent_messages row's whatsapp_status / counts reflect what the
+# admin actually sent.
+#
+# This flow is COMPLETELY SEPARATE from the lessons_log feature —
+# different table, different routes, different UI. They do not share
+# any helper.
+
+def _pm_user_role(user):
+    return ((user or {}).get("role") or "").strip().lower()
+
+def _pm_can_admin(user):
+    return _pm_user_role(user) in ("admin", "manager")
+
+def _pm_can_use(user):
+    return _pm_user_role(user) in ("admin", "manager", "teacher")
+
+def _pm_clean_phone(s):
+    """Mirror of the existing _msgCleanPhone client helper: strip
+    everything except digits, drop a leading 0, prepend 973 if the
+    number is short enough to be a local Bahrain mobile."""
+    if not s: return ""
+    digits = "".join(ch for ch in str(s) if ch.isdigit())
+    if not digits: return ""
+    if digits.startswith("00"): digits = digits[2:]
+    if digits.startswith("0"):  digits = digits[1:]
+    # 8-digit local number → prepend 973.
+    if len(digits) == 8: digits = "973" + digits
+    return digits
+
+def _pm_row_to_dict(r):
+    if r is None: return None
+    d = dict(r)
+    return {
+        "id":                   d.get("id"),
+        "teacher_id":           d.get("teacher_id"),
+        "teacher_name":         d.get("teacher_name") or "",
+        "teacher_username":     d.get("teacher_username") or "",
+        "group_name":           d.get("group_name") or "",
+        "sent_date":            d.get("sent_date") or "",
+        "content_covered":      d.get("content_covered") or "",
+        "skills_focused":       d.get("skills_focused") or "",
+        "books_used":           d.get("books_used") or "",
+        "homework":             d.get("homework") or "",
+        "parent_notes":         d.get("parent_notes") or "",
+        "whatsapp_status":      d.get("whatsapp_status") or "queued",
+        "whatsapp_sent_count":  int(d.get("whatsapp_sent_count") or 0),
+        "whatsapp_total_count": int(d.get("whatsapp_total_count") or 0),
+        "is_deleted":           int(d.get("is_deleted") or 0),
+        "created_at":           d.get("created_at") or "",
+        "updated_at":           d.get("updated_at") or "",
+    }
+
+def _pm_render_message(student_name, teacher_name, group_name, sent_date,
+                       content_covered, skills_focused, books_used,
+                       homework, parent_notes):
+    """Build the personalised WhatsApp text. Same structure for all
+    recipients; only the student name changes."""
+    lines = []
+    greeting = "السلام عليكم ولي أمر " + (student_name or "الطالب/ة")
+    lines.append(greeting)
+    lines.append("")
+    if group_name:
+        lines.append("📚 المجموعة: " + group_name)
+    if sent_date:
+        lines.append("📅 التاريخ: " + sent_date)
+    lines.append("")
+    if content_covered:
+        lines.append("✏️ المحتوى الذي تم تغطيته:")
+        lines.append(content_covered)
+        lines.append("")
+    if skills_focused:
+        lines.append("🎯 المهارات التي تم التركيز عليها:")
+        lines.append(skills_focused)
+        lines.append("")
+    if books_used:
+        lines.append("📖 الكتب المستخدمة:")
+        lines.append(books_used)
+        lines.append("")
+    if homework:
+        lines.append("📝 الواجب المنزلي:")
+        lines.append(homework)
+        lines.append("")
+    if parent_notes:
+        lines.append("📌 ملاحظات لولي الأمر:")
+        lines.append(parent_notes)
+        lines.append("")
+    if teacher_name:
+        lines.append("— المعلمة: " + teacher_name)
+    lines.append("مايندكس")
+    return "\n".join(lines).strip()
+
+def _pm_group_recipients(db, group_name):
+    """Return [{student_id, student_name, whatsapp_clean}] for every
+    actively-registered student in the given group. Honours the same
+    settings (active_column / active_value, group columns) the
+    teacher attendance flow uses, so the recipient list matches what
+    the teacher already sees."""
+    in_col     = get_setting('attendance', 'student_group_column',
+                              'group_name_student') or 'group_name_student'
+    online_col = get_setting('attendance', 'student_online_group_column',
+                              'group_online') or 'group_online'
+    if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+    if not _is_safe_ident(online_col): online_col = 'group_online'
+    try:
+        live = {r[1] for r in db.execute(
+            "PRAGMA table_info(students)").fetchall()}
+    except Exception:
+        live = set()
+    has_online = (online_col in live and online_col != in_col)
+    where = '"' + in_col + '" = ?'
+    params = [group_name]
+    if has_online:
+        where = '("' + in_col + '" = ? OR "' + online_col + '" = ?)'
+        params = [group_name, group_name]
+    act_col = (get_setting('students', 'active_column',
+                            'registration_term2_2026') or '').strip() \
+              or 'registration_term2_2026'
+    act_val = (get_setting('students', 'active_value', 'تم التسجيل') or '').strip() \
+              or 'تم التسجيل'
+    if not _is_safe_ident(act_col): act_col = 'registration_term2_2026'
+    if act_col in live:
+        where = '(' + where + ') AND TRIM(COALESCE("' + act_col + '", \'\')) = ?'
+        params.append(act_val)
+    sel_phone = "whatsapp"
+    if "whatsapp" not in live:
+        sel_phone = "mother_phone" if "mother_phone" in live else "''"
+    try:
+        rows = db.execute(
+            'SELECT id, student_name, "' + sel_phone + '" AS phone, '
+            'COALESCE(mother_phone,\'\') AS mother_phone, '
+            'COALESCE(father_phone,\'\') AS father_phone '
+            'FROM students WHERE ' + where +
+            ' ORDER BY student_name', tuple(params)
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        d = dict(r)
+        nm = (d.get("student_name") or "").strip()
+        if not nm: continue
+        phone_raw = (d.get("phone") or "").strip() or \
+                    (d.get("mother_phone") or "").strip() or \
+                    (d.get("father_phone") or "").strip()
+        out.append({
+            "student_id":    d.get("id"),
+            "student_name":  nm,
+            "whatsapp_raw":  phone_raw,
+            "whatsapp":      _pm_clean_phone(phone_raw),
+        })
+    return out
+
+def _pm_log_message(db, student_name, whatsapp, template_name):
+    """Reuse the existing message_log pipeline. One row per
+    recipient. Returns the new id (or 0 on failure)."""
+    try:
+        db.execute(
+            "INSERT INTO message_log(student_name, student_whatsapp, "
+            "template_name) VALUES(?,?,?)",
+            (student_name or "", whatsapp or "", template_name or ""),
+        )
+        try:
+            return int(db.execute("SELECT last_insert_rowid()").fetchone()[0])
+        except Exception:
+            return 0
+    except Exception:
+        return 0
+
+def _pm_assemble_recipients(db, row, log_to_message_log=True):
+    """Given a parent_messages row dict, build the list of
+    {student_id, student_name, whatsapp, text, log_id} that the client
+    will iterate over to fire wa.me links."""
+    rd = dict(row) if hasattr(row, "keys") else row
+    students = _pm_group_recipients(db, rd.get("group_name") or "")
+    template_name = "parent-broadcast/" + str(rd.get("id") or "")
+    out = []
+    for s in students:
+        text = _pm_render_message(
+            s["student_name"], rd.get("teacher_name") or "",
+            rd.get("group_name") or "", rd.get("sent_date") or "",
+            rd.get("content_covered") or "", rd.get("skills_focused") or "",
+            rd.get("books_used") or "", rd.get("homework") or "",
+            rd.get("parent_notes") or "",
+        )
+        log_id = 0
+        if log_to_message_log and s["whatsapp"]:
+            log_id = _pm_log_message(db, s["student_name"],
+                                     s["whatsapp"], template_name)
+        out.append({
+            "student_id":   s["student_id"],
+            "student_name": s["student_name"],
+            "whatsapp":     s["whatsapp"],
+            "whatsapp_raw": s["whatsapp_raw"],
+            "text":         text,
+            "log_id":       log_id,
+        })
+    return out
+
+
+@app.route('/api/parent-messages', methods=['POST'])
+@login_required
+def api_parent_messages_create():
+    user = session.get("user") or {}
+    if not _pm_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    group_name      = (body.get("group_name") or "").strip()
+    sent_date_raw   = (body.get("sent_date") or "").strip()
+    content_covered = (body.get("content_covered") or "").strip()
+    skills_focused  = (body.get("skills_focused")  or "").strip()
+    books_used      = (body.get("books_used")      or "").strip()
+    homework        = (body.get("homework")        or "").strip()
+    parent_notes    = (body.get("parent_notes")    or "").strip()
+    if not group_name:
+        return jsonify({"ok": False, "error": "اسم المجموعة مطلوب"}), 400
+    sent_date = _att_normalize_date(sent_date_raw) or sent_date_raw
+    if not sent_date:
+        import datetime as _dt_p
+        sent_date = _dt_p.date.today().isoformat()
+    if not content_covered:
+        return jsonify({"ok": False, "error": "حقل المحتوى مطلوب"}), 400
+    if not skills_focused:
+        return jsonify({"ok": False, "error": "حقل المهارات مطلوب"}), 400
+    if not books_used:
+        return jsonify({"ok": False, "error": "حقل الكتب مطلوب"}), 400
+    role = _pm_user_role(user)
+    db = get_db()
+    if role == "teacher":
+        own = set(_teacher_groups_for(db, user))
+        if group_name not in own:
+            return jsonify({"ok": False, "error":
+                "هذه المجموعة ليست ضمن مجموعاتك"}), 403
+    teacher_id = None
+    try: teacher_id = int(user.get("id") or 0) or None
+    except Exception: teacher_id = None
+    teacher_username = (user.get("username") or "").strip()
+    teacher_name     = (user.get("name") or teacher_username or "").strip()
+    # Compute total recipient count up-front so the row's stored
+    # total_count is meaningful even if the client never finalises.
+    total_count = len(_pm_group_recipients(db, group_name))
+    try:
+        cur = db.execute(
+            "INSERT INTO parent_messages(teacher_id,teacher_username,"
+            "teacher_name,group_name,sent_date,content_covered,"
+            "skills_focused,books_used,homework,parent_notes,"
+            "whatsapp_status,whatsapp_sent_count,whatsapp_total_count,"
+            "is_deleted,created_at,updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,'queued',0,?,0,"
+            "CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+            (teacher_id, teacher_username, teacher_name,
+             group_name, sent_date, content_covered, skills_focused,
+             books_used, homework, parent_notes, total_count),
+        )
+        db.commit()
+        new_id = None
+        try: new_id = cur.lastrowid
+        except Exception: pass
+        if new_id is None:
+            try:
+                new_id = db.execute(
+                    "SELECT id FROM parent_messages WHERE teacher_username=? "
+                    "AND group_name=? AND sent_date=? ORDER BY id DESC LIMIT 1",
+                    (teacher_username, group_name, sent_date)
+                ).fetchone()[0]
+            except Exception: pass
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    # Build the per-recipient payload + insert a message_log row per
+    # parent (delivery is fired from the client; the log entry exists
+    # so the existing /api/message-log inspection tools see them).
+    fresh = db.execute("SELECT * FROM parent_messages WHERE id=?",
+                       (new_id,)).fetchone()
+    recipients = _pm_assemble_recipients(db, fresh, log_to_message_log=True)
+    db.commit()
+    try:
+        _audit("parent_messages.create", target_type="parent_messages",
+               target_id=new_id,
+               new_value={"group_name": group_name, "sent_date": sent_date,
+                          "total_count": total_count})
+    except Exception: pass
+    return jsonify({
+        "ok": True, "success": True, "id": new_id,
+        "total_count": total_count,
+        "recipients":  recipients,
+    })
+
+
+@app.route('/api/parent-messages/<int:mid>/finalize', methods=['POST'])
+@login_required
+def api_parent_messages_finalize(mid):
+    """Client calls this after iterating through wa.me opens. Sets
+    whatsapp_status to 'sent' (or 'failed' if sent_count==0) and
+    persists the actual sent_count / total_count."""
+    user = session.get("user") or {}
+    if not _pm_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    try: sent_count = int(body.get("sent_count") or 0)
+    except Exception: sent_count = 0
+    try: total_count = int(body.get("total_count") or 0)
+    except Exception: total_count = 0
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? "
+                     "AND is_deleted=0", (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "الرسالة غير موجودة"}), 404
+    rd = dict(row)
+    if _pm_user_role(user) == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    status = "sent" if sent_count > 0 else "failed"
+    try:
+        db.execute(
+            "UPDATE parent_messages SET whatsapp_status=?, "
+            "whatsapp_sent_count=?, whatsapp_total_count=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (status, sent_count, total_count or rd.get("whatsapp_total_count") or 0, mid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": mid, "status": status,
+                    "sent_count": sent_count, "total_count": total_count})
+
+
+@app.route('/api/parent-messages', methods=['GET'])
+@login_required
+def api_parent_messages_list():
+    user = session.get("user") or {}
+    role = _pm_user_role(user)
+    db = get_db()
+    where = ["is_deleted=0"]; params = []
+    q_group   = (request.args.get("group_name") or "").strip()
+    q_teacher = (request.args.get("teacher_id") or "").strip()
+    q_from    = (request.args.get("date_from")  or "").strip()
+    q_to      = (request.args.get("date_to")    or "").strip()
+    q_search  = (request.args.get("search")     or "").strip()
+    q_limit   = (request.args.get("limit")      or "").strip()
+    if role == "teacher":
+        try: tid = int(user.get("id") or 0)
+        except Exception: tid = 0
+        where.append("teacher_id=?"); params.append(tid)
+    elif role == "student":
+        # Parent (student account): only this student's group.
+        sid = int(user.get("linked_student_id") or 0)
+        if not sid:
+            return jsonify({"ok": False, "error":
+                "الحساب غير مرتبط بطالب"}), 400
+        try:
+            srow = db.execute(
+                "SELECT group_name_student, group_online "
+                "FROM students WHERE id=?", (sid,)
+            ).fetchone()
+        except Exception: srow = None
+        groups = []
+        if srow:
+            sd = dict(srow)
+            for k in ("group_name_student", "group_online"):
+                v = (sd.get(k) or "").strip()
+                if v and v not in groups: groups.append(v)
+        if not groups:
+            return jsonify({"ok": True, "entries": [], "count": 0})
+        where.append("group_name IN (" + ",".join("?" for _ in groups) + ")")
+        params.extend(groups)
+    elif not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    if q_group:
+        where.append("group_name=?"); params.append(q_group)
+    if q_teacher and role != "teacher":
+        try:
+            where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("sent_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("sent_date<=?"); params.append(d)
+    if q_search:
+        where.append("(content_covered LIKE ? OR skills_focused LIKE ? "
+                     "OR books_used LIKE ? OR homework LIKE ? "
+                     "OR parent_notes LIKE ?)")
+        like = "%" + q_search + "%"
+        params.extend([like, like, like, like, like])
+    sql = ("SELECT * FROM parent_messages WHERE " +
+           " AND ".join(where) + " ORDER BY sent_date DESC, id DESC")
+    try:
+        lim = int(q_limit) if q_limit else 0
+    except Exception:
+        lim = 0
+    if lim and lim > 0:
+        sql += " LIMIT " + str(min(lim, 1000))
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    out = [_pm_row_to_dict(r) for r in rows]
+    # For parent role, also tag each entry with read-state so the
+    # client can render an unread badge without a second round-trip.
+    if role == "student":
+        sid = int(user.get("linked_student_id") or 0)
+        ids = [e["id"] for e in out if e.get("id")]
+        read_set = set()
+        if ids:
+            try:
+                rows_r = db.execute(
+                    "SELECT message_id FROM parent_message_reads "
+                    "WHERE student_id=? AND message_id IN (" +
+                    ",".join("?" for _ in ids) + ")",
+                    tuple([sid] + ids)
+                ).fetchall()
+                read_set = {int(dict(r).get("message_id") or 0)
+                            for r in rows_r}
+            except Exception: pass
+        for e in out:
+            e["is_read"] = (e.get("id") in read_set)
+    return jsonify({"ok": True, "entries": out, "count": len(out)})
+
+
+@app.route('/api/parent-messages/<int:mid>', methods=['GET'])
+@login_required
+def api_parent_messages_get_one(mid):
+    """Single-row fetch used by the admin "view full" modal — pulls
+    the row plus the recipient list (without re-logging) so the admin
+    can audit per-parent delivery from the message_log table."""
+    user = session.get("user") or {}
+    if not _pm_can_admin(user) and _pm_user_role(user) != "teacher":
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if _pm_user_role(user) == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    out = _pm_row_to_dict(row)
+    # Read each parent's delivery state via message_log (template
+    # marker carries the parent_messages id so the join is cheap).
+    template_marker = "parent-broadcast/" + str(mid)
+    deliveries = []
+    try:
+        for r in db.execute(
+            "SELECT id, student_name, student_whatsapp, sent_at "
+            "FROM message_log WHERE template_name=? "
+            "ORDER BY sent_at", (template_marker,)
+        ).fetchall():
+            deliveries.append(dict(r))
+    except Exception: pass
+    out["deliveries"] = deliveries
+    return jsonify({"ok": True, "entry": out})
+
+
+@app.route('/api/parent-messages/<int:mid>', methods=['PATCH'])
+@login_required
+def api_parent_messages_update(mid):
+    user = session.get("user") or {}
+    if not _pm_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _pm_user_role(user)
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if role == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+        # Teacher edits limited to within 1 hour of creation.
+        try:
+            import datetime as _dt_e
+            created = rd.get("created_at") or ""
+            # SQLite timestamps come back as 'YYYY-MM-DD HH:MM:SS'.
+            try:
+                ts = _dt_e.datetime.fromisoformat(str(created).replace(" ", "T"))
+            except Exception:
+                ts = None
+            if ts is not None:
+                elapsed = (_dt_e.datetime.utcnow() - ts).total_seconds()
+                if elapsed > 3600:
+                    return jsonify({"ok": False, "error":
+                        "لا يمكن التعديل بعد مرور ساعة على الإرسال"}), 403
+        except Exception: pass
+    body = request.get_json(silent=True) or {}
+    sets = []; params = []
+    audit_old = {}; audit_new = {}
+    for k in ("content_covered", "skills_focused", "books_used",
+              "homework", "parent_notes"):
+        if k in body:
+            v = (body.get(k) or "").strip()
+            if k in ("content_covered", "skills_focused", "books_used") and not v:
+                return jsonify({"ok": False, "error":
+                    "هذا الحقل مطلوب: " + k}), 400
+            if v != (rd.get(k) or ""):
+                audit_old[k] = rd.get(k) or ""
+                audit_new[k] = v
+            sets.append(k + "=?"); params.append(v)
+    if "sent_date" in body and _pm_can_admin(user):
+        raw = (body.get("sent_date") or "").strip()
+        nd = _att_normalize_date(raw) or raw
+        if nd and nd != (rd.get("sent_date") or ""):
+            audit_old["sent_date"] = rd.get("sent_date") or ""
+            audit_new["sent_date"] = nd
+            sets.append("sent_date=?"); params.append(nd)
+    if "group_name" in body and _pm_can_admin(user):
+        gv = (body.get("group_name") or "").strip()
+        if gv and gv != (rd.get("group_name") or ""):
+            audit_old["group_name"] = rd.get("group_name") or ""
+            audit_new["group_name"] = gv
+            sets.append("group_name=?"); params.append(gv)
+    if not sets:
+        return jsonify({"ok": True, "id": mid, "unchanged": True,
+                        "entry": _pm_row_to_dict(row)})
+    sets.append("updated_at=CURRENT_TIMESTAMP")
+    params.append(mid)
+    try:
+        db.execute("UPDATE parent_messages SET " + ", ".join(sets) +
+                   " WHERE id=?", tuple(params))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        if audit_new:
+            _audit("parent_messages.update", target_type="parent_messages",
+                   target_id=mid, old_value=audit_old, new_value=audit_new)
+    except Exception: pass
+    new_row = db.execute("SELECT * FROM parent_messages WHERE id=?",
+                         (mid,)).fetchone()
+    return jsonify({"ok": True, "id": mid, "entry": _pm_row_to_dict(new_row)})
+
+
+@app.route('/api/parent-messages/<int:mid>', methods=['DELETE'])
+@login_required
+def api_parent_messages_delete(mid):
+    user = session.get("user") or {}
+    if not _pm_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    role = _pm_user_role(user)
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if role == "teacher":
+        try: my_id = int(user.get("id") or 0)
+        except Exception: my_id = 0
+        if int(rd.get("teacher_id") or 0) != my_id:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+        try:
+            import datetime as _dt_e
+            created = rd.get("created_at") or ""
+            try:
+                ts = _dt_e.datetime.fromisoformat(str(created).replace(" ", "T"))
+            except Exception:
+                ts = None
+            if ts is not None:
+                elapsed = (_dt_e.datetime.utcnow() - ts).total_seconds()
+                if elapsed > 3600:
+                    return jsonify({"ok": False, "error":
+                        "لا يمكن الحذف بعد مرور ساعة على الإرسال"}), 403
+        except Exception: pass
+    try:
+        db.execute("UPDATE parent_messages SET is_deleted=1, "
+                   "updated_at=CURRENT_TIMESTAMP WHERE id=?", (mid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("parent_messages.delete", target_type="parent_messages",
+               target_id=mid,
+               old_value={"group_name":  rd.get("group_name")  or "",
+                          "sent_date":   rd.get("sent_date")   or ""})
+    except Exception: pass
+    return jsonify({"ok": True, "id": mid})
+
+
+@app.route('/api/parent-messages/<int:mid>/resend', methods=['POST'])
+@login_required
+def api_parent_messages_resend(mid):
+    """Admin-only re-queue. Returns the recipient list again so the
+    admin can fire wa.me links from the browser. Also marks status
+    back to 'queued' until the client calls /finalize."""
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    row = db.execute("SELECT * FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    recipients = _pm_assemble_recipients(db, row, log_to_message_log=True)
+    try:
+        db.execute("UPDATE parent_messages SET whatsapp_status='queued', "
+                   "whatsapp_sent_count=0, "
+                   "whatsapp_total_count=?, "
+                   "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                   (len(recipients), mid))
+        db.commit()
+    except Exception: pass
+    try:
+        _audit("parent_messages.resend", target_type="parent_messages",
+               target_id=mid)
+    except Exception: pass
+    return jsonify({"ok": True, "id": mid,
+                    "total_count": len(recipients),
+                    "recipients":  recipients})
+
+
+@app.route('/api/parent-messages/<int:mid>/read', methods=['POST'])
+@login_required
+def api_parent_messages_mark_read(mid):
+    """Parent (student-role session) marks a broadcast as read.
+    Idempotent via UNIQUE (message_id, student_id)."""
+    user = session.get("user") or {}
+    if _pm_user_role(user) != "student":
+        return jsonify({"ok": False, "error": "للوالدين فقط"}), 403
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return jsonify({"ok": False, "error": "الحساب غير مرتبط بطالب"}), 400
+    db = get_db()
+    row = db.execute("SELECT id FROM parent_messages WHERE id=? AND is_deleted=0",
+                     (mid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    body = request.get_json(silent=True) or {}
+    is_read = bool(body.get("is_read", True))
+    try:
+        if is_read:
+            try:
+                db.execute(
+                    "INSERT INTO parent_message_reads(message_id, student_id) "
+                    "VALUES(?,?) ON CONFLICT(message_id, student_id) DO NOTHING",
+                    (mid, sid),
+                )
+            except Exception:
+                # Postgres + older SQLite — fall back to a 'try insert,
+                # ignore unique conflict' pattern.
+                try: db.execute(
+                    "INSERT INTO parent_message_reads(message_id, student_id) "
+                    "VALUES(?,?)", (mid, sid))
+                except Exception: pass
+        else:
+            db.execute(
+                "DELETE FROM parent_message_reads WHERE message_id=? AND student_id=?",
+                (mid, sid),
+            )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": mid, "is_read": is_read})
+
+
+@app.route('/api/parent-messages/parent-unread-count', methods=['GET'])
+@login_required
+def api_parent_messages_unread_count():
+    user = session.get("user") or {}
+    if _pm_user_role(user) != "student":
+        return jsonify({"ok": False, "error": "للوالدين فقط"}), 403
+    sid = int(user.get("linked_student_id") or 0)
+    if not sid:
+        return jsonify({"ok": True, "unread": 0})
+    db = get_db()
+    try:
+        srow = db.execute(
+            "SELECT group_name_student, group_online FROM students WHERE id=?",
+            (sid,)).fetchone()
+    except Exception: srow = None
+    groups = []
+    if srow:
+        sd = dict(srow)
+        for k in ("group_name_student", "group_online"):
+            v = (sd.get(k) or "").strip()
+            if v and v not in groups: groups.append(v)
+    if not groups:
+        return jsonify({"ok": True, "unread": 0})
+    placeholders = ",".join("?" for _ in groups)
+    try:
+        n = db.execute(
+            "SELECT COUNT(*) FROM parent_messages pm "
+            "WHERE pm.is_deleted=0 AND pm.group_name IN (" + placeholders + ") "
+            "AND NOT EXISTS (SELECT 1 FROM parent_message_reads r "
+            "WHERE r.message_id=pm.id AND r.student_id=?)",
+            tuple(groups + [sid])
+        ).fetchone()[0]
+        n = int(n or 0)
+    except Exception:
+        n = 0
+    return jsonify({"ok": True, "unread": n})
+
+
+@app.route('/api/parent-messages/stats', methods=['GET'])
+@login_required
+def api_parent_messages_stats():
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    import datetime as _dt_p
+    today = _dt_p.date.today()
+    week_ago  = (today - _dt_p.timedelta(days=7)).isoformat()
+    month_ago = (today - _dt_p.timedelta(days=30)).isoformat()
+    try:
+        total = int(db.execute(
+            "SELECT COUNT(*) FROM parent_messages WHERE is_deleted=0"
+        ).fetchone()[0] or 0)
+        wk = int(db.execute(
+            "SELECT COUNT(*) FROM parent_messages WHERE is_deleted=0 "
+            "AND sent_date>=?", (week_ago,)).fetchone()[0] or 0)
+        mo = int(db.execute(
+            "SELECT COUNT(*) FROM parent_messages WHERE is_deleted=0 "
+            "AND sent_date>=?", (month_ago,)).fetchone()[0] or 0)
+        active_t = int(db.execute(
+            "SELECT COUNT(DISTINCT teacher_id) FROM parent_messages "
+            "WHERE is_deleted=0 AND sent_date>=?", (month_ago,)
+        ).fetchone()[0] or 0)
+        failed = int(db.execute(
+            "SELECT COUNT(*) FROM parent_messages WHERE is_deleted=0 "
+            "AND whatsapp_status IN ('failed','queued')"
+        ).fetchone()[0] or 0)
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "total": total, "this_week": wk,
+                    "this_month": mo, "active_teachers": active_t,
+                    "with_failures": failed,
+                    "today": today.isoformat()})
+
+
+@app.route('/api/parent-messages/teachers', methods=['GET'])
+@login_required
+def api_parent_messages_teachers():
+    """List of teachers for the admin filter dropdown. Mirrors the
+    lessons-tracking helper but is a separate route so changes to one
+    feature don't ripple into the other."""
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    db = get_db()
+    by_id = {}
+    try:
+        for r in db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE role='teacher' AND COALESCE(is_active,1)<>0 "
+            "ORDER BY name").fetchall():
+            d = dict(r); tid = int(d.get("id") or 0)
+            if tid:
+                by_id[tid] = {"id": tid,
+                              "name": (d.get("name") or "").strip()
+                                      or (d.get("username") or "").strip()}
+    except Exception: pass
+    try:
+        for r in db.execute(
+            "SELECT DISTINCT teacher_id, COALESCE(teacher_name,'') AS tn "
+            "FROM parent_messages WHERE teacher_id IS NOT NULL").fetchall():
+            d = dict(r); tid = int(d.get("teacher_id") or 0)
+            if tid and tid not in by_id:
+                by_id[tid] = {"id": tid,
+                              "name": (d.get("tn") or "").strip()}
+    except Exception: pass
+    out = sorted(by_id.values(), key=lambda x: (x["name"] or "", x["id"]))
+    return jsonify({"ok": True, "teachers": out})
+
+
+@app.route('/api/parent-messages/export', methods=['GET'])
+@login_required
+def api_parent_messages_export():
+    user = session.get("user") or {}
+    if not _pm_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+    except Exception:
+        return jsonify({"ok": False, "error":
+            "openpyxl غير مثبّت — أضيفي openpyxl إلى requirements.txt"}), 500
+    db = get_db()
+    where = ["is_deleted=0"]; params = []
+    q_group   = (request.args.get("group_name") or "").strip()
+    q_teacher = (request.args.get("teacher_id") or "").strip()
+    q_from    = (request.args.get("date_from")  or "").strip()
+    q_to      = (request.args.get("date_to")    or "").strip()
+    q_search  = (request.args.get("search")     or "").strip()
+    if q_group:
+        where.append("group_name=?"); params.append(q_group)
+    if q_teacher:
+        try:
+            where.append("teacher_id=?"); params.append(int(q_teacher))
+        except Exception: pass
+    if q_from:
+        d = _att_normalize_date(q_from) or q_from
+        where.append("sent_date>=?"); params.append(d)
+    if q_to:
+        d = _att_normalize_date(q_to) or q_to
+        where.append("sent_date<=?"); params.append(d)
+    if q_search:
+        where.append("(content_covered LIKE ? OR skills_focused LIKE ? "
+                     "OR books_used LIKE ? OR homework LIKE ? "
+                     "OR parent_notes LIKE ?)")
+        like = "%" + q_search + "%"
+        params.extend([like, like, like, like, like])
+    sql = ("SELECT sent_date, teacher_name, group_name, content_covered, "
+           "skills_focused, books_used, homework, parent_notes, "
+           "whatsapp_status, whatsapp_sent_count, whatsapp_total_count, "
+           "created_at FROM parent_messages WHERE " + " AND ".join(where) +
+           " ORDER BY sent_date DESC, id DESC")
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    wb = Workbook()
+    ws = wb.active
+    try: ws.sheet_view.rightToLeft = True
+    except Exception: pass
+    ws.title = "رسائل أولياء الأمور"
+    headers = ["التاريخ", "المعلمة", "المجموعة", "المحتوى",
+               "المهارات", "الكتب", "الواجب", "ملاحظات",
+               "حالة الإرسال", "تم الإرسال", "العدد الكلي",
+               "تاريخ الإنشاء"]
+    HF = PatternFill("solid", fgColor="6B3FA0")
+    HFONT = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+    BFONT = Font(name="Arial", size=10)
+    A_RTL = Alignment(horizontal="right", vertical="center",
+                      wrap_text=True, readingOrder=2)
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.fill = HF; c.font = HFONT; c.alignment = A_RTL
+    for ridx, r in enumerate(rows, start=2):
+        d = dict(r)
+        vals = [d.get("sent_date") or "", d.get("teacher_name") or "",
+                d.get("group_name") or "", d.get("content_covered") or "",
+                d.get("skills_focused") or "", d.get("books_used") or "",
+                d.get("homework") or "", d.get("parent_notes") or "",
+                d.get("whatsapp_status") or "",
+                d.get("whatsapp_sent_count") or 0,
+                d.get("whatsapp_total_count") or 0,
+                d.get("created_at") or ""]
+        for cidx, v in enumerate(vals, start=1):
+            cc = ws.cell(row=ridx, column=cidx, value=v)
+            cc.font = BFONT; cc.alignment = A_RTL
+    widths = [12, 22, 22, 36, 28, 22, 22, 22, 14, 12, 12, 18]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.row_dimensions[1].height = 24
+    import io as _io_pm
+    buf = _io_pm.BytesIO(); wb.save(buf); buf.seek(0)
+    from flask import send_file as _send_pm
+    return _send_pm(buf, as_attachment=True,
+                    download_name="parent_messages.xlsx",
+                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
