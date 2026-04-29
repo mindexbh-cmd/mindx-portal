@@ -247,3 +247,69 @@
   .md-tb-cap-icon { width: 38px; height: 38px; }
   .md-tb-icon-btn { width: 32px; height: 32px; }
 }
+
+/* ==========================================================================
+   Phase 3 — Welcome banner
+   ==========================================================================
+   Deep-purple gradient hero card at the top of .dh-main with the user's
+   first name + today's Arabic date. The decorative speech-bubble is a
+   CSS-positioned inline SVG (no image asset). On mobile the bubble
+   collapses and the typography shrinks one step.
+   ========================================================================== */
+.md-welcome {
+  background: linear-gradient(135deg, var(--md-brand-deep) 0%, var(--md-brand) 100%);
+  color: var(--md-text-on-brand);
+  border-radius: var(--md-rad-lg);
+  padding: var(--md-sp-6) var(--md-sp-7);
+  margin-bottom: var(--md-sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--md-shadow-md);
+  position: relative;
+  overflow: hidden;
+  gap: var(--md-sp-5);
+}
+.md-welcome-text {
+  flex: 1 1 auto;
+  z-index: 2;
+  min-width: 0;
+}
+.md-welcome-greeting {
+  font-size: var(--md-fz-2xl);
+  font-weight: var(--md-fw-black);
+  margin: 0 0 var(--md-sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--md-sp-3);
+  flex-wrap: wrap;
+  line-height: 1.2;
+}
+.md-welcome-wave {
+  font-size: var(--md-fz-2xl);
+  display: inline-block;
+  transform: rotate(-10deg);
+}
+.md-welcome-subtitle {
+  font-size: var(--md-fz-base);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: var(--md-fw-medium);
+  margin: 0;
+}
+.md-welcome-bubble {
+  width: 130px;
+  height: 100px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.md-welcome-bubble svg { width: 100%; height: 100%; display: block; }
+
+@media (max-width: 768px) {
+  .md-welcome {
+    padding: var(--md-sp-5);
+    gap: var(--md-sp-3);
+  }
+  .md-welcome-greeting { font-size: var(--md-fz-xl); }
+  .md-welcome-subtitle { font-size: var(--md-fz-sm); }
+  .md-welcome-bubble { display: none; }
+}
