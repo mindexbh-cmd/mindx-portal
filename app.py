@@ -25557,8 +25557,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .hello{text-align:center;margin-bottom:28px;}
 .hello h2{font-size:1.6rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello p{color:#666;margin:0;font-size:0.96rem;}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-.card{background:#fff;border-radius:22px;padding:34px 26px;text-align:center;
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
+.card{background:#fff;border-radius:22px;padding:30px 22px;text-align:center;
       box-shadow:0 10px 32px rgba(107,63,160,.18);
       cursor:pointer;text-decoration:none;color:inherit;display:block;
       transition:transform .18s ease, box-shadow .18s ease;
@@ -25566,15 +25566,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .card:hover{transform:translateY(-6px);
             box-shadow:0 18px 42px rgba(107,63,160,.28);
             border-color:#6B3FA0;}
-.card .ic{font-size:3.4rem;line-height:1;display:block;margin-bottom:14px;}
-.card h3{margin:0 0 8px;font-size:1.4rem;color:#4a148c;font-weight:900;}
-.card p{margin:0;color:#555;font-size:0.95rem;line-height:1.6;}
+.card .ic{font-size:3rem;line-height:1;display:block;margin-bottom:12px;}
+.card h3{margin:0 0 8px;font-size:1.2rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.9rem;line-height:1.55;}
 .card.attend::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
 .card.points::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
 .card.lessons::before{content:'';position:absolute;top:0;right:0;width:6px;
                      height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
+.card.parents::before{content:'';position:absolute;top:0;right:0;width:6px;
+                     height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
+@media (max-width:1180px){
+  .cards{grid-template-columns:repeat(2,1fr);}
+}
 @media (max-width:980px){
   .cards{grid-template-columns:repeat(2,1fr);}
 }
@@ -25613,6 +25618,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <span class="ic">📚</span>
       <h3>متابعة التقدم في الدروس</h3>
       <p>تسجيل الدرس المُعطى اليوم</p>
+    </a>
+    <a class="card parents" href="/teacher/parent-messages">
+      <span class="ic">📨</span>
+      <h3>ماذا تريد أن يعرف ولي الأمر</h3>
+      <p>إرسال ملخص الحصة لأولياء أمور المجموعة</p>
     </a>
   </div>
 </div>
@@ -26071,6 +26081,666 @@ def teacher_lessons_page():
         return redirect("/dashboard")
     who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
     return TEACHER_LESSONS_HTML.replace("USER_PLACEHOLDER", who)
+
+
+# ── /teacher/parent-messages — broadcast to parents ──────────────────
+# Form posts to /api/parent-messages; the response carries the
+# recipient list which the client iterates over with staggered wa.me
+# opens (matches the existing absence-message flow). After the loop,
+# /api/parent-messages/<id>/finalize records the actual sent_count.
+TEACHER_PARENT_MESSAGES_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>ماذا تريد أن يعرف ولي الأمر — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar .who{color:#6B3FA0;font-weight:700;font-size:0.95rem;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:980px;margin:24px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:16px;padding:22px;
+       box-shadow:0 8px 24px rgba(107,63,160,.15);margin-bottom:18px;}
+h2.head{margin:0 0 14px;color:#4a148c;font-size:1.25rem;font-weight:900;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-weight:700;color:#4a148c;font-size:.92rem;}
+.field input,.field select,.field textarea{
+  padding:10px 12px;border:2px solid #e7d8f3;border-radius:10px;
+  font-family:inherit;font-size:1rem;background:#fafafe;
+  transition:border-color .15s ease;}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:#E91E63;background:#fff;}
+.field input[readonly]{background:#f4f0fa;color:#666;}
+.field textarea{resize:vertical;min-height:78px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:680px){.row2{grid-template-columns:1fr;}}
+.btn{background:linear-gradient(135deg,#E91E63,#C2185B);color:#fff;
+     border:none;border-radius:10px;padding:12px 22px;font-weight:800;
+     font-size:1rem;cursor:pointer;display:inline-flex;align-items:center;
+     gap:8px;transition:transform .12s ease, box-shadow .12s ease;
+     font-family:inherit;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(233,30,99,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+.err{color:#c62828;font-size:.85rem;margin-top:4px;display:none;}
+.err.show{display:block;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;
+       max-width:90vw;text-align:center;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+table.tbl{width:100%;border-collapse:collapse;font-size:.92rem;}
+table.tbl th{background:#fce4ec;color:#880e4f;padding:10px 8px;
+             text-align:right;font-weight:800;}
+table.tbl td{padding:9px 8px;border-bottom:1px solid #f8e1ec;}
+table.tbl tr:hover td{background:#fff5f8;}
+.empty{text-align:center;color:#888;padding:24px;font-style:italic;}
+.act-btn{padding:5px 10px;border-radius:8px;border:none;cursor:pointer;
+         font-size:.82rem;font-weight:700;font-family:inherit;}
+.act-btn.view{background:#fce4ec;color:#880e4f;}
+.act-btn.edit{background:#e3f2fd;color:#1565c0;margin-right:4px;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:4px;}
+.act-btn.resend{background:#fff8e1;color:#f57c00;margin-right:4px;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:16px;padding:22px;max-width:640px;
+       width:100%;max-height:90vh;overflow:auto;}
+.modal.lg{max-width:780px;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.preview-box{background:#f3e5f5;border:1.5px solid #ce93d8;border-radius:10px;
+             padding:14px;font-family:'Segoe UI',monospace;
+             white-space:pre-wrap;color:#4a148c;line-height:1.65;font-size:.92rem;
+             max-height:60vh;overflow:auto;}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:6px;
+             font-size:.78rem;font-weight:800;}
+.status-pill.sent{background:#c8e6c9;color:#1b5e20;}
+.status-pill.failed{background:#ffcdd2;color:#b71c1c;}
+.status-pill.queued{background:#fff8e1;color:#f57c00;}
+.progress-bar{height:8px;background:#fce4ec;border-radius:4px;overflow:hidden;
+              margin-top:8px;}
+.progress-bar > div{height:100%;background:linear-gradient(90deg,#E91E63,#C2185B);
+                    transition:width .25s ease;width:0%;}
+.recipient-row{display:flex;justify-content:space-between;align-items:center;
+               padding:8px 12px;border-bottom:1px solid #f0e6f8;font-size:.9rem;}
+.recipient-row:last-child{border-bottom:none;}
+.recipient-row .nm{font-weight:700;color:#4a148c;}
+.recipient-row .ph{color:#666;font-size:.82rem;direction:ltr;}
+.recipient-row .st{font-size:.78rem;font-weight:700;}
+.recipient-row .st.ok{color:#2E7D32;}
+.recipient-row .st.no{color:#c62828;}
+.recipient-row .st.pending{color:#888;}
+@media (max-width:680px){
+  table.tbl{font-size:.85rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #f8e1ec;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                              color:#880e4f;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📨 مايندكس — ماذا تريد أن يعرف ولي الأمر</h1>
+  <span class="who">USER_PLACEHOLDER</span>
+  <a href="/teacher/hub">رجوع</a>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h2 class="head">إرسال ملخص الحصة لأولياء الأمور</h2>
+    <form id="pmForm" onsubmit="return submitForm(event);">
+      <div class="row2">
+        <div class="field">
+          <label for="pdate">تاريخ الحصة</label>
+          <input type="date" id="pdate" required>
+        </div>
+        <div class="field">
+          <label for="pteacher">المعلمة</label>
+          <input type="text" id="pteacher" readonly value="USER_PLACEHOLDER">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pgroup">المجموعة</label>
+        <select id="pgroup" required>
+          <option value="">— اختاري المجموعة —</option>
+        </select>
+        <span class="err" id="err-pgroup"></span>
+      </div>
+      <div class="field">
+        <label for="pcontent">المحتوى الذي تم تغطيته <span style="color:#c62828">*</span></label>
+        <textarea id="pcontent" required maxlength="2000"
+                  placeholder="مثال: درس الكسور — الجمع والطرح، حل التمارين 1 إلى 5"></textarea>
+        <span class="err" id="err-pcontent"></span>
+      </div>
+      <div class="field">
+        <label for="pskills">المهارات التي تم التركيز عليها <span style="color:#c62828">*</span></label>
+        <textarea id="pskills" required maxlength="2000"
+                  placeholder="مثال: الجمع، التحويل بين الكسور المختلفة المقامات"></textarea>
+        <span class="err" id="err-pskills"></span>
+      </div>
+      <div class="field">
+        <label for="pbooks">الكتب المستخدمة في الحصة <span style="color:#c62828">*</span></label>
+        <textarea id="pbooks" required maxlength="1000"
+                  placeholder="مثال: كتاب الرياضيات الصف الخامس — الفصل الثاني"></textarea>
+        <span class="err" id="err-pbooks"></span>
+      </div>
+      <div class="field">
+        <label for="phomework">الواجب المنزلي (اختياري)</label>
+        <textarea id="phomework" maxlength="1500"
+                  placeholder="اتركيه فارغاً إذا لا يوجد واجب"></textarea>
+      </div>
+      <div class="field">
+        <label for="pnotes">ملاحظات لولي الأمر (اختياري)</label>
+        <textarea id="pnotes" maxlength="1500"
+                  placeholder="ملاحظات خاصة للأهل"></textarea>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" onclick="openPreview()">👁️ معاينة الرسالة</button>
+        <button type="submit" class="btn" id="sendBtn">📨 إرسال للأهالي</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 class="head">آخر 5 رسائل</h2>
+    <div id="recentBox">
+      <div class="empty">جاري التحميل...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Preview modal -->
+<div class="modal-back" id="prevBack" onclick="if(event.target===this)closePreview()">
+  <div class="modal lg">
+    <h3>معاينة — كما ستصل لولي الأمر</h3>
+    <p style="color:#666;font-size:.86rem;margin:0 0 10px;">
+      هذه نسخة تجريبية باسم طالبة كمثال. كل ولي أمر سيستلم رسالته باسم طفلته.</p>
+    <div class="preview-box" id="prevText">—</div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closePreview()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm-send modal -->
+<div class="modal-back" id="confBack" onclick="if(event.target===this)closeConf()">
+  <div class="modal">
+    <h3>تأكيد الإرسال</h3>
+    <p id="confText">سيتم الإرسال لـ <b id="confCount">0</b> ولي أمر في المجموعة. متابعة؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeConf()">إلغاء</button>
+      <button class="btn" id="confirmSendBtn" onclick="confirmSend()">📨 تأكيد الإرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sending progress modal -->
+<div class="modal-back" id="progBack">
+  <div class="modal">
+    <h3 id="progTitle">جاري الإرسال...</h3>
+    <p id="progStatus">— من —</p>
+    <div class="progress-bar"><div id="progBar"></div></div>
+    <div id="progRecipients" style="max-height:40vh;overflow:auto;margin-top:14px;"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" id="progCloseBtn"
+              onclick="closeProgress()" style="display:none;">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- View modal -->
+<div class="modal-back" id="viewBack" onclick="if(event.target===this)closeView()">
+  <div class="modal lg">
+    <h3 id="viewTitle">تفاصيل الرسالة</h3>
+    <div id="viewBody"></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeView()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-back" id="editBack" onclick="if(event.target===this)closeEdit()">
+  <div class="modal lg">
+    <h3>تعديل الرسالة</h3>
+    <p style="color:#888;font-size:.84rem;margin:0 0 12px;">
+      التعديل متاح خلال ساعة من الإرسال فقط.</p>
+    <div class="field">
+      <label>المحتوى</label>
+      <textarea id="econtent" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label>المهارات</label>
+      <textarea id="eskills" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label>الكتب</label>
+      <textarea id="ebooks" maxlength="1000"></textarea>
+    </div>
+    <div class="field">
+      <label>الواجب</label>
+      <textarea id="ehomework" maxlength="1500"></textarea>
+    </div>
+    <div class="field">
+      <label>ملاحظات</label>
+      <textarea id="enotes" maxlength="1500"></textarea>
+    </div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeEdit()">إلغاء</button>
+      <button class="btn" id="saveEditBtn" onclick="saveEdit()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-back" id="delBack" onclick="if(event.target===this)closeDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذه الرسالة؟</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeDel()">إلغاء</button>
+      <button class="btn btn-danger" id="confirmDelBtn" onclick="confirmDel()">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  function isoToday(){
+    var d = new Date();
+    var p = function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  document.getElementById('pdate').value = isoToday();
+  document.getElementById('pdate').max = isoToday();
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function toast(msg, isErr){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+  function showErr(id, msg){
+    var el = document.getElementById('err-'+id);
+    if(!el) return;
+    if(msg){ el.textContent = msg; el.classList.add('show'); }
+    else { el.textContent = ''; el.classList.remove('show'); }
+  }
+  function clearErrs(){
+    ['pgroup','pcontent','pskills','pbooks'].forEach(function(k){ showErr(k, ''); });
+  }
+  function fmtDays(arr){
+    if(!arr || !arr.length) return '';
+    return arr.join(' و ');
+  }
+
+  // ── Group dropdown (uses the shared teacher endpoint) ──
+  function loadGroups(){
+    var sel = document.getElementById('pgroup');
+    fetch('/api/teacher/groups').then(function(r){return r.json();}).then(function(j){
+      sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
+      var groups = (j && j.groups) || [];
+      if(!groups.length){
+        sel.innerHTML = '<option value="">— لا توجد مجموعات لكِ —</option>';
+        return;
+      }
+      groups.forEach(function(g){
+        var nm = g.name || '';
+        var d  = fmtDays(g.study_days || []);
+        var t  = (g.study_time || '').trim();
+        var label = nm;
+        if(d || t){ label += ' (' + [d, t].filter(Boolean).join(' - ') + ')'; }
+        var opt = document.createElement('option');
+        opt.value = nm;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+    }).catch(function(){
+      sel.innerHTML = '<option value="">— تعذر تحميل المجموعات —</option>';
+    });
+  }
+
+  // ── Preview ──
+  function buildPreviewText(sampleName){
+    var teacher = document.getElementById('pteacher').value || 'المعلمة';
+    var group   = document.getElementById('pgroup').value || 'مجموعتي';
+    var date    = document.getElementById('pdate').value || '';
+    var content = document.getElementById('pcontent').value || '—';
+    var skills  = document.getElementById('pskills').value  || '—';
+    var books   = document.getElementById('pbooks').value   || '—';
+    var hw      = document.getElementById('phomework').value || '';
+    var notes   = document.getElementById('pnotes').value || '';
+    var lines = [];
+    lines.push('السلام عليكم ولي أمر ' + sampleName);
+    lines.push('');
+    if(group) lines.push('📚 المجموعة: ' + group);
+    if(date)  lines.push('📅 التاريخ: ' + date);
+    lines.push('');
+    lines.push('✏️ المحتوى الذي تم تغطيته:');
+    lines.push(content); lines.push('');
+    lines.push('🎯 المهارات التي تم التركيز عليها:');
+    lines.push(skills); lines.push('');
+    lines.push('📖 الكتب المستخدمة:');
+    lines.push(books); lines.push('');
+    if(hw){ lines.push('📝 الواجب المنزلي:'); lines.push(hw); lines.push(''); }
+    if(notes){ lines.push('📌 ملاحظات لولي الأمر:'); lines.push(notes); lines.push(''); }
+    if(teacher) lines.push('— المعلمة: ' + teacher);
+    lines.push('مايندكس');
+    return lines.join('\n');
+  }
+  window.openPreview = function(){
+    document.getElementById('prevText').textContent = buildPreviewText('فاطمة');
+    document.getElementById('prevBack').classList.add('show');
+  };
+  window.closePreview = function(){
+    document.getElementById('prevBack').classList.remove('show');
+  };
+
+  // ── Recent table ──
+  function loadRecent(){
+    var box = document.getElementById('recentBox');
+    fetch('/api/parent-messages?limit=5').then(function(r){return r.json();}).then(function(j){
+      if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+      var entries = j.entries || [];
+      if(!entries.length){
+        box.innerHTML = '<div class="empty">لا توجد رسائل بعد</div>';
+        return;
+      }
+      var html = '<table class="tbl"><thead><tr>'+
+        '<th>التاريخ</th><th>المجموعة</th><th>المحتوى</th>'+
+        '<th>الحالة</th><th>تم الإرسال</th><th>إجراءات</th>'+
+        '</tr></thead><tbody>';
+      entries.forEach(function(e){
+        var trunc = (e.content_covered || '').slice(0, 60);
+        if((e.content_covered||'').length > 60) trunc += '...';
+        var cls = (e.whatsapp_status === 'sent') ? 'sent' :
+                  (e.whatsapp_status === 'failed') ? 'failed' : 'queued';
+        var lbl = (e.whatsapp_status === 'sent') ? 'تم' :
+                  (e.whatsapp_status === 'failed') ? 'فشل' : 'قيد الانتظار';
+        html += '<tr>'+
+          '<td data-label="التاريخ">'+escapeHtml(e.sent_date)+'</td>'+
+          '<td data-label="المجموعة">'+escapeHtml(e.group_name)+'</td>'+
+          '<td data-label="المحتوى">'+escapeHtml(trunc)+'</td>'+
+          '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
+          '<td data-label="تم الإرسال">'+e.whatsapp_sent_count+'/'+e.whatsapp_total_count+'</td>'+
+          '<td data-label="إجراءات">'+
+            '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
+            '<button class="act-btn edit" onclick="openEdit('+e.id+')">تعديل</button>'+
+            '<button class="act-btn del" onclick="openDel('+e.id+')">حذف</button>'+
+          '</td></tr>';
+      });
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    }).catch(function(){
+      box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+    });
+  }
+
+  // ── Submit form ──
+  var _draftBody = null;
+  window.submitForm = function(ev){
+    ev.preventDefault();
+    clearErrs();
+    var grp     = document.getElementById('pgroup').value.trim();
+    var content = document.getElementById('pcontent').value.trim();
+    var skills  = document.getElementById('pskills').value.trim();
+    var books   = document.getElementById('pbooks').value.trim();
+    var hw      = document.getElementById('phomework').value.trim();
+    var notes   = document.getElementById('pnotes').value.trim();
+    var date    = document.getElementById('pdate').value;
+    var ok = true;
+    if(!grp){ showErr('pgroup', 'اختاري المجموعة'); ok = false; }
+    if(!content){ showErr('pcontent', 'حقل المحتوى مطلوب'); ok = false; }
+    if(!skills){ showErr('pskills', 'حقل المهارات مطلوب'); ok = false; }
+    if(!books){ showErr('pbooks', 'حقل الكتب مطلوب'); ok = false; }
+    if(!ok) return false;
+    _draftBody = {
+      group_name: grp, sent_date: date,
+      content_covered: content, skills_focused: skills,
+      books_used: books, homework: hw, parent_notes: notes
+    };
+    // Step 1 — POST to create the row + get recipients (server logs
+    // each recipient in message_log automatically).
+    var btn = document.getElementById('sendBtn');
+    btn.disabled = true; btn.textContent = '⏳ تجهيز...';
+    fetch('/api/parent-messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(_draftBody)
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = '📨 إرسال للأهالي';
+      if(!j || !j.ok){
+        toast((j && j.error) || 'تعذر التجهيز', true);
+        return;
+      }
+      _pendingSend = {
+        id: j.id,
+        recipients: j.recipients || [],
+        total: j.total_count || (j.recipients||[]).length
+      };
+      document.getElementById('confCount').textContent = _pendingSend.total;
+      document.getElementById('confBack').classList.add('show');
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '📨 إرسال للأهالي';
+      toast('تعذر التجهيز', true);
+    });
+    return false;
+  };
+
+  // ── Confirm + sending sweep ──
+  var _pendingSend = null;
+  window.closeConf = function(){
+    document.getElementById('confBack').classList.remove('show');
+    // Don't soft-delete the row if user cancels — finalize with 0
+    // sent so the entry is recorded as 'failed'/'queued'.
+  };
+  window.confirmSend = function(){
+    document.getElementById('confBack').classList.remove('show');
+    if(!_pendingSend) return;
+    var ps = _pendingSend;
+    document.getElementById('progBack').classList.add('show');
+    document.getElementById('progTitle').textContent = 'جاري الإرسال...';
+    document.getElementById('progStatus').textContent = '0 من ' + ps.total;
+    document.getElementById('progBar').style.width = '0%';
+    document.getElementById('progCloseBtn').style.display = 'none';
+    var box = document.getElementById('progRecipients');
+    box.innerHTML = ps.recipients.map(function(r, i){
+      return '<div class="recipient-row" id="rcp-'+i+'">'+
+        '<span class="nm">'+escapeHtml(r.student_name)+'</span>'+
+        '<span class="ph">'+escapeHtml(r.whatsapp_raw||'-')+'</span>'+
+        '<span class="st pending" id="rcp-st-'+i+'">قيد الانتظار</span>'+
+      '</div>';
+    }).join('');
+    if(!ps.recipients.length){
+      finishSweep(0, 0);
+      return;
+    }
+    var sentCount = 0;
+    var idx = 0;
+    function step(){
+      if(idx >= ps.recipients.length){
+        finishSweep(sentCount, ps.total);
+        return;
+      }
+      var r = ps.recipients[idx];
+      var stEl = document.getElementById('rcp-st-'+idx);
+      if(!r.whatsapp){
+        if(stEl){ stEl.textContent = 'لا يوجد رقم'; stEl.className = 'st no'; }
+        idx++;
+        document.getElementById('progStatus').textContent = idx + ' من ' + ps.total;
+        document.getElementById('progBar').style.width = ((idx/ps.total)*100)+'%';
+        setTimeout(step, 250);
+        return;
+      }
+      var url = 'https://wa.me/' + r.whatsapp + '?text=' + encodeURIComponent(r.text);
+      // Open in a new tab. Browser may block popups beyond the first
+      // unless they fire inside the same gesture; we mitigate with a
+      // small delay between opens.
+      try { window.open(url, '_blank'); } catch(e){}
+      sentCount++;
+      if(stEl){ stEl.textContent = 'تم الفتح'; stEl.className = 'st ok'; }
+      idx++;
+      document.getElementById('progStatus').textContent = idx + ' من ' + ps.total;
+      document.getElementById('progBar').style.width = ((idx/ps.total)*100)+'%';
+      // Stagger so popup blockers don't nuke them.
+      setTimeout(step, 600);
+    }
+    step();
+    function finishSweep(sent, total){
+      document.getElementById('progTitle').textContent = 'انتهى الإرسال';
+      document.getElementById('progStatus').textContent =
+        '✅ تم فتح ' + sent + ' من ' + total + ' رسالة';
+      document.getElementById('progBar').style.width = '100%';
+      document.getElementById('progCloseBtn').style.display = 'inline-flex';
+      // Tell server.
+      fetch('/api/parent-messages/' + ps.id + '/finalize', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({sent_count: sent, total_count: total})
+      }).then(function(r){return r.json();}).then(function(){
+        toast('تم تسجيل الإرسال ✓');
+        document.getElementById('pmForm').reset();
+        document.getElementById('pdate').value = isoToday();
+        document.getElementById('pteacher').value = 'USER_PLACEHOLDER';
+        loadRecent();
+      });
+    }
+  };
+  window.closeProgress = function(){
+    document.getElementById('progBack').classList.remove('show');
+    _pendingSend = null;
+  };
+
+  // ── View / edit / delete ──
+  var _editId = null; var _delId = null;
+  window.openView = function(id){
+    fetch('/api/parent-messages/'+id).then(function(r){return r.json();}).then(function(j){
+      if(!j || !j.ok){ toast((j&&j.error)||'تعذر التحميل', true); return; }
+      var e = j.entry || {};
+      document.getElementById('viewTitle').textContent =
+        'رسالة بتاريخ ' + (e.sent_date||'') + ' لمجموعة ' + (e.group_name||'');
+      var dlv = (e.deliveries||[]).map(function(d){
+        return '<div class="recipient-row"><span class="nm">'+
+                escapeHtml(d.student_name||'')+
+               '</span><span class="ph">'+escapeHtml(d.student_whatsapp||'')+
+               '</span><span class="st ok">'+escapeHtml((d.sent_at||'').slice(0,16))+
+               '</span></div>';
+      }).join('');
+      document.getElementById('viewBody').innerHTML =
+        '<div style="margin-bottom:14px;"><b>المحتوى:</b><div>'+escapeHtml(e.content_covered||'')+'</div></div>'+
+        '<div style="margin-bottom:14px;"><b>المهارات:</b><div>'+escapeHtml(e.skills_focused||'')+'</div></div>'+
+        '<div style="margin-bottom:14px;"><b>الكتب:</b><div>'+escapeHtml(e.books_used||'')+'</div></div>'+
+        (e.homework ? '<div style="margin-bottom:14px;background:#fff8e1;padding:10px;border-radius:8px;"><b>الواجب:</b><div>'+escapeHtml(e.homework)+'</div></div>' : '')+
+        (e.parent_notes ? '<div style="margin-bottom:14px;"><b>ملاحظات:</b><div>'+escapeHtml(e.parent_notes)+'</div></div>' : '')+
+        '<div style="margin-top:18px;"><b>سجل الإرسال ('+ (e.deliveries||[]).length +'):</b></div>'+
+        '<div>'+(dlv || '<div class="empty">لا يوجد سجل</div>')+'</div>';
+      document.getElementById('viewBack').classList.add('show');
+    });
+  };
+  window.closeView = function(){
+    document.getElementById('viewBack').classList.remove('show');
+  };
+  window.openEdit = function(id){
+    fetch('/api/parent-messages?limit=200').then(function(r){return r.json();}).then(function(j){
+      var e = (j.entries||[]).find(function(x){return x.id===id;});
+      if(!e){ toast('غير موجود', true); return; }
+      _editId = id;
+      document.getElementById('econtent').value = e.content_covered || '';
+      document.getElementById('eskills').value  = e.skills_focused  || '';
+      document.getElementById('ebooks').value   = e.books_used      || '';
+      document.getElementById('ehomework').value= e.homework        || '';
+      document.getElementById('enotes').value   = e.parent_notes    || '';
+      document.getElementById('editBack').classList.add('show');
+    });
+  };
+  window.closeEdit = function(){
+    document.getElementById('editBack').classList.remove('show');
+    _editId = null;
+  };
+  window.saveEdit = function(){
+    if(!_editId) return;
+    var btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = '⏳';
+    fetch('/api/parent-messages/'+_editId, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        content_covered: document.getElementById('econtent').value.trim(),
+        skills_focused:  document.getElementById('eskills').value.trim(),
+        books_used:      document.getElementById('ebooks').value.trim(),
+        homework:        document.getElementById('ehomework').value.trim(),
+        parent_notes:    document.getElementById('enotes').value.trim()
+      })
+    }).then(function(r){return r.json();}).then(function(j){
+      btn.disabled = false; btn.textContent = 'حفظ';
+      if(j && j.ok){
+        toast('تم التعديل ✓');
+        closeEdit(); loadRecent();
+      } else {
+        toast((j && j.error) || 'تعذر التعديل', true);
+      }
+    });
+  };
+  window.openDel = function(id){
+    _delId = id;
+    document.getElementById('delBack').classList.add('show');
+  };
+  window.closeDel = function(){
+    document.getElementById('delBack').classList.remove('show');
+    _delId = null;
+  };
+  window.confirmDel = function(){
+    if(!_delId) return;
+    fetch('/api/parent-messages/'+_delId, {method:'DELETE'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){
+          toast('تم الحذف ✓');
+          closeDel(); loadRecent();
+        } else {
+          toast((j && j.error) || 'تعذر الحذف', true);
+        }
+      });
+  };
+
+  loadGroups();
+  loadRecent();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/parent-messages')
+@login_required
+def teacher_parent_messages_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("teacher", "admin", "manager"):
+        return redirect("/dashboard")
+    who = (user.get("name") or user.get("username") or "").strip() or "معلمة"
+    return TEACHER_PARENT_MESSAGES_HTML.replace("USER_PLACEHOLDER", who)
 
 
 # ── /admin/lessons — admin/manager view of all lesson entries ────────
