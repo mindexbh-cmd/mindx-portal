@@ -1,0 +1,225 @@
+/* ==========================================================================
+   Mindex Sidebar — Phase 2
+   ==========================================================================
+   Fixed right-anchored RTL sidebar (260px desktop) collapsing to a
+   slide-in drawer on mobile via a hamburger trigger. Pure CSS — no
+   JS framework, no animation libraries. Uses the design tokens from
+   /static/css/design-system.css.
+
+   Activation:
+     The mx-sidebar JS module adds `mx-sidebar-mounted` to <body> after
+     it injects the sidebar markup, so layout-shifting rules (the
+     content padding-inline-end below) only fire on opted-in pages —
+     non-admin pages are completely unaffected.
+   ========================================================================== */
+
+/* ---- The host shift on desktop --------------------------------------- */
+@media (min-width: 1025px) {
+  body.mx-sidebar-mounted {
+    /* RTL-aware: pushes content to the LEFT side of the viewport so the
+       fixed sidebar on the right has room. */
+    padding-inline-end: 260px;
+  }
+}
+
+/* ---- Hamburger trigger (mobile only) -------------------------------- */
+.mx-sidebar-trigger {
+  position: fixed;
+  top: var(--space-md);
+  inset-inline-end: var(--space-md);
+  z-index: 1102;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: none;            /* shown only on mobile */
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: var(--shadow-md);
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.mx-sidebar-trigger:hover { background: var(--color-primary-hover); }
+.mx-sidebar-trigger:focus { outline: 3px solid var(--color-primary-light); outline-offset: 2px; }
+@media (max-width: 1024px) {
+  body.mx-sidebar-mounted .mx-sidebar-trigger { display: inline-flex; }
+}
+
+/* ---- Backdrop (mobile only when drawer is open) --------------------- */
+.mx-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+.mx-sidebar-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---- The sidebar itself --------------------------------------------- */
+.mx-sidebar {
+  position: fixed;
+  top: 0;
+  inset-inline-end: 0;          /* anchored to the right in RTL */
+  width: 260px;
+  height: 100vh;
+  background: var(--color-surface);
+  border-inline-start: 1px solid var(--color-border); /* visible edge in RTL */
+  box-shadow: var(--shadow-md);
+  z-index: 1101;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family-ar);
+  color: var(--color-text-primary);
+  transition: transform .25s ease;
+  overflow: hidden;
+}
+@media (max-width: 1024px) {
+  .mx-sidebar {
+    /* off-screen by default; transform direction is logical so RTL
+       slides FROM the right edge correctly. */
+    transform: translateX(100%);
+  }
+  html[dir="rtl"] .mx-sidebar {
+    /* In RTL, translateX(100%) moves the element AWAY from its
+       inset-inline-end:0 anchor — toward the right edge it lives
+       against, off-screen. translateX(-100%) would push it to the
+       LEFT, which is where we want it OFF in RTL because dir=rtl
+       flips the X axis sign. Keep translateX(100%) for both — the
+       physical effect of `100% off-screen on the side you live on`
+       is identical regardless of dir.   */
+    transform: translateX(100%);
+  }
+  .mx-sidebar.open { transform: translateX(0); }
+}
+
+/* ---- Header (logo / title) ----------------------------------------- */
+.mx-sidebar-head {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+.mx-sidebar-title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+}
+.mx-sidebar-close {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  font-family: inherit;
+  line-height: 1;
+}
+.mx-sidebar-close:hover { background: var(--color-primary-light); color: var(--color-primary); }
+@media (max-width: 1024px) {
+  .mx-sidebar-close { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* ---- Scrollable nav body ------------------------------------------ */
+.mx-sidebar-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-sm) 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.mx-sidebar-nav::-webkit-scrollbar { width: 6px; }
+.mx-sidebar-nav::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+/* ---- Nav groups --------------------------------------------------- */
+.mx-sidebar-group { padding: var(--space-sm) 0; }
+.mx-sidebar-group-label {
+  padding: var(--space-xs) var(--space-lg) var(--space-xs);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.mx-sidebar-group-label .mx-sidebar-group-icon {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* ---- Nav item ----------------------------------------------------- */
+.mx-sidebar-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg) 10px var(--space-md);
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border: none;
+  border-inline-end: 3px solid transparent; /* the side-indicator slot */
+  background: transparent;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+  font-family: inherit;
+  text-align: start;
+  line-height: 1.5;
+}
+.mx-sidebar-item:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+.mx-sidebar-item .mx-sidebar-item-icon {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
+}
+.mx-sidebar-item.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 700;
+  /* the side indicator on the right edge (RTL inline-end) */
+  border-inline-end-color: var(--color-primary);
+}
+
+/* ---- Footer (user / logout) -------------------------------------- */
+.mx-sidebar-foot {
+  flex-shrink: 0;
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  background: var(--color-bg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.mx-sidebar-foot a {
+  color: var(--color-danger);
+  text-decoration: none;
+  font-weight: 600;
+}
+.mx-sidebar-foot a:hover { text-decoration: underline; }
