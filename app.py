@@ -39763,18 +39763,22 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .hello .info h2{font-size:1.45rem;color:#4a148c;margin:0 0 6px;font-weight:900;}
 .hello .info p{color:#666;margin:2px 0;font-size:0.95rem;}
 .hello .info p b{color:#4a148c;}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
-.card{background:#fff;border-radius:22px;padding:30px 22px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+.card{background:#fff;border-radius:20px;padding:26px 18px;text-align:center;box-shadow:0 10px 32px rgba(107,63,160,.18);cursor:pointer;text-decoration:none;color:inherit;display:block;transition:transform .18s ease, box-shadow .18s ease;border:2.5px solid transparent;position:relative;overflow:hidden;}
 .card:hover{transform:translateY(-6px);box-shadow:0 18px 42px rgba(107,63,160,.28);border-color:#6B3FA0;}
-.card .ic{font-size:3rem;line-height:1;display:block;margin-bottom:12px;}
-.card h3{margin:0 0 8px;font-size:1.2rem;color:#4a148c;font-weight:900;}
-.card p{margin:0;color:#555;font-size:0.9rem;line-height:1.55;}
+.card .ic{font-size:2.6rem;line-height:1;display:block;margin-bottom:10px;}
+.card h3{margin:0 0 6px;font-size:1.05rem;color:#4a148c;font-weight:900;}
+.card p{margin:0;color:#555;font-size:0.84rem;line-height:1.5;}
 .card .badge{position:absolute;top:14px;left:14px;background:#e91e63;color:#fff;font-size:.78rem;font-weight:900;padding:3px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(233,30,99,.3);min-width:26px;text-align:center;}
 .card.pay::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#43A047,#2E7D32);}
 .card.att::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#0288D1,#01579B);}
 .card.pts::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#6B3FA0,#8B5CC8);}
 .card.msg::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
+.card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
 .empty{text-align:center;color:#888;padding:60px 20px;}
+@media (max-width:1280px){
+  .cards{grid-template-columns:repeat(3,1fr);gap:16px;}
+}
 @media (max-width:1100px){
   .cards{grid-template-columns:repeat(2,1fr);gap:18px;}
 }
@@ -39834,6 +39838,10 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +     '<span class="badge" id="ph-msg-badge" style="display:none;">0</span>'
       +     '<span class="ic">📨</span><h3>رسائل المعلمة</h3>'
       +     '<p>ملخصات الحصص من معلمة ' + _esc(s.student_name||firstName) + '</p>'
+      +   '</a>'
+      +   '<a class="card evals" href="/portal/parent-hub/evaluations">'
+      +     '<span class="ic">📊</span><h3>التقييمات</h3>'
+      +     '<p>تقييمات ' + _esc(s.student_name||firstName) + ' الشهرية</p>'
       +   '</a>'
       + '</div>';
     root.innerHTML = html;
@@ -40361,6 +40369,327 @@ def portal_parent_hub_messages_page():
     if int(user.get("must_change_pw") or 0):
         return redirect("/portal/change-password")
     return PORTAL_PARENT_MESSAGES_HTML
+
+
+# ── /portal/parent-hub/evaluations — parent view of monthly scores ──
+PORTAL_PARENT_EVALUATIONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>التقييمات الشهرية — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fff8e1,#ffe0b2,#ffccbc);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#e65100;}
+.topbar .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.topbar a{color:#e65100;text-decoration:none;background:#fff3e0;padding:8px 14px;
+          border-radius:9px;font-weight:700;font-size:0.85rem;}
+.topbar a.logout{background:#fff;border:1.5px solid #ffcc80;}
+.wrap{max-width:980px;margin:24px auto;padding:0 16px;}
+.head{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
+      box-shadow:0 4px 16px rgba(0,0,0,.06);display:flex;align-items:center;
+      gap:14px;flex-wrap:wrap;}
+.head .info h2{margin:0 0 4px;color:#e65100;font-size:1.2rem;font-weight:900;}
+.head .info p{margin:0;color:#666;font-size:.9rem;}
+.search-box{display:flex;gap:8px;margin-top:12px;}
+.search-box input{flex:1;padding:9px 12px;border:1.5px solid #ffe0b2;
+                  border-radius:9px;font-family:inherit;font-size:.95rem;
+                  background:#fffaf2;}
+.chart-box{background:#fff;border-radius:16px;padding:18px;margin-bottom:14px;
+           box-shadow:0 4px 16px rgba(0,0,0,.06);}
+.chart-box h3{margin:0 0 12px;color:#e65100;font-weight:900;font-size:1.05rem;}
+.chart-wrap{position:relative;height:240px;}
+.empty{text-align:center;color:#888;padding:40px 20px;font-style:italic;}
+.eval-card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;
+           box-shadow:0 4px 14px rgba(0,0,0,.06);border-right:5px solid #FB8C00;
+           cursor:pointer;transition:box-shadow .15s ease;}
+.eval-card:hover{box-shadow:0 6px 18px rgba(251,140,0,.2);}
+.eval-card.high{border-right-color:#43a047;}
+.eval-card.low{border-right-color:#e53935;}
+.eval-head{display:flex;justify-content:space-between;align-items:center;
+           flex-wrap:wrap;gap:10px;}
+.eval-head .m{color:#e65100;font-weight:900;font-size:1.05rem;}
+.eval-head .o{display:flex;align-items:center;gap:8px;}
+.score-pill{display:inline-block;padding:6px 14px;border-radius:8px;font-weight:900;
+            font-size:1.1rem;}
+.score-pill.high{background:#c8e6c9;color:#1b5e20;}
+.score-pill.mid{background:#fff8e1;color:#f57c00;}
+.score-pill.low{background:#ffcdd2;color:#b71c1c;}
+.indicator{width:14px;height:14px;border-radius:50%;display:inline-block;}
+.indicator.high{background:#43a047;}
+.indicator.mid{background:#fdd835;}
+.indicator.low{background:#e53935;}
+.eval-body{display:none;margin-top:14px;padding-top:12px;border-top:1px dashed #ffe0b2;}
+.eval-card.open .eval-body{display:block;}
+.eval-card.open .toggler{transform:rotate(180deg);}
+.toggler{transition:transform .2s ease;display:inline-block;color:#FB8C00;}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:.86rem;}
+.bar-row .b-lbl{flex:0 0 130px;color:#5d4037;font-weight:700;}
+.bar-row .b-bar{flex:1;height:14px;background:#fff3e0;border-radius:7px;overflow:hidden;
+                border:1px solid #ffe0b2;}
+.bar-row .b-bar > div{height:100%;background:linear-gradient(90deg,#e53935,#fdd835,#43a047);
+                      border-radius:7px;}
+.bar-row .b-val{flex:0 0 40px;text-align:left;font-weight:800;color:#e65100;}
+.notes-block{margin-top:10px;background:#fff8e1;border-radius:8px;padding:10px;
+             font-size:.92rem;line-height:1.6;color:#5d4037;}
+.notes-block b{color:#e65100;}
+.pag{display:flex;gap:6px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+.pag button{padding:6px 12px;border-radius:7px;border:1.5px solid #ffe0b2;
+            background:#fff;cursor:pointer;font-weight:700;color:#e65100;
+            font-family:inherit;}
+.pag button.active{background:#FB8C00;color:#fff;border-color:#FB8C00;}
+.pag button:disabled{opacity:.4;cursor:not-allowed;}
+@media (max-width:680px){
+  .bar-row .b-lbl{flex:0 0 100px;}
+  .eval-head .m{font-size:.96rem;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📊 التقييمات الشهرية</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap">
+
+  <div class="head">
+    <div class="info" style="flex:1;min-width:200px;">
+      <h2 id="head-title">التقييمات الشهرية</h2>
+      <p id="head-sub">يظهر هنا التقييم الشهري المُقدَّم من المعلمة بعد نشره من قِبَل الإدارة.</p>
+    </div>
+    <div class="search-box" style="margin-top:0;flex-basis:100%;">
+      <input type="text" id="search" placeholder="ابحث بالشهر أو الملاحظات...">
+    </div>
+  </div>
+
+  <div class="chart-box" id="chartBox" style="display:none;">
+    <h3>منحنى التقييم العام</h3>
+    <div class="chart-wrap">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+
+  <div id="listBox">
+    <div class="empty">جاري التحميل...</div>
+  </div>
+  <div class="pag" id="pagBox"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+        crossorigin="anonymous"></script>
+<script>
+(function(){
+  var SCORE_FIELDS = [
+    {k:'score_participation', l:'المشاركة'},
+    {k:'score_behavior',      l:'السلوك'},
+    {k:'score_reading',       l:'القراءة'},
+    {k:'score_dictation',     l:'الإملاء'},
+    {k:'score_vocabulary',    l:'المفردات'},
+    {k:'score_conversation',  l:'المحادثة'},
+    {k:'score_expression',    l:'التعبير'},
+    {k:'score_grammar',       l:'القواعد'}
+  ];
+  var ALL = []; var FILTERED = [];
+  var PAGE = 1; var PER = 6;
+  var _chart = null;
+
+  function escapeHtml(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function scoreCls(v){
+    if(v == null) return 'mid';
+    if(v >= 8) return 'high';
+    if(v <= 4) return 'low';
+    return 'mid';
+  }
+
+  function loadHeader(){
+    return fetch('/api/portal/student/meta', {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d && d.ok){
+          var s = d.student || {};
+          var fn = (s.student_name || '').split(' ')[0];
+          if(fn){
+            document.getElementById('head-title').textContent =
+              'تقييمات ' + (s.student_name||fn) + ' الشهرية';
+          }
+        }
+      });
+  }
+  function load(){
+    return fetch('/api/monthly-evaluations?limit=200', {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){
+          document.getElementById('listBox').innerHTML =
+            '<div class="empty">تعذر التحميل</div>';
+          return;
+        }
+        ALL = j.entries || [];
+        // List endpoint already restricts to released_to_parent for
+        // parent role; defensive client-side filter as well.
+        ALL = ALL.filter(function(e){ return e.released_to_parent; });
+        applySearch();
+        renderChart();
+      });
+  }
+  function applySearch(){
+    var q = (document.getElementById('search').value || '').trim().toLowerCase();
+    if(!q){ FILTERED = ALL.slice(); }
+    else {
+      FILTERED = ALL.filter(function(e){
+        return ((e.evaluation_month||'').indexOf(q) >= 0) ||
+               ((e.month_label||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.notes_behavior||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.notes_language||'').toLowerCase().indexOf(q) >= 0) ||
+               ((e.general_notes||'').toLowerCase().indexOf(q) >= 0);
+      });
+    }
+    PAGE = 1;
+    render();
+  }
+  function render(){
+    var box = document.getElementById('listBox');
+    if(!FILTERED.length){
+      box.innerHTML = '<div class="empty">لم يتم نشر تقييمات بعد. سيظهر التقييم الشهري هنا عند جاهزيته.</div>';
+      document.getElementById('pagBox').innerHTML = '';
+      return;
+    }
+    var totalPages = Math.max(1, Math.ceil(FILTERED.length / PER));
+    if(PAGE > totalPages) PAGE = totalPages;
+    var start = (PAGE-1)*PER;
+    var slice = FILTERED.slice(start, start+PER);
+    var html = slice.map(function(e){
+      var sCls = scoreCls(e.overall_score);
+      var bars = SCORE_FIELDS.map(function(s){
+        var v = e[s.k];
+        var pct = v == null ? 0 : Math.round((v/10)*100);
+        return '<div class="bar-row">'+
+          '<span class="b-lbl">'+s.l+'</span>'+
+          '<span class="b-bar"><div style="width:'+pct+'%;"></div></span>'+
+          '<span class="b-val">'+(v==null?'—':v)+'</span>'+
+        '</div>';
+      }).join('');
+      var notes = '';
+      if(e.notes_behavior) notes += '<div class="notes-block"><b>ملاحظات السلوك:</b> '+escapeHtml(e.notes_behavior)+'</div>';
+      if(e.notes_language) notes += '<div class="notes-block"><b>ملاحظات اللغة:</b> '+escapeHtml(e.notes_language)+'</div>';
+      if(e.general_notes)  notes += '<div class="notes-block"><b>ملاحظات عامة:</b> '+escapeHtml(e.general_notes)+'</div>';
+      return '<div class="eval-card '+sCls+'" id="ec-'+e.id+'" onclick="toggleCard('+e.id+')">'+
+        '<div class="eval-head">'+
+          '<div class="m">📅 '+escapeHtml(e.month_label||e.evaluation_month||'')+'</div>'+
+          '<div class="o">'+
+            '<span class="indicator '+sCls+'"></span>'+
+            '<span class="score-pill '+sCls+'">'+(e.overall_score==null?'—':e.overall_score)+'/10</span>'+
+            '<span class="toggler">▼</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="eval-body">'+
+          '<div style="margin-bottom:10px;color:#888;font-size:.86rem;">'+
+            (e.teacher_name ? '👩‍🏫 '+escapeHtml(e.teacher_name) : '')+
+          '</div>'+
+          bars +
+          notes +
+        '</div>'+
+      '</div>';
+    }).join('');
+    box.innerHTML = html;
+    renderPag(totalPages);
+  }
+  function renderPag(total){
+    var p = document.getElementById('pagBox');
+    if(total<=1){ p.innerHTML = ''; return; }
+    var html = '';
+    html += '<button onclick="goPage('+(PAGE-1)+')" '+(PAGE===1?'disabled':'')+'>‹</button>';
+    var s = Math.max(1, PAGE-2); var e = Math.min(total, s+4);
+    if(e-s < 4) s = Math.max(1, e-4);
+    for(var i=s;i<=e;i++){
+      html += '<button onclick="goPage('+i+')" class="'+(i===PAGE?'active':'')+'">'+i+'</button>';
+    }
+    html += '<button onclick="goPage('+(PAGE+1)+')" '+(PAGE===total?'disabled':'')+'>›</button>';
+    p.innerHTML = html;
+  }
+  window.goPage = function(p){ PAGE = p; render();
+    window.scrollTo({top:0, behavior:'smooth'}); };
+  window.toggleCard = function(id){
+    var el = document.getElementById('ec-'+id);
+    if(el) el.classList.toggle('open');
+  };
+
+  function renderChart(){
+    var box = document.getElementById('chartBox');
+    if(typeof Chart === 'undefined'){ box.style.display = 'none'; return; }
+    if(!ALL.length){ box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    // Sort ascending by month for the trend.
+    var rows = ALL.slice().sort(function(a,b){
+      return (a.evaluation_month||'') < (b.evaluation_month||'') ? -1 : 1;
+    });
+    var labels = rows.map(function(e){ return e.month_label || e.evaluation_month || ''; });
+    var data   = rows.map(function(e){ return e.overall_score == null ? null : e.overall_score; });
+    if(_chart){ _chart.destroy(); _chart = null; }
+    var ctx = document.getElementById('trendChart');
+    _chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'التقييم العام',
+          data:  data,
+          borderColor: '#FB8C00',
+          backgroundColor: 'rgba(251,140,0,.18)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.25,
+          pointRadius: 6,
+          pointBackgroundColor: '#FB8C00',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, max: 10,
+               ticks: { stepSize: 2, color: '#5d4037' },
+               grid: { color: '#ffe0b2' } },
+          x: { ticks: { color: '#5d4037' }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            rtl: true,
+            callbacks: {
+              label: function(ctx){ return ctx.parsed.y + '/10'; }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', applySearch);
+  loadHeader().then(load);
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/portal/parent-hub/evaluations')
+@login_required
+def portal_parent_hub_evaluations_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_EVALUATIONS_HTML
 
 
 def _pts_parent_children_ids(user):
