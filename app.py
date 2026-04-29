@@ -780,6 +780,34 @@ def init_db():
     )""")
     db.execute("CREATE INDEX IF NOT EXISTS idx_lessons_log_group_date "
                "ON lessons_log(group_name, lesson_date)")
+    db.execute("""CREATE TABLE IF NOT EXISTS parent_messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER,
+        teacher_username TEXT,
+        teacher_name TEXT,
+        group_name TEXT,
+        sent_date TEXT,
+        content_covered TEXT,
+        skills_focused TEXT,
+        books_used TEXT,
+        homework TEXT,
+        parent_notes TEXT,
+        whatsapp_status TEXT DEFAULT 'queued',
+        whatsapp_sent_count INTEGER DEFAULT 0,
+        whatsapp_total_count INTEGER DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_parent_messages_group_date "
+               "ON parent_messages(group_name, sent_date)")
+    db.execute("""CREATE TABLE IF NOT EXISTS parent_message_reads(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(message_id, student_id)
+    )""")
     db.commit()
     db.close()
 
@@ -2767,6 +2795,76 @@ if True:
         if _col not in _ll_cols:
             try: db2.execute("ALTER TABLE lessons_log ADD COLUMN " + _col + " " + _decl)
             except Exception: pass
+    db2.commit()
+
+    # ── parent_messages_v1: parent broadcast feature.
+    # Teachers fill a structured form per group ("ماذا تريد أن يعرف
+    # ولي الأمر") and the system both queues a personalised WhatsApp
+    # message per parent (via the existing message_log pipeline) and
+    # stores the broadcast in this table so admin + parents can view
+    # past messages. parent_message_reads is a lightweight
+    # per-student read tracker so the parent hub can show an unread
+    # badge. Idempotent: CREATE TABLE IF NOT EXISTS unconditionally,
+    # then ALTER TABLE ADD COLUMN for any column that pre-dates an
+    # earlier deploy. Companion table for read-state is also IF NOT
+    # EXISTS with a unique index on (message_id, student_id).
+    db2.execute("""CREATE TABLE IF NOT EXISTS parent_messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER,
+        teacher_username TEXT,
+        teacher_name TEXT,
+        group_name TEXT,
+        sent_date TEXT,
+        content_covered TEXT,
+        skills_focused TEXT,
+        books_used TEXT,
+        homework TEXT,
+        parent_notes TEXT,
+        whatsapp_status TEXT DEFAULT 'queued',
+        whatsapp_sent_count INTEGER DEFAULT 0,
+        whatsapp_total_count INTEGER DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_parent_messages_group_date "
+                    "ON parent_messages(group_name, sent_date)")
+    except Exception: pass
+    try:
+        _pm_cols = {r[1] for r in db2.execute(
+            "PRAGMA table_info(parent_messages)").fetchall()}
+    except Exception:
+        _pm_cols = set()
+    for _col, _decl in [
+        ("teacher_id",            "INTEGER"),
+        ("teacher_username",      "TEXT"),
+        ("teacher_name",          "TEXT"),
+        ("group_name",            "TEXT"),
+        ("sent_date",             "TEXT"),
+        ("content_covered",       "TEXT"),
+        ("skills_focused",        "TEXT"),
+        ("books_used",            "TEXT"),
+        ("homework",              "TEXT"),
+        ("parent_notes",          "TEXT"),
+        ("whatsapp_status",       "TEXT DEFAULT 'queued'"),
+        ("whatsapp_sent_count",   "INTEGER DEFAULT 0"),
+        ("whatsapp_total_count",  "INTEGER DEFAULT 0"),
+        ("is_deleted",            "INTEGER DEFAULT 0"),
+        ("created_at",            "DATETIME"),
+        ("updated_at",            "DATETIME"),
+    ]:
+        if _col not in _pm_cols:
+            try: db2.execute("ALTER TABLE parent_messages ADD COLUMN " +
+                             _col + " " + _decl)
+            except Exception: pass
+    db2.execute("""CREATE TABLE IF NOT EXISTS parent_message_reads(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(message_id, student_id)
+    )""")
     db2.commit()
 
     # ── column_labels: backfill any rows that were inserted without
@@ -21505,6 +21603,8 @@ BUILT_IN_TABLE_LABELS = {
     "custom_table_cols": "أعمدة الجداول المخصّصة",
     "custom_table_rows": "صفوف الجداول المخصّصة",
     "lessons_log":       "سجل الدروس",
+    "parent_messages":   "رسائل المعلمة لأولياء الأمور",
+    "parent_message_reads": "اطّلاع أولياء الأمور",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -23901,6 +24001,8 @@ _TBL_AUDIT_FEATURE = {
     "docs_pages":          ("صفحات دليل الموقع",            "نظام التوثيق"),
     "docs_screenshots":    ("لقطات الصفحات",                 "نظام التوثيق"),
     "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
+    "parent_messages":     ("رسائل المعلمة لأولياء الأمور",  "ماذا تريد أن يعرف ولي الأمر"),
+    "parent_message_reads": ("اطّلاع أولياء الأمور على الرسائل", "ماذا تريد أن يعرف ولي الأمر"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
