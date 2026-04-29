@@ -4661,8 +4661,50 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       &#x639;&#x631;&#x636; &#x627;&#x644;&#x642;&#x627;&#x626;&#x645;&#x629; &#x2190;
     </span>
   </a>
-  <div class="dh-section-title">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
-  <div class="dh-stats-grid">
+  <!-- New 4-card hero row (Phase 4). Sourced from /api/dashboard/stats —
+       same endpoint the legacy 8-grid uses. The legacy grid below stays
+       in DOM (with .dh-legacy-stats class so CSS hides it visually) so
+       the existing dhLoadStats() JS keeps populating its IDs without
+       errors and no data is lost from the request response. -->
+  <div class="md-stats-row">
+    <div class="md-stat-card is-yellow">
+      <div class="md-stat-card-icon">&#x1F4B0;</div>
+      <div class="md-stat-card-number" id="md-stat-attendance">&mdash;</div>
+      <div class="md-stat-card-label">&#x646;&#x633;&#x628;&#x629; &#x627;&#x644;&#x627;&#x644;&#x62A;&#x632;&#x627;&#x645; &#x628;&#x627;&#x644;&#x62D;&#x636;&#x648;&#x631;</div>
+    </div>
+    <div class="md-stat-card is-green">
+      <div class="md-stat-card-icon">&#x2705;</div>
+      <div class="md-stat-card-number" id="md-stat-teachers">&mdash;</div>
+      <div class="md-stat-card-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x64A;&#x646;</div>
+    </div>
+    <div class="md-stat-card is-red">
+      <div class="md-stat-card-icon">&#x1F4CB;</div>
+      <div class="md-stat-card-number" id="md-stat-violations">&mdash;</div>
+      <div class="md-stat-card-label">&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</div>
+    </div>
+    <div class="md-stat-card is-purple">
+      <div class="md-stat-card-icon">&#x1F465;</div>
+      <div class="md-stat-card-number" id="md-stat-active-students">&mdash;</div>
+      <div class="md-stat-card-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x646;&#x634;&#x637;&#x64A;&#x646;</div>
+    </div>
+  </div>
+  <script>
+  /* Populate the new 4-card hero row from the same /api/dashboard/stats
+     endpoint the legacy grid uses. Independent fetch keeps the existing
+     dhLoadStats untouched. */
+  (function(){
+    fetch('/api/dashboard/stats').then(function(r){return r.json();}).then(function(d){
+      function set(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+      set('md-stat-attendance',     (d.attendance_rate || 0) + '%');
+      set('md-stat-teachers',        d.teachers || 0);
+      set('md-stat-violations',      d.violations || 0);
+      var active = (d.english_students || 0) + (d.math_students || 0);
+      set('md-stat-active-students', active);
+    }).catch(function(){});
+  })();
+  </script>
+  <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
+  <div class="dh-stats-grid dh-legacy-stats">
     <div class="dh-stat-card teal">
       <div class="dh-stat-top"><span class="dh-stat-icon">&#x1F1EC;&#x1F1E7;</span></div>
       <div class="dh-stat-number" id="stat-english-students">&ndash;</div>
