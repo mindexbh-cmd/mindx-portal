@@ -4841,6 +4841,10 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <span class="md-sb-link-text">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x627;&#x62A;</span>
         </a>
+        <a class="md-sb-link mx-staff-only" href="/admin/curriculum">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</span>
+        </a>
       </div>
     </div>
     <!-- 🌟 نظام النقاط -->
@@ -29493,6 +29497,599 @@ def admin_parent_messages_page():
     if not _pm_can_admin(user):
         return redirect("/dashboard")
     return ADMIN_PARENT_MESSAGES_HTML
+
+
+# ── /admin/curriculum — admin/manager PDF library management ─────────
+# Upload PDFs, edit metadata, replace assignments, view access log.
+# All data flows through /api/curriculum/* endpoints; the page is a
+# pure UI shell over those routes. Mobile-first layout.
+ADMIN_CURRICULUM_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>المناهج — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);position:sticky;top:0;z-index:50;}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.wrap{max-width:1280px;margin:18px auto;padding:0 16px;}
+.panel{background:#fff;border-radius:14px;padding:18px;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.panel-title{font-weight:900;color:#4a148c;font-size:1.05rem;margin:0 0 12px;}
+.row-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.row-tools input[type=text]{flex:1;min-width:220px;padding:10px 14px;
+                            border:1.5px solid #d8c8ec;border-radius:10px;
+                            font-family:inherit;font-size:.95rem;background:#fafafe;}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;
+     border-radius:10px;padding:10px 18px;font-weight:800;font-size:.95rem;
+     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost{background:#f3e5f5;color:#4a148c;}
+.btn-ghost:hover{background:#e1bee7;}
+.btn-warn{background:linear-gradient(135deg,#fb8c00,#ef6c00);}
+.btn-danger{background:linear-gradient(135deg,#e53935,#c62828);}
+table.tbl{width:100%;border-collapse:collapse;font-size:.92rem;}
+table.tbl th{background:#ede7f6;color:#4a148c;padding:10px 8px;text-align:right;font-weight:800;}
+table.tbl td{padding:9px 8px;border-bottom:1px solid #e8e0f5;vertical-align:top;}
+table.tbl tr:hover td{background:#faf6ff;}
+.empty{text-align:center;color:#888;padding:30px 20px;font-style:italic;}
+.act-btn{padding:5px 10px;border-radius:8px;border:none;cursor:pointer;
+         font-size:.82rem;font-weight:700;font-family:inherit;}
+.act-btn.view{background:#e3f2fd;color:#1565c0;}
+.act-btn.edit{background:#ede7f6;color:#4a148c;margin-right:4px;}
+.act-btn.who{background:#fff8e1;color:#f57c00;margin-right:4px;}
+.act-btn.del{background:#ffebee;color:#c62828;margin-right:4px;}
+.size-pill{display:inline-block;padding:1px 8px;border-radius:6px;background:#e1bee7;color:#4a148c;
+           font-size:.78rem;font-weight:800;}
+.targets-pill{display:inline-block;padding:2px 10px;border-radius:8px;background:#e8f5e9;
+              color:#2E7D32;font-size:.78rem;font-weight:800;margin-right:4px;}
+.targets-pill.empty{background:#ffebee;color:#c62828;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:760px;width:100%;
+       max-height:92vh;overflow:auto;}
+.modal h3{margin:0 0 14px;color:#4a148c;font-weight:900;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-weight:800;color:#4a148c;font-size:.9rem;margin-bottom:5px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:9px 12px;border:1.6px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.95rem;background:#fafafe;}
+.field textarea{resize:vertical;min-height:60px;}
+.radio-row{display:flex;gap:14px;flex-wrap:wrap;}
+.radio-row label{display:flex;gap:6px;align-items:center;font-weight:700;color:#4a148c;cursor:pointer;}
+.assign-section{background:#faf6ff;border:1px dashed #d8c8ec;border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.assign-section h4{margin:0 0 8px;color:#4a148c;font-weight:900;font-size:.95rem;}
+.assign-tag{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d8c8ec;
+            border-radius:8px;padding:5px 10px;margin:3px;font-size:.86rem;color:#4a148c;font-weight:700;}
+.assign-tag .lbl{font-weight:800;}
+.assign-tag .dlt{font-size:.78rem;color:#666;cursor:pointer;}
+.assign-tag .dlt input{margin-right:4px;cursor:pointer;}
+.assign-tag .x{cursor:pointer;color:#c62828;font-weight:900;font-size:1rem;line-height:1;
+               border:none;background:transparent;padding:0 4px;}
+.preview-line{padding:10px 14px;background:#fff8e1;border:1.5px solid #ffd54f;border-radius:8px;
+              color:#e65100;font-weight:800;font-size:.92rem;}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+       background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+       font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+       opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:9999;}
+.toast.show{opacity:1;}
+.toast.err{background:#c62828;}
+.access-row{display:flex;justify-content:space-between;padding:6px 10px;
+            border-bottom:1px solid #f0e6f8;font-size:.88rem;}
+.access-row .who{font-weight:800;color:#4a148c;}
+.access-row .when{color:#666;}
+.access-row .act{font-weight:700;color:#2E7D32;}
+.access-row .act.download{color:#c62828;}
+@media (max-width:680px){
+  table.tbl{font-size:.84rem;}
+  table.tbl thead{display:none;}
+  table.tbl tbody tr{display:block;border:1.5px solid #e8e0f5;border-radius:10px;
+                     padding:10px;margin-bottom:10px;background:#fff;}
+  table.tbl tbody td{display:block;padding:4px 0;border:none;}
+  table.tbl tbody td::before{content:attr(data-label) ": ";font-weight:800;color:#4a148c;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 المناهج — إدارة المكتبة</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <div class="row-tools">
+      <input type="text" id="cu-search" placeholder="ابحث عن كتاب..." />
+      <button class="btn" onclick="cuOpenUpload()">📤 رفع منهج جديد</button>
+    </div>
+    <div id="cu-list-box"><div class="empty">جاري التحميل...</div></div>
+  </div>
+
+</div>
+
+<!-- Upload / Edit modal -->
+<div class="modal-back" id="cu-mod-back" onclick="if(event.target===this)cuCloseModal()">
+  <div class="modal">
+    <h3 id="cu-mod-title">📤 رفع منهج جديد</h3>
+    <div class="field">
+      <label>عنوان الملف <span style="color:#c62828">*</span></label>
+      <input type="text" id="cu-title" maxlength="200">
+    </div>
+    <div class="field">
+      <label>الوصف (اختياري)</label>
+      <textarea id="cu-desc" maxlength="2000"></textarea>
+    </div>
+    <div class="field" id="cu-file-field">
+      <label>ملف PDF (حد أقصى 50 ميجا)</label>
+      <input type="file" id="cu-file" accept="application/pdf">
+    </div>
+    <div class="field">
+      <label>الإذن الافتراضي</label>
+      <div class="radio-row">
+        <label><input type="radio" name="cu-dl" value="allowed" checked> السماح بالتحميل</label>
+        <label><input type="radio" name="cu-dl" value="view_only"> للقراءة فقط</label>
+      </div>
+    </div>
+
+    <div class="assign-section">
+      <h4>📋 المجموعات</h4>
+      <select id="cu-add-group" style="margin-bottom:6px;width:auto;display:inline-block;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+        <option value="">— اختر مجموعة —</option>
+      </select>
+      <button class="act-btn edit" type="button" onclick="cuAddTarget('group')">إضافة</button>
+      <div id="cu-tags-group" style="margin-top:8px;"></div>
+    </div>
+    <div class="assign-section">
+      <h4>👧 الطلاب</h4>
+      <input type="text" id="cu-add-student" placeholder="ابحث عن طالبة..." style="width:auto;display:inline-block;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+      <select id="cu-pick-student" style="margin-right:6px;display:none;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;"></select>
+      <button class="act-btn edit" type="button" id="cu-add-student-btn" onclick="cuAddTarget('student')" style="display:none;">إضافة</button>
+      <div id="cu-tags-student" style="margin-top:8px;"></div>
+    </div>
+    <div class="assign-section">
+      <h4>👪 أولياء الأمور</h4>
+      <input type="text" id="cu-add-parent" placeholder="ابحث عن ولي أمر..." style="width:auto;display:inline-block;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+      <select id="cu-pick-parent" style="margin-right:6px;display:none;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;"></select>
+      <button class="act-btn edit" type="button" id="cu-add-parent-btn" onclick="cuAddTarget('parent')" style="display:none;">إضافة</button>
+      <div id="cu-tags-parent" style="margin-top:8px;"></div>
+    </div>
+    <div class="assign-section">
+      <h4>🍎 المعلمات</h4>
+      <select id="cu-add-teacher" style="margin-bottom:6px;width:auto;display:inline-block;padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+        <option value="">— اختر معلمة —</option>
+      </select>
+      <button class="act-btn edit" type="button" onclick="cuAddTarget('teacher')">إضافة</button>
+      <div id="cu-tags-teacher" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="preview-line" id="cu-preview">سيظهر الملف لـ — مجموعة + — طالب + — ولي أمر + — معلمة</div>
+
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="cuCloseModal()">إلغاء</button>
+      <button class="btn" id="cu-save-btn" onclick="cuSave()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Beneficiaries modal -->
+<div class="modal-back" id="cu-who-back" onclick="if(event.target===this)cuCloseWho()">
+  <div class="modal">
+    <h3>👀 المُستفيدون من الملف</h3>
+    <div id="cu-who-body"><div class="empty">جاري التحميل...</div></div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="cuCloseWho()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="modal-back" id="cu-del-back" onclick="if(event.target===this)cuCloseDel()">
+  <div class="modal">
+    <h3>تأكيد الحذف</h3>
+    <p>هل ترغبين في حذف هذا الملف؟ لن يظهر بعد الآن للمعلمات أو الطلاب.</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="cuCloseDel()">إلغاء</button>
+      <button class="btn btn-danger" id="cu-del-yes">حذف</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="cu-toast"></div>
+
+<script>
+(function(){
+  function escapeHtml(s){ s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function toast(msg, isErr){
+    var t = document.getElementById('cu-toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  function fmtSize(b){
+    b = parseInt(b||0,10);
+    if(b<1024) return b+' بايت';
+    if(b<1024*1024) return Math.round(b/1024)+' كيلو';
+    return (b/1048576).toFixed(1)+' ميجا';
+  }
+
+  // ── State ───────────────────────────────────────────────────────
+  var EDIT_ID = null; // null = upload mode, integer = edit mode
+  var TAGS = {group:[], student:[], parent:[], teacher:[]};
+  // each tag: {id, label, can_download} where can_download is bool|null
+
+  // ── Load list ───────────────────────────────────────────────────
+  var SEARCH_TIMER = null;
+  function loadList(){
+    var q = document.getElementById('cu-search').value || '';
+    fetch('/api/curriculum/list' + (q ? ('?search=' + encodeURIComponent(q)) : ''),
+          {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('cu-list-box');
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+        var arr = j.files || [];
+        if(!arr.length){ box.innerHTML = '<div class="empty">لا توجد ملفات حتى الآن. اضغط "رفع منهج جديد" للبدء.</div>'; return; }
+        var html = '<table class="tbl"><thead><tr>'+
+          '<th>العنوان</th><th>الوصف</th><th>الحجم</th><th>المُستفيدون</th>'+
+          '<th>تاريخ الرفع</th><th>إجراءات</th></tr></thead><tbody>';
+        arr.forEach(function(e){
+          var s = e.assignment_summary || {};
+          var pills = '';
+          if(s.group)    pills += '<span class="targets-pill">'+s.group+' مجموعة</span>';
+          if(s.student)  pills += '<span class="targets-pill">'+s.student+' طالب</span>';
+          if(s.parent)   pills += '<span class="targets-pill">'+s.parent+' ولي أمر</span>';
+          if(s.teacher)  pills += '<span class="targets-pill">'+s.teacher+' معلمة</span>';
+          if(!pills)     pills = '<span class="targets-pill empty">— غير مخصص —</span>';
+          var lock = (e.download_default === 'view_only') ? ' 🔒' : '';
+          html += '<tr>'+
+            '<td data-label="العنوان"><b>'+escapeHtml(e.title)+'</b>'+lock+'</td>'+
+            '<td data-label="الوصف">'+escapeHtml((e.description||'').slice(0,80))+((e.description||'').length>80?'...':'')+'</td>'+
+            '<td data-label="الحجم"><span class="size-pill">'+fmtSize(e.file_size_bytes)+'</span></td>'+
+            '<td data-label="المُستفيدون">'+pills+'</td>'+
+            '<td data-label="تاريخ الرفع">'+escapeHtml((e.uploaded_at||'').slice(0,16))+'</td>'+
+            '<td data-label="إجراءات">'+
+              '<button class="act-btn edit" onclick="cuOpenEdit('+e.id+')">تعديل</button>'+
+              '<button class="act-btn who" onclick="cuOpenWho('+e.id+')">عرض المُستفيدين</button>'+
+              '<button class="act-btn view" onclick="cuOpenViewer('+e.id+')">عرض</button>'+
+              '<button class="act-btn del" onclick="cuOpenDel('+e.id+')">حذف</button>'+
+            '</td></tr>';
+        });
+        html += '</tbody></table>';
+        box.innerHTML = html;
+      })
+      .catch(function(){
+        document.getElementById('cu-list-box').innerHTML = '<div class="empty">تعذر التحميل</div>';
+      });
+  }
+  document.getElementById('cu-search').addEventListener('input', function(){
+    clearTimeout(SEARCH_TIMER);
+    SEARCH_TIMER = setTimeout(loadList, 300);
+  });
+
+  // ── Target dropdowns ────────────────────────────────────────────
+  function loadGroupsDD(){
+    var sel = document.getElementById('cu-add-group');
+    fetch('/api/curriculum/targets/groups', {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        sel.innerHTML = '<option value="">— اختر مجموعة —</option>';
+        (j.groups||[]).forEach(function(g){
+          var o = document.createElement('option');
+          o.value = g; o.textContent = g; sel.appendChild(o);
+        });
+      });
+  }
+  function loadTeachersDD(){
+    var sel = document.getElementById('cu-add-teacher');
+    fetch('/api/curriculum/targets/users?role=teacher', {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        sel.innerHTML = '<option value="">— اختر معلمة —</option>';
+        (j.users||[]).forEach(function(u){
+          var o = document.createElement('option');
+          o.value = u.id;
+          o.textContent = (u.name || u.username || ('#'+u.id));
+          o.dataset.lbl = o.textContent;
+          sel.appendChild(o);
+        });
+      });
+  }
+  function attachAutocomplete(inputId, pickId, btnId, role){
+    var inp = document.getElementById(inputId);
+    var pick = document.getElementById(pickId);
+    var btn = document.getElementById(btnId);
+    var t;
+    inp.addEventListener('input', function(){
+      clearTimeout(t);
+      var q = inp.value.trim();
+      if(!q){ pick.style.display='none'; btn.style.display='none'; return; }
+      t = setTimeout(function(){
+        var url = (role === 'student')
+          ? ('/api/curriculum/targets/students?q=' + encodeURIComponent(q))
+          : ('/api/curriculum/targets/users?role=parent&q=' + encodeURIComponent(q));
+        fetch(url, {credentials:'include'})
+          .then(function(r){return r.json();}).then(function(j){
+            var arr = (role==='student') ? (j.students||[]) : (j.users||[]);
+            if(!arr.length){ pick.style.display='none'; btn.style.display='none'; return; }
+            pick.innerHTML = '';
+            arr.forEach(function(s){
+              var o = document.createElement('option');
+              o.value = s.id;
+              o.textContent = (role==='student') ? (s.name + (s.group?(' · '+s.group):'')) : (s.name || s.username);
+              o.dataset.lbl = (role==='student') ? s.name : (s.name || s.username);
+              pick.appendChild(o);
+            });
+            pick.style.display = 'inline-block';
+            btn.style.display = 'inline-flex';
+          });
+      }, 250);
+    });
+  }
+  attachAutocomplete('cu-add-student','cu-pick-student','cu-add-student-btn','student');
+  attachAutocomplete('cu-add-parent', 'cu-pick-parent', 'cu-add-parent-btn', 'parent');
+
+  // ── Tag management ──────────────────────────────────────────────
+  function renderTags(kind){
+    var box = document.getElementById('cu-tags-'+kind);
+    box.innerHTML = TAGS[kind].map(function(t, i){
+      var dl = (t.can_download === null)
+        ? '<label class="dlt"><input type="checkbox" class="cu-cd" data-kind="'+kind+'" data-i="'+i+'" '+(t.inferred?'checked':'')+'>تحميل</label>'
+        : '<label class="dlt"><input type="checkbox" class="cu-cd" data-kind="'+kind+'" data-i="'+i+'" '+(t.can_download?'checked':'')+'>تحميل</label>';
+      return '<span class="assign-tag"><span class="lbl">'+escapeHtml(t.label)+'</span>'+ dl +
+             '<button class="x" type="button" onclick="cuDelTag(\''+kind+'\','+i+')">×</button></span>';
+    }).join('');
+    box.querySelectorAll('.cu-cd').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var k = cb.dataset.kind;
+        var idx = parseInt(cb.dataset.i,10);
+        if(!isNaN(idx) && TAGS[k][idx]){ TAGS[k][idx].can_download = cb.checked; }
+      });
+    });
+    refreshPreview();
+  }
+  function refreshPreview(){
+    var p = document.getElementById('cu-preview');
+    var ng=TAGS.group.length, ns=TAGS.student.length, npp=TAGS.parent.length, nt=TAGS.teacher.length;
+    if(ng+ns+npp+nt === 0){
+      p.textContent = 'لا يوجد مُستفيدون حتى الآن. أضف على الأقل مجموعة أو طالباً.';
+    } else {
+      p.textContent = 'سيظهر الملف لـ ' + ng + ' مجموعة + ' + ns + ' طالب + ' + npp + ' ولي أمر + ' + nt + ' معلمة';
+    }
+  }
+  window.cuAddTarget = function(kind){
+    var defaultDl = document.querySelector('input[name="cu-dl"]:checked');
+    var inheritDownload = (defaultDl && defaultDl.value === 'allowed');
+    if(kind === 'group'){
+      var sel = document.getElementById('cu-add-group');
+      var v = sel.value; if(!v) return;
+      if(TAGS.group.some(function(t){return t.id===v;})) return;
+      TAGS.group.push({id:v, label:v, can_download:null, inferred:inheritDownload});
+      sel.value = '';
+    } else if(kind === 'teacher'){
+      var sel = document.getElementById('cu-add-teacher');
+      var v = sel.value; if(!v) return;
+      var lbl = sel.options[sel.selectedIndex].dataset.lbl || sel.options[sel.selectedIndex].textContent;
+      if(TAGS.teacher.some(function(t){return String(t.id)===String(v);})) return;
+      TAGS.teacher.push({id:String(v), label:lbl, can_download:null, inferred:inheritDownload});
+      sel.value = '';
+    } else if(kind === 'student' || kind === 'parent'){
+      var pick = document.getElementById(kind==='student'?'cu-pick-student':'cu-pick-parent');
+      var v = pick.value; if(!v) return;
+      var lbl = pick.options[pick.selectedIndex].dataset.lbl || pick.options[pick.selectedIndex].textContent;
+      if(TAGS[kind].some(function(t){return String(t.id)===String(v);})) return;
+      TAGS[kind].push({id:String(v), label:lbl, can_download:null, inferred:inheritDownload});
+      pick.style.display='none';
+      document.getElementById(kind==='student'?'cu-add-student-btn':'cu-add-parent-btn').style.display='none';
+      document.getElementById(kind==='student'?'cu-add-student':'cu-add-parent').value='';
+    }
+    renderTags(kind);
+  };
+  window.cuDelTag = function(kind, i){
+    TAGS[kind].splice(i,1); renderTags(kind);
+  };
+
+  // ── Modal control ───────────────────────────────────────────────
+  window.cuOpenUpload = function(){
+    EDIT_ID = null;
+    document.getElementById('cu-mod-title').textContent = '📤 رفع منهج جديد';
+    document.getElementById('cu-title').value = '';
+    document.getElementById('cu-desc').value  = '';
+    document.getElementById('cu-file').value  = '';
+    document.querySelector('input[name="cu-dl"][value="allowed"]').checked = true;
+    document.getElementById('cu-file-field').style.display = '';
+    TAGS = {group:[], student:[], parent:[], teacher:[]};
+    ['group','student','parent','teacher'].forEach(renderTags);
+    refreshPreview();
+    document.getElementById('cu-mod-back').classList.add('show');
+  };
+  window.cuOpenEdit = function(id){
+    EDIT_ID = id;
+    document.getElementById('cu-mod-title').textContent = '✏️ تعديل المنهج';
+    document.getElementById('cu-file-field').style.display = 'none';
+    fetch('/api/curriculum/'+id, {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j || !j.ok){ toast(j&&j.error||'تعذر التحميل', true); return; }
+        var e = j.entry || {};
+        document.getElementById('cu-title').value = e.title || '';
+        document.getElementById('cu-desc').value  = e.description || '';
+        var dlVal = e.download_default || 'allowed';
+        document.querySelector('input[name="cu-dl"][value="'+dlVal+'"]').checked = true;
+        TAGS = {group:[], student:[], parent:[], teacher:[]};
+        (e.assignments||[]).forEach(function(a){
+          var t = (a.target_type||'').trim().toLowerCase();
+          if(['group','student','parent','teacher'].indexOf(t)<0) return;
+          var cd = a.can_download;
+          TAGS[t].push({
+            id: String(a.target_id),
+            label: String(a.target_id),
+            can_download: (cd === null || cd === undefined) ? null : !!parseInt(cd,10),
+            inferred: dlVal === 'allowed'
+          });
+        });
+        ['group','student','parent','teacher'].forEach(renderTags);
+        refreshPreview();
+        document.getElementById('cu-mod-back').classList.add('show');
+      });
+  };
+  window.cuCloseModal = function(){
+    document.getElementById('cu-mod-back').classList.remove('show');
+    EDIT_ID = null;
+  };
+
+  function buildAssignmentsArray(){
+    var out = [];
+    ['group','student','parent','teacher'].forEach(function(k){
+      TAGS[k].forEach(function(t){
+        out.push({
+          target_type: k,
+          target_id: t.id,
+          can_download: (t.can_download === null || t.can_download === undefined) ? null : !!t.can_download
+        });
+      });
+    });
+    return out;
+  }
+
+  window.cuSave = function(){
+    var title = document.getElementById('cu-title').value.trim();
+    var desc  = document.getElementById('cu-desc').value.trim();
+    var dl    = (document.querySelector('input[name="cu-dl"]:checked')||{}).value || 'allowed';
+    if(!title){ toast('العنوان مطلوب', true); return; }
+    var assigns = buildAssignmentsArray();
+    var btn = document.getElementById('cu-save-btn');
+    btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...';
+    if(EDIT_ID){
+      fetch('/api/curriculum/'+EDIT_ID, {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify({title:title, description:desc, download_default:dl, assignments:assigns})
+      }).then(function(r){return r.json();}).then(function(j){
+        btn.disabled = false; btn.textContent = '💾 حفظ';
+        if(!j || !j.ok){ toast(j&&j.error||'تعذر الحفظ', true); return; }
+        toast('تم الحفظ ✓');
+        cuCloseModal();
+        loadList();
+      }).catch(function(){
+        btn.disabled=false; btn.textContent='💾 حفظ'; toast('خطأ في الاتصال', true);
+      });
+    } else {
+      var f = document.getElementById('cu-file').files[0];
+      if(!f){ btn.disabled=false; btn.textContent='💾 حفظ'; toast('يجب اختيار ملف PDF', true); return; }
+      var fd = new FormData();
+      fd.append('title', title);
+      fd.append('description', desc);
+      fd.append('download_default', dl);
+      fd.append('assignments', JSON.stringify(assigns));
+      fd.append('pdf_file', f);
+      fetch('/api/curriculum/upload', {method:'POST', credentials:'include', body:fd})
+        .then(function(r){return r.json();}).then(function(j){
+          btn.disabled = false; btn.textContent = '💾 حفظ';
+          if(!j || !j.ok){ toast(j&&j.error||'تعذر الرفع', true); return; }
+          toast('تم رفع المنهج ✓');
+          cuCloseModal();
+          loadList();
+        }).catch(function(){
+          btn.disabled=false; btn.textContent='💾 حفظ'; toast('خطأ في الرفع', true);
+        });
+    }
+  };
+
+  // ── Beneficiaries view ──────────────────────────────────────────
+  window.cuOpenWho = function(id){
+    fetch('/api/curriculum/'+id, {credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        var box = document.getElementById('cu-who-body');
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>';
+          document.getElementById('cu-who-back').classList.add('show'); return; }
+        var e = j.entry || {};
+        var assigns = e.assignments || [];
+        var typeLabel = {group:'مجموعة', student:'طالبة', parent:'ولي أمر', teacher:'معلمة'};
+        var html = '<div style="margin-bottom:14px;font-size:.92rem;"><b>الإذن الافتراضي:</b> '+
+                   (e.download_default==='allowed'?'السماح بالتحميل':'للقراءة فقط')+'</div>';
+        if(!assigns.length){
+          html += '<div class="empty">لا يوجد مُستفيدون مخصصون.</div>';
+        } else {
+          html += '<div style="max-height:40vh;overflow:auto;">';
+          assigns.forEach(function(a){
+            var cd = a.can_download;
+            var dlNote = (cd === null) ? 'الافتراضي' : (parseInt(cd,10)?'تحميل':'قراءة فقط');
+            html += '<div class="access-row"><span class="who">'+escapeHtml(typeLabel[a.target_type]||a.target_type)+
+                    ': '+escapeHtml(a.target_id)+'</span>'+
+                    '<span class="when">'+escapeHtml(dlNote)+'</span></div>';
+          });
+          html += '</div>';
+        }
+        var logs = e.recent_access || [];
+        html += '<h4 style="margin-top:18px;color:#4a148c;">📊 سجل الاطّلاع (آخر 50)</h4>';
+        if(!logs.length){
+          html += '<div class="empty">لا يوجد سجل بعد.</div>';
+        } else {
+          html += '<div style="max-height:30vh;overflow:auto;">';
+          logs.forEach(function(l){
+            var ac = (l.action === 'download') ? 'تحميل' : 'عرض';
+            var cls = (l.action === 'download') ? 'download' : '';
+            html += '<div class="access-row">'+
+                    '<span class="who">'+escapeHtml(l.user_label||'-')+'</span>'+
+                    '<span class="act '+cls+'">'+escapeHtml(ac)+'</span>'+
+                    '<span class="when">'+escapeHtml((l.accessed_at||'').slice(0,16))+'</span></div>';
+          });
+          html += '</div>';
+        }
+        box.innerHTML = html;
+        document.getElementById('cu-who-back').classList.add('show');
+      });
+  };
+  window.cuCloseWho = function(){ document.getElementById('cu-who-back').classList.remove('show'); };
+
+  // ── Viewer (admins use the same /portal/curriculum/view route) ──
+  window.cuOpenViewer = function(id){
+    window.open('/portal/curriculum/view/' + id, '_blank');
+  };
+
+  // ── Delete ──────────────────────────────────────────────────────
+  var DEL_ID = null;
+  window.cuOpenDel = function(id){
+    DEL_ID = id;
+    document.getElementById('cu-del-back').classList.add('show');
+  };
+  window.cuCloseDel = function(){
+    document.getElementById('cu-del-back').classList.remove('show');
+    DEL_ID = null;
+  };
+  document.getElementById('cu-del-yes').onclick = function(){
+    if(!DEL_ID) return;
+    fetch('/api/curriculum/'+DEL_ID, {method:'DELETE', credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j && j.ok){ toast('تم الحذف ✓'); cuCloseDel(); loadList(); }
+        else { toast(j&&j.error||'تعذر الحذف', true); }
+      });
+  };
+
+  // Bootstrap
+  loadGroupsDD();
+  loadTeachersDD();
+  loadList();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/curriculum')
+@login_required
+def admin_curriculum_page():
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return redirect("/dashboard")
+    return ADMIN_CURRICULUM_HTML
 
 
 # ── /admin/evaluations — admin oversight + send-to-parent ──────────
