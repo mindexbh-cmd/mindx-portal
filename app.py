@@ -785,6 +785,7 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_attendance', 'اسم ورقة سجل الغياب', 'سجل الغياب'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_payment_log', 'اسم ورقة تفاصيل الدفع', 'تفاصيل الدفع'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_student_groups', 'اسم ورقة معلومات المجموعات', 'معلومات المجموعات (يدوي)'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_students', 'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'))
     except Exception:
         pass
     # ── permissions_v1: granular per-button + per-user permission system
@@ -1608,6 +1609,40 @@ if True:
                     pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("drive_settings_seed_v1",))
+        except Exception:
+            pass
+
+    # ── drive_settings_students_v1: add the students sheet name to
+    # integrations settings so the new "☁ استيراد من Drive" button on
+    # /database (sec-students) can resolve a sheet name without
+    # a hardcoded fallback. Idempotent via ON CONFLICT DO NOTHING —
+    # re-runs are no-ops once the row exists. Separate migration tag
+    # from drive_settings_seed_v1 because that one already ran on
+    # production and stamping it again would be a no-op (and we need
+    # this row to land even on DBs where v1 is already applied).
+    if "drive_settings_students_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ('integrations', 'drive_sheet_students',
+                 'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'),
+            )
+        except Exception:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                    ('integrations', 'drive_sheet_students',
+                     'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'),
+                )
+            except Exception:
+                pass
+        try:
+            db2.execute(
+                "INSERT INTO schema_migrations(tag) VALUES(?)",
+                ("drive_settings_students_v1",),
+            )
+            db2.commit()
         except Exception:
             pass
 
@@ -16445,7 +16480,11 @@ function updateAttendanceColumnLabel() {
     { sectionId:'sec-groups', table:'student_groups',
       label:'معلومات المجموعات', sheetKey:'drive_sheet_student_groups',
       countId:'groupsTotalCount',
-      refresh:function(){ try{ if(typeof loadGroups2==='function') loadGroups2(); }catch(_){} } }
+      refresh:function(){ try{ if(typeof loadGroups2==='function') loadGroups2(); }catch(_){} } },
+    { sectionId:'sec-students', table:'students',
+      label:'قاعدة بيانات الطلبة', sheetKey:'drive_sheet_students',
+      countId:'totalCount',
+      refresh:function(){ try{ if(typeof loadStudents==='function') loadStudents(); }catch(_){} } }
   ];
 
   function injectButton(spec){
@@ -36815,6 +36854,146 @@ _DRIVE_SHEET_MAP = {
         "عدد الحصص الاونلاين (تلقائي)":                       "online_sessions_count",
         "عدد الطلاب":                                         "student_count",
     },
+    "students": {
+        # Each English col_key keeps its primary-form Arabic header from
+        # column_labels (HTML-entity-decoded), plus widely-used alt
+        # phrasings the admin's sheet might use. _grp_norm folds
+        # ا/أ/إ/آ/ى/ة/diacritic/NBSP variants symmetrically, so each
+        # spelling family only needs ONE static entry. Live labels from
+        # column_labels are merged in at request time by
+        # _drive_build_header_lookup so a rename in /database is honoured.
+
+        # personal_id ── الرقم الشخصي
+        "الرقم الشخصي":                                       "personal_id",
+        "البطاقة الشخصية":                                    "personal_id",
+        "رقم البطاقة":                                        "personal_id",
+        "الرقم":                                              "personal_id",
+
+        # student_name ── اسم الطالب
+        "اسم الطالب":                                         "student_name",
+        "اسم الطالبة":                                        "student_name",
+        "الاسم":                                              "student_name",
+
+        # whatsapp ── هاتف الواتساب المعتمد
+        "هاتف الواتساب المعتمد":                              "whatsapp",
+        "هاتف الواتساب":                                      "whatsapp",
+        "الواتساب":                                           "whatsapp",
+        "رقم الواتساب":                                       "whatsapp",
+        "هاتف الطالب":                                        "whatsapp",
+        "رقم الطالب":                                         "whatsapp",
+
+        # class_name ── الصف
+        "الصف":                                               "class_name",
+        "المرحلة":                                            "class_name",
+        "الصف الدراسي":                                       "class_name",
+
+        # old_new_2026 ── قديم جديد 2026
+        "قديم جديد 2026":                                     "old_new_2026",
+        "قديم/جديد 2026":                                     "old_new_2026",
+        "قديم - جديد 2026":                                   "old_new_2026",
+
+        # registration_term2_2026 ── تسجيل الفصل الثاني 2026
+        "تسجيل الفصل الثاني 2026":                            "registration_term2_2026",
+        "تسجيل الفصل الثاني":                                 "registration_term2_2026",
+        "تم التسجيل":                                         "registration_term2_2026",
+        "مسجل":                                               "registration_term2_2026",
+
+        # group_name_student ── المجموعة (in-person)
+        "المجموعة":                                           "group_name_student",
+        "اسم المجموعة":                                       "group_name_student",
+        "مجموعة الطالب":                                      "group_name_student",
+        "المجموعة الحضورية":                                  "group_name_student",
+
+        # group_online ── المجموعة (الاونلاين)
+        "المجموعة (الاونلاين)":                               "group_online",
+        "المجموعة الأونلاين":                                 "group_online",
+        "المجموعة أونلاين":                                   "group_online",
+        "مجموعة الأونلاين":                                   "group_online",
+        "المجموعة (أونلاين)":                                 "group_online",
+
+        # final_result ── النتيجة النهائية (تحديد المستوى 2026)
+        "النتيجة النهائية (تحديد المستوى 2026)":              "final_result",
+        "النتيجة النهائية":                                   "final_result",
+        "النتيجة":                                            "final_result",
+
+        # level_reached_2026 ── الى اين وصل الطالب 2026
+        "الى اين وصل الطالب 2026":                            "level_reached_2026",
+        "إلى أين وصل الطالب 2026":                            "level_reached_2026",
+        "إلى أين وصل":                                        "level_reached_2026",
+        "الى اين وصل":                                        "level_reached_2026",
+
+        # suitable_level_2026 ── هل الطالب مناسب لهذا المستوى 2026؟
+        "هل الطالب مناسب لهذا المستوى 2026؟":                 "suitable_level_2026",
+        "هل الطالب مناسب لهذا المستوى 2026":                  "suitable_level_2026",
+        "مناسب للمستوى":                                      "suitable_level_2026",
+
+        # books_received ── استلام الكتب
+        "استلام الكتب":                                       "books_received",
+        "تم استلام الكتب":                                    "books_received",
+
+        # teacher_2026 ── المدرس 2026
+        "المدرس 2026":                                        "teacher_2026",
+        "المدرّس 2026":                                       "teacher_2026",
+        "المدرسة 2026":                                       "teacher_2026",
+        "اسم المدرس":                                         "teacher_2026",
+
+        # installment1..5 ── القسط الاول/الثاني/الثالث/الرابع/الخامس
+        "القسط الاول 2026":                                   "installment1",
+        "القسط الأول 2026":                                   "installment1",
+        "القسط الاول":                                        "installment1",
+        "القسط الأول":                                        "installment1",
+        "القسط 1":                                            "installment1",
+
+        "القسط الثاني":                                       "installment2",
+        "القسط 2":                                            "installment2",
+
+        "القسط الثالث":                                       "installment3",
+        "القسط 3":                                            "installment3",
+
+        "القسط الرابع":                                       "installment4",
+        "القسط 4":                                            "installment4",
+
+        "القسط الخامس":                                       "installment5",
+        "القسط 5":                                            "installment5",
+
+        # phones
+        "هاتف الام":                                          "mother_phone",
+        "هاتف الأم":                                          "mother_phone",
+        "رقم الام":                                           "mother_phone",
+        "رقم الأم":                                           "mother_phone",
+
+        "هاتف الاب":                                          "father_phone",
+        "هاتف الأب":                                          "father_phone",
+        "رقم الاب":                                           "father_phone",
+        "رقم الأب":                                           "father_phone",
+
+        "هاتف اخر":                                           "other_phone",
+        "هاتف آخر":                                           "other_phone",
+        "هاتف ولي الأمر":                                     "other_phone",
+        "رقم ولي الأمر":                                      "other_phone",
+        "هاتف ولي الامر":                                     "other_phone",
+        "رقم ولي الامر":                                      "other_phone",
+        "الهاتف":                                             "other_phone",
+        "رقم الهاتف":                                         "other_phone",
+
+        # address fields
+        "مكان السكن":                                         "residence",
+        "السكن":                                              "residence",
+        "المنطقة":                                            "residence",
+
+        "عنوان المنزل":                                       "home_address",
+        "العنوان":                                            "home_address",
+
+        "الطريق":                                             "road",
+
+        "المجمع":                                             "complex_name",
+        "المجمع السكني":                                      "complex_name",
+
+        # installment_type ── اختيار نوع التقسيط
+        "اختيار نوع التقسيط":                                 "installment_type",
+        "نوع التقسيط":                                        "installment_type",
+        "طريقة التقسيط":                                      "installment_type",
+    },
 }
 
 
@@ -37270,12 +37449,16 @@ def api_import():
     return jsonify(payload), status
 
 
-# ─── Drive published-sheets import (Phase C3) ──────────────────────────
+# ─── Drive published-sheets import (Phase C3 + students Phase E) ──────
 # Whitelist of tables the /api/import/from-drive endpoint will touch.
 # Anything else is rejected with 403. attendance / payment_log /
-# student_groups are the three tables whose Drive sheet names are
-# seeded in settings (integrations.drive_sheet_*) at C1.
-_DRIVE_IMPORT_ALLOWED = {"attendance", "payment_log", "student_groups"}
+# student_groups have Drive sheet names seeded by drive_settings_seed_v1
+# (C1); students gets its sheet name seeded by drive_settings_students_v1
+# (Phase E). The students table is in _TRUNCATE_PROTECTED so it can
+# never be wiped through the truncate UI, but it CAN be imported here
+# because the import is upsert (no DELETE) on personal_id and is gated
+# behind admin role + type-to-confirm.
+_DRIVE_IMPORT_ALLOWED = {"attendance", "payment_log", "student_groups", "students"}
 
 
 @app.route('/api/import/from-drive', methods=['POST'])
