@@ -36082,6 +36082,8 @@ IMPORT_TABLE_FIELDS = {
         "session_minutes_normal",
         "hours_in_person_auto","hours_online_only","hours_all_online",
         "total_required_hours",
+        "study_days","online_days","hours_session",
+        "online_time_normal","online_time_ramadan",
     ],
     "attendance": [
         "attendance_date","day_name","group_name","student_name","contact_number",
@@ -36245,6 +36247,167 @@ def _import_coerce_by_type(value, col_type):
         return False, value, "قيمة منطقية غير صالحة"
     # قائمة منسدلة and تقييم etc. — accept as text.
     return True, value, ""
+
+
+# ─── Drive published-sheets import (Phase C2) ──────────────────────────
+# Maps the Arabic header in each Drive sheet tab to the English field
+# key it should land on inside the matching DB table. Headers are
+# matched after whitespace-folding only (no Arabic letter normalisation
+# — admin-controlled sheets are stable enough). A value of None means
+# "skip this column" (e.g. a parental link with no DB home).
+_DRIVE_SHEET_MAP = {
+    "attendance": {
+        "التاريخ":                          "attendance_date",
+        "اليوم":                                      "day_name",
+        "المجموعة":                    "group_name",
+        "اسم الطالب":             "student_name",
+        "رقم التواصل":       "contact_number",
+        "الحالة":                                "status",
+        "الرسالة":                          "message",
+        "الرابط":                                None,
+        "حالة الرسالة": "message_status",
+    },
+    "payment_log": {
+        "الاسم":                                                       "student_name",
+        "الرقم الشخصي":                  "personal_id",
+        "حالة التسجيل":                  "registration_status",
+        "مبلغ الدورة":                        "course_amount",
+        "القسط 1":                                                     "inst1",
+        "القسط 1 للرسالة":          "msg1",
+        "القسط 2":                                                     "inst2",
+        "القسط 2 للرسالة":          "msg2",
+        "القسط 3":                                                     "inst3",
+        "القسط 3 للرسالة":          "msg3",
+        "القسط 4":                                                     "inst4",
+        "القسط 4 للرسالة":          "msg4",
+        "القسط 5":                                                     "inst5",
+        "القسط 5 للرسالة":          "msg5",
+        "المبلغ المدفوع":      "total_paid",
+        "المبلغ المتبقي":      "total_remaining",
+        "حالة المدفوعات":      "payment_status",
+    },
+    "student_groups": {
+        "اسم المجموعة":                                                                       "group_name",
+        "اسم المعلم":                                                                                   "teacher_name",
+        "المستوى":                                                                                                "level_course",
+        "آخر مرحلة":                                                                                         "last_reached",
+        "وقت الدراسة":                                                                             "study_time",
+        "أيام الدراسة":                                                                       "study_days",
+        "توقيت رمضان":                                                                             "ramadan_time",
+        "توقيت الأونلاين":                                                     "online_time",
+        "أيام الأونلاين":                                                           "online_days",
+        "ساعات الجلسة":                                                                       "hours_session",
+        "توقيت الأونلاين العادي":                "online_time_normal",
+        "توقيت الأونلاين في رمضان":         "online_time_ramadan",
+    },
+}
+
+
+def _drive_fetch_xlsx(url):
+    """Fetch a Google Sheets published workbook as raw XLSX bytes.
+
+    Accepts the `/pubhtml` URL produced by File -> Publish to web and
+    rewrites it to `/pub?output=xlsx` so Google returns the binary.
+    Stdlib only (urllib.request) -- no new dependency. 60s timeout.
+    Raises RuntimeError on any failure so the endpoint can surface one
+    Arabic error to the user instead of leaking a stacktrace. Pure:
+    no DB, no Flask context, no module globals.
+    """
+    import urllib.request, urllib.error
+    if not url or not isinstance(url, str):
+        raise RuntimeError("missing drive workbook url")
+    base = url.split("?", 1)[0].split("#", 1)[0]
+    if base.endswith("/pubhtml"):
+        xurl = base[: -len("/pubhtml")] + "/pub?output=xlsx"
+    elif base.endswith("/pub"):
+        xurl = base + "?output=xlsx"
+    else:
+        sep = "&" if "?" in url else "?"
+        xurl = url + sep + "output=xlsx"
+    try:
+        req = urllib.request.Request(xurl, headers={"User-Agent": "mindx-portal/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            status = getattr(resp, "status", 200)
+            if status != 200:
+                raise RuntimeError("http " + str(status))
+            data = resp.read()
+    except urllib.error.URLError as ex:
+        raise RuntimeError("network error: " + str(getattr(ex, "reason", ex))[:120])
+    except RuntimeError:
+        raise
+    except Exception as ex:
+        raise RuntimeError("fetch failed: " + str(ex)[:120])
+    if not data or len(data) < 4 or data[:2] != b"PK":
+        raise RuntimeError(
+            "response is not an xlsx workbook (sheet may be unpublished or url wrong)"
+        )
+    return data
+
+
+def _drive_extract_rows(table, xlsx_bytes, sheet_name):
+    """Parse the named sheet from the in-memory XLSX bytes and return a
+    list of row-dicts keyed by the English field names declared in
+    `_DRIVE_SHEET_MAP[table]`.
+
+    Cells whose header is not in the map (or maps to None) are dropped.
+    Empty rows are skipped. NO value-side normalisation here -- that is
+    `_import_normalize_value`'s job inside the import pipeline, so the
+    same fold/date/status rules apply for every entry path.
+    """
+    import io as _io
+    from openpyxl import load_workbook
+    header_map = _DRIVE_SHEET_MAP.get(table)
+    if header_map is None:
+        raise RuntimeError("no Drive header map for table " + str(table))
+    try:
+        wb = load_workbook(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    except Exception as ex:
+        raise RuntimeError("xlsx parse failed: " + str(ex)[:120])
+    titles = [ws.title for ws in wb.worksheets]
+    if sheet_name not in titles:
+        try: wb.close()
+        except Exception: pass
+        raise RuntimeError(
+            "sheet not found: " + str(sheet_name)
+            + " (available: " + ", ".join(titles) + ")"
+        )
+    ws = wb[sheet_name]
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header = next(rows_iter)
+    except StopIteration:
+        try: wb.close()
+        except Exception: pass
+        return []
+    col_keys = []
+    for cell in header:
+        raw = "" if cell is None else str(cell)
+        key = " ".join(raw.split())
+        col_keys.append(header_map.get(key))
+    out = []
+    for row in rows_iter:
+        if row is None:
+            continue
+        rec = {}
+        any_val = False
+        for idx, val in enumerate(row):
+            if idx >= len(col_keys):
+                break
+            fk = col_keys[idx]
+            if not fk:
+                continue
+            if val is None:
+                rec[fk] = ""
+                continue
+            sval = str(val)
+            if sval.strip():
+                any_val = True
+            rec[fk] = sval
+        if any_val:
+            out.append(rec)
+    try: wb.close()
+    except Exception: pass
+    return out
 
 
 IMPORT_TABLE_SQL = {
