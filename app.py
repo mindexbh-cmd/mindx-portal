@@ -1611,6 +1611,79 @@ if True:
         except Exception:
             pass
 
+    # ── cleanup_studentgroups_placeholders_v1: one-shot removal of
+    # placeholder rows inserted by an earlier Drive import that didn't
+    # validate the primary key. The Drive sheet had 4 rows at the
+    # bottom with group_name = " -  -  -  - " (only dashes/whitespace)
+    # that the old has_any row-skip let through (the dashes are truthy)
+    # so they got INSERTed with NULL/empty everywhere else. Going
+    # forward, _perform_import now skips these via
+    # _IMPORT_PK_PLACEHOLDER_RX, but the rows already in prod need
+    # this one-shot cleanup. Filter is done in Python so the same code
+    # works on SQLite and Postgres (no REGEXP/regex_matches dialect
+    # split). Pattern is conservative — an entire group_name made up of
+    # only whitespace + dash/dot/bullet variants — so real groups whose
+    # names happen to contain a hyphen (e.g. "Group A-B") are never
+    # touched.
+    if "cleanup_studentgroups_placeholders_v1" not in applied:
+        try:
+            _placeholder_rx = _re.compile(r'^[\s\-_\.·‒–—•−]*$')
+            _bad_ids = []
+            try:
+                _all_rows = db2.execute(
+                    "SELECT id, group_name FROM student_groups"
+                ).fetchall()
+            except Exception:
+                _all_rows = []
+            for _r in _all_rows:
+                _rid = _r[0] if hasattr(_r, "__getitem__") else None
+                _gn  = _r[1] if hasattr(_r, "__getitem__") else None
+                if _rid is None:
+                    continue
+                _gn_str = (_gn or "")
+                if not _gn_str.strip() or _placeholder_rx.match(_gn_str):
+                    _bad_ids.append(_rid)
+            if _bad_ids:
+                try:
+                    _del_placeholders = ",".join(["?"] * len(_bad_ids))
+                    db2.execute(
+                        "DELETE FROM student_groups WHERE id IN (" + _del_placeholders + ")",
+                        tuple(_bad_ids),
+                    )
+                    import sys as _sys_clean
+                    _sys_clean.stderr.write(
+                        "[cleanup_studentgroups_placeholders_v1] removed "
+                        + str(len(_bad_ids)) + " placeholder rows: ids=" + str(_bad_ids) + "\n"
+                    )
+                except Exception as _ex_del:
+                    import sys as _sys_clean
+                    _sys_clean.stderr.write(
+                        "[cleanup_studentgroups_placeholders_v1] DELETE failed: "
+                        + str(_ex_del) + "\n"
+                    )
+            else:
+                import sys as _sys_clean
+                _sys_clean.stderr.write(
+                    "[cleanup_studentgroups_placeholders_v1] no placeholder rows found — nothing to clean\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("cleanup_studentgroups_placeholders_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer:
+            try:
+                import sys as _sys_clean
+                _sys_clean.stderr.write(
+                    "[cleanup_studentgroups_placeholders_v1] outer error: "
+                    + str(_ex_outer) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -36387,6 +36460,18 @@ STATUS_REMAP = {
 }
 
 
+# Matches primary-key values that are empty/whitespace-only or only
+# contain placeholder punctuation: ASCII hyphen-minus, en-dash, em-dash,
+# figure-dash, minus-sign, underscore, dot, middle-dot, bullet, plus
+# spaces/tabs/newlines. Real group names always include Arabic letters
+# or digits so this regex never matches them. Drive sheets sometimes
+# have summary/separator rows like " -  -  -  - " at the bottom that
+# the bare has_any check lets through; this rejects them.
+_IMPORT_PK_PLACEHOLDER_RX = _re.compile(
+    r'^[\s\-_\.·‒–—•−]*$'
+)
+
+
 def _import_fold_whitespace(s):
     """Collapse leading/trailing + internal whitespace runs to a single
     space. Applied to every incoming text value so Excel cells that got an
@@ -36861,6 +36946,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     inserted = 0
     updated  = 0
     skipped  = 0
+    rows_skipped_empty = 0   # subset of `skipped` — placeholder/empty PK rows
     errors   = 0
     skip_reasons = []   # up to 20 entries
     last_error = ""
@@ -36884,8 +36970,24 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         has_any = any(v for v in norm.values())
         if not has_any:
             skipped += 1
+            rows_skipped_empty += 1
             _remember_skip(idx, "empty row")
             continue
+
+        # Reject rows whose primary key is empty/whitespace-only or
+        # only contains placeholder punctuation (dashes, dots, bullets).
+        # Drive sheets often have summary/separator rows at the bottom
+        # like " -  -  -  - " that the has_any check lets through (the
+        # dashes are truthy) which then get INSERTed as junk rows with
+        # NULL in every other column. Only enforced when the table
+        # declares a primary key in IMPORT_TABLE_KEYS.
+        if key_cols:
+            _pk_val = (norm.get(key_cols[0]) or "").strip()
+            if not _pk_val or _IMPORT_PK_PLACEHOLDER_RX.match(_pk_val):
+                skipped += 1
+                rows_skipped_empty += 1
+                _remember_skip(idx, "primary-key is empty/placeholder")
+                continue
 
         # Typed-column validation.
         bad_type_reason = ""
@@ -36955,6 +37057,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         "inserted": inserted,
         "updated":  updated,
         "skipped":  skipped,
+        "rows_skipped_empty": rows_skipped_empty,
         "errors":   errors,
         "received": len(rows),
         "skip_reasons": skip_reasons,
