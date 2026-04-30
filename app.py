@@ -13760,26 +13760,57 @@ function updateEditInstallmentDetail(val){
 }
 var allTaqseetData=[];
 async function loadStudents(){
-const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet').catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
-const sData=await sRes.json(); const cData=await cRes.json();
-allStudents=sData.students||[]; allColumns=cData.columns||[];
-/* /api/taqseet (v4+) returns {rows, schema}; older builds returned a
-   flat array. Normalise to an array so populateTaqseetDropdowns +
-   getTaqseetDetail keep working — without this the .forEach call
-   below throws "forEach is not a function" and renderTable(allStudents)
-   never runs, leaving the page empty. */
-var _tq = await tRes.json();
-allTaqseetData = Array.isArray(_tq) ? _tq : ((_tq && _tq.rows) || []);
-try { populateTaqseetDropdowns(); } catch(e){ console.error('populateTaqseetDropdowns failed:', e); }
-renderTable(allStudents);
-/* Count only ACTIVE students here — inactive ones still appear in the
-   table + the search modal, but the stat badge on the database page
-   reflects the same "registered for term 2" count the dashboard uses. */
-var _activeTotal = 0;
-for (var _i=0; _i<allStudents.length; _i++){ if (allStudents[_i].is_active !== false) _activeTotal++; }
-document.getElementById('totalCount').textContent=_activeTotal;
-buildTableHeader();
-applyFreezeToTable('students');
+console.log('[loadStudents] start');
+try {
+  const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet').catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
+  console.log('[loadStudents] HTTP statuses students=', sRes.status, 'columns=', cRes.status, 'taqseet=', tRes.status);
+  if (!sRes.ok) {
+    console.error('[loadStudents] /api/students failed:', sRes.status);
+    var bErr = document.getElementById('studentsBody');
+    if (bErr) bErr.innerHTML = '<tr><td colspan="30" class="no-data" style="color:#c62828;">تعذر تحميل الطلبة — HTTP ' + sRes.status + '. جرب Ctrl+F5.</td></tr>';
+    return;
+  }
+  if (!cRes.ok) {
+    console.error('[loadStudents] /api/columns failed:', cRes.status);
+    var bErr2 = document.getElementById('studentsBody');
+    if (bErr2) bErr2.innerHTML = '<tr><td colspan="30" class="no-data" style="color:#c62828;">تعذر تحميل أعمدة الطلبة — HTTP ' + cRes.status + '. جرب Ctrl+F5.</td></tr>';
+    return;
+  }
+  const sData=await sRes.json(); const cData=await cRes.json();
+  allStudents=sData.students||[]; allColumns=cData.columns||[];
+  console.log('[loadStudents] received', allStudents.length, 'students,', allColumns.length, 'columns; server count=', sData.count);
+  if (allStudents.length > 0) {
+    try {
+      var _firstKeys = Object.keys(allStudents[0]).join(',');
+      console.log('[loadStudents] first row keys:', _firstKeys);
+      console.log('[loadStudents] first row sample:', allStudents[0]);
+    } catch(_){}
+  }
+  /* /api/taqseet (v4+) returns {rows, schema}; older builds returned a
+     flat array. Normalise to an array so populateTaqseetDropdowns +
+     getTaqseetDetail keep working — without this the .forEach call
+     below throws "forEach is not a function" and renderTable(allStudents)
+     never runs, leaving the page empty. */
+  var _tq = await tRes.json();
+  allTaqseetData = Array.isArray(_tq) ? _tq : ((_tq && _tq.rows) || []);
+  try { populateTaqseetDropdowns(); } catch(e){ console.error('populateTaqseetDropdowns failed:', e); }
+  renderTable(allStudents);
+  /* Count only ACTIVE students here — inactive ones still appear in the
+     table + the search modal, but the stat badge on the database page
+     reflects the same "registered for term 2" count the dashboard uses. */
+  var _activeTotal = 0;
+  for (var _i=0; _i<allStudents.length; _i++){ if (allStudents[_i].is_active !== false) _activeTotal++; }
+  document.getElementById('totalCount').textContent=_activeTotal;
+  buildTableHeader();
+  applyFreezeToTable('students');
+  console.log('[loadStudents] done — rendered', allStudents.length, 'rows, active badge=', _activeTotal);
+} catch (err) {
+  console.error('[loadStudents] FAILED:', err);
+  try {
+    var bFail = document.getElementById('studentsBody');
+    if (bFail) bFail.innerHTML = '<tr><td colspan="30" class="no-data" style="color:#c62828;">خطأ في تحميل الطلبة — راجع الكونسول</td></tr>';
+  } catch(_){}
+}
 }
 function buildTableHeader(){
 var thead=document.querySelector('#studentsBody').closest('table').querySelector('thead tr');
@@ -19756,7 +19787,10 @@ def api_students_get():
         else:
             d["is_active"] = True
         out.append(d)
-    return jsonify({"students": out})
+    # `count` is purely diagnostic — frontend's loadStudents logs it
+    # alongside its own len(students) so we can spot serialization
+    # truncation (count != len) at a glance.
+    return jsonify({"students": out, "count": len(out)})
 
 def _students_live_columns(db):
     """Live `students` table columns minus system / auto fields. Used by
