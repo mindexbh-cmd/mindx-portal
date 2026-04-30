@@ -8,3 +8,10 @@ test_*.db
 # Each environment captures its own; nothing to track in git.
 static/docs/screenshots/*.png
 static/docs/screenshots/*.jpg
+
+# Local-only artifacts from import / cleanup operations.
+# Backups belong on the persistent disk in production, not in git.
+attendance_clean.csv
+backups/
+data/curriculum/
+*.sql
