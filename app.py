@@ -16186,6 +16186,244 @@ function updateAttendanceColumnLabel() {
   };
 })();
 </script>
+
+<!-- ── Import-from-Drive Modal (استيراد من Drive) ─────────────────────
+     Server-side endpoint: POST /api/import/from-drive
+     Hidden by default; opened by mxOpenDriveImportModal(spec). -->
+<div id="mxDriveImportModal" class="modal-bg" style="display:none;">
+  <div class="modal" style="max-width:580px;">
+    <h2 style="color:#0f766e;margin:0 0 12px;font-size:1.15rem;">
+      &#x2601;&#xFE0F; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; &#x645;&#x646; Drive
+    </h2>
+    <p id="mxDIBody" style="line-height:1.7;color:#333;margin:0 0 8px;"></p>
+    <div style="background:#f0fdfa;border-right:4px solid #14b8a6;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;color:#134e4a;line-height:1.7;">
+      &#x2713; &#x633;&#x64A;&#x62A;&#x645; &#x625;&#x646;&#x634;&#x627;&#x621; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x642;&#x628;&#x644; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;.<br>
+      &#x2713; &#x644;&#x646; &#x64A;&#x62A;&#x645; &#x645;&#x633;&#x62D; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x645;&#x648;&#x62C;&#x648;&#x62F;&#x629; &#x2014; &#x633;&#x64A;&#x62A;&#x645; &#x62A;&#x62D;&#x62F;&#x64A;&#x62B; &#x627;&#x644;&#x645;&#x637;&#x627;&#x628;&#x642;&#x627;&#x62A; &#x639;&#x644;&#x649; &#x627;&#x644;&#x645;&#x641;&#x62A;&#x627;&#x62D; &#x627;&#x644;&#x637;&#x628;&#x64A;&#x639;&#x64A; &#x648;&#x625;&#x636;&#x627;&#x641;&#x629; &#x627;&#x644;&#x62C;&#x62F;&#x64A;&#x62F;.
+    </div>
+    <p style="margin:0 0 6px;font-size:13px;color:#555;">
+      &#x627;&#x644;&#x648;&#x631;&#x642;&#x629; &#x627;&#x644;&#x645;&#x635;&#x62F;&#x631;: <b id="mxDISheet">&hellip;</b>
+    </p>
+    <p style="margin:0 0 6px;font-size:13px;color:#555;">
+      &#x639;&#x62F;&#x62F; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x62D;&#x627;&#x644;&#x64A;&#x629;: <b id="mxDIRowCount">&hellip;</b>
+    </p>
+    <p style="margin:0 0 6px;font-size:12px;color:#666;word-break:break-all;">
+      <span style="color:#999;">&#x631;&#x627;&#x628;&#x637; Drive: </span><span id="mxDIUrl" style="font-family:monospace;direction:ltr;">&hellip;</span>
+    </p>
+    <p style="margin:8px 0 6px;font-size:13px;color:#555;">
+      &#x644;&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;&#x60C; &#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; (<code id="mxDITblCode" style="font-family:monospace;color:#0f766e;background:#ccfbf1;padding:1px 6px;border-radius:4px;"></code>) &#x641;&#x64A; &#x627;&#x644;&#x62D;&#x642;&#x644; &#x623;&#x62F;&#x646;&#x627;&#x647;:
+    </p>
+    <input id="mxDIConfirmInput" type="text" autocomplete="off"
+           style="width:100%;padding:9px;border-radius:8px;border:1px solid #ccc;font-family:monospace;direction:ltr;margin-bottom:8px;box-sizing:border-box;">
+    <div id="mxDIProgress" style="display:none;font-size:13px;color:#0f766e;background:#ccfbf1;padding:8px 12px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button id="mxDICancelBtn" type="button" class="btn-add" style="background:#9e9e9e;margin-bottom:0;">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button id="mxDIConfirmBtn" type="button" class="btn-add" disabled style="background:linear-gradient(135deg,#10b981,#14b8a6);margin-bottom:0;opacity:0.5;cursor:not-allowed;">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Import-from-Drive (استيراد من Drive) — adds a green/teal button to
+   each whitelisted db-section toolbar. Pulls rows from the published
+   Drive workbook and feeds them through the same /api/import upsert
+   pipeline (no destructive wipe). Same admin role-gate as the truncate
+   button. Three sections only: attendance / payment_log / student_groups
+   (matches the C3 backend whitelist). */
+(function(){
+  var role = (document.body && document.body.dataset && document.body.dataset.role || '').toLowerCase();
+  if (role !== 'admin') return;
+
+  var SECTIONS = [
+    { sectionId:'sec-attendance', table:'attendance',
+      label:'سجل الغياب', sheetKey:'drive_sheet_attendance',
+      countId:'attendanceTotalCount',
+      refresh:function(){ try{ if(typeof loadAttendance==='function') loadAttendance(); }catch(_){} } },
+    { sectionId:'sec-paylog', table:'payment_log',
+      label:'سجل الدفع', sheetKey:'drive_sheet_payment_log',
+      countId:'paylogTotalCount',
+      refresh:function(){ try{ if(typeof loadPaymentLog==='function') loadPaymentLog(); }catch(_){} } },
+    { sectionId:'sec-groups', table:'student_groups',
+      label:'معلومات المجموعات', sheetKey:'drive_sheet_student_groups',
+      countId:'groupsTotalCount',
+      refresh:function(){ try{ if(typeof loadGroups2==='function') loadGroups2(); }catch(_){} } }
+  ];
+
+  function injectButton(spec){
+    var sec = document.getElementById(spec.sectionId);
+    if (!sec) return;
+    if (sec.querySelector('[data-mx-drive-import]')) return;
+    /* Same toolbar-locator as the truncate button so the new button
+       lands in the same row. The truncate IIFE runs first (source
+       order) and uses appendChild — we do the same, so this button
+       visually appears AFTER the truncate button. */
+    var bulkBtn = sec.querySelector('.btn-bulk-del');
+    var toolbar = bulkBtn ? bulkBtn.parentElement : null;
+    if (!toolbar) {
+      var divs = sec.querySelectorAll('div');
+      for (var i=0;i<divs.length;i++){
+        var s = (divs[i].getAttribute('style')||'');
+        if (s.indexOf('display:flex') >= 0 && divs[i].querySelector('button')){ toolbar = divs[i]; break; }
+      }
+    }
+    if (!toolbar) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-add';
+    btn.setAttribute('data-mx-drive-import', spec.table);
+    btn.setAttribute('title','استيراد كل صفوف الورقة من Drive (Upsert على المفتاح الطبيعي + نسخة احتياطية تلقائية)');
+    btn.style.background = 'linear-gradient(135deg,#10b981,#14b8a6)';
+    btn.style.marginBottom = '0';
+    btn.innerHTML = '&#x2601;&#xFE0F; استيراد من Drive';
+    btn.onclick = function(){ window.mxOpenDriveImportModal(spec); };
+    toolbar.appendChild(btn);
+  }
+
+  function injectAll(){ SECTIONS.forEach(injectButton); }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', injectAll);
+  else
+    injectAll();
+  setTimeout(injectAll, 1500);
+
+  /* Pull integration settings on each modal open so the URL/sheet
+     preview matches what the backend will use at confirm-time. */
+  function fetchIntegrationSettings(cb){
+    fetch('/api/settings', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var url='', sheets={};
+        var rows = (d && d.settings && d.settings.integrations) || [];
+        rows.forEach(function(row){
+          if (row.component === 'drive_workbook_url') url = row.value || '';
+          else if (row.component && row.component.indexOf('drive_sheet_') === 0)
+            sheets[row.component] = row.value || '';
+        });
+        cb(null, {url:url, sheets:sheets});
+      })
+      .catch(function(ex){ cb(ex, null); });
+  }
+
+  window.mxOpenDriveImportModal = function(spec){
+    var modal = document.getElementById('mxDriveImportModal');
+    var bodyP = document.getElementById('mxDIBody');
+    var sheet = document.getElementById('mxDISheet');
+    var rc    = document.getElementById('mxDIRowCount');
+    var urlEl = document.getElementById('mxDIUrl');
+    var code  = document.getElementById('mxDITblCode');
+    var inp   = document.getElementById('mxDIConfirmInput');
+    var prog  = document.getElementById('mxDIProgress');
+    var cancelBtn  = document.getElementById('mxDICancelBtn');
+    var confirmBtn = document.getElementById('mxDIConfirmBtn');
+    if (!modal || !bodyP || !inp || !confirmBtn) return;
+
+    bodyP.innerHTML = 'استيراد بيانات الجدول من Drive: <b></b>';
+    bodyP.querySelector('b').textContent = spec.label;
+    sheet.textContent = '…';
+    urlEl.textContent = '…';
+    rc.textContent = '…';
+    code.textContent = spec.table;
+    inp.value = '';
+    prog.style.display = 'none';
+    prog.style.color = '#0f766e';
+    prog.style.background = '#ccfbf1';
+    prog.textContent = '';
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+    confirmBtn.style.cursor = 'not-allowed';
+    cancelBtn.disabled = false;
+    modal.style.display = 'flex';
+    setTimeout(function(){ try{ inp.focus(); }catch(_){} }, 50);
+
+    /* Show the displayed count from the section's stat badge if present. */
+    try {
+      var countEl = spec.countId ? document.getElementById(spec.countId) : null;
+      if (countEl) {
+        var v = (countEl.textContent || '').trim();
+        if (v) rc.textContent = v;
+      }
+    } catch(_){}
+
+    /* Pull URL + sheet name preview from settings. */
+    fetchIntegrationSettings(function(err, conf){
+      if (err || !conf) {
+        urlEl.textContent = '(تعذر قراءة الإعدادات)';
+        sheet.textContent = '(غير محدد)';
+        return;
+      }
+      sheet.textContent = conf.sheets[spec.sheetKey] || '(غير محدد)';
+      var u = conf.url || '';
+      if (!u) {
+        urlEl.textContent = '(غير محدد)';
+      } else if (u.length > 90) {
+        urlEl.textContent = u.slice(0, 70) + '…' + u.slice(-15);
+      } else {
+        urlEl.textContent = u;
+      }
+    });
+
+    inp.oninput = function(){
+      var ok = (inp.value === spec.table);
+      confirmBtn.disabled = !ok;
+      confirmBtn.style.opacity = ok ? '1' : '0.5';
+      confirmBtn.style.cursor = ok ? 'pointer' : 'not-allowed';
+    };
+    cancelBtn.onclick = function(){ modal.style.display = 'none'; };
+    confirmBtn.onclick = function(){
+      if (inp.value !== spec.table) return;
+      confirmBtn.disabled = true;
+      cancelBtn.disabled = true;
+      prog.style.display = 'block';
+      prog.style.color = '#0f766e';
+      prog.style.background = '#ccfbf1';
+      prog.textContent = 'جاري إنشاء نسخة احتياطية…';
+      var hint = setTimeout(function(){
+        prog.textContent = 'جاري الاستيراد من Drive…';
+      }, 1200);
+      fetch('/api/import/from-drive', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body: JSON.stringify({table_name: spec.table, confirm_token: inp.value})
+      })
+      .then(function(r){ return r.json().then(function(d){ d._http=r.status; return d; }).catch(function(){ return {ok:false,error:'خطأ غير متوقع',_http:r.status}; }); })
+      .then(function(d){
+        clearTimeout(hint);
+        cancelBtn.disabled = false;
+        if (!d || !d.ok){
+          prog.style.color = '#c62828';
+          prog.style.background = '#ffebee';
+          prog.textContent = (d && d.error) || ('خطأ ' + (d&&d._http||'?'));
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+          return;
+        }
+        prog.style.color = '#1b5e20';
+        prog.style.background = '#e8f5e9';
+        var ins = (d.inserted|0), upd = (d.updated|0), skp = (d.skipped|0), errs = (d.errors|0);
+        prog.textContent = 'تم الاستيراد ✓ — أضيف ' + ins + '، حُدّث ' + upd + '، تُخطّي ' + skp + (errs ? '، أخطاء ' + errs : '');
+        try { spec.refresh && spec.refresh(); } catch(_){}
+        try {
+          var msg = 'استيراد من Drive: أضيف ' + ins + '، حُدّث ' + upd + '، تُخطّي ' + skp +
+                    (errs ? '، أخطاء ' + errs : '');
+          if (typeof showToast === 'function') showToast(msg, '#0f766e');
+        } catch(_){}
+        setTimeout(function(){ modal.style.display = 'none'; }, 2000);
+      })
+      .catch(function(){
+        clearTimeout(hint);
+        cancelBtn.disabled = false;
+        confirmBtn.disabled = false;
+        confirmBtn.style.opacity = '1';
+        prog.style.color = '#c62828';
+        prog.style.background = '#ffebee';
+        prog.textContent = 'خطأ في الاتصال بالخادم';
+      });
+    };
+  };
+})();
+</script>
 </body>
 </html>"""
 
