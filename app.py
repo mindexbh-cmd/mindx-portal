@@ -1684,6 +1684,132 @@ if True:
             except Exception:
                 pass
 
+    # ── backfill_studentgroups_days_v1: one-shot copy of `study_days`
+    # values into the admin's custom-labelled "أيام الدراسة" column
+    # (col_<timestamp>). Earlier Drive imports wrote only to the
+    # legacy `study_days` English-named column, but the admin's UI
+    # primarily reads the custom column (via _row_days_authoritative)
+    # and only falls back to study_days when the custom is empty for
+    # that row — so the admin sees blank days cells until they edit
+    # each row. This backfill copies the value across once so existing
+    # rows render correctly without re-importing. _grp_norm and
+    # _decode_arabic_entities aren't yet defined when this block runs
+    # at module-import time, so we do a small inline fold here that
+    # handles the alif / hamza / taa-marbuta variants the same way.
+    # Targeted UPDATE — never touches rows where the custom column is
+    # already populated, never touches rows with empty study_days.
+    if "backfill_studentgroups_days_v1" not in applied:
+        try:
+            import html as _html_b
+            import sys as _sys_b
+            # Inline fold: alif variants → ا, ى → ي, ة → ه, drop diacritics.
+            def _bfill_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":  # أ إ آ ٱ
+                        out.append("ا")
+                    elif c == "ى":                   # ى
+                        out.append("ي")
+                    elif c == "ة":                   # ة
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:           # diacritics
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+            _target = _bfill_fold("أيام الدراسة")  # أيام الدراسة
+            # Find the custom column key, if any.
+            _custom_col = None
+            try:
+                _live_cols_b = {row[1] for row in db2.execute("PRAGMA table_info(student_groups)").fetchall()}
+            except Exception:
+                _live_cols_b = set()
+            try:
+                _label_rows = db2.execute(
+                    "SELECT col_key, col_label FROM group_col_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows = []
+            import re as _re_b
+            _safe_rx = _re_b.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            for _r in _label_rows:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or _ck == "study_days":
+                    continue
+                if not _safe_rx.match(_ck):
+                    continue
+                if _ck not in _live_cols_b:
+                    continue
+                _decoded = _html_b.unescape(str(_cl)).strip()
+                if _bfill_fold(_decoded) == _target:
+                    _custom_col = _ck
+                    break
+            if not _custom_col:
+                _sys_b.stderr.write(
+                    "[backfill_studentgroups_days_v1] no custom أيام الدراسة column found; nothing to backfill\n"
+                )
+            else:
+                _q = '"' + _custom_col + '"'
+                try:
+                    _all_rows = db2.execute(
+                        "SELECT id, study_days, " + _q + " FROM student_groups"
+                    ).fetchall()
+                except Exception as _ex_sel:
+                    _all_rows = []
+                    _sys_b.stderr.write(
+                        "[backfill_studentgroups_days_v1] SELECT failed: "
+                        + str(_ex_sel) + "\n"
+                    )
+                _to_update = []
+                for _r in _all_rows:
+                    _rid = _r[0] if hasattr(_r, "__getitem__") else None
+                    _sd  = _r[1] if hasattr(_r, "__getitem__") else None
+                    _cv  = _r[2] if hasattr(_r, "__getitem__") else None
+                    if _rid is None:
+                        continue
+                    _sd_s = (_sd or "").strip()
+                    _cv_s = (_cv or "").strip()
+                    # Only fill when study_days has a value AND custom is empty.
+                    if _sd_s and not _cv_s:
+                        _to_update.append((_sd_s, _rid))
+                _filled = 0
+                for _v, _rid in _to_update:
+                    try:
+                        db2.execute(
+                            "UPDATE student_groups SET " + _q + " = ? WHERE id = ?",
+                            (_v, _rid),
+                        )
+                        _filled += 1
+                    except Exception:
+                        pass
+                if _filled:
+                    db2.commit()
+                _sys_b.stderr.write(
+                    "[backfill_studentgroups_days_v1] custom_col=" + _custom_col
+                    + " filled=" + str(_filled) + " of_candidates=" + str(len(_to_update)) + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_studentgroups_days_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer:
+            try:
+                import sys as _sys_b
+                _sys_b.stderr.write(
+                    "[backfill_studentgroups_days_v1] outer error: "
+                    + str(_ex_outer) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -36940,6 +37066,29 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     if not fields:
         return 400, {"ok": False, "error": "no matching columns in table " + table}
 
+    # Mirror student_groups days writes into the admin's custom-labelled
+    # "أيام الدراسة" column (col_<timestamp>) when one exists, in
+    # addition to the legacy `study_days` column. Without this, the
+    # admin UI shows the days column empty after import because it
+    # reads the custom column first via _row_days_authoritative and
+    # only falls back to study_days when the custom column is empty
+    # FOR THIS row — but a freshly-imported row always has that
+    # custom column NULL until the mirror happens. _groups_days_column
+    # returns 'study_days' when no custom column exists, so the
+    # equality check below is the no-mirror sentinel.
+    custom_days_col = None
+    if table == "student_groups" and "study_days" in live_cols:
+        try:
+            _resolved = _groups_days_column(db)
+            if (_resolved and _resolved != "study_days"
+                    and _resolved in live_cols
+                    and _resolved not in fields
+                    and _is_safe_ident(_resolved)):
+                custom_days_col = _resolved
+                fields = list(fields) + [custom_days_col]
+        except Exception:
+            custom_days_col = None
+
     key_cols = [k for k in IMPORT_TABLE_KEYS.get(table, []) if k in live_cols and _is_safe_ident(k)]
     col_types = _import_get_col_types(table)
 
@@ -36967,6 +37116,16 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         norm = {}
         for f in fields:
             norm[f] = _import_normalize_value(table, f, r.get(f))
+        # Mirror student_groups days value: incoming row dicts are keyed
+        # by English col_keys (study_days), but we ALSO want the value
+        # in the admin's custom-labelled col_<timestamp> column so the
+        # UI sees it immediately. Sources norm[study_days] directly so
+        # the value is the same post-normalisation form that lands in
+        # the legacy column.
+        if custom_days_col:
+            _days_val = norm.get("study_days") or ""
+            if _days_val:
+                norm[custom_days_col] = _days_val
         has_any = any(v for v in norm.values())
         if not has_any:
             skipped += 1
