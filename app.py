@@ -36540,7 +36540,12 @@ _DRIVE_SHEET_MAP = {
     },
     "student_groups": {
         # All 14 seeded group_col_labels labels (decoded from HTML
-        # entities) plus widely-used alt-phrasings.
+        # entities) plus widely-used alt-phrasings AND admin's actual
+        # Drive-sheet header phrasings (which are semantically richer
+        # than the seeded labels — e.g. "رابط بث المجموعة" instead of
+        # bare "رابط المجموعة"). _grp_norm folding handles ا/أ/إ/آ
+        # variants automatically, so each phrasing only needs one
+        # entry per spelling family.
         "اسم المجموعة":                                       "group_name",
         "اسم المدرس":                                         "teacher_name",
         "اسم المعلم":                                         "teacher_name",
@@ -36553,13 +36558,19 @@ _DRIVE_SHEET_MAP = {
         "توقيت رمضان":                                        "ramadan_time",
         "توقيت الاونلاين (العادي)":                           "online_time",
         "توقيت الأونلاين":                                    "online_time",
+        # Group link — sheet often uses "رابط بث المجموعة" (with بث)
+        # for the streaming-link column.
         "رابط المجموعة":                                      "group_link",
+        "رابط بث المجموعة":                                   "group_link",
         "الحصة بالدقيقة (يدوي)":                              "session_duration",
         "مدة الحصة بالدقيقة للوقت الاعتيادي (يدوي)":          "session_minutes_normal",
         "عدد الساعات الحضورية (تلقائي)":                      "hours_in_person_auto",
         "عدد ساعات الاونلاين فقط":                            "hours_online_only",
         "الساعات الدراسية كلها بالاونلاين":                   "hours_all_online",
+        # Total hours — admin's sheet uses bare "إجمالي الساعات",
+        # seeded label is the longer "إجمالي الساعات المستحقة".
         "إجمالي الساعات المستحقة":                            "total_required_hours",
+        "إجمالي الساعات":                                     "total_required_hours",
         # Days header writes to the legacy `study_days` column. The
         # custom-label "ايام الدراسة" col_<timestamp> column the admin
         # sees in the UI is NOT written by import — the read-side
@@ -36570,6 +36581,25 @@ _DRIVE_SHEET_MAP = {
         # tracked as a separate follow-up, not part of this fix.
         "ايام الدراسة":                                       "study_days",
         "أيام الدراسة":                                       "study_days",
+        # Headers below map to col_keys that DON'T currently exist in
+        # the student_groups schema (some were dropped by the
+        # else-branch migration, others were never added). The static
+        # alias keeps them out of `unmatched_headers`, but
+        # _perform_import's live_cols filter still drops the value at
+        # write-time so no fake column gets auto-created. Adding the
+        # backing columns is a separate follow-up that requires both
+        # init_db CREATE TABLE updates and an else-branch ALTER TABLE
+        # migration tag, plus group_col_labels seeds. Documented here
+        # so a future maintainer doesn't get confused when these keys
+        # appear in `fields_used` but never persist.
+        "أيام الاونلاين":                                     "online_days",
+        "توقيت الاونلاين (شهر رمضان)":                        "online_time_ramadan",
+        "الحصة بالدقيقة للاونلاين وشهر رمضان":                "session_minutes_online_ramadan",
+        "عدد الحصص الاجمالي (تلقائي)":                        "total_sessions_auto",
+        "عدد الحصص الحضورية قبل شهر رمضان و بعده (تلقائي)":   "in_person_sessions_normal",
+        "عدد الحصص الحضورية في شهر رمضان (تلقائي)":           "in_person_sessions_ramadan",
+        "عدد الحصص الاونلاين (تلقائي)":                       "online_sessions_count",
+        "عدد الطلاب":                                         "student_count",
     },
 }
 
