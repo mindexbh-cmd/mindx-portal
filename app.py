@@ -15951,6 +15951,204 @@ function updateAttendanceColumnLabel() {
   if(tw) fixScrollPassthrough(tw);
 })();
 </script>
+
+<!-- ── Fast Truncate Modal (تفريغ الجدول) ────────────────────────────
+     Server-side endpoint: POST /api/admin/table/truncate
+     Hidden by default; opened by mxOpenTruncateModal(spec). -->
+<div id="mxTruncateModal" class="modal-bg" style="display:none;">
+  <div class="modal" style="max-width:560px;">
+    <h2 style="color:#c62828;margin:0 0 12px;font-size:1.15rem;">&#x26A0;&#xFE0F; &#x62A;&#x641;&#x631;&#x64A;&#x63A; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</h2>
+    <p id="mxTruncBody" style="line-height:1.7;color:#333;margin:0 0 8px;"></p>
+    <div style="background:#fff8e1;border-right:4px solid #ff8f00;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;color:#5d4037;line-height:1.7;">
+      &#x2713; &#x633;&#x64A;&#x62A;&#x645; &#x625;&#x646;&#x634;&#x627;&#x621; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629; &#x62A;&#x644;&#x642;&#x627;&#x626;&#x64A;&#x627;&#x64B; &#x642;&#x628;&#x644; &#x627;&#x644;&#x62D;&#x630;&#x641;.<br>
+      &#x2713; &#x64A;&#x645;&#x643;&#x646;&#x643; &#x627;&#x633;&#x62A;&#x639;&#x627;&#x62F;&#x629; &#x627;&#x644;&#x628;&#x64A;&#x627;&#x646;&#x627;&#x62A; &#x644;&#x627;&#x62D;&#x642;&#x627;&#x64B; &#x645;&#x646; &#x627;&#x644;&#x646;&#x633;&#x62E;&#x629; &#x627;&#x644;&#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629;.
+    </div>
+    <p style="margin:0 0 6px;font-size:13px;color:#555;">
+      &#x639;&#x62F;&#x62F; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641; &#x627;&#x644;&#x62D;&#x627;&#x644;&#x64A;&#x629;: <b id="mxTruncRowCount">&hellip;</b>
+    </p>
+    <p style="margin:8px 0 6px;font-size:13px;color:#555;">
+      &#x644;&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62D;&#x630;&#x641;&#x60C; &#x627;&#x643;&#x62A;&#x628; &#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; (<code id="mxTruncTblCode" style="font-family:monospace;color:#c62828;background:#ffebee;padding:1px 6px;border-radius:4px;"></code>) &#x641;&#x64A; &#x627;&#x644;&#x62D;&#x642;&#x644; &#x623;&#x62F;&#x646;&#x627;&#x647;:
+    </p>
+    <input id="mxTruncConfirmInput" type="text" autocomplete="off"
+           style="width:100%;padding:9px;border-radius:8px;border:1px solid #ccc;font-family:monospace;direction:ltr;margin-bottom:8px;box-sizing:border-box;">
+    <div id="mxTruncProgress" style="display:none;font-size:13px;color:#1565C0;background:#e3f2fd;padding:8px 12px;border-radius:8px;margin-bottom:8px;line-height:1.5;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button id="mxTruncCancelBtn" type="button" class="btn-add" style="background:#9e9e9e;margin-bottom:0;">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button id="mxTruncConfirmBtn" type="button" class="btn-add" disabled style="background:#c62828;margin-bottom:0;opacity:0.5;cursor:not-allowed;">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x641;&#x631;&#x64A;&#x63A;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Fast Truncate (تفريغ الجدول) — adds a row-clear button to each
+   whitelisted db-section toolbar and wires it to the type-to-confirm
+   modal. Button is injected at runtime so the existing static markup
+   is untouched. /database is @admin_required server-side; the role
+   check below is defense-in-depth. */
+(function(){
+  var role = (document.body && document.body.dataset && document.body.dataset.role || '').toLowerCase();
+  if (role !== 'admin') return;
+
+  var SECTIONS = [
+    { sectionId:'sec-attendance', table:'attendance',
+      label:'سجل الغياب',
+      countId:'attendanceTotalCount',
+      refresh:function(){ try{ if(typeof loadAttendance==='function') loadAttendance(); }catch(_){} } },
+    { sectionId:'sec-paylog', table:'payment_log',
+      label:'سجل الدفع',
+      countId:'paylogTotalCount',
+      refresh:function(){ try{ if(typeof loadPaymentLog==='function') loadPaymentLog(); }catch(_){} } },
+    { sectionId:'sec-evals', table:'evaluations',
+      label:'التقييمات الشهرية',
+      countId:'evalsTotalCount',
+      refresh:function(){ try{ if(typeof loadEvaluations==='function') loadEvaluations(); }catch(_){} } },
+    { sectionId:'sec-groups', table:'student_groups',
+      label:'معلومات المجموعات',
+      countId:'groupsTotalCount',
+      refresh:function(){ try{ if(typeof loadGroups2==='function') loadGroups2(); }catch(_){} } }
+  ];
+
+  function injectButton(spec){
+    var sec = document.getElementById(spec.sectionId);
+    if (!sec) return;
+    if (sec.querySelector('[data-mx-truncate]')) return;
+    /* Toolbar = the row of buttons that contains the bulk-delete btn.
+       Falls back to the first flex row in the section. */
+    var bulkBtn = sec.querySelector('.btn-bulk-del');
+    var toolbar = bulkBtn ? bulkBtn.parentElement : null;
+    if (!toolbar) {
+      var divs = sec.querySelectorAll('div');
+      for (var i=0;i<divs.length;i++){
+        var s = (divs[i].getAttribute('style')||'');
+        if (s.indexOf('display:flex') >= 0 && divs[i].querySelector('button')){ toolbar = divs[i]; break; }
+      }
+    }
+    if (!toolbar) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-add';
+    btn.setAttribute('data-mx-truncate', spec.table);
+    btn.setAttribute('title','تفريغ كل صفوف الجدول بعملية واحدة مع نسخة احتياطية تلقائية');
+    btn.style.background = 'linear-gradient(135deg,#B71C1C,#E53935)';
+    btn.style.marginBottom = '0';
+    /* Trash emoji is non-BMP; emit as HTML entity through innerHTML
+       so Python's triple-quoted string parser doesn't choke on a
+       lone surrogate (per CLAUDE.md). */
+    btn.innerHTML = '&#x1F5D1; تفريغ الجدول';
+    btn.onclick = function(){ window.mxOpenTruncateModal(spec); };
+    toolbar.appendChild(btn);
+  }
+
+  function injectAll(){ SECTIONS.forEach(injectButton); }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', injectAll);
+  else
+    injectAll();
+  /* Late-mounted sections (some pages defer-render): retry once. */
+  setTimeout(injectAll, 1500);
+
+  window.mxOpenTruncateModal = function(spec){
+    var modal = document.getElementById('mxTruncateModal');
+    var bodyP = document.getElementById('mxTruncBody');
+    var rc    = document.getElementById('mxTruncRowCount');
+    var code  = document.getElementById('mxTruncTblCode');
+    var inp   = document.getElementById('mxTruncConfirmInput');
+    var prog  = document.getElementById('mxTruncProgress');
+    var cancelBtn  = document.getElementById('mxTruncCancelBtn');
+    var confirmBtn = document.getElementById('mxTruncConfirmBtn');
+    if (!modal || !bodyP || !inp || !confirmBtn) return;
+
+    bodyP.innerHTML = 'أنت على وشك حذف كل بيانات الجدول: <b></b>';
+    bodyP.querySelector('b').textContent = spec.label;
+    rc.textContent = '…';
+    code.textContent = spec.table;
+    inp.value = '';
+    prog.style.display = 'none';
+    prog.style.color = '#1565C0';
+    prog.style.background = '#e3f2fd';
+    prog.textContent = '';
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+    confirmBtn.style.cursor = 'not-allowed';
+    cancelBtn.disabled = false;
+    modal.style.display = 'flex';
+    setTimeout(function(){ try{ inp.focus(); }catch(_){} }, 50);
+
+    /* Show the displayed count from the section's stat badge if present. */
+    try {
+      var countEl = spec.countId ? document.getElementById(spec.countId) : null;
+      if (countEl) {
+        var v = (countEl.textContent || '').trim();
+        if (v) rc.textContent = v;
+      }
+    } catch(_){}
+
+    inp.oninput = function(){
+      var ok = (inp.value === spec.table);
+      confirmBtn.disabled = !ok;
+      confirmBtn.style.opacity = ok ? '1' : '0.5';
+      confirmBtn.style.cursor = ok ? 'pointer' : 'not-allowed';
+    };
+    cancelBtn.onclick = function(){ modal.style.display = 'none'; };
+    confirmBtn.onclick = function(){
+      if (inp.value !== spec.table) return;
+      confirmBtn.disabled = true;
+      cancelBtn.disabled = true;
+      prog.style.display = 'block';
+      prog.style.color = '#1565C0';
+      prog.style.background = '#e3f2fd';
+      prog.textContent = 'جاري إنشاء نسخة احتياطية…';
+      /* The backup runs on the server before the DELETE, so a single
+         POST will block while the backup is built. Show a soft hint. */
+      var hint = setTimeout(function(){
+        prog.textContent = 'جاري التفريغ…';
+      }, 1200);
+      fetch('/api/admin/table/truncate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body: JSON.stringify({table_name: spec.table, confirm_token: inp.value})
+      })
+      .then(function(r){ return r.json().then(function(d){ d._http=r.status; return d; }).catch(function(){ return {ok:false,error:'خطأ غير متوقع',_http:r.status}; }); })
+      .then(function(d){
+        clearTimeout(hint);
+        cancelBtn.disabled = false;
+        if (!d || !d.ok){
+          prog.style.color = '#c62828';
+          prog.style.background = '#ffebee';
+          prog.textContent = (d && d.error) || ('خطأ ' + (d&&d._http||'?'));
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+          return;
+        }
+        prog.style.color = '#1b5e20';
+        prog.style.background = '#e8f5e9';
+        prog.textContent = 'تم التفريغ بنجاح ✓';
+        try { spec.refresh && spec.refresh(); } catch(_){}
+        try {
+          var msg = 'تم تفريغ الجدول: ' +
+                    (d.rows_cleared|0) + ' صف. ' +
+                    'النسخة الاحتياطية: ' +
+                    (d.backup_filename || '');
+          if (typeof showToast === 'function') showToast(msg, '#2E7D32');
+        } catch(_){}
+        setTimeout(function(){ modal.style.display = 'none'; }, 900);
+      })
+      .catch(function(){
+        clearTimeout(hint);
+        cancelBtn.disabled = false;
+        confirmBtn.disabled = false;
+        confirmBtn.style.opacity = '1';
+        prog.style.color = '#c62828';
+        prog.style.background = '#ffebee';
+        prog.textContent = 'خطأ في الاتصال بالخادم';
+      });
+    };
+  };
+})();
+</script>
 </body>
 </html>"""
 
