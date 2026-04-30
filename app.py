@@ -16344,7 +16344,7 @@ def database():
     # edit pattern) and editable cells appear "stuck" until the user
     # hard-refreshes — visible as "only attendance and taqseet are
     # directly editable" while the rest still look read-only.
-    resp = Response(DATABASE_HTML, mimetype='text/html; charset=utf-8')
+    resp = Response(DATABASE_HTML.replace("USER_ROLE_PLACEHOLDER", "admin"), mimetype='text/html; charset=utf-8')
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
     return resp
