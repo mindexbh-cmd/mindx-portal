@@ -36488,58 +36488,140 @@ def _import_coerce_by_type(value, col_type):
     return True, value, ""
 
 
-# ─── Drive published-sheets import (Phase C2) ──────────────────────────
-# Maps the Arabic header in each Drive sheet tab to the English field
-# key it should land on inside the matching DB table. Headers are
-# matched after whitespace-folding only (no Arabic letter normalisation
-# — admin-controlled sheets are stable enough). A value of None means
-# "skip this column" (e.g. a parental link with no DB home).
+# ─── Drive published-sheets import (Phase C2 — Phase D header rewrite) ──
+# Static aliases mapping common Arabic header phrasings to their target
+# English column. THIS IS NOT THE PRIMARY SOURCE — at request time
+# _drive_build_header_lookup() also reads the live *_col_labels rows
+# (HTML-entity-decoded) so admin-renamed columns auto-match without a
+# code change. Both sides of the lookup are folded via _grp_norm,
+# which collapses ا/أ/إ/آ → ا, ى → ي, ة → ه, strips diacritics, and
+# normalises NBSP / zero-width / bidi marks.
+#
+# Each table's keys cover: (1) the seeded label as it appears in the
+# corresponding *_col_labels seed (decoded), (2) common alt-phrasings
+# users tend to type, (3) None-mapped columns to deliberately skip.
 _DRIVE_SHEET_MAP = {
     "attendance": {
-        "التاريخ":                          "attendance_date",
-        "اليوم":                                      "day_name",
-        "المجموعة":                    "group_name",
-        "اسم الطالب":             "student_name",
-        "رقم التواصل":       "contact_number",
-        "الحالة":                                "status",
-        "الرسالة":                          "message",
-        "الرابط":                                None,
-        "حالة الرسالة": "message_status",
+        "التاريخ":              "attendance_date",
+        "تاريخ الغياب":         "attendance_date",
+        "اليوم":                "day_name",
+        "المجموعة":             "group_name",
+        "اسم المجموعة":         "group_name",
+        "اسم الطالب":           "student_name",
+        "الطالب":               "student_name",
+        "رقم التواصل":          "contact_number",
+        "الهاتف":               "contact_number",
+        "الحالة":               "status",
+        "الرسالة":              "message",
+        "الرابط":               None,
+        "حالة الرسالة":         "message_status",
+        "حالة الدراسة":         "study_status",
     },
     "payment_log": {
-        "الاسم":                                                       "student_name",
-        "الرقم الشخصي":                  "personal_id",
-        "حالة التسجيل":                  "registration_status",
-        "مبلغ الدورة":                        "course_amount",
-        "القسط 1":                                                     "inst1",
-        "القسط 1 للرسالة":          "msg1",
-        "القسط 2":                                                     "inst2",
-        "القسط 2 للرسالة":          "msg2",
-        "القسط 3":                                                     "inst3",
-        "القسط 3 للرسالة":          "msg3",
-        "القسط 4":                                                     "inst4",
-        "القسط 4 للرسالة":          "msg4",
-        "القسط 5":                                                     "inst5",
-        "القسط 5 للرسالة":          "msg5",
-        "المبلغ المدفوع":      "total_paid",
-        "المبلغ المتبقي":      "total_remaining",
-        "حالة المدفوعات":      "payment_status",
+        "الاسم":                "student_name",
+        "اسم الطالب":           "student_name",
+        "الرقم الشخصي":         "personal_id",
+        "حالة التسجيل":         "registration_status",
+        "مبلغ الدورة":          "course_amount",
+        "القسط 1":              "inst1",
+        "القسط 1 للرسالة":      "msg1",
+        "القسط 2":              "inst2",
+        "القسط 2 للرسالة":      "msg2",
+        "القسط 3":              "inst3",
+        "القسط 3 للرسالة":      "msg3",
+        "القسط 4":              "inst4",
+        "القسط 4 للرسالة":      "msg4",
+        "القسط 5":              "inst5",
+        "القسط 5 للرسالة":      "msg5",
+        "المبلغ المدفوع":       "total_paid",
+        "المبلغ المتبقي":       "total_remaining",
+        "حالة المدفوعات":       "payment_status",
+        "حالة الدفع":           "payment_status",
     },
     "student_groups": {
-        "اسم المجموعة":                                                                       "group_name",
-        "اسم المعلم":                                                                                   "teacher_name",
-        "المستوى":                                                                                                "level_course",
-        "آخر مرحلة":                                                                                         "last_reached",
-        "وقت الدراسة":                                                                             "study_time",
-        "أيام الدراسة":                                                                       "study_days",
-        "توقيت رمضان":                                                                             "ramadan_time",
-        "توقيت الأونلاين":                                                     "online_time",
-        "أيام الأونلاين":                                                           "online_days",
-        "ساعات الجلسة":                                                                       "hours_session",
-        "توقيت الأونلاين العادي":                "online_time_normal",
-        "توقيت الأونلاين في رمضان":         "online_time_ramadan",
+        # All 14 seeded group_col_labels labels (decoded from HTML
+        # entities) plus widely-used alt-phrasings.
+        "اسم المجموعة":                                       "group_name",
+        "اسم المدرس":                                         "teacher_name",
+        "اسم المعلم":                                         "teacher_name",
+        "المستوى / المقرر":                                   "level_course",
+        "المستوى":                                            "level_course",
+        "المقرر الذي تم الوصول اليه الفصل الفائت":             "last_reached",
+        "آخر مرحلة":                                          "last_reached",
+        "وقت الدراسة":                                        "study_time",
+        "توقيت شهر رمضان":                                    "ramadan_time",
+        "توقيت رمضان":                                        "ramadan_time",
+        "توقيت الاونلاين (العادي)":                           "online_time",
+        "توقيت الأونلاين":                                    "online_time",
+        "رابط المجموعة":                                      "group_link",
+        "الحصة بالدقيقة (يدوي)":                              "session_duration",
+        "مدة الحصة بالدقيقة للوقت الاعتيادي (يدوي)":          "session_minutes_normal",
+        "عدد الساعات الحضورية (تلقائي)":                      "hours_in_person_auto",
+        "عدد ساعات الاونلاين فقط":                            "hours_online_only",
+        "الساعات الدراسية كلها بالاونلاين":                   "hours_all_online",
+        "إجمالي الساعات المستحقة":                            "total_required_hours",
+        # Days header writes to the legacy `study_days` column. The
+        # custom-label "ايام الدراسة" col_<timestamp> column the admin
+        # sees in the UI is NOT written by import — the read-side
+        # _row_days_authoritative resolver falls back to study_days
+        # when the custom column is empty for a row, so newly-imported
+        # rows still display correctly. Mirroring into the custom
+        # column would require resolving its dynamic col_key and is
+        # tracked as a separate follow-up, not part of this fix.
+        "ايام الدراسة":                                       "study_days",
+        "أيام الدراسة":                                       "study_days",
     },
 }
+
+
+def _drive_build_header_lookup(table, db):
+    """Build a folded-Arabic-header → english-col-key lookup for one of
+    the Drive-import tables. Fuses three sources, all normalised via
+    _grp_norm so ا/أ/إ/آ/ى/ة/diacritic/NBSP variants match symmetrically:
+
+      1. Static aliases from _DRIVE_SHEET_MAP[table] (covers common
+         alt-phrasings + the parent-link column to deliberately skip).
+      2. Live labels from the table's *_col_labels rows, HTML-entity-
+         decoded. Auto-adapts to whatever Arabic label the admin set
+         in /database, even if it differs from the seed text.
+      3. The English col_key itself — so a user who pastes the bare
+         column name (e.g. "group_name") into a sheet header still
+         matches.
+
+    Live labels OVERRIDE static aliases when both fold to the same key,
+    so an admin rename in /database is respected without a code change.
+    Returns whatever it managed to build on any DB error so the caller
+    falls back to static-only matching."""
+    import html as _html
+    lookup = {}
+    static = _DRIVE_SHEET_MAP.get(table) or {}
+    for k, v in static.items():
+        folded = _grp_norm(k)
+        if folded:
+            lookup[folded] = v
+    lbl_tbl = IMPORT_LABEL_TABLES.get(table)
+    if lbl_tbl and db is not None:
+        try:
+            for r in db.execute(
+                "SELECT col_key, col_label FROM " + lbl_tbl
+            ).fetchall():
+                col_key   = r[0] if hasattr(r, "__getitem__") else None
+                col_label = r[1] if hasattr(r, "__getitem__") else None
+                if not col_key:
+                    continue
+                col_key = str(col_key)
+                if col_label:
+                    decoded = _html.unescape(str(col_label))
+                    folded  = _grp_norm(decoded)
+                    if folded:
+                        lookup[folded] = col_key
+                # Also let the user paste the English col_key directly.
+                key_folded = _grp_norm(col_key)
+                if key_folded and key_folded not in lookup:
+                    lookup[key_folded] = col_key
+        except Exception:
+            pass
+    return lookup
 
 
 def _drive_fetch_xlsx(url):
@@ -36583,21 +36665,28 @@ def _drive_fetch_xlsx(url):
     return data
 
 
-def _drive_extract_rows(table, xlsx_bytes, sheet_name):
-    """Parse the named sheet from the in-memory XLSX bytes and return a
-    list of row-dicts keyed by the English field names declared in
-    `_DRIVE_SHEET_MAP[table]`.
+def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
+    """Parse the named sheet from the in-memory XLSX bytes and return
+    `(rows, unmatched_headers)`.
 
-    Cells whose header is not in the map (or maps to None) are dropped.
-    Empty rows are skipped. NO value-side normalisation here -- that is
+    rows: list of row-dicts keyed by the English field names found via
+      `_drive_build_header_lookup` (static aliases + live *_col_labels +
+      raw col_key, all folded via _grp_norm so spelling variants match).
+    unmatched_headers: list of distinct sheet headers that didn't map
+      to any target — surfaced to the API response so the admin can
+      either fix the sheet header or rename the DB column label.
+
+    Cells whose header is unmatched (or explicitly mapped to None, e.g.
+    the parental-link column) are silently dropped. Empty rows are
+    skipped. NO value-side normalisation here — that is
     `_import_normalize_value`'s job inside the import pipeline, so the
     same fold/date/status rules apply for every entry path.
     """
     import io as _io
     from openpyxl import load_workbook
-    header_map = _DRIVE_SHEET_MAP.get(table)
-    if header_map is None:
+    if _DRIVE_SHEET_MAP.get(table) is None:
         raise RuntimeError("no Drive header map for table " + str(table))
+    lookup = _drive_build_header_lookup(table, db)
     try:
         wb = load_workbook(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
     except Exception as ex:
@@ -36617,12 +36706,21 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name):
     except StopIteration:
         try: wb.close()
         except Exception: pass
-        return []
+        return [], []
     col_keys = []
+    unmatched = []
+    seen_unmatched = set()
     for cell in header:
         raw = "" if cell is None else str(cell)
-        key = " ".join(raw.split())
-        col_keys.append(header_map.get(key))
+        if not raw.strip():
+            col_keys.append(None)
+            continue
+        folded = _grp_norm(raw)
+        target = lookup.get(folded) if folded else None
+        col_keys.append(target)
+        if target is None and folded and folded not in seen_unmatched:
+            unmatched.append(raw.strip())
+            seen_unmatched.add(folded)
     out = []
     for row in rows_iter:
         if row is None:
@@ -36646,7 +36744,7 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name):
             out.append(rec)
     try: wb.close()
     except Exception: pass
-    return out
+    return out, unmatched
 
 
 IMPORT_TABLE_SQL = {
@@ -36935,9 +37033,11 @@ def api_import_from_drive():
             "error": "تعذر جلب الملف من Drive: " + str(ex)[:200],
         }), 502
 
-    # Parse the requested sheet.
+    # Parse the requested sheet (live-label-aware lookup via db).
     try:
-        rows = _drive_extract_rows(table_name, xlsx_bytes, sheet_name)
+        rows, unmatched_headers = _drive_extract_rows(
+            table_name, xlsx_bytes, sheet_name, db=db,
+        )
     except Exception as ex:
         msg = str(ex)
         # Sheet-missing maps to 404; everything else (xlsx parse, header
@@ -36979,6 +37079,7 @@ def api_import_from_drive():
                 "source_sheet": sheet_name,
                 "source_url":   url,
                 "received":     payload.get("received", 0),
+                "unmatched_headers": unmatched_headers,
                 "backup_filename": (bk_info.get("filename")
                                     if isinstance(bk_info, dict) else None),
                 "backup_path":     (bk_info.get("path")
@@ -36990,10 +37091,11 @@ def api_import_from_drive():
         pass
 
     # Augment payload with Drive-specific fields the UI shows alongside counts.
-    payload["source_sheet"] = sheet_name
-    payload["source_url"]   = url
-    payload["backup_path"]  = ((bk_info.get("path")
-                                if isinstance(bk_info, dict) else "") or "")
+    payload["source_sheet"]      = sheet_name
+    payload["source_url"]        = url
+    payload["unmatched_headers"] = unmatched_headers
+    payload["backup_path"]       = ((bk_info.get("path")
+                                     if isinstance(bk_info, dict) else "") or "")
     return jsonify(payload), status
 
 @app.route('/api/attendance/sessions', methods=['GET'])
