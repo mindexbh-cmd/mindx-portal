@@ -785,7 +785,7 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_attendance', 'اسم ورقة سجل الغياب', 'سجل الغياب'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_payment_log', 'اسم ورقة تفاصيل الدفع', 'تفاصيل الدفع'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_student_groups', 'اسم ورقة معلومات المجموعات', 'معلومات المجموعات (يدوي)'))
-            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_students', 'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_students', 'اسم ورقة قاعدة بيانات الطلبة', 'الصفحة الرئيسية لمعلومات الطلبة'))
     except Exception:
         pass
     # ── permissions_v1: granular per-button + per-user permission system
@@ -1626,14 +1626,16 @@ if True:
                 "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
                 "ON CONFLICT(page,component) DO NOTHING",
                 ('integrations', 'drive_sheet_students',
-                 'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'),
+                 'اسم ورقة قاعدة بيانات الطلبة',
+                 'الصفحة الرئيسية لمعلومات الطلبة'),
             )
         except Exception:
             try:
                 db2.execute(
                     "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
                     ('integrations', 'drive_sheet_students',
-                     'اسم ورقة قاعدة بيانات الطلبة', 'قاعدة بيانات الطلبة'),
+                     'اسم ورقة قاعدة بيانات الطلبة',
+                     'الصفحة الرئيسية لمعلومات الطلبة'),
                 )
             except Exception:
                 pass
@@ -1641,6 +1643,30 @@ if True:
             db2.execute(
                 "INSERT INTO schema_migrations(tag) VALUES(?)",
                 ("drive_settings_students_v1",),
+            )
+            db2.commit()
+        except Exception:
+            pass
+
+    # ── update_drive_sheet_students_name_v1: prod DBs that already
+    # ran drive_settings_students_v1 have value='قاعدة بيانات الطلبة'
+    # but the admin's actual Drive worksheet is named
+    # 'الصفحة الرئيسية لمعلومات الطلبة'. UPDATE only when the row is
+    # still on the OLD default — never clobber a value the admin
+    # already changed via /settings.
+    if "update_drive_sheet_students_name_v1" not in applied:
+        try:
+            db2.execute(
+                "UPDATE settings SET value = ? "
+                "WHERE page = 'integrations' "
+                "  AND component = 'drive_sheet_students' "
+                "  AND value = ?",
+                ('الصفحة الرئيسية لمعلومات الطلبة',
+                 'قاعدة بيانات الطلبة'),
+            )
+            db2.execute(
+                "INSERT INTO schema_migrations(tag) VALUES(?)",
+                ("update_drive_sheet_students_name_v1",),
             )
             db2.commit()
         except Exception:
@@ -37088,9 +37114,100 @@ def _drive_fetch_xlsx(url):
     return data
 
 
+# Per-table list of acceptable worksheet-name variants. _drive_resolve_sheet_name
+# walks this list (after the configured name + a folded-equality try) so
+# admins can rename their Drive sheets within reason without breaking
+# imports. _grp_norm folds ا/أ/إ/آ/ى/ة/diacritic/NBSP variants, so each
+# entry below only needs ONE spelling per family.
+_DRIVE_SHEET_VARIANTS = {
+    "students": [
+        "الصفحة الرئيسية لمعلومات الطلبة",
+        "قاعدة بيانات الطلبة",
+        "بيانات الطلبة",
+        "الطلبة",
+        "الطلاب",
+        "students",
+    ],
+    "student_groups": [
+        "معلومات المجموعات (يدوي)",
+        "معلومات المجموعات",
+        "المجموعات",
+        "groups",
+        "student_groups",
+    ],
+    "attendance": [
+        "سجل الغياب",
+        "الغياب",
+        "attendance",
+    ],
+    "payment_log": [
+        "تفاصيل الدفع",
+        "سجل الدفع",
+        "الدفع",
+        "payment_log",
+        "paylog",
+    ],
+}
+
+
+def _drive_resolve_sheet_name(sheet_name, available_titles, table):
+    """Resolve `sheet_name` against the actual worksheet titles in the
+    workbook. Returns (resolved_title, fallback_used: bool) or raises
+    RuntimeError on no/ambiguous match.
+
+    Resolution order (each step folded via _grp_norm where noted):
+      1. Exact match (current behaviour, no fallback flag).
+      2. Folded-equality match against the configured name.
+      3. Folded-equality match against _DRIVE_SHEET_VARIANTS[table].
+      4. Folded substring match (target contained in title or vice
+         versa) — only used when EXACTLY one title qualifies, to
+         avoid silently picking the wrong sheet.
+
+    Steps 2–4 set fallback_used=True so the response payload can show
+    that the configured name didn't match exactly. Ambiguous substring
+    match (multiple candidates) raises a RuntimeError that lists the
+    candidates so the admin can pick.
+    """
+    if sheet_name in available_titles:
+        return sheet_name, False
+    folded_titles = {}
+    for t in available_titles:
+        folded = _grp_norm(t)
+        if folded and folded not in folded_titles:
+            folded_titles[folded] = t
+    target_folded = _grp_norm(sheet_name)
+    if target_folded and target_folded in folded_titles:
+        return folded_titles[target_folded], True
+    for v in _DRIVE_SHEET_VARIANTS.get(table, []):
+        v_folded = _grp_norm(v)
+        if v_folded and v_folded in folded_titles:
+            return folded_titles[v_folded], True
+    if target_folded:
+        candidates = []
+        for ft, original in folded_titles.items():
+            if target_folded in ft or ft in target_folded:
+                candidates.append(original)
+        # Dedupe while preserving order.
+        seen = set(); uniq = []
+        for c in candidates:
+            if c not in seen:
+                seen.add(c); uniq.append(c)
+        if len(uniq) == 1:
+            return uniq[0], True
+        if len(uniq) > 1:
+            raise RuntimeError(
+                "sheet ambiguous: multiple sheets match \""
+                + str(sheet_name) + "\": " + ", ".join(uniq)
+            )
+    raise RuntimeError(
+        "sheet not found: " + str(sheet_name)
+        + " (available: " + ", ".join(available_titles) + ")"
+    )
+
+
 def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
     """Parse the named sheet from the in-memory XLSX bytes and return
-    `(rows, unmatched_headers)`.
+    `(rows, unmatched_headers, resolved_sheet_name)`.
 
     rows: list of row-dicts keyed by the English field names found via
       `_drive_build_header_lookup` (static aliases + live *_col_labels +
@@ -37098,6 +37215,10 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
     unmatched_headers: list of distinct sheet headers that didn't map
       to any target — surfaced to the API response so the admin can
       either fix the sheet header or rename the DB column label.
+    resolved_sheet_name: the actual worksheet title that was opened.
+      Equal to `sheet_name` on the exact-match path; equal to the
+      fuzzy-resolved title (via _drive_resolve_sheet_name) when the
+      configured name didn't match exactly.
 
     Cells whose header is unmatched (or explicitly mapped to None, e.g.
     the parental-link column) are silently dropped. Empty rows are
@@ -37115,21 +37236,22 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
     except Exception as ex:
         raise RuntimeError("xlsx parse failed: " + str(ex)[:120])
     titles = [ws.title for ws in wb.worksheets]
-    if sheet_name not in titles:
+    try:
+        resolved_name, _fallback = _drive_resolve_sheet_name(
+            sheet_name, titles, table,
+        )
+    except RuntimeError:
         try: wb.close()
         except Exception: pass
-        raise RuntimeError(
-            "sheet not found: " + str(sheet_name)
-            + " (available: " + ", ".join(titles) + ")"
-        )
-    ws = wb[sheet_name]
+        raise
+    ws = wb[resolved_name]
     rows_iter = ws.iter_rows(values_only=True)
     try:
         header = next(rows_iter)
     except StopIteration:
         try: wb.close()
         except Exception: pass
-        return [], []
+        return [], [], resolved_name
     col_keys = []
     unmatched = []
     seen_unmatched = set()
@@ -37167,7 +37289,7 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
             out.append(rec)
     try: wb.close()
     except Exception: pass
-    return out, unmatched
+    return out, unmatched, resolved_name
 
 
 IMPORT_TABLE_SQL = {
@@ -37526,9 +37648,15 @@ def api_import_from_drive():
             "error": "تعذر جلب الملف من Drive: " + str(ex)[:200],
         }), 502
 
-    # Parse the requested sheet (live-label-aware lookup via db).
+    # Parse the requested sheet (live-label-aware lookup via db). The
+    # resolver is fuzzy: configured-name-exact → folded-equality →
+    # _DRIVE_SHEET_VARIANTS list → folded substring (only when exactly
+    # one title qualifies). resolved_sheet_name is the actual worksheet
+    # title that was opened, surfaced to the response so the admin can
+    # see when the configured name didn't match exactly.
+    resolved_sheet_name = sheet_name
     try:
-        rows, unmatched_headers = _drive_extract_rows(
+        rows, unmatched_headers, resolved_sheet_name = _drive_extract_rows(
             table_name, xlsx_bytes, sheet_name, db=db,
         )
     except Exception as ex:
@@ -37570,6 +37698,8 @@ def api_import_from_drive():
             },
             details={
                 "source_sheet": sheet_name,
+                "resolved_sheet_name": resolved_sheet_name,
+                "fallback_used": (resolved_sheet_name != sheet_name),
                 "source_url":   url,
                 "received":     payload.get("received", 0),
                 "unmatched_headers": unmatched_headers,
@@ -37587,6 +37717,9 @@ def api_import_from_drive():
     payload["source_sheet"]      = sheet_name
     payload["source_url"]        = url
     payload["unmatched_headers"] = unmatched_headers
+    payload["resolved_sheet_name"]   = resolved_sheet_name
+    payload["configured_sheet_name"] = sheet_name
+    payload["fallback_used"]         = (resolved_sheet_name != sheet_name)
     payload["backup_path"]       = ((bk_info.get("path")
                                      if isinstance(bk_info, dict) else "") or "")
     return jsonify(payload), status
