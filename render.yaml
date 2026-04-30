@@ -16,7 +16,12 @@ services:
       pip install -r requirements.txt &&
       python -m playwright install chromium &&
       (python -m playwright install-deps chromium || echo "[deploy] install-deps non-fatal failure")
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    # --timeout 120: the Drive-import endpoint does pre-import backup +
+    #   xlsx fetch + parse + per-row upsert which can run 30-90s for a
+    #   ~280-row sheet against Postgres. Default 30s causes HTTP 502.
+    # --graceful-timeout 30: how long to give in-flight requests to
+    #   finish during a deploy/restart before SIGKILL.
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
     envVars:
       - key: SECRET_KEY
         generateValue: true
