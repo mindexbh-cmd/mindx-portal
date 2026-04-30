@@ -16652,14 +16652,34 @@ function updateAttendanceColumnLabel() {
         credentials:'same-origin',
         body: JSON.stringify({table_name: spec.table, confirm_token: inp.value})
       })
-      .then(function(r){ return r.json().then(function(d){ d._http=r.status; return d; }).catch(function(){ return {ok:false,error:'خطأ غير متوقع',_http:r.status}; }); })
+      .then(function(r){
+        var status = r.status;
+        return r.text().then(function(txt){
+          var d;
+          try { d = JSON.parse(txt); }
+          catch(e){
+            d = { ok: false, error: 'Server returned non-JSON (HTTP ' + status + '): ' + (txt || '').substring(0, 280) };
+          }
+          d._http = status;
+          return d;
+        });
+      })
       .then(function(d){
         clearTimeout(hint);
         cancelBtn.disabled = false;
         if (!d || !d.ok){
           prog.style.color = '#c62828';
           prog.style.background = '#ffebee';
-          prog.textContent = (d && d.error) || ('خطأ ' + (d&&d._http||'?'));
+          var parts = [];
+          if (d && d.error)      parts.push(d.error);
+          if (d && d._http)      parts.push('HTTP ' + d._http);
+          if (d && d.exc_type)   parts.push('exc: ' + d.exc_type);
+          if (d && d.last_error) parts.push('last: ' + d.last_error);
+          if (d && d.skip_reasons && d.skip_reasons.length) {
+            parts.push('skipped: ' + d.skip_reasons.length);
+          }
+          prog.textContent = parts.length ? parts.join(' | ') : ('خطأ ' + (d&&d._http||'?'));
+          try { console.error('[mx-drive-import] response error:', d); } catch(_){}
           confirmBtn.disabled = false;
           confirmBtn.style.opacity = '1';
           return;
@@ -16676,14 +16696,17 @@ function updateAttendanceColumnLabel() {
         } catch(_){}
         setTimeout(function(){ modal.style.display = 'none'; }, 2000);
       })
-      .catch(function(){
+      .catch(function(err){
         clearTimeout(hint);
         cancelBtn.disabled = false;
         confirmBtn.disabled = false;
         confirmBtn.style.opacity = '1';
         prog.style.color = '#c62828';
         prog.style.background = '#ffebee';
-        prog.textContent = 'خطأ في الاتصال بالخادم';
+        var msg2 = 'خطأ في الاتصال بالخادم';
+        try { if (err && err.message) msg2 += ': ' + err.message; } catch(_){}
+        prog.textContent = msg2;
+        try { console.error('[mx-drive-import] network error:', err); } catch(_){}
       });
     };
   };
@@ -37695,9 +37718,14 @@ def api_import_from_drive():
     try:
         xlsx_bytes = _drive_fetch_xlsx(url)
     except Exception as ex:
+        import sys as _sys, traceback as _tb
+        _sys.stderr.write("[drive-import] fetch failed: " + str(ex) + "\n")
+        _sys.stderr.write(_tb.format_exc() + "\n")
         return jsonify({
             "ok": False,
             "error": "تعذر جلب الملف من Drive: " + str(ex)[:200],
+            "exc_type": type(ex).__name__,
+            "stage": "fetch_xlsx",
         }), 502
 
     # Parse the requested sheet (live-label-aware lookup via db). The
@@ -37712,6 +37740,9 @@ def api_import_from_drive():
             table_name, xlsx_bytes, sheet_name, db=db,
         )
     except Exception as ex:
+        import sys as _sys, traceback as _tb
+        _sys.stderr.write("[drive-import] extract failed: " + str(ex) + "\n")
+        _sys.stderr.write(_tb.format_exc() + "\n")
         msg = str(ex)
         # Sheet-missing maps to 404; everything else (xlsx parse, header
         # map missing) maps to 502 since the upstream payload is bad.
@@ -37719,10 +37750,14 @@ def api_import_from_drive():
             return jsonify({
                 "ok": False,
                 "error": "الورقة غير موجودة في ملف Drive: " + msg[:200],
+                "exc_type": type(ex).__name__,
+                "stage": "extract_rows",
             }), 404
         return jsonify({
             "ok": False,
             "error": "فشل قراءة الملف: " + msg[:200],
+            "exc_type": type(ex).__name__,
+            "stage": "extract_rows",
         }), 502
 
     # Run through the shared import pipeline (same code path as /api/import).
@@ -37731,9 +37766,14 @@ def api_import_from_drive():
             table_name, rows, auto_create=False, db=db, column_labels=None,
         )
     except Exception as ex:
+        import sys as _sys, traceback as _tb
+        _sys.stderr.write("[drive-import] perform_import failed: " + str(ex) + "\n")
+        _sys.stderr.write(_tb.format_exc() + "\n")
         return jsonify({
             "ok": False,
             "error": "فشل أثناء الاستيراد: " + str(ex)[:200],
+            "exc_type": type(ex).__name__,
+            "stage": "perform_import",
         }), 500
 
     # Audit log entry — best-effort, never blocks the response.
