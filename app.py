@@ -16488,17 +16488,11 @@ function updateAttendanceColumnLabel() {
    each whitelisted db-section toolbar. Pulls rows from the published
    Drive workbook and feeds them through the same /api/import upsert
    pipeline (no destructive wipe). Same admin role-gate as the truncate
-   button. Four sections: attendance / payment_log / student_groups /
-   students (matches the C3+E backend whitelist).
-
-   Diagnostic console.log lines tagged "[mx-drive-import]" so silent
-   failures (button visible but click does nothing) become easy to
-   diagnose in DevTools — added after a "click does nothing" report
-   that turned out to be a missing modal element in the served HTML. */
+   button. Three sections only: attendance / payment_log / student_groups
+   (matches the C3 backend whitelist). */
 (function(){
   var role = (document.body && document.body.dataset && document.body.dataset.role || '').toLowerCase();
-  console.log('[mx-drive-import] iife start, role=', role);
-  if (role !== 'admin') { console.log('[mx-drive-import] not admin — skipping'); return; }
+  if (role !== 'admin') return;
 
   var SECTIONS = [
     { sectionId:'sec-attendance', table:'attendance',
@@ -16521,8 +16515,8 @@ function updateAttendanceColumnLabel() {
 
   function injectButton(spec){
     var sec = document.getElementById(spec.sectionId);
-    if (!sec) { console.warn('[mx-drive-import] section not found:', spec.sectionId); return; }
-    if (sec.querySelector('[data-mx-drive-import]')) return;  // silent — re-injection is fine
+    if (!sec) return;
+    if (sec.querySelector('[data-mx-drive-import]')) return;
     /* Same toolbar-locator as the truncate button so the new button
        lands in the same row. The truncate IIFE runs first (source
        order) and uses appendChild — we do the same, so this button
@@ -16536,7 +16530,7 @@ function updateAttendanceColumnLabel() {
         if (s.indexOf('display:flex') >= 0 && divs[i].querySelector('button')){ toolbar = divs[i]; break; }
       }
     }
-    if (!toolbar) { console.warn('[mx-drive-import] toolbar not found in', spec.sectionId); return; }
+    if (!toolbar) return;
 
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -16546,25 +16540,8 @@ function updateAttendanceColumnLabel() {
     btn.style.background = 'linear-gradient(135deg,#10b981,#14b8a6)';
     btn.style.marginBottom = '0';
     btn.innerHTML = '&#x2601;&#xFE0F; استيراد من Drive';
-    /* Wrap the click handler in try/catch so a missing modal element
-       or undefined window.mxOpenDriveImportModal alerts the admin
-       instead of failing silently. The bare onclick used to call
-       through to the modal opener which has its own early-return on
-       missing DOM nodes — that early-return is now a visible alert. */
-    btn.onclick = function(ev){
-      try {
-        console.log('[mx-drive-import] click:', spec.table);
-        if (typeof window.mxOpenDriveImportModal !== 'function') {
-          throw new Error('modal handler is not loaded yet — try Ctrl+F5 to hard-refresh the page');
-        }
-        window.mxOpenDriveImportModal(spec);
-      } catch (err) {
-        console.error('[mx-drive-import] click failed:', err);
-        try { alert('Drive import error: ' + (err && err.message || err)); } catch(_){}
-      }
-    };
+    btn.onclick = function(){ window.mxOpenDriveImportModal(spec); };
     toolbar.appendChild(btn);
-    console.log('[mx-drive-import] button injected:', spec.sectionId, '->', spec.table);
   }
 
   function injectAll(){ SECTIONS.forEach(injectButton); }
@@ -16594,7 +16571,6 @@ function updateAttendanceColumnLabel() {
   }
 
   window.mxOpenDriveImportModal = function(spec){
-    console.log('[mx-drive-import] modal open requested for table:', spec && spec.table);
     var modal = document.getElementById('mxDriveImportModal');
     var bodyP = document.getElementById('mxDIBody');
     var sheet = document.getElementById('mxDISheet');
@@ -16605,21 +16581,7 @@ function updateAttendanceColumnLabel() {
     var prog  = document.getElementById('mxDIProgress');
     var cancelBtn  = document.getElementById('mxDICancelBtn');
     var confirmBtn = document.getElementById('mxDIConfirmBtn');
-    if (!modal || !bodyP || !inp || !confirmBtn) {
-      var _missing = [];
-      if (!modal)      _missing.push('mxDriveImportModal');
-      if (!bodyP)      _missing.push('mxDIBody');
-      if (!inp)        _missing.push('mxDIConfirmInput');
-      if (!confirmBtn) _missing.push('mxDIConfirmBtn');
-      console.error('[mx-drive-import] modal elements missing:', _missing.join(', '));
-      try {
-        alert('Drive import modal not loaded — missing element(s): '
-              + _missing.join(', ')
-              + '\n\nTry Ctrl+F5 to hard-refresh. If that doesn\'t fix it, '
-              + 'the deployed page is stale; check Render deploy status.');
-      } catch(_){}
-      return;
-    }
+    if (!modal || !bodyP || !inp || !confirmBtn) return;
 
     bodyP.innerHTML = 'استيراد بيانات الجدول من Drive: <b></b>';
     bodyP.querySelector('b').textContent = spec.label;
