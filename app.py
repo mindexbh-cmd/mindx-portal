@@ -37400,6 +37400,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     updated  = 0
     skipped  = 0
     rows_skipped_empty = 0   # subset of `skipped` — placeholder/empty PK rows
+    inserted_without_id = 0  # students-only: new rows inserted with NULL personal_id
     errors   = 0
     skip_reasons = []   # up to 20 entries
     last_error = ""
@@ -37458,13 +37459,40 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         # dashes are truthy) which then get INSERTed as junk rows with
         # NULL in every other column. Only enforced when the table
         # declares a primary key in IMPORT_TABLE_KEYS.
+        #
+        # SPECIAL CASE for students: real students often appear in the
+        # sheet without a personal_id yet (registration in progress).
+        # Their record is still valuable — name, phones, status — so
+        # we keep the row when student_name is non-empty. The dedup
+        # key for re-imports falls back to student_name in the upsert
+        # block below. Only when BOTH personal_id AND student_name
+        # are empty/placeholder is the row treated as junk and
+        # skipped.
         if key_cols:
             _pk_val = (norm.get(key_cols[0]) or "").strip()
-            if not _pk_val or _IMPORT_PK_PLACEHOLDER_RX.match(_pk_val):
-                skipped += 1
-                rows_skipped_empty += 1
-                _remember_skip(idx, "primary-key is empty/placeholder")
-                continue
+            _pk_invalid = (not _pk_val
+                           or bool(_IMPORT_PK_PLACEHOLDER_RX.match(_pk_val)))
+            if _pk_invalid:
+                if table == "students":
+                    _name_val = (norm.get("student_name") or "").strip()
+                    _name_invalid = (
+                        not _name_val
+                        or bool(_IMPORT_PK_PLACEHOLDER_RX.match(_name_val))
+                    )
+                    if _name_invalid:
+                        skipped += 1
+                        rows_skipped_empty += 1
+                        _remember_skip(
+                            idx,
+                            "students row missing both personal_id and student_name",
+                        )
+                        continue
+                    # else: name is valid, fall through with NULL ID
+                else:
+                    skipped += 1
+                    rows_skipped_empty += 1
+                    _remember_skip(idx, "primary-key is empty/placeholder")
+                    continue
 
         # Typed-column validation.
         bad_type_reason = ""
@@ -37496,6 +37524,25 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
                     existing_id = row[0] if not hasattr(row, "keys") else row["id"]
             except Exception:
                 existing_id = None
+        elif table == "students":
+            # Students fallback: when personal_id is empty/NULL but
+            # student_name is set, look up an existing ID-less row by
+            # name so re-imports UPDATE in place rather than creating
+            # duplicates. Restricted to rows where personal_id IS NULL
+            # — never accidentally pulls in a student that already has
+            # a real ID.
+            _name_val = (norm.get("student_name") or "").strip()
+            if _name_val and "student_name" in live_cols:
+                try:
+                    _row = db.execute(
+                        "SELECT id FROM students "
+                        "WHERE personal_id IS NULL AND student_name = ? LIMIT 1",
+                        (_name_val,),
+                    ).fetchone()
+                    if _row:
+                        existing_id = _row[0] if not hasattr(_row, "keys") else _row["id"]
+                except Exception:
+                    existing_id = None
 
         try:
             if existing_id:
@@ -37513,12 +37560,16 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
                 values = [norm.get(f, "") for f in fields]
                 # Empty personal_id -> NULL so UNIQUE(personal_id) treats
                 # blank-ID rows as distinct. Only matters for students here.
+                _had_null_pk = False
                 for i2, f in enumerate(fields):
                     if f == "personal_id" and not (values[i2] or "").strip():
                         values[i2] = None
+                        _had_null_pk = True
                 cur = db.execute(sql_insert, tuple(values))
                 if cur.rowcount > 0:
                     inserted += 1
+                    if table == "students" and _had_null_pk:
+                        inserted_without_id += 1
                 else:
                     skipped += 1
                     _remember_skip(idx, "insert suppressed (UNIQUE?)")
@@ -37535,6 +37586,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         "updated":  updated,
         "skipped":  skipped,
         "rows_skipped_empty": rows_skipped_empty,
+        "inserted_without_id": inserted_without_id,
         "errors":   errors,
         "received": len(rows),
         "skip_reasons": skip_reasons,
