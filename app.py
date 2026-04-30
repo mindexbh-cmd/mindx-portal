@@ -779,6 +779,12 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'total_paid_column', 'عمود المدفوع', 'total_paid'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'total_remaining_column', 'عمود المتبقي', 'total_remaining'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('paylog', 'status_column', 'عمود حالة الدفع', 'payment_status'))
+            # Drive integration: published-Sheets workbook URL + per-table sheet names.
+            # The /api/import/from-drive endpoint reads these via get_setting('integrations',…).
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_workbook_url', 'رابط ورقة Drive المنشورة', 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFR_MYGC6VOUwZf5_miHxEHMr0CSgAGdOEyicApuAh2Y4r9P-hXMAXmNN6_j0w3UqOeeAi2vrG2uXQ/pubhtml'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_attendance', 'اسم ورقة سجل الغياب', 'سجل الغياب'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_payment_log', 'اسم ورقة تفاصيل الدفع', 'تفاصيل الدفع'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_student_groups', 'اسم ورقة معلومات المجموعات', 'معلومات المجموعات (يدوي)'))
     except Exception:
         pass
     # ── permissions_v1: granular per-button + per-user permission system
@@ -1571,6 +1577,37 @@ if True:
                     pass
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("settings_seed_v2",))
+        except Exception:
+            pass
+
+    # ── drive_settings_seed_v1: integration settings for "Import from Drive"
+    # feature. Stores the published-Sheets URL + per-table sheet names so admin
+    # can rotate the URL via /settings without a Render redeploy. Idempotent
+    # via ON CONFLICT DO NOTHING — re-runs are no-ops once the rows exist.
+    if "drive_settings_seed_v1" not in applied:
+        _drive_seed = [
+            ('integrations', 'drive_workbook_url', 'رابط ورقة Drive المنشورة', 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFR_MYGC6VOUwZf5_miHxEHMr0CSgAGdOEyicApuAh2Y4r9P-hXMAXmNN6_j0w3UqOeeAi2vrG2uXQ/pubhtml'),
+            ('integrations', 'drive_sheet_attendance', 'اسم ورقة سجل الغياب', 'سجل الغياب'),
+            ('integrations', 'drive_sheet_payment_log', 'اسم ورقة تفاصيل الدفع', 'تفاصيل الدفع'),
+            ('integrations', 'drive_sheet_student_groups', 'اسم ورقة معلومات المجموعات', 'معلومات المجموعات (يدوي)'),
+        ]
+        for _p, _c, _lbl, _v in _drive_seed:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                    "ON CONFLICT(page,component) DO NOTHING",
+                    (_p, _c, _lbl, _v),
+                )
+            except Exception:
+                try:
+                    db2.execute(
+                        "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                        (_p, _c, _lbl, _v),
+                    )
+                except Exception:
+                    pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)", ("drive_settings_seed_v1",))
         except Exception:
             pass
 
