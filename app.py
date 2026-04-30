@@ -36419,12 +36419,15 @@ IMPORT_TABLE_SQL = {
     "payment_log": "INSERT INTO payment_log",
 }
 
-@app.route('/api/import', methods=['POST'])
-@admin_required
-def api_import():
-    """Generic Excel-import endpoint used by every table on the database page.
+def _perform_import(table, rows, auto_create, db, column_labels=None):
+    """Core import worker shared by /api/import and /api/import/from-drive.
 
-    Behaviour:
+    Takes already-parsed `rows` (list of dicts) and runs the same
+    upsert / typed-validation pipeline that /api/import has always
+    used. Returns (status_code, payload_dict) so the caller can pass
+    straight to jsonify(...).
+
+    Behaviour preserved verbatim from the original api_import body:
       - Every incoming text value is whitespace-folded.
       - Attendance status values are mapped to canonical Arabic
         (غياب→غائب, تأخير→متأخر, حضور→حاضر) so downstream matching works.
@@ -36436,18 +36439,14 @@ def api_import():
       - Typed columns (نص/رقم/تاريخ/نعم-لا) are validated; on failure the
         row is skipped with a reason added to skip_reasons.
 
-    Response includes: inserted, updated, skipped, errors, received,
-    skip_reasons (up to 20), last_error, fields_used.
+    Side effects: ALTER TABLE on auto_create, INSERT INTO taqseet_col_labels
+    when relevant, INSERT/UPDATE on the data table. db.commit() called
+    at the end.
     """
-    d = request.get_json() or {}
-    table = d.get('table', '')
-    rows = d.get('rows', [])
-    auto_create = bool(d.get('auto_create', False))
-    column_labels = d.get('column_labels') or {}
+    column_labels = column_labels or {}
     fields = IMPORT_TABLE_FIELDS.get(table)
     if not fields:
-        return jsonify({"ok": False, "error": "unknown table"}), 400
-    db = get_db()
+        return 400, {"ok": False, "error": "unknown table"}
     live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
 
     if auto_create:
@@ -36487,7 +36486,7 @@ def api_import():
         fields = [f for f in fields if f in live_cols]
 
     if not fields:
-        return jsonify({"ok": False, "error": "no matching columns in table " + table}), 400
+        return 400, {"ok": False, "error": "no matching columns in table " + table}
 
     key_cols = [k for k in IMPORT_TABLE_KEYS.get(table, []) if k in live_cols and _is_safe_ident(k)]
     col_types = _import_get_col_types(table)
@@ -36583,7 +36582,7 @@ def api_import():
             _remember_skip(idx, "error: " + last_error[:80])
 
     db.commit()
-    return jsonify({
+    return 200, {
         "ok": True,
         "table": table,
         "inserted": inserted,
@@ -36597,7 +36596,166 @@ def api_import():
         # Backwards-compat aliases (existing front-end reads d.imported/d.ignored).
         "imported": inserted,
         "ignored":  skipped,
-    })
+    }
+
+
+@app.route('/api/import', methods=['POST'])
+@admin_required
+def api_import():
+    """Generic Excel-import endpoint used by every table on the database page.
+
+    Thin wrapper around _perform_import — request parsing here, the
+    actual upsert / validation pipeline lives in the helper so the new
+    /api/import/from-drive endpoint shares the exact same code path.
+
+    Response includes: inserted, updated, skipped, errors, received,
+    skip_reasons (up to 20), last_error, fields_used.
+    """
+    d = request.get_json() or {}
+    table = d.get('table', '')
+    rows = d.get('rows', [])
+    auto_create = bool(d.get('auto_create', False))
+    column_labels = d.get('column_labels') or {}
+    db = get_db()
+    status, payload = _perform_import(
+        table, rows, auto_create, db, column_labels=column_labels,
+    )
+    return jsonify(payload), status
+
+
+# ─── Drive published-sheets import (Phase C3) ──────────────────────────
+# Whitelist of tables the /api/import/from-drive endpoint will touch.
+# Anything else is rejected with 403. attendance / payment_log /
+# student_groups are the three tables whose Drive sheet names are
+# seeded in settings (integrations.drive_sheet_*) at C1.
+_DRIVE_IMPORT_ALLOWED = {"attendance", "payment_log", "student_groups"}
+
+
+@app.route('/api/import/from-drive', methods=['POST'])
+@admin_required
+def api_import_from_drive():
+    """Pull rows from the published Google Sheets workbook and feed them
+    through the same _perform_import pipeline as /api/import.
+
+    Steps (in order):
+      1. Validate body: table_name + confirm_token (must equal table_name).
+      2. Run _pre_destructive_backup BEFORE any read — abort on failure.
+      3. Resolve URL + sheet name from settings (integrations.*).
+      4. Fetch xlsx via _drive_fetch_xlsx (stdlib only, 60s timeout).
+      5. Parse rows via _drive_extract_rows.
+      6. Hand to _perform_import (auto_create=False — no schema drift
+         from a remote source).
+      7. Audit + return JSON with counts and the backup path.
+    """
+    err = _require_admin_response()
+    if err:
+        return err
+    db = get_db()
+    d = request.get_json(silent=True) or {}
+    table_name    = (d.get("table_name") or "").strip()
+    confirm_token = (d.get("confirm_token") or "").strip()
+
+    if not table_name:
+        return jsonify({"ok": False, "error": "اسم الجدول مطلوب"}), 400
+    if not _re.match(r"^[A-Za-z0-9_]+$", table_name):
+        return jsonify({"ok": False, "error": "اسم الجدول غير صالح"}), 400
+    if confirm_token != table_name:
+        return jsonify({"ok": False, "error": "التأكيد غير مطابق"}), 400
+    if table_name not in _DRIVE_IMPORT_ALLOWED:
+        return jsonify({"ok": False,
+                        "error": "هذا الجدول غير مدعوم للاستيراد من Drive"}), 403
+
+    # Mandatory pre-destructive backup. If this fails, NO data is touched.
+    try:
+        bk_info = _pre_destructive_backup("import-from-drive:" + table_name)
+    except Exception as ex:
+        import sys as _sys
+        print("[drive-import] backup failed: " + str(ex), file=_sys.stderr)
+        return jsonify({
+            "ok": False,
+            "error": "تعذر إنشاء نسخة احتياطية. لا يمكن المتابعة بدون نسخة محفوظة.",
+        }), 500
+
+    # Resolve URL + sheet name from settings (seeded in C1).
+    url = (get_setting("integrations", "drive_workbook_url", "") or "").strip()
+    if not url:
+        return jsonify({"ok": False,
+                        "error": "رابط Drive غير معرّف في الإعدادات"}), 400
+    sheet_setting_key = "drive_sheet_" + table_name
+    sheet_name = (get_setting("integrations", sheet_setting_key, "") or "").strip()
+    if not sheet_name:
+        return jsonify({"ok": False,
+                        "error": "اسم ورقة Drive غير معرّف في الإعدادات"}), 400
+
+    # Fetch xlsx bytes.
+    try:
+        xlsx_bytes = _drive_fetch_xlsx(url)
+    except Exception as ex:
+        return jsonify({
+            "ok": False,
+            "error": "تعذر جلب الملف من Drive: " + str(ex)[:200],
+        }), 502
+
+    # Parse the requested sheet.
+    try:
+        rows = _drive_extract_rows(table_name, xlsx_bytes, sheet_name)
+    except Exception as ex:
+        msg = str(ex)
+        # Sheet-missing maps to 404; everything else (xlsx parse, header
+        # map missing) maps to 502 since the upstream payload is bad.
+        if msg.startswith("sheet not found"):
+            return jsonify({
+                "ok": False,
+                "error": "الورقة غير موجودة في ملف Drive: " + msg[:200],
+            }), 404
+        return jsonify({
+            "ok": False,
+            "error": "فشل قراءة الملف: " + msg[:200],
+        }), 502
+
+    # Run through the shared import pipeline (same code path as /api/import).
+    try:
+        status, payload = _perform_import(
+            table_name, rows, auto_create=False, db=db, column_labels=None,
+        )
+    except Exception as ex:
+        return jsonify({
+            "ok": False,
+            "error": "فشل أثناء الاستيراد: " + str(ex)[:200],
+        }), 500
+
+    # Audit log entry — best-effort, never blocks the response.
+    try:
+        u = session.get("user") or {}
+        _audit(
+            "import.from_drive",
+            target_type="table", target_id=table_name,
+            new_value={
+                "inserted": payload.get("inserted", 0),
+                "updated":  payload.get("updated", 0),
+                "skipped":  payload.get("skipped", 0),
+                "errors":   payload.get("errors", 0),
+            },
+            details={
+                "source_sheet": sheet_name,
+                "source_url":   url,
+                "received":     payload.get("received", 0),
+                "backup_filename": (bk_info.get("filename")
+                                    if isinstance(bk_info, dict) else None),
+                "backup_path":     (bk_info.get("path")
+                                    if isinstance(bk_info, dict) else None),
+                "actor": u.get("username") or "",
+            },
+        )
+    except Exception:
+        pass
+
+    # Augment payload with Drive-specific fields the UI shows alongside counts.
+    payload["source_sheet"] = sheet_name
+    payload["source_url"]   = url
+    payload["backup_path"]  = ((bk_info.get("path")
+                                if isinstance(bk_info, dict) else "") or "")
+    return jsonify(payload), status
 
 @app.route('/api/attendance/sessions', methods=['GET'])
 @login_required
