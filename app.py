@@ -21085,6 +21085,209 @@ def api_backups_run():
         return jsonify({"ok": False, "error": str(ex)}), 500
 
 
+# ── Fast table truncation (تفريغ الجدول) ─────────────────────────────
+#
+# Why this exists: row-by-row DELETE through the per-row API was the
+# only way to "empty" a table from قاعدة البيانات. On a real attendance
+# table that's thousands of round-trips — slow and prone to timeout.
+# This endpoint clears a whole table in ONE database statement after
+# an automatic verified backup, so the same operation completes in
+# seconds.
+#
+# Defense-in-depth (every layer below independently blocks abuse):
+#   1. /database is @admin_required (managers can't even reach it).
+#   2. This endpoint is @admin_required + double-checks via
+#      _require_admin_response().
+#   3. _TRUNCATE_ALLOWED is a hard whitelist — anything else is 403.
+#   4. _TRUNCATE_PROTECTED is an explicit deny-list seen even for
+#      tables that might one day be added to the whitelist by mistake.
+#   5. table_name is regex-validated [A-Za-z0-9_]+ so it can't contain
+#      a SQL fragment, and confirmed against PRAGMA-equivalent schema
+#      lookup so a typo can't accidentally hit the wrong table.
+#   6. confirm_token must equal the table name (frontend type-to-
+#      confirm). No global CSRF system in this app — SameSite=Lax
+#      on the session cookie + admin role gate are the actual CSRF
+#      defenses; the type-to-confirm enforces user *intent*.
+#   7. Auto-backup via _pre_destructive_backup() runs FIRST; if it
+#      raises (verification mismatch, disk full, anything), the
+#      DELETE is never executed.
+#   8. Audit log entry recorded with rows_cleared + backup path.
+_TRUNCATE_ALLOWED = {
+    "attendance",          # سجل الغياب
+    "payment_log",         # سجل الدفع
+    "student_payments",    # السجلات الفعلية للدفع
+    "payment_edits",       # سجل تعديلات الدفع
+    "student_groups",      # معلومات المجموعات
+    "evaluations",         # التقييمات الشهرية
+    "lessons_log",         # متابعة الدروس
+    "parent_messages",     # رسائل المعلمات
+    "attendance_late",     # التأخير
+    "session_durations",   # مدة الحصص
+    "message_log",         # سجل الرسائل
+    "point_events",        # أحداث النقاط
+    "redemptions",         # المكافآت المستبدلة
+    "point_notifications", # إشعارات النقاط
+}
+_TRUNCATE_PROTECTED = {
+    "users", "students", "taqseet", "parent_receipts",
+    "audit_log", "backup_log",
+    "curriculum_files", "curriculum_assignments", "curriculum_access_log",
+    "docs_pages", "docs_screenshots",
+    "settings", "schema_migrations", "table_labels",
+}
+
+
+def _truncate_table_exists(db, table_name):
+    """Return True iff `table_name` exists in the live DB schema.
+    Uses sqlite_master locally, information_schema on Postgres."""
+    try:
+        if USE_PG:
+            row = db.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name=? LIMIT 1",
+                (table_name,)
+            ).fetchone()
+        else:
+            row = db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name=? LIMIT 1",
+                (table_name,)
+            ).fetchone()
+        return bool(row)
+    except Exception:
+        return False
+
+
+@app.route('/api/admin/table/truncate', methods=['POST'])
+@admin_required
+def api_admin_table_truncate():
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    d = request.get_json(silent=True) or {}
+    table_name    = (d.get("table_name") or "").strip()
+    confirm_token = (d.get("confirm_token") or "").strip()
+
+    # ── Validation gauntlet ──
+    if not table_name:
+        return jsonify({"ok": False,
+                        "error": "&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x645;&#x637;&#x644;&#x648;&#x628;"}), 400
+    # Strict identifier — no quotes, no spaces, no SQL fragments.
+    if not _re.match(r"^[A-Za-z0-9_]+$", table_name):
+        return jsonify({"ok": False,
+                        "error": "&#x627;&#x633;&#x645; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x63A;&#x64A;&#x631; &#x635;&#x627;&#x644;&#x62D;"}), 400
+    # Type-to-confirm check (frontend made the user type the name).
+    if confirm_token != table_name:
+        return jsonify({"ok": False,
+                        "error": "&#x627;&#x644;&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x63A;&#x64A;&#x631; &#x645;&#x637;&#x627;&#x628;&#x642;"}), 400
+    # Protected (deny-list).
+    tn_lower = table_name.lower()
+    if (tn_lower in _TRUNCATE_PROTECTED
+        or tn_lower.startswith("backup_")
+        or tn_lower.startswith("system_")):
+        return jsonify({"ok": False,
+                        "error": "&#x647;&#x630;&#x627; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x645;&#x62D;&#x645;&#x64A;"}), 403
+    # Whitelist (allow-list).
+    if tn_lower not in _TRUNCATE_ALLOWED:
+        return jsonify({"ok": False,
+                        "error": "&#x647;&#x630;&#x627; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x63A;&#x64A;&#x631; &#x645;&#x633;&#x645;&#x648;&#x62D; &#x628;&#x62A;&#x641;&#x631;&#x64A;&#x63A;&#x647;"}), 403
+    # Schema existence (the table must really live in this DB).
+    if not _truncate_table_exists(db, table_name):
+        return jsonify({"ok": False,
+                        "error": "&#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644; &#x63A;&#x64A;&#x631; &#x645;&#x648;&#x62C;&#x648;&#x62F;"}), 404
+
+    # ── Pre-truncate row count ──
+    try:
+        pre_count = int(db.execute(
+            'SELECT COUNT(*) FROM "' + table_name + '"'
+        ).fetchone()[0] or 0)
+    except Exception as ex:
+        return jsonify({"ok": False,
+                        "error": "&#x62A;&#x639;&#x630;&#x631; &#x639;&#x62F; &#x627;&#x644;&#x635;&#x641;&#x648;&#x641;: " + str(ex)}), 500
+
+    # ── Mandatory verified backup ──
+    try:
+        bk_info = _pre_destructive_backup(
+            "truncate:" + table_name + " (rows=" + str(pre_count) + ")"
+        )
+    except Exception as ex:
+        import sys as _sys
+        print("[truncate] backup failed: " + str(ex), file=_sys.stderr)
+        return jsonify({
+            "ok": False,
+            "error": "&#x62A;&#x639;&#x630;&#x631; &#x625;&#x646;&#x634;&#x627;&#x621; &#x646;&#x633;&#x62E;&#x629; &#x627;&#x62D;&#x62A;&#x64A;&#x627;&#x637;&#x64A;&#x629;. &#x644;&#x627; &#x64A;&#x645;&#x643;&#x646; &#x627;&#x644;&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x628;&#x62F;&#x648;&#x646; &#x646;&#x633;&#x62E;&#x629; &#x645;&#x62D;&#x641;&#x648;&#x638;&#x629;.",
+        }), 500
+
+    # ── Atomic single-statement truncate ──
+    # A single DELETE is a transaction in both SQLite and Postgres.
+    # We use DELETE (not TRUNCATE) so triggers / FK ON DELETE rules
+    # fire normally and rollback semantics stay consistent with the
+    # rest of the app's row-level deletes.
+    rows_cleared = 0
+    try:
+        cur = db.execute('DELETE FROM "' + table_name + '"')
+        try:
+            rows_cleared = int(cur.rowcount or 0)
+        except Exception:
+            rows_cleared = pre_count
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[truncate] DELETE failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False,
+                        "error": "&#x641;&#x634;&#x644; &#x627;&#x644;&#x62A;&#x641;&#x631;&#x64A;&#x63A;: " + str(ex)}), 500
+
+    # Reset autoincrement so the next inserted row starts at 1 again.
+    # SQLite-only — Postgres sequence reset is skipped (sequence name
+    # varies and a non-reset sequence is harmless).
+    if not USE_PG:
+        try:
+            db.execute("DELETE FROM sqlite_sequence WHERE name=?", (table_name,))
+            db.commit()
+        except Exception:
+            pass
+
+    # ── Post-truncate verification ──
+    try:
+        post_count = int(db.execute(
+            'SELECT COUNT(*) FROM "' + table_name + '"'
+        ).fetchone()[0] or 0)
+    except Exception:
+        post_count = -1
+
+    # ── Audit log ──
+    try:
+        u = session.get("user") or {}
+        _audit(
+            "table.truncate",
+            target_type="table", target_id=table_name,
+            old_value={"rows": pre_count},
+            new_value={"rows": post_count},
+            details={
+                "rows_cleared": rows_cleared,
+                "backup_filename": bk_info.get("filename"),
+                "backup_path": bk_info.get("path"),
+                "actor": u.get("username") or "",
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "success": True,
+        "table": table_name,
+        "rows_cleared": rows_cleared,
+        "pre_count": pre_count,
+        "post_count": post_count,
+        "backup_path": bk_info.get("path") or "",
+        "backup_filename": bk_info.get("filename") or "",
+        "backup_id": bk_info.get("id"),
+    })
+
+
 @app.route('/api/backups', methods=['GET'])
 @admin_required
 def api_backups_list():
