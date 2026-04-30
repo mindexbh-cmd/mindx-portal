@@ -36761,6 +36761,9 @@ _DRIVE_SHEET_MAP = {
         "اسم المدرس":                                         "teacher_name",
         "اسم المعلم":                                         "teacher_name",
         "المستوى / المقرر":                                   "level_course",
+        "المستوى أو المقرر":                                   "level_course",
+        "المستوى/المقرر":                                     "level_course",
+        "المستوى - المقرر":                                   "level_course",
         "المستوى":                                            "level_course",
         "المقرر الذي تم الوصول اليه الفصل الفائت":             "last_reached",
         "آخر مرحلة":                                          "last_reached",
@@ -37099,6 +37102,15 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     errors   = 0
     skip_reasons = []   # up to 20 entries
     last_error = ""
+    # Per-column count of rows that arrived with a non-empty value for
+    # that field. Surfaced in the response payload so admins can spot
+    # "why is column X still empty after import?" without prod DB
+    # access — column with `nonempty_writes_per_col[col] == 0` means
+    # the sheet either didn't have that header or every row was empty
+    # under it. Helps differentiate between (a) header didn't match,
+    # (b) header matched but cells were blank, (c) value was rejected
+    # downstream.
+    nonempty_writes_per_col = {f: 0 for f in fields}
 
     cols = ",".join(fields)
     placeholders = ",".join(["?"] * len(fields))
@@ -37126,6 +37138,11 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
             _days_val = norm.get("study_days") or ""
             if _days_val:
                 norm[custom_days_col] = _days_val
+        # Tally non-empty writes per target column for the diagnostic
+        # surface in the response payload.
+        for _f in fields:
+            if (norm.get(_f) or "").strip():
+                nonempty_writes_per_col[_f] = nonempty_writes_per_col.get(_f, 0) + 1
         has_any = any(v for v in norm.values())
         if not has_any:
             skipped += 1
@@ -37222,6 +37239,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         "skip_reasons": skip_reasons,
         "last_error": last_error,
         "fields_used": fields,
+        "nonempty_writes_per_col": nonempty_writes_per_col,
         # Backwards-compat aliases (existing front-end reads d.imported/d.ignored).
         "imported": inserted,
         "ignored":  skipped,
