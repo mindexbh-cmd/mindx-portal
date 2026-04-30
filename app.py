@@ -37692,16 +37692,47 @@ def api_import_from_drive():
         return jsonify({"ok": False,
                         "error": "هذا الجدول غير مدعوم للاستيراد من Drive"}), 403
 
-    # Mandatory pre-destructive backup. If this fails, NO data is touched.
-    try:
-        bk_info = _pre_destructive_backup("import-from-drive:" + table_name)
-    except Exception as ex:
-        import sys as _sys
-        print("[drive-import] backup failed: " + str(ex), file=_sys.stderr)
-        return jsonify({
-            "ok": False,
-            "error": "تعذر إنشاء نسخة احتياطية. لا يمكن المتابعة بدون نسخة محفوظة.",
-        }), 500
+    # Per-phase timing diagnostics. Surfaced in response payload and
+    # stderr so 502 timeouts (or near-timeouts) reveal which phase is
+    # slow without prod DB access.
+    import time as _t_drv
+    _t_drive_start = _t_drv.time()
+    _t_backup = 0.0
+    _t_fetch  = 0.0
+    _t_parse  = 0.0
+    _t_import = 0.0
+
+    # Pre-import backup is OPT-IN for Drive imports. The endpoint is
+    # upsert-only — IMPORT_TABLE_KEYS dedups on natural keys and
+    # _perform_import only UPDATEs columns where the new value is
+    # non-empty, so existing data is never overwritten with blanks
+    # and no row is ever DELETEd. A backup is therefore not required
+    # for data safety. Running it inline often blows past the gunicorn
+    # worker timeout (30-60s+ for a full DB dump on Postgres) which
+    # was the cause of the HTTP 502 the admin reported. Admin can
+    # still trigger a manual backup via /api/backups/run before the
+    # import if a snapshot is desired. Pass {"with_backup": true} in
+    # the request body to opt back into inline backup. Truncate
+    # endpoint /api/admin/table/truncate is unchanged — it still
+    # backs up unconditionally because that one IS destructive.
+    bk_info = None
+    backup_skipped = True
+    if d.get("with_backup") is True:
+        backup_skipped = False
+        _t_b0 = _t_drv.time()
+        try:
+            bk_info = _pre_destructive_backup("import-from-drive:" + table_name)
+        except Exception as ex:
+            import sys as _sys, traceback as _tb
+            _sys.stderr.write("[drive-import] backup failed: " + str(ex) + "\n")
+            _sys.stderr.write(_tb.format_exc() + "\n")
+            return jsonify({
+                "ok": False,
+                "error": "تعذر إنشاء نسخة احتياطية. لا يمكن المتابعة بدون نسخة محفوظة.",
+                "exc_type": type(ex).__name__,
+                "stage": "backup",
+            }), 500
+        _t_backup = _t_drv.time() - _t_b0
 
     # Resolve URL + sheet name from settings (seeded in C1).
     url = (get_setting("integrations", "drive_workbook_url", "") or "").strip()
@@ -37715,6 +37746,7 @@ def api_import_from_drive():
                         "error": "اسم ورقة Drive غير معرّف في الإعدادات"}), 400
 
     # Fetch xlsx bytes.
+    _t_f0 = _t_drv.time()
     try:
         xlsx_bytes = _drive_fetch_xlsx(url)
     except Exception as ex:
@@ -37727,6 +37759,7 @@ def api_import_from_drive():
             "exc_type": type(ex).__name__,
             "stage": "fetch_xlsx",
         }), 502
+    _t_fetch = _t_drv.time() - _t_f0
 
     # Parse the requested sheet (live-label-aware lookup via db). The
     # resolver is fuzzy: configured-name-exact → folded-equality →
@@ -37735,6 +37768,7 @@ def api_import_from_drive():
     # title that was opened, surfaced to the response so the admin can
     # see when the configured name didn't match exactly.
     resolved_sheet_name = sheet_name
+    _t_p0 = _t_drv.time()
     try:
         rows, unmatched_headers, resolved_sheet_name = _drive_extract_rows(
             table_name, xlsx_bytes, sheet_name, db=db,
@@ -37759,8 +37793,10 @@ def api_import_from_drive():
             "exc_type": type(ex).__name__,
             "stage": "extract_rows",
         }), 502
+    _t_parse = _t_drv.time() - _t_p0
 
     # Run through the shared import pipeline (same code path as /api/import).
+    _t_i0 = _t_drv.time()
     try:
         status, payload = _perform_import(
             table_name, rows, auto_create=False, db=db, column_labels=None,
@@ -37775,6 +37811,7 @@ def api_import_from_drive():
             "exc_type": type(ex).__name__,
             "stage": "perform_import",
         }), 500
+    _t_import = _t_drv.time() - _t_i0
 
     # Audit log entry — best-effort, never blocks the response.
     try:
@@ -37805,6 +37842,28 @@ def api_import_from_drive():
     except Exception:
         pass
 
+    # Per-phase timing summary to stderr (visible in Render Logs) so
+    # 502 timeouts or near-timeouts are immediately diagnosable.
+    _t_total = _t_drv.time() - _t_drive_start
+    try:
+        import sys as _sys_t
+        _sys_t.stderr.write(
+            "[drive-import] table=" + table_name
+            + " resolved_sheet=" + repr(resolved_sheet_name)
+            + " rows=" + str(len(rows))
+            + " backup=" + ("%.1fs" % _t_backup)
+            + " fetch="  + ("%.1fs" % _t_fetch)
+            + " parse="  + ("%.1fs" % _t_parse)
+            + " import=" + ("%.1fs" % _t_import)
+            + " total="  + ("%.1fs" % _t_total)
+            + " inserted=" + str(payload.get("inserted", 0))
+            + " updated="  + str(payload.get("updated", 0))
+            + " skipped="  + str(payload.get("skipped", 0))
+            + "\n"
+        )
+    except Exception:
+        pass
+
     # Augment payload with Drive-specific fields the UI shows alongside counts.
     payload["source_sheet"]      = sheet_name
     payload["source_url"]        = url
@@ -37812,8 +37871,16 @@ def api_import_from_drive():
     payload["resolved_sheet_name"]   = resolved_sheet_name
     payload["configured_sheet_name"] = sheet_name
     payload["fallback_used"]         = (resolved_sheet_name != sheet_name)
+    payload["backup_skipped"]    = backup_skipped
     payload["backup_path"]       = ((bk_info.get("path")
                                      if isinstance(bk_info, dict) else "") or "")
+    payload["timings_ms"] = {
+        "backup": int(_t_backup * 1000),
+        "fetch":  int(_t_fetch * 1000),
+        "parse":  int(_t_parse * 1000),
+        "import": int(_t_import * 1000),
+        "total":  int(_t_total * 1000),
+    }
     return jsonify(payload), status
 
 @app.route('/api/attendance/sessions', methods=['GET'])
