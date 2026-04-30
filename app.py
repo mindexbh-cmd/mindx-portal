@@ -13762,7 +13762,12 @@ var allTaqseetData=[];
 async function loadStudents(){
 console.log('[loadStudents] start');
 try {
-  const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students'),fetch('/api/columns'),fetch('/api/taqseet').catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
+  /* Cache-bust query param so any aggressive browser/proxy cache
+     can't serve a stale empty response from before the most recent
+     import. Backend ignores unknown query params. Server already
+     sets Cache-Control: no-store but this is belt-and-braces. */
+  var _bust = '?_=' + Date.now();
+  const [sRes,cRes,tRes]=await Promise.all([fetch('/api/students' + _bust, {credentials:'same-origin'}),fetch('/api/columns' + _bust, {credentials:'same-origin'}),fetch('/api/taqseet' + _bust, {credentials:'same-origin'}).catch(()=>({ok:false,json:()=>Promise.resolve([])}))]);
   console.log('[loadStudents] HTTP statuses students=', sRes.status, 'columns=', cRes.status, 'taqseet=', tRes.status);
   if (!sRes.ok) {
     console.error('[loadStudents] /api/students failed:', sRes.status);
@@ -13831,8 +13836,10 @@ var STUDENT_DROPDOWN_FIELDS = {
   'group_online':       { source: 'group', emptyLabel: '-- لا يوجد --' }
 };
 var html='';
+var _renderFails=0;
 for(var i=0;i<list.length;i++){
 var s2=list[i];
+try {
 var row='<tr><td class="bulk-col"><input type="checkbox" class="bulk-cb" data-id="'+s2.id+'" onclick="_bulkUpdate(\\'studentsBody\\',\\'selectAll_students\\',\\'bulkDelBtn_students\\')"></td><td>'+(i+1)+'</td>';
 for(var j=0;j<allColumns.length;j++){
 var key=allColumns[j].col_key;
@@ -13857,7 +13864,15 @@ if(key==='installment_type'){
 }
 row+='<td><button class="action-btn btn-edit" onclick="openEdit('+s2.id+')">&#9998;</button><button class="action-btn btn-del" onclick="askDelete('+s2.id+')">&#128465;</button></td></tr>';
 html+=row;
+} catch (rowErr) {
+  _renderFails++;
+  console.error('[renderTable] row index', i, 'failed:', rowErr, 'data:', s2);
+  /* Don't blank the table — emit a visible placeholder row so the
+     user knows N students exist but K had a render problem. */
+  html += '<tr><td colspan="'+(allColumns.length+3)+'" style="color:#c62828;background:#ffebee;font-size:13px;padding:6px;">&#x62E;&#x637;&#x623; &#x641;&#x64A; &#x639;&#x631;&#x636; &#x627;&#x644;&#x635;&#x641; #' + (i+1) + ' (id=' + (s2 && s2.id) + ')</td></tr>';
 }
+}
+if (_renderFails > 0) console.warn('[renderTable]', _renderFails, 'rows failed to render out of', list.length);
 body.innerHTML=html;
 // Wire taqseet-style blur save on every contenteditable cell.
 body.querySelectorAll('.editable[data-field]').forEach(function(td){
@@ -19772,25 +19787,79 @@ def api_group_detail(gid):
 def api_students_get():
     """Every student, each row annotated with `is_active` so the
     student-search modal can rank active matches first while still
-    finding inactive ones."""
+    finding inactive ones.
+
+    Defensive serialization: each row is dict-converted and JSON-
+    sanitized inside its own try/except. A single bad row no longer
+    kills the whole response (which would otherwise blank the UI
+    via a 500 HTML page that the frontend can't parse). Decimal,
+    datetime, and any other non-(str|int|float|bool|None) value is
+    coerced to str() so jsonify never raises. NaN/Inf floats become
+    null. Cache-Control: no-store so the browser can't serve a
+    stale empty response from a previous import attempt.
+    """
+    import math as _math_safe
+    import sys as _sys_safe
     db = get_db()
     act_col = (get_setting("students", "active_column", "registration_term2_2026") or "").strip()
     act_val = (get_setting("students", "active_value",  "تم التسجيل") or "").strip()
     act_col = act_col if _is_safe_ident(act_col) else ""
-    rows = db.execute("SELECT * FROM students ORDER BY id ASC").fetchall()
+    try:
+        rows = db.execute("SELECT * FROM students ORDER BY id ASC").fetchall()
+    except Exception as ex:
+        _sys_safe.stderr.write("[/api/students] SELECT failed: " + str(ex) + "\n")
+        rows = []
     out = []
+    bad_row_count = 0
     for r in rows:
-        d = dict(r)
-        if act_col:
-            v = (d.get(act_col) or "").strip() if isinstance(d.get(act_col), str) else d.get(act_col)
-            d["is_active"] = (str(v or "").strip() == act_val)
-        else:
-            d["is_active"] = True
-        out.append(d)
+        try:
+            d = dict(r)
+            # Sanitize values that jsonify can't encode (Decimal,
+            # datetime objects from older psycopg builds, NaN/Inf).
+            for _k in list(d.keys()):
+                _v = d[_k]
+                if _v is None:
+                    continue
+                if isinstance(_v, bool):
+                    continue  # bool is a subclass of int, allow it through
+                if isinstance(_v, float):
+                    if _math_safe.isnan(_v) or _math_safe.isinf(_v):
+                        d[_k] = None
+                    continue
+                if isinstance(_v, (str, int)):
+                    continue
+                # Decimal / datetime / date / bytes / other — string-coerce
+                try:
+                    d[_k] = str(_v)
+                except Exception:
+                    d[_k] = None
+            if act_col:
+                _av = d.get(act_col)
+                if isinstance(_av, str):
+                    _av = _av.strip()
+                d["is_active"] = (str(_av or "").strip() == act_val)
+            else:
+                d["is_active"] = True
+            out.append(d)
+        except Exception as _ex_row:
+            bad_row_count += 1
+            try:
+                _sys_safe.stderr.write(
+                    "[/api/students] row failed (id="
+                    + str(getattr(r, "get", lambda *a: "?")("id"))
+                    + "): " + str(_ex_row) + "\n"
+                )
+            except Exception:
+                pass
+            continue
     # `count` is purely diagnostic — frontend's loadStudents logs it
     # alongside its own len(students) so we can spot serialization
-    # truncation (count != len) at a glance.
-    return jsonify({"students": out, "count": len(out)})
+    # truncation (count != len) at a glance. `bad_row_count` is the
+    # number of rows that failed serialization.
+    resp = jsonify({"students": out, "count": len(out), "bad_row_count": bad_row_count})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 def _students_live_columns(db):
     """Live `students` table columns minus system / auto fields. Used by
