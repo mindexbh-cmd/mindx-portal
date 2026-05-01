@@ -786,6 +786,7 @@ def init_db():
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_payment_log', 'اسم ورقة تفاصيل الدفع', 'تفاصيل الدفع'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_student_groups', 'اسم ورقة معلومات المجموعات', 'معلومات المجموعات (يدوي)'))
             db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_students', 'اسم ورقة قاعدة بيانات الطلبة', 'الصفحة الرئيسية لمعلومات الطلبة'))
+            db.execute("INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)", ('integrations', 'drive_sheet_payment_log_source_table', 'مصدر بيانات سجل الدفع عند الاستيراد من Drive', 'students'))
     except Exception:
         pass
     # ── permissions_v1: granular per-button + per-user permission system
@@ -1667,6 +1668,42 @@ if True:
             db2.execute(
                 "INSERT INTO schema_migrations(tag) VALUES(?)",
                 ("update_drive_sheet_students_name_v1",),
+            )
+            db2.commit()
+        except Exception:
+            pass
+
+    # ── drive_paylog_source_v1: add a configurable source for the
+    # payment_log Drive import. When set to 'students' (the default),
+    # the /api/import/from-drive endpoint reads the students sheet
+    # instead of the dedicated payment-log sheet and extracts ONLY
+    # personal_id + the 5 installment columns. Any other value
+    # (including missing) falls back to the legacy behaviour of
+    # reading from drive_sheet_payment_log. Idempotent via ON
+    # CONFLICT DO NOTHING — re-runs are no-ops once the row exists.
+    if "drive_paylog_source_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?) "
+                "ON CONFLICT(page,component) DO NOTHING",
+                ('integrations', 'drive_sheet_payment_log_source_table',
+                 'مصدر بيانات سجل الدفع عند الاستيراد من Drive',
+                 'students'),
+            )
+        except Exception:
+            try:
+                db2.execute(
+                    "INSERT INTO settings(page,component,label,value) VALUES(?,?,?,?)",
+                    ('integrations', 'drive_sheet_payment_log_source_table',
+                     'مصدر بيانات سجل الدفع عند الاستيراد من Drive',
+                     'students'),
+                )
+            except Exception:
+                pass
+        try:
+            db2.execute(
+                "INSERT INTO schema_migrations(tag) VALUES(?)",
+                ("drive_paylog_source_v1",),
             )
             db2.commit()
         except Exception:
@@ -37453,6 +37490,273 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
     return out, unmatched, resolved_name
 
 
+# Special-case extraction map for the "payment_log read from students
+# sheet" mode. Slot keys (_inst_slot_1.._inst_slot_5 + personal_id) are
+# placeholders the extractor uses; they get remapped to the live
+# payment_log column names (default inst1..inst5) in a second pass via
+# _paylog_resolve_inst_col_map. Every other column on the students
+# sheet is silently dropped — this map is a strict whitelist.
+# All Arabic aliases are folded via _grp_norm at lookup time so
+# alif/ya/taa-marbuta/diacritic variants match symmetrically.
+_PAYLOG_FROM_STUDENTS_FIELDS = {
+    "personal_id": [
+        "الرقم الشخصي",
+        "رقم البطاقة الشخصية",
+        "البطاقة الشخصية",
+        "رقم البطاقة",
+        "رقم الهوية",
+        "رقم الطالب",
+        "الرقم",
+        "personal_id",
+        "Personal ID",
+        "ID",
+        "CPR",
+    ],
+    "_inst_slot_1": [
+        "القسط الاول 2026",
+        "القسط الأول 2026",
+        "القسط الاول",
+        "القسط الأول",
+        "القسط 1",
+        "installment1",
+        "inst1",
+    ],
+    "_inst_slot_2": [
+        "القسط الثاني",
+        "القسط 2",
+        "installment2",
+        "inst2",
+    ],
+    "_inst_slot_3": [
+        "القسط الثالث",
+        "القسط 3",
+        "installment3",
+        "inst3",
+    ],
+    "_inst_slot_4": [
+        "القسط الرابع",
+        "القسط 4",
+        "installment4",
+        "inst4",
+    ],
+    "_inst_slot_5": [
+        "القسط الخامس",
+        "القسط 5",
+        "installment5",
+        "inst5",
+    ],
+}
+
+
+def _paylog_resolve_inst_col_map(db):
+    """Resolve the live payment_log column name for each installment
+    slot (1..5). Returned dict maps slot number -> live col_key.
+
+    Resolution order (per slot):
+      1. inst{N}            — the canonical seeded column.
+      2. installment{N}     — the alternative naming the user's
+                              instructions explicitly call out.
+      3. paylog_col_labels  — scan for an Arabic label that folds to
+                              "القسط N" (any spelling family) and
+                              return its col_key, but only if that
+                              col_key is actually present in the
+                              live schema. This handles the case
+                              where an admin renamed the columns
+                              via the table-edit modal (col_<ts>).
+      4. Fallback           — return inst{N} so downstream
+                              live_cols filtering drops the field
+                              cleanly instead of erroring.
+
+    Best-effort, never raises. Empty dict on PRAGMA failure means
+    the caller falls back to canonical inst1..inst5 names.
+    """
+    canonical = {n: "inst" + str(n) for n in (1, 2, 3, 4, 5)}
+    if db is None:
+        return canonical
+    try:
+        live = {r[1] for r in db.execute(
+            "PRAGMA table_info(payment_log)"
+        ).fetchall()}
+    except Exception:
+        return canonical
+    out = {}
+    for n in (1, 2, 3, 4, 5):
+        if ("inst" + str(n)) in live:
+            out[n] = "inst" + str(n)
+        elif ("installment" + str(n)) in live:
+            out[n] = "installment" + str(n)
+        else:
+            out[n] = canonical[n]
+    unresolved = [n for n in (1, 2, 3, 4, 5) if out[n] not in live]
+    if unresolved:
+        try:
+            import html as _html_pri
+            slot_patterns = {
+                1: ["القسط 1", "القسط الاول", "القسط الأول",
+                    "القسط الاول 2026", "القسط الأول 2026"],
+                2: ["القسط 2", "القسط الثاني"],
+                3: ["القسط 3", "القسط الثالث"],
+                4: ["القسط 4", "القسط الرابع"],
+                5: ["القسط 5", "القسط الخامس"],
+            }
+            folded_patterns = {
+                n: {_grp_norm(p) for p in pats if _grp_norm(p)}
+                for n, pats in slot_patterns.items()
+            }
+            for r in db.execute(
+                "SELECT col_key, col_label FROM paylog_col_labels"
+            ).fetchall():
+                ck = r[0] if hasattr(r, "__getitem__") else None
+                cl = r[1] if hasattr(r, "__getitem__") else None
+                if not ck or not cl:
+                    continue
+                ck = str(ck)
+                if ck not in live:
+                    continue
+                cl_decoded = _html_pri.unescape(str(cl))
+                cl_folded = _grp_norm(cl_decoded)
+                if not cl_folded:
+                    continue
+                for n in unresolved:
+                    if cl_folded in folded_patterns[n]:
+                        out[n] = ck
+                        break
+        except Exception:
+            pass
+    return out
+
+
+def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
+    """Parse the students workbook sheet and emit payment_log-shaped
+    rows. Returns `(rows, unmatched_headers, resolved_sheet_name)` —
+    same tuple shape as `_drive_extract_rows` so the calling endpoint
+    branches only at the call site.
+
+    Behaviour vs `_drive_extract_rows`:
+      - Uses the strict `_PAYLOG_FROM_STUDENTS_FIELDS` whitelist —
+        only personal_id + the 5 installment columns are extracted.
+        Every other column on the students sheet (name, phones,
+        groups, results, etc.) is silently dropped and is NOT
+        surfaced as an unmatched header.
+      - Slot keys are remapped to the live payment_log column names
+        via `_paylog_resolve_inst_col_map` before the row is emitted,
+        so admin-renamed columns are honoured without a code change.
+      - Rows with empty/whitespace-only personal_id are dropped
+        (payment_log natural key requires it).
+      - Rows where ALL 5 installment cells are empty are dropped
+        (no payment data to import — saves Postgres round-trips
+        and keeps the upsert idempotent).
+      - Re-uses the existing `_drive_resolve_sheet_name` fuzzy
+        resolver against the `students` variant list so a renamed
+        Drive sheet still matches.
+
+    Cells that arrive as raw numbers from openpyxl are str()'d. No
+    further normalisation here — `_perform_import` already runs
+    `_import_normalize_value` on every value, so the same
+    whitespace-fold + date-coerce + status-fold rules apply.
+    """
+    import io as _io
+    from openpyxl import load_workbook
+
+    # Build folded-Arabic → slot-key lookup. Slot keys (placeholders)
+    # are remapped to live payment_log column names below.
+    lookup = {}
+    for slot_key, aliases in _PAYLOG_FROM_STUDENTS_FIELDS.items():
+        for alias in aliases:
+            f = _grp_norm(alias)
+            if f and f not in lookup:
+                lookup[f] = slot_key
+        ek_folded = _grp_norm(slot_key)
+        if ek_folded and ek_folded not in lookup:
+            lookup[ek_folded] = slot_key
+
+    try:
+        wb = load_workbook(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    except Exception as ex:
+        raise RuntimeError("xlsx parse failed: " + str(ex)[:120])
+    titles = [ws.title for ws in wb.worksheets]
+    try:
+        # Use the "students" variant list for fuzzy fallback — the
+        # source sheet IS the students sheet, even though the target
+        # table is payment_log.
+        resolved_name, _fb = _drive_resolve_sheet_name(
+            sheet_name, titles, "students",
+        )
+    except RuntimeError:
+        try: wb.close()
+        except Exception: pass
+        raise
+    ws = wb[resolved_name]
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header = next(rows_iter)
+    except StopIteration:
+        try: wb.close()
+        except Exception: pass
+        return [], [], resolved_name
+
+    col_keys = []
+    for cell in header:
+        raw = "" if cell is None else str(cell)
+        if not raw.strip():
+            col_keys.append(None)
+            continue
+        f = _grp_norm(raw)
+        target = lookup.get(f) if f else None
+        col_keys.append(target)
+        # Note: we deliberately do NOT collect unmatched_headers here.
+        # Almost every column on the students sheet is "unmatched" by
+        # design — surfacing them would drown the admin in noise.
+
+    inst_col_map = _paylog_resolve_inst_col_map(db)
+    # _inst_slot_N -> live payment_log column key; personal_id
+    # passes through unchanged (it lives in payment_log under the
+    # same name).
+    slot_to_live = {"personal_id": "personal_id"}
+    for n in (1, 2, 3, 4, 5):
+        slot_to_live["_inst_slot_" + str(n)] = inst_col_map.get(
+            n, "inst" + str(n)
+        )
+
+    out = []
+    inst_live_cols = [slot_to_live["_inst_slot_" + str(n)]
+                      for n in (1, 2, 3, 4, 5)]
+    for row in rows_iter:
+        if row is None:
+            continue
+        rec = {}
+        for idx, val in enumerate(row):
+            if idx >= len(col_keys):
+                break
+            slot = col_keys[idx]
+            if not slot:
+                continue
+            sval = "" if val is None else str(val)
+            live_key = slot_to_live.get(slot, slot)
+            # Multiple sheet headers can fold to the same target
+            # (e.g. duplicate columns) — keep the first non-empty
+            # value rather than blindly overwriting with a blank.
+            if live_key in rec:
+                if (not (rec[live_key] or "").strip()) and sval.strip():
+                    rec[live_key] = sval
+            else:
+                rec[live_key] = sval
+        pid = (rec.get("personal_id") or "").strip()
+        if not pid:
+            continue
+        any_inst = False
+        for ic in inst_live_cols:
+            if (rec.get(ic) or "").strip():
+                any_inst = True
+                break
+        if not any_inst:
+            continue
+        out.append(rec)
+    try: wb.close()
+    except Exception: pass
+    return out, [], resolved_name
+
+
 IMPORT_TABLE_SQL = {
     "students": "INSERT INTO students",
     "student_groups": "INSERT INTO student_groups",
@@ -37462,7 +37766,8 @@ IMPORT_TABLE_SQL = {
     "payment_log": "INSERT INTO payment_log",
 }
 
-def _perform_import(table, rows, auto_create, db, column_labels=None):
+def _perform_import(table, rows, auto_create, db, column_labels=None,
+                    extra_fields=None):
     """Core import worker shared by /api/import and /api/import/from-drive.
 
     Takes already-parsed `rows` (list of dicts) and runs the same
@@ -37485,6 +37790,15 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     Side effects: ALTER TABLE on auto_create, INSERT INTO taqseet_col_labels
     when relevant, INSERT/UPDATE on the data table. db.commit() called
     at the end.
+
+    extra_fields: optional list of additional live column keys to
+    include in the INSERT/UPDATE field list. Use this when a caller
+    knows that incoming rows may carry admin-renamed columns (e.g.
+    col_<timestamp>) that aren't in IMPORT_TABLE_FIELDS but DO exist
+    in the live schema. Each candidate is safe-ident validated and
+    must already exist in live_cols — never triggers a CREATE/ALTER.
+    Lets a caller opt-in to renamed-column writes without enabling
+    auto_create (which would also create unwanted shadow columns).
     """
     column_labels = column_labels or {}
     import sys as _sys_pi
@@ -37540,6 +37854,21 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
                 pass
     else:
         fields = [f for f in fields if f in live_cols]
+
+    # Caller-supplied extras: live-only, safe-ident, deduped against
+    # `fields`. Never triggers ALTER TABLE — these MUST already exist
+    # in the live schema. Lets the Drive paylog-from-students path
+    # write to admin-renamed inst columns (col_<timestamp>) without
+    # enabling auto_create globally.
+    if extra_fields:
+        import re as _re_xf
+        _safe_xf = _re_xf.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+        for _xf in extra_fields:
+            if (isinstance(_xf, str)
+                    and _safe_xf.match(_xf)
+                    and _xf in live_cols
+                    and _xf not in fields):
+                fields.append(_xf)
 
     _sys_pi.stderr.write(
         "[perform_import] filtered fields (after live_cols)=" + str(fields) + "\n"
@@ -38047,6 +38376,26 @@ def api_import_from_drive():
                         "error": "رابط Drive غير معرّف في الإعدادات"}), 400
     sheet_setting_key = "drive_sheet_" + table_name
     sheet_name = (get_setting("integrations", sheet_setting_key, "") or "").strip()
+
+    # Special routing: payment_log can be configured to source its rows
+    # from the students sheet (which carries the 5 installment columns
+    # alongside student data). When `drive_sheet_payment_log_source_table`
+    # is 'students' (the seeded default), re-resolve the sheet name from
+    # `drive_sheet_students` and downstream we hand the bytes to a
+    # whitelist extractor that emits ONLY personal_id + inst1..5. Any
+    # other source value (or the row missing) falls back to the legacy
+    # behaviour of reading from the dedicated payment-log sheet.
+    paylog_source = ""
+    if table_name == "payment_log":
+        paylog_source = (get_setting(
+            "integrations", "drive_sheet_payment_log_source_table",
+            "students",
+        ) or "").strip()
+        if paylog_source == "students":
+            sheet_name = (get_setting(
+                "integrations", "drive_sheet_students", "",
+            ) or "").strip()
+
     if not sheet_name:
         return jsonify({"ok": False,
                         "error": "اسم ورقة Drive غير معرّف في الإعدادات"}), 400
@@ -38076,9 +38425,16 @@ def api_import_from_drive():
     resolved_sheet_name = sheet_name
     _t_p0 = _t_drv.time()
     try:
-        rows, unmatched_headers, resolved_sheet_name = _drive_extract_rows(
-            table_name, xlsx_bytes, sheet_name, db=db,
-        )
+        if table_name == "payment_log" and paylog_source == "students":
+            rows, unmatched_headers, resolved_sheet_name = (
+                _drive_extract_paylog_from_students(
+                    xlsx_bytes, sheet_name, db=db,
+                )
+            )
+        else:
+            rows, unmatched_headers, resolved_sheet_name = _drive_extract_rows(
+                table_name, xlsx_bytes, sheet_name, db=db,
+            )
     except Exception as ex:
         import sys as _sys, traceback as _tb
         _sys.stderr.write("[drive-import] extract failed: " + str(ex) + "\n")
@@ -38101,11 +38457,29 @@ def api_import_from_drive():
         }), 502
     _t_parse = _t_drv.time() - _t_p0
 
+    # For the paylog-from-students path, surface admin-renamed inst
+    # columns (col_<timestamp>) as `extra_fields` so _perform_import
+    # can write to them without enabling auto_create. Resolved BEFORE
+    # the import call so the diagnostic log line has it. Empty list
+    # in the canonical case (inst1..5 already in IMPORT_TABLE_FIELDS).
+    _import_extra_fields = None
+    if table_name == "payment_log" and paylog_source == "students":
+        try:
+            _inst_map = _paylog_resolve_inst_col_map(db)
+            _paylog_static = set(IMPORT_TABLE_FIELDS.get("payment_log") or ())
+            _import_extra_fields = [
+                v for v in _inst_map.values()
+                if isinstance(v, str) and v not in _paylog_static
+            ]
+        except Exception:
+            _import_extra_fields = None
+
     # Run through the shared import pipeline (same code path as /api/import).
     _t_i0 = _t_drv.time()
     try:
         status, payload = _perform_import(
             table_name, rows, auto_create=False, db=db, column_labels=None,
+            extra_fields=_import_extra_fields,
         )
     except Exception as ex:
         import sys as _sys, traceback as _tb
@@ -38138,6 +38512,8 @@ def api_import_from_drive():
                 "source_url":   url,
                 "received":     payload.get("received", 0),
                 "unmatched_headers": unmatched_headers,
+                "paylog_source_table": (paylog_source
+                                        if table_name == "payment_log" else None),
                 "backup_filename": (bk_info.get("filename")
                                     if isinstance(bk_info, dict) else None),
                 "backup_path":     (bk_info.get("path")
@@ -38155,6 +38531,8 @@ def api_import_from_drive():
         import sys as _sys_t
         _sys_t.stderr.write(
             "[drive-import] table=" + table_name
+            + (" paylog_source=" + repr(paylog_source)
+               if table_name == "payment_log" else "")
             + " resolved_sheet=" + repr(resolved_sheet_name)
             + " rows=" + str(len(rows))
             + " backup=" + ("%.1fs" % _t_backup)
@@ -38177,6 +38555,8 @@ def api_import_from_drive():
     payload["resolved_sheet_name"]   = resolved_sheet_name
     payload["configured_sheet_name"] = sheet_name
     payload["fallback_used"]         = (resolved_sheet_name != sheet_name)
+    if table_name == "payment_log":
+        payload["paylog_source_table"] = paylog_source
     payload["backup_skipped"]    = backup_skipped
     payload["backup_path"]       = ((bk_info.get("path")
                                      if isinstance(bk_info, dict) else "") or "")
