@@ -23642,6 +23642,7 @@ BUILT_IN_COLUMN_LABELS = {
     "complex_name":      "المجمع",
     "old_new_2026":      "قديم/جديد 2026",
     "registration_term2_2026":"حالة التسجيل",
+    "avatar_id":        "الصورة الرمزية",
 }
 
 # Taqseet columns are now Arabic identifiers (after v4 rebuild). Seed
