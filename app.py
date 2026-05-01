@@ -37246,6 +37246,13 @@ def _drive_build_header_lookup(table, db):
         folded = _grp_norm(k)
         if folded:
             lookup[folded] = v
+    # Tracking only used by the [students-import-debug] diagnostic
+    # below — captures the (col_key, decoded_label) pairs we observed
+    # so the admin can verify whether their UI-added Arabic-labelled
+    # column (e.g. "حالة التسجيل" → registration_term2_2026 or a
+    # col_<timestamp> the admin just added) is wired up before the
+    # import runs.
+    _live_label_rows = []
     lbl_tbl = IMPORT_LABEL_TABLES.get(table)
     if lbl_tbl and db is not None:
         try:
@@ -37262,10 +37269,38 @@ def _drive_build_header_lookup(table, db):
                     folded  = _grp_norm(decoded)
                     if folded:
                         lookup[folded] = col_key
+                    if table == "students":
+                        _live_label_rows.append((col_key, decoded))
                 # Also let the user paste the English col_key directly.
                 key_folded = _grp_norm(col_key)
                 if key_folded and key_folded not in lookup:
                     lookup[key_folded] = col_key
+        except Exception:
+            pass
+    if table == "students":
+        try:
+            import sys as _sys_sid
+            _sys_sid.stderr.write(
+                "[students-import-debug] live_label_rows="
+                + str(_live_label_rows[:30]) + "\n"
+            )
+            # Surface only the entries that look like "حالة التسجيل"
+            # variants so the admin can immediately verify the
+            # registration-status column is in the lookup with a
+            # known col_key target.
+            _hala_targets = {
+                tgt for fld, tgt in lookup.items()
+                if "حالة" in fld or "تسجيل" in fld
+                or ("hala" in fld) or ("tasjeel" in fld)
+            }
+            _sys_sid.stderr.write(
+                "[students-import-debug] registration-status targets="
+                + str(sorted(_hala_targets)) + "\n"
+            )
+            _sys_sid.stderr.write(
+                "[students-import-debug] lookup_size=" + str(len(lookup))
+                + " sample=" + str(list(lookup.items())[:10]) + "\n"
+            )
         except Exception:
             pass
     return lookup
@@ -37453,6 +37488,7 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
     col_keys = []
     unmatched = []
     seen_unmatched = set()
+    header_mapping = []   # only populated for table=='students' diagnostics
     for cell in header:
         raw = "" if cell is None else str(cell)
         if not raw.strip():
@@ -37464,6 +37500,23 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
         if target is None and folded and folded not in seen_unmatched:
             unmatched.append(raw.strip())
             seen_unmatched.add(folded)
+        if table == "students":
+            header_mapping.append((raw.strip(), target))
+    if table == "students":
+        try:
+            import sys as _sys_sid
+            _sys_sid.stderr.write(
+                "[students-import-debug] header_mapping(first 20)="
+                + str(header_mapping[:20]) + "\n"
+            )
+            _sys_sid.stderr.write(
+                "[students-import-debug] unmatched_headers="
+                + str(unmatched) + "\n"
+            )
+        except Exception:
+            pass
+    _diag_rows_logged = 0
+    _DIAG_ROW_SAMPLE_LIMIT = 3
     out = []
     for row in rows_iter:
         if row is None:
@@ -37485,8 +37538,36 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
             rec[fk] = sval
         if any_val:
             out.append(rec)
+            # Sample first 3 rows for the students-import diagnostic so the
+            # admin can verify the live-label-aware lookup actually picked
+            # up their UI-added columns before the upsert runs.
+            if (table == "students"
+                    and _diag_rows_logged < _DIAG_ROW_SAMPLE_LIMIT):
+                _diag_rows_logged += 1
+                try:
+                    import sys as _sys_sid2
+                    _populated = sorted(
+                        k for k, v in rec.items()
+                        if isinstance(v, str) and v.strip()
+                    )
+                    _sys_sid2.stderr.write(
+                        "[students-import-debug] row_sample="
+                        + str(len(out)) + " populated_keys="
+                        + str(_populated) + "\n"
+                    )
+                except Exception:
+                    pass
     try: wb.close()
     except Exception: pass
+    if table == "students":
+        try:
+            import sys as _sys_sid3
+            _sys_sid3.stderr.write(
+                "[students-import-debug] extracted_rows=" + str(len(out))
+                + " resolved_sheet=" + repr(resolved_name) + "\n"
+            )
+        except Exception:
+            pass
     return out, unmatched, resolved_name
 
 
@@ -38349,6 +38430,28 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
             _sys_pi.stderr.write(
                 "[perform_import] skip_reasons (first 10): "
                 + str(skip_reasons[:10]) + "\n"
+            )
+        except Exception:
+            pass
+
+    # Per-column write tally for the students Drive-import diagnostic.
+    # Lets the admin confirm post-import that newly-added columns
+    # ("حالة التسجيل" → registration_term2_2026 or a col_<timestamp>
+    # alias the admin set up via /database) actually received writes.
+    if table == "students":
+        try:
+            _sys_pi.stderr.write(
+                "[students-import-debug] nonempty_writes_per_col="
+                + str(nonempty_writes_per_col) + "\n"
+            )
+            _hala_keys = [k for k in nonempty_writes_per_col.keys()
+                          if k == "registration_term2_2026"
+                          or (isinstance(k, str)
+                              and k.startswith("col_"))]
+            _sys_pi.stderr.write(
+                "[students-import-debug] registration-status writes="
+                + str({k: nonempty_writes_per_col.get(k, 0)
+                       for k in _hala_keys}) + "\n"
             )
         except Exception:
             pass
