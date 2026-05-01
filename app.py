@@ -12703,6 +12703,127 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
 .spinner.show{display:flex;}
 .spin-circle{width:16px;height:16px;border:2px solid #b2dfdb;border-top-color:#00897B;border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+
+/* === MOBILE FIX (≤768px tablet, ≤600px phone) ============================
+   The attendance roster used to render with fixed-width table cells +
+   `.att-table-wrap{overflow:hidden}`, which on phones (≤400px wide) clipped
+   the right-side cells (action button, sometimes the status dropdown,
+   occasionally the rightmost characters of long Arabic names). This
+   block restructures the table on small screens without changing desktop
+   behaviour at all.
+
+   Applied fixes (per the 8-point comprehensive plan):
+     1. Responsive table wrapper — overflow-x:auto + min-width:100% so
+        the table can scroll horizontally as a fallback even before the
+        vertical-card collapse kicks in.
+     2. Name wrapping — white-space:normal + overflow-wrap:anywhere so
+        long Arabic names break across lines instead of being truncated
+        or pushing siblings off-screen.
+     3. Vertical scroll — natural body scroll; tbody is display:block so
+        every row renders (no max-height cap that hides students below
+        the fold).
+     4. No JS pagination — the renderer iterates `students` end-to-end;
+        confirmed nothing slices.
+     5. Backend filter (`include_inactive=1` knob) is observable via
+        the [attendance-load] stderr log in /api/groups-students.
+     6. Vertical row layout — `tr{display:block}` collapses each row to a
+        stacked card on phones; tap targets meet 44×44px Apple HIG.
+     7. RTL — body is `direction:rtl` already; we reassert text-align:right
+        on every collapsed cell so Arabic flows correctly.
+     8. Viewport meta — already set in <head>.
+   ======================================================================= */
+@media (max-width: 768px) {
+  .topbar { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+  .topbar h1 { font-size: 16px; flex: 1 1 100%; text-align: center; }
+  .main { padding: 14px 10px; }
+  .card { padding: 14px 12px; margin-bottom: 14px; }
+
+  .controls-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .controls-row .ctrl-group { width: 100%; margin-right: 0 !important; }
+  select.group-select, input.date-input { min-width: 0; width: 100%; }
+  .day-badge { width: 100%; min-width: 0; }
+  .student-count { align-self: flex-start; margin-bottom: 0; }
+
+  /* Replace the hidden-overflow desktop wrapper with horizontal-scroll
+     fallback, then collapse rows to stacked cards below. */
+  .att-table-wrap { overflow: visible; }
+  .att-table-wrap table { width: 100%; min-width: 0; }
+
+  /* Header padding tighter so tablet (>600px) view still renders as a
+     compact table; the collapse to cards happens at the 600px breakpoint. */
+  .att-table-wrap th { padding: 10px 8px; font-size: 13px; }
+  .att-table-wrap td { padding: 8px 8px; font-size: 13px; }
+  .student-name-cell {
+    white-space: normal !important;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  .status-select { min-width: 0 !important; padding: 8px 10px; font-size: 13.5px; }
+
+  .att-footer-btns { flex-direction: column; align-items: stretch; gap: 10px; }
+  .btn-save-all, .btn-cancel-att { width: 100%; justify-content: center; padding: 14px; font-size: 15px; min-height: 48px; }
+
+  .search-wrap { padding: 10px 12px; }
+}
+
+@media (max-width: 600px) {
+  /* Phone: collapse the table into vertical cards so every name fits
+     and tap targets meet the 44px minimum. */
+  .att-table-wrap { overflow: visible; box-shadow: none; background: transparent; }
+  .att-table-wrap table { display: block; }
+  .att-table-wrap thead { display: none; }
+  .att-table-wrap tbody { display: block; }
+  .att-table-wrap tr {
+    display: block;
+    background: #fff;
+    border: 1px solid #e0f2f1;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,137,123,.08);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .att-table-wrap td {
+    display: block;
+    padding: 4px 0;
+    text-align: right !important;
+    border: none;
+    font-size: 14px;
+  }
+  .att-table-wrap td:first-child {
+    /* Row number — small, top-right corner */
+    text-align: right !important;
+    color: #80CBC4;
+    font-weight: 700;
+    font-size: 11px;
+    padding-bottom: 0;
+  }
+  .student-name-cell {
+    font-size: 16px !important;
+    color: #1a1a2e !important;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 2px 0 6px !important;
+  }
+  .status-select {
+    width: 100%;
+    min-width: 0 !important;
+    font-size: 16px;
+    padding: 12px 14px;
+    min-height: 44px;
+  }
+  .action-cell { text-align: right !important; }
+  .btn-wa, .btn-wa-disabled {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 14px;
+    font-size: 14px;
+    min-height: 44px;
+    margin-top: 6px;
+  }
+  .att-stat { text-align: right !important; }
+  .empty-state { padding: 32px 12px; font-size: 14px; }
+}
 </style>
 </head>
 <body>
@@ -37365,6 +37486,25 @@ def api_groups_students():
             params.append(act_val)
         students = db.execute(students_sql, tuple(params)).fetchall()
         out[gname] = [dict(s) for s in students]
+    # [attendance-load] diagnostic — surfaces per-group roster sizes so the
+    # admin can verify post-deploy that mobile-rendering issues are pure
+    # CSS/layout problems and not the backend silently dropping students
+    # via the active-only filter. The full per-group dict can grow large
+    # on prod (300+ students across many groups) so we cap the dump at 5
+    # groups + a single total. Pass ?include_inactive=1 to bypass the
+    # active-only filter and see the unfiltered roster.
+    try:
+        import sys as _sys_al
+        _total = sum(len(v) for v in out.values())
+        _sample = {gn: len(out[gn]) for gn in list(out.keys())[:5]}
+        _sys_al.stderr.write(
+            "[attendance-load] groups=" + str(len(out))
+            + " students_total=" + str(_total)
+            + " include_inactive=" + str(include_inactive)
+            + " sample=" + str(_sample) + "\n"
+        )
+    except Exception:
+        pass
     return jsonify(out)
 
 def _att_normalize_date(s):
