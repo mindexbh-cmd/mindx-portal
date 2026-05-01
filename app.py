@@ -2973,6 +2973,190 @@ if True:
         except Exception:
             pass
 
+    # ── backfill_installment_type_v4: one-shot re-application of the
+    # installment_type rule now that "حالة التسجيل" has been backfilled
+    # via the e9d3f91 mirror fix. v1/v2/v3 are all already stamped from
+    # prior deploys but ran while حالة التسجيل was empty, so they
+    # mostly no-op'd. This v4 is a FRESH tag so it actually executes —
+    # matches the user's intent for a one-shot that runs once now,
+    # logs an explicit tally regardless of result, then never re-runs.
+    # The always-run block above keeps catching any subsequent edge
+    # cases automatically.
+    if "backfill_installment_type_v4" not in applied:
+        try:
+            import html as _html_v4
+            import sys as _sys_v4
+            import re as _re_v4
+            def _v4_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            # Em-dash is U+2014 (NOT '-'). These literals are bytes-
+            # for-bytes the same as the dropdown options.
+            _METHOD_1_v4 = "طريقة 1 — 140 د — 4 أقساط"
+            _METHOD_2_v4 = "طريقة 2 — 100 د — 3 أقساط"
+            _F_STATUS_LBL_v4 = _v4_fold("حالة التسجيل")
+            _F_FLAG_LBL_v4   = _v4_fold("قديم جديد 2026")
+            _F_INST_LBL_v4   = _v4_fold("اختيار نوع التقسيط")
+            _F_REGISTERED_v4 = _v4_fold("تم التسجيل")
+            _F_OLD_v4        = _v4_fold("قديم")
+            _F_NEW1_v4       = _v4_fold("مستجد")
+            _F_NEW2_v4       = _v4_fold("جديد")
+            _F_PROTECT_v4    = _v4_fold("طريقة")
+
+            try:
+                _live_cols_v4 = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+            except Exception:
+                _live_cols_v4 = set()
+            try:
+                _label_rows_v4 = db2.execute(
+                    "SELECT col_key, col_label FROM column_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows_v4 = []
+            _safe_rx_v4 = _re_v4.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            _label_to_key_v4 = {}
+            for _r in _label_rows_v4:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or not _safe_rx_v4.match(_ck):
+                    continue
+                if _ck not in _live_cols_v4:
+                    continue
+                _decoded = _html_v4.unescape(str(_cl)).strip()
+                _flbl = _v4_fold(_decoded)
+                if _flbl and _flbl not in _label_to_key_v4:
+                    _label_to_key_v4[_flbl] = _ck
+            _status_col_v4 = (_label_to_key_v4.get(_F_STATUS_LBL_v4)
+                              or ("registration_term2_2026" if "registration_term2_2026" in _live_cols_v4 else None))
+            _flag_col_v4   = (_label_to_key_v4.get(_F_FLAG_LBL_v4)
+                              or ("old_new_2026" if "old_new_2026" in _live_cols_v4 else None))
+            _inst_col_v4   = (_label_to_key_v4.get(_F_INST_LBL_v4)
+                              or ("installment_type" if "installment_type" in _live_cols_v4 else None))
+
+            if not (_status_col_v4 and _flag_col_v4 and _inst_col_v4):
+                _sys_v4.stderr.write(
+                    "[backfill-installment-type-v3] resolution failed: "
+                    "status=" + str(_status_col_v4)
+                    + " flag=" + str(_flag_col_v4)
+                    + " installment=" + str(_inst_col_v4)
+                    + " — skipping (tag stamped to avoid retry loop)\n"
+                )
+            else:
+                _sys_v4.stderr.write(
+                    "[backfill-installment-type-v3] columns resolved: status="
+                    + _status_col_v4 + " flag=" + _flag_col_v4
+                    + " installment=" + _inst_col_v4 + "\n"
+                )
+                _q_status_v4 = '"' + _status_col_v4 + '"'
+                _q_flag_v4   = '"' + _flag_col_v4 + '"'
+                _q_inst_v4   = '"' + _inst_col_v4 + '"'
+                try:
+                    _rows_v4 = db2.execute(
+                        "SELECT id, " + _q_status_v4 + ", " + _q_flag_v4
+                        + ", " + _q_inst_v4 + " FROM students"
+                    ).fetchall()
+                except Exception as _ex_sel_v4:
+                    _rows_v4 = []
+                    _sys_v4.stderr.write(
+                        "[backfill-installment-type-v3] SELECT failed: "
+                        + str(_ex_sel_v4) + "\n"
+                    )
+                _assigned_1_v4 = 0
+                _assigned_2_v4 = 0
+                _kept_existing_v4 = 0
+                _left_empty_v4    = 0
+                for _r in _rows_v4:
+                    _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                    _status = _r[1] if hasattr(_r, "__getitem__") else None
+                    _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                    _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                    if _rid is None:
+                        continue
+                    _cur_str = (_curr or "").strip()
+                    # Protect any value containing "طريقة" (admin's
+                    # manual or v2-shipped selection).
+                    if _cur_str and _F_PROTECT_v4 in _v4_fold(_cur_str):
+                        _kept_existing_v4 += 1
+                        continue
+                    # Any other non-empty value also kept untouched —
+                    # treat unrecognised text as admin's explicit choice.
+                    if _cur_str:
+                        _kept_existing_v4 += 1
+                        continue
+                    _fs = _v4_fold(_status)
+                    _ff = _v4_fold(_flag)
+                    _new = None
+                    if _fs == _F_REGISTERED_v4:
+                        if _ff == _F_OLD_v4:
+                            _new = _METHOD_2_v4
+                        elif _ff == _F_NEW1_v4 or _ff == _F_NEW2_v4:
+                            _new = _METHOD_1_v4
+                    if _new is None:
+                        _left_empty_v4 += 1
+                        continue
+                    try:
+                        db2.execute(
+                            "UPDATE students SET " + _q_inst_v4
+                            + " = ? WHERE id = ?",
+                            (_new, _rid),
+                        )
+                        if _new is _METHOD_1_v4:
+                            _assigned_1_v4 += 1
+                        else:
+                            _assigned_2_v4 += 1
+                    except Exception as _ex_upd_v4:
+                        _sys_v4.stderr.write(
+                            "[backfill-installment-type-v3] UPDATE row "
+                            + str(_rid) + " failed: " + str(_ex_upd_v4) + "\n"
+                        )
+                if _assigned_1_v4 or _assigned_2_v4:
+                    try: db2.commit()
+                    except Exception: pass
+                # Always log the tally so the admin has an explicit
+                # confirmation line per deploy, even when no rows
+                # changed (they may have been caught by the always-run
+                # block on a prior boot).
+                _sys_v4.stderr.write(
+                    "[backfill-installment-type-v3] tally:"
+                    + " assigned-1=" + str(_assigned_1_v4)
+                    + " assigned-2=" + str(_assigned_2_v4)
+                    + " kept-existing=" + str(_kept_existing_v4)
+                    + " left-empty=" + str(_left_empty_v4)
+                    + " total-rows=" + str(len(_rows_v4)) + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_installment_type_v4",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_v4:
+            try:
+                import sys as _sys_v4
+                _sys_v4.stderr.write(
+                    "[backfill-installment-type-v3] outer error: "
+                    + str(_ex_outer_v4) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
