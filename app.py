@@ -16194,10 +16194,21 @@ function importGenericFromExcel() {
         if(upd) parts.push("\u062A\u062D\u062F\u064A\u062B: " + upd);
         if(skp) parts.push("\u062A\u062C\u0627\u0647\u0644: " + skp);
         if(err) parts.push("\u062E\u0637\u0623: " + err);
-        statusEl.textContent = parts.join(" \u2014 ");
+        // Surface diagnostic detail when nothing landed \u2014 show the
+        // server-reported last_error or the first skip_reason so the
+        // user sees WHY before having to ask for prod logs.
+        var detail = "";
+        if (err > 0 && d.last_error) {
+          detail = " \u2014 " + String(d.last_error).slice(0, 220);
+        } else if ((ins + upd) === 0 && d.skip_reasons && d.skip_reasons.length) {
+          var sr0 = d.skip_reasons[0] || {};
+          detail = " \u2014 \u0635\u0641 " + (sr0.row || '?')
+                 + ": " + String(sr0.reason || '').slice(0, 220);
+        }
+        statusEl.textContent = parts.join(" \u2014 ") + detail;
         try { window.dispatchEvent(new CustomEvent('mx-imported', {detail: d})); } catch(e) {}
         if(defs.refresh && typeof window[defs.refresh] === 'function') { try { window[defs.refresh](); } catch(e) {} }
-        if(typeof showToast === 'function') showToast(parts.join(" \u2014 "));
+        if(typeof showToast === 'function') showToast(parts.join(" \u2014 ") + detail);
         if(ins + upd > 0 && skp === 0 && err === 0) {
           setTimeout(closeGenericExcelModal, 1200);
         }
@@ -37579,6 +37590,48 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         except Exception:
             pass
 
+    # Defensive server-side header remap. Rows from /api/import are
+    # already mapped client-side by mapGenericRow + IMPORT_DEFS, but the
+    # JS alias list is a strict subset of _DRIVE_SHEET_MAP. The Drive
+    # path knows more synonyms (e.g. the new "registration status"
+    # alias added in 266074d and the bulletproof personal_id aliases
+    # added in 3e40730). Run any unrecognised Arabic keys through
+    # _drive_build_header_lookup so the legacy upload path picks up the
+    # same aliases the Drive flow does. No-op for tables without a Drive
+    # map. Folded matching via _grp_norm makes alif/ya/taa-marbuta and
+    # diacritic variants match symmetrically. Existing English-keyed
+    # entries always win — we never overwrite them.
+    _drive_lookup = None
+    if _DRIVE_SHEET_MAP.get(table):
+        try:
+            _drive_lookup = _drive_build_header_lookup(table, db)
+        except Exception:
+            _drive_lookup = None
+    field_set = set(fields)
+
+    def _remap_row_keys(r_in):
+        if not _drive_lookup or not isinstance(r_in, dict):
+            return r_in
+        out = {}
+        for k, v in r_in.items():
+            if not isinstance(k, str):
+                out[k] = v
+                continue
+            # Already an English col_key in our schema — keep as-is.
+            if k in field_set:
+                if k not in out or (out.get(k) in (None, "") and v not in (None, "")):
+                    out[k] = v
+                continue
+            folded = _grp_norm(k)
+            target = _drive_lookup.get(folded) if folded else None
+            if target and target in field_set:
+                # Don't clobber an English-keyed entry that already
+                # arrived for this same target column.
+                if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
+                    out[target] = v
+            # Unrecognised keys are dropped silently — same as Drive flow.
+        return out
+
     inserted = 0
     updated  = 0
     skipped  = 0
@@ -37610,6 +37663,11 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
             skipped += 1
             _remember_skip(idx, "row is not an object")
             continue
+        # Apply server-side defensive header remap (no-op when lookup
+        # is unavailable / table has no Drive map). Idempotent for
+        # rows already keyed by English col_keys.
+        if _drive_lookup is not None:
+            r = _remap_row_keys(r)
         norm = {}
         for f in fields:
             norm[f] = _import_normalize_value(table, f, r.get(f))
@@ -37844,10 +37902,53 @@ def api_import():
     rows = d.get('rows', [])
     auto_create = bool(d.get('auto_create', False))
     column_labels = d.get('column_labels') or {}
+
+    # Diagnostic logging tagged so the legacy upload path is
+    # distinguishable from /api/import/from-drive in prod logs. Surfaces
+    # exactly what keys the JS sent us — useful for debugging cases where
+    # mapGenericRow's alias list silently dropped a header.
+    import sys as _sys_li
+    try:
+        _first_keys = []
+        if rows and isinstance(rows[0], dict):
+            _first_keys = sorted(list(rows[0].keys()))[:40]
+        _sys_li.stderr.write(
+            "[legacy-import] enter table=" + str(table)
+            + " rows=" + str(len(rows) if rows is not None else 0)
+            + " auto_create=" + str(auto_create)
+            + " first-row keys(<=40)=" + str(_first_keys) + "\n"
+        )
+    except Exception:
+        pass
+
     db = get_db()
     status, payload = _perform_import(
         table, rows, auto_create, db, column_labels=column_labels,
     )
+
+    # Surface counts + first-5 skip reasons + last_error in the log so
+    # we can diagnose "171 attempted, 0 inserted, 171 errors" without
+    # prod DB access. Per-row Postgres errors are already logged by
+    # _perform_import with the [perform_import] prefix.
+    try:
+        if isinstance(payload, dict):
+            _sys_li.stderr.write(
+                "[legacy-import] result table=" + str(table)
+                + " inserted=" + str(payload.get("inserted"))
+                + " updated=" + str(payload.get("updated"))
+                + " skipped=" + str(payload.get("skipped"))
+                + " errors=" + str(payload.get("errors"))
+                + " last_error=" + str(payload.get("last_error", ""))[:300] + "\n"
+            )
+            _sr = payload.get("skip_reasons") or []
+            if _sr:
+                _sys_li.stderr.write(
+                    "[legacy-import] first-5 skip_reasons: "
+                    + str(_sr[:5]) + "\n"
+                )
+    except Exception:
+        pass
+
     return jsonify(payload), status
 
 
