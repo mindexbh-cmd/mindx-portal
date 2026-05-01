@@ -3451,6 +3451,274 @@ if True:
         except Exception:
             pass
 
+    # ── backfill_installment_type_v5: corrective one-shot. The truth
+    # the deep diagnostic uncovered: students.installment_type stores
+    # the taqseet row id (a short digit-string), NOT a synthesized
+    # display label. v2/v3/v4 wrote the literal "طريقة N — ... — ...
+    # أقساط" string into the column, breaking the UI's
+    # _tqMatchesStored() lookup so the dropdown rendered as
+    # unselected. v5 repairs that garbage AND fills truly-empty rows
+    # using DYNAMICALLY-RESOLVED taqseet ids (NOT hardcoded "1"/"2"
+    # — admin may have reordered or deleted seed rows).
+    #
+    # Decision matrix per student row:
+    #   tag           → installment_type
+    #   ────────────────────────────────────────────────────
+    #   empty/null    → apply rule (registered+قديم → m2_id,
+    #                   registered+مستجد/جديد → m1_id, else → leave)
+    #   garbage str   → same rule, replacing the garbage. If rule
+    #                   doesn't apply, clear garbage to NULL.
+    #   admin manual  → KEEP (anything non-empty that doesn't match
+    #                   the garbage pattern is treated as admin's
+    #                   explicit choice — could be a digit-id or a
+    #                   custom label).
+    #
+    # Garbage detector: regex r'^طريقة\s*[12]\s*—' — matches the
+    # exact two literals v2/v3/v4 wrote, with em-dash U+2014.
+    # Anything else (including admin's "1", "5", "طريقة مخصصة", etc.)
+    # is preserved.
+    if "backfill_installment_type_v5" not in applied:
+        try:
+            import html as _html_v5
+            import sys as _sys_v5
+            import re as _re_v5
+            def _v5_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            _F_REGISTERED_v5 = _v5_fold("تم التسجيل")
+            _F_OLD_v5        = _v5_fold("قديم")
+            _F_NEW1_v5       = _v5_fold("مستجد")
+            _F_NEW2_v5       = _v5_fold("جديد")
+            _F_STATUS_LBL_v5 = _v5_fold("حالة التسجيل")
+            _F_FLAG_LBL_v5   = _v5_fold("قديم جديد 2026")
+            _F_INST_LBL_v5   = _v5_fold("اختيار نوع التقسيط")
+
+            # Em-dash U+2014. Matches "طريقة 1 — ..." / "طريقة 2 — ..."
+            # exactly as v2/v3/v4 wrote them.
+            _GARBAGE_RX_v5 = _re_v5.compile(r'^\s*طريقة\s*[12]\s*—')
+
+            # === STEP 1: dynamic taqseet id resolution ===
+            _method_1_id = None
+            _method_2_id = None
+            try:
+                _tq_rows = db2.execute(
+                    'SELECT id, "طريقة_التقسيط" FROM taqseet'
+                ).fetchall()
+            except Exception as _ex_tq:
+                _tq_rows = []
+                _sys_v5.stderr.write(
+                    "[backfill-installment-type-v5] taqseet SELECT failed: "
+                    + str(_ex_tq) + "\n"
+                )
+            for _r in _tq_rows:
+                _tid    = _r[0] if hasattr(_r, "__getitem__") else None
+                _method = _r[1] if hasattr(_r, "__getitem__") else None
+                _ms = (str(_method).strip() if _method is not None else "")
+                if _ms == "1" and _method_1_id is None:
+                    _method_1_id = str(_tid)
+                elif _ms == "2" and _method_2_id is None:
+                    _method_2_id = str(_tid)
+
+            _sys_v5.stderr.write(
+                "[backfill-installment-type-v5] resolved taqseet ids:"
+                + " method_1_id=" + repr(_method_1_id)
+                + " method_2_id=" + repr(_method_2_id) + "\n"
+            )
+
+            if not (_method_1_id and _method_2_id):
+                _sys_v5.stderr.write(
+                    "[backfill-installment-type-v5] could not resolve both "
+                    "taqseet ids (method_1=" + repr(_method_1_id)
+                    + ", method_2=" + repr(_method_2_id) + ") — "
+                    "skipping. Tag stamped to avoid retry loop; admin "
+                    "can re-run after seeding the taqseet table.\n"
+                )
+            else:
+                # === STEP 2: resolve students column keys ===
+                try:
+                    _live_cols_v5 = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+                except Exception:
+                    _live_cols_v5 = set()
+                try:
+                    _label_rows_v5 = db2.execute(
+                        "SELECT col_key, col_label FROM column_labels"
+                    ).fetchall()
+                except Exception:
+                    _label_rows_v5 = []
+                _safe_rx_v5 = _re_v5.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+                _label_to_key_v5 = {}
+                for _r in _label_rows_v5:
+                    _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                    _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                    _ck = str(_ck).strip()
+                    if not _ck or not _safe_rx_v5.match(_ck):
+                        continue
+                    if _ck not in _live_cols_v5:
+                        continue
+                    _decoded = _html_v5.unescape(str(_cl)).strip()
+                    _flbl = _v5_fold(_decoded)
+                    if _flbl and _flbl not in _label_to_key_v5:
+                        _label_to_key_v5[_flbl] = _ck
+                _status_col_v5 = (_label_to_key_v5.get(_F_STATUS_LBL_v5)
+                                  or ("registration_term2_2026" if "registration_term2_2026" in _live_cols_v5 else None))
+                _flag_col_v5   = (_label_to_key_v5.get(_F_FLAG_LBL_v5)
+                                  or ("old_new_2026" if "old_new_2026" in _live_cols_v5 else None))
+                _inst_col_v5   = (_label_to_key_v5.get(_F_INST_LBL_v5)
+                                  or ("installment_type" if "installment_type" in _live_cols_v5 else None))
+
+                if not (_status_col_v5 and _flag_col_v5 and _inst_col_v5):
+                    _sys_v5.stderr.write(
+                        "[backfill-installment-type-v5] column resolution failed: "
+                        "status=" + str(_status_col_v5)
+                        + " flag=" + str(_flag_col_v5)
+                        + " installment=" + str(_inst_col_v5) + "\n"
+                    )
+                else:
+                    # === STEP 3: per-row repair + apply ===
+                    _q_status_v5 = '"' + _status_col_v5 + '"'
+                    _q_flag_v5   = '"' + _flag_col_v5 + '"'
+                    _q_inst_v5   = '"' + _inst_col_v5 + '"'
+                    try:
+                        _rows_v5 = db2.execute(
+                            "SELECT id, " + _q_status_v5 + ", " + _q_flag_v5
+                            + ", " + _q_inst_v5 + " FROM students"
+                        ).fetchall()
+                    except Exception as _ex_sel_v5:
+                        _rows_v5 = []
+                        _sys_v5.stderr.write(
+                            "[backfill-installment-type-v5] SELECT failed: "
+                            + str(_ex_sel_v5) + "\n"
+                        )
+
+                    _repaired_to_1     = 0
+                    _repaired_to_2     = 0
+                    _repaired_to_empty = 0
+                    _newly_to_1        = 0
+                    _newly_to_2        = 0
+                    _kept_existing     = 0
+                    _left_empty        = 0
+                    for _r in _rows_v5:
+                        _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                        _status = _r[1] if hasattr(_r, "__getitem__") else None
+                        _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                        _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                        if _rid is None:
+                            continue
+                        _cur_str = (_curr or "").strip()
+                        _is_garbage = bool(_cur_str
+                                           and _GARBAGE_RX_v5.search(_cur_str))
+                        _is_empty   = (not _cur_str)
+                        # Admin manual choice: anything non-empty that
+                        # isn't garbage. Preserve verbatim.
+                        if _cur_str and not _is_garbage:
+                            _kept_existing += 1
+                            continue
+                        # Compute the rule's verdict.
+                        _fs = _v5_fold(_status)
+                        _ff = _v5_fold(_flag)
+                        _new_val = None
+                        if _fs == _F_REGISTERED_v5:
+                            if _ff == _F_OLD_v5:
+                                _new_val = _method_2_id
+                            elif _ff == _F_NEW1_v5 or _ff == _F_NEW2_v5:
+                                _new_val = _method_1_id
+                        # Determine what to write + which counter to bump.
+                        if _is_garbage:
+                            # Always rewrite garbage — even to NULL when
+                            # rule doesn't apply (clearing the broken
+                            # display).
+                            try:
+                                if _new_val is None:
+                                    db2.execute(
+                                        "UPDATE students SET " + _q_inst_v5
+                                        + " = NULL WHERE id = ?",
+                                        (_rid,),
+                                    )
+                                    _repaired_to_empty += 1
+                                else:
+                                    db2.execute(
+                                        "UPDATE students SET " + _q_inst_v5
+                                        + " = ? WHERE id = ?",
+                                        (_new_val, _rid),
+                                    )
+                                    if _new_val == _method_1_id:
+                                        _repaired_to_1 += 1
+                                    else:
+                                        _repaired_to_2 += 1
+                            except Exception as _ex_upd:
+                                _sys_v5.stderr.write(
+                                    "[backfill-installment-type-v5] repair "
+                                    "row " + str(_rid) + " failed: "
+                                    + str(_ex_upd) + "\n"
+                                )
+                        elif _is_empty:
+                            if _new_val is None:
+                                _left_empty += 1
+                                continue
+                            try:
+                                db2.execute(
+                                    "UPDATE students SET " + _q_inst_v5
+                                    + " = ? WHERE id = ?",
+                                    (_new_val, _rid),
+                                )
+                                if _new_val == _method_1_id:
+                                    _newly_to_1 += 1
+                                else:
+                                    _newly_to_2 += 1
+                            except Exception as _ex_upd:
+                                _sys_v5.stderr.write(
+                                    "[backfill-installment-type-v5] new-assign "
+                                    "row " + str(_rid) + " failed: "
+                                    + str(_ex_upd) + "\n"
+                                )
+                    if (_repaired_to_1 or _repaired_to_2 or _repaired_to_empty
+                            or _newly_to_1 or _newly_to_2):
+                        try: db2.commit()
+                        except Exception: pass
+
+                    _sys_v5.stderr.write(
+                        "[backfill-installment-type-v5] tally:"
+                        + " repaired-from-garbage-to-1=" + str(_repaired_to_1)
+                        + " repaired-from-garbage-to-2=" + str(_repaired_to_2)
+                        + " repaired-from-garbage-to-empty=" + str(_repaired_to_empty)
+                        + " newly-assigned-1=" + str(_newly_to_1)
+                        + " newly-assigned-2=" + str(_newly_to_2)
+                        + " kept-existing=" + str(_kept_existing)
+                        + " left-empty=" + str(_left_empty)
+                        + " total-rows=" + str(len(_rows_v5)) + "\n"
+                    )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_installment_type_v5",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_v5:
+            try:
+                import sys as _sys_v5
+                _sys_v5.stderr.write(
+                    "[backfill-installment-type-v5] outer error: "
+                    + str(_ex_outer_v5) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
