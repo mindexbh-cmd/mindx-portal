@@ -15939,7 +15939,7 @@ var IMPORT_DEFS = {
     refresh: "loadPaymentLog",
     fields: [
       {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
-      {key:"personal_id", ar:"الرقم"},
+      {key:"personal_id", ar:"\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a"},
       {key:"registration_status", ar:"\u062d\u0627\u0644\u0629 \u0627\u0644\u062a\u0633\u062c\u064a\u0644"},
       {key:"course_amount", ar:"\u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0648\u0631\u0629"},
       {key:"inst1", ar:"\u0627\u0644\u0642\u0633\u0637 1"},
