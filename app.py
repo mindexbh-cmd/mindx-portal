@@ -15862,7 +15862,7 @@ var IMPORT_DEFS = {
     title: "\u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628\u0629",
     refresh: "loadStudents",
     fields: [
-      {key:"personal_id", ar:["\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A","\u0631\u0642\u0645 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628","\u0627\u0644\u0631\u0642\u0645","Personal ID","Personal_ID","ID","CPR","cpr"]},
+      {key:"personal_id", ar:["\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A","\u0631\u0642\u0645 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064A\u0629","\u0627\u0644\u0647\u0648\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628","\u0627\u0644\u0631\u0642\u0645","\u0631\u0642\u0645 \u0627\u0644\u062A\u0639\u0631\u064A\u0641","Personal ID","Personal_ID","personal_id","ID","id","CPR","cpr"]},
       {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
       {key:"whatsapp", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F"},
       {key:"class_name", ar:"\u0627\u0644\u0635\u0641"},
@@ -16020,12 +16020,23 @@ function onGenExcelTableChange() {
   genExcelRows = []; genExcelHeaders = [];
 }
 function _countMatches(headers, defs){
+  // f.ar can be a single Arabic alias OR an array of aliases (e.g.
+  // personal_id has 11+ aliases). Earlier versions called
+  // _arNorm(f.ar) directly, which on an array does String([...]) ->
+  // "a,b,c,..." -> never matches. Match `mapGenericRow`'s logic and
+  // iterate the array properly.
   var n = 0;
   for(var i=0;i<headers.length;i++){
     var hn = _arNorm(headers[i]); if(!hn) continue;
     for(var j=0;j<defs.fields.length;j++){
       var f = defs.fields[j];
-      if(hn === f.key || hn === _arNorm(f.ar)){ n++; break; }
+      if(hn === f.key){ n++; break; }
+      var arVariants = Array.isArray(f.ar) ? f.ar : [f.ar];
+      var any = false;
+      for(var av=0; av<arVariants.length; av++){
+        if(hn === _arNorm(arVariants[av])){ any = true; break; }
+      }
+      if(any){ n++; break; }
     }
   }
   return n;
@@ -16090,17 +16101,50 @@ function readGenericExcelFile(input) {
         return r.some(function(c){ return String(c).trim() !== ''; });
       });
       try { console.log('[import] headers:', genExcelHeaders, 'codepage:', best.cp, 'matches:', best.matchCount); } catch(e){}
+      // f.ar may be a single Arabic alias OR an array of aliases \u2014
+      // iterate array variants symmetrically, matching mapGenericRow.
+      // Without this, columns whose alias list is an array (notably
+      // students.personal_id with 11+ aliases) were always reported
+      // as "unmatched" in the UI counter even though the actual
+      // import via mapGenericRow correctly mapped them.
       var matched = [], unmatched = [];
+      var unmatchedDiag = [];
       for(var i=0;i<genExcelHeaders.length;i++){
         var h = genExcelHeaders[i]; if(!h){ continue; }
         var hn = _arNorm(h), found = null;
         for(var j=0;j<defs.fields.length;j++){
           var f = defs.fields[j];
-          if(hn === f.key || hn === _arNorm(f.ar)){ found = f.key; break; }
+          if(hn === f.key){ found = f.key; break; }
+          var arVariants = Array.isArray(f.ar) ? f.ar : [f.ar];
+          var any = false;
+          for(var av=0; av<arVariants.length; av++){
+            if(hn === _arNorm(arVariants[av])){ any = true; break; }
+          }
+          if(any){ found = f.key; break; }
         }
         if(found) matched.push(h + ' \u2192 ' + found);
-        else unmatched.push(h);
+        else {
+          unmatched.push(h);
+          // Per-header diagnostic so the admin can open browser
+          // DevTools console and see exactly what folded form was
+          // tried and which alias families were checked.
+          var triedFolded = [];
+          for(var jd=0; jd<defs.fields.length; jd++){
+            var fd = defs.fields[jd];
+            var fdAr = Array.isArray(fd.ar) ? fd.ar : [fd.ar];
+            for(var ad=0; ad<fdAr.length; ad++){
+              triedFolded.push(_arNorm(fdAr[ad]));
+            }
+          }
+          unmatchedDiag.push({raw: h, folded: hn, tried: triedFolded});
+        }
       }
+      try {
+        if(unmatchedDiag.length){
+          console.log('[header-match] unmatched diagnostics:', unmatchedDiag);
+        }
+        console.log('[header-match] matched:', matched, 'unmatched:', unmatched);
+      } catch(_e) {}
       var html = '<div style="text-align:right;">'
         + '<div><b>' + genExcelRows.length + '</b> ' + (genExcelRows.length===1?"\u0635\u0641":"\u0635\u0641\u0648\u0641") + ' \u2014 '
         + '\u0645\u0637\u0627\u0628\u0642\u0629: <b>' + matched.length + '</b> / \u063A\u064A\u0631 \u0645\u0637\u0627\u0628\u0642: <b>' + unmatched.length + '</b>'
@@ -37087,10 +37131,27 @@ _DRIVE_SHEET_MAP = {
         # _drive_build_header_lookup so a rename in /database is honoured.
 
         # personal_id ── الرقم الشخصي
+        # _grp_norm folds alif/ya/taa-marbuta/diacritic variants
+        # symmetrically, so each spelling family only needs one entry.
+        # The English-key + lowercase 'id' entries let the admin paste
+        # the bare column name into a sheet header too. NOTE: the
+        # ambiguous header "رقم الطالب" is intentionally NOT listed here
+        # — it's already a whatsapp alias below for legacy compatibility,
+        # and re-routing it would change existing import behaviour.
         "الرقم الشخصي":                                       "personal_id",
         "البطاقة الشخصية":                                    "personal_id",
         "رقم البطاقة":                                        "personal_id",
+        "رقم البطاقة الشخصية":                                "personal_id",
+        "رقم الهوية":                                         "personal_id",
+        "الهوية":                                             "personal_id",
+        "رقم التعريف":                                        "personal_id",
         "الرقم":                                              "personal_id",
+        "personal_id":                                        "personal_id",
+        "Personal ID":                                        "personal_id",
+        "ID":                                                 "personal_id",
+        "id":                                                 "personal_id",
+        "CPR":                                                "personal_id",
+        "cpr":                                                "personal_id",
 
         # student_name ── اسم الطالب
         "اسم الطالب":                                         "student_name",
@@ -37500,6 +37561,26 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
         if target is None and folded and folded not in seen_unmatched:
             unmatched.append(raw.strip())
             seen_unmatched.add(folded)
+            if table == "students":
+                # Per-header diagnostic on misses, with the resolved
+                # folded form + a sample of personal-id-family alias
+                # folds so a comparison failure is one log line away
+                # from the admin instead of a prod DB query.
+                try:
+                    import sys as _sys_hm
+                    _pid_aliases = [
+                        a for a, t in (_DRIVE_SHEET_MAP.get("students") or {}).items()
+                        if t == "personal_id"
+                    ]
+                    _pid_folds = [_grp_norm(a) for a in _pid_aliases]
+                    _sys_hm.stderr.write(
+                        "[header-match] sheet_header_raw=" + repr(raw.strip())
+                        + " folded=" + repr(folded)
+                        + " personal_id_aliases_folded="
+                        + str(_pid_folds) + "\n"
+                    )
+                except Exception:
+                    pass
         if table == "students":
             header_mapping.append((raw.strip(), target))
     if table == "students":
