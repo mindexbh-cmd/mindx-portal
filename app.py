@@ -2320,6 +2320,515 @@ if True:
             except Exception:
                 pass
 
+    # ── backfill_registration_status_from_drive_v1: one-shot Drive
+    # fetch to populate "حالة التسجيل" for existing students rows that
+    # are currently empty. Earlier imports (before the f26db36 / 266074d
+    # / e828124 fixes shipped) routed the column inconsistently, so the
+    # admin has 326 students with empty registration_term2_2026 and
+    # doesn't want to truncate-and-re-import. This migration fixes the
+    # data in place by:
+    #   1. Resolving the internal column key for the "حالة التسجيل"
+    #      label via column_labels (with registration_term2_2026 as
+    #      the fall-back).
+    #   2. Reading the Drive workbook URL + students sheet name from
+    #      the `settings` table (no get_setting() — that needs a
+    #      Flask app context, which we don't have at module-import).
+    #   3. Fetching the published xlsx via a stdlib urllib.request
+    #      with a tight 25s timeout (well under gunicorn's 120s
+    #      worker timeout — boot must not stall on a slow Drive).
+    #   4. Parsing the sheet via openpyxl, finding the Sheet column
+    #      whose folded header matches the target label.
+    #   5. Building a Sheet-row index keyed by personal_id (preferred)
+    #      with student_name as fall-back.
+    #   6. UPDATE-ing every DB row whose target column is empty AND
+    #      whose personal_id (or student_name) matches a Sheet row
+    #      that has a non-empty registration-status value.
+    # NEVER overwrites a non-empty DB value (admin's manual edit).
+    # The tag is stamped on success OR graceful skip — the only
+    # un-stamped path is hard exception (so a transient network
+    # blip lets the next deploy retry).
+    if "backfill_registration_status_from_drive_v1" not in applied:
+        _stamp_brs = False
+        try:
+            import sys as _sys_brs
+            import re as _re_brs
+            import html as _html_brs
+            import io as _io_brs
+            import urllib.request as _ur_brs
+            import urllib.error   as _ue_brs
+
+            def _brs_fold(s):
+                # Same shape as v1/v2 inline fold — _grp_norm not yet
+                # defined at module-import time.
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            _F_TARGET_LBL = _brs_fold("حالة التسجيل")
+
+            try:
+                _live_cols_brs = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+            except Exception:
+                _live_cols_brs = set()
+            try:
+                _label_rows_brs = db2.execute(
+                    "SELECT col_key, col_label FROM column_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows_brs = []
+            _safe_rx_brs = _re_brs.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            _target_col = None
+            for _r in _label_rows_brs:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or not _safe_rx_brs.match(_ck):
+                    continue
+                if _ck not in _live_cols_brs:
+                    continue
+                _decoded = _html_brs.unescape(str(_cl)).strip()
+                if _brs_fold(_decoded) == _F_TARGET_LBL:
+                    _target_col = _ck
+                    break
+            if not _target_col and "registration_term2_2026" in _live_cols_brs:
+                _target_col = "registration_term2_2026"
+
+            # Read Drive URL + students-sheet name from settings.
+            def _setting(comp, default=""):
+                try:
+                    _row = db2.execute(
+                        "SELECT value FROM settings "
+                        "WHERE page = 'integrations' AND component = ?",
+                        (comp,),
+                    ).fetchone()
+                    if _row and _row[0]:
+                        return str(_row[0]).strip()
+                except Exception:
+                    pass
+                return default
+            _drive_url   = _setting("drive_workbook_url")
+            _sheet_name  = _setting("drive_sheet_students")
+
+            if not _target_col or not _drive_url or not _sheet_name:
+                _sys_brs.stderr.write(
+                    "[backfill-registration-status] cannot run: "
+                    "target_col=" + str(_target_col)
+                    + " drive_url_set=" + str(bool(_drive_url))
+                    + " sheet_name=" + repr(_sheet_name)
+                    + " — skipping (tag stamped to avoid retry loop)\n"
+                )
+                _stamp_brs = True
+            else:
+                # Inline minimal Drive fetch — boot must not block.
+                _base = _drive_url.split("?", 1)[0].split("#", 1)[0]
+                if _base.endswith("/pubhtml"):
+                    _xurl = _base[: -len("/pubhtml")] + "/pub?output=xlsx"
+                elif _base.endswith("/pub"):
+                    _xurl = _base + "?output=xlsx"
+                else:
+                    _xurl = _drive_url + ("&" if "?" in _drive_url else "?") + "output=xlsx"
+                try:
+                    _req = _ur_brs.Request(_xurl, headers={"User-Agent": "mindx-portal/1.0"})
+                    with _ur_brs.urlopen(_req, timeout=25) as _resp:
+                        if getattr(_resp, "status", 200) != 200:
+                            raise RuntimeError("http " + str(getattr(_resp, "status", 0)))
+                        _xlsx_bytes = _resp.read()
+                except (_ue_brs.URLError, RuntimeError, Exception) as _ex_fetch:
+                    _sys_brs.stderr.write(
+                        "[backfill-registration-status] Drive fetch failed: "
+                        + str(_ex_fetch)[:200]
+                        + " — tag NOT stamped, will retry next deploy\n"
+                    )
+                    _xlsx_bytes = None
+
+                if not _xlsx_bytes:
+                    pass
+                elif len(_xlsx_bytes) < 4 or _xlsx_bytes[:2] != b"PK":
+                    _sys_brs.stderr.write(
+                        "[backfill-registration-status] response is not an xlsx "
+                        "(unpublished sheet or wrong URL) — tag NOT stamped\n"
+                    )
+                else:
+                    try:
+                        from openpyxl import load_workbook as _lwb_brs
+                        _wb = _lwb_brs(_io_brs.BytesIO(_xlsx_bytes), read_only=True, data_only=True)
+                    except Exception as _ex_parse:
+                        _sys_brs.stderr.write(
+                            "[backfill-registration-status] xlsx parse failed: "
+                            + str(_ex_parse)[:200] + " — tag NOT stamped\n"
+                        )
+                        _wb = None
+
+                    if _wb is None:
+                        pass
+                    else:
+                        try:
+                            # Inline fuzzy sheet resolver: exact match → folded
+                            # match → folded substring containment (only when
+                            # exactly one title qualifies, to avoid silent
+                            # mis-pick).
+                            _titles = [ws.title for ws in _wb.worksheets]
+                            _resolved = None
+                            if _sheet_name in _titles:
+                                _resolved = _sheet_name
+                            else:
+                                _ftarget = _brs_fold(_sheet_name)
+                                _folded_to_title = {}
+                                for _t in _titles:
+                                    _ft = _brs_fold(_t)
+                                    if _ft and _ft not in _folded_to_title:
+                                        _folded_to_title[_ft] = _t
+                                if _ftarget in _folded_to_title:
+                                    _resolved = _folded_to_title[_ftarget]
+                                else:
+                                    _candidates = [
+                                        orig for ft, orig in _folded_to_title.items()
+                                        if _ftarget and (_ftarget in ft or ft in _ftarget)
+                                    ]
+                                    _seen = set(); _uniq = []
+                                    for _c in _candidates:
+                                        if _c not in _seen:
+                                            _seen.add(_c); _uniq.append(_c)
+                                    if len(_uniq) == 1:
+                                        _resolved = _uniq[0]
+                            if _resolved is None:
+                                _sys_brs.stderr.write(
+                                    "[backfill-registration-status] sheet not found: "
+                                    + repr(_sheet_name)
+                                    + " (available: " + ", ".join(_titles)
+                                    + ") — tag NOT stamped\n"
+                                )
+                            else:
+                                _ws = _wb[_resolved]
+                                _row_iter = _ws.iter_rows(values_only=True)
+                                try:
+                                    _header = next(_row_iter)
+                                except StopIteration:
+                                    _header = None
+                                # Find target column index + personal_id +
+                                # student_name column indices in the sheet.
+                                # The target column folds to the same form
+                                # as "حالة التسجيل" (matched by label).
+                                _F_PID_LBL  = _brs_fold("الرقم الشخصي")
+                                _F_NAME_LBL = _brs_fold("اسم الطالب")
+                                _idx_target = None
+                                _idx_pid    = None
+                                _idx_name   = None
+                                if _header:
+                                    for _i, _cell in enumerate(_header):
+                                        _raw = "" if _cell is None else str(_cell)
+                                        _ff = _brs_fold(_raw)
+                                        if not _ff:
+                                            continue
+                                        if _ff == _F_TARGET_LBL and _idx_target is None:
+                                            _idx_target = _i
+                                        elif _ff == _F_PID_LBL and _idx_pid is None:
+                                            _idx_pid = _i
+                                        elif _ff == _F_NAME_LBL and _idx_name is None:
+                                            _idx_name = _i
+
+                                if _idx_target is None:
+                                    _sys_brs.stderr.write(
+                                        "[backfill-registration-status] sheet has no "
+                                        "'حالة التسجيل' column header — tag stamped\n"
+                                    )
+                                    _stamp_brs = True
+                                else:
+                                    # Build pid + name → registration-status maps.
+                                    _by_pid  = {}
+                                    _by_name = {}
+                                    for _row in _row_iter:
+                                        if _row is None: continue
+                                        try:
+                                            _val = _row[_idx_target]
+                                        except IndexError:
+                                            _val = None
+                                        _val_s = "" if _val is None else str(_val).strip()
+                                        if not _val_s:
+                                            continue
+                                        if _idx_pid is not None:
+                                            try:
+                                                _pid = _row[_idx_pid]
+                                            except IndexError:
+                                                _pid = None
+                                            _pid_s = "" if _pid is None else str(_pid).strip()
+                                            if _pid_s and _pid_s not in _by_pid:
+                                                _by_pid[_pid_s] = _val_s
+                                        if _idx_name is not None:
+                                            try:
+                                                _nm = _row[_idx_name]
+                                            except IndexError:
+                                                _nm = None
+                                            _nm_s = "" if _nm is None else " ".join(str(_nm).split())
+                                            if _nm_s and _nm_s not in _by_name:
+                                                _by_name[_nm_s] = _val_s
+
+                                    # SELECT current students rows.
+                                    _q_target = '"' + _target_col + '"'
+                                    try:
+                                        _db_rows = db2.execute(
+                                            "SELECT id, personal_id, student_name, "
+                                            + _q_target + " FROM students"
+                                        ).fetchall()
+                                    except Exception as _ex_dbsel:
+                                        _db_rows = []
+                                        _sys_brs.stderr.write(
+                                            "[backfill-registration-status] DB SELECT failed: "
+                                            + str(_ex_dbsel) + "\n"
+                                        )
+
+                                    _updated             = 0
+                                    _skipped_already_set = 0
+                                    _skipped_not_found   = 0
+                                    for _r in _db_rows:
+                                        _id   = _r[0] if hasattr(_r, "__getitem__") else None
+                                        _pidd = _r[1] if hasattr(_r, "__getitem__") else None
+                                        _nmd  = _r[2] if hasattr(_r, "__getitem__") else None
+                                        _curd = _r[3] if hasattr(_r, "__getitem__") else None
+                                        if _id is None: continue
+                                        if (_curd or "").strip():
+                                            _skipped_already_set += 1
+                                            continue
+                                        _new_v = None
+                                        _pidd_s = "" if _pidd is None else str(_pidd).strip()
+                                        if _pidd_s and _pidd_s in _by_pid:
+                                            _new_v = _by_pid[_pidd_s]
+                                        else:
+                                            _nmd_s = "" if _nmd is None else " ".join(str(_nmd).split())
+                                            if _nmd_s and _nmd_s in _by_name:
+                                                _new_v = _by_name[_nmd_s]
+                                        if _new_v is None:
+                                            _skipped_not_found += 1
+                                            continue
+                                        try:
+                                            db2.execute(
+                                                "UPDATE students SET " + _q_target
+                                                + " = ? WHERE id = ?",
+                                                (_new_v, _id),
+                                            )
+                                            _updated += 1
+                                        except Exception as _ex_upd:
+                                            _sys_brs.stderr.write(
+                                                "[backfill-registration-status] UPDATE row "
+                                                + str(_id) + " failed: " + str(_ex_upd) + "\n"
+                                            )
+                                    if _updated:
+                                        try: db2.commit()
+                                        except Exception: pass
+                                    _sys_brs.stderr.write(
+                                        "[backfill-registration-status] columns: target_col="
+                                        + str(_target_col) + " sheet_resolved=" + repr(_resolved)
+                                        + "\n"
+                                    )
+                                    _sys_brs.stderr.write(
+                                        "[backfill-registration-status] tally:"
+                                        + " updated=" + str(_updated)
+                                        + " skipped-not-found=" + str(_skipped_not_found)
+                                        + " skipped-already-set=" + str(_skipped_already_set)
+                                        + " total-sheet-rows=" + str(len(_by_pid) + len(_by_name) - len(set(_by_pid.values()) & set(_by_name.values())))
+                                        + " sheet_pid_index=" + str(len(_by_pid))
+                                        + " sheet_name_index=" + str(len(_by_name)) + "\n"
+                                    )
+                                    _stamp_brs = True
+                        finally:
+                            try: _wb.close()
+                            except Exception: pass
+            if _stamp_brs:
+                try:
+                    db2.execute(
+                        "INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("backfill_registration_status_from_drive_v1",),
+                    )
+                    db2.commit()
+                except Exception:
+                    pass
+        except Exception as _ex_outer_brs:
+            try:
+                import sys as _sys_brs2
+                _sys_brs2.stderr.write(
+                    "[backfill_registration_status_from_drive_v1] outer error: "
+                    + str(_ex_outer_brs) + " — tag NOT stamped\n"
+                )
+            except Exception:
+                pass
+
+    # ── backfill_installment_type_v3: chained re-application of the
+    # installment-type rule. v2 already used the full dropdown strings,
+    # but if v1's "حالة التسجيل" column was empty when v2 ran (the bug
+    # backfill_registration_status_from_drive_v1 above is patching), the
+    # "anything else" branch would have left the row's installment_type
+    # empty. v3 re-applies the same rule with the same full strings —
+    # only on rows that still have empty installment_type AND now have a
+    # populated حالة التسجيل + قديم/جديد flag. Idempotent: never
+    # overwrites a non-empty value, NEVER touches rows whose
+    # installment_type already matches an admin choice.
+    if "backfill_installment_type_v3" not in applied:
+        try:
+            import html as _html_v3
+            import sys as _sys_v3
+            import re as _re_v3
+            def _v3_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            _METHOD_1_v3 = "طريقة 1 — 140 د — 4 أقساط"
+            _METHOD_2_v3 = "طريقة 2 — 100 د — 3 أقساط"
+            _F_STATUS_LBL_v3 = _v3_fold("حالة التسجيل")
+            _F_FLAG_LBL_v3   = _v3_fold("قديم جديد 2026")
+            _F_INST_LBL_v3   = _v3_fold("اختيار نوع التقسيط")
+            _F_REGISTERED_v3 = _v3_fold("تم التسجيل")
+            _F_OLD_v3        = _v3_fold("قديم")
+            _F_NEW1_v3       = _v3_fold("مستجد")
+            _F_NEW2_v3       = _v3_fold("جديد")
+
+            try:
+                _live_cols_v3 = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+            except Exception:
+                _live_cols_v3 = set()
+            try:
+                _label_rows_v3 = db2.execute(
+                    "SELECT col_key, col_label FROM column_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows_v3 = []
+            _safe_rx_v3 = _re_v3.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            _label_to_key_v3 = {}
+            for _r in _label_rows_v3:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or not _safe_rx_v3.match(_ck):
+                    continue
+                if _ck not in _live_cols_v3:
+                    continue
+                _decoded = _html_v3.unescape(str(_cl)).strip()
+                _flbl = _v3_fold(_decoded)
+                if _flbl and _flbl not in _label_to_key_v3:
+                    _label_to_key_v3[_flbl] = _ck
+            _status_col_v3      = _label_to_key_v3.get(_F_STATUS_LBL_v3) \
+                                  or ("registration_term2_2026" if "registration_term2_2026" in _live_cols_v3 else None)
+            _flag_col_v3        = _label_to_key_v3.get(_F_FLAG_LBL_v3) \
+                                  or ("old_new_2026" if "old_new_2026" in _live_cols_v3 else None)
+            _installment_col_v3 = _label_to_key_v3.get(_F_INST_LBL_v3) \
+                                  or ("installment_type" if "installment_type" in _live_cols_v3 else None)
+
+            if not (_status_col_v3 and _flag_col_v3 and _installment_col_v3):
+                _sys_v3.stderr.write(
+                    "[backfill_installment_type_v3] could not resolve all 3 columns "
+                    "(status=" + str(_status_col_v3)
+                    + ", flag=" + str(_flag_col_v3)
+                    + ", installment=" + str(_installment_col_v3)
+                    + ") — skipping\n"
+                )
+            else:
+                _q_status_v3 = '"' + _status_col_v3 + '"'
+                _q_flag_v3   = '"' + _flag_col_v3 + '"'
+                _q_inst_v3   = '"' + _installment_col_v3 + '"'
+                try:
+                    _rows_v3 = db2.execute(
+                        "SELECT id, " + _q_status_v3 + ", " + _q_flag_v3
+                        + ", " + _q_inst_v3 + " FROM students"
+                    ).fetchall()
+                except Exception as _ex_sel_v3:
+                    _rows_v3 = []
+                    _sys_v3.stderr.write(
+                        "[backfill_installment_type_v3] SELECT failed: "
+                        + str(_ex_sel_v3) + "\n"
+                    )
+                _assigned_to_1_v3 = 0
+                _assigned_to_2_v3 = 0
+                _kept_existing_v3 = 0
+                _left_empty_v3    = 0
+                for _r in _rows_v3:
+                    _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                    _status = _r[1] if hasattr(_r, "__getitem__") else None
+                    _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                    _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                    if _rid is None:
+                        continue
+                    if (_curr or "").strip():
+                        _kept_existing_v3 += 1
+                        continue
+                    _fs = _v3_fold(_status)
+                    _ff = _v3_fold(_flag)
+                    _new_val = None
+                    if _fs == _F_REGISTERED_v3:
+                        if _ff == _F_OLD_v3:
+                            _new_val = _METHOD_2_v3
+                        elif _ff == _F_NEW1_v3 or _ff == _F_NEW2_v3:
+                            _new_val = _METHOD_1_v3
+                    if _new_val is None:
+                        _left_empty_v3 += 1
+                        continue
+                    try:
+                        db2.execute(
+                            "UPDATE students SET " + _q_inst_v3
+                            + " = ? WHERE id = ?",
+                            (_new_val, _rid),
+                        )
+                        if _new_val is _METHOD_1_v3:
+                            _assigned_to_1_v3 += 1
+                        else:
+                            _assigned_to_2_v3 += 1
+                    except Exception as _ex_upd:
+                        _sys_v3.stderr.write(
+                            "[backfill_installment_type_v3] UPDATE row "
+                            + str(_rid) + " failed: " + str(_ex_upd) + "\n"
+                        )
+                if _assigned_to_1_v3 or _assigned_to_2_v3:
+                    try: db2.commit()
+                    except Exception: pass
+                _sys_v3.stderr.write(
+                    "[backfill-installment-type-v3] tally:"
+                    + " assigned-to-1=" + str(_assigned_to_1_v3)
+                    + " assigned-to-2=" + str(_assigned_to_2_v3)
+                    + " kept-existing=" + str(_kept_existing_v3)
+                    + " left-empty=" + str(_left_empty_v3)
+                    + " total-rows=" + str(len(_rows_v3)) + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_installment_type_v3",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_v3:
+            try:
+                import sys as _sys_v3
+                _sys_v3.stderr.write(
+                    "[backfill_installment_type_v3] outer error: "
+                    + str(_ex_outer_v3) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
