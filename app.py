@@ -7534,6 +7534,32 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       <div class="dh-action-title">&#x062A;&#x062F;&#x0642;&#x064A;&#x0642; &#x0627;&#x0644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644;</div>
       <div class="dh-action-desc">&#x062A;&#x0635;&#x0646;&#x064A;&#x0641; &#x0648;&#x062D;&#x0630;&#x0641; &#x0622;&#x0645;&#x0646; &#x0644;&#x644;&#x062C;&#x062F;&#x0627;&#x0648;&#x0644; &#x063A;&#x064A;&#x0631; &#x0627;&#x0644;&#x0645;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645;&#x0629;</div>
     </a>
+    <!-- Staff-only mirror of the 4 teacher-hub buttons.
+         Visible to admin + manager via mx-staff-only. The same /teacher/*
+         pages render with all-groups dropdowns when the logged-in user
+         is admin/manager (api_teacher_groups + page-route gates).
+         Teachers do NOT see these buttons here — they go through
+         /teacher/hub instead. -->
+    <a class="dh-action-card mx-staff-only" href="/teacher/lessons" style="background:linear-gradient(135deg,#1976D2,#42A5F5);">
+      <div class="dh-action-icon">&#x1F4DA;</div>
+      <div class="dh-action-title">&#x645;&#x62A;&#x627;&#x628;&#x639;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x62F;&#x645; &#x641;&#x64A; &#x627;&#x644;&#x62F;&#x631;&#x648;&#x633;</div>
+      <div class="dh-action-desc">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x62F;&#x631;&#x633; &#x627;&#x644;&#x645;&#x64F;&#x639;&#x637;&#x649; &#x627;&#x644;&#x64A;&#x648;&#x645;</div>
+    </a>
+    <a class="dh-action-card mx-staff-only" href="/teacher/parent-messages" style="background:linear-gradient(135deg,#00897B,#26A69A);">
+      <div class="dh-action-icon">&#x1F4E8;</div>
+      <div class="dh-action-title">&#x645;&#x627;&#x630;&#x627; &#x62A;&#x631;&#x64A;&#x62F; &#x623;&#x646; &#x64A;&#x639;&#x631;&#x641; &#x648;&#x644;&#x64A; &#x627;&#x644;&#x623;&#x645;&#x631;</div>
+      <div class="dh-action-desc">&#x625;&#x631;&#x633;&#x627;&#x644; &#x645;&#x644;&#x62E;&#x635; &#x627;&#x644;&#x62D;&#x635;&#x629; &#x644;&#x623;&#x648;&#x644;&#x64A;&#x627;&#x621; &#x623;&#x645;&#x648;&#x631; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</div>
+    </a>
+    <a class="dh-action-card mx-staff-only" href="/teacher/evaluations" style="background:linear-gradient(135deg,#7B1FA2,#9C27B0);">
+      <div class="dh-action-icon">&#x1F4CA;</div>
+      <div class="dh-action-title">&#x627;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;</div>
+      <div class="dh-action-desc">&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x634;&#x647;&#x631;&#x64A; &#x644;&#x644;&#x637;&#x627;&#x644;&#x628;&#x627;&#x62A;</div>
+    </a>
+    <a class="dh-action-card mx-staff-only" href="/teacher/curriculum" style="background:linear-gradient(135deg,#E65100,#FB8C00);">
+      <div class="dh-action-icon">&#x1F4D6;</div>
+      <div class="dh-action-title">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</div>
+      <div class="dh-action-desc">&#x643;&#x62A;&#x628; &#x627;&#x644;&#x645;&#x646;&#x647;&#x62C; &#x627;&#x644;&#x645;&#x62A;&#x627;&#x62D;&#x629; &#x644;&#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
+    </a>
   </div>
 </div>
 <script>
@@ -29619,7 +29645,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 def teacher_curriculum_page():
     user = session.get("user") or {}
     role = (user.get("role") or "").strip().lower()
-    if role != "teacher":
+    # Mirror /teacher/lessons / parent-messages / evaluations: allow
+    # admin + manager so the staff-dashboard buttons can reach this
+    # page. _curriculum_visible_file_ids(db, user) already returns
+    # ALL curriculum files for admin/manager — no group filtering on
+    # this page, so showing it to staff is equivalent to showing the
+    # full library (which they already have admin access to via the
+    # /admin/curriculum tooling).
+    if role not in ("teacher", "admin", "manager"):
         return redirect("/dashboard")
     return TEACHER_CURRICULUM_HTML
 
@@ -35847,17 +35880,93 @@ def api_teacher_groups_diag():
 @app.route('/api/teacher/groups', methods=['GET'])
 @login_required
 def api_teacher_groups():
-    """Returns the teacher's groups, filtered by the active center
-    mode (حالة المركز) — أونلاين shows only group_online refs;
-    حضوري / رمضان shows only group_name_student refs. Group-level
-    mode_exceptions take precedence. Each entry carries study_days
-    + study_time so the frontend can render "(الأيام - الوقت)"
-    next to the group name."""
-    user, err = _require_teacher()
-    if err: return err
+    """Returns the groups dropdown source for the /teacher/* pages.
+
+    For role=teacher: returns ONLY the teacher's owned groups, filtered
+    by the active center mode (حالة المركز). أونلاين shows only
+    group_online refs; حضوري / رمضان shows only group_name_student refs.
+    Group-level mode_exceptions take precedence.
+
+    For role=admin / manager: returns ALL groups (no teacher filter),
+    decorated the same way (study_days, study_time, schedule), and
+    NOT mode-filtered — staff need to see and edit any group regardless
+    of center mode. Lets the staff-dashboard mirror buttons (lessons,
+    parent-messages, evaluations) populate their dropdown without
+    needing a separate endpoint.
+    """
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("teacher", "admin", "manager"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
     db = get_db()
     mode = _get_center_mode(db)
-    detailed = _teacher_mode_filtered_groups(db, user, mode)
+    if role == "teacher":
+        detailed = _teacher_mode_filtered_groups(db, user, mode)
+    else:
+        # Admin / manager: ALL groups, decorated the same way that
+        # _teacher_mode_filtered_groups._decorate does (study_days +
+        # mode-appropriate time + flat schedule string). No center-
+        # mode filter — staff handle every group regardless.
+        try:
+            _live_cols = [r[1] for r in db.execute(
+                "PRAGMA table_info(student_groups)"
+            ).fetchall()]
+        except Exception:
+            _live_cols = []
+        _select_cols = ["id", "group_name", "teacher_name", "study_days",
+                        "study_time", "ramadan_time", "online_time"]
+        _select_cols = [c for c in _select_cols if c in _live_cols]
+        try:
+            rows = db.execute(
+                "SELECT " + ",".join('"' + c + '"' for c in _select_cols) +
+                " FROM student_groups "
+                "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+                "ORDER BY group_name"
+            ).fetchall()
+        except Exception:
+            rows = []
+        is_online  = (mode == "أونلاين")
+        is_ramadan = (mode == "رمضان")
+        detailed = []
+        for r in rows:
+            rd = dict(r) if hasattr(r, "keys") else {
+                _select_cols[i]: (r[i] if i < len(r) else "")
+                for i in range(len(_select_cols))
+            }
+            name = (rd.get("group_name") or "").strip()
+            if not name:
+                continue
+            days = (rd.get("study_days") or "").strip()
+            if is_online:
+                sched_time = (rd.get("online_time")
+                              or rd.get("study_time") or "")
+            elif is_ramadan:
+                sched_time = (rd.get("ramadan_time")
+                              or rd.get("study_time") or "")
+            else:
+                sched_time = (rd.get("study_time") or "")
+            sched_time = (sched_time or "").strip()
+            try:
+                time_has_days = _value_has_arabic_day(sched_time)
+            except Exception:
+                time_has_days = False
+            if days and sched_time and not time_has_days:
+                schedule = days + " - " + sched_time
+            elif days and not sched_time:
+                schedule = days
+            else:
+                schedule = sched_time
+            detailed.append({
+                "id":            rd.get("id"),
+                "name":          name,
+                "teacher_name":  (rd.get("teacher_name") or "").strip(),
+                "study_days":    days,
+                "study_time":    (rd.get("study_time")  or "").strip(),
+                "ramadan_time":  (rd.get("ramadan_time") or "").strip(),
+                "online_time":   (rd.get("online_time")  or "").strip(),
+                "schedule":      (schedule or "").strip(),
+                "used_mode":     mode,
+            })
     return jsonify({
         "ok":     True,
         "mode":   mode,
