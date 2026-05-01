@@ -12387,7 +12387,6 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
       <span class="stat-label">&#x625;&#x62C;&#x645;&#x627;&#x644;&#x64A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</span>
     </div>
   </div>
-  <div id="studentsDiag" style="margin:0 0 10px;padding:6px 10px;border-radius:8px;background:#f3f4f6;color:#374151;font-size:12.5px;display:none;direction:ltr;text-align:left;font-family:monospace;"></div>
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;"><button class="btn-add" style="margin-bottom:0;" onclick="openAddModal()">+ &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#43A047,#2E7D32);" onclick="openStudentExcelModal()">&#128196; &#x625;&#x636;&#x627;&#x641;&#x629; &#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#FF6B35,#E55A2B);" onclick="openUniversalTableEditModal('students')">&#9881; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button>
   <button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#3F51B5,#5C6BC0);" onclick="openGenericExcelModal()">&#x1F4E5; &#x627;&#x633;&#x62A;&#x64A;&#x631;&#x627;&#x62F; Excel</button><button class="btn-delete-table" onclick="openDeleteTableModal()">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x62C;&#x62F;&#x648;&#x644;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#1565C0,#1E88E5);" onclick="openFreezeModal('students')">&#x1F4CC; &#x62A;&#x62C;&#x645;&#x64A;&#x62F;</button><button class="btn-add" style="margin-bottom:0;background:linear-gradient(135deg,#00897B,#26A69A);" onclick="utemFocusSearch('students')">&#x1F50D; &#x628;&#x62D;&#x62B;</button><button id="bulkDelBtn_students" class="btn-bulk-del" onclick="_bulkDelete('studentsBody',function(id){return '/api/students/'+id;},loadStudents,'&#x647;&#x644; &#x62A;&#x631;&#x64A;&#x62F; &#x62D;&#x630;&#x641; {n} &#x637;&#x627;&#x644;&#x628;&#x61F;')">&#x1F5D1; &#x62D;&#x630;&#x641; &#x627;&#x644;&#x645;&#x62D;&#x62F;&#x62F;</button></div>
   <div class="search-bar">
@@ -13816,38 +13815,6 @@ try {
   document.getElementById('totalCount').textContent=_activeTotal;
   try { buildTableHeader(); } catch(e){ console.error('[loadStudents] buildTableHeader threw:', e); }
   try { applyFreezeToTable('students'); } catch(e){ console.error('[loadStudents] applyFreezeToTable threw:', e); }
-  /* Visible diagnostic strip — surfaces server count, render count,
-     and ID/no-ID split right above the table so the user can see
-     what arrived even when the rendered table looks blank. Hidden
-     once everything looks normal (server count == rendered count
-     AND > 0 AND no bad rows). */
-  try {
-    var _diag = document.getElementById('studentsDiag');
-    if (_diag) {
-      var _bodyEl = document.getElementById('studentsBody');
-      var _renderedRows = _bodyEl ? _bodyEl.querySelectorAll('tr').length : 0;
-      var _serverCount = (sData && sData.count != null) ? sData.count : '?';
-      var _serverBad = (sData && sData.bad_row_count != null) ? sData.bad_row_count : 0;
-      var _msg = 'server=' + _serverCount
-               + ' | received=' + allStudents.length
-               + ' | with-id=' + _withId
-               + ' | no-id=' + _withoutId
-               + ' | columns=' + allColumns.length
-               + ' | rendered-rows=' + _renderedRows
-               + ' | server-bad=' + _serverBad
-               + ' | active=' + _activeTotal;
-      _diag.textContent = _msg;
-      var _hideOk = (allStudents.length > 0
-                     && _renderedRows >= allStudents.length
-                     && _badRows === 0
-                     && _serverBad === 0);
-      _diag.style.display = _hideOk ? 'none' : 'block';
-      if (!_hideOk) {
-        _diag.style.background = '#fff3cd';
-        _diag.style.color = '#856404';
-      }
-    }
-  } catch(e){ console.error('[loadStudents] diag failed:', e); }
   console.log('[loadStudents] done — rendered', allStudents.length, 'rows, active badge=', _activeTotal, 'with-id=', _withId, 'no-id=', _withoutId);
 } catch (err) {
   console.error('[loadStudents] FAILED:', err);
