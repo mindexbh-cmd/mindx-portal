@@ -37466,10 +37466,23 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     at the end.
     """
     column_labels = column_labels or {}
+    import sys as _sys_pi
+    _sys_pi.stderr.write(
+        "[perform_import] enter: table=" + str(table)
+        + " rows=" + str(len(rows) if rows is not None else 0)
+        + " auto_create=" + str(auto_create) + "\n"
+    )
     fields = IMPORT_TABLE_FIELDS.get(table)
     if not fields:
+        _sys_pi.stderr.write("[perform_import] EARLY EXIT: unknown table " + str(table) + "\n")
         return 400, {"ok": False, "error": "unknown table"}
     live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
+    _sys_pi.stderr.write(
+        "[perform_import] live_cols(" + table + ")=" + str(sorted(live_cols)) + "\n"
+    )
+    _sys_pi.stderr.write(
+        "[perform_import] static fields=" + str(fields) + "\n"
+    )
 
     if auto_create:
         import re as _re_local
@@ -37507,7 +37520,11 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
     else:
         fields = [f for f in fields if f in live_cols]
 
+    _sys_pi.stderr.write(
+        "[perform_import] filtered fields (after live_cols)=" + str(fields) + "\n"
+    )
     if not fields:
+        _sys_pi.stderr.write("[perform_import] EARLY EXIT: no matching columns in " + str(table) + "\n")
         return 400, {"ok": False, "error": "no matching columns in table " + table}
 
     # Mirror student_groups days writes into the admin's custom-labelled
@@ -37535,6 +37552,22 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
 
     key_cols = [k for k in IMPORT_TABLE_KEYS.get(table, []) if k in live_cols and _is_safe_ident(k)]
     col_types = _import_get_col_types(table)
+    _sys_pi.stderr.write(
+        "[perform_import] key_cols=" + str(key_cols)
+        + " col_types_keys=" + str(sorted(col_types.keys())) + "\n"
+    )
+    # Sample first incoming row's keys so we can see what _drive_extract_rows
+    # produced — if these keys don't intersect with `fields`, every row
+    # will end up empty after norm and get skipped.
+    if rows:
+        try:
+            _first = rows[0] if isinstance(rows[0], dict) else {}
+            _sys_pi.stderr.write(
+                "[perform_import] first-row keys=" + str(sorted(_first.keys()))
+                + " sample-vals=" + str({k: (str(v)[:30] if v else v) for k, v in list(_first.items())[:5]}) + "\n"
+            )
+        except Exception:
+            pass
 
     inserted = 0
     updated  = 0
@@ -37717,8 +37750,52 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
             errors += 1
             last_error = str(ex)
             _remember_skip(idx, "error: " + last_error[:80])
+            # Log the full Postgres error per row so we can see
+            # constraint violations, type mismatches, etc.
+            try:
+                _sys_pi.stderr.write(
+                    "[perform_import] row " + str(idx) + " ERROR: "
+                    + type(ex).__name__ + ": " + str(ex)[:300] + "\n"
+                )
+            except Exception:
+                pass
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as ex:
+        _sys_pi.stderr.write("[perform_import] db.commit() raised: " + str(ex) + "\n")
+
+    # Verification: count rows now in the target table so we can spot
+    # phantom inserts (rowcount said inserted but actual table count
+    # didn't move). Best-effort, never blocks the response.
+    try:
+        _vc = db.execute("SELECT COUNT(*) FROM " + table).fetchone()
+        _verified_count = _vc[0] if _vc else None
+    except Exception as ex:
+        _verified_count = None
+        _sys_pi.stderr.write("[perform_import] verification SELECT failed: " + str(ex) + "\n")
+
+    _sys_pi.stderr.write(
+        "[perform_import] EXIT: table=" + str(table)
+        + " inserted=" + str(inserted)
+        + " updated=" + str(updated)
+        + " skipped=" + str(skipped)
+        + " rows_skipped_empty=" + str(rows_skipped_empty)
+        + " errors=" + str(errors)
+        + " received=" + str(len(rows))
+        + " verified_db_count=" + str(_verified_count)
+        + " last_error=" + str(last_error)[:200]
+        + "\n"
+    )
+    if skip_reasons:
+        try:
+            _sys_pi.stderr.write(
+                "[perform_import] skip_reasons (first 10): "
+                + str(skip_reasons[:10]) + "\n"
+            )
+        except Exception:
+            pass
+
     return 200, {
         "ok": True,
         "table": table,
@@ -37733,6 +37810,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None):
         "last_error": last_error,
         "fields_used": fields,
         "nonempty_writes_per_col": nonempty_writes_per_col,
+        "verified_db_count": _verified_count,
         # Backwards-compat aliases (existing front-end reads d.imported/d.ignored).
         "imported": inserted,
         "ignored":  skipped,
