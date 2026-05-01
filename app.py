@@ -7072,10 +7072,97 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') document.body.classList.remove('md-sb-open');
   });
-  // Section collapse toggles
-  document.querySelectorAll('.md-sb-section-header').forEach(function(h){
-    h.addEventListener('click', function(){ h.parentElement.classList.toggle('collapsed'); });
-  });
+  // ── Sidebar accordion ─────────────────────────────────────────────
+  // Default: every section starts collapsed. Per-section state is
+  // persisted in localStorage under key 'mx_sb_open_<sectionId>'
+  // ('1' = open, '0' = collapsed). On every page load we:
+  //   1. Add .md-sb-no-anim to the sidebar so the initial sync of
+  //      .collapsed classes doesn't flash an open-then-close animation.
+  //   2. Mark every section .collapsed (default state).
+  //   3. Restore each section's saved open state from localStorage
+  //      (open = remove .collapsed; collapsed = no-op).
+  //   4. Auto-expand the section that owns the .md-sb-link.active
+  //      anchor — overrides any saved-collapsed state so the user
+  //      always sees their current location in the sidebar.
+  //   5. Sync aria-expanded on every header.
+  //   6. Drop .md-sb-no-anim on the next animation frame so future
+  //      toggles animate via the CSS max-height transition.
+  // Multi-open is supported: clicking a header toggles only its own
+  // section. Other sections keep their current state.
+  // Mobile (<1024px): when a sub-link is clicked we also remove
+  // body.md-sb-open so the drawer auto-closes after navigation.
+  var sbNav = document.querySelector('.md-sb-nav');
+  if (sbNav) {
+    sbNav.classList.add('md-sb-no-anim');
+    var headers = sbNav.querySelectorAll('.md-sb-section-header');
+    var sections = sbNav.querySelectorAll('.md-sb-section');
+    sections.forEach(function(sec){ sec.classList.add('collapsed'); });
+    sections.forEach(function(sec){
+      var hdr = sec.querySelector('.md-sb-section-header');
+      var key = hdr ? hdr.getAttribute('data-sb-section') : '';
+      if (!key) return;
+      var saved = null;
+      try { saved = window.localStorage.getItem('mx_sb_open_' + key); }
+      catch(_e) {}
+      if (saved === '1') sec.classList.remove('collapsed');
+    });
+    // Auto-expand the section containing the active link. Looks for
+    // both server-rendered .active and a runtime-flagged variant so
+    // future routes that mark active client-side still light up.
+    var active = sbNav.querySelector('.md-sb-link.active, .md-sb-link[aria-current="page"]');
+    if (active) {
+      var sec = active.closest('.md-sb-section');
+      if (sec) sec.classList.remove('collapsed');
+    }
+    // Sync aria-expanded on every header now that .collapsed is final.
+    sections.forEach(function(sec){
+      var hdr = sec.querySelector('.md-sb-section-header');
+      if (!hdr) return;
+      var open = !sec.classList.contains('collapsed');
+      hdr.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var items = sec.querySelector('.md-sb-items');
+      if (items && !items.id) {
+        var key = hdr.getAttribute('data-sb-section') || '';
+        if (key) items.id = 'md-sb-items-' + key;
+      }
+      if (items && items.id) hdr.setAttribute('aria-controls', items.id);
+    });
+    // Drop the anim-suppression class on the next frame so future
+    // toggles animate normally.
+    if (window.requestAnimationFrame) {
+      window.requestAnimationFrame(function(){
+        sbNav.classList.remove('md-sb-no-anim');
+      });
+    } else {
+      setTimeout(function(){ sbNav.classList.remove('md-sb-no-anim'); }, 50);
+    }
+    // Click handler: toggle one section, persist, sync aria. Multi-open.
+    headers.forEach(function(h){
+      h.addEventListener('click', function(){
+        var sec = h.parentElement;
+        if (!sec) return;
+        sec.classList.toggle('collapsed');
+        var open = !sec.classList.contains('collapsed');
+        h.setAttribute('aria-expanded', open ? 'true' : 'false');
+        var key = h.getAttribute('data-sb-section');
+        if (key) {
+          try {
+            window.localStorage.setItem(
+              'mx_sb_open_' + key, open ? '1' : '0'
+            );
+          } catch(_e) {}
+        }
+      });
+    });
+    // Mobile: tapping a sub-link closes the drawer after navigation.
+    sbNav.querySelectorAll('.md-sb-link').forEach(function(lnk){
+      lnk.addEventListener('click', function(){
+        if (window.innerWidth < 1024) {
+          document.body.classList.remove('md-sb-open');
+        }
+      });
+    });
+  }
 })();
 </script>
 <div class="dh-main">

@@ -326,9 +326,28 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
   flex-shrink: 0;
 }
 .md-sb-section.collapsed .md-sb-chev { transform: rotate(-90deg); }
-.md-sb-section.collapsed .md-sb-items { display: none; }
 
-.md-sb-items { padding: 0 0 var(--md-sp-2); list-style: none; margin: 0; }
+.md-sb-items {
+  padding: 0 0 var(--md-sp-2);
+  list-style: none;
+  margin: 0;
+  /* Accordion animation — max-height tween instead of display:none flicker. */
+  overflow: hidden;
+  max-height: 1200px;
+  transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.md-sb-section.collapsed .md-sb-items {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* Initial paint suppression — when JS adds .md-sb-no-anim before
+   first sync, the transition is muted so the user doesn't see the
+   "open then snap shut" flash on slower devices. JS removes this
+   class on the next animation frame. */
+.md-sb-no-anim .md-sb-items,
+.md-sb-no-anim .md-sb-chev { transition: none !important; }
 .md-sb-link {
   display: flex;
   align-items: center;
