@@ -15825,7 +15825,7 @@ var IMPORT_DEFS = {
     title: "\u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0637\u0644\u0628\u0629",
     refresh: "loadStudents",
     fields: [
-      {key:"personal_id", ar:"\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A"},
+      {key:"personal_id", ar:["\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A","\u0631\u0642\u0645 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062E\u0635\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064A\u0629","\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628","\u0627\u0644\u0631\u0642\u0645","Personal ID","Personal_ID","ID","CPR","cpr"]},
       {key:"student_name", ar:"\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628"},
       {key:"whatsapp", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F"},
       {key:"class_name", ar:"\u0627\u0644\u0635\u0641"},
@@ -15939,7 +15939,7 @@ var IMPORT_DEFS = {
     refresh: "loadPaymentLog",
     fields: [
       {key:"student_name", ar:"\u0627\u0644\u0627\u0633\u0645"},
-      {key:"personal_id", ar:"\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a"},
+      {key:"personal_id", ar:["\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a","\u0631\u0642\u0645 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062e\u0635\u064a\u0629","\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0634\u062e\u0635\u064a\u0629","\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064a\u0629","\u0631\u0642\u0645 \u0627\u0644\u0637\u0627\u0644\u0628","\u0627\u0644\u0631\u0642\u0645","Personal ID","Personal_ID","ID","CPR","cpr"]},
       {key:"registration_status", ar:"\u062d\u0627\u0644\u0629 \u0627\u0644\u062a\u0633\u062c\u064a\u0644"},
       {key:"course_amount", ar:"\u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0648\u0631\u0629"},
       {key:"inst1", ar:"\u0627\u0644\u0642\u0633\u0637 1"},
@@ -16122,10 +16122,18 @@ function mapGenericRow(headers, row, defs, opts) {
     var matched = false;
     for(var j=0; j<defs.fields.length; j++){
       var f = defs.fields[j];
-      if(h === f.key || h === _arNorm(f.ar)){
+      var arVariants = Array.isArray(f.ar) ? f.ar : [f.ar];
+      var matchedThis = false;
+      if(h === f.key){ matchedThis = true; }
+      else {
+        for(var av=0; av<arVariants.length; av++){
+          if(h === _arNorm(arVariants[av])){ matchedThis = true; break; }
+        }
+      }
+      if(matchedThis){
         result[f.key] = String(row[i]==null?'':row[i]);
         if (opts.labelMap && !opts.labelMap[f.key]) {
-          opts.labelMap[f.key] = String(rawHdr||'').trim() || f.ar;
+          opts.labelMap[f.key] = String(rawHdr||'').trim() || (Array.isArray(f.ar) ? f.ar[0] : f.ar);
         }
         matched = true;
         break;
