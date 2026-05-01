@@ -4298,7 +4298,7 @@ STUDENT_FORM_MODAL_HTML = """
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628;</label><input id="sra_whatsapp" placeholder="+973 XXXX XXXX" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;direction:ltr;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x635;&#x641;</label><select id="sra_class_name" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>0.3</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</label><input id="sra_old_new_2026" placeholder="&#x642;&#x62F;&#x64A;&#x645; / &#x62C;&#x62F;&#x64A;&#x62F;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
-        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</label><input id="sra_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
+        <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x633;&#x62C;&#x64A;&#x644;</label><input id="sra_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;"></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="sra_group_name_student" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x623;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><select id="sra_group_online" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x644;&#x627; &#x64A;&#x648;&#x62C;&#x62F; --</option></select></div>
         <div><label style="font-size:12.5px;font-weight:700;color:#333;display:block;margin-bottom:3px;">&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629;</label><select id="sra_final_result" style="width:100%;padding:8px 10px;border:1.3px solid #ccc;border-radius:8px;font-size:13.5px;background:#fff;"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>&#x646;&#x627;&#x62C;&#x62D;</option><option>&#x631;&#x627;&#x633;&#x628;</option><option>&#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</option><option>&#x63A;&#x627;&#x626;&#x628;</option></select></div>
@@ -6969,7 +6969,7 @@ var _SR_FIELD_LABELS = {
   group_name_student: 'المجموعة',
   group_online: 'المجموعة (أونلاين)',
   old_new_2026: 'قديم/جديد 2026',
-  registration_term2_2026: 'تسجيل الفصل الثاني 2026',
+  registration_term2_2026: 'حالة التسجيل',
   teacher_2026: 'المدرس 2026',
   books_received: 'استلام الكتب',
   final_result: 'النتيجة النهائية',
@@ -7381,7 +7381,7 @@ function _srRenderCard(d){
   html += _srField('sr_group_name_student','المجموعة', s.group_name_student);
   html += _srField('sr_group_online','المجموعة (الاونلاين)', s.group_online);
   html += _srField('sr_old_new_2026','قديم جديد 2026', s.old_new_2026);
-  html += _srField('sr_registration_term2_2026','تسجيل الفصل الثاني 2026', s.registration_term2_2026);
+  html += _srField('sr_registration_term2_2026','حالة التسجيل', s.registration_term2_2026);
   html += _srField('sr_teacher_2026','المدرس 2026', s.teacher_2026);
   html += _srField('sr_books_received','استلام الكتب', s.books_received);
   html += _srField('sr_final_result','النتيجة النهائية', s.final_result);
@@ -12404,7 +12404,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
           <th>&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x627;&#x644;&#x645;&#x639;&#x62A;&#x645;&#x62F;</th>
           <th>&#x627;&#x644;&#x635;&#x641;</th>
           <th>&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</th>
-          <th>&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</th>
+          <th>&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x633;&#x62C;&#x64A;&#x644;</th>
           <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th>
           <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</th>
           <th>&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629; (&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026)</th>
@@ -12605,7 +12605,7 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 <div class="field"><label>&#x647;&#x627;&#x62A;&#x641; &#x627;&#x644;&#x648;&#x627;&#x62A;&#x633;&#x627;&#x628; &#x627;&#x644;&#x645;&#x639;&#x62A;&#x645;&#x62F;</label><input id="f_whatsapp" placeholder="+973 XXXX XXXX" class="ltr"></div>
 <div class="field"><label>&#x627;&#x644;&#x635;&#x641;</label><select id="f_class_name"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>0.3</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
 <div class="field"><label>&#x642;&#x62F;&#x64A;&#x645; &#x62C;&#x62F;&#x64A;&#x62F; 2026</label><input id="f_old_new_2026" placeholder="&#x642;&#x62F;&#x64A;&#x645; &#x623;&#x648; &#x62C;&#x62F;&#x64A;&#x62F;"></div>
-<div class="field"><label>&#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x641;&#x635;&#x644; &#x627;&#x644;&#x62B;&#x627;&#x646;&#x64A; 2026</label><input id="f_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;"></div>
+<div class="field"><label>&#x62D;&#x627;&#x644;&#x629; &#x627;&#x644;&#x62A;&#x633;&#x62C;&#x64A;&#x644;</label><input id="f_registration_term2_2026" placeholder="&#x646;&#x639;&#x645; / &#x644;&#x627;"></div>
 <div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</label><select id="f_group_name_student"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option></select></div>
 <div class="field"><label>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x644;&#x627;&#x648;&#x646;&#x644;&#x627;&#x64A;&#x646;)</label><select id="f_group_online"><option value="">-- &#x644;&#x627; &#x64A;&#x648;&#x62C;&#x62F; --</option></select></div>
 <div class="field"><label>&#x627;&#x644;&#x646;&#x62A;&#x64A;&#x62C;&#x629; &#x627;&#x644;&#x646;&#x647;&#x627;&#x626;&#x64A;&#x629; (&#x62A;&#x62D;&#x62F;&#x64A;&#x62F; &#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; 2026)</label><select id="f_final_result"><option value="">-- &#x627;&#x62E;&#x62A;&#x631; --</option><option>&#x646;&#x627;&#x62C;&#x62D;</option><option>&#x631;&#x627;&#x633;&#x628;</option><option>&#x642;&#x64A;&#x62F; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;</option><option>&#x63A;&#x627;&#x626;&#x628;</option></select></div>
@@ -13986,7 +13986,7 @@ function showToast(msg,bg='#6B3FA0'){const t=document.getElementById('toast');t.
     f_whatsapp: '\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F',
     f_class_name: '\u0627\u0644\u0635\u0641',
     f_old_new_2026: '\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026',
-    f_registration_term2_2026: '\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026',
+    f_registration_term2_2026: '\u062D\u0627\u0644\u0629 \u0627\u0644\u062A\u0633\u062C\u064A\u0644',
     f_group_name_student: '\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629',
     f_group_online: '\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)',
     f_final_result: '\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 (\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0633\u062A\u0648\u0649 2026)',
