@@ -2088,6 +2088,238 @@ if True:
             except Exception:
                 pass
 
+    # ── backfill_installment_type_v2: follow-up to v1 — replace the
+    # bare "1" / "2" digit values v1 wrote with the FULL dropdown
+    # strings the admin's "اختيار نوع التقسيط" column actually expects.
+    # The dropdown options (per the screenshot the admin verified) are:
+    #   "طريقة 1 — 140 د — 4 أقساط"   (new students: مستجد / جديد)
+    #   "طريقة 2 — 100 د — 3 أقساط"   (old students: قديم)
+    # Note the U+2014 EM-DASH between the segments — NOT a regular '-'.
+    #
+    # This migration:
+    #   1. Upgrades any row whose installment_type is exactly "1" / "2"
+    #      (the wrong v1 values) to the corresponding full string.
+    #   2. RE-applies the v1 rule for rows that are still empty (covers
+    #      anything v1 missed because columns hadn't resolved yet, or
+    #      rows added between deploys).
+    #   3. NEVER overwrites a row whose value already contains "طريقة"
+    #      (admin's manual selection or already-correct upgrade).
+    # v1's tag stays stamped — it ran, just with the wrong values; v2
+    # gets its own tag so this block is also strictly one-shot.
+    if "backfill_installment_type_v2" not in applied:
+        try:
+            import html as _html_v2
+            import sys as _sys_v2
+            import re as _re_v2
+            def _v2_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            # Full dropdown strings — em-dash is U+2014 (NOT '-').
+            _METHOD_1 = "طريقة 1 — 140 د — 4 أقساط"
+            _METHOD_2 = "طريقة 2 — 100 د — 3 أقساط"
+
+            _F_STATUS_LBL = _v2_fold("حالة التسجيل")
+            _F_FLAG_LBL   = _v2_fold("قديم جديد 2026")
+            _F_INST_LBL   = _v2_fold("اختيار نوع التقسيط")
+            _F_REGISTERED = _v2_fold("تم التسجيل")
+            _F_OLD        = _v2_fold("قديم")
+            _F_NEW1       = _v2_fold("مستجد")
+            _F_NEW2       = _v2_fold("جديد")
+            _F_PROTECT    = _v2_fold("طريقة")  # any cell with this stays
+
+            try:
+                _live_cols_v2 = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+            except Exception:
+                _live_cols_v2 = set()
+            try:
+                _label_rows_v2 = db2.execute(
+                    "SELECT col_key, col_label FROM column_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows_v2 = []
+            _safe_rx_v2 = _re_v2.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            _label_to_key_v2 = {}
+            for _r in _label_rows_v2:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or not _safe_rx_v2.match(_ck):
+                    continue
+                if _ck not in _live_cols_v2:
+                    continue
+                _decoded = _html_v2.unescape(str(_cl)).strip()
+                _flbl = _v2_fold(_decoded)
+                if _flbl and _flbl not in _label_to_key_v2:
+                    _label_to_key_v2[_flbl] = _ck
+
+            _status_col_v2      = _label_to_key_v2.get(_F_STATUS_LBL)
+            _flag_col_v2        = _label_to_key_v2.get(_F_FLAG_LBL)
+            _installment_col_v2 = _label_to_key_v2.get(_F_INST_LBL)
+            if not _status_col_v2 and "registration_term2_2026" in _live_cols_v2:
+                _status_col_v2 = "registration_term2_2026"
+            if not _flag_col_v2 and "old_new_2026" in _live_cols_v2:
+                _flag_col_v2 = "old_new_2026"
+            if not _installment_col_v2 and "installment_type" in _live_cols_v2:
+                _installment_col_v2 = "installment_type"
+
+            if not (_status_col_v2 and _flag_col_v2 and _installment_col_v2):
+                _sys_v2.stderr.write(
+                    "[backfill_installment_type_v2] could not resolve all 3 columns "
+                    "(status=" + str(_status_col_v2)
+                    + ", flag=" + str(_flag_col_v2)
+                    + ", installment=" + str(_installment_col_v2)
+                    + ") — skipping backfill\n"
+                )
+            else:
+                _q_status_v2 = '"' + _status_col_v2 + '"'
+                _q_flag_v2   = '"' + _flag_col_v2 + '"'
+                _q_inst_v2   = '"' + _installment_col_v2 + '"'
+                try:
+                    _rows_v2 = db2.execute(
+                        "SELECT id, " + _q_status_v2 + ", " + _q_flag_v2
+                        + ", " + _q_inst_v2 + " FROM students"
+                    ).fetchall()
+                except Exception as _ex_sel_v2:
+                    _rows_v2 = []
+                    _sys_v2.stderr.write(
+                        "[backfill_installment_type_v2] SELECT failed: "
+                        + str(_ex_sel_v2) + "\n"
+                    )
+
+                _upgraded_from_1   = 0
+                _upgraded_from_2   = 0
+                _newly_assigned_1  = 0
+                _newly_assigned_2  = 0
+                _kept_existing     = 0
+                _left_empty        = 0
+                for _r in _rows_v2:
+                    _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                    _status = _r[1] if hasattr(_r, "__getitem__") else None
+                    _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                    _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                    if _rid is None:
+                        continue
+                    _cur_str = (_curr or "").strip()
+                    # Branch A: bare "1" / "2" → upgrade to full string.
+                    if _cur_str == "1":
+                        try:
+                            db2.execute(
+                                "UPDATE students SET " + _q_inst_v2
+                                + " = ? WHERE id = ?",
+                                (_METHOD_1, _rid),
+                            )
+                            _upgraded_from_1 += 1
+                        except Exception as _ex:
+                            _sys_v2.stderr.write(
+                                "[backfill_installment_type_v2] UPDATE row "
+                                + str(_rid) + " failed: " + str(_ex) + "\n"
+                            )
+                        continue
+                    if _cur_str == "2":
+                        try:
+                            db2.execute(
+                                "UPDATE students SET " + _q_inst_v2
+                                + " = ? WHERE id = ?",
+                                (_METHOD_2, _rid),
+                            )
+                            _upgraded_from_2 += 1
+                        except Exception as _ex:
+                            _sys_v2.stderr.write(
+                                "[backfill_installment_type_v2] UPDATE row "
+                                + str(_rid) + " failed: " + str(_ex) + "\n"
+                            )
+                        continue
+                    # Branch B: any non-empty value containing "طريقة"
+                    # is admin's choice (or already a valid upgrade) —
+                    # keep untouched. The fold check tolerates extra
+                    # whitespace / diacritic / alif variants.
+                    if _cur_str and _F_PROTECT in _v2_fold(_cur_str):
+                        _kept_existing += 1
+                        continue
+                    # Branch C: any other non-empty value is also
+                    # treated as "admin's manual choice" — keep, don't
+                    # blindly remap unrecognised text.
+                    if _cur_str:
+                        _kept_existing += 1
+                        continue
+                    # Branch D: empty cell → re-apply v1 rule with full strings.
+                    _fs = _v2_fold(_status)
+                    _ff = _v2_fold(_flag)
+                    _new_val = None
+                    if _fs == _F_REGISTERED:
+                        if _ff == _F_OLD:
+                            _new_val = _METHOD_2
+                        elif _ff == _F_NEW1 or _ff == _F_NEW2:
+                            _new_val = _METHOD_1
+                    if _new_val is None:
+                        _left_empty += 1
+                        continue
+                    try:
+                        db2.execute(
+                            "UPDATE students SET " + _q_inst_v2
+                            + " = ? WHERE id = ?",
+                            (_new_val, _rid),
+                        )
+                        if _new_val is _METHOD_1:
+                            _newly_assigned_1 += 1
+                        else:
+                            _newly_assigned_2 += 1
+                    except Exception as _ex:
+                        _sys_v2.stderr.write(
+                            "[backfill_installment_type_v2] UPDATE row "
+                            + str(_rid) + " failed: " + str(_ex) + "\n"
+                        )
+                if (_upgraded_from_1 or _upgraded_from_2
+                        or _newly_assigned_1 or _newly_assigned_2):
+                    try: db2.commit()
+                    except Exception: pass
+                _sys_v2.stderr.write(
+                    "[backfill-installment-type-v2] columns resolved: status="
+                    + _status_col_v2 + " flag=" + _flag_col_v2
+                    + " installment=" + _installment_col_v2 + "\n"
+                )
+                _sys_v2.stderr.write(
+                    "[backfill-installment-type-v2] tally:"
+                    + " upgraded-from-1=" + str(_upgraded_from_1)
+                    + " upgraded-from-2=" + str(_upgraded_from_2)
+                    + " newly-assigned-1=" + str(_newly_assigned_1)
+                    + " newly-assigned-2=" + str(_newly_assigned_2)
+                    + " kept-existing=" + str(_kept_existing)
+                    + " left-empty=" + str(_left_empty)
+                    + " total-rows=" + str(len(_rows_v2)) + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_installment_type_v2",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_v2:
+            try:
+                import sys as _sys_v2
+                _sys_v2.stderr.write(
+                    "[backfill_installment_type_v2] outer error: "
+                    + str(_ex_outer_v2) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
