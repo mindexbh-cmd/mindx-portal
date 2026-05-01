@@ -37868,9 +37868,40 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
     if not fields:
         _sys_pi.stderr.write("[perform_import] EARLY EXIT: unknown table " + str(table) + "\n")
         return 400, {"ok": False, "error": "unknown table"}
-    live_cols = {r[1] for r in db.execute("PRAGMA table_info(" + table + ")").fetchall()}
+    # Single PRAGMA round-trip — keeps both the column-name set and the
+    # SQL-type map. The _PgConnection wrapper translates this to an
+    # information_schema.columns query on Postgres so r[2] = data_type
+    # ('numeric', 'integer', 'text', etc.) regardless of backend.
+    _pti_rows = db.execute("PRAGMA table_info(" + table + ")").fetchall()
+    live_cols = {r[1] for r in _pti_rows}
+    live_sql_types = {}
+    for _r in _pti_rows:
+        try:
+            _nm = _r[1] if hasattr(_r, "__getitem__") else None
+            _ty = _r[2] if hasattr(_r, "__getitem__") else None
+            if _nm:
+                live_sql_types[_nm] = (_ty or "").lower()
+        except Exception:
+            pass
+    # Universal Postgres pitfall: NUMERIC/INTEGER/REAL columns reject
+    # the empty string '' — it must be NULL. SQLite is lenient, so a
+    # row that imports cleanly locally explodes on prod with
+    # 'invalid input syntax for type numeric: ""'. Detect every
+    # numeric-flavoured column up front so the per-row coercion below
+    # can rewrite "" → None silently and pre-validate non-empty values.
+    _NUMERIC_TYPE_KEYWORDS = (
+        "numeric", "integer", "bigint", "smallint",
+        "real", "double", "decimal", "float",
+    )
+    numeric_cols = {
+        c for c, t in live_sql_types.items()
+        if any(kw in t for kw in _NUMERIC_TYPE_KEYWORDS)
+    }
     _sys_pi.stderr.write(
         "[perform_import] live_cols(" + table + ")=" + str(sorted(live_cols)) + "\n"
+    )
+    _sys_pi.stderr.write(
+        "[perform_import] numeric_cols(" + table + ")=" + str(sorted(numeric_cols)) + "\n"
     )
     _sys_pi.stderr.write(
         "[perform_import] static fields=" + str(fields) + "\n"
@@ -38026,6 +38057,14 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
     errors   = 0
     skip_reasons = []   # up to 20 entries
     last_error = ""
+    # Counters for the [type-coerce] diagnostic. Only the first few
+    # empty→NULL conversions are logged inline (one line per cell would
+    # spam the log on a bulk import); the totals get one summary line
+    # at exit. Skip-row events are always logged because they're rare
+    # and indicate an actual data issue.
+    _coerce_empty_to_null_total = 0
+    _coerce_empty_to_null_logged = 0
+    _COERCE_LOG_SAMPLE_LIMIT = 5
     # Per-column count of rows that arrived with a non-empty value for
     # that field. Surfaced in the response payload so admins can spot
     # "why is column X still empty after import?" without prod DB
@@ -38137,6 +38176,69 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
             _remember_skip(idx, bad_type_reason)
             continue
 
+        # SQL-numeric coercion. Postgres rejects "" for NUMERIC /
+        # INTEGER / REAL / DECIMAL / FLOAT / BIGINT / SMALLINT / DOUBLE
+        # columns ('invalid input syntax for type numeric: ""'); SQLite
+        # silently accepts the bad value. Universally rewrite "" /
+        # whitespace → None for any column whose live SQL type is in
+        # one of those families. For non-empty values, pre-validate
+        # they parse as a number — if not (e.g. "معفي" landing in a
+        # column that someone changed to NUMERIC), skip the row with
+        # a clear reason instead of letting Postgres explode per-row.
+        # Note: payment_log.inst1..5 are TEXT in the live schema, so
+        # "معفي" passes through cleanly without entering this branch.
+        numeric_skip_reason = ""
+        if numeric_cols:
+            for f in fields:
+                if f not in numeric_cols:
+                    continue
+                v = norm.get(f)
+                if v is None:
+                    continue
+                s = str(v)
+                if not s.strip():
+                    norm[f] = None
+                    _coerce_empty_to_null_total += 1
+                    if _coerce_empty_to_null_logged < _COERCE_LOG_SAMPLE_LIMIT:
+                        _coerce_empty_to_null_logged += 1
+                        try:
+                            _sys_pi.stderr.write(
+                                "[type-coerce] table=" + table
+                                + " row=" + str(idx)
+                                + " field=" + f
+                                + " value=" + repr(s[:30])
+                                + " sql_type=" + repr(live_sql_types.get(f, ""))
+                                + " action=NULL\n"
+                            )
+                        except Exception:
+                            pass
+                    continue
+                cleaned = s.strip().replace(",", ".")
+                try:
+                    float(cleaned)
+                    norm[f] = cleaned
+                except (ValueError, TypeError):
+                    numeric_skip_reason = (
+                        f + ": قيمة غير رقمية '" + s.strip()[:30]
+                        + "' في عمود رقمي"
+                    )
+                    try:
+                        _sys_pi.stderr.write(
+                            "[type-coerce] table=" + table
+                            + " row=" + str(idx)
+                            + " field=" + f
+                            + " value=" + repr(s[:30])
+                            + " sql_type=" + repr(live_sql_types.get(f, ""))
+                            + " action=skip_row\n"
+                        )
+                    except Exception:
+                        pass
+                    break
+        if numeric_skip_reason:
+            skipped += 1
+            _remember_skip(idx, numeric_skip_reason)
+            continue
+
         # Upsert: if every key column is non-empty AND a row with that tuple
         # exists, UPDATE non-key columns; else INSERT.
         existing_id = None
@@ -38238,6 +38340,7 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
         + " errors=" + str(errors)
         + " received=" + str(len(rows))
         + " verified_db_count=" + str(_verified_count)
+        + " coerce_empty_to_null=" + str(_coerce_empty_to_null_total)
         + " last_error=" + str(last_error)[:200]
         + "\n"
     )
