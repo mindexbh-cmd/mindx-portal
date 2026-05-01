@@ -39252,41 +39252,49 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
         except Exception:
             _drive_lookup = None
 
-    # Renamed-column-key redirect: when an admin renamed a seeded
-    # column via /database (e.g. registration_term2_2026 → col_<ts>
-    # while keeping the same Arabic label "حالة التسجيل"), JS-side
-    # mapGenericRow still uses the static IMPORT_DEFS key — so the
-    # incoming row dict has key = registration_term2_2026, but the
-    # live schema only has col_<ts>. Without this redirect, the
-    # field-filter above strips the data because the static key
-    # isn't in live_cols. We rebuild the routing in three steps:
+    # Live-label-aware mirror: when admin-added columns share an
+    # Arabic label with a seeded IMPORT_DEFS key, mirror the JS-routed
+    # value to ALL live col_keys carrying that label. Two scenarios:
     #
-    #   1. For every static IMPORT_TABLE_FIELDS entry that's NOT in
-    #      live_cols, look up its first Arabic alias in the same
-    #      _DRIVE_SHEET_MAP[table] used by the Drive path.
-    #   2. Search the *_col_labels table for any col_key whose
-    #      decoded label folds to that same Arabic alias. Restrict
-    #      to col_keys that ARE in live_cols.
-    #   3. Append the discovered col_key to `fields` (so the SQL
-    #      INSERT / UPDATE writes it) and add a renamed_map entry
-    #      static_key -> live_col_key so _remap_row_keys translates
-    #      incoming JS row keys.
+    #   A. Admin RENAMED the seeded column via /database (e.g. seeded
+    #      registration_term2_2026 was dropped, replaced by col_<ts>
+    #      with the same label "حالة التسجيل"). Without this mirror,
+    #      JS-side mapGenericRow routes data to the seeded key but
+    #      it's no longer in live_cols → data dropped.
+    #
+    #   B. Admin ADDED a duplicate column (e.g. seeded
+    #      registration_term2_2026 still exists but admin also added
+    #      col_<ts> with the same label "حالة التسجيل" because they
+    #      didn't realise the seeded one already had the label).
+    #      Without this mirror, JS routes data to the seeded key only;
+    #      the admin's UI shows their col_<ts> labelled
+    #      "حالة التسجيل" empty.
+    #
+    # Algorithm: for each IMPORT_TABLE_FIELDS static key, find every
+    # live col_key whose label folds to the same form as the static
+    # key's Arabic alias from _DRIVE_SHEET_MAP[table]. Build a list
+    # of mirror targets per static key. When the only target is the
+    # static key itself (canonical no-rename / no-duplicate case),
+    # skip — _remap_row_keys behaves exactly as before. Otherwise
+    # add every target to `fields` and to the mirror_map so
+    # _remap_row_keys writes the value to all of them.
     #
     # Diagnostic [excel-header-match] log fires for students so the
-    # admin can verify post-import which static keys got redirected.
-    renamed_map = {}
+    # admin can verify post-import which static keys got mirrored.
+    mirror_map = {}
     if _DRIVE_SHEET_MAP.get(table) and table in IMPORT_TABLE_FIELDS:
         try:
             import html as _html_rmk
-            # static col_key -> first folded Arabic alias.
             _static_key_to_lbl = {}
             for _ar, _tgt in (_DRIVE_SHEET_MAP.get(table) or {}).items():
                 if not _tgt: continue
                 _f = _grp_norm(_ar)
                 if _f and _tgt not in _static_key_to_lbl:
                     _static_key_to_lbl[_tgt] = _f
-            # live folded-label -> live col_key.
-            _live_lbl_to_key = {}
+            # folded_label -> [live col_keys] (multiple cols can
+            # share the same label — that's exactly the duplicate
+            # scenario we want to detect).
+            _live_lbl_to_keys = {}
             _lbl_tbl_rmk = IMPORT_LABEL_TABLES.get(table)
             if _lbl_tbl_rmk:
                 try:
@@ -39300,23 +39308,36 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
                         if _ck not in live_cols: continue
                         _decoded = _html_rmk.unescape(str(_cl))
                         _f = _grp_norm(_decoded)
-                        if _f and _f not in _live_lbl_to_key:
-                            _live_lbl_to_key[_f] = _ck
+                        if _f:
+                            _live_lbl_to_keys.setdefault(_f, []).append(_ck)
                 except Exception:
                     pass
             for _sk in IMPORT_TABLE_FIELDS.get(table, []):
-                if _sk in live_cols:
-                    continue
                 _folded_lbl = _static_key_to_lbl.get(_sk)
                 if not _folded_lbl:
                     continue
-                _target = _live_lbl_to_key.get(_folded_lbl)
-                if _target and _target != _sk and _target in live_cols:
-                    renamed_map[_sk] = _target
-                    if _target not in fields:
-                        fields.append(_target)
+                _matches = list(_live_lbl_to_keys.get(_folded_lbl, []))
+                # The static key itself is also a target if it's in
+                # live_cols (whether or not it's in column_labels —
+                # the seeded col may not have a row in column_labels
+                # on every prod state).
+                if _sk in live_cols and _sk not in _matches:
+                    _matches.append(_sk)
+                if not _matches:
+                    continue
+                # Canonical: the only target is the static key itself
+                # (and it's in live_cols). Existing field-filter
+                # already includes it; no mirror needed.
+                if _matches == [_sk]:
+                    continue
+                # Either rename (sk not in live_cols) or duplicate
+                # (multiple matches). Mirror to every target.
+                mirror_map[_sk] = _matches
+                for _t in _matches:
+                    if _t not in fields:
+                        fields.append(_t)
         except Exception:
-            renamed_map = {}
+            mirror_map = {}
 
     field_set = set(fields)
 
@@ -39326,12 +39347,12 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
                 "[excel-header-match] static_keys_in_live="
                 + str(sorted([f for f in IMPORT_TABLE_FIELDS.get("students", [])
                               if f in live_cols]))[:300]
-                + "\n[excel-header-match] static_keys_redirected="
-                + str(renamed_map) + "\n"
+                + "\n[excel-header-match] mirror_map="
+                + str(mirror_map) + "\n"
                 + "[excel-header-match] static_keys_LOST="
                 + str([f for f in IMPORT_TABLE_FIELDS.get("students", [])
-                       if f not in live_cols and f not in renamed_map])
-                + " (these admin-renamed-without-matching-label rows will be dropped)\n"
+                       if f not in live_cols and f not in mirror_map])
+                + " (these would silently drop)\n"
             )
         except Exception:
             pass
@@ -39339,20 +39360,22 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
     def _remap_row_keys(r_in):
         if not isinstance(r_in, dict):
             return r_in
-        if not _drive_lookup and not renamed_map:
+        if not _drive_lookup and not mirror_map:
             return r_in
         out = {}
         for k, v in r_in.items():
             if not isinstance(k, str):
                 out[k] = v
                 continue
-            # Step 1: redirect dropped-static-keys to their live
-            # equivalents. JS sent registration_term2_2026; live
-            # schema has col_<ts>; redirect rebinds the value.
-            if k in renamed_map:
-                target = renamed_map[k]
-                if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
-                    out[target] = v
+            # Step 1: mirror static-key incoming values to ALL live
+            # col_keys that share the static key's Arabic label
+            # (covers both the rename scenario where the seeded key
+            # is gone, and the duplicate scenario where the seeded
+            # key still exists alongside an admin-added col_<ts>).
+            if k in mirror_map:
+                for target in mirror_map[k]:
+                    if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
+                        out[target] = v
                 continue
             # Step 2: already an English col_key in our schema — keep as-is.
             if k in field_set:
