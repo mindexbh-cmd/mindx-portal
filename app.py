@@ -15830,7 +15830,7 @@ var IMPORT_DEFS = {
       {key:"whatsapp", ar:"\u0647\u0627\u062A\u0641 \u0627\u0644\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u062A\u0645\u062F"},
       {key:"class_name", ar:"\u0627\u0644\u0635\u0641"},
       {key:"old_new_2026", ar:"\u0642\u062F\u064A\u0645 \u062C\u062F\u064A\u062F 2026"},
-      {key:"registration_term2_2026", ar:"\u0627\u0644\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062B\u0627\u0646\u064A 2026"},
+      {key:"registration_term2_2026", ar:"\u062D\u0627\u0644\u0629 \u0627\u0644\u062A\u0633\u062C\u064A\u0644"},
       {key:"group_name_student", ar:"\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629"},
       {key:"group_online", ar:"\u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0629 (\u0627\u0644\u0627\u0648\u0646\u0644\u0627\u064A\u0646)"},
       {key:"final_result", ar:"\u0627\u0644\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064A\u0629 (\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0633\u062A\u0648\u0649 2026)"},
@@ -37058,7 +37058,8 @@ _DRIVE_SHEET_MAP = {
         "قديم/جديد 2026":                                     "old_new_2026",
         "قديم - جديد 2026":                                   "old_new_2026",
 
-        # registration_term2_2026 ── تسجيل الفصل الثاني 2026
+        # registration_term2_2026 ── حالة التسجيل
+        "حالة التسجيل":                                       "registration_term2_2026",
         "تسجيل الفصل الثاني 2026":                            "registration_term2_2026",
         "تسجيل الفصل الثاني":                                 "registration_term2_2026",
         "تم التسجيل":                                         "registration_term2_2026",
