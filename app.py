@@ -2829,6 +2829,150 @@ if True:
             except Exception:
                 pass
 
+    # ── apply_installment_type_rule_every_boot (NOT a one-shot — runs
+    # on EVERY boot; never stamps schema_migrations). This catches the
+    # case where the admin re-uploads via /api/import legacy AFTER the
+    # one-shot migrations have already stamped: the JS payload populates
+    # حالة التسجيل + قديم/جديد flags, but the v3 one-shot already ran
+    # on the prior deploy so it won't re-fire. The next boot picks up
+    # the work here. Idempotent: only updates rows whose installment_type
+    # is empty AND the rule applies. Fast no-op when there are no
+    # candidates (a single SELECT per boot, ~ms).
+    try:
+        import html as _html_aiv
+        import sys as _sys_aiv
+        import re as _re_aiv
+        def _aiv_fold(s):
+            if not s: return ""
+            out = []
+            for c in str(s):
+                cp = ord(c)
+                if c in "أإآٱ":
+                    out.append("ا")
+                elif c == "ى":
+                    out.append("ي")
+                elif c == "ة":
+                    out.append("ه")
+                elif 0x064B <= cp <= 0x0652:
+                    continue
+                else:
+                    out.append(c)
+            return " ".join("".join(out).split())
+
+        _METHOD_1_aiv = "طريقة 1 — 140 د — 4 أقساط"
+        _METHOD_2_aiv = "طريقة 2 — 100 د — 3 أقساط"
+        _F_REGISTERED_aiv = _aiv_fold("تم التسجيل")
+        _F_OLD_aiv        = _aiv_fold("قديم")
+        _F_NEW1_aiv       = _aiv_fold("مستجد")
+        _F_NEW2_aiv       = _aiv_fold("جديد")
+        _F_STATUS_LBL_aiv = _aiv_fold("حالة التسجيل")
+        _F_FLAG_LBL_aiv   = _aiv_fold("قديم جديد 2026")
+        _F_INST_LBL_aiv   = _aiv_fold("اختيار نوع التقسيط")
+
+        try:
+            _live_cols_aiv = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+        except Exception:
+            _live_cols_aiv = set()
+        try:
+            _label_rows_aiv = db2.execute(
+                "SELECT col_key, col_label FROM column_labels"
+            ).fetchall()
+        except Exception:
+            _label_rows_aiv = []
+        _safe_rx_aiv = _re_aiv.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+        _label_to_key_aiv = {}
+        for _r in _label_rows_aiv:
+            _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+            _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+            _ck = str(_ck).strip()
+            if not _ck or not _safe_rx_aiv.match(_ck):
+                continue
+            if _ck not in _live_cols_aiv:
+                continue
+            _decoded = _html_aiv.unescape(str(_cl)).strip()
+            _flbl = _aiv_fold(_decoded)
+            if _flbl and _flbl not in _label_to_key_aiv:
+                _label_to_key_aiv[_flbl] = _ck
+        _status_col_aiv = (_label_to_key_aiv.get(_F_STATUS_LBL_aiv)
+                            or ("registration_term2_2026" if "registration_term2_2026" in _live_cols_aiv else None))
+        _flag_col_aiv   = (_label_to_key_aiv.get(_F_FLAG_LBL_aiv)
+                            or ("old_new_2026" if "old_new_2026" in _live_cols_aiv else None))
+        _inst_col_aiv   = (_label_to_key_aiv.get(_F_INST_LBL_aiv)
+                            or ("installment_type" if "installment_type" in _live_cols_aiv else None))
+
+        if _status_col_aiv and _flag_col_aiv and _inst_col_aiv:
+            _q_status_aiv = '"' + _status_col_aiv + '"'
+            _q_flag_aiv   = '"' + _flag_col_aiv + '"'
+            _q_inst_aiv   = '"' + _inst_col_aiv + '"'
+            # Only fetch rows with empty installment_type — fast no-op
+            # when there's nothing to do. Postgres NULL and empty string
+            # both treated as empty.
+            try:
+                _candidates_aiv = db2.execute(
+                    "SELECT id, " + _q_status_aiv + ", " + _q_flag_aiv
+                    + " FROM students WHERE " + _q_inst_aiv
+                    + " IS NULL OR TRIM(" + _q_inst_aiv + ") = ''"
+                ).fetchall()
+            except Exception as _ex_sel_aiv:
+                _candidates_aiv = []
+                _sys_aiv.stderr.write(
+                    "[apply-installment-type-every-boot] SELECT failed: "
+                    + str(_ex_sel_aiv) + "\n"
+                )
+            _hit_1 = 0; _hit_2 = 0
+            for _r in _candidates_aiv:
+                _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                _status = _r[1] if hasattr(_r, "__getitem__") else None
+                _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                if _rid is None: continue
+                _fs = _aiv_fold(_status)
+                _ff = _aiv_fold(_flag)
+                _new = None
+                if _fs == _F_REGISTERED_aiv:
+                    if _ff == _F_OLD_aiv:
+                        _new = _METHOD_2_aiv
+                    elif _ff == _F_NEW1_aiv or _ff == _F_NEW2_aiv:
+                        _new = _METHOD_1_aiv
+                if _new is None: continue
+                try:
+                    db2.execute(
+                        "UPDATE students SET " + _q_inst_aiv
+                        + " = ? WHERE id = ? AND ("
+                        + _q_inst_aiv + " IS NULL OR TRIM("
+                        + _q_inst_aiv + ") = '')",
+                        (_new, _rid),
+                    )
+                    if _new is _METHOD_1_aiv:
+                        _hit_1 += 1
+                    else:
+                        _hit_2 += 1
+                except Exception as _ex_upd_aiv:
+                    _sys_aiv.stderr.write(
+                        "[apply-installment-type-every-boot] UPDATE row "
+                        + str(_rid) + " failed: " + str(_ex_upd_aiv) + "\n"
+                    )
+            if _hit_1 or _hit_2:
+                try: db2.commit()
+                except Exception: pass
+                _sys_aiv.stderr.write(
+                    "[apply-installment-type-every-boot] tally:"
+                    + " assigned-to-1=" + str(_hit_1)
+                    + " assigned-to-2=" + str(_hit_2)
+                    + " candidates=" + str(len(_candidates_aiv)) + "\n"
+                )
+            # When no work was done, stay silent — boot logs are noisy
+            # enough as is. The presence of the line above signals real
+            # writes; absence means no eligible rows.
+    except Exception as _ex_outer_aiv:
+        try:
+            import sys as _sys_aiv2
+            _sys_aiv2.stderr.write(
+                "[apply-installment-type-every-boot] outer error: "
+                + str(_ex_outer_aiv) + "\n"
+            )
+        except Exception:
+            pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -39516,6 +39660,67 @@ def api_import():
         pass
 
     db = get_db()
+
+    # Focused [excel-import-header] diagnostic for students. Lets the
+    # admin (and us) verify post-import that:
+    #   (a) every admin-added column registered in column_labels is
+    #       visible to the live-label-aware lookup that runs inside
+    #       _perform_import,
+    #   (b) the JS row keys arriving here either land on a static
+    #       IMPORT_TABLE_FIELDS slot (will be written) or on a live
+    #       label target (will be re-keyed by the defensive remap),
+    #   (c) any keys that don't match either source are surfaced so
+    #       the admin sees them in Render Logs instead of silently
+    #       being dropped.
+    if table == "students":
+        try:
+            import html as _html_eih
+            _label_rows_eih = []
+            try:
+                _label_rows_eih = db.execute(
+                    "SELECT col_key, col_label FROM column_labels "
+                    "ORDER BY col_order"
+                ).fetchall()
+            except Exception:
+                _label_rows_eih = []
+            _admin_labels = []
+            for _r in _label_rows_eih:
+                _ck = _r[0] if hasattr(_r, "__getitem__") else None
+                _cl = _r[1] if hasattr(_r, "__getitem__") else None
+                if _ck and _cl:
+                    _admin_labels.append((str(_ck),
+                                          _html_eih.unescape(str(_cl))))
+            _sys_li.stderr.write(
+                "[excel-import-header] column_labels(students) rows="
+                + str(len(_admin_labels))
+                + " sample=" + str(_admin_labels[:30]) + "\n"
+            )
+            _static_set = set(IMPORT_TABLE_FIELDS.get("students") or ())
+            _live_set = set()
+            try:
+                _live_set = {r[1] for r in db.execute(
+                    "PRAGMA table_info(students)"
+                ).fetchall()}
+            except Exception:
+                pass
+            _per_key = []
+            if rows and isinstance(rows[0], dict):
+                for _k in sorted(rows[0].keys()):
+                    _in_static = _k in _static_set
+                    _in_live   = _k in _live_set
+                    _per_key.append((_k,
+                                     "STATIC+LIVE" if (_in_static and _in_live)
+                                     else "STATIC_NO_LIVE" if _in_static
+                                     else "LIVE_NO_STATIC" if _in_live
+                                     else "NEITHER"))
+            _sys_li.stderr.write(
+                "[excel-import-header] first-row key→fate: "
+                + str(_per_key[:40]) + "\n"
+            )
+        except Exception:
+            pass
+
+
     status, payload = _perform_import(
         table, rows, auto_create, db, column_labels=column_labels,
     )
