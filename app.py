@@ -36820,7 +36820,7 @@ IMPORT_TABLE_KEYS = {
     "attendance":     ["group_name", "attendance_date", "student_name"],
     "taqseet":        ["طريقة_التقسيط"],
     "evaluations":    ["form_fill_date", "group_name", "student_name"],
-    "payment_log":    ["personal_id"],
+    "payment_log":    ["student_name"],
 }
 
 # Label table each data table stores its column types in. Column types come
@@ -37499,20 +37499,20 @@ def _drive_extract_rows(table, xlsx_bytes, sheet_name, db=None):
 # All Arabic aliases are folded via _grp_norm at lookup time so
 # alif/ya/taa-marbuta/diacritic variants match symmetrically.
 _PAYLOG_FROM_STUDENTS_FIELDS = {
-    "personal_id": [
-        "الرقم الشخصي",
-        "رقم البطاقة الشخصية",
-        "البطاقة الشخصية",
-        "رقم البطاقة",
-        "رقم الهوية",
-        "رقم الطالب",
-        "الرقم",
-        "personal_id",
-        "Personal ID",
-        "ID",
-        "CPR",
+    # The natural key for payment_log is student_name (see
+    # IMPORT_TABLE_KEYS['payment_log']). personal_id is intentionally
+    # NOT extracted here — payment_log dedups by name only.
+    "student_name": [
+        "اسم الطالب",
+        "اسم الطالبة",
+        "الاسم",
+        "student_name",
     ],
-    "_inst_slot_1": [
+    # The 5 installment placeholders. These keys are remapped to the
+    # live payment_log column names (inst1..inst5 by default, or
+    # admin-renamed col_<timestamp>) by _paylog_resolve_inst_col_map
+    # before each row is emitted.
+    "installment1": [
         "القسط الاول 2026",
         "القسط الأول 2026",
         "القسط الاول",
@@ -37521,25 +37521,25 @@ _PAYLOG_FROM_STUDENTS_FIELDS = {
         "installment1",
         "inst1",
     ],
-    "_inst_slot_2": [
+    "installment2": [
         "القسط الثاني",
         "القسط 2",
         "installment2",
         "inst2",
     ],
-    "_inst_slot_3": [
+    "installment3": [
         "القسط الثالث",
         "القسط 3",
         "installment3",
         "inst3",
     ],
-    "_inst_slot_4": [
+    "installment4": [
         "القسط الرابع",
         "القسط 4",
         "installment4",
         "inst4",
     ],
-    "_inst_slot_5": [
+    "installment5": [
         "القسط الخامس",
         "القسط 5",
         "installment5",
@@ -37634,32 +37634,42 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
 
     Behaviour vs `_drive_extract_rows`:
       - Uses the strict `_PAYLOG_FROM_STUDENTS_FIELDS` whitelist —
-        only personal_id + the 5 installment columns are extracted.
-        Every other column on the students sheet (name, phones,
+        only student_name + the 5 installment columns are extracted.
+        Every other column on the students sheet (id, phones,
         groups, results, etc.) is silently dropped and is NOT
         surfaced as an unmatched header.
-      - Slot keys are remapped to the live payment_log column names
-        via `_paylog_resolve_inst_col_map` before the row is emitted,
-        so admin-renamed columns are honoured without a code change.
-      - Rows with empty/whitespace-only personal_id are dropped
-        (payment_log natural key requires it).
+      - The 5 installment placeholders (installment1..installment5)
+        are remapped to the live payment_log column names via
+        `_paylog_resolve_inst_col_map` before each row is emitted,
+        so admin-renamed columns (col_<timestamp>) are honoured
+        without a code change.
+      - Rows with empty/whitespace-only student_name are dropped
+        (payment_log natural key under IMPORT_TABLE_KEYS).
       - Rows where ALL 5 installment cells are empty are dropped
-        (no payment data to import — saves Postgres round-trips
-        and keeps the upsert idempotent).
+        (no payment data to import — keeps the upsert idempotent).
       - Re-uses the existing `_drive_resolve_sheet_name` fuzzy
         resolver against the `students` variant list so a renamed
         Drive sheet still matches.
+      - Whitespace folding applied to student_name so re-imports
+        match cleanly across slightly inconsistent name spacing.
 
     Cells that arrive as raw numbers from openpyxl are str()'d. No
     further normalisation here — `_perform_import` already runs
     `_import_normalize_value` on every value, so the same
     whitespace-fold + date-coerce + status-fold rules apply.
+
+    Diagnostic [paylog-from-students] stderr lines surface the
+    configured/resolved sheet names, parsed-header keys, and the
+    silent-skip counts so post-deploy debugging in Render Logs is
+    immediate.
     """
     import io as _io
+    import sys as _sys_pfs
     from openpyxl import load_workbook
 
-    # Build folded-Arabic → slot-key lookup. Slot keys (placeholders)
-    # are remapped to live payment_log column names below.
+    # Build folded-Arabic → slot-key lookup. Slot keys (placeholders
+    # for installment1..5) are remapped to live payment_log column
+    # names below.
     lookup = {}
     for slot_key, aliases in _PAYLOG_FROM_STUDENTS_FIELDS.items():
         for alias in aliases:
@@ -37686,6 +37696,14 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
         try: wb.close()
         except Exception: pass
         raise
+    try:
+        _sys_pfs.stderr.write(
+            "[paylog-from-students] configured_sheet=" + repr(sheet_name)
+            + " resolved_sheet=" + repr(resolved_name)
+            + " fallback_used=" + str(_fb) + "\n"
+        )
+    except Exception:
+        pass
     ws = wb[resolved_name]
     rows_iter = ws.iter_rows(values_only=True)
     try:
@@ -37693,9 +37711,16 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
     except StopIteration:
         try: wb.close()
         except Exception: pass
+        try:
+            _sys_pfs.stderr.write(
+                "[paylog-from-students] empty sheet — no rows produced\n"
+            )
+        except Exception:
+            pass
         return [], [], resolved_name
 
     col_keys = []
+    matched_headers = []
     for cell in header:
         raw = "" if cell is None else str(cell)
         if not raw.strip():
@@ -37704,23 +37729,41 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
         f = _grp_norm(raw)
         target = lookup.get(f) if f else None
         col_keys.append(target)
+        if target:
+            matched_headers.append((target, raw.strip()))
         # Note: we deliberately do NOT collect unmatched_headers here.
         # Almost every column on the students sheet is "unmatched" by
         # design — surfacing them would drown the admin in noise.
+    try:
+        _sys_pfs.stderr.write(
+            "[paylog-from-students] matched_headers="
+            + str(matched_headers) + "\n"
+        )
+    except Exception:
+        pass
 
     inst_col_map = _paylog_resolve_inst_col_map(db)
-    # _inst_slot_N -> live payment_log column key; personal_id
-    # passes through unchanged (it lives in payment_log under the
-    # same name).
-    slot_to_live = {"personal_id": "personal_id"}
+    # installment{N} placeholder -> live payment_log column key.
+    # student_name passes through unchanged (it's the same column
+    # name in payment_log).
+    slot_to_live = {"student_name": "student_name"}
     for n in (1, 2, 3, 4, 5):
-        slot_to_live["_inst_slot_" + str(n)] = inst_col_map.get(
-            n, "inst" + str(n)
+        slot_to_live["installment" + str(n)] = inst_col_map.get(
+            n, "inst" + str(n),
         )
+    try:
+        _sys_pfs.stderr.write(
+            "[paylog-from-students] inst_col_map=" + str(inst_col_map)
+            + " slot_to_live=" + str(slot_to_live) + "\n"
+        )
+    except Exception:
+        pass
 
-    out = []
-    inst_live_cols = [slot_to_live["_inst_slot_" + str(n)]
+    inst_live_cols = [slot_to_live["installment" + str(n)]
                       for n in (1, 2, 3, 4, 5)]
+    out = []
+    skipped_no_name = 0
+    skipped_no_inst = 0
     for row in rows_iter:
         if row is None:
             continue
@@ -37741,8 +37784,13 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
                     rec[live_key] = sval
             else:
                 rec[live_key] = sval
-        pid = (rec.get("personal_id") or "").strip()
-        if not pid:
+        # Whitespace-fold the natural key so re-imports match across
+        # cells with stray double-spaces / NBSPs.
+        sname_raw = (rec.get("student_name") or "").strip()
+        if sname_raw:
+            rec["student_name"] = " ".join(sname_raw.split())
+        else:
+            skipped_no_name += 1
             continue
         any_inst = False
         for ic in inst_live_cols:
@@ -37750,10 +37798,19 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
                 any_inst = True
                 break
         if not any_inst:
+            skipped_no_inst += 1
             continue
         out.append(rec)
     try: wb.close()
     except Exception: pass
+    try:
+        _sys_pfs.stderr.write(
+            "[paylog-from-students] extracted=" + str(len(out))
+            + " skipped_no_name=" + str(skipped_no_name)
+            + " skipped_no_installments=" + str(skipped_no_inst) + "\n"
+        )
+    except Exception:
+        pass
     return out, [], resolved_name
 
 
@@ -38492,6 +38549,25 @@ def api_import_from_drive():
             "stage": "perform_import",
         }), 500
     _t_import = _t_drv.time() - _t_i0
+
+    # Final summary line for the paylog-from-students path so post-deploy
+    # diagnosis in Render Logs is one grep away.
+    if table_name == "payment_log" and paylog_source == "students":
+        try:
+            import sys as _sys_pfs2
+            _sys_pfs2.stderr.write(
+                "[paylog-from-students] result inserted="
+                + str(payload.get("inserted", 0))
+                + " updated=" + str(payload.get("updated", 0))
+                + " skipped=" + str(payload.get("skipped", 0))
+                + " errors="  + str(payload.get("errors", 0))
+                + " verified_db_count="
+                + str(payload.get("verified_db_count", "?"))
+                + " extra_fields=" + str(_import_extra_fields or [])
+                + "\n"
+            )
+        except Exception:
+            pass
 
     # Audit log entry — best-effort, never blocks the response.
     try:
