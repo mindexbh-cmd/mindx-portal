@@ -3157,6 +3157,300 @@ if True:
             except Exception:
                 pass
 
+    # ── installment_deep_diagnostic (runs EVERY boot, no stamp) — five
+    # buckets of stderr trace so the admin can see exactly why
+    # backfill_installment_type_v* is leaving اختيار نوع التقسيط empty.
+    # Removable in one commit once the root cause is found. The user
+    # spec called this "v4" but backfill_installment_type_v4 is already
+    # taken by the stamped block above, so we drop the tag entirely
+    # and just run unconditionally.
+    #
+    # Buckets logged to stderr:
+    #   [installment-deep-resolve]  every column_labels row + the
+    #                               final 3 resolved col_keys (or
+    #                               UNRESOLVED markers).
+    #   [installment-deep]          first 10 students with id, raw
+    #                               + folded status / flag / current
+    #                               installment_type, target per
+    #                               rule, decision + reason.
+    #   [installment-deep] tally   total + per-bucket counts.
+    #   [installment-deep] test-write SUCCESS|FAILED — single-row
+    #                               UPDATE+SELECT round-trip then
+    #                               revert, so we know whether the
+    #                               column type even accepts the
+    #                               full dropdown string.
+    try:
+        import sys as _sys_dd
+        import html as _html_dd
+        import re as _re_dd
+        def _dd_fold(s):
+            if not s: return ""
+            out = []
+            for c in str(s):
+                cp = ord(c)
+                if c in "أإآٱ":
+                    out.append("ا")
+                elif c == "ى":
+                    out.append("ي")
+                elif c == "ة":
+                    out.append("ه")
+                elif 0x064B <= cp <= 0x0652:
+                    continue
+                else:
+                    out.append(c)
+            return " ".join("".join(out).split())
+
+        # Em-dash is U+2014 (NOT '-'). Bytes-for-bytes the dropdown options.
+        _METHOD_1_dd = "طريقة 1 — 140 د — 4 أقساط"
+        _METHOD_2_dd = "طريقة 2 — 100 د — 3 أقساط"
+        _F_REGISTERED_dd = _dd_fold("تم التسجيل")
+        _F_OLD_dd        = _dd_fold("قديم")
+        _F_NEW1_dd       = _dd_fold("مستجد")
+        _F_NEW2_dd       = _dd_fold("جديد")
+        _F_PROTECT_dd    = _dd_fold("طريقة")
+        _F_STATUS_LBL_dd = _dd_fold("حالة التسجيل")
+        _F_FLAG_LBL_dd   = _dd_fold("قديم جديد 2026")
+        _F_INST_LBL_dd   = _dd_fold("اختيار نوع التقسيط")
+
+        try:
+            _live_cols_dd = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+        except Exception:
+            _live_cols_dd = set()
+        _safe_rx_dd = _re_dd.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+
+        # === STEP 2: dump column_labels resolution ===
+        _label_rows_dd = []
+        try:
+            _label_rows_dd = db2.execute(
+                "SELECT col_key, col_label FROM column_labels"
+            ).fetchall()
+        except Exception as _ex_lbl:
+            _sys_dd.stderr.write(
+                "[installment-deep-resolve] column_labels SELECT failed: "
+                + str(_ex_lbl) + "\n"
+            )
+
+        _resolved_dd = {"status": None, "flag": None, "installment": None}
+        for _r in _label_rows_dd:
+            _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+            _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+            _ck = str(_ck).strip()
+            if not _ck:
+                continue
+            _decoded = _html_dd.unescape(str(_cl)).strip()
+            _flbl = _dd_fold(_decoded)
+            _safe_ok = bool(_safe_rx_dd.match(_ck))
+            _in_live = _ck in _live_cols_dd
+            _sys_dd.stderr.write(
+                "[installment-deep-resolve] row col_key=" + repr(_ck)
+                + " label=" + repr(_decoded)
+                + " folded=" + repr(_flbl)
+                + " safe_ident=" + str(_safe_ok)
+                + " in_live_cols=" + str(_in_live) + "\n"
+            )
+            if _flbl == _F_STATUS_LBL_dd and _safe_ok and _in_live and not _resolved_dd["status"]:
+                _resolved_dd["status"] = _ck
+            if _flbl == _F_FLAG_LBL_dd and _safe_ok and _in_live and not _resolved_dd["flag"]:
+                _resolved_dd["flag"] = _ck
+            if _flbl == _F_INST_LBL_dd and _safe_ok and _in_live and not _resolved_dd["installment"]:
+                _resolved_dd["installment"] = _ck
+        # Fall-back to seeded English column names.
+        if not _resolved_dd["status"] and "registration_term2_2026" in _live_cols_dd:
+            _resolved_dd["status"] = "registration_term2_2026"
+        if not _resolved_dd["flag"] and "old_new_2026" in _live_cols_dd:
+            _resolved_dd["flag"] = "old_new_2026"
+        if not _resolved_dd["installment"] and "installment_type" in _live_cols_dd:
+            _resolved_dd["installment"] = "installment_type"
+        _sys_dd.stderr.write(
+            "[installment-deep-resolve] FINAL: status=" + repr(_resolved_dd["status"])
+            + " flag=" + repr(_resolved_dd["flag"])
+            + " installment=" + repr(_resolved_dd["installment"]) + "\n"
+        )
+        for _name in ("status", "flag", "installment"):
+            if not _resolved_dd[_name]:
+                _sys_dd.stderr.write("[installment-deep-resolve] UNRESOLVED: " + _name + "\n")
+
+        if (_resolved_dd["status"] and _resolved_dd["flag"]
+                and _resolved_dd["installment"]):
+            _q_status_dd = '"' + _resolved_dd["status"] + '"'
+            _q_flag_dd   = '"' + _resolved_dd["flag"] + '"'
+            _q_inst_dd   = '"' + _resolved_dd["installment"] + '"'
+
+            # === STEP 1: first 10 students decision ===
+            try:
+                _rows_dd = db2.execute(
+                    "SELECT id, " + _q_status_dd + ", " + _q_flag_dd
+                    + ", " + _q_inst_dd + " FROM students ORDER BY id LIMIT 10"
+                ).fetchall()
+            except Exception as _ex_sample:
+                _rows_dd = []
+                _sys_dd.stderr.write(
+                    "[installment-deep] sample SELECT failed: "
+                    + str(_ex_sample) + "\n"
+                )
+            for _r in _rows_dd:
+                _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                _status = _r[1] if hasattr(_r, "__getitem__") else None
+                _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                _fs = _dd_fold(_status)
+                _ff = _dd_fold(_flag)
+                _cur_str = (_curr or "").strip()
+                _decision = ""
+                _reason = ""
+                _target = None
+                if _cur_str and _F_PROTECT_dd in _dd_fold(_cur_str):
+                    _decision = "would-skip-existing"
+                    _reason = "value contains 'طريقة' (protected)"
+                elif _cur_str:
+                    _decision = "would-skip-existing"
+                    _reason = "value non-empty (admin manual)"
+                elif _fs != _F_REGISTERED_dd:
+                    _decision = "would-leave-empty"
+                    _reason = ("status_folded " + repr(_fs)
+                               + " != folded(تم التسجيل) " + repr(_F_REGISTERED_dd))
+                elif _ff == _F_OLD_dd:
+                    _decision = "would-update"; _target = _METHOD_2_dd
+                elif _ff == _F_NEW1_dd or _ff == _F_NEW2_dd:
+                    _decision = "would-update"; _target = _METHOD_1_dd
+                else:
+                    _decision = "would-leave-empty"
+                    _reason = ("flag_folded " + repr(_ff)
+                               + " not in {قديم,مستجد,جديد}")
+                _sys_dd.stderr.write(
+                    "[installment-deep] id=" + str(_rid)
+                    + " status_raw=" + repr(_status)
+                    + " status_folded=" + repr(_fs)
+                    + " flag_raw=" + repr(_flag)
+                    + " flag_folded=" + repr(_ff)
+                    + " current_installment=" + repr(_curr)
+                    + " target=" + repr(_target)
+                    + " decision=" + _decision
+                    + " reason=" + repr(_reason) + "\n"
+                )
+
+            # === STEP 4: aggregate tally ===
+            try:
+                _total_dd = db2.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+            except Exception:
+                _total_dd = 0
+            try:
+                _all_rows_dd = db2.execute(
+                    "SELECT " + _q_status_dd + ", " + _q_flag_dd
+                    + ", " + _q_inst_dd + " FROM students"
+                ).fetchall()
+            except Exception:
+                _all_rows_dd = []
+            _cnt_reg = 0
+            _cnt_old = 0
+            _cnt_new = 0
+            _cnt_tar = 0
+            _cnt_emp = 0
+            for _r in _all_rows_dd:
+                _s = _r[0] if hasattr(_r, "__getitem__") else None
+                _f = _r[1] if hasattr(_r, "__getitem__") else None
+                _c = _r[2] if hasattr(_r, "__getitem__") else None
+                if _dd_fold(_s) == _F_REGISTERED_dd:
+                    _cnt_reg += 1
+                _ff_a = _dd_fold(_f)
+                if _ff_a == _F_OLD_dd:
+                    _cnt_old += 1
+                elif _ff_a == _F_NEW1_dd or _ff_a == _F_NEW2_dd:
+                    _cnt_new += 1
+                _cs_a = (_c or "").strip()
+                if _cs_a and _F_PROTECT_dd in _dd_fold(_cs_a):
+                    _cnt_tar += 1
+                if not _cs_a:
+                    _cnt_emp += 1
+            _sys_dd.stderr.write(
+                "[installment-deep] tally:"
+                + " total=" + str(_total_dd)
+                + " status=registered=" + str(_cnt_reg)
+                + " flag=قديم=" + str(_cnt_old)
+                + " flag=مستجد/جديد=" + str(_cnt_new)
+                + " inst_has_طريقة=" + str(_cnt_tar)
+                + " inst_empty=" + str(_cnt_emp) + "\n"
+            )
+
+            # === STEP 3: test write + revert ===
+            try:
+                _first_id_row = db2.execute(
+                    "SELECT id FROM students ORDER BY id LIMIT 1"
+                ).fetchone()
+                if _first_id_row:
+                    _first_id = _first_id_row[0]
+                    _orig_row = db2.execute(
+                        "SELECT " + _q_inst_dd + " FROM students WHERE id = ?",
+                        (_first_id,),
+                    ).fetchone()
+                    _orig_val = _orig_row[0] if _orig_row else None
+                    _sys_dd.stderr.write(
+                        "[installment-deep] test-write target id=" + str(_first_id)
+                        + " column=" + repr(_resolved_dd["installment"])
+                        + " original_value=" + repr(_orig_val) + "\n"
+                    )
+                    _test_sql = ("UPDATE students SET " + _q_inst_dd
+                                 + " = ? WHERE id = ?")
+                    _sys_dd.stderr.write(
+                        "[installment-deep] test SQL: " + _test_sql
+                        + " params=(<METHOD_2_string>, " + str(_first_id) + ")\n"
+                    )
+                    _wrote_test = False
+                    try:
+                        db2.execute(_test_sql, (_METHOD_2_dd, _first_id))
+                        try: db2.commit()
+                        except Exception: pass
+                        _wrote_test = True
+                        _after_row = db2.execute(
+                            "SELECT " + _q_inst_dd + " FROM students WHERE id = ?",
+                            (_first_id,),
+                        ).fetchone()
+                        _after_val = _after_row[0] if _after_row else None
+                        _match = (_after_val == _METHOD_2_dd)
+                        _sys_dd.stderr.write(
+                            "[installment-deep] test-write SUCCESS — value_after="
+                            + repr(_after_val)
+                            + " round_trip_match=" + str(_match) + "\n"
+                        )
+                    except Exception as _ex_w:
+                        _sys_dd.stderr.write(
+                            "[installment-deep] test-write FAILED: "
+                            + type(_ex_w).__name__ + ": "
+                            + str(_ex_w)[:300] + "\n"
+                        )
+                    # Revert (only if we wrote — never write a junk
+                    # NULL into a row that already had a value just
+                    # because a SELECT failed earlier).
+                    if _wrote_test:
+                        try:
+                            db2.execute(_test_sql, (_orig_val, _first_id))
+                            try: db2.commit()
+                            except Exception: pass
+                            _sys_dd.stderr.write(
+                                "[installment-deep] reverted id=" + str(_first_id)
+                                + " back to " + repr(_orig_val) + "\n"
+                            )
+                        except Exception as _ex_r:
+                            _sys_dd.stderr.write(
+                                "[installment-deep] REVERT FAILED for id="
+                                + str(_first_id) + ": " + str(_ex_r)
+                                + " — row may now hold the test value!\n"
+                            )
+            except Exception as _ex_test:
+                _sys_dd.stderr.write(
+                    "[installment-deep] test-write outer error: "
+                    + str(_ex_test) + "\n"
+                )
+    except Exception as _ex_outer_dd:
+        try:
+            import sys as _sys_dd2
+            _sys_dd2.stderr.write(
+                "[installment-deep] OUTER ERROR: "
+                + str(_ex_outer_dd) + "\n"
+            )
+        except Exception:
+            pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
