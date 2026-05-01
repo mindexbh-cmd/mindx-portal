@@ -39251,28 +39251,123 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
             _drive_lookup = _drive_build_header_lookup(table, db)
         except Exception:
             _drive_lookup = None
+
+    # Renamed-column-key redirect: when an admin renamed a seeded
+    # column via /database (e.g. registration_term2_2026 → col_<ts>
+    # while keeping the same Arabic label "حالة التسجيل"), JS-side
+    # mapGenericRow still uses the static IMPORT_DEFS key — so the
+    # incoming row dict has key = registration_term2_2026, but the
+    # live schema only has col_<ts>. Without this redirect, the
+    # field-filter above strips the data because the static key
+    # isn't in live_cols. We rebuild the routing in three steps:
+    #
+    #   1. For every static IMPORT_TABLE_FIELDS entry that's NOT in
+    #      live_cols, look up its first Arabic alias in the same
+    #      _DRIVE_SHEET_MAP[table] used by the Drive path.
+    #   2. Search the *_col_labels table for any col_key whose
+    #      decoded label folds to that same Arabic alias. Restrict
+    #      to col_keys that ARE in live_cols.
+    #   3. Append the discovered col_key to `fields` (so the SQL
+    #      INSERT / UPDATE writes it) and add a renamed_map entry
+    #      static_key -> live_col_key so _remap_row_keys translates
+    #      incoming JS row keys.
+    #
+    # Diagnostic [excel-header-match] log fires for students so the
+    # admin can verify post-import which static keys got redirected.
+    renamed_map = {}
+    if _DRIVE_SHEET_MAP.get(table) and table in IMPORT_TABLE_FIELDS:
+        try:
+            import html as _html_rmk
+            # static col_key -> first folded Arabic alias.
+            _static_key_to_lbl = {}
+            for _ar, _tgt in (_DRIVE_SHEET_MAP.get(table) or {}).items():
+                if not _tgt: continue
+                _f = _grp_norm(_ar)
+                if _f and _tgt not in _static_key_to_lbl:
+                    _static_key_to_lbl[_tgt] = _f
+            # live folded-label -> live col_key.
+            _live_lbl_to_key = {}
+            _lbl_tbl_rmk = IMPORT_LABEL_TABLES.get(table)
+            if _lbl_tbl_rmk:
+                try:
+                    for _r in db.execute(
+                        "SELECT col_key, col_label FROM " + _lbl_tbl_rmk
+                    ).fetchall():
+                        _ck = _r[0] if hasattr(_r, "__getitem__") else None
+                        _cl = _r[1] if hasattr(_r, "__getitem__") else None
+                        if not _ck or not _cl: continue
+                        _ck = str(_ck)
+                        if _ck not in live_cols: continue
+                        _decoded = _html_rmk.unescape(str(_cl))
+                        _f = _grp_norm(_decoded)
+                        if _f and _f not in _live_lbl_to_key:
+                            _live_lbl_to_key[_f] = _ck
+                except Exception:
+                    pass
+            for _sk in IMPORT_TABLE_FIELDS.get(table, []):
+                if _sk in live_cols:
+                    continue
+                _folded_lbl = _static_key_to_lbl.get(_sk)
+                if not _folded_lbl:
+                    continue
+                _target = _live_lbl_to_key.get(_folded_lbl)
+                if _target and _target != _sk and _target in live_cols:
+                    renamed_map[_sk] = _target
+                    if _target not in fields:
+                        fields.append(_target)
+        except Exception:
+            renamed_map = {}
+
     field_set = set(fields)
 
+    if table == "students":
+        try:
+            _sys_pi.stderr.write(
+                "[excel-header-match] static_keys_in_live="
+                + str(sorted([f for f in IMPORT_TABLE_FIELDS.get("students", [])
+                              if f in live_cols]))[:300]
+                + "\n[excel-header-match] static_keys_redirected="
+                + str(renamed_map) + "\n"
+                + "[excel-header-match] static_keys_LOST="
+                + str([f for f in IMPORT_TABLE_FIELDS.get("students", [])
+                       if f not in live_cols and f not in renamed_map])
+                + " (these admin-renamed-without-matching-label rows will be dropped)\n"
+            )
+        except Exception:
+            pass
+
     def _remap_row_keys(r_in):
-        if not _drive_lookup or not isinstance(r_in, dict):
+        if not isinstance(r_in, dict):
+            return r_in
+        if not _drive_lookup and not renamed_map:
             return r_in
         out = {}
         for k, v in r_in.items():
             if not isinstance(k, str):
                 out[k] = v
                 continue
-            # Already an English col_key in our schema — keep as-is.
+            # Step 1: redirect dropped-static-keys to their live
+            # equivalents. JS sent registration_term2_2026; live
+            # schema has col_<ts>; redirect rebinds the value.
+            if k in renamed_map:
+                target = renamed_map[k]
+                if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
+                    out[target] = v
+                continue
+            # Step 2: already an English col_key in our schema — keep as-is.
             if k in field_set:
                 if k not in out or (out.get(k) in (None, "") and v not in (None, "")):
                     out[k] = v
                 continue
-            folded = _grp_norm(k)
-            target = _drive_lookup.get(folded) if folded else None
-            if target and target in field_set:
-                # Don't clobber an English-keyed entry that already
-                # arrived for this same target column.
-                if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
-                    out[target] = v
+            # Step 3: try the folded Arabic-label lookup. Catches Arabic
+            # row keys when the JS payload didn't pre-map (e.g. unknown
+            # alias variants the JS-side IMPORT_DEFS doesn't know).
+            if _drive_lookup:
+                folded = _grp_norm(k)
+                target = _drive_lookup.get(folded) if folded else None
+                if target and target in field_set:
+                    if target not in out or (out.get(target) in (None, "") and v not in (None, "")):
+                        out[target] = v
             # Unrecognised keys are dropped silently — same as Drive flow.
         return out
 
