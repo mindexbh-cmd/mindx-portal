@@ -1908,6 +1908,186 @@ if True:
             except Exception:
                 pass
 
+    # ── backfill_installment_type_v1: one-shot fill of the
+    # "اختيار نوع التقسيط" (installment_type) column on students based
+    # on existing values in "حالة التسجيل" + "قديم جديد 2026". Rule:
+    #   تم التسجيل  +  قديم            →  '2'
+    #   تم التسجيل  +  مستجد / جديد    →  '1'
+    #   anything else                    →  leave empty
+    # NEVER overwrites a row that already has a non-empty value in the
+    # installment_type column. Resolves all three column keys via
+    # column_labels so admin-renamed col_<timestamp> columns work too,
+    # with a fall-back to the seeded English column names. Inline
+    # Arabic-fold helper because _grp_norm isn't yet defined at module-
+    # import time. Stamps the migration tag regardless of outcome to
+    # keep idempotent — if resolution fails on this boot, re-running on
+    # every subsequent boot won't help (the columns either exist with
+    # a label or they don't; admin can do a manual SQL fix if needed).
+    if "backfill_installment_type_v1" not in applied:
+        try:
+            import html as _html_bif
+            import sys as _sys_bif
+            import re as _re_bif
+            def _bif_fold(s):
+                if not s: return ""
+                out = []
+                for c in str(s):
+                    cp = ord(c)
+                    if c in "أإآٱ":
+                        out.append("ا")
+                    elif c == "ى":
+                        out.append("ي")
+                    elif c == "ة":
+                        out.append("ه")
+                    elif 0x064B <= cp <= 0x0652:
+                        continue
+                    else:
+                        out.append(c)
+                return " ".join("".join(out).split())
+
+            _F_STATUS_LBL = _bif_fold("حالة التسجيل")
+            _F_FLAG_LBL   = _bif_fold("قديم جديد 2026")
+            _F_INST_LBL   = _bif_fold("اختيار نوع التقسيط")
+            _F_REGISTERED = _bif_fold("تم التسجيل")
+            _F_OLD        = _bif_fold("قديم")
+            _F_NEW1       = _bif_fold("مستجد")
+            _F_NEW2       = _bif_fold("جديد")
+
+            try:
+                _live_cols_bif = {row[1] for row in db2.execute("PRAGMA table_info(students)").fetchall()}
+            except Exception:
+                _live_cols_bif = set()
+            try:
+                _label_rows_bif = db2.execute(
+                    "SELECT col_key, col_label FROM column_labels"
+                ).fetchall()
+            except Exception:
+                _label_rows_bif = []
+            _safe_rx_bif = _re_bif.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,63}$')
+            _label_to_key = {}
+            for _r in _label_rows_bif:
+                _ck = (_r[0] if hasattr(_r, "__getitem__") else None) or ""
+                _cl = (_r[1] if hasattr(_r, "__getitem__") else None) or ""
+                _ck = str(_ck).strip()
+                if not _ck or not _safe_rx_bif.match(_ck):
+                    continue
+                if _ck not in _live_cols_bif:
+                    continue
+                _decoded = _html_bif.unescape(str(_cl)).strip()
+                _flbl = _bif_fold(_decoded)
+                if _flbl and _flbl not in _label_to_key:
+                    _label_to_key[_flbl] = _ck
+
+            _status_col      = _label_to_key.get(_F_STATUS_LBL)
+            _flag_col        = _label_to_key.get(_F_FLAG_LBL)
+            _installment_col = _label_to_key.get(_F_INST_LBL)
+            # Fall back to the seeded English column names when label
+            # resolution didn't match (e.g. mid-deploy state where
+            # column_labels seed lagged the schema).
+            if not _status_col and "registration_term2_2026" in _live_cols_bif:
+                _status_col = "registration_term2_2026"
+            if not _flag_col and "old_new_2026" in _live_cols_bif:
+                _flag_col = "old_new_2026"
+            if not _installment_col and "installment_type" in _live_cols_bif:
+                _installment_col = "installment_type"
+
+            if not (_status_col and _flag_col and _installment_col):
+                _sys_bif.stderr.write(
+                    "[backfill_installment_type_v1] could not resolve all 3 columns "
+                    "(status=" + str(_status_col)
+                    + ", flag=" + str(_flag_col)
+                    + ", installment=" + str(_installment_col)
+                    + ") — skipping backfill\n"
+                )
+            else:
+                _q_status = '"' + _status_col + '"'
+                _q_flag   = '"' + _flag_col + '"'
+                _q_inst   = '"' + _installment_col + '"'
+                try:
+                    _rows_bif = db2.execute(
+                        "SELECT id, " + _q_status + ", " + _q_flag + ", " + _q_inst
+                        + " FROM students"
+                    ).fetchall()
+                except Exception as _ex_sel_bif:
+                    _rows_bif = []
+                    _sys_bif.stderr.write(
+                        "[backfill_installment_type_v1] SELECT failed: "
+                        + str(_ex_sel_bif) + "\n"
+                    )
+
+                _assigned_to_1 = 0
+                _assigned_to_2 = 0
+                _kept_existing = 0
+                _left_empty    = 0
+                for _r in _rows_bif:
+                    _rid    = _r[0] if hasattr(_r, "__getitem__") else None
+                    _status = _r[1] if hasattr(_r, "__getitem__") else None
+                    _flag   = _r[2] if hasattr(_r, "__getitem__") else None
+                    _curr   = _r[3] if hasattr(_r, "__getitem__") else None
+                    if _rid is None:
+                        continue
+                    if (_curr or "").strip():
+                        _kept_existing += 1
+                        continue
+                    _fs = _bif_fold(_status)
+                    _ff = _bif_fold(_flag)
+                    _new_val = None
+                    if _fs == _F_REGISTERED:
+                        if _ff == _F_OLD:
+                            _new_val = "2"
+                        elif _ff == _F_NEW1 or _ff == _F_NEW2:
+                            _new_val = "1"
+                    if _new_val is None:
+                        _left_empty += 1
+                        continue
+                    try:
+                        db2.execute(
+                            "UPDATE students SET " + _q_inst + " = ? WHERE id = ?",
+                            (_new_val, _rid),
+                        )
+                        if _new_val == "1":
+                            _assigned_to_1 += 1
+                        else:
+                            _assigned_to_2 += 1
+                    except Exception as _ex_upd_bif:
+                        _sys_bif.stderr.write(
+                            "[backfill_installment_type_v1] UPDATE row "
+                            + str(_rid) + " failed: " + str(_ex_upd_bif) + "\n"
+                        )
+                if _assigned_to_1 or _assigned_to_2:
+                    try: db2.commit()
+                    except Exception: pass
+                _sys_bif.stderr.write(
+                    "[backfill-installment-type] columns resolved: status="
+                    + _status_col + " flag=" + _flag_col
+                    + " installment=" + _installment_col + "\n"
+                )
+                _sys_bif.stderr.write(
+                    "[backfill-installment-type] tally: assigned-to-1="
+                    + str(_assigned_to_1)
+                    + " assigned-to-2=" + str(_assigned_to_2)
+                    + " kept-existing=" + str(_kept_existing)
+                    + " left-empty=" + str(_left_empty)
+                    + " total-rows=" + str(len(_rows_bif)) + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("backfill_installment_type_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_bif:
+            try:
+                import sys as _sys_bif
+                _sys_bif.stderr.write(
+                    "[backfill_installment_type_v1] outer error: "
+                    + str(_ex_outer_bif) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
