@@ -10867,11 +10867,15 @@ function srOpenSectionModal(section, sid, group){
      pre-selection (others ignore it). */
   if (section === 'payment'){
     titleAr = "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
-    /* /database with embedded mode + auto-open the متابعة الدفع
-       modal scoped to this student. mx-helpers' embedded handler
-       hides the topbar/sidebar; pmOpen() runs via the auto-open
-       flag below once the page loads. */
-    url = "/database?embedded=1&pm_open=1&pm_sid=" + encodeURIComponent(sid);
+    /* The متابعة الدفع UI (#pay-modal + pmOpen) lives in HOME_HTML
+       (the /dashboard page), not in any dedicated route. Reuse it
+       via /dashboard?embedded=1&pm_open=1&pm_sid=<sid> — the
+       auto-open handler shipped in HOME_HTML calls pmOpen() then
+       drives the search-by-name flow so just this student's card
+       renders. Switched from /database to /dashboard so the iframe
+       loads the lighter page (auto-open handler exists on both;
+       /dashboard avoids the full-table render of /database). */
+    url = "/dashboard?embedded=1&pm_open=1&pm_sid=" + encodeURIComponent(sid);
   } else if (section === 'attendance'){
     titleAr = "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062D\u0636\u0648\u0631";
     url = "/attendance?embedded=1&student=" + encodeURIComponent(sid)
@@ -14989,6 +14993,21 @@ function loadGroups() {
         if (qg && sel.querySelector('option[value="' + qg.replace(/"/g, '\\"') + '"]')){
           sel.value = qg;
           if (typeof onControlChange === 'function') onControlChange();
+        }
+        /* Focus-on-student: when opened embedded with ?student=<sid>,
+           wait for rows to render then scroll the matching row into
+           view + highlight 4 seconds. Falls through silently if the
+           param is absent or the row isn't rendered. */
+        var qs = qp.get('student');
+        if (qs){
+          setTimeout(function(){
+            var row = document.querySelector('tr[data-sid="'+qs+'"], [data-student-id="'+qs+'"]');
+            if (!row) return;
+            try { row.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+            row.style.outline = '3px solid #FFD600';
+            row.style.outlineOffset = '2px';
+            setTimeout(function(){ row.style.outline=''; row.style.outlineOffset=''; }, 4000);
+          }, 1200);
         }
       } catch(e) { /* no-op */ }
     })
@@ -36204,6 +36223,18 @@ table.tbl tr:hover td{background:#fff8e1;}
     document.getElementById('f-month').value =
       d.getFullYear()+'-'+p(d.getMonth()+1);
     loadFilterOpts().then(function(){
+      /* Focus-on-student: when opened embedded with ?student=<sid>,
+         pre-fill the f-student filter so loadData() returns only
+         that student's evaluations. Falls through silently if the
+         param is absent. f-student value is the numeric student_id
+         which the /api/monthly-evaluations endpoint already filters
+         on (see buildQs above). */
+      try {
+        var qp = new URLSearchParams(window.location.search);
+        var qs = qp.get('student');
+        var fs = document.getElementById('f-student');
+        if (qs && fs){ fs.value = qs; }
+      } catch(e){}
       loadData(); loadStats();
     });
   })();
