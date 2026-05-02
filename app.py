@@ -42518,6 +42518,393 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
     }
     return paid_by_inst, pl_dict
 
+
+@app.route('/admin/diag/paylog-compare', methods=['GET'])
+@login_required
+def admin_diag_paylog_compare():
+    """Comparative diagnostic: side-by-side dump of two students so
+    the byte-level / row-level difference between a working and a
+    broken case is visible in one HTTP call.
+
+    Usage:
+        GET /admin/diag/paylog-compare?a=<name_fragment_a>&b=<name_fragment_b>
+
+    Logs [paylog-compare] (per-student raw dumps), then
+    [paylog-compare-result] (summary + verdict). Read-only.
+    """
+    import sys as _sys_pc
+
+    qa = (request.args.get('a') or '').strip()
+    qb = (request.args.get('b') or '').strip()
+    if not qa or not qb:
+        return jsonify({
+            "ok": False,
+            "error": "need ?a=<name_a>&b=<name_b>",
+        }), 400
+
+    db = get_db()
+    try:
+        s_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(students)"
+        ).fetchall()]
+    except Exception:
+        s_cols = []
+    try:
+        p_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(payment_log)"
+        ).fetchall()]
+    except Exception:
+        p_cols = []
+
+    inst_col_map = _paylog_inst_col_map_cached(db)
+    inst_cols_resolved = [inst_col_map.get(n) or ("inst" + str(n))
+                          for n in (1, 2, 3, 4, 5)]
+
+    _sys_pc.stderr.write(
+        "[paylog-compare] ═══ SIDE-BY-SIDE DIAG START ═══\n"
+    )
+    _sys_pc.stderr.write(
+        "[paylog-compare] queries a=" + repr(qa)
+        + " b=" + repr(qb) + "\n"
+    )
+    _sys_pc.stderr.write(
+        "[paylog-compare] resolved_inst_cols="
+        + repr(inst_cols_resolved) + "\n"
+    )
+
+    def _hex_of(s, limit=120):
+        if s is None:
+            return ""
+        out = []
+        for ch in str(s)[:limit]:
+            cp = ord(ch)
+            if cp > 0x7F:
+                out.append("U+%04X" % cp)
+            else:
+                out.append(ch)
+        return " ".join(out)
+
+    def _dump_one(label, q):
+        block = {"label": label, "query": q}
+        # 1. Student rows
+        try:
+            srows = db.execute(
+                "SELECT * FROM students WHERE student_name LIKE ?",
+                ("%" + q + "%",),
+            ).fetchall()
+        except Exception as ex:
+            srows = []
+            _sys_pc.stderr.write(
+                "[paylog-compare] " + label
+                + " students SELECT FAILED: " + str(ex) + "\n"
+            )
+        block["students_count"] = len(srows)
+        block["students"] = []
+        for sr in srows:
+            sd = {}
+            for i, c in enumerate(s_cols):
+                try:
+                    sd[c] = (sr[i] if not hasattr(sr, "keys") else sr[c])
+                except Exception:
+                    sd[c] = "<read-error>"
+            block["students"].append(sd)
+            _sys_pc.stderr.write(
+                "[paylog-compare] " + label
+                + " students.id=" + repr(sd.get("id"))
+                + " personal_id=" + repr(sd.get("personal_id"))
+                + " student_name=" + repr(sd.get("student_name"))
+                + " name_hex=" + _hex_of(sd.get("student_name"))
+                + " installment_type=" + repr(sd.get("installment_type"))
+                + "\n"
+            )
+
+        # 2. payment_log rows: by personal_id (for each matched student)
+        #    and by name LIKE — deduped.
+        seen = set()
+        block["paylog"] = []
+        all_pids = [str(s.get("personal_id") or "").strip()
+                    for s in block["students"]]
+        all_pids = [p for p in all_pids if p]
+        for pid in all_pids:
+            try:
+                prs = db.execute(
+                    "SELECT * FROM payment_log WHERE personal_id = ?",
+                    (pid,),
+                ).fetchall()
+            except Exception as ex:
+                prs = []
+                _sys_pc.stderr.write(
+                    "[paylog-compare] " + label
+                    + " paylog by-pid SELECT FAILED pid=" + repr(pid)
+                    + ": " + str(ex) + "\n"
+                )
+            for pr in prs:
+                key = id(pr)
+                if key in seen: continue
+                seen.add(key)
+                pd = {}
+                for i, c in enumerate(p_cols):
+                    try:
+                        pd[c] = (pr[i] if not hasattr(pr, "keys") else pr[c])
+                    except Exception:
+                        pd[c] = "<read-error>"
+                pd["__source__"] = "by_pid:" + pid
+                block["paylog"].append(pd)
+        try:
+            prs2 = db.execute(
+                "SELECT * FROM payment_log WHERE student_name LIKE ?",
+                ("%" + q + "%",),
+            ).fetchall()
+        except Exception as ex:
+            prs2 = []
+            _sys_pc.stderr.write(
+                "[paylog-compare] " + label
+                + " paylog by-name SELECT FAILED: " + str(ex) + "\n"
+            )
+        for pr in prs2:
+            key = id(pr)
+            if key in seen: continue
+            seen.add(key)
+            pd = {}
+            for i, c in enumerate(p_cols):
+                try:
+                    pd[c] = (pr[i] if not hasattr(pr, "keys") else pr[c])
+                except Exception:
+                    pd[c] = "<read-error>"
+            pd["__source__"] = "by_name_like"
+            block["paylog"].append(pd)
+
+        for idx, pd in enumerate(block["paylog"]):
+            inst_vals = {c: pd.get(c) for c in inst_cols_resolved}
+            _sys_pc.stderr.write(
+                "[paylog-compare] " + label
+                + " paylog[" + str(idx) + "]"
+                + " source=" + repr(pd.get("__source__"))
+                + " id=" + repr(pd.get("id"))
+                + " student_name=" + repr(pd.get("student_name"))
+                + " name_hex=" + _hex_of(pd.get("student_name"))
+                + " personal_id=" + repr(pd.get("personal_id"))
+                + " inst_values=" + repr(inst_vals)
+                + " course_amount=" + repr(pd.get("course_amount"))
+                + " total_paid=" + repr(pd.get("total_paid"))
+                + " total_remaining=" + repr(pd.get("total_remaining"))
+                + "\n"
+            )
+
+        # 3. _payment_compute_plan output for each matched student.
+        block["compute_plan"] = []
+        for sd in block["students"]:
+            sid = sd.get("id")
+            if sid is None: continue
+            try:
+                plan = _payment_compute_plan(db, sid)
+            except Exception as ex:
+                plan = {"_error": str(ex)}
+            entry = {"sid": sid, "plan": plan}
+            block["compute_plan"].append(entry)
+            if isinstance(plan, dict) and plan.get("plan"):
+                pl = plan["plan"]
+                _sys_pc.stderr.write(
+                    "[paylog-compare] " + label
+                    + " compute_plan sid=" + str(sid)
+                    + " paylog_matched=" + repr(pl.get("paylog_matched"))
+                    + " total_paid=" + repr(pl.get("total_paid"))
+                    + " total_remaining=" + repr(pl.get("total_remaining"))
+                    + " status=" + repr(pl.get("status"))
+                    + " totals_source=" + repr(pl.get("totals_source"))
+                    + " course_amount=" + repr(pl.get("course_amount"))
+                    + " num_installments=" + repr(pl.get("num_installments"))
+                    + "\n"
+                )
+                for it in (pl.get("installments") or []):
+                    _sys_pc.stderr.write(
+                        "[paylog-compare] " + label
+                        + " inst.n=" + repr(it.get("n"))
+                        + " amount=" + repr(it.get("amount"))
+                        + " paid=" + repr(it.get("paid"))
+                        + " source=" + repr(it.get("source"))
+                        + "\n"
+                    )
+        return block
+
+    block_a = _dump_one("A", qa)
+    block_b = _dump_one("B", qb)
+
+    # ── Verdict computation. ────────────────────────────────────
+    def _summarize(block):
+        s = (block["students"][0] if block["students"] else {})
+        pl_rows = block["paylog"]
+        compute = (block["compute_plan"][0]["plan"]
+                   if block["compute_plan"]
+                      and isinstance(block["compute_plan"][0].get("plan"),
+                                     dict)
+                   else None)
+        cp = (compute.get("plan") if compute else None)
+        sid = s.get("id")
+        spid = (s.get("personal_id") or "").strip() if s else ""
+        sname = s.get("student_name") if s else None
+        # Decide which paylog row (if any) the reader actually used:
+        # mirror _payment_log_paid_for_student's lookup ladder.
+        used_pl = None
+        if spid:
+            for pr in pl_rows:
+                if str(pr.get("personal_id") or "").strip() == spid:
+                    used_pl = pr; break
+        if used_pl is None and pl_rows:
+            target = _payment_normalize_name(sname)
+            for pr in pl_rows:
+                if _payment_normalize_name(pr.get("student_name")) == target:
+                    used_pl = pr; break
+            if used_pl is None and pl_rows:
+                used_pl = pl_rows[0]   # ILIKE fallback
+        return {
+            "sid":          sid,
+            "personal_id":  spid,
+            "name":         sname,
+            "name_hex":     _hex_of(sname),
+            "paylog_count": len(pl_rows),
+            "used_pl":      used_pl,
+            "total_paid":   (cp.get("total_paid") if cp else None),
+            "status":       (cp.get("status")     if cp else None),
+            "paylog_matched": (cp.get("paylog_matched") if cp else None),
+        }
+
+    sa = _summarize(block_a)
+    sb = _summarize(block_b)
+
+    # Verdict logic — pick the case that fits.
+    verdict = "INCONCLUSIVE"
+    evidence = []
+    fix_hint = ""
+
+    if not block_b["students"]:
+        verdict = "STUDENT NOT FOUND (B)"
+        evidence.append("query b=" + repr(qb)
+                        + " produced 0 rows in students table")
+        fix_hint = ("Adjust the search fragment for B; the broken "
+                    "student isn't matchable by this name fragment.")
+    elif sb["paylog_count"] == 0:
+        verdict = "CASE B — payment_log row missing"
+        evidence.append("B has no payment_log rows by PID or name LIKE")
+        evidence.append("A has " + str(sa["paylog_count"]) + " paylog row(s)")
+        fix_hint = ("Re-import the Drive students sheet. The "
+                    "_drive_extract_paylog_from_students extractor "
+                    "either dropped this row entirely (empty student_name "
+                    "or all-empty installments) or this name was renamed "
+                    "after the last import.")
+    elif sb["used_pl"] is not None:
+        used_b = sb["used_pl"]
+        b_inst_vals = [used_b.get(c) for c in inst_cols_resolved]
+        b_all_empty = all((v is None or str(v).strip() == "") for v in b_inst_vals)
+        b_total_paid = used_b.get("total_paid")
+        if b_all_empty and (b_total_paid in (None, "", 0, "0", "0.0")):
+            verdict = ("CASE C — paylog row exists but ALL installment "
+                       "columns are empty")
+            evidence.append("B paylog inst values: " + repr(b_inst_vals))
+            evidence.append("B paylog total_paid: " + repr(b_total_paid))
+            evidence.append("B resolved inst cols: " + repr(inst_cols_resolved))
+            fix_hint = ("The import wrote a paylog row for B but with "
+                        "empty installment columns. Verify the source "
+                        "sheet has values in cols 28..32 for this row, "
+                        "and that those headers fold to a known alias "
+                        "in _PAYLOG_FROM_STUDENTS_FIELDS.")
+        elif sb["used_pl"].get("personal_id") and sb["personal_id"] \
+              and (str(sb["used_pl"].get("personal_id")).strip()
+                   != sb["personal_id"]):
+            verdict = "CASE D — wrong paylog row matched"
+            evidence.append("B students.personal_id="
+                            + repr(sb["personal_id"]))
+            evidence.append("B paylog row picked has personal_id="
+                            + repr(sb["used_pl"].get("personal_id")))
+            evidence.append("Lookup ladder fell through PID match (PID "
+                            "mismatch or empty) and matched a "
+                            "different student's row by name.")
+            fix_hint = ("Backfill payment_log.personal_id for B's row, "
+                        "or tighten the name-fold path so it doesn't "
+                        "collapse two distinct names into one.")
+        else:
+            # Has values but compute_plan still 0 → resolver path
+            # picked wrong column? Or a name-fold mismatch despite
+            # values being present.
+            if sb["paylog_matched"]:
+                verdict = ("CASE E — paylog matched, values present, "
+                           "but total_paid still 0")
+                evidence.append("paylog_matched=True")
+                evidence.append("inst values: " + repr(b_inst_vals))
+                evidence.append("total_paid via compute_plan: "
+                                + repr(sb["total_paid"]))
+                fix_hint = ("Likely a taqseet mismatch — installment_type "
+                            "doesn't resolve to a taqseet row, so the "
+                            "loop never iterates installments. Check B's "
+                            "students.installment_type and whether a "
+                            "taqseet row with that id/method exists.")
+            else:
+                verdict = ("CASE A — paylog row exists but reader didn't "
+                           "match (PID NULL + name fold gap)")
+                evidence.append("B students.personal_id="
+                                + repr(sb["personal_id"]))
+                evidence.append("B paylog.personal_id="
+                                + repr(sb["used_pl"].get("personal_id")))
+                evidence.append("B students.name_hex=" + sb["name_hex"])
+                evidence.append("B paylog.name_hex="
+                                + _hex_of(sb["used_pl"].get("student_name")))
+                fix_hint = ("Compare the two name_hex strings — if they "
+                            "differ at the byte level, extend "
+                            "_payment_normalize_name to fold the "
+                            "discriminating character.")
+
+    _sys_pc.stderr.write(
+        "[paylog-compare-result] WORKING (A) sid=" + repr(sa["sid"])
+        + " name=" + repr(sa["name"])
+        + " pid=" + repr(sa["personal_id"])
+        + " paylog_count=" + str(sa["paylog_count"])
+        + " total_paid=" + repr(sa["total_paid"])
+        + " status=" + repr(sa["status"])
+        + " paylog_matched=" + repr(sa["paylog_matched"])
+        + "\n"
+    )
+    _sys_pc.stderr.write(
+        "[paylog-compare-result] BROKEN (B)  sid=" + repr(sb["sid"])
+        + " name=" + repr(sb["name"])
+        + " pid=" + repr(sb["personal_id"])
+        + " paylog_count=" + str(sb["paylog_count"])
+        + " total_paid=" + repr(sb["total_paid"])
+        + " status=" + repr(sb["status"])
+        + " paylog_matched=" + repr(sb["paylog_matched"])
+        + "\n"
+    )
+    _sys_pc.stderr.write(
+        "[paylog-compare-result] VERDICT: " + verdict + "\n"
+    )
+    for ev in evidence:
+        _sys_pc.stderr.write(
+            "[paylog-compare-result] EVIDENCE: " + ev + "\n"
+        )
+    if fix_hint:
+        _sys_pc.stderr.write(
+            "[paylog-compare-result] SUGGESTED FIX: " + fix_hint + "\n"
+        )
+    _sys_pc.stderr.write(
+        "[paylog-compare] ═══ SIDE-BY-SIDE DIAG END ═══\n"
+    )
+
+    return jsonify({
+        "ok":                  True,
+        "qa":                  qa,
+        "qb":                  qb,
+        "students_columns":    s_cols,
+        "paylog_columns":      p_cols,
+        "resolved_inst_cols":  inst_cols_resolved,
+        "a":                   block_a,
+        "b":                   block_b,
+        "summary_a":           sa,
+        "summary_b":           sb,
+        "verdict":             verdict,
+        "evidence":            evidence,
+        "suggested_fix":       fix_hint,
+    })
+
+
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
     student doesn\'t exist.
