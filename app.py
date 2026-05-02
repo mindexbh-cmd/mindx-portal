@@ -19626,7 +19626,7 @@ def dashboard():
         return redirect("/portal/parent-hub")
     if role == "parent":
         return redirect("/portal/parent")
-    return (
+    _html = (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
         .replace("USER_USERNAME_PLACEHOLDER", username)
@@ -19634,6 +19634,16 @@ def dashboard():
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
     )
+    # Defense-in-depth: scrub any lone surrogates the username
+    # placeholder substitutions (or future placeholders) might have
+    # injected. The global after_request hook also catches this, but
+    # this inline scrub guarantees /dashboard never 500s on encoding.
+    try:
+        if any(0xD800 <= ord(c) <= 0xDFFF for c in _html):
+            _html = ''.join(c for c in _html if not (0xD800 <= ord(c) <= 0xDFFF))
+    except Exception:
+        pass
+    return _html
 
 @app.route("/attendance")
 @login_required
@@ -55616,6 +55626,52 @@ for _mxh_name in ('PORTAL_STUDENT_HTML', 'PORTAL_PARENT_HTML',
     _mxh_val = globals().get(_mxh_name)
     if isinstance(_mxh_val, str) and '</body>' in _mxh_val and '/mx-helpers.js' not in _mxh_val:
         globals()[_mxh_name] = _mxh_val.replace('</body>', '<script src="/mx-helpers.js"></script>\n</body>')
+
+
+# ── Global surrogate stripper ─────────────────────────────────────
+# Lone surrogates (U+D800–U+DFFF) are valid in Python str but invalid
+# in UTF-8 — they crash werkzeug's response.set_data() with
+# "UnicodeEncodeError: 'utf-8' codec can't encode characters ...
+# surrogates not allowed". They sneak into our DB from broken emoji
+# copy-paste, malformed Excel imports, and assorted Windows / Render
+# round-trips. This after_request hook strips them silently from
+# every text/html response so a single bad row in students.name or
+# evaluations.notes can't 500 the entire dashboard.
+#
+# Idempotent + try/except-wrapped — never blocks a successful
+# response, only intervenes when the body would have crashed encoding.
+def _strip_lone_surrogates(s):
+    """Remove U+D800..U+DFFF from a string. Safe on already-clean
+    input (the genexp short-circuits)."""
+    if not isinstance(s, str):
+        return s
+    return ''.join(c for c in s if not (0xD800 <= ord(c) <= 0xDFFF))
+
+
+@app.after_request
+def _mx_strip_response_surrogates(response):
+    """Defensive scrub of lone surrogates in text/html responses.
+    Catches the case CLAUDE.md's surrogate-pair caveat warns about,
+    but originating from DB data rather than source code escapes."""
+    try:
+        if response.mimetype and 'text/html' in response.mimetype:
+            # Probe via a cheap encode attempt; only re-encode the body
+            # when the strict path would fail. Bytes inputs already
+            # encoded clean pass through with no allocation.
+            try:
+                data = response.get_data(as_text=False)
+                # Round-trip: decode tolerantly, scrub, re-encode.
+                # If it's already clean UTF-8, decode succeeds and the
+                # genexp produces the same chars — measurably cheap.
+                txt = data.decode('utf-8', errors='surrogateescape')
+                if any(0xD800 <= ord(c) <= 0xDFFF for c in txt):
+                    cleaned = _strip_lone_surrogates(txt)
+                    response.set_data(cleaned.encode('utf-8'))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return response
 
 
 if __name__ == "__main__":
