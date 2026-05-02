@@ -42476,25 +42476,40 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
     )
     select_sql_base = ('SELECT ' + ', '.join(select_pieces)
                        + ' FROM payment_log ')
-    try:
-        if personal_id and str(personal_id).strip():
+    # Lookup ladder: personal_id → exact name fold → ILIKE substring.
+    # Each attempt is wrapped INDEPENDENTLY so a failing earlier
+    # attempt (e.g. PID lookup raising "no such column" because
+    # payment_log on this DB has no personal_id column at all) does
+    # NOT abort later attempts. Without this isolation the entire
+    # ladder collapsed to None whenever the live schema lacked the
+    # personal_id column AND the student record had a non-empty PID.
+    has_pid_col = 'personal_id' in live_cols
+    if has_pid_col and personal_id and str(personal_id).strip():
+        try:
             pl_row = db.execute(
                 select_sql_base + "WHERE personal_id=? AND personal_id <> '' LIMIT 1",
                 (str(personal_id).strip(),),
             ).fetchone()
-        if not pl_row and student_name:
-            target = _payment_normalize_name(student_name)
-            for r in db.execute(select_sql_base).fetchall():
-                if _payment_normalize_name(r[0]) == target:
-                    pl_row = r; break
-            if not pl_row:
-                row = db.execute(
-                    select_sql_base + "WHERE student_name ILIKE ? LIMIT 1",
-                    ('%' + str(student_name).strip() + '%',),
-                ).fetchone()
-                if row: pl_row = row
-    except Exception:
-        pl_row = None
+        except Exception:
+            pl_row = None
+    if not pl_row and student_name:
+        target = _payment_normalize_name(student_name)
+        if target:
+            try:
+                for r in db.execute(select_sql_base).fetchall():
+                    if _payment_normalize_name(r[0]) == target:
+                        pl_row = r; break
+            except Exception:
+                pl_row = None
+    if not pl_row and student_name:
+        try:
+            row = db.execute(
+                select_sql_base + "WHERE student_name ILIKE ? LIMIT 1",
+                ('%' + str(student_name).strip() + '%',),
+            ).fetchone()
+            if row: pl_row = row
+        except Exception:
+            pass
     if not pl_row:
         return paid_by_inst, None
     for n in range(1, 6):
