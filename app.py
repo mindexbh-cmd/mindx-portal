@@ -43126,6 +43126,389 @@ def admin_diag_payment(student_query):
     })
 
 
+@app.route('/admin/diag/payment-truth/<path:student_query>', methods=['GET'])
+@login_required
+def admin_diag_payment_truth(student_query):
+    """Deep root-cause diagnostic for the لم يدفع / 0 د bug.
+
+    Dumps EVERY column of EVERY row in students + payment_log +
+    student_payments that touches the queried student name, plus
+    the taqseet row used by _payment_compute_plan, plus a
+    step-by-step trace of _payment_compute_plan inputs/outputs.
+
+    Read-only, repr()'s every value so hidden chars (NBSP, ZWNJ,
+    tatweel, BIDI marks) become visible. Stderr-tagged
+    [tasneem-truth] for grep continuity.
+    """
+    import sys as _sys_tt
+
+    db = get_db()
+    q = (student_query or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "empty query"}), 400
+
+    _sys_tt.stderr.write(
+        "[tasneem-truth] ═══ DEEP DIAG START ═══ query="
+        + repr(q) + "\n"
+    )
+
+    # ── 1. Resolve students table column list (every column). ────
+    try:
+        s_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(students)"
+        ).fetchall()]
+    except Exception as ex:
+        s_cols = []
+        _sys_tt.stderr.write(
+            "[tasneem-truth] PRAGMA students FAILED: " + str(ex) + "\n"
+        )
+    _sys_tt.stderr.write(
+        "[tasneem-truth] students.columns ("
+        + str(len(s_cols)) + ") = " + repr(s_cols) + "\n"
+    )
+
+    # ── 2. Resolve payment_log column list (every column). ───────
+    try:
+        p_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(payment_log)"
+        ).fetchall()]
+    except Exception as ex:
+        p_cols = []
+        _sys_tt.stderr.write(
+            "[tasneem-truth] PRAGMA payment_log FAILED: "
+            + str(ex) + "\n"
+        )
+    _sys_tt.stderr.write(
+        "[tasneem-truth] payment_log.columns ("
+        + str(len(p_cols)) + ") = " + repr(p_cols) + "\n"
+    )
+
+    # Identify installment-like columns in each table.
+    def _is_inst_col(name):
+        n = (name or "").lower()
+        return ("inst" in n) or ("installment" in n) or ("قسط" in name)
+    students_inst_cols   = [c for c in s_cols if _is_inst_col(c)]
+    paylog_inst_cols     = [c for c in p_cols if _is_inst_col(c)]
+    _sys_tt.stderr.write(
+        "[tasneem-truth] students.inst_like_cols=" + repr(students_inst_cols)
+        + "\n"
+    )
+    _sys_tt.stderr.write(
+        "[tasneem-truth] payment_log.inst_like_cols=" + repr(paylog_inst_cols)
+        + "\n"
+    )
+
+    # ── 3. Pull EVERY column for every matching student row. ─────
+    students_full = []
+    matched_sids  = []
+    matched_pids  = []
+    matched_names = []
+    try:
+        rows = db.execute(
+            "SELECT * FROM students WHERE student_name LIKE ?",
+            ("%" + q + "%",),
+        ).fetchall()
+    except Exception as ex:
+        rows = []
+        _sys_tt.stderr.write(
+            "[tasneem-truth] SELECT students FAILED: " + str(ex) + "\n"
+        )
+    _sys_tt.stderr.write(
+        "[tasneem-truth] students.matched_count=" + str(len(rows)) + "\n"
+    )
+    for r in rows:
+        rec = {}
+        for i, c in enumerate(s_cols):
+            try:
+                v = r[i] if not hasattr(r, "keys") else r[c]
+            except Exception:
+                v = "<read-error>"
+            rec[c] = v
+            # repr each cell so hidden chars show up.
+            _sys_tt.stderr.write(
+                "[tasneem-truth] students[" + repr(rec.get("id"))
+                + "]." + c + " = " + repr(v) + "\n"
+            )
+        students_full.append(rec)
+        if rec.get("id") is not None:
+            matched_sids.append(rec.get("id"))
+        if rec.get("personal_id"):
+            matched_pids.append(str(rec.get("personal_id")).strip())
+        if rec.get("student_name"):
+            matched_names.append(str(rec.get("student_name")))
+
+    # ── 4. Pull EVERY column from payment_log — by PID OR by
+    #    name LIKE. Keep both query paths visible.
+    paylog_full   = []
+    seen_paylog   = set()
+    try:
+        # 4a. by personal_id
+        for pid in matched_pids:
+            try:
+                prs = db.execute(
+                    "SELECT * FROM payment_log WHERE personal_id = ?",
+                    (pid,),
+                ).fetchall()
+            except Exception as ex:
+                prs = []
+                _sys_tt.stderr.write(
+                    "[tasneem-truth] paylog by-pid FAILED pid=" + repr(pid)
+                    + ": " + str(ex) + "\n"
+                )
+            _sys_tt.stderr.write(
+                "[tasneem-truth] paylog.by_pid pid=" + repr(pid)
+                + " count=" + str(len(prs)) + "\n"
+            )
+            for pr in prs:
+                key = id(pr)
+                if key in seen_paylog: continue
+                seen_paylog.add(key)
+                rec = {}
+                for i, c in enumerate(p_cols):
+                    try:
+                        v = pr[i] if not hasattr(pr, "keys") else pr[c]
+                    except Exception:
+                        v = "<read-error>"
+                    rec[c] = v
+                rec["__source__"] = "by_pid:" + pid
+                paylog_full.append(rec)
+        # 4b. by name LIKE
+        try:
+            prs = db.execute(
+                "SELECT * FROM payment_log WHERE student_name LIKE ?",
+                ("%" + q + "%",),
+            ).fetchall()
+        except Exception as ex:
+            prs = []
+            _sys_tt.stderr.write(
+                "[tasneem-truth] paylog by-name FAILED: " + str(ex) + "\n"
+            )
+        _sys_tt.stderr.write(
+            "[tasneem-truth] paylog.by_name count=" + str(len(prs)) + "\n"
+        )
+        for pr in prs:
+            key = id(pr)
+            if key in seen_paylog: continue
+            seen_paylog.add(key)
+            rec = {}
+            for i, c in enumerate(p_cols):
+                try:
+                    v = pr[i] if not hasattr(pr, "keys") else pr[c]
+                except Exception:
+                    v = "<read-error>"
+                rec[c] = v
+            rec["__source__"] = "by_name_like"
+            paylog_full.append(rec)
+    except Exception as ex:
+        _sys_tt.stderr.write(
+            "[tasneem-truth] paylog combined SELECT outer-FAILED: "
+            + str(ex) + "\n"
+        )
+
+    # repr each paylog row's full column set
+    for idx, rec in enumerate(paylog_full):
+        for c in p_cols:
+            _sys_tt.stderr.write(
+                "[tasneem-truth] payment_log[" + str(idx) + "/"
+                + repr(rec.get("__source__")) + "]." + c
+                + " = " + repr(rec.get(c)) + "\n"
+            )
+
+    # ── 5. Pull EVERY student_payments row for matched students.
+    sp_full = []
+    try:
+        sp_cols = [r[1] for r in db.execute(
+            "PRAGMA table_info(student_payments)"
+        ).fetchall()]
+    except Exception:
+        sp_cols = []
+    _sys_tt.stderr.write(
+        "[tasneem-truth] student_payments.columns="
+        + repr(sp_cols) + "\n"
+    )
+    for sid in matched_sids:
+        try:
+            sprs = db.execute(
+                "SELECT * FROM student_payments WHERE student_id=?",
+                (sid,),
+            ).fetchall()
+        except Exception as ex:
+            sprs = []
+            _sys_tt.stderr.write(
+                "[tasneem-truth] student_payments SELECT FAILED sid="
+                + str(sid) + ": " + str(ex) + "\n"
+            )
+        _sys_tt.stderr.write(
+            "[tasneem-truth] student_payments.sid=" + str(sid)
+            + " count=" + str(len(sprs)) + "\n"
+        )
+        for spr in sprs:
+            rec = {}
+            for i, c in enumerate(sp_cols):
+                try:
+                    v = spr[i] if not hasattr(spr, "keys") else spr[c]
+                except Exception:
+                    v = "<read-error>"
+                rec[c] = v
+            sp_full.append({"sid": sid, "row": rec})
+            for c in sp_cols:
+                _sys_tt.stderr.write(
+                    "[tasneem-truth] student_payments[sid=" + str(sid)
+                    + "]." + c + " = " + repr(rec.get(c)) + "\n"
+                )
+
+    # ── 6. Trace _payment_compute_plan step by step. ─────────────
+    plan_traces = []
+    for sid in matched_sids:
+        trace = {"sid": sid}
+        try:
+            student = _payment_load_student(db, sid)
+        except Exception as ex:
+            student = None
+            trace["load_student_error"] = str(ex)
+        trace["loaded_student"] = student
+        _sys_tt.stderr.write(
+            "[tasneem-truth] trace.sid=" + str(sid)
+            + " loaded_student=" + repr(student) + "\n"
+        )
+
+        # Taqseet rows + the matched row.
+        try:
+            tq_rows = _payment_load_taqseet_rows(db)
+        except Exception as ex:
+            tq_rows = []
+            _sys_tt.stderr.write(
+                "[tasneem-truth] trace.taqseet_rows FAILED: "
+                + str(ex) + "\n"
+            )
+        trace["taqseet_row_count"] = len(tq_rows)
+        try:
+            tq = _payment_find_taqseet(
+                tq_rows,
+                (student or {}).get("installment_type") if student else None,
+            )
+        except Exception as ex:
+            tq = None
+            trace["find_taqseet_error"] = str(ex)
+        # Convert tq row to a dict-of-tuples so it serialises cleanly.
+        tq_dump = None
+        if tq is not None:
+            try:
+                tq_dump = [
+                    (i,
+                     (tq[i] if not hasattr(tq, "keys") else tq[i]))
+                    for i in range(len(tq))
+                ]
+            except Exception:
+                tq_dump = "<unserializable>"
+        trace["matched_taqseet"] = tq_dump
+        _sys_tt.stderr.write(
+            "[tasneem-truth] trace.sid=" + str(sid)
+            + " matched_taqseet=" + repr(tq_dump) + "\n"
+        )
+
+        # _payment_log_paid_for_student inputs + outputs.
+        sname_in = (student or {}).get("name") if student else None
+        spid_in  = (student or {}).get("personal_id") if student else None
+        try:
+            paid_pl, pl_row_dict = _payment_log_paid_for_student(
+                db, sname_in, spid_in,
+            )
+        except Exception as ex:
+            paid_pl, pl_row_dict = {}, None
+            trace["paid_for_student_error"] = str(ex)
+        trace["paid_pl"]      = paid_pl
+        trace["pl_row_dict"]  = pl_row_dict
+        _sys_tt.stderr.write(
+            "[tasneem-truth] trace.sid=" + str(sid)
+            + " input_name=" + repr(sname_in)
+            + " input_pid=" + repr(spid_in) + "\n"
+        )
+        _sys_tt.stderr.write(
+            "[tasneem-truth] trace.sid=" + str(sid)
+            + " paid_pl=" + repr(paid_pl) + "\n"
+        )
+        _sys_tt.stderr.write(
+            "[tasneem-truth] trace.sid=" + str(sid)
+            + " pl_row_dict=" + repr(pl_row_dict) + "\n"
+        )
+
+        # Final compute_plan output (whole shape).
+        try:
+            plan_payload = _payment_compute_plan(db, sid)
+        except Exception as ex:
+            plan_payload = {"_error": str(ex)}
+        trace["compute_plan"] = plan_payload
+        if isinstance(plan_payload, dict) and "plan" in plan_payload:
+            _pl = plan_payload["plan"]
+            _sys_tt.stderr.write(
+                "[tasneem-truth] trace.sid=" + str(sid)
+                + " FINAL course_amount=" + repr(_pl.get("course_amount"))
+                + " total_paid=" + repr(_pl.get("total_paid"))
+                + " total_remaining=" + repr(_pl.get("total_remaining"))
+                + " status=" + repr(_pl.get("status"))
+                + " paylog_matched=" + repr(_pl.get("paylog_matched"))
+                + " totals_source=" + repr(_pl.get("totals_source"))
+                + "\n"
+            )
+            for it in (_pl.get("installments") or []):
+                _sys_tt.stderr.write(
+                    "[tasneem-truth] trace.sid=" + str(sid)
+                    + " inst.n=" + repr(it.get("n"))
+                    + " amount=" + repr(it.get("amount"))
+                    + " paid=" + repr(it.get("paid"))
+                    + " remaining=" + repr(it.get("remaining"))
+                    + " source=" + repr(it.get("source")) + "\n"
+                )
+        plan_traces.append(trace)
+
+    # ── 7. Verdict computation. ──────────────────────────────────
+    truth_verdict = []
+    for sf in students_full:
+        sid_v = sf.get("id")
+        sname_v = sf.get("student_name")
+        # pull installment values FROM students directly
+        s_inst_vals = {c: sf.get(c) for c in students_inst_cols}
+        # pull installment values FROM payment_log row(s) for this student
+        pl_inst_vals = {}
+        for prec in paylog_full:
+            if str(prec.get("personal_id") or "").strip() == \
+               str(sf.get("personal_id") or "").strip() \
+               and (sf.get("personal_id") or "").strip():
+                for c in paylog_inst_cols:
+                    if c not in pl_inst_vals or pl_inst_vals[c] in (None, ""):
+                        pl_inst_vals[c] = prec.get(c)
+        truth_verdict.append({
+            "sid":                  sid_v,
+            "name":                 sname_v,
+            "students_inst_values": s_inst_vals,
+            "paylog_inst_values":   pl_inst_vals,
+        })
+        _sys_tt.stderr.write(
+            "[tasneem-truth] verdict sid=" + str(sid_v)
+            + " students_inst=" + repr(s_inst_vals)
+            + " paylog_inst="   + repr(pl_inst_vals) + "\n"
+        )
+
+    _sys_tt.stderr.write(
+        "[tasneem-truth] ═══ DEEP DIAG END ═══\n"
+    )
+
+    return jsonify({
+        "ok":                   True,
+        "query":                q,
+        "students_columns":     s_cols,
+        "paylog_columns":       p_cols,
+        "students_inst_cols":   students_inst_cols,
+        "paylog_inst_cols":     paylog_inst_cols,
+        "students_rows":        students_full,
+        "paylog_rows":          paylog_full,
+        "student_payments":     sp_full,
+        "compute_plan_traces":  plan_traces,
+        "truth_verdict":        truth_verdict,
+    })
+
+
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
     student doesn\'t exist.
