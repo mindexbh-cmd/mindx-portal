@@ -14627,6 +14627,13 @@ function saveAllAttendance() {
     }
     showToast('تم حفظ ' + done + '/' + total + ' سجل', '#00897B');
     checkAndLoad(group, date);
+    /* If embedded inside the section-edit modal on the student
+       search card, dismiss the parent modal + trigger refresh. */
+    try {
+      if (typeof window.mxEmbeddedNotifySaved === 'function') {
+        window.mxEmbeddedNotifySaved('attendance');
+      }
+    } catch(e){}
   };
 }
 
@@ -32409,6 +32416,12 @@ table.tbl tr:hover td{background:#fff8e1;}
       _editId = null; _draft = null;
       document.getElementById('saveBtn').textContent = '💾 حفظ التقييم';
       loadRecent();
+      /* If embedded inside the section-edit modal, dismiss + refresh. */
+      try {
+        if (typeof window.mxEmbeddedNotifySaved === 'function') {
+          window.mxEmbeddedNotifySaved('evaluations');
+        }
+      } catch(e){}
     });
   };
   window.closeDup = function(){
@@ -52168,6 +52181,35 @@ function loadGroup(){
     if(!d.ok){document.getElementById('grid').innerHTML='<div class="empty">'+(d.error||'فشل التحميل')+'</div>';return;}
     STATE.students=d.students||[];
     render();
+    /* When opened in embedded mode with ?student=<id>, scroll the
+       target student's card into view + auto-select it so the
+       allow-listed user lands directly on that student. Standalone
+       access (no ?student) falls through unchanged. */
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var ts = qs.get('student');
+      if (ts) {
+        var sid = parseInt(ts, 10);
+        if (sid > 0) {
+          setTimeout(function(){
+            var c = document.getElementById('card-' + sid);
+            if (!c) return;
+            try { c.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+            /* Auto-select so the next behavior tap immediately
+               applies to the target student. */
+            if (typeof toggleSel === 'function' && !STATE.selected[sid]) {
+              toggleSel(sid, {stopPropagation:function(){}, preventDefault:function(){}});
+            }
+            c.style.outline = '3px solid #FFD600';
+            c.style.outlineOffset = '4px';
+            setTimeout(function(){
+              c.style.outline = '';
+              c.style.outlineOffset = '';
+            }, 4000);
+          }, 60);
+        }
+      }
+    } catch(e){}
   });
 }
 function render(){
@@ -52254,6 +52296,12 @@ function grant(bid){
     clearSel();
     closeMenu();
     setTimeout(loadGroup,800);
+    /* If embedded inside the section-edit modal, dismiss + refresh. */
+    try {
+      if (typeof window.mxEmbeddedNotifySaved === 'function') {
+        window.mxEmbeddedNotifySaved('points');
+      }
+    } catch(e){}
   }).catch(function(){toast('خطأ في الاتصال',false);});
 }
 
