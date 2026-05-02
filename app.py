@@ -43639,6 +43639,94 @@ def _payment_compute_plan(db, sid):
         status = 'unpaid'
     else:
         status = 'partial'
+    # ── Inline truth tracing for the Tasneem case. Fires only when
+    # the loaded student's name folds to contain "تسنيم", so it
+    # surfaces every time her payment card loads — no need to hit
+    # the diag URL. Read-only; safe to leave on.
+    try:
+        _name_for_match = (student.get('name') or '')
+        _name_folded = _payment_normalize_name(_name_for_match)
+        if 'تسنيم' in _name_for_match or 'تسنيم' in _name_folded:
+            import sys as _sys_inline
+            _sys_inline.stderr.write(
+                "[tasneem-inline] ─── _payment_compute_plan trace ───\n"
+            )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] sid=" + str(sid)
+                + " name=" + repr(_name_for_match)
+                + " pid=" + repr(student.get('personal_id'))
+                + " installment_type=" + repr(student.get('installment_type'))
+                + "\n"
+            )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] taqseet matched=" + str(bool(tq))
+                + " method=" + repr(method_label)
+                + " method_id=" + repr(tq[0] if tq else None)
+                + "\n"
+            )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] paid_pl=" + repr(paid_pl)
+                + " pl_row_dict=" + repr(pl_row)
+                + "\n"
+            )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] paid_sp=" + repr(paid_sp)
+                + "\n"
+            )
+            for _it in installments:
+                _sys_inline.stderr.write(
+                    "[tasneem-inline] inst.n=" + repr(_it.get('n'))
+                    + " amount=" + repr(_it.get('amount'))
+                    + " paid=" + repr(_it.get('paid'))
+                    + " remaining=" + repr(_it.get('remaining'))
+                    + " source=" + repr(_it.get('source'))
+                    + "\n"
+                )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] FINAL course_amount=" + repr(course_amount)
+                + " total_paid=" + repr(total_paid)
+                + " total_remaining=" + repr(total_remaining)
+                + " status=" + repr(status)
+                + " paylog_matched=" + repr(bool(pl_row))
+                + " totals_source="
+                + repr("payment_log" if total_paid_pl is not None else "computed")
+                + "\n"
+            )
+            # Cross-table dump: every installment-named column on
+            # students for this sid, so we can see immediately
+            # whether the data lives on students.installment* even
+            # though the page reads payment_log.
+            try:
+                _scols = [r[1] for r in db.execute(
+                    "PRAGMA table_info(students)"
+                ).fetchall()]
+                _ic = [c for c in _scols if 'inst' in c.lower()
+                                          or 'installment' in c.lower()]
+                if _ic:
+                    _sel = ('SELECT ' + ', '.join('"' + c + '"' for c in _ic)
+                            + ' FROM students WHERE id=?')
+                    _sr = db.execute(_sel, (sid,)).fetchone()
+                    if _sr is not None:
+                        for i, c in enumerate(_ic):
+                            try:
+                                _v = _sr[i] if not hasattr(_sr, "keys") else _sr[c]
+                            except Exception:
+                                _v = "<read-error>"
+                            _sys_inline.stderr.write(
+                                "[tasneem-inline] students." + c
+                                + " = " + repr(_v) + "\n"
+                            )
+            except Exception as _ex_inline:
+                _sys_inline.stderr.write(
+                    "[tasneem-inline] students-inst dump FAILED: "
+                    + str(_ex_inline) + "\n"
+                )
+            _sys_inline.stderr.write(
+                "[tasneem-inline] ─── end ───\n"
+            )
+    except Exception:
+        pass
+
     return {
         "student": {
             "id":           student['id'],
