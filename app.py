@@ -10260,6 +10260,26 @@ function _srCanEdit(){
   var u = (document.body && document.body.dataset && document.body.dataset.username) || '';
   return !!MX_STUDENT_EDIT_ALLOW[(u || '').trim()];
 }
+/* Emit a SINGLE-quoted JS string literal — safe inside double-quoted
+   HTML onclick attributes. JSON.stringify uses double quotes which
+   collide with the attribute delimiter and truncate the handler.
+   Embedded backslashes and single-quotes in the input are escaped
+   so values like O'Brien's group still produce valid JS.
+   Uses String.fromCharCode(92)/(39) to avoid any Python "" string
+   escape ambiguity — char codes survive the triple-quote round-trip
+   unchanged. */
+function _srQsArg(v){
+  var s = (v == null) ? '' : String(v);
+  var BS = String.fromCharCode(92);
+  var QT = String.fromCharCode(39);
+  var out = '';
+  for (var i = 0; i < s.length; i++){
+    var ch = s.charAt(i);
+    if (ch === BS || ch === QT) out += BS;
+    out += ch;
+  }
+  return QT + out + QT;
+}
 function _srRenderActions(){
   var box = document.getElementById('sr-actions');
   if (!box) return;
@@ -10682,8 +10702,8 @@ function _srRenderCard(d){
   if (typeof _srGrpNow === 'undefined') var _srGrpNow = (s.group_name_student || s.group_online || '');
   if (typeof _srCanEdit === 'function' && _srCanEdit()) {
     html += '<div class="srm-section-clickable-wrap" onclick="srOpenSectionModal('
-         + JSON.stringify('payment') + ',' + (_srSidNow||0) + ','
-         + JSON.stringify(_srGrpNow||'') + ')" '
+         + _srQsArg('payment') + ',' + (_srSidNow||0) + ','
+         + _srQsArg(_srGrpNow||'') + ')" '
          + 'title="\u0627\u0636\u063A\u0637 \u0644\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062F\u0641\u0639" '
          + 'style="cursor:pointer;position:relative;">';
     html += '<div class="srm-edit-overlay-badge">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</div>';
@@ -10704,16 +10724,16 @@ function _srRenderCard(d){
     if (!_srCanEdit()) return '';
     return '<a href="javascript:void(0)" class="srm-edit-pencil" '
          + 'onclick="event.stopPropagation();srOpenSectionModal('
-         + JSON.stringify(section) + ',' + (sid||0) + ','
-         + JSON.stringify(grp||'') + ')" '
+         + _srQsArg(section) + ',' + (sid||0) + ','
+         + _srQsArg(grp||'') + ')" '
          + 'title="\u062A\u0639\u062F\u064A\u0644 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</a>';
   };
   var _sectionClickAttrs = function(section, sid, grp){
     if (!_srCanEdit()) return '';
     return ' class="srm-section srm-section-clickable" '
          + 'onclick="srOpenSectionModal('
-         + JSON.stringify(section) + ',' + (sid||0) + ','
-         + JSON.stringify(grp||'') + ')"';
+         + _srQsArg(section) + ',' + (sid||0) + ','
+         + _srQsArg(grp||'') + ')"';
   };
   html += '<div' + (_srCanEdit() ? _sectionClickAttrs('attendance', _srSidNow, _srGrpNow) : ' class="srm-section"') + '>';
   html += '<div class="srm-section-title">\U0001F4C5 إحصائيات الحضور ('+(att.total||0)+' جلسة)' + _editAff('attendance', _srSidNow, _srGrpNow) + '</div>';
