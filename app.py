@@ -3907,6 +3907,186 @@ if True:
             except Exception:
                 pass
 
+    # ── payment_log_pid_backfill_v1: one-shot data-integrity sweep
+    # that pairs with the _payment_normalize_name extension shipped
+    # in the same commit. Brings step-1 (exact PID) of the matcher
+    # up to near-100% so the system isn't relying on the looser
+    # name-fold step every time the متابعة الدفع page renders.
+    #
+    # For every payment_log row where personal_id is NULL or empty,
+    # super-fold the row's student_name and look it up in students
+    # via the same fold. When EXACTLY one student matches, write
+    # that student's personal_id back into payment_log. Ambiguous
+    # (>1 students share the folded name) and orphan (0 matches)
+    # rows are logged with [paylog-orphan] / [paylog-ambiguous]
+    # markers so the admin sees them and can resolve manually.
+    #
+    # NEVER overwrites a non-empty payment_log.personal_id — if a
+    # row already has a PID, we trust whatever's there. NEVER
+    # mutates payment_log.student_name — only the PID. Idempotent:
+    # tag stamped after successful run, so re-deploys are no-ops.
+    if "payment_log_pid_backfill_v1" not in applied:
+        try:
+            import sys as _sys_pbk
+            import re as _re_pbk
+
+            # Inline super-fold helper — _payment_normalize_name is
+            # defined later in the module so we can't reference it
+            # at module-import time. Mirrors the request-time fold
+            # bytes-for-bytes (alif family + ya/taa-marbuta +
+            # tashkeel + tatweel + zero-width + bidi + whitespace
+            # collapse + casefold).
+            def _pbk_fold(s):
+                if not s: return ''
+                t = str(s)
+                for k, v in (('أ','ا'), ('إ','ا'), ('آ','ا'), ('ٱ','ا'),
+                             ('ة','ه'), ('ى','ي')):
+                    t = t.replace(k, v)
+                t = _re_pbk.sub(r'[ً-ٟ]', '', t)
+                for ch in ('ـ',
+                           '​', '‌', '‍',
+                           '‎', '‏',
+                           '‪', '‫', '‬',
+                           '‭', '‮', '﻿'):
+                    t = t.replace(ch, '')
+                return ' '.join(t.split()).strip().lower()
+
+            # Skip the migration entirely if either table is empty
+            # or missing — fresh-DB / dev installs.
+            try:
+                _stu_count = db2.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+            except Exception:
+                _stu_count = 0
+            try:
+                _pl_count = db2.execute("SELECT COUNT(*) FROM payment_log").fetchone()[0]
+            except Exception:
+                _pl_count = 0
+
+            if _stu_count == 0 or _pl_count == 0:
+                _sys_pbk.stderr.write(
+                    "[paylog-pid-backfill] skipping: students=" + str(_stu_count)
+                    + " payment_log=" + str(_pl_count) + " (need both > 0)\n"
+                )
+            else:
+                # Build folded-name → set(personal_id) index from
+                # students. We track sets so ambiguous folds are
+                # surfaced rather than silently picking one.
+                _stu_idx = {}   # folded_name -> { personal_id1, ... }
+                try:
+                    for _r in db2.execute(
+                        "SELECT personal_id, student_name FROM students "
+                        "WHERE student_name IS NOT NULL AND TRIM(student_name) <> ''"
+                    ).fetchall():
+                        _spid = _r[0] if hasattr(_r, "__getitem__") else None
+                        _snm  = _r[1] if hasattr(_r, "__getitem__") else None
+                        _spid_s = (str(_spid).strip() if _spid is not None else "")
+                        if not _spid_s:
+                            continue
+                        _f = _pbk_fold(_snm)
+                        if _f:
+                            _stu_idx.setdefault(_f, set()).add(_spid_s)
+                except Exception as _ex:
+                    _sys_pbk.stderr.write(
+                        "[paylog-pid-backfill] students index SELECT failed: "
+                        + str(_ex) + "\n"
+                    )
+
+                # Pull every payment_log row missing a PID.
+                try:
+                    _pl_missing = db2.execute(
+                        "SELECT id, personal_id, student_name FROM payment_log "
+                        "WHERE personal_id IS NULL "
+                        "   OR TRIM(COALESCE(personal_id, '')) = ''"
+                    ).fetchall()
+                except Exception as _ex:
+                    _pl_missing = []
+                    _sys_pbk.stderr.write(
+                        "[paylog-pid-backfill] payment_log SELECT failed: "
+                        + str(_ex) + "\n"
+                    )
+
+                _matched     = 0
+                _ambiguous   = 0
+                _orphans     = 0
+                _orphan_log  = []
+                _ambig_log   = []
+                _update_sql  = "UPDATE payment_log SET personal_id = ? WHERE id = ?"
+                for _r in _pl_missing:
+                    _plid  = _r[0] if hasattr(_r, "__getitem__") else None
+                    _plnm  = _r[2] if hasattr(_r, "__getitem__") else None
+                    if _plid is None:
+                        continue
+                    _f = _pbk_fold(_plnm)
+                    if not _f:
+                        _orphans += 1
+                        _orphan_log.append((_plid, repr(_plnm)))
+                        continue
+                    _candidates = _stu_idx.get(_f, set())
+                    if len(_candidates) == 1:
+                        _pid = next(iter(_candidates))
+                        try:
+                            db2.execute(_update_sql, (_pid, _plid))
+                            _matched += 1
+                        except Exception as _ex_upd:
+                            _sys_pbk.stderr.write(
+                                "[paylog-pid-backfill] UPDATE row "
+                                + str(_plid) + " failed: " + str(_ex_upd) + "\n"
+                            )
+                    elif len(_candidates) > 1:
+                        _ambiguous += 1
+                        if len(_ambig_log) < 10:
+                            _ambig_log.append((_plid, repr(_plnm),
+                                               sorted(_candidates)))
+                    else:
+                        _orphans += 1
+                        if len(_orphan_log) < 20:
+                            _orphan_log.append((_plid, repr(_plnm)))
+                if _matched:
+                    try: db2.commit()
+                    except Exception: pass
+
+                _sys_pbk.stderr.write(
+                    "[paylog-pid-backfill] tally:"
+                    + " students_indexed=" + str(len(_stu_idx))
+                    + " paylog_missing_pid=" + str(len(_pl_missing))
+                    + " matched=" + str(_matched)
+                    + " ambiguous=" + str(_ambiguous)
+                    + " orphans=" + str(_orphans) + "\n"
+                )
+                if _orphan_log:
+                    for _plid, _nm in _orphan_log[:20]:
+                        _sys_pbk.stderr.write(
+                            "[paylog-orphan] paylog_id=" + str(_plid)
+                            + " name=" + _nm
+                            + " — no students row matched the super-folded name\n"
+                        )
+                if _ambig_log:
+                    for _plid, _nm, _pids in _ambig_log[:10]:
+                        _sys_pbk.stderr.write(
+                            "[paylog-ambiguous] paylog_id=" + str(_plid)
+                            + " name=" + _nm
+                            + " matched_pids=" + str(_pids)
+                            + " — left untouched (rename one student to disambiguate)\n"
+                        )
+
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("payment_log_pid_backfill_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_pbk:
+            try:
+                import sys as _sys_pbk2
+                _sys_pbk2.stderr.write(
+                    "[paylog-pid-backfill] outer error: "
+                    + str(_ex_outer_pbk) + "\n"
+                )
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -42301,10 +42481,31 @@ def _payment_load_student(db, sid):
     return d
 
 def _payment_normalize_name(s):
-    """Whitespace-collapse and strip diacritics so a payment_log row
-    survives slight name spelling differences (extra space, alef
-    variants, ta-marbuta vs heh, etc.) when matched against the
-    students.student_name."""
+    """Whitespace-collapse, strip diacritics + presentation chars so
+    a payment_log row survives slight name spelling differences when
+    matched against students.student_name.
+
+    Folds applied (every one is bug-driven):
+      - alif family    (أ إ آ ٱ)               → ا
+      - taa-marbuta                                → ه
+      - alef-maksura                               → ي
+      - tashkeel marks (U+064B-U+065F)
+      - tatweel        (U+0640)                    → removed
+      - zero-width     (U+200B-U+200D, U+FEFF)     → removed
+      - bidi marks     (U+200E-U+200F, U+202A-U+202E) → removed
+      - whitespace runs (incl. NBSP via str.split) collapsed to
+        single space
+      - .casefold() / .lower()
+
+    The tatweel + invisibles strip was added after the
+    [tasneem-diag] tracer found that تسنيم's payment_log row had a
+    U+0640 (tatweel) inside her name that the original normaliser
+    didn't fold — so the matcher's step-2 name-fold compare
+    rejected the row and the UI showed her as unpaid despite three
+    paid installments in payment_log. Pure widening — every name
+    pair that previously matched still matches (we only added
+    folds, never removed).
+    """
     if not s: return ''
     s = str(s)
     repl = {
@@ -42316,6 +42517,16 @@ def _payment_normalize_name(s):
     # Strip Arabic tashkeel marks.
     import re as _re
     s = _re.sub(r'[ً-ٟ]', '', s)
+    # Strip presentation-only invisibles the matcher used to miss.
+    # Tatweel is the kashida elongation char (typesetting only,
+    # never semantic). Zero-width and bidi marks come in via
+    # copy-paste from rich-text editors / Excel / Drive sheets.
+    for _zap in ('ـ',                          # tatweel U+0640
+                 '​', '‌', '‍',      # ZWS / ZWNJ / ZWJ
+                 '‎', '‏',                # LRM / RLM
+                 '‪', '‫', '‬',      # LRE / RLE / PDF
+                 '‭', '‮', '﻿'):     # LRO / RLO / BOM
+        s = s.replace(_zap, '')
     s = ' '.join(s.split())
     return s.strip().lower()
 
