@@ -3899,6 +3899,432 @@ if True:
             except Exception:
                 pass
 
+    # ── paylog_pid_col_v1: ensure payment_log.personal_id column
+    # exists. Legacy DBs created before personal_id was in the
+    # CREATE TABLE seed lack the column entirely, which made the
+    # PID lookup branch in _payment_log_paid_for_student raise
+    # "no such column" and (pre-fix) silently abort the whole
+    # lookup ladder. Idempotent — only adds the column if missing.
+    if "paylog_pid_col_v1" not in applied:
+        try:
+            import sys as _sys_ppc
+            _sys_ppc.stderr.write(
+                "[paylog-migration] paylog_pid_col_v1 START\n"
+            )
+            try:
+                _pl_live = {r[1] for r in db2.execute(
+                    "PRAGMA table_info(payment_log)"
+                ).fetchall()}
+            except Exception:
+                _pl_live = set()
+                try: db2.rollback()
+                except Exception: pass
+            _alter_ok = "personal_id" in _pl_live
+            if not _alter_ok:
+                try:
+                    db2.execute(
+                        "ALTER TABLE payment_log ADD COLUMN personal_id TEXT"
+                    )
+                    db2.commit()
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] ALTER added personal_id column\n"
+                    )
+                except Exception as _ex_alter:
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] ALTER failed: "
+                        + str(_ex_alter) + "\n"
+                    )
+                    # Postgres aborts the transaction on any error; rollback
+                    # so the next statement isn't blocked.
+                    try: db2.rollback()
+                    except Exception: pass
+                # PRAGMA recheck so the migration only stamps its tag
+                # when the column actually landed. Prevents the
+                # subsequent strong-link / create-missing migrations
+                # from reading a column that doesn't exist.
+                try:
+                    _pl_live2 = {r[1] for r in db2.execute(
+                        "PRAGMA table_info(payment_log)"
+                    ).fetchall()}
+                    _alter_ok = "personal_id" in _pl_live2
+                except Exception:
+                    _alter_ok = False
+                    try: db2.rollback()
+                    except Exception: pass
+            else:
+                _sys_ppc.stderr.write(
+                    "[paylog-migration] personal_id already present\n"
+                )
+            # Best-effort index for fast PID lookup. Idempotent. Skip
+            # entirely if the ALTER didn't land — index on a missing
+            # column would re-raise.
+            if _alter_ok:
+                try:
+                    db2.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_paylog_pid "
+                        "ON payment_log(personal_id)"
+                    )
+                    db2.commit()
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] CREATE INDEX idx_paylog_pid OK\n"
+                    )
+                except Exception as _ex_idx:
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] CREATE INDEX failed: "
+                        + str(_ex_idx) + "\n"
+                    )
+                    try: db2.rollback()
+                    except Exception: pass
+            # Only stamp the tag when the column actually landed —
+            # otherwise the strong-link migration will re-attempt next
+            # boot, which is what we want.
+            if _alter_ok:
+                try:
+                    db2.execute(
+                        "INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("paylog_pid_col_v1",),
+                    )
+                    db2.commit()
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] paylog_pid_col_v1 DONE (tag stamped)\n"
+                    )
+                except Exception as _ex_tag:
+                    _sys_ppc.stderr.write(
+                        "[paylog-migration] tag-stamp failed: "
+                        + str(_ex_tag) + "\n"
+                    )
+                    try: db2.rollback()
+                    except Exception: pass
+            else:
+                _sys_ppc.stderr.write(
+                    "[paylog-migration] paylog_pid_col_v1 SKIPPED — "
+                    "personal_id column unavailable, will retry next boot\n"
+                )
+        except Exception as _ex_outer_ppc:
+            try:
+                import sys as _sys_ppc2
+                _sys_ppc2.stderr.write(
+                    "[paylog-migration] paylog_pid_col_v1 outer error: "
+                    + str(_ex_outer_ppc) + "\n"
+                )
+            except Exception:
+                pass
+            try: db2.rollback()
+            except Exception: pass
+
+    # ── paylog_pid_strong_link_v1: backfill payment_log.personal_id
+    # for every paylog row where it's NULL/empty, by folding the
+    # row's student_name and looking up a UNIQUE matching student.
+    # Existing data is preserved 100% — this migration ONLY ADDS
+    # the missing personal_id, never modifies installment values,
+    # message timestamps, or any other column. Ambiguous /
+    # orphan rows are logged for admin review and left untouched.
+    if "paylog_pid_strong_link_v1" not in applied:
+        try:
+            import sys as _sys_ppl
+            import re as _re_ppl
+            _sys_ppl.stderr.write(
+                "[paylog-migration] paylog_pid_strong_link_v1 START\n"
+            )
+            # Pre-flight: personal_id column must exist on payment_log.
+            # paylog_pid_col_v1 should have added it already, but if
+            # that ALTER failed on Postgres we need to skip cleanly
+            # rather than fail mid-loop.
+            try:
+                _pl_live_ppl = {r[1] for r in db2.execute(
+                    "PRAGMA table_info(payment_log)"
+                ).fetchall()}
+            except Exception:
+                _pl_live_ppl = set()
+                try: db2.rollback()
+                except Exception: pass
+            if "personal_id" not in _pl_live_ppl:
+                _sys_ppl.stderr.write(
+                    "[paylog-migration] paylog_pid_strong_link_v1 SKIPPED "
+                    "— payment_log.personal_id column is missing, will "
+                    "retry next boot\n"
+                )
+                raise RuntimeError("__paylog_strong_link_skip__")
+            def _ppl_fold(s):
+                if not s: return ""
+                t = str(s)
+                # Strip tatweel + zero-width / bidi marks first.
+                for _zap in ("ـ", "​", "‌", "‍",
+                             "‎", "‏", "‪", "‫",
+                             "‬", "‭", "‮", "﻿"):
+                    t = t.replace(_zap, "")
+                # Alif/ya/taa-marbuta family fold.
+                for k, v in (("أ","ا"),("إ","ا"),("آ","ا"),("ٱ","ا"),
+                             ("ة","ه"),("ى","ي")):
+                    t = t.replace(k, v)
+                # Strip tashkeel.
+                t = _re_ppl.sub(r"[ً-ْ]", "", t)
+                # Collapse whitespace.
+                t = " ".join(t.split()).strip().lower()
+                return t
+
+            try:
+                _stu_rows_ppl = db2.execute(
+                    "SELECT id, student_name, personal_id FROM students"
+                ).fetchall()
+            except Exception:
+                _stu_rows_ppl = []
+                try: db2.rollback()
+                except Exception: pass
+            try:
+                _pl_rows_ppl = db2.execute(
+                    "SELECT id, student_name, personal_id FROM payment_log"
+                ).fetchall()
+            except Exception:
+                _pl_rows_ppl = []
+                try: db2.rollback()
+                except Exception: pass
+
+            # Group students by folded name so we can detect
+            # ambiguity in O(N).
+            _stu_by_fold = {}
+            for _r in _stu_rows_ppl:
+                _sn = _r[1] if hasattr(_r, "__getitem__") else None
+                _spid = _r[2] if hasattr(_r, "__getitem__") else None
+                _f = _ppl_fold(_sn)
+                if not _f: continue
+                _stu_by_fold.setdefault(_f, []).append({
+                    "name": _sn,
+                    "pid":  (str(_spid).strip() if _spid is not None else ""),
+                })
+
+            _matched   = 0
+            _ambiguous = 0
+            _orphans   = 0
+            _skipped_already_pid = 0
+            for _r in _pl_rows_ppl:
+                _pid_existing = _r[2] if hasattr(_r, "__getitem__") else None
+                if _pid_existing is not None and str(_pid_existing).strip():
+                    _skipped_already_pid += 1
+                    continue
+                _pl_id = _r[0] if hasattr(_r, "__getitem__") else None
+                _pl_name = _r[1] if hasattr(_r, "__getitem__") else None
+                _f = _ppl_fold(_pl_name)
+                if not _f:
+                    _orphans += 1
+                    continue
+                _candidates = _stu_by_fold.get(_f, [])
+                # Filter to candidates with non-empty PIDs only — no
+                # point linking to a student whose PID is also empty.
+                _eligible = [c for c in _candidates if c["pid"]]
+                if len(_eligible) == 1:
+                    try:
+                        db2.execute(
+                            "UPDATE payment_log SET personal_id = ? "
+                            "WHERE id = ?",
+                            (_eligible[0]["pid"], _pl_id),
+                        )
+                        _matched += 1
+                    except Exception as _ex_upd:
+                        _sys_ppl.stderr.write(
+                            "[paylog-pid-strong-link-v1] UPDATE failed "
+                            "id=" + str(_pl_id) + ": "
+                            + str(_ex_upd) + "\n"
+                        )
+                        # Postgres aborts the txn on error — rollback
+                        # so the next UPDATE in the loop can run.
+                        try: db2.rollback()
+                        except Exception: pass
+                elif len(_eligible) > 1:
+                    _ambiguous += 1
+                    _sys_ppl.stderr.write(
+                        "[paylog-ambiguous] paylog_id=" + str(_pl_id)
+                        + " name=" + repr(_pl_name)
+                        + " matches=" + str(len(_eligible))
+                        + " pids=" + repr([c["pid"]
+                                           for c in _eligible[:5]])
+                        + "\n"
+                    )
+                else:
+                    _orphans += 1
+                    _sys_ppl.stderr.write(
+                        "[paylog-orphan] paylog_id=" + str(_pl_id)
+                        + " name=" + repr(_pl_name)
+                        + " — no student match\n"
+                    )
+            if _matched:
+                try: db2.commit()
+                except Exception: pass
+
+            _sys_ppl.stderr.write(
+                "[paylog-pid-strong-link-v1] tally:"
+                + " matched=" + str(_matched)
+                + " ambiguous=" + str(_ambiguous)
+                + " orphans=" + str(_orphans)
+                + " skipped_already_had_pid=" + str(_skipped_already_pid)
+                + " paylog_total=" + str(len(_pl_rows_ppl))
+                + " students_total=" + str(len(_stu_rows_ppl))
+                + "\n"
+            )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("paylog_pid_strong_link_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_ppl:
+            try:
+                import sys as _sys_ppl2
+                # Sentinel exception is the deliberate skip when
+                # personal_id column is missing — already logged.
+                if "__paylog_strong_link_skip__" not in str(_ex_outer_ppl):
+                    _sys_ppl2.stderr.write(
+                        "[paylog-migration] paylog_pid_strong_link_v1 outer error: "
+                        + str(_ex_outer_ppl) + "\n"
+                    )
+                try: db2.rollback()
+                except Exception: pass
+            except Exception:
+                pass
+
+    # ── paylog_create_missing_v1: ensure every student has a
+    # corresponding payment_log row. INSERT-ONLY — never modifies
+    # an existing row. Match by (PID + non-empty) first, then by
+    # folded student_name. Newly-created rows have NULL installment
+    # columns by design — admin/import can fill them later.
+    if "paylog_create_missing_v1" not in applied:
+        try:
+            import sys as _sys_pcm
+            import re as _re_pcm
+            _sys_pcm.stderr.write(
+                "[paylog-migration] paylog_create_missing_v1 START\n"
+            )
+            def _pcm_fold(s):
+                if not s: return ""
+                t = str(s)
+                for _zap in ("ـ", "​", "‌", "‍",
+                             "‎", "‏", "‪", "‫",
+                             "‬", "‭", "‮", "﻿"):
+                    t = t.replace(_zap, "")
+                for k, v in (("أ","ا"),("إ","ا"),("آ","ا"),("ٱ","ا"),
+                             ("ة","ه"),("ى","ي")):
+                    t = t.replace(k, v)
+                t = _re_pcm.sub(r"[ً-ْ]", "", t)
+                t = " ".join(t.split()).strip().lower()
+                return t
+
+            try:
+                _pl_live_pcm = {r[1] for r in db2.execute(
+                    "PRAGMA table_info(payment_log)"
+                ).fetchall()}
+            except Exception:
+                _pl_live_pcm = set()
+            _has_pid_col_pcm = ("personal_id" in _pl_live_pcm)
+            try:
+                _stu_rows_pcm = db2.execute(
+                    "SELECT id, student_name, personal_id FROM students"
+                ).fetchall()
+            except Exception:
+                _stu_rows_pcm = []
+            try:
+                _pl_rows_pcm = db2.execute(
+                    "SELECT id, student_name" +
+                    (", personal_id" if _has_pid_col_pcm else "")
+                    + " FROM payment_log"
+                ).fetchall()
+            except Exception:
+                _pl_rows_pcm = []
+
+            _pl_pids = set()
+            _pl_folds = set()
+            for _r in _pl_rows_pcm:
+                _name = _r[1] if hasattr(_r, "__getitem__") else None
+                _f = _pcm_fold(_name)
+                if _f: _pl_folds.add(_f)
+                if _has_pid_col_pcm:
+                    _ppid = _r[2] if hasattr(_r, "__getitem__") else None
+                    _ppid_s = (str(_ppid).strip()
+                               if _ppid is not None else "")
+                    if _ppid_s: _pl_pids.add(_ppid_s)
+
+            _created = 0
+            _already_had = 0
+            _skipped_no_name = 0
+            for _r in _stu_rows_pcm:
+                _sn = _r[1] if hasattr(_r, "__getitem__") else None
+                _spid = _r[2] if hasattr(_r, "__getitem__") else None
+                _spid_s = (str(_spid).strip()
+                           if _spid is not None else "")
+                _sn_s = (str(_sn).strip() if _sn is not None else "")
+                if not _sn_s:
+                    _skipped_no_name += 1
+                    continue
+                _f = _pcm_fold(_sn_s)
+                if (_spid_s and _spid_s in _pl_pids) or \
+                        (_f and _f in _pl_folds):
+                    _already_had += 1
+                    continue
+                # INSERT a fresh paylog row with NULL installments.
+                _cols_pcm = ["student_name"]
+                _vals_pcm = [_sn_s]
+                if _has_pid_col_pcm:
+                    _cols_pcm.append("personal_id")
+                    _vals_pcm.append(_spid_s if _spid_s else None)
+                try:
+                    _ph_pcm = ",".join(["?"] * len(_cols_pcm))
+                    _q_pcm = ",".join('"' + _c + '"' for _c in _cols_pcm)
+                    db2.execute(
+                        "INSERT INTO payment_log (" + _q_pcm + ") "
+                        "VALUES (" + _ph_pcm + ")",
+                        tuple(_vals_pcm),
+                    )
+                    _created += 1
+                    # Track fold/pid so a duplicate student name in
+                    # the same loop doesn't re-insert.
+                    if _f: _pl_folds.add(_f)
+                    if _spid_s: _pl_pids.add(_spid_s)
+                except Exception as _ex_ins:
+                    _sys_pcm.stderr.write(
+                        "[paylog-mirror-init] INSERT failed for sid="
+                        + repr(_r[0] if hasattr(_r, "__getitem__") else None)
+                        + " name=" + repr(_sn_s)
+                        + ": " + str(_ex_ins) + "\n"
+                    )
+                    # Postgres aborts the txn on error — rollback so
+                    # the loop can continue with the next student.
+                    try: db2.rollback()
+                    except Exception: pass
+            if _created:
+                try: db2.commit()
+                except Exception: pass
+
+            _sys_pcm.stderr.write(
+                "[paylog-mirror-init] tally:"
+                + " students_total=" + str(len(_stu_rows_pcm))
+                + " paylog_total_before=" + str(len(_pl_rows_pcm))
+                + " already_had_paylog=" + str(_already_had)
+                + " created_new=" + str(_created)
+                + " skipped_no_name=" + str(_skipped_no_name)
+                + " existing_data_modified=0"
+                + "\n"
+            )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("paylog_create_missing_v1",),
+                )
+                db2.commit()
+            except Exception:
+                pass
+        except Exception as _ex_outer_pcm:
+            try:
+                import sys as _sys_pcm2
+                _sys_pcm2.stderr.write(
+                    "[paylog-migration] paylog_create_missing_v1 outer error: "
+                    + str(_ex_outer_pcm) + "\n"
+                )
+                try: db2.rollback()
+                except Exception: pass
+            except Exception:
+                pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -12092,7 +12518,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else msgStartScheduler();
 </script>
 
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div><div style="margin-top:8px;"><button type="button" onclick="pmOpenDueReminders()" style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(230,81,0,0.25);">📅 رسائل تذكير الاستحقاق</button></div></div></div><div id="pm-filter-bar" style="padding:10px 16px;background:#faf6ff;border-bottom:1px solid #e0d0f8;display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;font-weight:600;color:#4a148c;"><span style="font-weight:800;">تصفية:</span><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="all" checked onchange="_pmFilterChange()"> الكل</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="today" onchange="_pmFilterChange()"> حان موعد الاستحقاق اليوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="within" onchange="_pmFilterChange()"> يستحق خلال <input type="number" id="pm-flt-days" min="1" max="60" placeholder="عدد" oninput="_pmFilterChange(true)" onfocus="document.querySelector('input[name=pm-flt][value=within]').checked=true;_pmFilterChange(true);" style="width:64px;padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:800;direction:ltr;font-family:inherit;"> يوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="overdue" onchange="_pmFilterChange()"> متأخر عن الاستحقاق</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="manual" onchange="_pmFilterChange()"> اختيار قسط <select id="pm-flt-n" onchange="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" onfocus="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" style="padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:700;font-family:inherit;background:#fff;"><option value="1">القسط 1</option><option value="2">القسط 2</option><option value="3">القسط 3</option><option value="4">القسط 4</option><option value="5">القسط 5</option><option value="6">القسط 6</option><option value="7">القسط 7</option><option value="8">القسط 8</option><option value="9">القسط 9</option><option value="10">القسط 10</option><option value="11">القسط 11</option><option value="12">القسط 12</option></select></label><span id="pm-flt-count" style="margin-right:auto;color:#666;font-weight:700;font-size:12.5px;"></span></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}.pm-due-row.red>td{background:#ffebee;}.pm-due-row.yellow>td{background:#fff8e1;}.pm-due-row.green>td{background:#e8f5e9;}.pm-due-pill{padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-due-pill.red{background:#ffebee;color:#c62828;}.pm-due-pill.yellow{background:#fff8e1;color:#e65100;}.pm-due-pill.green{background:#e8f5e9;color:#1b5e20;}</style>
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;padding:18px;"><div style="background:#fff;margin:0 auto;border-radius:14px;max-width:920px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(107,63,160,0.25);direction:rtl;"><div style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;"><span style="color:#fff;font-size:1.2rem;font-weight:bold;">💳 متابعة الدفع</span><span onclick="document.getElementById('pay-modal').style.display='none'" style="color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</span></div><div style="padding:14px 16px;background:#f8f4ff;border-bottom:1px solid #e0d0f8;"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;"><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">المجموعة</label><select id="pm-group" onchange="pmLoadGroup()" style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:180px;font-size:0.95rem;"><option value="">— اختر المجموعة —</option><option value="__ALL__">🗓️ جميع المجموعات</option></select></div><div><label style="display:block;font-weight:bold;color:#4a148c;margin-bottom:4px;">بحث الطالب</label><div style="display:flex;gap:6px;"><input type="text" id="pm-search" oninput="pmSearchInput()" onkeydown="if(event.key==='Enter')pmSearchClick()" placeholder="ابحث باسم الطالب أو الرقم الشخصي..." style="padding:8px 14px;border-radius:8px;border:1.5px solid #8B5CC8;min-width:240px;font-size:0.95rem;"><button type="button" onclick="pmSearchClick()" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;white-space:nowrap;">🔍 بحث</button></div></div><div style="margin-top:8px;"><button type="button" onclick="pmOpenDueReminders()" style="background:linear-gradient(135deg,#E65100,#FB8C00);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;cursor:pointer;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(230,81,0,0.25);">📅 رسائل تذكير الاستحقاق</button></div></div></div><div id="pm-filter-bar" style="padding:10px 16px;background:#faf6ff;border-bottom:1px solid #e0d0f8;display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;font-weight:600;color:#4a148c;"><span style="font-weight:800;">تصفية:</span><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="all" checked onchange="_pmFilterChange()"> الكل</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="today" onchange="_pmFilterChange()"> حان موعد الاستحقاق اليوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="within" onchange="_pmFilterChange()"> يستحق خلال <input type="number" id="pm-flt-days" min="1" max="60" placeholder="عدد" oninput="_pmFilterChange(true)" onfocus="document.querySelector('input[name=pm-flt][value=within]').checked=true;_pmFilterChange(true);" style="width:64px;padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:800;direction:ltr;font-family:inherit;"> يوم</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="overdue" onchange="_pmFilterChange()"> متأخر عن الاستحقاق</label><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="pm-flt" value="manual" onchange="_pmFilterChange()"> اختيار قسط <select id="pm-flt-n" onchange="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" onfocus="document.querySelector('input[name=pm-flt][value=manual]').checked=true;_pmFilterChange();" style="padding:4px 8px;border:1.4px solid #c4a8e8;border-radius:7px;font-weight:700;font-family:inherit;background:#fff;"><option value="1">القسط 1</option><option value="2">القسط 2</option><option value="3">القسط 3</option><option value="4">القسط 4</option><option value="5">القسط 5</option><option value="6">القسط 6</option><option value="7">القسط 7</option><option value="8">القسط 8</option><option value="9">القسط 9</option><option value="10">القسط 10</option><option value="11">القسط 11</option><option value="12">القسط 12</option></select></label><span id="pm-flt-count" style="margin-right:auto;color:#666;font-weight:700;font-size:12.5px;"></span></div><div id="pm-cards" style="padding:14px 16px;max-height:70vh;overflow-y:auto;"><div id="pm-empty" style="text-align:center;color:#999;padding:30px;font-size:14px;">— اختر مجموعة لعرض الطلبة —</div></div><div id="pm-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e7d32;color:#fff;padding:10px 22px;border-radius:30px;font-weight:700;font-size:13.5px;box-shadow:0 6px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10000;pointer-events:none;direction:rtl;"></div></div></div><style>.pm-card{background:#fff;border:1.8px solid #e0d0f8;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(107,63,160,0.06);transition:border-color .15s ease,box-shadow .15s ease;}.pm-frozen{background:#f5f7fa;border-color:#cfd8dc;}.pm-frozen .pm-summary-grid{opacity:0.55;filter:grayscale(0.4);}.pm-frozen .pm-controls{opacity:0.55;pointer-events:none;}.pm-frozen-badge{background:#eceff1;color:#546e7a;border:1.5px dashed #b0bec5;border-radius:8px;padding:6px 10px;margin:6px 0;font-size:12.5px;font-weight:700;text-align:center;}.pm-card:hover{border-color:#8B5CC8;box-shadow:0 4px 14px rgba(107,63,160,0.12);}.pm-card-head{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#4a148c;margin-bottom:8px;border-bottom:1.5px dashed #e0d0f8;padding-bottom:8px;}.pm-status{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-status.paid{background:#e8f5e9;color:#1b5e20;}.pm-status.partial{background:#fff8e1;color:#e65100;}.pm-status.unpaid{background:#ffebee;color:#c62828;}.pm-status.exempt{background:#e3f2fd;color:#0d47a1;}.pm-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:8px 0;font-size:13px;color:#333;}.pm-summary-grid b{color:#4a148c;}.pm-card .pm-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#f8f4ff;border-radius:10px;padding:10px 12px;margin-top:8px;}.pm-card .pm-controls label{display:block;font-size:12px;font-weight:700;color:#4a148c;margin-bottom:3px;}.pm-card select,.pm-card input[type=number]{padding:7px 10px;border-radius:8px;border:1.5px solid #8B5CC8;font-size:13.5px;background:#fff;direction:rtl;font-family:inherit;}.pm-card select{min-width:200px;}.pm-card input[type=number]{width:120px;}.pm-card button.pm-pay{background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13.5px;}.pm-card button.pm-pay:hover{filter:brightness(1.08);}.pm-card button.pm-pay[disabled]{background:#bdbdbd;cursor:not-allowed;}.pm-detail{background:#fff;border:1.5px dashed #8B5CC8;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px;color:#222;display:none;}.pm-detail.show{display:block;}.pm-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 14px;}.pm-detail b{color:#4a148c;}#pm-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}#pm-toast.error{background:#c62828;}#pm-toast.warn{background:#e65100;}.pm-due-row.red>td{background:#ffebee;}.pm-due-row.yellow>td{background:#fff8e1;}.pm-due-row.green>td{background:#e8f5e9;}.pm-due-pill{padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:800;}.pm-due-pill.red{background:#ffebee;color:#c62828;}.pm-due-pill.yellow{background:#fff8e1;color:#e65100;}.pm-due-pill.green{background:#e8f5e9;color:#1b5e20;}</style>
 <div id="pm-due-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;overflow:auto;padding:18px;direction:rtl;">
   <div style="background:#fff;margin:0 auto;border-radius:14px;max-width:980px;width:100%;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
     <div style="background:linear-gradient(135deg,#E65100,#FB8C00);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;">
@@ -12442,6 +12868,31 @@ function _pmRenderCard(card, sid, name, res){
     + '<div class="pm-detail" id="pm-detail-' + sid + '"></div>';
   card.innerHTML = head + summary + controls;
   card._pmPlan = p;
+  /* Freeze when not registered. registration_status comes from
+     _payment_load_student → res.student.registration_status; the
+     installment values stay visible (read-only) but inputs are
+     disabled and the card is visually grayed. */
+  var regStatus = "";
+  try { regStatus = ((res.student && res.student.registration_status) || "").trim(); } catch (e) {}
+  var REG_OK = "\u062A\u0645 \u0627\u0644\u062A\u0633\u062C\u064A\u0644";
+  if (regStatus !== REG_OK) {
+    card.classList.add("pm-frozen");
+    var iceEmoji = String.fromCodePoint(0x1F9CA);
+    var badge = document.createElement("div");
+    badge.className = "pm-frozen-badge";
+    badge.innerHTML = iceEmoji + " \u0645\u062C\u0645\u0651\u062F\u0629 - \u0627\u0644\u0637\u0627\u0644\u0628 \u063A\u064A\u0631 \u0645\u0633\u062C\u0651\u0644";
+    var headEl = card.querySelector(".pm-card-head");
+    if (headEl && headEl.nextSibling) {
+      card.insertBefore(badge, headEl.nextSibling);
+    } else {
+      card.appendChild(badge);
+    }
+    var sel2 = card.querySelector(".pm-inst-sel"); if (sel2) sel2.disabled = true;
+    var inp2 = card.querySelector(".pm-amount-in"); if (inp2) inp2.disabled = true;
+    var btn2 = card.querySelector(".pm-pay");      if (btn2) btn2.disabled = true;
+  } else {
+    card.classList.remove("pm-frozen");
+  }
 }
 function pmInstChange(sel){
   var sid = parseInt(sel.dataset.sid, 10);
@@ -22852,6 +23303,12 @@ def api_students_add():
         db.execute(sql, tuple(use_vals))
         db.commit()
         new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        # Auto-create matching paylog row (NULL installments).
+        # Best-effort — never blocks the student-create response.
+        try:
+            _paylog_mirror_for_student(db, new_id)
+        except Exception:
+            pass
         return jsonify({"ok": True, "id": new_id})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
@@ -22924,10 +23381,34 @@ def api_students_update(sid):
                     "existing_name": ename or "",
                     "error": "\u26A0 \u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A \u0645\u0633\u062C\u0644 \u0645\u0633\u0628\u0642\u0627\u064B \u0644\u0644\u0637\u0627\u0644\u0628: " + (ename or ""),
                 }), 409
+    # Capture pre-UPDATE name/PID so the paylog mirror can locate
+    # the matching paylog row even when the student is being
+    # renamed AND its PID is being changed in the same call.
+    _old_name = None
+    _old_pid  = None
+    if "student_name" in d or "personal_id" in d:
+        try:
+            _orig = db.execute(
+                "SELECT student_name, personal_id FROM students WHERE id=?",
+                (sid,),
+            ).fetchone()
+            if _orig:
+                _old_name = (_orig[0] if not hasattr(_orig, "keys")
+                             else _orig["student_name"])
+                _old_pid  = (_orig[1] if not hasattr(_orig, "keys")
+                             else _orig["personal_id"])
+        except Exception:
+            pass
     sql = "UPDATE students SET " + ",".join(set_cols) + " WHERE id=?"
     try:
         db.execute(sql, tuple(set_vals) + (sid,))
         db.commit()
+        # Mirror name/PID changes into the linked paylog row.
+        # Best-effort — never blocks the student-update response.
+        try:
+            _paylog_mirror_for_student(db, sid, _old_name, _old_pid)
+        except Exception:
+            pass
         return jsonify({"ok": True, "updated_columns": [c for c in cols if c in d]})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
@@ -42663,21 +43144,209 @@ def _payment_load_student(db, sid):
     except Exception:
         live_cols = set()
     has_online = online_col in live_cols and online_col != in_col
+    has_reg    = "registration_term2_2026" in live_cols
     cols = ['id', 'student_name', 'personal_id', 'installment_type', in_col]
     if has_online: cols.append(online_col)
+    if has_reg:    cols.append("registration_term2_2026")
     select = 'SELECT ' + ', '.join('"' + c + '"' for c in cols) + ' FROM students WHERE id=?'
     row = db.execute(select, (sid,)).fetchone()
     if not row:
         return None
+    # Resolve the optional columns by index after the fixed prefix.
+    _next = 5
+    _online_val = (row[_next] if has_online and len(row) > _next else '')
+    if has_online: _next += 1
+    _reg_val = (row[_next] if has_reg and len(row) > _next else '')
     d = {
         'id':              row[0],
         'name':            row[1],
         'personal_id':     row[2],
         'installment_type': row[3],
-        'group':           row[4] or (row[5] if has_online and len(row) > 5 else ''),
-        'group_online':    (row[5] if has_online and len(row) > 5 else ''),
+        'group':           row[4] or _online_val,
+        'group_online':    _online_val,
+        'registration_status': _reg_val,
     }
     return d
+
+def _paylog_mirror_for_student(db, sid, old_name=None, old_pid=None):
+    """Keep payment_log linkage in sync with students for ONE student.
+
+    Strict invariant per the user's spec:
+      - NEVER modifies installment values, message timestamps,
+        course_amount, total_paid, total_remaining, or any other
+        column on an existing paylog row.
+      - ONLY allowed mutations:
+          a) INSERT a fresh paylog row for a student that has no
+             matching row (NULL installments — admin/import will
+             fill them later).
+          b) UPDATE student_name + personal_id on the matching
+             paylog row to keep linkage strong when those fields
+             change on the student row.
+      - NEVER deletes paylog rows. A deleted student keeps its
+        paylog row as a historical record.
+
+    Lookup ladder for the matching row (in order):
+      1. By NEW personal_id (current value on students.id=sid).
+      2. By OLD personal_id passed in (so a PID-rename sees the
+         pre-change row before it disappears from PID-1's bucket).
+      3. By folded NEW name.
+      4. By folded OLD name.
+
+    Best-effort, never raises. Errors are stderr-logged with
+    [paylog-mirror] prefix and the function returns silently so
+    a paylog issue can't block a student CRUD operation.
+    """
+    try:
+        import sys as _sys_mir
+        # 1. Reload current student row.
+        try:
+            srow = db.execute(
+                "SELECT id, student_name, personal_id FROM students "
+                "WHERE id=?",
+                (sid,),
+            ).fetchone()
+        except Exception as _ex_sr:
+            _sys_mir.stderr.write(
+                "[paylog-mirror] student SELECT failed sid=" + str(sid)
+                + ": " + str(_ex_sr) + "\n"
+            )
+            return
+        if not srow:
+            return
+        new_name = srow[1] if not hasattr(srow, "keys") else srow["student_name"]
+        new_pid  = srow[2] if not hasattr(srow, "keys") else srow["personal_id"]
+        new_name = (str(new_name).strip() if new_name is not None else "")
+        new_pid  = (str(new_pid).strip()  if new_pid  is not None else "")
+        if not new_name:
+            return  # can't mirror an unnamed student
+
+        # 2. PRAGMA check — only attempt PID lookup/write if the
+        # column actually exists on this DB.
+        try:
+            live_cols = {r[1] for r in db.execute(
+                "PRAGMA table_info(payment_log)"
+            ).fetchall()}
+        except Exception:
+            live_cols = set()
+        has_pid_col = ("personal_id" in live_cols)
+
+        # 3. Find the matching paylog row.
+        match_id = None
+        if has_pid_col and new_pid:
+            try:
+                r = db.execute(
+                    "SELECT id FROM payment_log WHERE personal_id=? "
+                    "AND personal_id <> '' LIMIT 1",
+                    (new_pid,),
+                ).fetchone()
+                if r:
+                    match_id = r[0] if not hasattr(r, "keys") else r["id"]
+            except Exception:
+                pass
+        if (match_id is None and has_pid_col and old_pid
+                and str(old_pid).strip()
+                and str(old_pid).strip() != new_pid):
+            try:
+                r = db.execute(
+                    "SELECT id FROM payment_log WHERE personal_id=? "
+                    "AND personal_id <> '' LIMIT 1",
+                    (str(old_pid).strip(),),
+                ).fetchone()
+                if r:
+                    match_id = r[0] if not hasattr(r, "keys") else r["id"]
+            except Exception:
+                pass
+        if match_id is None:
+            try:
+                target_fold = _payment_normalize_name(new_name)
+                if target_fold:
+                    for r in db.execute(
+                        "SELECT id, student_name FROM payment_log"
+                    ).fetchall():
+                        rn = (r[1] if not hasattr(r, "keys")
+                              else r["student_name"])
+                        if _payment_normalize_name(rn) == target_fold:
+                            match_id = (r[0] if not hasattr(r, "keys")
+                                        else r["id"])
+                            break
+            except Exception:
+                pass
+        if match_id is None and old_name and old_name != new_name:
+            try:
+                target_fold = _payment_normalize_name(old_name)
+                if target_fold:
+                    for r in db.execute(
+                        "SELECT id, student_name FROM payment_log"
+                    ).fetchall():
+                        rn = (r[1] if not hasattr(r, "keys")
+                              else r["student_name"])
+                        if _payment_normalize_name(rn) == target_fold:
+                            match_id = (r[0] if not hasattr(r, "keys")
+                                        else r["id"])
+                            break
+            except Exception:
+                pass
+
+        if match_id is not None:
+            # UPDATE only the linkage columns. Installment values,
+            # course_amount, total_paid, total_remaining, msg1..5,
+            # created_at, etc., are NEVER touched.
+            try:
+                set_pairs = ['"student_name"=?']
+                params    = [new_name]
+                if has_pid_col:
+                    set_pairs.append('"personal_id"=?')
+                    params.append(new_pid if new_pid else None)
+                params.append(match_id)
+                db.execute(
+                    "UPDATE payment_log SET " + ", ".join(set_pairs)
+                    + " WHERE id=?",
+                    tuple(params),
+                )
+                db.commit()
+                _sys_mir.stderr.write(
+                    "[paylog-mirror] linked sid=" + str(sid)
+                    + " paylog_id=" + str(match_id)
+                    + " name=" + repr(new_name)
+                    + " pid=" + repr(new_pid) + "\n"
+                )
+            except Exception as _ex_upd:
+                _sys_mir.stderr.write(
+                    "[paylog-mirror] UPDATE failed sid=" + str(sid)
+                    + " paylog_id=" + str(match_id)
+                    + ": " + str(_ex_upd) + "\n"
+                )
+            return
+
+        # No match — INSERT a fresh paylog row with NULL installments.
+        try:
+            cols = ['"student_name"']
+            vals = [new_name]
+            if has_pid_col:
+                cols.append('"personal_id"')
+                vals.append(new_pid if new_pid else None)
+            ph = ",".join(["?"] * len(cols))
+            db.execute(
+                "INSERT INTO payment_log (" + ",".join(cols) + ") "
+                "VALUES (" + ph + ")",
+                tuple(vals),
+            )
+            db.commit()
+            _sys_mir.stderr.write(
+                "[paylog-mirror] created sid=" + str(sid)
+                + " name=" + repr(new_name)
+                + " pid=" + repr(new_pid) + "\n"
+            )
+        except Exception as _ex_ins:
+            _sys_mir.stderr.write(
+                "[paylog-mirror] INSERT failed sid=" + str(sid)
+                + " name=" + repr(new_name)
+                + ": " + str(_ex_ins) + "\n"
+            )
+    except Exception:
+        # Never let mirror errors propagate up to the caller.
+        pass
+
 
 def _paylog_inst_select_clause(db):
     """Return a 5-column comma-separated SELECT clause for the live
@@ -42847,6 +43516,15 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
         except Exception:
             pass
     if not pl_row:
+        try:
+            import sys as _sys_pnm
+            _sys_pnm.stderr.write(
+                "[paylog-no-match] name=" + repr(student_name)
+                + " pid=" + repr(personal_id)
+                + " (all 3 lookup steps returned None)\n"
+            )
+        except Exception:
+            pass
         return paid_by_inst, None
     for n in range(1, 6):
         v = pl_row[n]
@@ -42868,6 +43546,128 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
         **extras,
     }
     return paid_by_inst, pl_dict
+
+
+@app.route('/admin/diag/paylog-mirror-status', methods=['GET'])
+@login_required
+def admin_diag_paylog_mirror_status():
+    """Linkage-health snapshot. Counts paylog ↔ students linkage by
+    PID-only / name-only / unlinked, lists orphan paylog rows
+    (paylog rows whose name doesn't fold-match any student), and
+    lists missing-paylog students (students that have no paylog
+    row — should be 0 after paylog_create_missing_v1 runs).
+
+    Read-only; safe to hit anytime.
+    """
+    db = get_db()
+
+    try:
+        live_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(payment_log)"
+        ).fetchall()}
+    except Exception:
+        live_cols = set()
+    has_pid_col = ("personal_id" in live_cols)
+
+    try:
+        stu_total = db.execute(
+            "SELECT COUNT(*) FROM students"
+        ).fetchone()[0]
+    except Exception:
+        stu_total = 0
+    try:
+        pl_total = db.execute(
+            "SELECT COUNT(*) FROM payment_log"
+        ).fetchone()[0]
+    except Exception:
+        pl_total = 0
+
+    try:
+        stu_rows = db.execute(
+            "SELECT id, student_name, personal_id FROM students"
+        ).fetchall()
+    except Exception:
+        stu_rows = []
+    try:
+        pl_select = ("SELECT id, student_name"
+                     + (", personal_id" if has_pid_col else "")
+                     + " FROM payment_log")
+        pl_rows = db.execute(pl_select).fetchall()
+    except Exception:
+        pl_rows = []
+
+    # Build student PID + folded-name index.
+    stu_pid_to_id  = {}
+    stu_fold_to_id = {}
+    for r in stu_rows:
+        sid = r[0] if not hasattr(r, "keys") else r["id"]
+        sn  = r[1] if not hasattr(r, "keys") else r["student_name"]
+        spid = r[2] if not hasattr(r, "keys") else r["personal_id"]
+        spid_s = (str(spid).strip() if spid is not None else "")
+        if spid_s:
+            stu_pid_to_id.setdefault(spid_s, sid)
+        f = _payment_normalize_name(sn)
+        if f:
+            stu_fold_to_id.setdefault(f, sid)
+
+    # Walk paylog rows; classify each.
+    linked_by_pid       = 0
+    linked_by_name_only = 0
+    orphans             = []
+    paylog_pids_seen    = set()
+    paylog_folds_seen   = set()
+    for r in pl_rows:
+        pid_id = r[0] if not hasattr(r, "keys") else r["id"]
+        pn     = r[1] if not hasattr(r, "keys") else r["student_name"]
+        ppid   = (r[2] if has_pid_col else None)
+        if has_pid_col and not hasattr(r, "keys"):
+            pass  # ppid already r[2]
+        elif has_pid_col:
+            ppid = r["personal_id"]
+        ppid_s = (str(ppid).strip() if ppid is not None else "")
+        f = _payment_normalize_name(pn)
+        if ppid_s: paylog_pids_seen.add(ppid_s)
+        if f:      paylog_folds_seen.add(f)
+        if ppid_s and ppid_s in stu_pid_to_id:
+            linked_by_pid += 1
+        elif f and f in stu_fold_to_id:
+            linked_by_name_only += 1
+        else:
+            orphans.append({
+                "id":          pid_id,
+                "student_name": pn,
+                "personal_id": ppid_s,
+            })
+
+    # Walk students; find missing paylog rows.
+    missing = []
+    for r in stu_rows:
+        sid  = r[0] if not hasattr(r, "keys") else r["id"]
+        sn   = r[1] if not hasattr(r, "keys") else r["student_name"]
+        spid = r[2] if not hasattr(r, "keys") else r["personal_id"]
+        spid_s = (str(spid).strip() if spid is not None else "")
+        f = _payment_normalize_name(sn)
+        has_link = ((spid_s and spid_s in paylog_pids_seen)
+                    or (f and f in paylog_folds_seen))
+        if not has_link:
+            missing.append({
+                "id":          sid,
+                "student_name": sn,
+                "personal_id": spid_s,
+            })
+
+    return jsonify({
+        "ok":                  True,
+        "students_total":      stu_total,
+        "paylog_total":        pl_total,
+        "has_pid_col":         has_pid_col,
+        "linked_by_pid":       linked_by_pid,
+        "linked_by_name_only": linked_by_name_only,
+        "orphan_paylog_count": len(orphans),
+        "orphan_paylog_rows":  orphans[:50],
+        "missing_paylog_count": len(missing),
+        "missing_paylog_rows":  missing[:50],
+    })
 
 
 @app.route('/admin/diag/paylog-compare', methods=['GET'])
@@ -43393,6 +44193,7 @@ def _payment_compute_plan(db, sid):
             "personal_id":  student.get('personal_id') or '',
             "group":        student.get('group') or '',
             "group_online": student.get('group_online') or '',
+            "registration_status": student.get('registration_status') or '',
         },
         "plan": {
             "method":          method_label,
