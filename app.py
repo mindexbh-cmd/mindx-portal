@@ -4325,6 +4325,309 @@ if True:
             except Exception:
                 pass
 
+    # ── eval_attendance_pid_col_v1: ensure personal_id columns
+    # exist on both evaluations and attendance. Mirrors the
+    # paylog_pid_col_v1 pattern. Idempotent; ALTER only fires
+    # when the column is genuinely missing.
+    if "eval_attendance_pid_col_v1" not in applied:
+        try:
+            import sys as _sys_eapc
+            _sys_eapc.stderr.write(
+                "[strong-link-migration] eval_attendance_pid_col_v1 START\n"
+            )
+            _all_landed = True
+            for _tbl_eapc in ("evaluations", "attendance"):
+                try:
+                    _live_eapc = {r[1] for r in db2.execute(
+                        "PRAGMA table_info(" + _tbl_eapc + ")"
+                    ).fetchall()}
+                except Exception:
+                    _live_eapc = set()
+                    try: db2.rollback()
+                    except Exception: pass
+                if "personal_id" not in _live_eapc:
+                    try:
+                        db2.execute(
+                            "ALTER TABLE " + _tbl_eapc
+                            + " ADD COLUMN personal_id TEXT"
+                        )
+                        db2.commit()
+                        _sys_eapc.stderr.write(
+                            "[strong-link-migration] ALTER added personal_id "
+                            "to " + _tbl_eapc + "\n"
+                        )
+                    except Exception as _ex_alter_eapc:
+                        _sys_eapc.stderr.write(
+                            "[strong-link-migration] ALTER "
+                            + _tbl_eapc + " failed: "
+                            + str(_ex_alter_eapc) + "\n"
+                        )
+                        # Postgres aborts the txn on error — rollback so
+                        # the next table's ALTER can run.
+                        try: db2.rollback()
+                        except Exception: pass
+                    # PRAGMA recheck per table.
+                    try:
+                        _live_eapc2 = {r[1] for r in db2.execute(
+                            "PRAGMA table_info(" + _tbl_eapc + ")"
+                        ).fetchall()}
+                        if "personal_id" not in _live_eapc2:
+                            _all_landed = False
+                            _sys_eapc.stderr.write(
+                                "[strong-link-migration] " + _tbl_eapc
+                                + ".personal_id NOT present after ALTER — "
+                                "will retry next boot\n"
+                            )
+                    except Exception:
+                        _all_landed = False
+                        try: db2.rollback()
+                        except Exception: pass
+                else:
+                    _sys_eapc.stderr.write(
+                        "[strong-link-migration] " + _tbl_eapc
+                        + ".personal_id already present\n"
+                    )
+                # Index — only when the column actually exists. Skip
+                # silently otherwise (the next-boot retry will do it).
+                try:
+                    _live_eapc3 = {r[1] for r in db2.execute(
+                        "PRAGMA table_info(" + _tbl_eapc + ")"
+                    ).fetchall()}
+                except Exception:
+                    _live_eapc3 = set()
+                    try: db2.rollback()
+                    except Exception: pass
+                if "personal_id" in _live_eapc3:
+                    try:
+                        db2.execute(
+                            "CREATE INDEX IF NOT EXISTS idx_"
+                            + _tbl_eapc + "_personal_id ON "
+                            + _tbl_eapc + "(personal_id)"
+                        )
+                        db2.commit()
+                        _sys_eapc.stderr.write(
+                            "[strong-link-migration] CREATE INDEX idx_"
+                            + _tbl_eapc + "_personal_id OK\n"
+                        )
+                    except Exception as _ex_idx_eapc:
+                        _sys_eapc.stderr.write(
+                            "[strong-link-migration] CREATE INDEX "
+                            + _tbl_eapc + " failed: "
+                            + str(_ex_idx_eapc) + "\n"
+                        )
+                        try: db2.rollback()
+                        except Exception: pass
+            # Only stamp the tag when BOTH tables have the column —
+            # otherwise the backfill migration would skip them anyway.
+            if _all_landed:
+                try:
+                    db2.execute(
+                        "INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("eval_attendance_pid_col_v1",),
+                    )
+                    db2.commit()
+                    _sys_eapc.stderr.write(
+                        "[strong-link-migration] eval_attendance_pid_col_v1 "
+                        "DONE (tag stamped)\n"
+                    )
+                except Exception as _ex_tag_e:
+                    _sys_eapc.stderr.write(
+                        "[strong-link-migration] tag-stamp failed: "
+                        + str(_ex_tag_e) + "\n"
+                    )
+                    try: db2.rollback()
+                    except Exception: pass
+            else:
+                _sys_eapc.stderr.write(
+                    "[strong-link-migration] eval_attendance_pid_col_v1 "
+                    "PARTIAL — at least one table still missing column, "
+                    "will retry next boot\n"
+                )
+        except Exception as _ex_outer_eapc:
+            try:
+                import sys as _sys_eapc2
+                _sys_eapc2.stderr.write(
+                    "[strong-link-migration] eval_attendance_pid_col_v1 "
+                    "outer error: " + str(_ex_outer_eapc) + "\n"
+                )
+            except Exception:
+                pass
+            try: db2.rollback()
+            except Exception: pass
+
+    # ── eval_attendance_pid_backfill_v1: backfill personal_id on
+    # evaluations + attendance for rows where it's NULL/empty.
+    # Strict invariant — ONLY adds personal_id, never modifies any
+    # other column. Single-match-only (skips ambiguous + orphan).
+    if "eval_attendance_pid_backfill_v1" not in applied:
+        try:
+            import sys as _sys_eapb
+            import re as _re_eapb
+            _sys_eapb.stderr.write(
+                "[strong-link-migration] eval_attendance_pid_backfill_v1 "
+                "START\n"
+            )
+            def _eapb_fold(s):
+                if not s: return ""
+                t = str(s)
+                for _zap in ("ـ", "​", "‌", "‍",
+                             "‎", "‏", "‪", "‫",
+                             "‬", "‭", "‮", "﻿"):
+                    t = t.replace(_zap, "")
+                for k, v in (("أ","ا"),("إ","ا"),("آ","ا"),("ٱ","ا"),
+                             ("ة","ه"),("ى","ي")):
+                    t = t.replace(k, v)
+                t = _re_eapb.sub(r"[ً-ْ]", "", t)
+                t = " ".join(t.split()).strip().lower()
+                return t
+
+            try:
+                _stu_rows_eapb = db2.execute(
+                    "SELECT id, student_name, personal_id FROM students"
+                ).fetchall()
+            except Exception:
+                _stu_rows_eapb = []
+                try: db2.rollback()
+                except Exception: pass
+            _stu_by_fold_eapb = {}
+            for _r in _stu_rows_eapb:
+                _sn = _r[1] if hasattr(_r, "__getitem__") else None
+                _spid = _r[2] if hasattr(_r, "__getitem__") else None
+                _sid = _r[0] if hasattr(_r, "__getitem__") else None
+                _f = _eapb_fold(_sn)
+                if not _f: continue
+                _stu_by_fold_eapb.setdefault(_f, []).append({
+                    "id":  _sid,
+                    "pid": (str(_spid).strip()
+                            if _spid is not None else ""),
+                })
+
+            for _tbl_eapb in ("evaluations", "attendance"):
+                try:
+                    _has_pid_eapb = bool([r for r in db2.execute(
+                        "PRAGMA table_info(" + _tbl_eapb + ")"
+                    ).fetchall() if r[1] == "personal_id"])
+                except Exception:
+                    _has_pid_eapb = False
+                    try: db2.rollback()
+                    except Exception: pass
+                if not _has_pid_eapb:
+                    _sys_eapb.stderr.write(
+                        "[strong-link-migration] " + _tbl_eapb
+                        + ".personal_id column missing — skipping table\n"
+                    )
+                    continue
+                try:
+                    _rows_eapb = db2.execute(
+                        "SELECT id, student_name, personal_id FROM "
+                        + _tbl_eapb
+                    ).fetchall()
+                except Exception as _ex_sel:
+                    _rows_eapb = []
+                    _sys_eapb.stderr.write(
+                        "[strong-link-migration] " + _tbl_eapb
+                        + " SELECT failed: " + str(_ex_sel) + "\n"
+                    )
+                    try: db2.rollback()
+                    except Exception: pass
+                _backfilled = 0
+                _already_set = 0
+                _ambiguous = 0
+                _orphans = 0
+                for _r in _rows_eapb:
+                    _rid = _r[0] if hasattr(_r, "__getitem__") else None
+                    _sn = _r[1] if hasattr(_r, "__getitem__") else None
+                    _existing_pid = _r[2] if hasattr(_r, "__getitem__") else None
+                    if _existing_pid is not None and \
+                            str(_existing_pid).strip():
+                        _already_set += 1
+                        continue
+                    _f = _eapb_fold(_sn)
+                    if not _f:
+                        _orphans += 1
+                        continue
+                    _candidates = _stu_by_fold_eapb.get(_f, [])
+                    _eligible = [c for c in _candidates if c["pid"]]
+                    if len(_eligible) == 1:
+                        try:
+                            db2.execute(
+                                "UPDATE " + _tbl_eapb
+                                + " SET personal_id = ? WHERE id = ?",
+                                (_eligible[0]["pid"], _rid),
+                            )
+                            _backfilled += 1
+                        except Exception as _ex_upd:
+                            _sys_eapb.stderr.write(
+                                "[" + _tbl_eapb
+                                + "-pid-backfill-v1] UPDATE failed "
+                                "id=" + str(_rid) + ": "
+                                + str(_ex_upd) + "\n"
+                            )
+                            # Postgres aborts the txn on error — rollback
+                            # so the loop can continue with the next row.
+                            try: db2.rollback()
+                            except Exception: pass
+                    elif len(_eligible) > 1:
+                        _ambiguous += 1
+                        _sys_eapb.stderr.write(
+                            "[" + _tbl_eapb + "-ambiguous-v1] "
+                            + _tbl_eapb + ".id=" + str(_rid)
+                            + " name=" + repr(_sn)
+                            + " matches=" + str(len(_eligible))
+                            + " pids="
+                            + repr([c["pid"] for c in _eligible[:5]])
+                            + "\n"
+                        )
+                    else:
+                        _orphans += 1
+                        _sys_eapb.stderr.write(
+                            "[" + _tbl_eapb + "-orphan-v1] "
+                            + _tbl_eapb + ".id=" + str(_rid)
+                            + " name=" + repr(_sn)
+                            + " — no student match\n"
+                        )
+                if _backfilled:
+                    try: db2.commit()
+                    except Exception: pass
+                _sys_eapb.stderr.write(
+                    "[" + _tbl_eapb + "-pid-backfill-v1] tally:"
+                    + " backfilled=" + str(_backfilled)
+                    + " already_set=" + str(_already_set)
+                    + " ambiguous=" + str(_ambiguous)
+                    + " orphan=" + str(_orphans)
+                    + " total=" + str(len(_rows_eapb))
+                    + " other_columns_modified=0"
+                    + "\n"
+                )
+            try:
+                db2.execute(
+                    "INSERT INTO schema_migrations(tag) VALUES(?)",
+                    ("eval_attendance_pid_backfill_v1",),
+                )
+                db2.commit()
+                _sys_eapb.stderr.write(
+                    "[strong-link-migration] eval_attendance_pid_backfill_v1 "
+                    "DONE (tag stamped)\n"
+                )
+            except Exception as _ex_tag_b:
+                _sys_eapb.stderr.write(
+                    "[strong-link-migration] tag-stamp failed: "
+                    + str(_ex_tag_b) + "\n"
+                )
+                try: db2.rollback()
+                except Exception: pass
+        except Exception as _ex_outer_eapb:
+            try:
+                import sys as _sys_eapb2
+                _sys_eapb2.stderr.write(
+                    "[strong-link-migration] eval_attendance_pid_backfill_v1 "
+                    "outer error: " + str(_ex_outer_eapb) + "\n"
+                )
+            except Exception:
+                pass
+            try: db2.rollback()
+            except Exception: pass
+
     # Global "حالة المركز" mode + per-row class_duration / class_type
     # on attendance. The INSERT/UPDATE for attendance is already
     # dynamic (whitelisted against PRAGMA table_info) so adding these
@@ -23409,6 +23712,12 @@ def api_students_update(sid):
             _paylog_mirror_for_student(db, sid, _old_name, _old_pid)
         except Exception:
             pass
+        # Mirror name/PID changes into evaluations + attendance rows.
+        # Same best-effort, same "linkage only" invariant.
+        try:
+            _eval_attendance_mirror_for_student(db, sid, _old_name, _old_pid)
+        except Exception:
+            pass
         return jsonify({"ok": True, "updated_columns": [c for c in cols if c in d]})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
@@ -28069,6 +28378,18 @@ def api_evaluations_get():
 def api_evaluations_add():
     d = request.get_json() or {}
     db = get_db()
+    # Auto-bind to student via personal_id at write time so future
+    # name edits don't break linkage. Only set when not already
+    # provided in the body.
+    try:
+        if not (d.get("personal_id") or "").strip() if isinstance(d.get("personal_id"), str) else not d.get("personal_id"):
+            _resolved = _strong_link_resolve_pid(
+                db, d.get("student_id"), d.get("student_name"),
+            )
+            if _resolved:
+                d["personal_id"] = _resolved
+    except Exception:
+        pass
     try:
         cols = _evaluations_writable_cols(db)
         placeholders = ",".join(["?"] * len(cols))
@@ -37704,12 +38025,21 @@ def api_teacher_attendance_save():
         # group references.
         try:
             sid_lookup = db.execute(
-                "SELECT id FROM students WHERE TRIM(student_name)=TRIM(?) LIMIT 1",
+                "SELECT id, personal_id FROM students "
+                "WHERE TRIM(student_name)=TRIM(?) LIMIT 1",
                 (sname,),
             ).fetchone()
         except Exception:
             sid_lookup = None
         _sid = sid_lookup[0] if sid_lookup else None
+        # Bind the new attendance row to the student via personal_id
+        # so future student-name edits don't break linkage.
+        try:
+            _spid_t = (sid_lookup[1] if sid_lookup else None)
+            if _spid_t is not None and str(_spid_t).strip():
+                body["personal_id"] = str(_spid_t).strip()
+        except Exception:
+            pass
         _override_dur = (raw.get("class_duration") or "").strip() if isinstance(raw, dict) else ""
         _override_typ = (raw.get("class_type")     or "").strip() if isinstance(raw, dict) else ""
         if _override_dur or _override_typ:
@@ -37847,6 +38177,17 @@ def api_attendance_add():
     d = request.get_json() or {}
     body = _attendance_normalize_body(d)
     db = get_db()
+    # Auto-bind to student via personal_id at write time so future
+    # name edits don't break linkage. Only set when not already in body.
+    try:
+        if not (body.get("personal_id") or "").strip():
+            _resolved = _strong_link_resolve_pid(
+                db, body.get("student_id"), body.get("student_name"),
+            )
+            if _resolved:
+                body["personal_id"] = _resolved
+    except Exception:
+        pass
     try:
         sname = body.get("student_name") or ""
         sdate = body.get("attendance_date") or ""
@@ -40460,7 +40801,7 @@ IMPORT_TABLE_FIELDS = {
         "online_time_normal","online_time_ramadan",
     ],
     "attendance": [
-        "attendance_date","day_name","group_name","student_name","contact_number",
+        "attendance_date","day_name","group_name","student_name","personal_id","contact_number",
         "status","message","message_status","study_status",
     ],
     "taqseet": [
@@ -40474,7 +40815,7 @@ IMPORT_TABLE_FIELDS = {
         "عدد_ساعات_الدراسة","تاريخ_بدء_الدورة","تاريخ_انتهاء_الدورة",
     ],
     "evaluations": [
-        "form_fill_date","group_name","student_name","class_participation",
+        "form_fill_date","group_name","student_name","personal_id","class_participation",
         "general_behavior","behavior_notes","reading","dictation",
         "term_meanings","conversation","expression","grammar","notes",
     ],
@@ -42247,6 +42588,20 @@ def _perform_import(table, rows, auto_create, db, column_labels=None,
                 db.execute(sql_up, tuple([norm[c] for c in set_cols] + [existing_id]))
                 updated += 1
             else:
+                # Auto-bind evaluations + attendance rows to a student
+                # via personal_id at INSERT time so future name edits
+                # don't break linkage. Only fills when the row's
+                # personal_id is empty AND a unique student matches.
+                if table in ("evaluations", "attendance"):
+                    if not (norm.get("personal_id") or "").strip():
+                        try:
+                            _resolved_pid_imp = _strong_link_resolve_pid(
+                                db, None, norm.get("student_name"),
+                            )
+                        except Exception:
+                            _resolved_pid_imp = ""
+                        if _resolved_pid_imp:
+                            norm["personal_id"] = _resolved_pid_imp
                 values = [norm.get(f, "") for f in fields]
                 # Empty personal_id -> NULL so UNIQUE(personal_id) treats
                 # blank-ID rows as distinct. Only matters for students here.
@@ -43168,6 +43523,202 @@ def _payment_load_student(db, sid):
     }
     return d
 
+def _strong_link_resolve_pid(db, student_id=None, student_name=None):
+    """Look up a student's personal_id given student_id (preferred) or
+    student_name. Returns the resolved PID string, or "" when no
+    student matches / multiple match (ambiguous). Used by INSERT
+    paths on evaluations + attendance to populate personal_id at
+    write time so future name edits don't break linkage.
+
+    Best-effort, never raises.
+    """
+    try:
+        if student_id is not None:
+            try:
+                _sid_int = int(student_id)
+            except Exception:
+                _sid_int = None
+            if _sid_int is not None:
+                try:
+                    r = db.execute(
+                        "SELECT personal_id FROM students WHERE id=?",
+                        (_sid_int,),
+                    ).fetchone()
+                    if r:
+                        v = r[0] if not hasattr(r, "keys") else r["personal_id"]
+                        if v is not None and str(v).strip():
+                            return str(v).strip()
+                except Exception:
+                    pass
+        if student_name and str(student_name).strip():
+            target = _payment_normalize_name(student_name)
+            if not target:
+                return ""
+            try:
+                rows = db.execute(
+                    "SELECT id, student_name, personal_id FROM students"
+                ).fetchall()
+            except Exception:
+                rows = []
+            matches = []
+            for r in rows:
+                rn = r[1] if not hasattr(r, "keys") else r["student_name"]
+                rp = r[2] if not hasattr(r, "keys") else r["personal_id"]
+                if _payment_normalize_name(rn) == target:
+                    pid = (str(rp).strip()
+                           if rp is not None and str(rp).strip()
+                           else "")
+                    if pid:
+                        matches.append(pid)
+            # Single match → return it. Ambiguous → return "" so the
+            # caller doesn't bind to the wrong student.
+            if len(matches) == 1:
+                return matches[0]
+        return ""
+    except Exception:
+        return ""
+
+
+def _eval_attendance_mirror_for_student(db, sid, old_name=None, old_pid=None):
+    """Mirror student rename / PID change into evaluations + attendance.
+
+    Strict invariant per the user's spec:
+      - Only updates student_name + personal_id columns. NEVER
+        touches scores, behavior notes, attendance status, dates,
+        or any other column on existing rows.
+      - Match strategy:
+          a) By NEW PID — if rows already have it (post-backfill).
+          b) By OLD PID — if a PID is being changed.
+          c) By folded NEW name — for rows whose PID is still NULL.
+          d) By folded OLD name — when both name + PID changed.
+      - Never deletes.
+
+    Returns dict {table: rows_updated} for the [name-sync] log.
+    """
+    out = {"evaluations": 0, "attendance": 0}
+    try:
+        import sys as _sys_eam
+        try:
+            srow = db.execute(
+                "SELECT id, student_name, personal_id FROM students "
+                "WHERE id=?",
+                (sid,),
+            ).fetchone()
+        except Exception:
+            srow = None
+        if not srow:
+            return out
+        new_name = srow[1] if not hasattr(srow, "keys") else srow["student_name"]
+        new_pid  = srow[2] if not hasattr(srow, "keys") else srow["personal_id"]
+        new_name_s = (str(new_name).strip()
+                      if new_name is not None else "")
+        new_pid_s  = (str(new_pid).strip()
+                      if new_pid is not None else "")
+        if not new_name_s and not new_pid_s:
+            return out
+
+        target_fold_new = _payment_normalize_name(new_name_s)
+        target_fold_old = (_payment_normalize_name(old_name)
+                           if old_name and old_name != new_name_s else "")
+
+        for tbl in ("evaluations", "attendance"):
+            try:
+                live_cols = {r[1] for r in db.execute(
+                    "PRAGMA table_info(" + tbl + ")"
+                ).fetchall()}
+            except Exception:
+                live_cols = set()
+            if "student_name" not in live_cols:
+                continue
+            has_pid_col = ("personal_id" in live_cols)
+
+            # Collect candidate row ids (deduped). Prefer PID match
+            # so a rename collision can't mis-link.
+            ids_to_update = set()
+            if has_pid_col and new_pid_s:
+                try:
+                    for r in db.execute(
+                        "SELECT id FROM " + tbl
+                        + " WHERE personal_id = ?",
+                        (new_pid_s,),
+                    ).fetchall():
+                        ids_to_update.add(
+                            r[0] if not hasattr(r, "keys") else r["id"]
+                        )
+                except Exception:
+                    pass
+            if (has_pid_col and old_pid and str(old_pid).strip()
+                    and str(old_pid).strip() != new_pid_s):
+                try:
+                    for r in db.execute(
+                        "SELECT id FROM " + tbl
+                        + " WHERE personal_id = ?",
+                        (str(old_pid).strip(),),
+                    ).fetchall():
+                        ids_to_update.add(
+                            r[0] if not hasattr(r, "keys") else r["id"]
+                        )
+                except Exception:
+                    pass
+            # Name-fold sweeps — only used when row's PID is NULL,
+            # otherwise PID is the source of truth.
+            if target_fold_new or target_fold_old:
+                try:
+                    for r in db.execute(
+                        "SELECT id, student_name, personal_id FROM "
+                        + tbl
+                        + " WHERE personal_id IS NULL "
+                        + "OR personal_id = ''"
+                    ).fetchall():
+                        rid = r[0] if not hasattr(r, "keys") else r["id"]
+                        rn  = r[1] if not hasattr(r, "keys") else r["student_name"]
+                        rfold = _payment_normalize_name(rn)
+                        if (target_fold_new and rfold == target_fold_new) \
+                                or (target_fold_old
+                                    and rfold == target_fold_old):
+                            ids_to_update.add(rid)
+                except Exception:
+                    pass
+
+            if not ids_to_update:
+                continue
+            # UPDATE only linkage columns. Never modifies scores,
+            # status, dates, notes, or anything else.
+            set_pairs = ['"student_name"=?']
+            params_template = [new_name_s]
+            if has_pid_col:
+                set_pairs.append('"personal_id"=?')
+                params_template.append(new_pid_s if new_pid_s else None)
+            for rid in ids_to_update:
+                try:
+                    db.execute(
+                        "UPDATE " + tbl
+                        + " SET " + ", ".join(set_pairs)
+                        + " WHERE id=?",
+                        tuple(params_template) + (rid,),
+                    )
+                    out[tbl] += 1
+                except Exception as _ex_u:
+                    _sys_eam.stderr.write(
+                        "[name-sync] UPDATE " + tbl
+                        + " id=" + str(rid)
+                        + " failed: " + str(_ex_u) + "\n"
+                    )
+            try: db.commit()
+            except Exception: pass
+        if out["evaluations"] or out["attendance"]:
+            _sys_eam.stderr.write(
+                "[name-sync] student_id=" + str(sid)
+                + " evaluations_updated=" + str(out["evaluations"])
+                + " attendance_updated=" + str(out["attendance"])
+                + " new_name=" + repr(new_name_s)
+                + " new_pid=" + repr(new_pid_s) + "\n"
+            )
+    except Exception:
+        pass
+    return out
+
+
 def _paylog_mirror_for_student(db, sid, old_name=None, old_pid=None):
     """Keep payment_log linkage in sync with students for ONE student.
 
@@ -43546,6 +44097,98 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
         **extras,
     }
     return paid_by_inst, pl_dict
+
+
+@app.route('/admin/diag/strong-link-status', methods=['GET'])
+@login_required
+def admin_diag_strong_link_status():
+    """Linkage-health snapshot for ALL three strong-linked tables
+    (payment_log, evaluations, attendance) in one place. Per table:
+
+      - total                 — row count
+      - linked_by_pid         — PID populated AND matches a student
+      - linked_by_name_only   — PID empty/NULL but folded name
+                                matches exactly one student
+      - orphan                — no student match by PID OR name
+      - ambiguous             — folded name fold-matches >1 student
+                                (admin must disambiguate)
+
+    Read-only; safe to hit anytime.
+    """
+    db = get_db()
+
+    try:
+        stu_rows = db.execute(
+            "SELECT id, student_name, personal_id FROM students"
+        ).fetchall()
+    except Exception:
+        stu_rows = []
+
+    stu_pids = set()
+    stu_fold_count = {}
+    for r in stu_rows:
+        spid = r[2] if not hasattr(r, "keys") else r["personal_id"]
+        sn   = r[1] if not hasattr(r, "keys") else r["student_name"]
+        spid_s = (str(spid).strip() if spid is not None else "")
+        if spid_s:
+            stu_pids.add(spid_s)
+        f = _payment_normalize_name(sn)
+        if f:
+            stu_fold_count[f] = stu_fold_count.get(f, 0) + 1
+
+    def _stats_for(table):
+        try:
+            live = {r[1] for r in db.execute(
+                "PRAGMA table_info(" + table + ")"
+            ).fetchall()}
+        except Exception:
+            live = set()
+        has_pid = ("personal_id" in live)
+        try:
+            sel = ("SELECT student_name"
+                   + (", personal_id" if has_pid else "")
+                   + " FROM " + table)
+            rows = db.execute(sel).fetchall()
+        except Exception:
+            rows = []
+        total = len(rows)
+        by_pid = 0
+        by_name = 0
+        orphan = 0
+        ambiguous = 0
+        for r in rows:
+            sn  = r[0] if not hasattr(r, "keys") else r["student_name"]
+            ppid = (r[1] if has_pid else None) if not hasattr(r, "keys") else \
+                   (r["personal_id"] if has_pid else None)
+            ppid_s = (str(ppid).strip() if ppid is not None else "")
+            if ppid_s and ppid_s in stu_pids:
+                by_pid += 1; continue
+            f = _payment_normalize_name(sn)
+            if not f:
+                orphan += 1; continue
+            cnt = stu_fold_count.get(f, 0)
+            if cnt == 1:
+                by_name += 1
+            elif cnt >= 2:
+                ambiguous += 1
+            else:
+                orphan += 1
+        return {
+            "total": total,
+            "has_pid_col": has_pid,
+            "linked_by_pid": by_pid,
+            "linked_by_name_only": by_name,
+            "orphan": orphan,
+            "ambiguous": ambiguous,
+        }
+
+    return jsonify({
+        "ok":            True,
+        "students_total": len(stu_rows),
+        "payment_log":   _stats_for("payment_log"),
+        "evaluations":   _stats_for("evaluations"),
+        "attendance":    _stats_for("attendance"),
+    })
 
 
 @app.route('/admin/diag/paylog-mirror-status', methods=['GET'])
@@ -50780,16 +51423,47 @@ def api_portal_student_attendance():
         return jsonify({"ok": False, "error": "student record missing"}), 404
     sd = dict(srow)
     name = (sd.get("student_name") or "").strip()
-    # Pull every row keyed by student_name (legacy data has no FK to
-    # student_id). Filter Python-side so whitespace/normalisation
-    # quirks the existing _att_normalize_date helper handles cleanly.
+    pid  = (sd.get("personal_id") or "").strip()
+    # Strong-linkage reader: try PID first (now reliably populated
+    # post-eval_attendance_pid_backfill_v1), fall back to folded
+    # student_name. Both run independently so a partial schema
+    # (PID column missing on legacy DB) still returns rows via
+    # the name fallback. Whitespace/normalisation quirks are
+    # handled Python-side via _att_normalize_date below.
+    rows = []
+    seen_ids = set()
     try:
-        rows = db.execute(
+        att_live = {r[1] for r in db.execute(
+            "PRAGMA table_info(attendance)"
+        ).fetchall()}
+    except Exception:
+        att_live = set()
+    has_pid_col_a = ("personal_id" in att_live)
+    if has_pid_col_a and pid:
+        try:
+            for r in db.execute(
+                "SELECT id, attendance_date, group_name, student_name, status, "
+                "       day_name, message, message_status "
+                "FROM attendance WHERE personal_id = ?",
+                (pid,),
+            ).fetchall():
+                _rid = r[0] if not hasattr(r, "keys") else r["id"]
+                if _rid in seen_ids: continue
+                seen_ids.add(_rid)
+                rows.append(r)
+        except Exception:
+            pass
+    try:
+        for r in db.execute(
             "SELECT id, attendance_date, group_name, student_name, status, "
             "       day_name, message, message_status "
             "FROM attendance WHERE TRIM(student_name)=TRIM(?)",
             (name,),
-        ).fetchall()
+        ).fetchall():
+            _rid = r[0] if not hasattr(r, "keys") else r["id"]
+            if _rid in seen_ids: continue
+            seen_ids.add(_rid)
+            rows.append(r)
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
     STATUS_PRESENT = "حاضر"
@@ -55319,18 +55993,45 @@ def api_mev_create():
                             cols[-len(_EV_SCORE_FIELDS):])
     # Build the INSERT manually so the ORDER stays explicit and the
     # placeholders count matches.
-    sql = (
-        "INSERT INTO evaluations(evaluation_date,evaluation_month,group_name,"
-        "student_id,student_name,teacher_id,teacher_name,"
-        "notes_behavior,notes_language,general_notes,"
-        "overall_score,released_to_parent,is_deleted,form_fill_date,"
-        "created_at,updated_at," + ",".join(_EV_SCORE_FIELDS) + ") "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,0,0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP," +
-        ",".join("?" for _ in _EV_SCORE_FIELDS) + ")"
-    )
-    params = [eval_date, eval_month, group_name, student_id, student_name,
-              teacher_id, teacher_name, notes_behavior, notes_language,
-              general_notes, overall, eval_date]
+    # Resolve personal_id at write time so future name edits don't
+    # break linkage. Add to INSERT only when the live schema has
+    # the column (post-eval_attendance_pid_col_v1) so legacy DBs
+    # without the migration still succeed.
+    _ev_personal_id = _strong_link_resolve_pid(db, student_id, student_name)
+    try:
+        _ev_live_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(evaluations)"
+        ).fetchall()}
+    except Exception:
+        _ev_live_cols = set()
+    _ev_has_pid = ("personal_id" in _ev_live_cols)
+    if _ev_has_pid:
+        sql = (
+            "INSERT INTO evaluations(evaluation_date,evaluation_month,group_name,"
+            "student_id,student_name,personal_id,teacher_id,teacher_name,"
+            "notes_behavior,notes_language,general_notes,"
+            "overall_score,released_to_parent,is_deleted,form_fill_date,"
+            "created_at,updated_at," + ",".join(_EV_SCORE_FIELDS) + ") "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP," +
+            ",".join("?" for _ in _EV_SCORE_FIELDS) + ")"
+        )
+        params = [eval_date, eval_month, group_name, student_id, student_name,
+                  (_ev_personal_id or None),
+                  teacher_id, teacher_name, notes_behavior, notes_language,
+                  general_notes, overall, eval_date]
+    else:
+        sql = (
+            "INSERT INTO evaluations(evaluation_date,evaluation_month,group_name,"
+            "student_id,student_name,teacher_id,teacher_name,"
+            "notes_behavior,notes_language,general_notes,"
+            "overall_score,released_to_parent,is_deleted,form_fill_date,"
+            "created_at,updated_at," + ",".join(_EV_SCORE_FIELDS) + ") "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,0,0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP," +
+            ",".join("?" for _ in _EV_SCORE_FIELDS) + ")"
+        )
+        params = [eval_date, eval_month, group_name, student_id, student_name,
+                  teacher_id, teacher_name, notes_behavior, notes_language,
+                  general_notes, overall, eval_date]
     for k in _EV_SCORE_FIELDS:
         params.append(score_vals[k])
     try:
