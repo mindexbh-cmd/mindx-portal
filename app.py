@@ -7398,7 +7398,7 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M3 10v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9z"/><path d="M3 10h18"/></svg>
           &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#x627;&#x644;&#x646;&#x634;&#x637;&#x629; &#x627;&#x644;&#x64A;&#x648;&#x645;
         </h3>
-        <a class="md-panel-link" href="/groups">&#x639;&#x631;&#x636; &#x627;&#x644;&#x643;&#x644;</a>
+        <a class="md-panel-link" href="/groups" id="md-groups-today-viewall" onclick="event.preventDefault(); openActiveGroupsModal();">&#x639;&#x631;&#x636; &#x627;&#x644;&#x643;&#x644;</a>
       </div>
       <ul class="md-panel-list" id="md-groups-today-list">
         <li class="md-panel-empty">&#x62C;&#x627;&#x631;&#x64A; &#x627;&#x644;&#x62A;&#x62D;&#x645;&#x64A;&#x644;...</li>
@@ -7474,6 +7474,334 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
         var ul = document.getElementById('md-groups-today-list');
         if (ul) ul.innerHTML = '<li class="md-panel-empty">تعذر التحميل</li>';
       });
+  })();
+  </script>
+  <!-- جميع المجموعات النشطة — read-only modal opened by عرض الكل
+       on the dashboard's "المجموعات النشطة اليوم" panel. Shows every
+       active group with search + drill-down to that group's full
+       student roster. Backed by /api/dashboard/active-groups-detailed
+       (purely SELECT — no mutations). Closed by × button or backdrop. -->
+  <style>
+    .agm-back { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:11030;
+      display:none; align-items:center; justify-content:center; padding:18px; direction:rtl; }
+    .agm-back.open { display:flex; }
+    .agm-modal { background:#fff; border-radius:16px; width:min(800px,95vw);
+      max-height:85vh; display:flex; flex-direction:column;
+      box-shadow:0 18px 60px rgba(0,0,0,.35); overflow:hidden; }
+    .agm-head { background:linear-gradient(135deg,#6B3FA0,#8B5CC8); color:#fff;
+      padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .agm-title { font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:10px; }
+    .agm-close { background:none; border:none; color:#fff; font-size:1.7rem; line-height:1;
+      cursor:pointer; padding:0 4px; }
+    .agm-close:hover { opacity:.85; }
+    .agm-search-wrap { padding:12px 20px; background:#faf7ff; border-bottom:1px solid #ede7f6; }
+    .agm-search { width:100%; padding:10px 14px; border:1.5px solid #c4a8e8;
+      border-radius:10px; font-size:14px; font-weight:600; background:#fff; outline:none;
+      direction:rtl; font-family:inherit; }
+    .agm-search:focus { border-color:#6B3FA0; box-shadow:0 0 0 3px rgba(107,63,160,.12); }
+    .agm-body { flex:1 1 auto; overflow-y:auto; padding:14px 20px 20px; background:#faf9fc; }
+    .agm-empty { text-align:center; color:#8e7cb8; font-weight:600; padding:30px 12px; }
+    .agm-card { background:#fff; border:1.5px solid #ede7f6; border-radius:12px;
+      padding:13px 16px; margin-bottom:10px; cursor:pointer;
+      transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+    .agm-card:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(107,63,160,.12);
+      border-color:#c4a8e8; }
+    .agm-card-row1 { display:flex; align-items:center; justify-content:space-between;
+      gap:8px; flex-wrap:wrap; }
+    .agm-card-name { font-size:1.05rem; font-weight:800; color:#2a1d4a; }
+    .agm-pills { display:flex; gap:6px; flex-wrap:wrap; }
+    .agm-pill { font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:999px;
+      background:#ede7f6; color:#4527a0; }
+    .agm-pill-today { background:#e8f5e9; color:#1b5e20; }
+    .agm-pill-count { background:#e0f2f1; color:#00695c; }
+    .agm-card-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
+      font-size:13px; color:#5d4f78; font-weight:600; }
+    .agm-card-meta-item { display:inline-flex; align-items:center; gap:5px; }
+    .agm-card-meta-icon { opacity:.7; }
+    .agm-card-link { color:#1976D2; font-size:12.5px; text-decoration:none; word-break:break-all; }
+    .agm-card-link:hover { text-decoration:underline; }
+    /* Drill-down view */
+    .agm-detail-back { background:none; border:1px solid #c4a8e8; color:#6B3FA0;
+      padding:7px 14px; border-radius:9px; font-weight:700; cursor:pointer;
+      font-family:inherit; font-size:13px; margin-bottom:12px; }
+    .agm-detail-back:hover { background:#ede7f6; }
+    .agm-detail-name { font-size:1.2rem; font-weight:800; color:#2a1d4a; margin-bottom:6px; }
+    .agm-detail-fields { background:#fff; border:1.5px solid #ede7f6; border-radius:12px;
+      padding:12px 16px; margin-bottom:14px; }
+    .agm-field-row { display:flex; gap:8px; padding:5px 0; font-size:13px;
+      border-bottom:1px dashed #f0ebf8; }
+    .agm-field-row:last-child { border-bottom:none; }
+    .agm-field-label { color:#7e6db1; font-weight:700; min-width:140px; flex-shrink:0; }
+    .agm-field-value { color:#2a1d4a; font-weight:600; word-break:break-word; flex:1; }
+    .agm-students-head { font-size:0.95rem; font-weight:800; color:#4a3c5e; margin:6px 0 8px;
+      display:flex; align-items:center; justify-content:space-between; }
+    .agm-students-list { background:#fff; border:1.5px solid #ede7f6; border-radius:12px;
+      overflow:hidden; }
+    .agm-stu-row { display:flex; align-items:center; gap:10px; padding:9px 14px;
+      border-bottom:1px solid #f5f1fa; text-decoration:none; color:#2a1d4a;
+      transition:background .12s ease; }
+    .agm-stu-row:last-child { border-bottom:none; }
+    .agm-stu-row:hover { background:#faf7ff; }
+    .agm-stu-num { color:#a78dd9; font-weight:700; font-size:12px; min-width:24px; text-align:center; }
+    .agm-stu-name { flex:1; font-weight:700; }
+    .agm-stu-pid { color:#8e7cb8; font-size:12px; font-weight:600; }
+    @media (max-width: 640px) {
+      .agm-modal { width:100vw; max-width:100vw; max-height:100vh; border-radius:0; }
+      .agm-back { padding:0; }
+      .agm-card-meta { font-size:12.5px; gap:8px; }
+      .agm-field-label { min-width:110px; }
+    }
+  </style>
+  <div class="agm-back" id="agmBack" role="dialog" aria-modal="true"
+       aria-labelledby="agmTitle">
+    <div class="agm-modal">
+      <div class="agm-head">
+        <div class="agm-title" id="agmTitle">
+          <span aria-hidden="true">&#x1F4DA;</span>
+          <span>&#x062C;&#x0645;&#x064A;&#x0639; &#x0627;&#x0644;&#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A; &#x0627;&#x0644;&#x0646;&#x0634;&#x0637;&#x0629;</span>
+        </div>
+        <button type="button" class="agm-close" aria-label="Close" id="agmCloseBtn">&times;</button>
+      </div>
+      <div class="agm-search-wrap" id="agmSearchWrap">
+        <input id="agmSearch" class="agm-search" type="search" autocomplete="off"
+               placeholder="&#x0627;&#x0628;&#x062D;&#x062B; &#x0639;&#x0646; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0629;&#x060C; &#x0645;&#x0639;&#x0644;&#x0645;&#x0629;&#x060C; &#x0648;&#x0642;&#x062A;...">
+      </div>
+      <div class="agm-body" id="agmBody">
+        <div class="agm-empty">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    /* جميع المجموعات النشطة — read-only modal. Single fetch on first
+       open caches the response; subsequent opens reuse the cache so
+       the search field stays responsive even on slow networks. */
+    var AGM_GROUPS = null;          /* fetched array */
+    var AGM_LOADING = false;
+    var AGM_VIEW = 'list';          /* 'list' or 'detail' */
+    var AGM_DETAIL_ID = null;
+    function agmEsc(s){
+      return String(s==null?'':s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    /* Same Arabic-fold semantics as _grp_norm on the server side:
+       NFC + alif/ya/taa-marbuta + tashkeel removal + casefold. */
+    function agmFold(s){
+      var t = String(s==null?'':s).replace(/^﻿/,'');
+      try { t = t.normalize('NFKD'); } catch(_e){}
+      return t
+        .toLowerCase()
+        .replace(/[ؐ-ًؚ-ٰٟۖ-ۭ]/g,'')
+        .replace(/[​-‏‪-‮⁠﻿]/g,'')
+        .replace(/ـ/g,'')
+        .replace(/[ ]/g,' ')
+        .replace(/[أإآٱ]/g,'ا')
+        .replace(/ة/g,'ه')
+        .replace(/ى/g,'ي')
+        .replace(/\s+/g,' ').trim();
+    }
+    function agmOpenModal(){
+      var bk = document.getElementById('agmBack');
+      if (!bk) return;
+      bk.classList.add('open');
+      AGM_VIEW = 'list';
+      AGM_DETAIL_ID = null;
+      var sw = document.getElementById('agmSearchWrap');
+      if (sw) sw.style.display = '';
+      var search = document.getElementById('agmSearch');
+      if (search) search.value = '';
+      if (AGM_GROUPS === null && !AGM_LOADING) {
+        AGM_LOADING = true;
+        var body = document.getElementById('agmBody');
+        if (body) body.innerHTML = '<div class="agm-empty">&#x062C;&#x0627;&#x0631;&#x064A; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;...</div>';
+        fetch('/api/dashboard/active-groups-detailed', {credentials:'include'})
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            AGM_GROUPS = (j && j.ok && Array.isArray(j.groups)) ? j.groups : [];
+            AGM_LOADING = false;
+            agmRenderList('');
+          })
+          .catch(function(){
+            AGM_GROUPS = [];
+            AGM_LOADING = false;
+            var b = document.getElementById('agmBody');
+            if (b) b.innerHTML = '<div class="agm-empty" style="color:#c62828;">&#x062A;&#x0639;&#x0630;&#x0631; &#x0627;&#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644;</div>';
+          });
+      } else if (AGM_GROUPS) {
+        agmRenderList('');
+      }
+    }
+    window.openActiveGroupsModal = agmOpenModal;
+    function agmCloseModal(){
+      var bk = document.getElementById('agmBack');
+      if (bk) bk.classList.remove('open');
+    }
+    function agmRenderList(query){
+      var body = document.getElementById('agmBody');
+      if (!body) return;
+      var sw = document.getElementById('agmSearchWrap');
+      if (sw) sw.style.display = '';
+      var groups = AGM_GROUPS || [];
+      var q = agmFold(query || '');
+      var filtered = groups;
+      if (q) {
+        filtered = groups.filter(function(g){
+          var hay = agmFold([
+            g.group_name||'', g.teacher_name||'', g.study_time||'',
+            g.days||'', g.study_days||'', g.level_course||'',
+            g.online_time||'', g.ramadan_time||'', g.group_link||''
+          ].join(' '));
+          return hay.indexOf(q) >= 0;
+        });
+      }
+      if (!filtered.length) {
+        body.innerHTML = '<div class="agm-empty">&#x0644;&#x0627; &#x062A;&#x0648;&#x062C;&#x062F; &#x0645;&#x062C;&#x0645;&#x0648;&#x0639;&#x0627;&#x062A;</div>';
+        return;
+      }
+      var html = filtered.map(function(g){
+        var teacher = (g.teacher_name||'').trim();
+        if (teacher && teacher.indexOf('أ.') !== 0) teacher = 'أ. ' + teacher;
+        var time  = agmEsc((g.study_time || g.online_time || g.ramadan_time || '').trim());
+        var days  = agmEsc((g.days || g.study_days || '').trim());
+        var grade = agmEsc((g.level_course || '').trim());
+        var link  = (g.group_link || '').trim();
+        var pills = '';
+        if (g.is_today) pills += '<span class="agm-pill agm-pill-today">&#x0627;&#x0644;&#x064A;&#x0648;&#x0645;</span>';
+        pills += '<span class="agm-pill agm-pill-count">' + (g.student_count||0) + ' &#x0637;&#x0627;&#x0644;&#x0628;</span>';
+        var meta = [];
+        if (teacher) meta.push('<span class="agm-card-meta-item"><span class="agm-card-meta-icon">&#x1F469;&#x200D;&#x1F3EB;</span>' + agmEsc(teacher) + '</span>');
+        if (time)    meta.push('<span class="agm-card-meta-item"><span class="agm-card-meta-icon">&#x23F0;</span>' + time + '</span>');
+        if (days)    meta.push('<span class="agm-card-meta-item"><span class="agm-card-meta-icon">&#x1F4C5;</span>' + days + '</span>');
+        if (grade)   meta.push('<span class="agm-card-meta-item"><span class="agm-card-meta-icon">&#x1F393;</span>' + grade + '</span>');
+        var linkRow = link ? ('<div style="margin-top:6px;"><a class="agm-card-link" href="' + agmEsc(link) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();">&#x1F517; ' + agmEsc(link) + '</a></div>') : '';
+        return '<div class="agm-card" data-agm-id="' + agmEsc(g.id) + '" role="button" tabindex="0">'
+             +   '<div class="agm-card-row1">'
+             +     '<div class="agm-card-name">' + agmEsc(g.group_name||'—') + '</div>'
+             +     '<div class="agm-pills">' + pills + '</div>'
+             +   '</div>'
+             +   '<div class="agm-card-meta">' + meta.join('') + '</div>'
+             +   linkRow
+             + '</div>';
+      }).join('');
+      body.innerHTML = html;
+      AGM_VIEW = 'list';
+      AGM_DETAIL_ID = null;
+      Array.prototype.forEach.call(body.querySelectorAll('.agm-card'), function(c){
+        c.addEventListener('click', function(){
+          var id = c.getAttribute('data-agm-id');
+          agmRenderDetail(id);
+        });
+        c.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            var id = c.getAttribute('data-agm-id');
+            agmRenderDetail(id);
+          }
+        });
+      });
+    }
+    function agmRenderDetail(id){
+      var body = document.getElementById('agmBody');
+      if (!body) return;
+      var grp = (AGM_GROUPS || []).find(function(x){ return String(x.id) === String(id); });
+      if (!grp) { agmRenderList(''); return; }
+      AGM_VIEW = 'detail';
+      AGM_DETAIL_ID = id;
+      var sw = document.getElementById('agmSearchWrap');
+      if (sw) sw.style.display = 'none';
+      /* Field labels — minimal Arabic mapping for the most common
+         student_groups columns. Anything else flows through with its
+         raw key as the label. */
+      var FIELD_LABELS = {
+        'group_name':              'اسم المجموعة',
+        'teacher_name':            'المعلمة',
+        'level_course':            'الصف / المستوى',
+        'study_time':              'وقت الدراسة',
+        'study_days':              'أيام الدراسة',
+        'days':                    'أيام الدراسة',
+        'ramadan_time':            'وقت رمضان',
+        'online_time':             'وقت الأونلاين',
+        'online_days':             'أيام الأونلاين',
+        'group_link':              'رابط البث',
+        'last_reached':            'آخر مرحلة',
+        'session_duration':        'مدة الحصة',
+        'session_minutes_normal':  'حصة الوقت الاعتيادي',
+        'hours_in_person_auto':    'ساعات الحضوري',
+        'hours_online_only':       'ساعات الأونلاين',
+        'hours_all_online':        'إجمالي الأونلاين',
+        'total_required_hours':    'إجمالي الساعات المستحقة',
+        'student_count':           'عدد الطلاب النشطين',
+      };
+      var teacher = (grp.teacher_name||'').trim();
+      if (teacher && teacher.indexOf('أ.') !== 0) teacher = 'أ. ' + teacher;
+      var SKIP_KEYS = {
+        'students': 1, 'is_today': 1, 'id': 1,
+      };
+      var rowsHtml = '';
+      Object.keys(grp).forEach(function(k){
+        if (SKIP_KEYS[k]) return;
+        var v = grp[k];
+        if (v === null || v === undefined) return;
+        var vs = String(v).trim();
+        if (!vs) return;
+        var label = FIELD_LABELS[k] || k;
+        rowsHtml += '<div class="agm-field-row">'
+                  +   '<div class="agm-field-label">' + agmEsc(label) + '</div>'
+                  +   '<div class="agm-field-value">' + agmEsc(vs) + '</div>'
+                  + '</div>';
+      });
+      var stu = (grp.students || []);
+      var stuHtml = '';
+      if (stu.length) {
+        stuHtml = stu.map(function(s, i){
+          var pid = (s.personal_id || '').trim();
+          var nm  = (s.student_name || '').trim();
+          var href = '/portal/parent-hub/' + encodeURIComponent(s.id || pid);
+          return '<a class="agm-stu-row" href="' + agmEsc(href) + '" target="_blank" rel="noopener">'
+               +   '<span class="agm-stu-num">' + (i+1) + '</span>'
+               +   '<span class="agm-stu-name">' + agmEsc(nm||'—') + '</span>'
+               +   (pid ? '<span class="agm-stu-pid">' + agmEsc(pid) + '</span>' : '')
+               + '</a>';
+        }).join('');
+      } else {
+        stuHtml = '<div class="agm-empty">&#x0644;&#x0627; &#x064A;&#x0648;&#x062C;&#x062F; &#x0637;&#x0644;&#x0627;&#x0628; &#x0646;&#x0634;&#x0637;&#x0648;&#x0646;</div>';
+      }
+      body.innerHTML =
+        '<button type="button" class="agm-detail-back" id="agmBackBtn">&larr; '
+        + 'رجوع' + '</button>'
+        + '<div class="agm-detail-name">' + agmEsc(grp.group_name||'—')
+        + (grp.is_today ? ' <span class="agm-pill agm-pill-today" style="margin-right:6px;">اليوم</span>' : '')
+        + '</div>'
+        + (teacher ? '<div style="color:#5d4f78;font-weight:700;margin-bottom:10px;">' + agmEsc(teacher) + '</div>' : '')
+        + '<div class="agm-detail-fields">' + (rowsHtml || '<div class="agm-empty">—</div>') + '</div>'
+        + '<div class="agm-students-head">'
+        +   '<span>الطلاب النشطون</span>'
+        +   '<span class="agm-pill agm-pill-count">' + stu.length + '</span>'
+        + '</div>'
+        + '<div class="agm-students-list">' + stuHtml + '</div>';
+      var back = document.getElementById('agmBackBtn');
+      if (back) back.addEventListener('click', function(){ agmRenderList(document.getElementById('agmSearch').value || ''); });
+    }
+    /* Wire close + backdrop + escape + search input. */
+    document.addEventListener('DOMContentLoaded', function(){
+      var bk = document.getElementById('agmBack');
+      var btn = document.getElementById('agmCloseBtn');
+      if (btn) btn.addEventListener('click', agmCloseModal);
+      if (bk) bk.addEventListener('click', function(e){
+        if (e.target === bk) agmCloseModal();
+      });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape' && bk && bk.classList.contains('open')) agmCloseModal();
+      });
+      var search = document.getElementById('agmSearch');
+      if (search) {
+        search.addEventListener('input', function(){
+          if (AGM_VIEW !== 'list') return;
+          agmRenderList(search.value || '');
+        });
+      }
+    });
   })();
   </script>
   <!-- Phase 8 — Quick action shortcuts. Each card targets an existing
@@ -38235,6 +38563,99 @@ def api_dashboard_recent_activity():
             "created_at":  d.get("created_at") or "",
         })
     return jsonify({"ok": True, "items": out})
+
+
+@app.route("/api/dashboard/active-groups-detailed", methods=["GET"])
+@login_required
+def api_dashboard_active_groups_detailed():
+    """Read-only feed for the "جميع المجموعات النشطة" modal opened
+    from the dashboard's "عرض الكل" link. Returns every group from
+    student_groups along with:
+      - is_today flag computed via _parse_study_days against the
+        current weekday name (same logic as
+        /api/dashboard/active-groups-today, just without the
+        today-only filter and the LIMIT 6 cap).
+      - student_count using the same _active_students_filter
+        definition the rest of the dashboard already trusts.
+      - students[] array (id, personal_id, student_name) for the
+        drill-down view, sorted alphabetically.
+      - every column from the student_groups row, dict-merged so
+        the modal can render whatever the admin's UI labels expose.
+    Pure read — no schema changes, no mutations. Available to every
+    logged-in user (admin / manager / teacher / reception)."""
+    import datetime as _dt_d
+    DAYS_AR = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس",
+               "الجمعة", "السبت", "الأحد"]
+    today_label = DAYS_AR[_dt_d.date.today().weekday()]
+    db = get_db()
+    days_col = _groups_days_column(db)
+    try:
+        rows = db.execute(
+            "SELECT * FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+            "ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    # Active-student filter (configurable via /settings —
+    # registration_term2_2026 = 'تم التسجيل' by default).
+    act_frag, act_val = _active_students_filter()
+    out = []
+    for r in rows:
+        rd = dict(r)
+        gname = (rd.get("group_name") or "").strip()
+        if not gname:
+            continue
+        # is_today via the same parser /api/dashboard/active-groups-today uses.
+        days_val = (rd.get(days_col) or rd.get("study_days") or "").strip()
+        try:
+            parsed_days = _parse_study_days(days_val)
+        except Exception:
+            parsed_days = []
+        is_today = (today_label in parsed_days)
+
+        # Students assigned via either the in-person OR online group
+        # column on the students table. Active filter applied so the
+        # counts match the rest of the dashboard.
+        sql = ("SELECT id, personal_id, student_name FROM students "
+               "WHERE (TRIM(group_name_student) = TRIM(?) "
+               "       OR TRIM(group_online)        = TRIM(?))")
+        params = [gname, gname]
+        if act_frag:
+            sql += " AND " + act_frag
+            params.append(act_val)
+        sql += " ORDER BY student_name"
+        try:
+            srows = db.execute(sql, tuple(params)).fetchall()
+        except Exception:
+            srows = []
+        students = [
+            {
+                "id": s["id"] if "id" in s.keys() else None,
+                "personal_id": (s["personal_id"] if "personal_id" in s.keys() else "") or "",
+                "student_name": (s["student_name"] if "student_name" in s.keys() else "") or "",
+            }
+            for s in srows
+        ]
+        # Build the response row — start from the full DB row so any
+        # admin-added column on student_groups flows through, then
+        # overlay the derived fields.
+        entry = {k: v for k, v in rd.items()}
+        entry["is_today"]      = is_today
+        entry["student_count"] = len(students)
+        entry["students"]      = students
+        # Convenience field the JS list view shows.
+        entry["days"]          = days_val
+        out.append(entry)
+    # Sort: today's groups first (preserves alphabetical inside each tier).
+    out.sort(key=lambda e: (0 if e.get("is_today") else 1,
+                            (e.get("group_name") or "").lower()))
+    return jsonify({
+        "ok":     True,
+        "today":  today_label,
+        "groups": out,
+        "count":  len(out),
+    })
 
 
 @app.route("/api/dashboard/active-groups-today", methods=["GET"])
