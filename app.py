@@ -6919,6 +6919,15 @@ body{background:linear-gradient(135deg,#f8f4ff 0%,#e8f8fb 100%);min-height:100vh
 .srm-section{padding:14px 18px;border-bottom:1px solid #eee;}
 .srm-section:last-child{border-bottom:none;}
 .srm-section-title{font-weight:700;color:#00695C;font-size:1.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.srm-section-clickable{cursor:pointer;transition:background-color .15s ease,box-shadow .15s ease;}
+.srm-section-clickable:hover{background-color:#f3eef9;box-shadow:inset 0 0 0 2px rgba(107,63,160,0.15);}
+.srm-section-clickable:hover .srm-edit-pencil{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.srm-edit-pencil{margin-right:auto;font-size:11.5px;background:#f3eef9;border:1.2px solid #c4a8e8;color:#6B3FA0;padding:3px 10px;border-radius:999px;text-decoration:none;font-weight:700;transition:all .15s ease;}
+.srm-edit-pencil:hover{filter:brightness(1.05);}
+.srm-section-clickable-wrap{position:relative;cursor:pointer;transition:background-color .15s ease,box-shadow .15s ease;}
+.srm-section-clickable-wrap:hover{background-color:#f3eef9;}
+.srm-section-clickable-wrap:hover .srm-edit-overlay-badge{background:#6B3FA0;color:#fff;}
+.srm-edit-overlay-badge{position:absolute;top:8px;left:14px;font-size:11.5px;background:#f3eef9;border:1.2px solid #c4a8e8;color:#6B3FA0;padding:3px 10px;border-radius:999px;font-weight:700;z-index:2;pointer-events:none;transition:all .15s ease;}
 .srm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .srm-field{display:flex;flex-direction:column;gap:3px;}
 .srm-field label{font-size:0.82em;color:#607D8B;font-weight:600;}
@@ -8280,6 +8289,23 @@ function dhCopyParentLink(){
     </div>
   </div>
 </div>
+
+<!-- Section-edit modal: opened from the student-search card by
+     clicking on the payment / attendance / evaluations / points
+     section. Uses an iframe to embed the existing edit page with
+     ?embedded=1 chrome-hidden. Allow-list-gated on the parent
+     side (srOpenSectionModal short-circuits for non-allowed
+     users); embedded edit pages still enforce server-side auth. -->
+<div id="sr-section-edit-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);z-index:10500;">
+  <div style="background:#fff;margin:24px auto;border-radius:16px;max-width:1200px;width:95vw;height:calc(100vh - 48px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.25);">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e8d8f5;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;flex-shrink:0;">
+      <span id="sr-sect-modal-title" style="flex:1;font-weight:800;font-size:1rem;">&#x62A;&#x639;&#x62F;&#x64A;&#x644;</span>
+      <button onclick="srCloseSectionModal()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:8px;width:34px;height:34px;font-size:18px;cursor:pointer;font-weight:800;" title="&#x625;&#x63A;&#x644;&#x627;&#x642;">&#x2715;</button>
+    </div>
+    <iframe id="sr-sect-modal-frame" src="" frameborder="0" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
+  </div>
+</div>
+
 <script src="/static/js/group_search.js"></script>
 __STUDENT_FORM_MODAL__
 <script>
@@ -9919,22 +9945,71 @@ function _srRenderCard(d){
   // taqseet plan + per-installment paid/remaining + persisted totals
   // from payment_log. Replaces the legacy تفاصيل الدفع + سجل الدفع
   // pair.
-  html += _srBuildPaymentMethodSection(d.payment_details);
+  /* Click-to-edit wrapper: allow-listed users get a clickable
+     overlay that opens the متابعة الدفع modal scoped to this
+     student. Wraps the existing section verbatim — view-only
+     rendering for non-allow-listed users is unchanged. */
+  if (typeof _srSidNow === 'undefined') var _srSidNow = (s.id || (d && d.id) || 0);
+  if (typeof _srGrpNow === 'undefined') var _srGrpNow = (s.group_name_student || s.group_online || '');
+  if (typeof _srCanEdit === 'function' && _srCanEdit()) {
+    html += '<div class="srm-section-clickable-wrap" onclick="srOpenSectionModal('
+         + JSON.stringify('payment') + ',' + (_srSidNow||0) + ','
+         + JSON.stringify(_srGrpNow||'') + ')" '
+         + 'title="\u0627\u0636\u063A\u0637 \u0644\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062F\u0641\u0639" '
+         + 'style="cursor:pointer;position:relative;">';
+    html += '<div class="srm-edit-overlay-badge">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</div>';
+    html += _srBuildPaymentMethodSection(d.payment_details);
+    html += '</div>';
+  } else {
+    html += _srBuildPaymentMethodSection(d.payment_details);
+  }
   // ATTENDANCE
   var pct = function(v){ return (v||0)+'%'; };
   var bar = function(v){ return '<div class="srm-pct-bar"><div class="srm-pct-bar-inner" style="width:'+(Math.min(100,v||0))+'%"></div></div>'; };
-  html += '<div class="srm-section"><div class="srm-section-title">\U0001F4C5 إحصائيات الحضور ('+(att.total||0)+' جلسة)</div>';
+  /* Click-to-edit affordance on the section title — only visible to
+     allow-listed users (admin + 3 managers). Server-side auth on
+     the embedded edit pages still gates real changes. */
+  var _srSidNow = (s.id || (d && d.id) || 0);
+  var _srGrpNow = (s.group_name_student || s.group_online || '');
+  var _editAff = function(section, sid, grp){
+    if (!_srCanEdit()) return '';
+    return '<a href="javascript:void(0)" class="srm-edit-pencil" '
+         + 'onclick="event.stopPropagation();srOpenSectionModal('
+         + JSON.stringify(section) + ',' + (sid||0) + ','
+         + JSON.stringify(grp||'') + ')" '
+         + 'title="\u062A\u0639\u062F\u064A\u0644 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</a>';
+  };
+  var _sectionClickAttrs = function(section, sid, grp){
+    if (!_srCanEdit()) return '';
+    return ' class="srm-section srm-section-clickable" '
+         + 'onclick="srOpenSectionModal('
+         + JSON.stringify(section) + ',' + (sid||0) + ','
+         + JSON.stringify(grp||'') + ')"';
+  };
+  html += '<div' + (_srCanEdit() ? _sectionClickAttrs('attendance', _srSidNow, _srGrpNow) : ' class="srm-section"') + '>';
+  html += '<div class="srm-section-title">\U0001F4C5 إحصائيات الحضور ('+(att.total||0)+' جلسة)' + _editAff('attendance', _srSidNow, _srGrpNow) + '</div>';
   html += '<div class="srm-totals">'
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.present_rate)+'</div><div class="srm-stat-lbl">نسبة الحضور ('+(att.present||0)+')</div>'+bar(att.present_rate)+'</div>'
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.absent_rate)+'</div><div class="srm-stat-lbl">نسبة الغياب ('+(att.absent||0)+')</div>'+bar(att.absent_rate)+'</div>'
        +  '<div class="srm-stat"><div class="srm-stat-num">'+pct(att.late_rate)+'</div><div class="srm-stat-lbl">نسبة التأخير ('+(att.late||0)+')</div>'+bar(att.late_rate)+'</div>'
        + '</div></div>';
+  // EVALUATIONS — link-only summary section that opens the monthly
+  // evaluation form for this student in a modal. The summary itself
+  // is intentionally lightweight; the full per-month history lives
+  // in the modal-iframe view.
+  html += '<div' + (_srCanEdit() ? _sectionClickAttrs('evaluations', _srSidNow, _srGrpNow) : ' class="srm-section"') + '>';
+  html += '<div class="srm-section-title">\uD83D\uDCDD \u0627\u0644\u062A\u0642\u064A\u064A\u0645\u0627\u062A' + _editAff('evaluations', _srSidNow, _srGrpNow) + '</div>';
+  html += '<div style="color:#666;font-size:0.92rem;padding:6px 0;">'
+       + (_srCanEdit()
+          ? '\u0627\u0636\u063A\u0637 \u0644\u0641\u062A\u062D \u0625\u0633\u062A\u0645\u0627\u0631\u0629 \u0627\u0644\u062A\u0642\u064A\u064A\u0645 \u0627\u0644\u0634\u0647\u0631\u064A \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628'
+          : '\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u062A\u0642\u064A\u064A\u0645 \u0641\u064A \u0635\u0641\u062D\u0629 \u0627\u0644\u062A\u0642\u064A\u064A\u0645\u0627\u062A')
+       + '</div></div>';
   // The legacy "سجل الدفع" block has been folded into the new
   // "💰 طريقة التقسيط" section above (_srBuildPaymentMethodSection).
   // POINTS — load asynchronously (one extra request) and inject
   // into a placeholder div. Pulls balance + level + last 5 events.
-  html += '<div class="srm-section" id="sr-points-section">'
-       +    '<div class="srm-section-title">🌟 نظام النقاط</div>'
+  html += '<div' + (_srCanEdit() ? _sectionClickAttrs('points', _srSidNow, _srGrpNow) : ' class="srm-section"') + ' id="sr-points-section">'
+       +    '<div class="srm-section-title">🌟 نظام النقاط' + _editAff('points', _srSidNow, _srGrpNow) + '</div>'
        +    '<div id="sr-points-body" style="padding:8px 0;color:#888;">جاري التحميل...</div>'
        +  '</div>';
   // ACTIONS
@@ -10007,6 +10082,111 @@ function _srLoadPoints(sid){
     });
 }
 function srSave(){ _srTrySave(); }  /* backward-compat shim */
+
+/* ── Section click-to-edit modal ───────────────────────────────────
+ * Opens any of the 4 editable sections (payment / attendance /
+ * evaluations / points) of the student profile in an iframe modal,
+ * scoped to the current student via the existing edit page's
+ * URL params plus our shared ?embedded=1 chrome-hider.
+ *
+ * Allow-list-gated on the parent side via _srCanEdit() so only
+ * the 4 admin/manager logins can even see the affordances; the
+ * embedded edit pages still enforce server-side auth on every
+ * mutation. Iframe sandbox is the default web sandbox — no
+ * special tricks required.
+ *
+ * Save-flow: the embedded edit page can call
+ * window.parent.postMessage({type:'sectionSaved',section:'<name>'})
+ * (or use the convenience window.mxEmbeddedNotifySaved(section)
+ * helper in /mx-helpers.js) to dismiss the modal + trigger a
+ * refetch of this student's data so the new values show
+ * immediately.
+ *  */
+function srOpenSectionModal(section, sid, group){
+  if (typeof _srCanEdit === 'function' && !_srCanEdit()){
+    if (typeof window.mxToast === 'function')
+      window.mxToast("\u063A\u064A\u0631 \u0645\u0633\u0645\u0648\u062D \u0628\u0627\u0644\u062A\u0639\u062F\u064A\u0644 \u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u062D\u0633\u0627\u0628", "error");
+    return;
+  }
+  if (!sid){ sid = _srCurrentId || 0; }
+  if (!sid){ return; }
+  var titleAr = "\u062A\u0639\u062F\u064A\u0644";
+  var url = "";
+  /* Build the URL per section. Each existing edit page is reused
+     verbatim; ?embedded=1 hides chrome via the global handler in
+     /mx-helpers.js. ?student=<id> is read by pages that support
+     pre-selection (others ignore it). */
+  if (section === 'payment'){
+    titleAr = "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062F\u0641\u0639";
+    /* /database with embedded mode + auto-open the متابعة الدفع
+       modal scoped to this student. mx-helpers' embedded handler
+       hides the topbar/sidebar; pmOpen() runs via the auto-open
+       flag below once the page loads. */
+    url = "/database?embedded=1&pm_open=1&pm_sid=" + encodeURIComponent(sid);
+  } else if (section === 'attendance'){
+    titleAr = "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u062D\u0636\u0648\u0631";
+    url = "/attendance?embedded=1&student=" + encodeURIComponent(sid)
+        + (group ? "&group=" + encodeURIComponent(group) : "");
+  } else if (section === 'evaluations'){
+    titleAr = "\u0627\u0633\u062A\u0645\u0627\u0631\u0629 \u0627\u0644\u062A\u0642\u064A\u064A\u0645";
+    url = "/admin/evaluations?embedded=1&student=" + encodeURIComponent(sid);
+  } else if (section === 'points'){
+    titleAr = "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0646\u0642\u0627\u0637";
+    var grpEnc = group ? encodeURIComponent(group) : "";
+    url = "/points/board" + (grpEnc ? ("/" + grpEnc) : "")
+        + "?embedded=1&student=" + encodeURIComponent(sid);
+  } else {
+    return;
+  }
+  var modal = document.getElementById('sr-section-edit-modal');
+  if (!modal){ return; }
+  var titleEl = document.getElementById('sr-sect-modal-title');
+  if (titleEl) titleEl.textContent = titleAr;
+  var frame = document.getElementById('sr-sect-modal-frame');
+  if (frame){
+    /* Reset src first so the iframe always reloads fresh. */
+    frame.src = "about:blank";
+    setTimeout(function(){ frame.src = url; }, 10);
+  }
+  modal.style.display = 'block';
+  /* Track which section is open so the postMessage listener can
+     refresh the right summary afterward. */
+  modal.dataset.section = section;
+  modal.dataset.sid     = String(sid || 0);
+}
+
+function srCloseSectionModal(){
+  var modal = document.getElementById('sr-section-edit-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  /* Clear iframe src to free memory + abort any in-flight requests. */
+  var frame = document.getElementById('sr-sect-modal-frame');
+  if (frame) frame.src = "about:blank";
+}
+
+/* PostMessage listener: child pages broadcast
+   {type:'sectionSaved', section:'...'} on successful save.
+   Refresh the affected section by re-fetching the student
+   detail; the existing _srRenderCard() handles the DOM update. */
+(function(){
+  if (window.__srSectionMsgBound) return;
+  window.__srSectionMsgBound = true;
+  window.addEventListener('message', function(e){
+    var d = e && e.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.type !== 'sectionSaved') return;
+    /* Close modal first so the refetch shows behind it cleanly. */
+    srCloseSectionModal();
+    /* Re-fetch the current student so summary numbers update. */
+    var sid = _srCurrentId;
+    if (!sid) return;
+    fetch('/api/students/' + sid + '/details', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(d2){
+        if (d2 && d2.ok){ _srRenderCard(d2); }
+      });
+  });
+})();
 
 /* ── Receipt print (طباعة رصيد) ──────────────────────────────── */
 var _srRcpt = { sid: 0, data: null, selected: null,
@@ -11987,6 +12167,36 @@ function pmOpen(){
     });
   });
 }
+/* Auto-open متابعة الدفع scoped to one student when /database is
+   loaded with ?pm_open=1&pm_sid=<id> — the click-to-edit modal on
+   the student-search card uses this to embed the payment editor. */
+(function(){
+  try {
+    var qs = new URLSearchParams(window.location.search);
+    if (qs.get('pm_open') !== '1') return;
+    var sid = qs.get('pm_sid'); if (!sid) return;
+    var run = function(){
+      pmOpen();
+      /* Look up the student's personal_id + name, then drive the
+         existing search-by-name flow so just their card renders. */
+      fetch('/api/students/' + sid + '/details', {credentials:'include'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if (!d || !d.ok || !d.student) return;
+          var inp = document.getElementById('pm-search'); if (!inp) return;
+          var s = d.student;
+          /* Personal_id is a stable filter key; fall back to name. */
+          inp.value = (s.personal_id || s.student_name || '');
+          if (typeof pmSearchClick === 'function') pmSearchClick();
+        });
+    };
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', run);
+    } else {
+      setTimeout(run, 0);
+    }
+  } catch(e){}
+})();
 /* ─── Database-wide student search ─────────────────────────────────
  * Independent from the group dropdown. Searches /api/students for
  * fuzzy name OR personal_id matches and renders matching cards.
@@ -12291,7 +12501,7 @@ function _pmEnsureEditModal(){
   bg.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;align-items:center;justify-content:center;padding:18px;direction:rtl;";
   bg.innerHTML =
     '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);">' +
-      '<h3 id="pm-edit-title" style="font-size:1.1rem;font-weight:800;color:#E65100;margin-bottom:12px;border-bottom:1.5px dashed #ffb74d;padding-bottom:8px;">✏️ تعديل القسط</h3>' +
+      '<h3 id="pm-edit-title" style="font-size:1.1rem;font-weight:800;color:#E65100;margin-bottom:12px;border-bottom:1.5px dashed #ffb74d;padding-bottom:8px;">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644 القسط</h3>' +
       '<div id="pm-edit-body" style="font-size:14px;color:#333;line-height:1.7;"></div>' +
       '<div id="pm-edit-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;"></div>' +
     '</div>';
@@ -12321,7 +12531,7 @@ function pmStartEdit(sid, n){
 function _pmShowEditForm(){
   if (!_pmEditState) return;
   var inst = _pmEditState.inst;
-  document.getElementById("pm-edit-title").innerHTML = "✏️ تعديل القسط " + _pmEditState.n;
+  document.getElementById("pm-edit-title").innerHTML = "\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644 القسط " + _pmEditState.n;
   document.getElementById("pm-edit-body").innerHTML =
     '<div style="display:grid;gap:10px;">' +
       '<div style="display:flex;justify-content:space-between;background:#f8f4ff;border-radius:8px;padding:8px 12px;">' +
@@ -12414,6 +12624,14 @@ function pmRecordPay(btn){
       var name = card.dataset.name || "";
       _pmToast("\u2705 \u062A\u0645 \u062A\u0633\u062C\u064A\u0644 \u062F\u0641\u0639 \u0627\u0644\u0642\u0633\u0637 " + n + " - " + amount + " \u062F \u0644\u0644\u0637\u0627\u0644\u0628 " + name);
       _pmRenderCard(card, sid, name, res);
+      /* If embedded inside the section-edit iframe modal, notify
+         the parent so it can refresh the student card and dismiss
+         the modal. No-op when running standalone. */
+      try {
+        if (typeof window.mxEmbeddedNotifySaved === 'function') {
+          window.mxEmbeddedNotifySaved('payment');
+        }
+      } catch(e){}
     })
     .catch(function(){
       _pmToast("\u062E\u0637\u0623 \u0641\u064A \u0627\u0644\u0627\u062A\u0635\u0627\u0644", "error");
@@ -20873,7 +21091,7 @@ function _ppPaintDetail(){
        +  'margin-bottom:6px;flex-wrap:wrap;gap:6px;">';
   html += '<h3 style="margin:0;">تفاصيل المستخدم</h3>';
   if (!_PP_EDIT_MODE){
-    html += '<button class="pp-edit-btn" onclick="ppToggleEdit()">✏️ تعديل</button>';
+    html += '<button class="pp-edit-btn" onclick="ppToggleEdit()">\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644</button>';
   } else {
     html += '<div>'
          +  '<button class="pp-edit-btn pp-save" onclick="ppSaveEdit()">💾 حفظ</button>'
@@ -33948,7 +34166,7 @@ table.tbl tr:hover td{background:#faf6ff;}
   };
   window.cuOpenEdit = function(id){
     EDIT_ID = id;
-    document.getElementById('cu-mod-title').textContent = '✏️ تعديل المنهج';
+    document.getElementById('cu-mod-title').textContent = '\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644 المنهج';
     document.getElementById('cu-file-field').style.display = 'none';
     fetch('/api/curriculum/'+id, {credentials:'include'})
       .then(function(r){return r.json();}).then(function(j){
@@ -47828,6 +48046,61 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
       mo.observe(document.documentElement, { childList: true, subtree: true });
     } catch (e){}
   })();
+
+  /* ================================================================
+   * EMBEDDED MODE — sitewide ?embedded=1 chrome-hider
+   *
+   * When a page is loaded with ?embedded=1 in its query string (e.g.
+   * via the click-to-edit iframe modal on the student-search card),
+   * we inject a body class .mx-embedded that hides the topbar /
+   * sidebar / "back to dashboard" buttons / page title — leaving
+   * just the form/table for the editing task. No standalone page
+   * is affected; the class only fires when the query param is
+   * explicitly set.
+   *
+   * Pages that want their save-flow to auto-close the parent modal
+   * post a window.parent.postMessage({type:'sectionSaved', section:'...'})
+   * — handled by the parent in srOpenSectionModal().
+   * ================================================================ */
+  try {
+    var _mxqs = (function(){ try { return new URLSearchParams(window.location.search); } catch(e){ return null; } })();
+    if (_mxqs && _mxqs.get('embedded') === '1') {
+      var _setEmbedded = function(){
+        if (document.body && !document.body.classList.contains('mx-embedded')) {
+          document.body.classList.add('mx-embedded');
+        }
+      };
+      if (document.body) _setEmbedded();
+      else document.addEventListener('DOMContentLoaded', _setEmbedded);
+      var _embStyle = document.createElement('style');
+      _embStyle.textContent = (
+        'body.mx-embedded .topbar,' +
+        'body.mx-embedded .dh-topbar,' +
+        'body.mx-embedded .md-sb-wrap,' +
+        'body.mx-embedded .md-topbar,' +
+        'body.mx-embedded .btn-home,' +
+        'body.mx-embedded .btn-back,' +
+        'body.mx-embedded #md-sb,' +
+        'body.mx-embedded .topbar-links{display:none !important;}' +
+        'body.mx-embedded{padding:8px !important;background:#fff !important;}' +
+        'body.mx-embedded .container,' +
+        'body.mx-embedded .md-content{margin-right:0 !important;padding:8px !important;max-width:100% !important;}'
+      );
+      try { document.head.appendChild(_embStyle); } catch(e){}
+      /* Expose a tiny helper child pages can call after a successful
+         save to dismiss the parent modal + trigger refresh. */
+      window.mxEmbeddedNotifySaved = function(section){
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(
+              { type: 'sectionSaved', section: (section || '') },
+              '*'
+            );
+          }
+        } catch(e){}
+      };
+    }
+  } catch (e){}
 })();
 '''
 
