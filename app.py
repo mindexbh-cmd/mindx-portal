@@ -23080,53 +23080,148 @@ def verify_receipt_page(receipt_number):
     receipt's QR. Returns MATCH only when the row exists, the
     code matches, and the status is 'issued'. The page does NOT
     show internal totals - only the fields printed on the
-    receipt + status."""
-    code = (request.args.get("code") or "").strip()
-    db = get_db()
+    receipt + status.
+
+    Wrapped in defensive try/except \u2014 every value-rendering step
+    is logged via [qr-handler-crash] on failure so any future
+    type-mismatch / KeyError / NoneType issue surfaces as one
+    Render-log line instead of a blank 500. The user gets a
+    friendly Arabic error page instead of an Internal Server
+    Error.
+    """
+    import sys as _sys_qr
+    import traceback as _tb_qr
+    rd = None
     try:
-        row = db.execute(
-            "SELECT receipt_number, student_name, personal_id, course_name, "
-            "installment_number, amount, employee_name, status, issued_at, "
-            "verification_code FROM receipts_log WHERE receipt_number=?",
-            (receipt_number,),
-        ).fetchone()
-    except Exception:
-        row = None
-    if not row:
-        html = _verify_receipt_render("nomatch",
-            "\u274C \u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0635\u064A\u062F \u0628\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645",
-            [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
+        code = (request.args.get("code") or "").strip()
+        db = get_db()
+        try:
+            row = db.execute(
+                "SELECT receipt_number, student_name, personal_id, course_name, "
+                "installment_number, amount, employee_name, status, issued_at, "
+                "verification_code FROM receipts_log WHERE receipt_number=?",
+                (receipt_number,),
+            ).fetchone()
+        except Exception as _ex_select:
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] receipts_log SELECT failed for "
+                + repr(receipt_number) + ": " + str(_ex_select) + "\n"
+            )
+            row = None
+        if not row:
+            html = _verify_receipt_render("nomatch",
+                "\u274C \u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0635\u064A\u062F \u0628\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645",
+                [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
+            return Response(html, mimetype="text/html; charset=utf-8")
+        rd = dict(row)
+        # Trace every column's type + value so a TypeError reveals
+        # itself in a single log line.
+        try:
+            _types_dump = {k: (type(v).__name__, repr(v)[:80])
+                           for k, v in rd.items()}
+            _sys_qr.stderr.write(
+                "[qr-handler-trace] receipt=" + repr(receipt_number)
+                + " row_type_value=" + repr(_types_dump) + "\n"
+            )
+        except Exception:
+            pass
+        stored = (rd.get("verification_code") or "").strip()
+        if not code or code != stored:
+            html = _verify_receipt_render("nomatch",
+                "\u274C \u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D",
+                [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
+            return Response(html, mimetype="text/html; charset=utf-8")
+        status = (rd.get("status") or "").strip()
+        if status == "issued":
+            kind, text = "match", "\u2705 \u062A\u0645 \u0627\u0644\u062A\u062D\u0642\u0642 \u0628\u0646\u062C\u0627\u062D"
+        elif status == "reserved":
+            kind, text = "reserved", "\u26A0\uFE0F \u0631\u0635\u064A\u062F \u0645\u062D\u062C\u0648\u0632 \u0644\u0645 \u064A\u062A\u0645 \u0625\u0635\u062F\u0627\u0631\u0647 \u0628\u0639\u062F"
+        elif status == "\u0645\u0644\u063A\u0649":
+            kind, text = "cancelled", "\u26D4 \u0647\u0630\u0627 \u0627\u0644\u0631\u0635\u064A\u062F \u0645\u0644\u063A\u0649"
+        else:
+            kind, text = "nomatch", "\u274C \u062D\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629"
+        # amount: float coercion may raise on str("abc")-shape data.
+        try:
+            fmt_amount = ("%.3f" % float(rd.get("amount") or 0)).rstrip("0").rstrip(".")
+        except Exception as _ex_amt:
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] amount float coerce failed: "
+                + str(_ex_amt) + " amount=" + repr(rd.get("amount")) + "\n"
+            )
+            fmt_amount = "0"
+        # issued_at slicing \u2014 was the most likely 500 source.
+        # Postgres returns a datetime object; the legacy [:19] slice
+        # raises TypeError on datetime. Coerce to str defensively.
+        try:
+            _issued_raw = rd.get("issued_at")
+            if _issued_raw is None:
+                _issued_str = ""
+            else:
+                _issued_str = str(_issued_raw)[:19]
+        except Exception as _ex_iss:
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] issued_at coerce failed: "
+                + str(_ex_iss) + " value=" + repr(rd.get("issued_at"))
+                + " type=" + type(rd.get("issued_at")).__name__ + "\n"
+            )
+            _issued_str = ""
+        rows = [
+            ("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F",  rd.get("receipt_number") or ""),
+            ("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631", _issued_str),
+            ("\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628", rd.get("student_name") or ""),
+            ("\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A", rd.get("personal_id") or ""),
+            ("\u0627\u0633\u0645 \u0627\u0644\u062F\u0648\u0631\u0629", rd.get("course_name") or ""),
+            ("\u0631\u0642\u0645 \u0627\u0644\u0642\u0633\u0637", str(rd.get("installment_number") or 0)),
+            ("\u0627\u0644\u0645\u0628\u0644\u063A", fmt_amount + " \u062F.\u0628"),
+            ("\u0627\u0644\u0645\u0648\u0638\u0641", rd.get("employee_name") or ""),
+            ("\u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642", stored),
+        ]
+        html = _verify_receipt_render(kind, text, rows)
         return Response(html, mimetype="text/html; charset=utf-8")
-    rd = dict(row)
-    stored = (rd.get("verification_code") or "").strip()
-    if not code or code != stored:
-        html = _verify_receipt_render("nomatch",
-            "\u274C \u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D",
-            [("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F", str(receipt_number))])
-        return Response(html, mimetype="text/html; charset=utf-8")
-    status = (rd.get("status") or "").strip()
-    if status == "issued":
-        kind, text = "match", "\u2705 \u062A\u0645 \u0627\u0644\u062A\u062D\u0642\u0642 \u0628\u0646\u062C\u0627\u062D"
-    elif status == "reserved":
-        kind, text = "reserved", "\u26A0\uFE0F \u0631\u0635\u064A\u062F \u0645\u062D\u062C\u0648\u0632 \u0644\u0645 \u064A\u062A\u0645 \u0625\u0635\u062F\u0627\u0631\u0647 \u0628\u0639\u062F"
-    elif status == "\u0645\u0644\u063A\u0649":
-        kind, text = "cancelled", "\u26D4 \u0647\u0630\u0627 \u0627\u0644\u0631\u0635\u064A\u062F \u0645\u0644\u063A\u0649"
-    else:
-        kind, text = "nomatch", "\u274C \u062D\u0627\u0644\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629"
-    fmt_amount = ("%.3f" % float(rd.get("amount") or 0)).rstrip("0").rstrip(".")
-    rows = [
-        ("\u0631\u0642\u0645 \u0627\u0644\u0631\u0635\u064A\u062F",  rd.get("receipt_number") or ""),
-        ("\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0625\u0635\u062F\u0627\u0631", (rd.get("issued_at") or "")[:19]),
-        ("\u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628", rd.get("student_name") or ""),
-        ("\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062E\u0635\u064A", rd.get("personal_id") or ""),
-        ("\u0627\u0633\u0645 \u0627\u0644\u062F\u0648\u0631\u0629", rd.get("course_name") or ""),
-        ("\u0631\u0642\u0645 \u0627\u0644\u0642\u0633\u0637", str(rd.get("installment_number") or 0)),
-        ("\u0627\u0644\u0645\u0628\u0644\u063A", fmt_amount + " \u062F.\u0628"),
-        ("\u0627\u0644\u0645\u0648\u0638\u0641", rd.get("employee_name") or ""),
-        ("\u0631\u0645\u0632 \u0627\u0644\u062A\u062D\u0642\u0642", stored),
-    ]
-    html = _verify_receipt_render(kind, text, rows)
-    return Response(html, mimetype="text/html; charset=utf-8")
+    except Exception as _ex_qr:
+        # Friendly Arabic error page + full crash dump for admins.
+        try:
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] OUTER receipt=" + repr(receipt_number)
+                + " query_string=" + repr(request.query_string.decode('utf-8', 'replace'))
+                + "\n"
+            )
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] OUTER exception_type="
+                + type(_ex_qr).__name__
+                + " message=" + str(_ex_qr)
+                + " rd=" + (repr(rd)[:500] if rd is not None else 'None')
+                + "\n"
+            )
+            _sys_qr.stderr.write(
+                "[qr-handler-crash] OUTER traceback:\n"
+                + _tb_qr.format_exc()
+            )
+        except Exception:
+            pass
+        _err_html = (
+            "<!doctype html><html lang='ar' dir='rtl'><head>"
+            "<meta charset='utf-8'><title>\u062E\u0637\u0623</title>"
+            "<style>body{font-family:Tahoma,Arial;background:#f5f7fa;"
+            "margin:0;padding:40px;text-align:center;color:#37474f;}"
+            ".box{background:#fff;border:1.5px solid #e0e0e0;"
+            "border-radius:12px;padding:30px;max-width:500px;margin:0 auto;"
+            "box-shadow:0 2px 12px rgba(0,0,0,0.06);}h1{color:#c62828;"
+            "font-size:1.4rem;}p{font-size:1rem;line-height:1.7;}</style>"
+            "</head><body><div class='box'><h1>\u26A0\uFE0F "
+            "\u062D\u062F\u062B \u062E\u0637\u0623 \u0641\u064A "
+            "\u0639\u0631\u0636 \u0625\u064A\u0635\u0627\u0644 \u0627\u0644\u062F\u0641\u0639</h1>"
+            "<p>\u062A\u0645 \u0625\u0628\u0644\u0627\u063A "
+            "\u0627\u0644\u0625\u062F\u0627\u0631\u0629 "
+            "\u0648\u0633\u064A\u062A\u0645 "
+            "\u0627\u0644\u0625\u0635\u0644\u0627\u062D "
+            "\u0641\u064A \u0623\u0642\u0631\u0628 \u0648\u0642\u062A. "
+            "\u0631\u0642\u0645 \u0627\u0644\u0625\u064A\u0635\u0627\u0644: <b>"
+            + str(receipt_number).replace('<', '&lt;') + "</b></p>"
+            "</div></body></html>"
+        )
+        return Response(_err_html, status=200,
+                        mimetype="text/html; charset=utf-8")
 
 
 @app.route('/api/receipts/issue', methods=['POST'])
