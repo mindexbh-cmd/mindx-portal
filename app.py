@@ -42388,6 +42388,336 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
     }
     return paid_by_inst, pl_dict
 
+
+@app.route('/admin/diag/payment/<path:student_query>', methods=['GET'])
+@login_required
+def admin_diag_payment(student_query):
+    """Targeted diagnostic for "متابعة الدفع shows X as unpaid"
+    incidents. Surfaces every join-relevant byte for one student
+    name fragment so the admin (or us) can spot the exact
+    invisible-character / fold-gap / empty-PID that broke the
+    student↔payment_log lookup.
+
+    Usage: GET /admin/diag/payment/تسنيم   (or any URL-encoded name
+    fragment). Admin/manager/reception only — pure read, no
+    mutations.
+
+    Logs five buckets to stderr (greppable as [tasneem-diag]) AND
+    returns the same data as JSON so you can also inspect it in
+    the browser without opening the prod log:
+
+      [tasneem-diag] query  — the raw query string + its UTF-8
+                              hex codepoints, so a stray bidi
+                              mark in the URL itself is visible.
+      [tasneem-diag] student[i] — every students row whose
+                              student_name LIKE %query%, with
+                              repr() of name + personal_id, the
+                              UTF-8 hex codepoints of the name,
+                              and the _payment_normalize_name()
+                              folded form.
+      [tasneem-diag] paylog[j] — every payment_log row whose
+                              student_name LIKE %query%, with the
+                              same repr/hex/fold treatment, plus
+                              inst1..5 values, course_amount,
+                              total_paid.
+      [tasneem-diag] match[i,j] — for every (student, paylog)
+                              pair, the three lookup ladder steps
+                              compared explicitly:
+                                step1_pid_exact  = students.pid == paylog.pid?
+                                step2_name_fold  = fold(students.name) == fold(paylog.name)?
+                                step3_ilike_sub  = students.name in paylog.name (substring)?
+                              If any step is True, the matcher
+                              would have linked that pair; if all
+                              are False, the row is silently
+                              dropped — and the diff_codepoints
+                              field surfaces exactly which
+                              codepoints differ in the folded
+                              forms.
+      [tasneem-diag] computed_plan — runs the actual
+                              _payment_compute_plan(db, sid) for
+                              every matched student id and dumps
+                              the paid_by_installment + totals so
+                              the diag's verdict matches what the
+                              UI is rendering.
+    """
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role not in ("admin", "manager", "reception"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    import sys as _sys_td
+    db = get_db()
+    q = (student_query or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "empty query"}), 400
+
+    def _hex(s):
+        if s is None: return ""
+        out = []
+        for ch in str(s)[:200]:
+            cp = ord(ch)
+            out.append("U+%04X" % cp if cp > 0x7F else ch)
+        return " ".join(out)
+
+    _sys_td.stderr.write(
+        "[tasneem-diag] query=" + repr(q)
+        + " hex=" + _hex(q) + "\n"
+    )
+
+    # ── students rows ────────────────────────────────────────────
+    try:
+        s_rows = db.execute(
+            "SELECT * FROM students WHERE student_name LIKE ? ORDER BY id",
+            ('%' + q + '%',),
+        ).fetchall()
+    except Exception as ex:
+        s_rows = []
+        _sys_td.stderr.write("[tasneem-diag] students SELECT failed: " + str(ex) + "\n")
+    students_dump = []
+    for r in s_rows:
+        rd = dict(r) if hasattr(r, "keys") else {}
+        nm = rd.get("student_name") or ""
+        pid = rd.get("personal_id") or ""
+        folded = _payment_normalize_name(nm)
+        students_dump.append({
+            "id":              rd.get("id"),
+            "personal_id":     pid,
+            "personal_id_hex": _hex(pid),
+            "student_name":    nm,
+            "student_name_repr": repr(nm),
+            "student_name_hex":  _hex(nm),
+            "student_name_folded": folded,
+            "student_name_utf8_bytes": str(nm).encode("utf-8").hex(),
+            "group_name_student":  rd.get("group_name_student") or "",
+            "group_online":        rd.get("group_online") or "",
+            "registration":        rd.get("registration_term2_2026") or "",
+            "installment_type":    rd.get("installment_type") or "",
+        })
+    _sys_td.stderr.write(
+        "[tasneem-diag] students_matches=" + str(len(students_dump)) + "\n"
+    )
+    for i, sd in enumerate(students_dump):
+        _sys_td.stderr.write(
+            "[tasneem-diag] student[" + str(i) + "] id=" + str(sd["id"])
+            + " pid=" + repr(sd["personal_id"])
+            + " name=" + repr(sd["student_name"])
+            + " name_hex=" + sd["student_name_hex"]
+            + " folded=" + repr(sd["student_name_folded"])
+            + " group=" + repr(sd["group_name_student"])
+            + " inst_type=" + repr(sd["installment_type"]) + "\n"
+        )
+
+    # ── payment_log rows ─────────────────────────────────────────
+    # Two-phase scan: literal LIKE first (cheap, indexable), then a
+    # fold-aware fallback that pulls every paylog name and matches
+    # against the folded query. Catches tatweel-inside-name +
+    # invisible-char-inside-name cases that LIKE silently misses
+    # (the very mismatch the matcher itself stumbles on at request
+    # time, so the diag has to model the same gap).
+    try:
+        pl_rows = db.execute(
+            "SELECT * FROM payment_log WHERE student_name LIKE ? ORDER BY id",
+            ('%' + q + '%',),
+        ).fetchall()
+    except Exception as ex:
+        pl_rows = []
+        _sys_td.stderr.write("[tasneem-diag] payment_log SELECT failed: " + str(ex) + "\n")
+    # Fold-aware fallback: scan every paylog row and match the
+    # super-folded query against the super-folded student_name.
+    # Super-fold = _payment_normalize_name + strip tatweel +
+    # zero-width + bidi marks. This is broader than what the
+    # request-time matcher does, so it surfaces rows that the
+    # production matcher silently misses — exactly the diag's
+    # purpose. Bounded at 5000 rows for safety.
+    def _super_fold(s):
+        if not s: return ''
+        t = _payment_normalize_name(s)
+        # Strip tatweel + zero-width + bidi marks the request-time
+        # normaliser leaves intact.
+        for ch in ('ـ',                          # tatweel
+                   '​', '‌', '‍',      # ZWS / ZWNJ / ZWJ
+                   '‎', '‏',                # LRM / RLM
+                   '‪', '‫', '‬',      # LRE / RLE / PDF
+                   '‭', '‮', '﻿'):     # LRO / RLO / BOM
+            t = t.replace(ch, '')
+        return ' '.join(t.split())
+    if not pl_rows:
+        q_super = _super_fold(q)
+        if q_super:
+            try:
+                _all = db.execute(
+                    "SELECT * FROM payment_log ORDER BY id LIMIT 5000"
+                ).fetchall()
+            except Exception:
+                _all = []
+            _fallback = []
+            for r in _all:
+                _nm = (r["student_name"] if hasattr(r, "keys")
+                       else (r[1] if len(r) > 1 else "")) or ""
+                _f = _super_fold(_nm)
+                if _f and q_super in _f:
+                    _fallback.append(r)
+            if _fallback:
+                pl_rows = _fallback
+                _sys_td.stderr.write(
+                    "[tasneem-diag] payment_log literal-LIKE missed "
+                    + repr(q) + " — super-fold (strips tatweel + "
+                    + "zero-width + bidi) fallback found "
+                    + str(len(_fallback)) + " rows. ROOT CAUSE: the "
+                    + "paylog name contains characters that "
+                    + "_payment_normalize_name does NOT strip — "
+                    + "extending the request-time normaliser to do "
+                    + "the same super-fold should resolve the bug.\n"
+                )
+    paylog_dump = []
+    for r in pl_rows:
+        rd = dict(r) if hasattr(r, "keys") else {}
+        nm = rd.get("student_name") or ""
+        pid = rd.get("personal_id") or ""
+        folded = _payment_normalize_name(nm)
+        paylog_dump.append({
+            "id":                 rd.get("id"),
+            "personal_id":        pid,
+            "personal_id_hex":    _hex(pid),
+            "student_name":       nm,
+            "student_name_repr":  repr(nm),
+            "student_name_hex":   _hex(nm),
+            "student_name_folded": folded,
+            "student_name_utf8_bytes": str(nm).encode("utf-8").hex(),
+            "inst1":              rd.get("inst1"),
+            "inst2":              rd.get("inst2"),
+            "inst3":              rd.get("inst3"),
+            "inst4":              rd.get("inst4"),
+            "inst5":              rd.get("inst5"),
+            "course_amount":      rd.get("course_amount"),
+            "total_paid":         rd.get("total_paid"),
+            "total_remaining":    rd.get("total_remaining"),
+        })
+    _sys_td.stderr.write(
+        "[tasneem-diag] paylog_matches=" + str(len(paylog_dump)) + "\n"
+    )
+    for j, pl in enumerate(paylog_dump):
+        _sys_td.stderr.write(
+            "[tasneem-diag] paylog[" + str(j) + "] id=" + str(pl["id"])
+            + " pid=" + repr(pl["personal_id"])
+            + " name=" + repr(pl["student_name"])
+            + " name_hex=" + pl["student_name_hex"]
+            + " folded=" + repr(pl["student_name_folded"])
+            + " inst1=" + repr(pl["inst1"])
+            + " inst2=" + repr(pl["inst2"])
+            + " inst3=" + repr(pl["inst3"])
+            + " inst4=" + repr(pl["inst4"])
+            + " inst5=" + repr(pl["inst5"])
+            + " course_amount=" + repr(pl["course_amount"])
+            + " total_paid=" + repr(pl["total_paid"]) + "\n"
+        )
+
+    # ── pairwise match-ladder analysis ──────────────────────────
+    pairs = []
+    for i, sd in enumerate(students_dump):
+        for j, pl in enumerate(paylog_dump):
+            s_pid = (sd["personal_id"] or "").strip()
+            p_pid = (pl["personal_id"] or "").strip()
+            step1 = bool(s_pid and p_pid and s_pid == p_pid)
+            s_fold = sd["student_name_folded"]
+            p_fold = pl["student_name_folded"]
+            step2 = bool(s_fold and p_fold and s_fold == p_fold)
+            s_nm = (sd["student_name"] or "").strip()
+            p_nm = (pl["student_name"] or "").strip()
+            step3 = bool(s_nm and p_nm and (
+                s_nm in p_nm or p_nm in s_nm
+            ))
+            # Codepoint diff between the two folded forms.
+            diff_a = []; diff_b = []
+            for k in range(max(len(s_fold), len(p_fold))):
+                ca = s_fold[k] if k < len(s_fold) else ""
+                cb = p_fold[k] if k < len(p_fold) else ""
+                if ca != cb:
+                    diff_a.append(("U+%04X" % ord(ca)) if ca else "—")
+                    diff_b.append(("U+%04X" % ord(cb)) if cb else "—")
+            verdict = ("matched_step1" if step1
+                       else "matched_step2" if step2
+                       else "matched_step3_substring" if step3
+                       else "UNMATCHED")
+            pairs.append({
+                "student_idx": i, "paylog_idx": j,
+                "student_id":  sd["id"], "paylog_id": pl["id"],
+                "step1_pid_exact":   step1,
+                "step2_name_fold":   step2,
+                "step3_ilike_sub":   step3,
+                "verdict":           verdict,
+                "diff_in_students":  " ".join(diff_a)[:300],
+                "diff_in_paylog":    " ".join(diff_b)[:300],
+            })
+            _sys_td.stderr.write(
+                "[tasneem-diag] match[" + str(i) + "," + str(j) + "]"
+                + " sid=" + str(sd["id"]) + " plid=" + str(pl["id"])
+                + " step1_pid_exact=" + str(step1)
+                + " step2_name_fold=" + str(step2)
+                + " step3_ilike_sub=" + str(step3)
+                + " verdict=" + verdict
+                + (" diff_codepoints=" + repr({
+                       "students": " ".join(diff_a)[:200],
+                       "paylog":   " ".join(diff_b)[:200]
+                   }) if not (step1 or step2 or step3) and (diff_a or diff_b) else "")
+                + "\n"
+            )
+
+    # ── what _payment_compute_plan actually returns for each student ──
+    plans = []
+    for sd in students_dump:
+        sid = sd["id"]
+        if sid is None:
+            continue
+        try:
+            plan_payload = _payment_compute_plan(db, sid)
+        except Exception as ex:
+            plan_payload = {"_error": str(ex)}
+        plans.append({"sid": sid, "plan": plan_payload})
+        # Only log a compact summary per student — full payload is
+        # in the JSON response. Reads the actual plan-dict shape:
+        # plan_payload = {"student": {...}, "plan": {installments[],
+        # total_paid, total_remaining, course_amount, status,
+        # paylog_matched, totals_source}}.
+        if isinstance(plan_payload, dict):
+            _plan = plan_payload.get("plan") or {}
+            _insts = _plan.get("installments") or []
+            inst_summary = {
+                str(it.get("n")): {
+                    "paid":   it.get("paid"),
+                    "amount": it.get("amount"),
+                    "source": it.get("source"),
+                    "status": it.get("status"),
+                }
+                for it in _insts
+                if isinstance(it, dict)
+            }
+            _sys_td.stderr.write(
+                "[tasneem-diag] computed_plan sid=" + str(sid)
+                + " paylog_matched=" + repr(_plan.get("paylog_matched"))
+                + " totals_source=" + repr(_plan.get("totals_source"))
+                + " status=" + repr(_plan.get("status"))
+                + " total_paid=" + repr(_plan.get("total_paid"))
+                + " total_remaining=" + repr(_plan.get("total_remaining"))
+                + " course_amount=" + repr(_plan.get("course_amount"))
+                + " num_installments=" + str(len(_insts))
+                + " installments=" + repr(inst_summary)
+                + "\n"
+            )
+        else:
+            _sys_td.stderr.write(
+                "[tasneem-diag] computed_plan sid=" + str(sid)
+                + " plan=" + repr(plan_payload) + "\n"
+            )
+    return jsonify({
+        "ok":       True,
+        "query":    q,
+        "students": students_dump,
+        "paylog":   paylog_dump,
+        "pairs":    pairs,
+        "plans":    plans,
+    })
+
+
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
     student doesn\'t exist.
