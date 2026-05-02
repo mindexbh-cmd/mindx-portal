@@ -3451,6 +3451,194 @@ if True:
         except Exception:
             pass
 
+    # ── payment-link-diag (NOT a migration — runs every boot, no
+    # stamp). Read-only diagnostic that surfaces why "متابعة الدفع"
+    # shows some registered students as having paid nothing despite
+    # rows existing in payment_log. The lookup ladder in
+    # _payment_log_paid_for_student() goes:
+    #   1. exact personal_id (non-empty)
+    #   2. _payment_normalize_name() folded match
+    #   3. ILIKE '%name%' substring
+    # Step 2's normaliser folds alif/ya/taa-marbuta + tashkeel +
+    # whitespace, but DOES NOT strip:
+    #   • NBSP (U+00A0) / zero-width joiners (U+200B-U+200D, U+FEFF)
+    #   • bidi marks (U+200E-U+200F, U+202A-U+202E)
+    #   • tatweel (U+0640)
+    # Any payment_log name that differs from students.student_name
+    # only by those characters silently fails to match. The diag
+    # surfaces the exact distinct rows + hex dumps of the
+    # discriminating bytes so a follow-up commit can apply the
+    # right tightening (likely extend _payment_normalize_name OR
+    # backfill payment_log.personal_id from students by a
+    # whitespace-tolerant join).
+    try:
+        import sys as _sys_pld
+        # Cheap precondition — skip when either table is empty so
+        # boot logs stay quiet on dev / fresh-install DBs.
+        try:
+            _stu_total = db2.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+        except Exception:
+            _stu_total = 0
+        try:
+            _pl_total = db2.execute("SELECT COUNT(*) FROM payment_log").fetchone()[0]
+        except Exception:
+            _pl_total = 0
+        if _stu_total > 0 and _pl_total > 0:
+            # Inline fold matching _payment_normalize_name (so the
+            # diag mirrors the actual matcher).
+            def _pld_fold(s):
+                if not s: return ''
+                t = str(s)
+                for k, v in (('أ','ا'),('إ','ا'),('آ','ا'),('ٱ','ا'),
+                             ('ة','ه'),('ى','ي')):
+                    t = t.replace(k, v)
+                import re as _r
+                t = _r.sub(r'[ً-ٟ]', '', t)  # tashkeel
+                t = ' '.join(t.split()).strip().lower()
+                return t
+
+            # Active filter resolution. get_setting() / _is_safe_ident
+            # aren't yet defined at module-import time when this block
+            # runs, so we hardcode the canonical active-column lookup
+            # (registration_term2_2026 = 'تم التسجيل') and gracefully
+            # fall through if the column isn't present.
+            _act_col = "registration_term2_2026"
+            _act_val = "تم التسجيل"
+            _act_safe = False
+            try:
+                _stu_live_cols = {r[1] for r in db2.execute(
+                    "PRAGMA table_info(students)"
+                ).fetchall()}
+                _act_safe = _act_col in _stu_live_cols
+            except Exception:
+                pass
+
+            # Pull both tables once.
+            _select_stu = ("SELECT id, personal_id, student_name FROM students "
+                           "WHERE student_name IS NOT NULL AND TRIM(student_name) <> ''")
+            if _act_safe and _act_val:
+                _select_stu += (" AND TRIM(\"" + _act_col + "\") = '"
+                                + _act_val.replace("'", "''") + "'")
+            try:
+                _stu_rows = db2.execute(_select_stu).fetchall()
+            except Exception:
+                _stu_rows = []
+            try:
+                _pl_rows = db2.execute(
+                    "SELECT student_name, personal_id, "
+                    "       COALESCE(inst1,'') AS i1, COALESCE(inst2,'') AS i2, "
+                    "       COALESCE(inst3,'') AS i3, COALESCE(inst4,'') AS i4, "
+                    "       COALESCE(inst5,'') AS i5 "
+                    "FROM payment_log"
+                ).fetchall()
+            except Exception:
+                _pl_rows = []
+
+            # Index payment_log by exact PID + by folded name.
+            _pl_by_pid  = {}
+            _pl_by_name = {}
+            _pl_pid_empty = 0
+            for r in _pl_rows:
+                _ps_name = r[0] if hasattr(r,"__getitem__") else None
+                _ps_pid  = r[1] if hasattr(r,"__getitem__") else None
+                _ps_pid_s = (str(_ps_pid).strip() if _ps_pid is not None else "")
+                if _ps_pid_s:
+                    _pl_by_pid.setdefault(_ps_pid_s, r)
+                else:
+                    _pl_pid_empty += 1
+                _f = _pld_fold(_ps_name)
+                if _f:
+                    _pl_by_name.setdefault(_f, r)
+
+            _matched_pid = 0
+            _matched_name = 0
+            _unmatched = []   # rows with NO match via either route
+            _near_misses = [] # candidates close enough to suggest a fold gap
+            for r in _stu_rows:
+                _sid = r[0] if hasattr(r,"__getitem__") else None
+                _spid = r[1] if hasattr(r,"__getitem__") else None
+                _sname = r[2] if hasattr(r,"__getitem__") else None
+                _spid_s = (str(_spid).strip() if _spid is not None else "")
+                _sname_s = str(_sname or "").strip()
+                if _spid_s and _spid_s in _pl_by_pid:
+                    _matched_pid += 1
+                    continue
+                _f_stu = _pld_fold(_sname_s)
+                if _f_stu and _f_stu in _pl_by_name:
+                    _matched_name += 1
+                    continue
+                # Try ILIKE-style fallback to find a near-miss before
+                # giving up. Brute-force scan capped at 20 candidates so
+                # the diag doesn't quadratically explode on big DBs.
+                _candidate = None
+                if _f_stu:
+                    for _f_pl, _row_pl in list(_pl_by_name.items())[:5000]:
+                        # Substring contains in either direction.
+                        if _f_stu in _f_pl or _f_pl in _f_stu:
+                            _candidate = (_f_pl, _row_pl)
+                            break
+                _unmatched.append({
+                    "student_id":   _sid,
+                    "student_pid":  _spid_s,
+                    "student_name": _sname_s,
+                    "near_miss":    _candidate,
+                })
+
+            # Build hex dumps for the first 5 unmatched + their
+            # near-miss candidates so we can spot invisible chars.
+            def _hex_dump(s, limit=80):
+                if not s: return ''
+                out = []
+                for ch in str(s)[:limit]:
+                    cp = ord(ch)
+                    out.append('U+%04X' % cp if cp > 0x7F else ch)
+                return ' '.join(out)
+
+            _sys_pld.stderr.write(
+                "[payment-link-diag] totals:"
+                + " students=" + str(_stu_total)
+                + " payment_log=" + str(_pl_total)
+                + " registered_students_scanned=" + str(len(_stu_rows))
+                + " pl_pid_index=" + str(len(_pl_by_pid))
+                + " pl_name_index=" + str(len(_pl_by_name))
+                + " pl_rows_with_empty_pid=" + str(_pl_pid_empty) + "\n"
+            )
+            _sys_pld.stderr.write(
+                "[payment-link-diag] match-bucket-counts:"
+                + " matched_by_personal_id=" + str(_matched_pid)
+                + " matched_by_name_fold=" + str(_matched_name)
+                + " unmatched=" + str(len(_unmatched)) + "\n"
+            )
+            for i, u in enumerate(_unmatched[:5]):
+                _nm = u["near_miss"]
+                _line = ("[payment-link-diag] unmatched["
+                         + str(i + 1) + "] sid=" + str(u["student_id"])
+                         + " pid=" + repr(u["student_pid"])
+                         + " name=" + repr(u["student_name"])
+                         + " name_hex=" + _hex_dump(u["student_name"]))
+                if _nm is not None:
+                    _line += (" | NEAR_MISS_in_paylog name="
+                              + repr(_nm[1][0])
+                              + " name_hex=" + _hex_dump(_nm[1][0])
+                              + " pid=" + repr(_nm[1][1] or ''))
+                _sys_pld.stderr.write(_line + "\n")
+        else:
+            _sys_pld.stderr.write(
+                "[payment-link-diag] skipping —"
+                + " students=" + str(_stu_total)
+                + " payment_log=" + str(_pl_total)
+                + " (need both > 0)\n"
+            )
+    except Exception as _ex_outer_pld:
+        try:
+            import sys as _sys_pld2
+            _sys_pld2.stderr.write(
+                "[payment-link-diag] OUTER ERROR: "
+                + str(_ex_outer_pld) + "\n"
+            )
+        except Exception:
+            pass
+
     # ── backfill_installment_type_v5: corrective one-shot. The truth
     # the deep diagnostic uncovered: students.installment_type stores
     # the taqseet row id (a short digit-string), NOT a synthesized
