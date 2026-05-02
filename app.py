@@ -42919,13 +42919,210 @@ def admin_diag_payment(student_query):
                 "[tasneem-diag] computed_plan sid=" + str(sid)
                 + " plan=" + repr(plan_payload) + "\n"
             )
+
+    # ── RECHECK ADDITIONS (post-fix verification) ─────────────────
+    # 1. Migration tag presence — confirms whether
+    #    payment_log_pid_backfill_v1 actually stamped on this DB.
+    migration_status = {"tag_stamped": False, "row": None}
+    try:
+        _row = db.execute(
+            "SELECT tag FROM schema_migrations "
+            "WHERE tag = 'payment_log_pid_backfill_v1'"
+        ).fetchone()
+        if _row:
+            migration_status["tag_stamped"] = True
+            migration_status["row"] = (_row[0]
+                                        if not hasattr(_row, "keys")
+                                        else _row["tag"])
+    except Exception as ex:
+        migration_status["error"] = str(ex)
+    _sys_td.stderr.write(
+        "[tasneem-recheck] migration_status: payment_log_pid_backfill_v1 "
+        + ("stamped" if migration_status["tag_stamped"] else "NOT stamped")
+        + "\n"
+    )
+
+    # 2. student_payments rows for each matched student — this is
+    #    the table the LIST-view endpoint /api/payments/group reads
+    #    from, NOT payment_log. If the UI is showing the list view
+    #    rather than the per-student detail, the 5b72056 fix
+    #    doesn't help because the list view doesn't go through
+    #    _payment_compute_plan.
+    student_payments_dump = []
+    for sd in students_dump:
+        sid = sd.get("id")
+        if sid is None:
+            continue
+        try:
+            _spr = db.execute(
+                "SELECT inst_num, inst_type, price, paid "
+                "FROM student_payments WHERE student_id = ? "
+                "ORDER BY inst_num",
+                (sid,),
+            ).fetchall()
+        except Exception as ex:
+            _spr = []
+            _sys_td.stderr.write(
+                "[tasneem-recheck] student_payments SELECT failed for sid="
+                + str(sid) + ": " + str(ex) + "\n"
+            )
+        sp_rows = [
+            {
+                "inst_num":  (r[0] if not hasattr(r, "keys") else r["inst_num"]),
+                "inst_type": (r[1] if not hasattr(r, "keys") else r["inst_type"]),
+                "price":     (r[2] if not hasattr(r, "keys") else r["price"]),
+                "paid":      (r[3] if not hasattr(r, "keys") else r["paid"]),
+            }
+            for r in _spr
+        ]
+        student_payments_dump.append({"sid": sid, "rows": sp_rows})
+        _sys_td.stderr.write(
+            "[tasneem-recheck] student_payments sid=" + str(sid)
+            + " count=" + str(len(sp_rows))
+            + " rows=" + repr(sp_rows[:8]) + "\n"
+        )
+
+    # 3. /api/payments/group simulation — call the actual list-view
+    #    endpoint logic for each matched student's group and dump
+    #    what the list view would render. Reads from
+    #    student_payments (NOT payment_log) so any zeros here are
+    #    the smoking gun for "list shows unpaid even though detail
+    #    shows paid".
+    list_view_simulation = []
+    for sd in students_dump:
+        gname = (sd.get("group_name_student") or "").strip()
+        gname_online = (sd.get("group_online") or "").strip()
+        target_group = gname or gname_online
+        if not target_group:
+            continue
+        try:
+            # Mirror /api/payments/group's WHERE clause + select.
+            in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
+            online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
+            if not _is_safe_ident(in_col):     in_col = 'group_name_student'
+            if not _is_safe_ident(online_col): online_col = 'group_online'
+            try:
+                live_cols = {r[1] for r in db.execute(
+                    "PRAGMA table_info(students)"
+                ).fetchall()}
+            except Exception:
+                live_cols = set()
+            has_online = online_col in live_cols and online_col != in_col
+            if has_online:
+                _sql = (
+                    'SELECT id, student_name FROM students '
+                    'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
+                    'OR TRIM(COALESCE("' + online_col + '", \'\')) = ? '
+                    'ORDER BY student_name'
+                )
+                _params = (target_group, target_group)
+            else:
+                _sql = (
+                    'SELECT id, student_name FROM students '
+                    'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
+                    'ORDER BY student_name'
+                )
+                _params = (target_group,)
+            _list_rows = db.execute(_sql, _params).fetchall()
+        except Exception as ex:
+            _list_rows = []
+            _sys_td.stderr.write(
+                "[tasneem-recheck] list-view group SELECT failed: "
+                + str(ex) + "\n"
+            )
+        # For each student in the group, count student_payments
+        # rows + sum paid amounts.
+        _entries = []
+        for _lr in _list_rows:
+            _lsid  = _lr[0] if not hasattr(_lr, "keys") else _lr["id"]
+            _lname = _lr[1] if not hasattr(_lr, "keys") else _lr["student_name"]
+            try:
+                _sps = db.execute(
+                    "SELECT inst_num, paid FROM student_payments "
+                    "WHERE student_id = ?",
+                    (_lsid,),
+                ).fetchall()
+            except Exception:
+                _sps = []
+            _total = 0.0
+            for _sp in _sps:
+                _v = _sp[1] if not hasattr(_sp, "keys") else _sp["paid"]
+                try:
+                    _total += float(_v or 0)
+                except Exception:
+                    pass
+            _entries.append({
+                "id":           _lsid,
+                "name":         _lname,
+                "sp_row_count": len(_sps),
+                "sp_total":     _total,
+            })
+        list_view_simulation.append({
+            "group":   target_group,
+            "students": _entries,
+        })
+        _sys_td.stderr.write(
+            "[tasneem-recheck] list_view group=" + repr(target_group)
+            + " student_count=" + str(len(_entries))
+            + " entries=" + repr(_entries[:10]) + "\n"
+        )
+
+    # 4. Verdict — explicit conclusion the admin can read at a glance.
+    _verdict_lines = []
+    if not migration_status["tag_stamped"]:
+        _verdict_lines.append(
+            "MIGRATION DIDN'T STAMP — payment_log_pid_backfill_v1 "
+            "is missing from schema_migrations. The 5b72056 fix "
+            "never ran on this DB. Either the deploy hasn't picked "
+            "up the new code, or the migration's outer try/except "
+            "swallowed an exception. Re-deploy and check Render "
+            "logs for [paylog-pid-backfill] tally."
+        )
+    elif paylog_dump:
+        _any_with_pid = any(
+            (p.get("personal_id") or "").strip() for p in paylog_dump
+        )
+        if not _any_with_pid:
+            _verdict_lines.append(
+                "MIGRATION STAMPED but payment_log rows for this "
+                "name STILL have empty personal_id. Possible "
+                "causes: (a) ambiguous fold (multiple students "
+                "share folded name) — see [paylog-ambiguous] in "
+                "boot logs; (b) orphan (no students row matched) "
+                "— see [paylog-orphan]; (c) the row was inserted "
+                "AFTER the migration ran (one-shot tags don't "
+                "re-fire). The student_payments table is empty "
+                "for this student, so the LIST view "
+                "(/api/payments/group) shows 0 even though the "
+                "DETAIL view (/api/payment/student/<sid>/plan) "
+                "should show the paylog totals."
+            )
+    if any(plan.get("plan", {}).get("plan", {}).get("paylog_matched")
+           for plan in plans):
+        _verdict_lines.append(
+            "DETAIL view (/api/payment/student/<sid>/plan) reports "
+            "paylog_matched=True. If the UI still shows 'لم يدفع' "
+            "/ 'المبلغ المدفوع: 0 د' in the LIST view, that's "
+            "because the list view reads student_payments — NOT "
+            "payment_log. Mirror the paid amounts from payment_log "
+            "into student_payments (a second one-shot migration), "
+            "or change /api/payments/group to use "
+            "_payment_compute_plan."
+        )
+    for v in _verdict_lines:
+        _sys_td.stderr.write("[tasneem-recheck] verdict: " + v + "\n")
+
     return jsonify({
-        "ok":       True,
-        "query":    q,
-        "students": students_dump,
-        "paylog":   paylog_dump,
-        "pairs":    pairs,
-        "plans":    plans,
+        "ok":                       True,
+        "query":                    q,
+        "students":                 students_dump,
+        "paylog":                   paylog_dump,
+        "pairs":                    pairs,
+        "plans":                    plans,
+        "migration_status":         migration_status,
+        "student_payments":         student_payments_dump,
+        "list_view_simulation":     list_view_simulation,
+        "verdict":                  _verdict_lines,
     })
 
 
