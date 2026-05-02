@@ -6815,6 +6815,7 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 </head>
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
+<script>document.body && (document.body.dataset.username = (window._mxUserUsername = "USER_USERNAME_PLACEHOLDER"));</script>
 <div class="dh-topbar">
   <!-- Phase 2 — fixed 64px deep purple header. Settings + logout
        preserved as items inside the avatar dropdown. The hamburger
@@ -9311,18 +9312,45 @@ function _srApplyMode(){
   if (banner) banner.classList.toggle('show', _srMode === 'edit');
   _srRenderActions();
 }
+/* Allow-list of usernames permitted to edit / delete a student
+   from the search modal. MUST stay in sync with the server-side
+   _STUDENT_EDIT_ALLOW set in app.py — both sides enforce. The
+   server returns 403 if a non-allow-listed user tries to PUT/
+   DELETE, so this client-side hide is purely UX (don't show
+   buttons that wouldn't work). */
+var MX_STUDENT_EDIT_ALLOW = {
+  'admin': 1, '021005931': 1, '010307885': 1, '980909805': 1
+};
+function _srCanEdit(){
+  var u = (document.body && document.body.dataset && document.body.dataset.username) || '';
+  return !!MX_STUDENT_EDIT_ALLOW[(u || '').trim()];
+}
 function _srRenderActions(){
   var box = document.getElementById('sr-actions');
   if (!box) return;
+  var canEdit = _srCanEdit();
   if (_srMode === 'edit'){
-    box.innerHTML =
-        '<button class="srm-btn-save" onclick="_srTrySave()">💾 حفظ التغييرات</button>'
-      + '<button class="srm-btn-cancel-edit" onclick="_srExitEditMode(true)">❌ إلغاء التعديل</button>'
-      + '<button class="srm-btn-delete" onclick="_srTryDelete()">🗑 حذف الطالب</button>';
+    /* Edit-mode is unreachable for non-allow-listed users — the
+       button that flips _srMode to 'edit' isn't rendered for them.
+       We still gate the save/delete buttons here as belt-and-
+       suspenders in case _srMode somehow gets flipped externally. */
+    if (canEdit) {
+      box.innerHTML =
+          '<button class="srm-btn-save" onclick="_srTrySave()">💾 حفظ التغييرات</button>'
+        + '<button class="srm-btn-cancel-edit" onclick="_srExitEditMode(true)">❌ إلغاء التعديل</button>'
+        + '<button class="srm-btn-delete" onclick="_srTryDelete()">🗑 حذف الطالب</button>';
+    } else {
+      box.innerHTML = '<button class="srm-cancel" onclick="srClose()">إغلاق</button>';
+    }
   } else {
-    box.innerHTML =
-        '<button class="srm-btn-edit" onclick="_srEnterEditMode()">✏ تعديل بيانات الطالب</button>'
-      + '<button class="srm-cancel" onclick="srClose()">إغلاق</button>';
+    if (canEdit) {
+      box.innerHTML =
+          '<button class="srm-btn-edit" onclick="_srEnterEditMode()">✏ تعديل بيانات الطالب</button>'
+        + '<button class="srm-cancel" onclick="srClose()">إغلاق</button>';
+    } else {
+      /* Non-allow-listed user: read-only view, no edit entry-point. */
+      box.innerHTML = '<button class="srm-cancel" onclick="srClose()">إغلاق</button>';
+    }
   }
 }
 function _srResetIdle(){
@@ -19421,6 +19449,7 @@ def dashboard():
     return (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
+        .replace("USER_USERNAME_PLACEHOLDER", username)
         .replace("DH_CTRL_DISP_PLACEHOLDER", ("flex" if role == "admin" else "none"))
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
@@ -22412,6 +22441,30 @@ def api_students_add():
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
 
+# Allow-list of usernames permitted to edit / delete student rows via
+# the search-modal "تعديل" / "حذف" flow. Server-side gate — never
+# trust the client's hide-the-button. Currently seeded:
+#   "admin"      — the original main admin (init_db seed; CLAUDE.md
+#                  Seeded credentials section)
+#   "021005931"  — أحمد يونس (admin), employee_logins_v1 migration
+#   "010307885"  — أحمد إبراهيم (manager), employee_logins_v1
+#   "980909805"  — رائد (manager), employee_logins_v1
+# Add new entries here AND in the frontend MX_STUDENT_EDIT_ALLOW
+# constant in HOME_HTML so client + server stay in lock-step.
+_STUDENT_EDIT_ALLOW = {"admin", "021005931", "010307885", "980909805"}
+
+def _student_edit_allowed(user):
+    """True iff the user is permitted to edit/delete a student row.
+    Belt-and-suspenders gate used by api_students_update +
+    api_students_delete in addition to the existing @login_required
+    role checks (admin / manager / reception all reach the search
+    modal but only this 4-person allow-list may save changes)."""
+    if not isinstance(user, dict):
+        return False
+    uname = (user.get("username") or "").strip()
+    return uname in _STUDENT_EDIT_ALLOW
+
+
 @app.route("/api/students/<int:sid>", methods=["PUT", "PATCH"])
 @login_required
 def api_students_update(sid):
@@ -22419,6 +22472,12 @@ def api_students_update(sid):
     body are touched, so the search-detail diff-only save flow no
     longer overwrites unchanged columns with NULL. Any new column on
     the `students` table is automatically supported."""
+    user = session.get("user") or {}
+    if not _student_edit_allowed(user):
+        return jsonify({
+            "ok": False,
+            "error": "غير مصرح بالتعديل من هذا الحساب",
+        }), 403
     d = request.get_json() or {}
     db = get_db()
     cols = _students_live_columns(db)
@@ -22461,6 +22520,12 @@ def api_students_update(sid):
 @app.route("/api/students/<int:sid>", methods=["DELETE"])
 @login_required
 def api_students_delete(sid):
+    user = session.get("user") or {}
+    if not _student_edit_allowed(user):
+        return jsonify({
+            "ok": False,
+            "error": "غير مصرح بالحذف من هذا الحساب",
+        }), 403
     try:
         db = get_db()
         db.execute("DELETE FROM students WHERE id=?", (sid,))
