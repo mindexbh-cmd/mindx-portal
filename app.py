@@ -3451,194 +3451,6 @@ if True:
         except Exception:
             pass
 
-    # ── payment-link-diag (NOT a migration — runs every boot, no
-    # stamp). Read-only diagnostic that surfaces why "متابعة الدفع"
-    # shows some registered students as having paid nothing despite
-    # rows existing in payment_log. The lookup ladder in
-    # _payment_log_paid_for_student() goes:
-    #   1. exact personal_id (non-empty)
-    #   2. _payment_normalize_name() folded match
-    #   3. ILIKE '%name%' substring
-    # Step 2's normaliser folds alif/ya/taa-marbuta + tashkeel +
-    # whitespace, but DOES NOT strip:
-    #   • NBSP (U+00A0) / zero-width joiners (U+200B-U+200D, U+FEFF)
-    #   • bidi marks (U+200E-U+200F, U+202A-U+202E)
-    #   • tatweel (U+0640)
-    # Any payment_log name that differs from students.student_name
-    # only by those characters silently fails to match. The diag
-    # surfaces the exact distinct rows + hex dumps of the
-    # discriminating bytes so a follow-up commit can apply the
-    # right tightening (likely extend _payment_normalize_name OR
-    # backfill payment_log.personal_id from students by a
-    # whitespace-tolerant join).
-    try:
-        import sys as _sys_pld
-        # Cheap precondition — skip when either table is empty so
-        # boot logs stay quiet on dev / fresh-install DBs.
-        try:
-            _stu_total = db2.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-        except Exception:
-            _stu_total = 0
-        try:
-            _pl_total = db2.execute("SELECT COUNT(*) FROM payment_log").fetchone()[0]
-        except Exception:
-            _pl_total = 0
-        if _stu_total > 0 and _pl_total > 0:
-            # Inline fold matching _payment_normalize_name (so the
-            # diag mirrors the actual matcher).
-            def _pld_fold(s):
-                if not s: return ''
-                t = str(s)
-                for k, v in (('أ','ا'),('إ','ا'),('آ','ا'),('ٱ','ا'),
-                             ('ة','ه'),('ى','ي')):
-                    t = t.replace(k, v)
-                import re as _r
-                t = _r.sub(r'[ً-ٟ]', '', t)  # tashkeel
-                t = ' '.join(t.split()).strip().lower()
-                return t
-
-            # Active filter resolution. get_setting() / _is_safe_ident
-            # aren't yet defined at module-import time when this block
-            # runs, so we hardcode the canonical active-column lookup
-            # (registration_term2_2026 = 'تم التسجيل') and gracefully
-            # fall through if the column isn't present.
-            _act_col = "registration_term2_2026"
-            _act_val = "تم التسجيل"
-            _act_safe = False
-            try:
-                _stu_live_cols = {r[1] for r in db2.execute(
-                    "PRAGMA table_info(students)"
-                ).fetchall()}
-                _act_safe = _act_col in _stu_live_cols
-            except Exception:
-                pass
-
-            # Pull both tables once.
-            _select_stu = ("SELECT id, personal_id, student_name FROM students "
-                           "WHERE student_name IS NOT NULL AND TRIM(student_name) <> ''")
-            if _act_safe and _act_val:
-                _select_stu += (" AND TRIM(\"" + _act_col + "\") = '"
-                                + _act_val.replace("'", "''") + "'")
-            try:
-                _stu_rows = db2.execute(_select_stu).fetchall()
-            except Exception:
-                _stu_rows = []
-            try:
-                _pl_rows = db2.execute(
-                    "SELECT student_name, personal_id, "
-                    "       COALESCE(inst1,'') AS i1, COALESCE(inst2,'') AS i2, "
-                    "       COALESCE(inst3,'') AS i3, COALESCE(inst4,'') AS i4, "
-                    "       COALESCE(inst5,'') AS i5 "
-                    "FROM payment_log"
-                ).fetchall()
-            except Exception:
-                _pl_rows = []
-
-            # Index payment_log by exact PID + by folded name.
-            _pl_by_pid  = {}
-            _pl_by_name = {}
-            _pl_pid_empty = 0
-            for r in _pl_rows:
-                _ps_name = r[0] if hasattr(r,"__getitem__") else None
-                _ps_pid  = r[1] if hasattr(r,"__getitem__") else None
-                _ps_pid_s = (str(_ps_pid).strip() if _ps_pid is not None else "")
-                if _ps_pid_s:
-                    _pl_by_pid.setdefault(_ps_pid_s, r)
-                else:
-                    _pl_pid_empty += 1
-                _f = _pld_fold(_ps_name)
-                if _f:
-                    _pl_by_name.setdefault(_f, r)
-
-            _matched_pid = 0
-            _matched_name = 0
-            _unmatched = []   # rows with NO match via either route
-            _near_misses = [] # candidates close enough to suggest a fold gap
-            for r in _stu_rows:
-                _sid = r[0] if hasattr(r,"__getitem__") else None
-                _spid = r[1] if hasattr(r,"__getitem__") else None
-                _sname = r[2] if hasattr(r,"__getitem__") else None
-                _spid_s = (str(_spid).strip() if _spid is not None else "")
-                _sname_s = str(_sname or "").strip()
-                if _spid_s and _spid_s in _pl_by_pid:
-                    _matched_pid += 1
-                    continue
-                _f_stu = _pld_fold(_sname_s)
-                if _f_stu and _f_stu in _pl_by_name:
-                    _matched_name += 1
-                    continue
-                # Try ILIKE-style fallback to find a near-miss before
-                # giving up. Brute-force scan capped at 20 candidates so
-                # the diag doesn't quadratically explode on big DBs.
-                _candidate = None
-                if _f_stu:
-                    for _f_pl, _row_pl in list(_pl_by_name.items())[:5000]:
-                        # Substring contains in either direction.
-                        if _f_stu in _f_pl or _f_pl in _f_stu:
-                            _candidate = (_f_pl, _row_pl)
-                            break
-                _unmatched.append({
-                    "student_id":   _sid,
-                    "student_pid":  _spid_s,
-                    "student_name": _sname_s,
-                    "near_miss":    _candidate,
-                })
-
-            # Build hex dumps for the first 5 unmatched + their
-            # near-miss candidates so we can spot invisible chars.
-            def _hex_dump(s, limit=80):
-                if not s: return ''
-                out = []
-                for ch in str(s)[:limit]:
-                    cp = ord(ch)
-                    out.append('U+%04X' % cp if cp > 0x7F else ch)
-                return ' '.join(out)
-
-            _sys_pld.stderr.write(
-                "[payment-link-diag] totals:"
-                + " students=" + str(_stu_total)
-                + " payment_log=" + str(_pl_total)
-                + " registered_students_scanned=" + str(len(_stu_rows))
-                + " pl_pid_index=" + str(len(_pl_by_pid))
-                + " pl_name_index=" + str(len(_pl_by_name))
-                + " pl_rows_with_empty_pid=" + str(_pl_pid_empty) + "\n"
-            )
-            _sys_pld.stderr.write(
-                "[payment-link-diag] match-bucket-counts:"
-                + " matched_by_personal_id=" + str(_matched_pid)
-                + " matched_by_name_fold=" + str(_matched_name)
-                + " unmatched=" + str(len(_unmatched)) + "\n"
-            )
-            for i, u in enumerate(_unmatched[:5]):
-                _nm = u["near_miss"]
-                _line = ("[payment-link-diag] unmatched["
-                         + str(i + 1) + "] sid=" + str(u["student_id"])
-                         + " pid=" + repr(u["student_pid"])
-                         + " name=" + repr(u["student_name"])
-                         + " name_hex=" + _hex_dump(u["student_name"]))
-                if _nm is not None:
-                    _line += (" | NEAR_MISS_in_paylog name="
-                              + repr(_nm[1][0])
-                              + " name_hex=" + _hex_dump(_nm[1][0])
-                              + " pid=" + repr(_nm[1][1] or ''))
-                _sys_pld.stderr.write(_line + "\n")
-        else:
-            _sys_pld.stderr.write(
-                "[payment-link-diag] skipping —"
-                + " students=" + str(_stu_total)
-                + " payment_log=" + str(_pl_total)
-                + " (need both > 0)\n"
-            )
-    except Exception as _ex_outer_pld:
-        try:
-            import sys as _sys_pld2
-            _sys_pld2.stderr.write(
-                "[payment-link-diag] OUTER ERROR: "
-                + str(_ex_outer_pld) + "\n"
-            )
-        except Exception:
-            pass
-
     # ── backfill_installment_type_v5: corrective one-shot. The truth
     # the deep diagnostic uncovered: students.installment_type stores
     # the taqseet row id (a short digit-string), NOT a synthesized
@@ -20525,7 +20337,7 @@ def api_admin_receipt_confirm(rid):
                 db.execute('UPDATE payment_log SET ' + ', '.join(set_pairs) + ' WHERE id=?', tuple(params))
             if has_total:
                 fresh = db.execute(
-                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?', (row_id,),
+                    'SELECT ' + _paylog_inst_select_clause(db) + ' FROM payment_log WHERE id=?', (row_id,),
                 ).fetchone()
                 fresh_total = 0.0
                 for k in range(1, 6):
@@ -40743,13 +40555,23 @@ def _paylog_resolve_inst_col_map(db):
     except Exception:
         return canonical
     out = {}
+    # Per-slot ASCII alias ladder. Tried in order; first that exists in
+    # the live schema wins. Covers every naming convention the import
+    # paths and label-system can produce.
+    _ascii_aliases = {
+        1: ["inst1", "installment1", "installment_1", "paid_1", "paid1"],
+        2: ["inst2", "installment2", "installment_2", "paid_2", "paid2"],
+        3: ["inst3", "installment3", "installment_3", "paid_3", "paid3"],
+        4: ["inst4", "installment4", "installment_4", "paid_4", "paid4"],
+        5: ["inst5", "installment5", "installment_5", "paid_5", "paid5"],
+    }
     for n in (1, 2, 3, 4, 5):
-        if ("inst" + str(n)) in live:
-            out[n] = "inst" + str(n)
-        elif ("installment" + str(n)) in live:
-            out[n] = "installment" + str(n)
-        else:
-            out[n] = canonical[n]
+        picked = None
+        for cand in _ascii_aliases[n]:
+            if cand in live:
+                picked = cand
+                break
+        out[n] = picked or canonical[n]
     unresolved = [n for n in (1, 2, 3, 4, 5) if out[n] not in live]
     if unresolved:
         try:
@@ -40786,6 +40608,47 @@ def _paylog_resolve_inst_col_map(db):
                         break
         except Exception:
             pass
+    return out
+
+
+def _paylog_inst_col_map_cached(db):
+    """Per-request cached _paylog_resolve_inst_col_map.
+
+    Caches on flask.g._paylog_inst_map so the resolver runs once per
+    request even when both the reader (_payment_log_paid_for_student)
+    and the writer (_drive_extract_paylog_from_students) hit it. Falls
+    back to no caching if invoked outside a request context.
+
+    Logs the resolved map once per resolution via [paylog-col-resolve]
+    so prod logs make the actual column-name selection auditable.
+    """
+    _g = None
+    try:
+        from flask import g as _flask_g
+        _g = _flask_g
+        cached = getattr(_g, "_paylog_inst_map", None)
+        if cached is not None:
+            return cached
+    except Exception:
+        _g = None
+    out = _paylog_resolve_inst_col_map(db)
+    try:
+        import sys as _s_pcr
+        _s_pcr.stderr.write(
+            "[paylog-col-resolve] "
+            + " ".join(
+                "inst" + str(n) + "=" + str(out.get(n) or "?")
+                for n in (1, 2, 3, 4, 5)
+            )
+            + "\n"
+        )
+    except Exception:
+        pass
+    try:
+        if _g is not None:
+            _g._paylog_inst_map = out
+    except Exception:
+        pass
     return out
 
 
@@ -40905,7 +40768,7 @@ def _drive_extract_paylog_from_students(xlsx_bytes, sheet_name, db=None):
     except Exception:
         pass
 
-    inst_col_map = _paylog_resolve_inst_col_map(db)
+    inst_col_map = _paylog_inst_col_map_cached(db)
     # installment{N} placeholder -> live payment_log column key.
     # student_name passes through unchanged (it's the same column
     # name in payment_log).
@@ -41989,7 +41852,7 @@ def api_import_from_drive():
     _import_extra_fields = None
     if table_name == "payment_log" and paylog_source == "students":
         try:
-            _inst_map = _paylog_resolve_inst_col_map(db)
+            _inst_map = _paylog_inst_col_map_cached(db)
             _paylog_static = set(IMPORT_TABLE_FIELDS.get("payment_log") or ())
             _import_extra_fields = [
                 v for v in _inst_map.values()
@@ -42480,6 +42343,31 @@ def _payment_load_student(db, sid):
     }
     return d
 
+def _paylog_inst_select_clause(db):
+    """Return a 5-column comma-separated SELECT clause for the live
+    inst1..inst5 column names, suitable for plugging into
+    'SELECT <clause> FROM payment_log WHERE id=?'. Any slot whose
+    resolved column isn't present in the live schema is substituted
+    with the literal NULL keyword so positional reading (fresh[0..4])
+    always lines up. Used by the recompute-totals paths that need
+    per-row installment values."""
+    try:
+        live_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(payment_log)"
+        ).fetchall()}
+    except Exception:
+        live_cols = set()
+    imap = _paylog_inst_col_map_cached(db)
+    pieces = []
+    for n in (1, 2, 3, 4, 5):
+        ck = imap.get(n) or ("inst" + str(n))
+        if ck in live_cols:
+            pieces.append('"' + ck + '"')
+        else:
+            pieces.append("NULL")
+    return ",".join(pieces)
+
+
 def _payment_normalize_name(s):
     """Whitespace-collapse, strip diacritics + presentation chars so
     a payment_log row survives slight name spelling differences when
@@ -42536,7 +42424,14 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
     total_remaining, course_amount, and msg1..msg5 columns when they
     exist on the live schema (they were added in the paylog v2
     migration). Lookup ladder: personal_id → exact-normalised
-    student_name → ILIKE substring."""
+    student_name → ILIKE substring.
+
+    Installment column names are runtime-resolved via
+    _paylog_inst_col_map_cached(), so this works whether the live
+    schema names them inst1..inst5, installment1..installment5,
+    installment_1..installment_5, paid_1..paid_5, or any admin-renamed
+    label-resolved variant the col_labels resolver picks up.
+    """
     paid_by_inst = {}
     pl_row = None
     # Detect which paylog columns exist (course_amount, total_paid,
@@ -42546,16 +42441,40 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
         live_cols = {r[1] for r in db.execute("PRAGMA table_info(payment_log)").fetchall()}
     except Exception:
         live_cols = set()
+    # Runtime-resolved installment column names. Fall back to the
+    # canonical inst1..inst5 only when the resolver returns names not
+    # present in the live schema (drops them from SELECT so we don't
+    # raise "column does not exist" on prod).
+    inst_col_map = _paylog_inst_col_map_cached(db)
+    inst_cols = []
+    for n in (1, 2, 3, 4, 5):
+        ck = inst_col_map.get(n) or ("inst" + str(n))
+        if ck in live_cols:
+            inst_cols.append(ck)
+        else:
+            # Column missing from live schema — substitute a literal
+            # NULL alias so positional reading below still lines up.
+            inst_cols.append(None)
     extra_cols = []
     for c in ('course_amount', 'total_paid', 'total_remaining',
               'msg1', 'msg2', 'msg3', 'msg4', 'msg5'):
         if c in live_cols:
             extra_cols.append(c)
-    select_cols = (
-        ['student_name', 'inst1', 'inst2', 'inst3', 'inst4', 'inst5']
-        + extra_cols
+
+    # Build the SELECT, treating any None inst slot as an explicit
+    # NULL placeholder so positional indexes 1..5 always exist.
+    inst_select_pieces = []
+    for ck in inst_cols:
+        if ck is None:
+            inst_select_pieces.append("NULL")
+        else:
+            inst_select_pieces.append('"' + ck + '"')
+    select_pieces = (
+        ['"student_name"']
+        + inst_select_pieces
+        + ['"' + c + '"' for c in extra_cols]
     )
-    select_sql_base = ('SELECT ' + ', '.join('"' + c + '"' for c in select_cols)
+    select_sql_base = ('SELECT ' + ', '.join(select_pieces)
                        + ' FROM payment_log ')
     try:
         if personal_id and str(personal_id).strip():
@@ -42598,916 +42517,6 @@ def _payment_log_paid_for_student(db, student_name, personal_id):
         **extras,
     }
     return paid_by_inst, pl_dict
-
-
-@app.route('/admin/diag/payment/<path:student_query>', methods=['GET'])
-@login_required
-def admin_diag_payment(student_query):
-    """Targeted diagnostic for "متابعة الدفع shows X as unpaid"
-    incidents. Surfaces every join-relevant byte for one student
-    name fragment so the admin (or us) can spot the exact
-    invisible-character / fold-gap / empty-PID that broke the
-    student↔payment_log lookup.
-
-    Usage: GET /admin/diag/payment/تسنيم   (or any URL-encoded name
-    fragment). Admin/manager/reception only — pure read, no
-    mutations.
-
-    Logs five buckets to stderr (greppable as [tasneem-diag]) AND
-    returns the same data as JSON so you can also inspect it in
-    the browser without opening the prod log:
-
-      [tasneem-diag] query  — the raw query string + its UTF-8
-                              hex codepoints, so a stray bidi
-                              mark in the URL itself is visible.
-      [tasneem-diag] student[i] — every students row whose
-                              student_name LIKE %query%, with
-                              repr() of name + personal_id, the
-                              UTF-8 hex codepoints of the name,
-                              and the _payment_normalize_name()
-                              folded form.
-      [tasneem-diag] paylog[j] — every payment_log row whose
-                              student_name LIKE %query%, with the
-                              same repr/hex/fold treatment, plus
-                              inst1..5 values, course_amount,
-                              total_paid.
-      [tasneem-diag] match[i,j] — for every (student, paylog)
-                              pair, the three lookup ladder steps
-                              compared explicitly:
-                                step1_pid_exact  = students.pid == paylog.pid?
-                                step2_name_fold  = fold(students.name) == fold(paylog.name)?
-                                step3_ilike_sub  = students.name in paylog.name (substring)?
-                              If any step is True, the matcher
-                              would have linked that pair; if all
-                              are False, the row is silently
-                              dropped — and the diff_codepoints
-                              field surfaces exactly which
-                              codepoints differ in the folded
-                              forms.
-      [tasneem-diag] computed_plan — runs the actual
-                              _payment_compute_plan(db, sid) for
-                              every matched student id and dumps
-                              the paid_by_installment + totals so
-                              the diag's verdict matches what the
-                              UI is rendering.
-    """
-    user = session.get("user") or {}
-    role = (user.get("role") or "").strip().lower()
-    if role not in ("admin", "manager", "reception"):
-        return jsonify({"ok": False, "error": "forbidden"}), 403
-    import sys as _sys_td
-    db = get_db()
-    q = (student_query or "").strip()
-    if not q:
-        return jsonify({"ok": False, "error": "empty query"}), 400
-
-    def _hex(s):
-        if s is None: return ""
-        out = []
-        for ch in str(s)[:200]:
-            cp = ord(ch)
-            out.append("U+%04X" % cp if cp > 0x7F else ch)
-        return " ".join(out)
-
-    _sys_td.stderr.write(
-        "[tasneem-diag] query=" + repr(q)
-        + " hex=" + _hex(q) + "\n"
-    )
-
-    # ── students rows ────────────────────────────────────────────
-    try:
-        s_rows = db.execute(
-            "SELECT * FROM students WHERE student_name LIKE ? ORDER BY id",
-            ('%' + q + '%',),
-        ).fetchall()
-    except Exception as ex:
-        s_rows = []
-        _sys_td.stderr.write("[tasneem-diag] students SELECT failed: " + str(ex) + "\n")
-    students_dump = []
-    for r in s_rows:
-        rd = dict(r) if hasattr(r, "keys") else {}
-        nm = rd.get("student_name") or ""
-        pid = rd.get("personal_id") or ""
-        folded = _payment_normalize_name(nm)
-        students_dump.append({
-            "id":              rd.get("id"),
-            "personal_id":     pid,
-            "personal_id_hex": _hex(pid),
-            "student_name":    nm,
-            "student_name_repr": repr(nm),
-            "student_name_hex":  _hex(nm),
-            "student_name_folded": folded,
-            "student_name_utf8_bytes": str(nm).encode("utf-8").hex(),
-            "group_name_student":  rd.get("group_name_student") or "",
-            "group_online":        rd.get("group_online") or "",
-            "registration":        rd.get("registration_term2_2026") or "",
-            "installment_type":    rd.get("installment_type") or "",
-        })
-    _sys_td.stderr.write(
-        "[tasneem-diag] students_matches=" + str(len(students_dump)) + "\n"
-    )
-    for i, sd in enumerate(students_dump):
-        _sys_td.stderr.write(
-            "[tasneem-diag] student[" + str(i) + "] id=" + str(sd["id"])
-            + " pid=" + repr(sd["personal_id"])
-            + " name=" + repr(sd["student_name"])
-            + " name_hex=" + sd["student_name_hex"]
-            + " folded=" + repr(sd["student_name_folded"])
-            + " group=" + repr(sd["group_name_student"])
-            + " inst_type=" + repr(sd["installment_type"]) + "\n"
-        )
-
-    # ── payment_log rows ─────────────────────────────────────────
-    # Two-phase scan: literal LIKE first (cheap, indexable), then a
-    # fold-aware fallback that pulls every paylog name and matches
-    # against the folded query. Catches tatweel-inside-name +
-    # invisible-char-inside-name cases that LIKE silently misses
-    # (the very mismatch the matcher itself stumbles on at request
-    # time, so the diag has to model the same gap).
-    try:
-        pl_rows = db.execute(
-            "SELECT * FROM payment_log WHERE student_name LIKE ? ORDER BY id",
-            ('%' + q + '%',),
-        ).fetchall()
-    except Exception as ex:
-        pl_rows = []
-        _sys_td.stderr.write("[tasneem-diag] payment_log SELECT failed: " + str(ex) + "\n")
-    # Fold-aware fallback: scan every paylog row and match the
-    # super-folded query against the super-folded student_name.
-    # Super-fold = _payment_normalize_name + strip tatweel +
-    # zero-width + bidi marks. This is broader than what the
-    # request-time matcher does, so it surfaces rows that the
-    # production matcher silently misses — exactly the diag's
-    # purpose. Bounded at 5000 rows for safety.
-    def _super_fold(s):
-        if not s: return ''
-        t = _payment_normalize_name(s)
-        # Strip tatweel + zero-width + bidi marks the request-time
-        # normaliser leaves intact.
-        for ch in ('ـ',                          # tatweel
-                   '​', '‌', '‍',      # ZWS / ZWNJ / ZWJ
-                   '‎', '‏',                # LRM / RLM
-                   '‪', '‫', '‬',      # LRE / RLE / PDF
-                   '‭', '‮', '﻿'):     # LRO / RLO / BOM
-            t = t.replace(ch, '')
-        return ' '.join(t.split())
-    if not pl_rows:
-        q_super = _super_fold(q)
-        if q_super:
-            try:
-                _all = db.execute(
-                    "SELECT * FROM payment_log ORDER BY id LIMIT 5000"
-                ).fetchall()
-            except Exception:
-                _all = []
-            _fallback = []
-            for r in _all:
-                _nm = (r["student_name"] if hasattr(r, "keys")
-                       else (r[1] if len(r) > 1 else "")) or ""
-                _f = _super_fold(_nm)
-                if _f and q_super in _f:
-                    _fallback.append(r)
-            if _fallback:
-                pl_rows = _fallback
-                _sys_td.stderr.write(
-                    "[tasneem-diag] payment_log literal-LIKE missed "
-                    + repr(q) + " — super-fold (strips tatweel + "
-                    + "zero-width + bidi) fallback found "
-                    + str(len(_fallback)) + " rows. ROOT CAUSE: the "
-                    + "paylog name contains characters that "
-                    + "_payment_normalize_name does NOT strip — "
-                    + "extending the request-time normaliser to do "
-                    + "the same super-fold should resolve the bug.\n"
-                )
-    paylog_dump = []
-    for r in pl_rows:
-        rd = dict(r) if hasattr(r, "keys") else {}
-        nm = rd.get("student_name") or ""
-        pid = rd.get("personal_id") or ""
-        folded = _payment_normalize_name(nm)
-        paylog_dump.append({
-            "id":                 rd.get("id"),
-            "personal_id":        pid,
-            "personal_id_hex":    _hex(pid),
-            "student_name":       nm,
-            "student_name_repr":  repr(nm),
-            "student_name_hex":   _hex(nm),
-            "student_name_folded": folded,
-            "student_name_utf8_bytes": str(nm).encode("utf-8").hex(),
-            "inst1":              rd.get("inst1"),
-            "inst2":              rd.get("inst2"),
-            "inst3":              rd.get("inst3"),
-            "inst4":              rd.get("inst4"),
-            "inst5":              rd.get("inst5"),
-            "course_amount":      rd.get("course_amount"),
-            "total_paid":         rd.get("total_paid"),
-            "total_remaining":    rd.get("total_remaining"),
-        })
-    _sys_td.stderr.write(
-        "[tasneem-diag] paylog_matches=" + str(len(paylog_dump)) + "\n"
-    )
-    for j, pl in enumerate(paylog_dump):
-        _sys_td.stderr.write(
-            "[tasneem-diag] paylog[" + str(j) + "] id=" + str(pl["id"])
-            + " pid=" + repr(pl["personal_id"])
-            + " name=" + repr(pl["student_name"])
-            + " name_hex=" + pl["student_name_hex"]
-            + " folded=" + repr(pl["student_name_folded"])
-            + " inst1=" + repr(pl["inst1"])
-            + " inst2=" + repr(pl["inst2"])
-            + " inst3=" + repr(pl["inst3"])
-            + " inst4=" + repr(pl["inst4"])
-            + " inst5=" + repr(pl["inst5"])
-            + " course_amount=" + repr(pl["course_amount"])
-            + " total_paid=" + repr(pl["total_paid"]) + "\n"
-        )
-
-    # ── pairwise match-ladder analysis ──────────────────────────
-    pairs = []
-    for i, sd in enumerate(students_dump):
-        for j, pl in enumerate(paylog_dump):
-            s_pid = (sd["personal_id"] or "").strip()
-            p_pid = (pl["personal_id"] or "").strip()
-            step1 = bool(s_pid and p_pid and s_pid == p_pid)
-            s_fold = sd["student_name_folded"]
-            p_fold = pl["student_name_folded"]
-            step2 = bool(s_fold and p_fold and s_fold == p_fold)
-            s_nm = (sd["student_name"] or "").strip()
-            p_nm = (pl["student_name"] or "").strip()
-            step3 = bool(s_nm and p_nm and (
-                s_nm in p_nm or p_nm in s_nm
-            ))
-            # Codepoint diff between the two folded forms.
-            diff_a = []; diff_b = []
-            for k in range(max(len(s_fold), len(p_fold))):
-                ca = s_fold[k] if k < len(s_fold) else ""
-                cb = p_fold[k] if k < len(p_fold) else ""
-                if ca != cb:
-                    diff_a.append(("U+%04X" % ord(ca)) if ca else "—")
-                    diff_b.append(("U+%04X" % ord(cb)) if cb else "—")
-            verdict = ("matched_step1" if step1
-                       else "matched_step2" if step2
-                       else "matched_step3_substring" if step3
-                       else "UNMATCHED")
-            pairs.append({
-                "student_idx": i, "paylog_idx": j,
-                "student_id":  sd["id"], "paylog_id": pl["id"],
-                "step1_pid_exact":   step1,
-                "step2_name_fold":   step2,
-                "step3_ilike_sub":   step3,
-                "verdict":           verdict,
-                "diff_in_students":  " ".join(diff_a)[:300],
-                "diff_in_paylog":    " ".join(diff_b)[:300],
-            })
-            _sys_td.stderr.write(
-                "[tasneem-diag] match[" + str(i) + "," + str(j) + "]"
-                + " sid=" + str(sd["id"]) + " plid=" + str(pl["id"])
-                + " step1_pid_exact=" + str(step1)
-                + " step2_name_fold=" + str(step2)
-                + " step3_ilike_sub=" + str(step3)
-                + " verdict=" + verdict
-                + (" diff_codepoints=" + repr({
-                       "students": " ".join(diff_a)[:200],
-                       "paylog":   " ".join(diff_b)[:200]
-                   }) if not (step1 or step2 or step3) and (diff_a or diff_b) else "")
-                + "\n"
-            )
-
-    # ── what _payment_compute_plan actually returns for each student ──
-    plans = []
-    for sd in students_dump:
-        sid = sd["id"]
-        if sid is None:
-            continue
-        try:
-            plan_payload = _payment_compute_plan(db, sid)
-        except Exception as ex:
-            plan_payload = {"_error": str(ex)}
-        plans.append({"sid": sid, "plan": plan_payload})
-        # Only log a compact summary per student — full payload is
-        # in the JSON response. Reads the actual plan-dict shape:
-        # plan_payload = {"student": {...}, "plan": {installments[],
-        # total_paid, total_remaining, course_amount, status,
-        # paylog_matched, totals_source}}.
-        if isinstance(plan_payload, dict):
-            _plan = plan_payload.get("plan") or {}
-            _insts = _plan.get("installments") or []
-            inst_summary = {
-                str(it.get("n")): {
-                    "paid":   it.get("paid"),
-                    "amount": it.get("amount"),
-                    "source": it.get("source"),
-                    "status": it.get("status"),
-                }
-                for it in _insts
-                if isinstance(it, dict)
-            }
-            _sys_td.stderr.write(
-                "[tasneem-diag] computed_plan sid=" + str(sid)
-                + " paylog_matched=" + repr(_plan.get("paylog_matched"))
-                + " totals_source=" + repr(_plan.get("totals_source"))
-                + " status=" + repr(_plan.get("status"))
-                + " total_paid=" + repr(_plan.get("total_paid"))
-                + " total_remaining=" + repr(_plan.get("total_remaining"))
-                + " course_amount=" + repr(_plan.get("course_amount"))
-                + " num_installments=" + str(len(_insts))
-                + " installments=" + repr(inst_summary)
-                + "\n"
-            )
-        else:
-            _sys_td.stderr.write(
-                "[tasneem-diag] computed_plan sid=" + str(sid)
-                + " plan=" + repr(plan_payload) + "\n"
-            )
-
-    # ── RECHECK ADDITIONS (post-fix verification) ─────────────────
-    # 1. Migration tag presence — confirms whether
-    #    payment_log_pid_backfill_v1 actually stamped on this DB.
-    migration_status = {"tag_stamped": False, "row": None}
-    try:
-        _row = db.execute(
-            "SELECT tag FROM schema_migrations "
-            "WHERE tag = 'payment_log_pid_backfill_v1'"
-        ).fetchone()
-        if _row:
-            migration_status["tag_stamped"] = True
-            migration_status["row"] = (_row[0]
-                                        if not hasattr(_row, "keys")
-                                        else _row["tag"])
-    except Exception as ex:
-        migration_status["error"] = str(ex)
-    _sys_td.stderr.write(
-        "[tasneem-recheck] migration_status: payment_log_pid_backfill_v1 "
-        + ("stamped" if migration_status["tag_stamped"] else "NOT stamped")
-        + "\n"
-    )
-
-    # 2. student_payments rows for each matched student — this is
-    #    the table the LIST-view endpoint /api/payments/group reads
-    #    from, NOT payment_log. If the UI is showing the list view
-    #    rather than the per-student detail, the 5b72056 fix
-    #    doesn't help because the list view doesn't go through
-    #    _payment_compute_plan.
-    student_payments_dump = []
-    for sd in students_dump:
-        sid = sd.get("id")
-        if sid is None:
-            continue
-        try:
-            _spr = db.execute(
-                "SELECT inst_num, inst_type, price, paid "
-                "FROM student_payments WHERE student_id = ? "
-                "ORDER BY inst_num",
-                (sid,),
-            ).fetchall()
-        except Exception as ex:
-            _spr = []
-            _sys_td.stderr.write(
-                "[tasneem-recheck] student_payments SELECT failed for sid="
-                + str(sid) + ": " + str(ex) + "\n"
-            )
-        sp_rows = [
-            {
-                "inst_num":  (r[0] if not hasattr(r, "keys") else r["inst_num"]),
-                "inst_type": (r[1] if not hasattr(r, "keys") else r["inst_type"]),
-                "price":     (r[2] if not hasattr(r, "keys") else r["price"]),
-                "paid":      (r[3] if not hasattr(r, "keys") else r["paid"]),
-            }
-            for r in _spr
-        ]
-        student_payments_dump.append({"sid": sid, "rows": sp_rows})
-        _sys_td.stderr.write(
-            "[tasneem-recheck] student_payments sid=" + str(sid)
-            + " count=" + str(len(sp_rows))
-            + " rows=" + repr(sp_rows[:8]) + "\n"
-        )
-
-    # 3. /api/payments/group simulation — call the actual list-view
-    #    endpoint logic for each matched student's group and dump
-    #    what the list view would render. Reads from
-    #    student_payments (NOT payment_log) so any zeros here are
-    #    the smoking gun for "list shows unpaid even though detail
-    #    shows paid".
-    list_view_simulation = []
-    for sd in students_dump:
-        gname = (sd.get("group_name_student") or "").strip()
-        gname_online = (sd.get("group_online") or "").strip()
-        target_group = gname or gname_online
-        if not target_group:
-            continue
-        try:
-            # Mirror /api/payments/group's WHERE clause + select.
-            in_col     = get_setting('attendance', 'student_group_column',         'group_name_student')
-            online_col = get_setting('attendance', 'student_online_group_column',  'group_online')
-            if not _is_safe_ident(in_col):     in_col = 'group_name_student'
-            if not _is_safe_ident(online_col): online_col = 'group_online'
-            try:
-                live_cols = {r[1] for r in db.execute(
-                    "PRAGMA table_info(students)"
-                ).fetchall()}
-            except Exception:
-                live_cols = set()
-            has_online = online_col in live_cols and online_col != in_col
-            if has_online:
-                _sql = (
-                    'SELECT id, student_name FROM students '
-                    'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
-                    'OR TRIM(COALESCE("' + online_col + '", \'\')) = ? '
-                    'ORDER BY student_name'
-                )
-                _params = (target_group, target_group)
-            else:
-                _sql = (
-                    'SELECT id, student_name FROM students '
-                    'WHERE TRIM(COALESCE("' + in_col + '", \'\')) = ? '
-                    'ORDER BY student_name'
-                )
-                _params = (target_group,)
-            _list_rows = db.execute(_sql, _params).fetchall()
-        except Exception as ex:
-            _list_rows = []
-            _sys_td.stderr.write(
-                "[tasneem-recheck] list-view group SELECT failed: "
-                + str(ex) + "\n"
-            )
-        # For each student in the group, count student_payments
-        # rows + sum paid amounts.
-        _entries = []
-        for _lr in _list_rows:
-            _lsid  = _lr[0] if not hasattr(_lr, "keys") else _lr["id"]
-            _lname = _lr[1] if not hasattr(_lr, "keys") else _lr["student_name"]
-            try:
-                _sps = db.execute(
-                    "SELECT inst_num, paid FROM student_payments "
-                    "WHERE student_id = ?",
-                    (_lsid,),
-                ).fetchall()
-            except Exception:
-                _sps = []
-            _total = 0.0
-            for _sp in _sps:
-                _v = _sp[1] if not hasattr(_sp, "keys") else _sp["paid"]
-                try:
-                    _total += float(_v or 0)
-                except Exception:
-                    pass
-            _entries.append({
-                "id":           _lsid,
-                "name":         _lname,
-                "sp_row_count": len(_sps),
-                "sp_total":     _total,
-            })
-        list_view_simulation.append({
-            "group":   target_group,
-            "students": _entries,
-        })
-        _sys_td.stderr.write(
-            "[tasneem-recheck] list_view group=" + repr(target_group)
-            + " student_count=" + str(len(_entries))
-            + " entries=" + repr(_entries[:10]) + "\n"
-        )
-
-    # 4. Verdict — explicit conclusion the admin can read at a glance.
-    _verdict_lines = []
-    if not migration_status["tag_stamped"]:
-        _verdict_lines.append(
-            "MIGRATION DIDN'T STAMP — payment_log_pid_backfill_v1 "
-            "is missing from schema_migrations. The 5b72056 fix "
-            "never ran on this DB. Either the deploy hasn't picked "
-            "up the new code, or the migration's outer try/except "
-            "swallowed an exception. Re-deploy and check Render "
-            "logs for [paylog-pid-backfill] tally."
-        )
-    elif paylog_dump:
-        _any_with_pid = any(
-            (p.get("personal_id") or "").strip() for p in paylog_dump
-        )
-        if not _any_with_pid:
-            _verdict_lines.append(
-                "MIGRATION STAMPED but payment_log rows for this "
-                "name STILL have empty personal_id. Possible "
-                "causes: (a) ambiguous fold (multiple students "
-                "share folded name) — see [paylog-ambiguous] in "
-                "boot logs; (b) orphan (no students row matched) "
-                "— see [paylog-orphan]; (c) the row was inserted "
-                "AFTER the migration ran (one-shot tags don't "
-                "re-fire). The student_payments table is empty "
-                "for this student, so the LIST view "
-                "(/api/payments/group) shows 0 even though the "
-                "DETAIL view (/api/payment/student/<sid>/plan) "
-                "should show the paylog totals."
-            )
-    if any(plan.get("plan", {}).get("plan", {}).get("paylog_matched")
-           for plan in plans):
-        _verdict_lines.append(
-            "DETAIL view (/api/payment/student/<sid>/plan) reports "
-            "paylog_matched=True. If the UI still shows 'لم يدفع' "
-            "/ 'المبلغ المدفوع: 0 د' in the LIST view, that's "
-            "because the list view reads student_payments — NOT "
-            "payment_log. Mirror the paid amounts from payment_log "
-            "into student_payments (a second one-shot migration), "
-            "or change /api/payments/group to use "
-            "_payment_compute_plan."
-        )
-    for v in _verdict_lines:
-        _sys_td.stderr.write("[tasneem-recheck] verdict: " + v + "\n")
-
-    return jsonify({
-        "ok":                       True,
-        "query":                    q,
-        "students":                 students_dump,
-        "paylog":                   paylog_dump,
-        "pairs":                    pairs,
-        "plans":                    plans,
-        "migration_status":         migration_status,
-        "student_payments":         student_payments_dump,
-        "list_view_simulation":     list_view_simulation,
-        "verdict":                  _verdict_lines,
-    })
-
-
-@app.route('/admin/diag/payment-truth/<path:student_query>', methods=['GET'])
-@login_required
-def admin_diag_payment_truth(student_query):
-    """Deep root-cause diagnostic for the لم يدفع / 0 د bug.
-
-    Dumps EVERY column of EVERY row in students + payment_log +
-    student_payments that touches the queried student name, plus
-    the taqseet row used by _payment_compute_plan, plus a
-    step-by-step trace of _payment_compute_plan inputs/outputs.
-
-    Read-only, repr()'s every value so hidden chars (NBSP, ZWNJ,
-    tatweel, BIDI marks) become visible. Stderr-tagged
-    [tasneem-truth] for grep continuity.
-    """
-    import sys as _sys_tt
-
-    db = get_db()
-    q = (student_query or "").strip()
-    if not q:
-        return jsonify({"ok": False, "error": "empty query"}), 400
-
-    _sys_tt.stderr.write(
-        "[tasneem-truth] ═══ DEEP DIAG START ═══ query="
-        + repr(q) + "\n"
-    )
-
-    # ── 1. Resolve students table column list (every column). ────
-    try:
-        s_cols = [r[1] for r in db.execute(
-            "PRAGMA table_info(students)"
-        ).fetchall()]
-    except Exception as ex:
-        s_cols = []
-        _sys_tt.stderr.write(
-            "[tasneem-truth] PRAGMA students FAILED: " + str(ex) + "\n"
-        )
-    _sys_tt.stderr.write(
-        "[tasneem-truth] students.columns ("
-        + str(len(s_cols)) + ") = " + repr(s_cols) + "\n"
-    )
-
-    # ── 2. Resolve payment_log column list (every column). ───────
-    try:
-        p_cols = [r[1] for r in db.execute(
-            "PRAGMA table_info(payment_log)"
-        ).fetchall()]
-    except Exception as ex:
-        p_cols = []
-        _sys_tt.stderr.write(
-            "[tasneem-truth] PRAGMA payment_log FAILED: "
-            + str(ex) + "\n"
-        )
-    _sys_tt.stderr.write(
-        "[tasneem-truth] payment_log.columns ("
-        + str(len(p_cols)) + ") = " + repr(p_cols) + "\n"
-    )
-
-    # Identify installment-like columns in each table.
-    def _is_inst_col(name):
-        n = (name or "").lower()
-        return ("inst" in n) or ("installment" in n) or ("قسط" in name)
-    students_inst_cols   = [c for c in s_cols if _is_inst_col(c)]
-    paylog_inst_cols     = [c for c in p_cols if _is_inst_col(c)]
-    _sys_tt.stderr.write(
-        "[tasneem-truth] students.inst_like_cols=" + repr(students_inst_cols)
-        + "\n"
-    )
-    _sys_tt.stderr.write(
-        "[tasneem-truth] payment_log.inst_like_cols=" + repr(paylog_inst_cols)
-        + "\n"
-    )
-
-    # ── 3. Pull EVERY column for every matching student row. ─────
-    students_full = []
-    matched_sids  = []
-    matched_pids  = []
-    matched_names = []
-    try:
-        rows = db.execute(
-            "SELECT * FROM students WHERE student_name LIKE ?",
-            ("%" + q + "%",),
-        ).fetchall()
-    except Exception as ex:
-        rows = []
-        _sys_tt.stderr.write(
-            "[tasneem-truth] SELECT students FAILED: " + str(ex) + "\n"
-        )
-    _sys_tt.stderr.write(
-        "[tasneem-truth] students.matched_count=" + str(len(rows)) + "\n"
-    )
-    for r in rows:
-        rec = {}
-        for i, c in enumerate(s_cols):
-            try:
-                v = r[i] if not hasattr(r, "keys") else r[c]
-            except Exception:
-                v = "<read-error>"
-            rec[c] = v
-            # repr each cell so hidden chars show up.
-            _sys_tt.stderr.write(
-                "[tasneem-truth] students[" + repr(rec.get("id"))
-                + "]." + c + " = " + repr(v) + "\n"
-            )
-        students_full.append(rec)
-        if rec.get("id") is not None:
-            matched_sids.append(rec.get("id"))
-        if rec.get("personal_id"):
-            matched_pids.append(str(rec.get("personal_id")).strip())
-        if rec.get("student_name"):
-            matched_names.append(str(rec.get("student_name")))
-
-    # ── 4. Pull EVERY column from payment_log — by PID OR by
-    #    name LIKE. Keep both query paths visible.
-    paylog_full   = []
-    seen_paylog   = set()
-    try:
-        # 4a. by personal_id
-        for pid in matched_pids:
-            try:
-                prs = db.execute(
-                    "SELECT * FROM payment_log WHERE personal_id = ?",
-                    (pid,),
-                ).fetchall()
-            except Exception as ex:
-                prs = []
-                _sys_tt.stderr.write(
-                    "[tasneem-truth] paylog by-pid FAILED pid=" + repr(pid)
-                    + ": " + str(ex) + "\n"
-                )
-            _sys_tt.stderr.write(
-                "[tasneem-truth] paylog.by_pid pid=" + repr(pid)
-                + " count=" + str(len(prs)) + "\n"
-            )
-            for pr in prs:
-                key = id(pr)
-                if key in seen_paylog: continue
-                seen_paylog.add(key)
-                rec = {}
-                for i, c in enumerate(p_cols):
-                    try:
-                        v = pr[i] if not hasattr(pr, "keys") else pr[c]
-                    except Exception:
-                        v = "<read-error>"
-                    rec[c] = v
-                rec["__source__"] = "by_pid:" + pid
-                paylog_full.append(rec)
-        # 4b. by name LIKE
-        try:
-            prs = db.execute(
-                "SELECT * FROM payment_log WHERE student_name LIKE ?",
-                ("%" + q + "%",),
-            ).fetchall()
-        except Exception as ex:
-            prs = []
-            _sys_tt.stderr.write(
-                "[tasneem-truth] paylog by-name FAILED: " + str(ex) + "\n"
-            )
-        _sys_tt.stderr.write(
-            "[tasneem-truth] paylog.by_name count=" + str(len(prs)) + "\n"
-        )
-        for pr in prs:
-            key = id(pr)
-            if key in seen_paylog: continue
-            seen_paylog.add(key)
-            rec = {}
-            for i, c in enumerate(p_cols):
-                try:
-                    v = pr[i] if not hasattr(pr, "keys") else pr[c]
-                except Exception:
-                    v = "<read-error>"
-                rec[c] = v
-            rec["__source__"] = "by_name_like"
-            paylog_full.append(rec)
-    except Exception as ex:
-        _sys_tt.stderr.write(
-            "[tasneem-truth] paylog combined SELECT outer-FAILED: "
-            + str(ex) + "\n"
-        )
-
-    # repr each paylog row's full column set
-    for idx, rec in enumerate(paylog_full):
-        for c in p_cols:
-            _sys_tt.stderr.write(
-                "[tasneem-truth] payment_log[" + str(idx) + "/"
-                + repr(rec.get("__source__")) + "]." + c
-                + " = " + repr(rec.get(c)) + "\n"
-            )
-
-    # ── 5. Pull EVERY student_payments row for matched students.
-    sp_full = []
-    try:
-        sp_cols = [r[1] for r in db.execute(
-            "PRAGMA table_info(student_payments)"
-        ).fetchall()]
-    except Exception:
-        sp_cols = []
-    _sys_tt.stderr.write(
-        "[tasneem-truth] student_payments.columns="
-        + repr(sp_cols) + "\n"
-    )
-    for sid in matched_sids:
-        try:
-            sprs = db.execute(
-                "SELECT * FROM student_payments WHERE student_id=?",
-                (sid,),
-            ).fetchall()
-        except Exception as ex:
-            sprs = []
-            _sys_tt.stderr.write(
-                "[tasneem-truth] student_payments SELECT FAILED sid="
-                + str(sid) + ": " + str(ex) + "\n"
-            )
-        _sys_tt.stderr.write(
-            "[tasneem-truth] student_payments.sid=" + str(sid)
-            + " count=" + str(len(sprs)) + "\n"
-        )
-        for spr in sprs:
-            rec = {}
-            for i, c in enumerate(sp_cols):
-                try:
-                    v = spr[i] if not hasattr(spr, "keys") else spr[c]
-                except Exception:
-                    v = "<read-error>"
-                rec[c] = v
-            sp_full.append({"sid": sid, "row": rec})
-            for c in sp_cols:
-                _sys_tt.stderr.write(
-                    "[tasneem-truth] student_payments[sid=" + str(sid)
-                    + "]." + c + " = " + repr(rec.get(c)) + "\n"
-                )
-
-    # ── 6. Trace _payment_compute_plan step by step. ─────────────
-    plan_traces = []
-    for sid in matched_sids:
-        trace = {"sid": sid}
-        try:
-            student = _payment_load_student(db, sid)
-        except Exception as ex:
-            student = None
-            trace["load_student_error"] = str(ex)
-        trace["loaded_student"] = student
-        _sys_tt.stderr.write(
-            "[tasneem-truth] trace.sid=" + str(sid)
-            + " loaded_student=" + repr(student) + "\n"
-        )
-
-        # Taqseet rows + the matched row.
-        try:
-            tq_rows = _payment_load_taqseet_rows(db)
-        except Exception as ex:
-            tq_rows = []
-            _sys_tt.stderr.write(
-                "[tasneem-truth] trace.taqseet_rows FAILED: "
-                + str(ex) + "\n"
-            )
-        trace["taqseet_row_count"] = len(tq_rows)
-        try:
-            tq = _payment_find_taqseet(
-                tq_rows,
-                (student or {}).get("installment_type") if student else None,
-            )
-        except Exception as ex:
-            tq = None
-            trace["find_taqseet_error"] = str(ex)
-        # Convert tq row to a dict-of-tuples so it serialises cleanly.
-        tq_dump = None
-        if tq is not None:
-            try:
-                tq_dump = [
-                    (i,
-                     (tq[i] if not hasattr(tq, "keys") else tq[i]))
-                    for i in range(len(tq))
-                ]
-            except Exception:
-                tq_dump = "<unserializable>"
-        trace["matched_taqseet"] = tq_dump
-        _sys_tt.stderr.write(
-            "[tasneem-truth] trace.sid=" + str(sid)
-            + " matched_taqseet=" + repr(tq_dump) + "\n"
-        )
-
-        # _payment_log_paid_for_student inputs + outputs.
-        sname_in = (student or {}).get("name") if student else None
-        spid_in  = (student or {}).get("personal_id") if student else None
-        try:
-            paid_pl, pl_row_dict = _payment_log_paid_for_student(
-                db, sname_in, spid_in,
-            )
-        except Exception as ex:
-            paid_pl, pl_row_dict = {}, None
-            trace["paid_for_student_error"] = str(ex)
-        trace["paid_pl"]      = paid_pl
-        trace["pl_row_dict"]  = pl_row_dict
-        _sys_tt.stderr.write(
-            "[tasneem-truth] trace.sid=" + str(sid)
-            + " input_name=" + repr(sname_in)
-            + " input_pid=" + repr(spid_in) + "\n"
-        )
-        _sys_tt.stderr.write(
-            "[tasneem-truth] trace.sid=" + str(sid)
-            + " paid_pl=" + repr(paid_pl) + "\n"
-        )
-        _sys_tt.stderr.write(
-            "[tasneem-truth] trace.sid=" + str(sid)
-            + " pl_row_dict=" + repr(pl_row_dict) + "\n"
-        )
-
-        # Final compute_plan output (whole shape).
-        try:
-            plan_payload = _payment_compute_plan(db, sid)
-        except Exception as ex:
-            plan_payload = {"_error": str(ex)}
-        trace["compute_plan"] = plan_payload
-        if isinstance(plan_payload, dict) and "plan" in plan_payload:
-            _pl = plan_payload["plan"]
-            _sys_tt.stderr.write(
-                "[tasneem-truth] trace.sid=" + str(sid)
-                + " FINAL course_amount=" + repr(_pl.get("course_amount"))
-                + " total_paid=" + repr(_pl.get("total_paid"))
-                + " total_remaining=" + repr(_pl.get("total_remaining"))
-                + " status=" + repr(_pl.get("status"))
-                + " paylog_matched=" + repr(_pl.get("paylog_matched"))
-                + " totals_source=" + repr(_pl.get("totals_source"))
-                + "\n"
-            )
-            for it in (_pl.get("installments") or []):
-                _sys_tt.stderr.write(
-                    "[tasneem-truth] trace.sid=" + str(sid)
-                    + " inst.n=" + repr(it.get("n"))
-                    + " amount=" + repr(it.get("amount"))
-                    + " paid=" + repr(it.get("paid"))
-                    + " remaining=" + repr(it.get("remaining"))
-                    + " source=" + repr(it.get("source")) + "\n"
-                )
-        plan_traces.append(trace)
-
-    # ── 7. Verdict computation. ──────────────────────────────────
-    truth_verdict = []
-    for sf in students_full:
-        sid_v = sf.get("id")
-        sname_v = sf.get("student_name")
-        # pull installment values FROM students directly
-        s_inst_vals = {c: sf.get(c) for c in students_inst_cols}
-        # pull installment values FROM payment_log row(s) for this student
-        pl_inst_vals = {}
-        for prec in paylog_full:
-            if str(prec.get("personal_id") or "").strip() == \
-               str(sf.get("personal_id") or "").strip() \
-               and (sf.get("personal_id") or "").strip():
-                for c in paylog_inst_cols:
-                    if c not in pl_inst_vals or pl_inst_vals[c] in (None, ""):
-                        pl_inst_vals[c] = prec.get(c)
-        truth_verdict.append({
-            "sid":                  sid_v,
-            "name":                 sname_v,
-            "students_inst_values": s_inst_vals,
-            "paylog_inst_values":   pl_inst_vals,
-        })
-        _sys_tt.stderr.write(
-            "[tasneem-truth] verdict sid=" + str(sid_v)
-            + " students_inst=" + repr(s_inst_vals)
-            + " paylog_inst="   + repr(pl_inst_vals) + "\n"
-        )
-
-    _sys_tt.stderr.write(
-        "[tasneem-truth] ═══ DEEP DIAG END ═══\n"
-    )
-
-    return jsonify({
-        "ok":                   True,
-        "query":                q,
-        "students_columns":     s_cols,
-        "paylog_columns":       p_cols,
-        "students_inst_cols":   students_inst_cols,
-        "paylog_inst_cols":     paylog_inst_cols,
-        "students_rows":        students_full,
-        "paylog_rows":          paylog_full,
-        "student_payments":     sp_full,
-        "compute_plan_traces":  plan_traces,
-        "truth_verdict":        truth_verdict,
-    })
-
 
 def _payment_compute_plan(db, sid):
     """Build the plan payload for a given student. Returns None if the
@@ -43639,94 +42648,6 @@ def _payment_compute_plan(db, sid):
         status = 'unpaid'
     else:
         status = 'partial'
-    # ── Inline truth tracing for the Tasneem case. Fires only when
-    # the loaded student's name folds to contain "تسنيم", so it
-    # surfaces every time her payment card loads — no need to hit
-    # the diag URL. Read-only; safe to leave on.
-    try:
-        _name_for_match = (student.get('name') or '')
-        _name_folded = _payment_normalize_name(_name_for_match)
-        if 'تسنيم' in _name_for_match or 'تسنيم' in _name_folded:
-            import sys as _sys_inline
-            _sys_inline.stderr.write(
-                "[tasneem-inline] ─── _payment_compute_plan trace ───\n"
-            )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] sid=" + str(sid)
-                + " name=" + repr(_name_for_match)
-                + " pid=" + repr(student.get('personal_id'))
-                + " installment_type=" + repr(student.get('installment_type'))
-                + "\n"
-            )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] taqseet matched=" + str(bool(tq))
-                + " method=" + repr(method_label)
-                + " method_id=" + repr(tq[0] if tq else None)
-                + "\n"
-            )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] paid_pl=" + repr(paid_pl)
-                + " pl_row_dict=" + repr(pl_row)
-                + "\n"
-            )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] paid_sp=" + repr(paid_sp)
-                + "\n"
-            )
-            for _it in installments:
-                _sys_inline.stderr.write(
-                    "[tasneem-inline] inst.n=" + repr(_it.get('n'))
-                    + " amount=" + repr(_it.get('amount'))
-                    + " paid=" + repr(_it.get('paid'))
-                    + " remaining=" + repr(_it.get('remaining'))
-                    + " source=" + repr(_it.get('source'))
-                    + "\n"
-                )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] FINAL course_amount=" + repr(course_amount)
-                + " total_paid=" + repr(total_paid)
-                + " total_remaining=" + repr(total_remaining)
-                + " status=" + repr(status)
-                + " paylog_matched=" + repr(bool(pl_row))
-                + " totals_source="
-                + repr("payment_log" if total_paid_pl is not None else "computed")
-                + "\n"
-            )
-            # Cross-table dump: every installment-named column on
-            # students for this sid, so we can see immediately
-            # whether the data lives on students.installment* even
-            # though the page reads payment_log.
-            try:
-                _scols = [r[1] for r in db.execute(
-                    "PRAGMA table_info(students)"
-                ).fetchall()]
-                _ic = [c for c in _scols if 'inst' in c.lower()
-                                          or 'installment' in c.lower()]
-                if _ic:
-                    _sel = ('SELECT ' + ', '.join('"' + c + '"' for c in _ic)
-                            + ' FROM students WHERE id=?')
-                    _sr = db.execute(_sel, (sid,)).fetchone()
-                    if _sr is not None:
-                        for i, c in enumerate(_ic):
-                            try:
-                                _v = _sr[i] if not hasattr(_sr, "keys") else _sr[c]
-                            except Exception:
-                                _v = "<read-error>"
-                            _sys_inline.stderr.write(
-                                "[tasneem-inline] students." + c
-                                + " = " + repr(_v) + "\n"
-                            )
-            except Exception as _ex_inline:
-                _sys_inline.stderr.write(
-                    "[tasneem-inline] students-inst dump FAILED: "
-                    + str(_ex_inline) + "\n"
-                )
-            _sys_inline.stderr.write(
-                "[tasneem-inline] ─── end ───\n"
-            )
-    except Exception:
-        pass
-
     return {
         "student": {
             "id":           student['id'],
@@ -43887,7 +42808,7 @@ def api_payment_student_pay(sid):
             # they\'re full-paid markers.
             if has_total:
                 fresh = db.execute(
-                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?',
+                    'SELECT ' + _paylog_inst_select_clause(db) + ' FROM payment_log WHERE id=?',
                     (row_id,),
                 ).fetchone()
                 fresh_total = 0.0
@@ -44023,7 +42944,7 @@ def api_payment_student_edit(sid):
                 db.execute('UPDATE payment_log SET ' + ', '.join(set_pairs) + ' WHERE id=?', tuple(params))
             if has_total:
                 fresh = db.execute(
-                    'SELECT inst1,inst2,inst3,inst4,inst5 FROM payment_log WHERE id=?', (row_id,),
+                    'SELECT ' + _paylog_inst_select_clause(db) + ' FROM payment_log WHERE id=?', (row_id,),
                 ).fetchone()
                 fresh_total = 0.0
                 for k in range(1, 6):
