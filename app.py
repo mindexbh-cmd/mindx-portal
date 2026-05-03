@@ -9388,6 +9388,38 @@ function dhCopyParentLink(){
                                border:0.5px solid #A32D2D;}
           .gs-grp-att.att-none{background:#fafafe;color:#8a7da5;
                                border:0.5px solid #d8c8ec;}
+
+          /* Edit-mode UI for the معلومات عامة tab. The action row
+             sits above the info grid; in RTL the right-aligned
+             buttons land on the visual start of the row. */
+          .gs-edit-actions{display:flex;justify-content:flex-end;
+                           gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+          .gs-edit-btn-primary,
+          .gs-edit-btn-success,
+          .gs-edit-btn-cancel{border:none;border-radius:9px;
+                              padding:8px 14px;font-weight:800;
+                              font-family:inherit;font-size:.86rem;
+                              cursor:pointer;}
+          .gs-edit-btn-primary{background:#6B3FA0;color:#fff;}
+          .gs-edit-btn-primary:hover{background:#5a3489;}
+          .gs-edit-btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+          .gs-edit-btn-success{background:#1D9E75;color:#fff;}
+          .gs-edit-btn-success:hover{background:#178360;}
+          .gs-edit-btn-success:disabled{opacity:.5;cursor:not-allowed;}
+          .gs-edit-btn-cancel{background:#f3e5f5;color:#4a148c;
+                              border:0.5px solid #d8c8ec;}
+          .gs-edit-btn-cancel:hover{background:#e1bee7;}
+          .gs-edit-input{width:100%;padding:7px 10px;
+                         border:0.5px solid #d8c8ec;border-radius:8px;
+                         background:#fff;color:#212121;
+                         font-family:inherit;font-size:.92rem;}
+          .gs-edit-input:focus{outline:none;border-color:#6B3FA0;
+                               box-shadow:0 0 0 2px
+                                 rgba(107,63,160,.15);}
+          .gs-edit-error{color:#A32D2D;font-weight:700;font-size:.86rem;
+                         padding:7px 11px;background:#FCE6E6;
+                         border:0.5px solid #A32D2D;border-radius:8px;
+                         margin-top:8px;}
         </style>
 
         <!-- A) Filters card -->
@@ -9842,6 +9874,118 @@ function dhCopyParentLink(){
               infoEl.innerHTML = gsRenderInfo(payload);
             }
           };
+
+          /* ── Round-7 Commit 4 — edit UI for the info tab.
+             Admin-only. Wraps gsRenderInfo to prepend an action
+             row carrying the "تعديل المعلومات" button when the
+             current session is admin. Click-delegate on the info
+             panel switches between read-only and edit form; cancel
+             re-renders from cache; save shows a placeholder alert
+             that Commit 5 will replace with the real PATCH call. */
+          function gsIsAdmin(){
+            return !!(document.body && document.body.dataset &&
+              (document.body.dataset.role || '').toLowerCase() === 'admin');
+          }
+
+          var _gsOrigRenderInfo = gsRenderInfo;
+          gsRenderInfo = function(payload){
+            var inner = _gsOrigRenderInfo(payload);
+            if(!inner) return inner;
+            if(!gsIsAdmin()) return inner;
+            return '<div class="gs-edit-actions">' +
+              '<button type="button" class="gs-edit-btn-primary" ' +
+                'data-gs-edit="enter">' +
+                '✏️ تعديل المعلومات</button>' +
+            '</div>' + inner;
+          };
+
+          function gsRenderInfoEditForm(payload){
+            var grp = (payload && payload.detail &&
+                       payload.detail.group) || {};
+            function field(idSuffix, labelAr, fieldKey, value){
+              return '<div class="gs-info-card">' +
+                '<div class="gs-info-label">' +
+                  gsEscape(labelAr) + '</div>' +
+                '<input type="text" class="gs-edit-input" ' +
+                  'id="gs-edit-' + idSuffix + '" ' +
+                  'data-gs-edit-field="' + fieldKey + '" ' +
+                  'value="' + gsEscape(value || '') + '">' +
+              '</div>';
+            }
+            return '<div class="gs-edit-actions">' +
+              '<button type="button" class="gs-edit-btn-success" ' +
+                'data-gs-edit="save">💾 حفظ التعديلات</button>' +
+              '<button type="button" class="gs-edit-btn-cancel" ' +
+                'data-gs-edit="cancel">إلغاء</button>' +
+            '</div>' +
+            '<div class="gs-info-grid">' +
+              field('teacher', 'المعلمة',     'teacher_name',
+                    grp.teacher_name) +
+              field('level',   'المستوى',     'level',
+                    grp.level) +
+              field('days',    'أيام الدراسة', 'study_days',
+                    grp.study_days) +
+              field('time',    'وقت الحصة',   'study_time',
+                    grp.study_time) +
+              field('ramadan', 'وقت رمضان',   'ramadan_time',
+                    grp.ramadan_time) +
+              field('online',  'وقت أونلاين', 'online_time',
+                    grp.online_time) +
+              field('session', 'مدة الحصة',   'session_duration',
+                    grp.session_duration) +
+            '</div>' +
+            '<div class="gs-edit-error" id="gs-edit-error" hidden></div>';
+          }
+
+          function gsEnterEditMode(){
+            var gid = sel.value;
+            if(!gid || gid === 'all') return;
+            var entry = gsDetailCache[gid];
+            if(!entry) return;
+            var infoEl = document.querySelector(
+              '.gs-panel[data-gs-panel="info"]');
+            if(infoEl){
+              infoEl.innerHTML = gsRenderInfoEditForm(entry);
+              /* Auto-focus the first input so the admin can start
+                 typing immediately. */
+              var firstInp = infoEl.querySelector('.gs-edit-input');
+              if(firstInp) firstInp.focus();
+            }
+          }
+
+          function gsExitEditMode(){
+            var gid = sel.value;
+            if(!gid || gid === 'all') return;
+            var entry = gsDetailCache[gid];
+            if(!entry) return;
+            var infoEl = document.querySelector(
+              '.gs-panel[data-gs-panel="info"]');
+            if(infoEl){
+              infoEl.innerHTML = gsRenderInfo(entry);
+            }
+          }
+
+          /* Click delegate on the info panel — survives every
+             re-render of the panel content. */
+          var gsInfoPanel = document.querySelector(
+            '.gs-panel[data-gs-panel="info"]');
+          if(gsInfoPanel){
+            gsInfoPanel.addEventListener('click', function(ev){
+              var btn = ev.target.closest('[data-gs-edit]');
+              if(!btn) return;
+              var action = btn.getAttribute('data-gs-edit');
+              if(action === 'enter'){
+                gsEnterEditMode();
+              } else if(action === 'cancel'){
+                gsExitEditMode();
+              } else if(action === 'save'){
+                /* Commit 5 wires the actual PATCH. Until then, this
+                   placeholder confirms the click reached the right
+                   handler. */
+                alert('سيتم تنفيذ الحفظ في الخطوة التالية');
+              }
+            });
+          }
 
           /* ── Step 5 — الطالبات roster tab. Same wrap pattern.
              pay_status mapping note: the detail endpoint returns
