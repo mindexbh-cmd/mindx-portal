@@ -41051,6 +41051,278 @@ def api_admin_violations_stats():
     })
 
 
+# ── Violations: severity classification + validation tables ─────────
+# Single source of truth for the 12 → severity mapping AND for the
+# allowed value lists used by POST validation. Exposed as module-level
+# constants so future stages (PDF / WhatsApp template / reports) can
+# reuse the same table without redefining.
+_VIO_PLACES = (
+    "الصف",
+    "مقر المعهد",
+    "بالقرب من مقر المعهد في الخارج",
+)
+_VIO_SEVERITY_BY_TYPE = {
+    # LIGHT
+    "النوم في الدرس": "light",
+    "إصدار أصوات": "light",
+    "التحدث مع الطلاب بدون إذن": "light",
+    # MEDIUM
+    "الحركة والتنقل بدون إذن": "medium",
+    "الخروج من دون إذن": "medium",
+    "استخدام الهاتف من دون إذن": "medium",
+    "الدخول إلى بعض الصفوف أو الغُرف من دون إذن": "medium",
+    # SEVERE
+    "ضرب طالب/طالبة": "severe",
+    "التكلم بكلمات بذيئة أو غير لائقة": "severe",
+    "إصدار أفعال تشوش على الطلاب الدرس": "severe",
+    "التصوير من دون إذن": "severe",
+    "إصدار أفعال غير لائقة أو غير أخلاقية": "severe",
+}
+_VIO_SEVERITY_LABEL_AR = {
+    "light":  "خفيفة",
+    "medium": "متوسطة",
+    "severe": "خطيرة",
+}
+_VIO_ACTION_FIELDS = (
+    "action_oral_teacher",
+    "action_oral_supervisor",
+    "action_written",
+    "action_message_parent",
+    "action_call_parent",
+    "action_meeting_parent",
+)
+
+
+def _vio_int01(v):
+    """Coerce any truthy/falsy value into 0 or 1 (action checkbox)."""
+    if v is True or v == 1 or str(v).strip() in ("1", "true", "True", "yes", "on"):
+        return 1
+    return 0
+
+
+@app.route("/api/admin/violations", methods=["POST"])
+@login_required
+def api_admin_violations_create():
+    """Create a single violation row. Admin-only.
+
+    Validation:
+    - student_name required, non-empty (after strip).
+    - violation_date required, must parse as YYYY-MM-DD.
+    - violation_place must be one of the 3 allowed places.
+    - violation_type must be one of the 12 allowed types.
+    - description truncated to 500 chars (silent — no error).
+
+    Severity is auto-classified from violation_type via
+    _VIO_SEVERITY_BY_TYPE. created_by is set from the session user.
+    Returns the new id + classified severity. Audit-trailed."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    data = request.get_json(silent=True) or {}
+
+    def _str(v):
+        return ("" if v is None else str(v)).strip()
+
+    student_name    = _str(data.get("student_name"))
+    violation_date  = _str(data.get("violation_date"))
+    violation_place = _str(data.get("violation_place"))
+    violation_type  = _str(data.get("violation_type"))
+
+    if not student_name:
+        return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
+    if not violation_date:
+        return jsonify({"ok": False, "error": "تاريخ المخالفة مطلوب"}), 400
+    try:
+        from datetime import datetime as _dt
+        _dt.strptime(violation_date, "%Y-%m-%d")
+    except Exception:
+        return jsonify({"ok": False, "error": "صيغة التاريخ غير صحيحة"}), 400
+    if violation_place not in _VIO_PLACES:
+        return jsonify({"ok": False, "error": "مكان المخالفة غير صحيح"}), 400
+    if violation_type not in _VIO_SEVERITY_BY_TYPE:
+        return jsonify({"ok": False, "error": "نوع المخالفة غير صحيح"}), 400
+
+    severity = _VIO_SEVERITY_BY_TYPE[violation_type]
+
+    # student_id may be null (manual entry) or any int that links to students.id
+    sid_raw = data.get("student_id")
+    student_id = None
+    if sid_raw not in (None, "", "null"):
+        try:
+            student_id = int(sid_raw)
+        except Exception:
+            student_id = None
+
+    group_name = _str(data.get("group_name")) or None
+    description = _str(data.get("description"))[:500] or None
+    additional_notes = _str(data.get("additional_notes")) or None
+
+    actions = {f: _vio_int01(data.get(f)) for f in _VIO_ACTION_FIELDS}
+
+    db = get_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO violations("
+            "student_id, student_name, group_name, violation_date, "
+            "violation_place, violation_type, description, "
+            + ", ".join(_VIO_ACTION_FIELDS) + ", "
+            "additional_notes, severity, created_by"
+            ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                student_id, student_name, group_name, violation_date,
+                violation_place, violation_type, description,
+                actions["action_oral_teacher"],
+                actions["action_oral_supervisor"],
+                actions["action_written"],
+                actions["action_message_parent"],
+                actions["action_call_parent"],
+                actions["action_meeting_parent"],
+                additional_notes, severity, int(user.get("id") or 0),
+            ),
+        )
+        db.commit()
+        new_id = getattr(cur, "lastrowid", None)
+        if not new_id:
+            row = db.execute(
+                "SELECT id FROM violations WHERE student_name=? AND violation_date=? "
+                "AND violation_type=? AND created_by=? ORDER BY id DESC LIMIT 1",
+                (student_name, violation_date, violation_type,
+                 int(user.get("id") or 0)),
+            ).fetchone()
+            new_id = row[0] if row else None
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر حفظ المخالفة: " + str(ex)}), 500
+
+    try:
+        _audit(
+            "violation.create",
+            target_type="violation",
+            target_id=new_id,
+            new_value={
+                "student_id":      student_id,
+                "student_name":    student_name,
+                "group_name":      group_name,
+                "violation_date":  violation_date,
+                "violation_place": violation_place,
+                "violation_type":  violation_type,
+                "severity":        severity,
+                "actions":         actions,
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "id": new_id, "severity": severity})
+
+
+@app.route("/api/admin/violations", methods=["GET"])
+@login_required
+def api_admin_violations_list():
+    """List violations with optional filters. Admin-only.
+
+    Filters (all query-string, optional):
+      - search : substring match (case-insensitive) on student_name
+      - type   : exact match on violation_type
+      - place  : exact match on violation_place
+      - limit  : default 50, capped at 200
+
+    Returned rows are augmented with:
+      - severity_label                : Arabic version of severity
+      - action_count                  : sum of all 6 action_* booleans
+      - days_ago                      : days since violation_date
+      - violation_count_for_student   : lifetime non-deleted total
+        for the same (student_id, student_name) tuple
+
+    Ordering: created_at DESC, then id DESC for stable tiebreak.
+    Hard filter: WHERE is_deleted = 0 in every query."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    search = (request.args.get("search") or "").strip()
+    vtype  = (request.args.get("type")   or "").strip()
+    place  = (request.args.get("place")  or "").strip()
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except Exception:
+        limit = 50
+    if limit < 1: limit = 1
+    if limit > 200: limit = 200
+
+    where = ["is_deleted = 0"]
+    params = []
+    if search:
+        where.append("LOWER(student_name) LIKE ?")
+        params.append("%" + search.lower() + "%")
+    if vtype:
+        where.append("violation_type = ?")
+        params.append(vtype)
+    if place:
+        where.append("violation_place = ?")
+        params.append(place)
+
+    sql = (
+        "SELECT * FROM violations WHERE " + " AND ".join(where) +
+        " ORDER BY created_at DESC, id DESC LIMIT ?"
+    )
+
+    db = get_db()
+    try:
+        rows = db.execute(sql, tuple(params) + (limit,)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر جلب المخالفات: " + str(ex)}), 500
+
+    # Pre-compute lifetime counts per (student_id, student_name) tuple in
+    # one pass — avoids N+1 SELECTs while the list is being rendered.
+    counts = {}
+    try:
+        for r in db.execute(
+            "SELECT student_id, student_name, COUNT(*) AS c "
+            "FROM violations WHERE is_deleted = 0 "
+            "GROUP BY student_id, student_name"
+        ).fetchall():
+            sid = r["student_id"] if isinstance(r, dict) or hasattr(r, "keys") else r[0]
+            nm  = r["student_name"] if isinstance(r, dict) or hasattr(r, "keys") else r[1]
+            c   = r["c"] if isinstance(r, dict) or hasattr(r, "keys") else r[2]
+            counts[(sid, nm)] = int(c or 0)
+    except Exception:
+        counts = {}
+
+    from datetime import date as _date, datetime as _dt
+    today = _date.today()
+
+    out = []
+    for row in rows:
+        d = dict(row)
+        sev = (d.get("severity") or "").strip().lower()
+        d["severity_label"] = _VIO_SEVERITY_LABEL_AR.get(sev, "")
+        d["action_count"]   = sum(int(d.get(f) or 0) for f in _VIO_ACTION_FIELDS)
+        # days_ago
+        days_ago = None
+        vd = d.get("violation_date")
+        if vd:
+            try:
+                if hasattr(vd, "year"):
+                    parsed = vd if not hasattr(vd, "hour") else vd.date()
+                else:
+                    parsed = _dt.strptime(str(vd)[:10], "%Y-%m-%d").date()
+                days_ago = (today - parsed).days
+            except Exception:
+                days_ago = None
+        d["days_ago"] = days_ago
+        d["violation_count_for_student"] = counts.get(
+            (d.get("student_id"), d.get("student_name")), 0)
+        # Stringify any non-JSON-friendly value (datetime, etc.)
+        for k, v in list(d.items()):
+            if v is None or isinstance(v, (str, int, float, bool)): continue
+            try: d[k] = str(v)
+            except Exception: d[k] = None
+        out.append(d)
+
+    return jsonify({"ok": True, "violations": out, "total": len(out)})
+
+
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
 # Admin/manager-only lookup for the redesigned monitoring page: returns
 # the groups owned by a specific teacher (by user id) plus the live
