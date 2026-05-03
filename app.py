@@ -7092,9 +7092,9 @@ LOGIN_HTML = """<!DOCTYPE html>
 body{background:linear-gradient(135deg,#f3eeff 0%,#e8f8fb 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;}
 .box{background:#fff;border:1px solid #E0D5F0;border-radius:20px;padding:40px 36px;width:380px;box-shadow:0 8px 40px rgba(107,63,160,0.13);}
 .logo-area{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:32px;}
-.logo-circle{width:110px;height:110px;border-radius:50%;border:3px solid #6B3FA0;background:#fff;display:flex;align-items:center;justify-content:center;}
-.logo-circle svg{width:90px;height:90px;}
-.centre-name{font-size:15px;font-weight:800;color:#6B3FA0;text-align:center;line-height:1.4;}
+.logo-img{width:130px;height:auto;display:block;}
+.centre-name-ar{font-size:17px;font-weight:900;color:#4a148c;text-align:center;line-height:1.4;direction:rtl;}
+.centre-name{font-size:13px;font-weight:700;color:#6B3FA0;text-align:center;line-height:1.4;letter-spacing:1px;}
 .centre-slogan{font-size:12px;color:#00BCD4;font-weight:600;text-align:center;}
 label{display:block;text-align:right;font-size:13px;color:#6B3FA0;margin-bottom:6px;font-weight:600;}
 input{width:100%;padding:12px 14px;border:1.5px solid #E0D5F0;border-radius:10px;font-size:14px;margin-bottom:16px;outline:none;background:#faf7ff;}
@@ -7106,17 +7106,9 @@ button{width:100%;padding:13px;background:linear-gradient(135deg,#6B3FA0,#8B5CC8
 <body>
 <div class="box">
 <div class="logo-area">
-<div class="logo-circle">
-<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-<rect x="12" y="48" width="66" height="30" rx="4" fill="#00BCD4"/>
-<ellipse cx="45" cy="36" rx="18" ry="16" fill="#9C5BB5"/>
-<polygon points="33,18 38,10 45,16 52,10 57,18 33,18" fill="#FFD700"/>
-<path d="M40 42 Q45 47 50 42" stroke="#7B3FA0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-<circle cx="41" cy="39" r="1.5" fill="#7B3FA0"/>
-<circle cx="49" cy="39" r="1.5" fill="#7B3FA0"/>
-</svg>
-</div>
-<div class="centre-name">MINDEX EDUCATION<br>&amp; TRAINING CENTRE</div>
+<img src="/static/images/mindex_logo.png" alt="Mindex" class="logo-img">
+<div class="centre-name-ar">&#x645;&#x631;&#x643;&#x632; &#x645;&#x627;&#x64A;&#x646;&#x62F;&#x643;&#x633; &#x644;&#x644;&#x62A;&#x639;&#x644;&#x64A;&#x645; &#x648;&#x627;&#x644;&#x62A;&#x62F;&#x631;&#x64A;&#x628;</div>
+<div class="centre-name">MINDEX Education &amp; Training Centre</div>
 <div class="centre-slogan">Play &middot; Enjoy &middot; Learn</div>
 </div>
 ERROR_PLACEHOLDER
@@ -42754,16 +42746,33 @@ def api_admin_violations_student_history():
 # natively — no font setup required. Mirrors the docs-screenshot
 # Playwright launch pattern (line 32570+) but ends with pg.pdf()
 # instead of pg.screenshot().
-_VIO_PDF_LOGO_SVG = (
-    '<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">'
-    '<rect x="12" y="48" width="66" height="30" rx="4" fill="#00BCD4"/>'
-    '<ellipse cx="45" cy="36" rx="18" ry="16" fill="#9C5BB5"/>'
-    '<polygon points="33,18 38,10 45,16 52,10 57,18 33,18" fill="#FFD700"/>'
-    '<path d="M40 42 Q45 47 50 42" stroke="#7B3FA0" stroke-width="1.5" '
-    'fill="none" stroke-linecap="round"/>'
-    '<circle cx="41" cy="39" r="1.5" fill="#7B3FA0"/>'
-    '<circle cx="49" cy="39" r="1.5" fill="#7B3FA0"/>'
-    '</svg>'
+def _vio_load_logo_data_uri():
+    """Read the canonical Mindex logo PNG once at import time and
+    return it as a base64 data URI ready to drop into an <img src="...">.
+    Used by the PDF / pledge HTML renderers so the printed pages
+    include the real brand mark even when served from a host that
+    doesn't proxy /static through to the browser (e.g. when the user
+    saves the HTML and re-prints offline). Falls back to an empty
+    string if the file is missing — pages still render, just without
+    the logo."""
+    import base64 as _base64, os as _os
+    try:
+        path = _os.path.join(
+            _os.path.dirname(_os.path.abspath(__file__)),
+            "static", "images", "mindex_logo.png",
+        )
+        with open(path, "rb") as f:
+            b64 = _base64.b64encode(f.read()).decode("ascii")
+        return "data:image/png;base64," + b64
+    except Exception:
+        return ""
+
+
+_VIO_PDF_LOGO_DATA_URI = _vio_load_logo_data_uri()
+_VIO_PDF_LOGO_HTML = (
+    ('<img src="' + _VIO_PDF_LOGO_DATA_URI + '" alt="Mindex" '
+     'style="width:100%;height:auto;display:block;">')
+    if _VIO_PDF_LOGO_DATA_URI else ''
 )
 
 _VIO_PDF_CSS = """
@@ -43058,7 +43067,7 @@ def _vio_render_single_pdf_html(row):
     )
     header = (
         "<div class=\"pdf-header\">"
-          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_HTML + "</div>"
           "<div class=\"pdf-titles\">"
             "<div class=\"pdf-center-en\">MINDEX EDUCATION &amp; TRAINING CENTRE</div>"
             "<div class=\"pdf-center-ar\">مركز مايندكس للتعليم والتدريب</div>"
@@ -43250,7 +43259,7 @@ def _vio_render_monthly_pdf_html(student_name, group_name, month_label, rows):
     )
     header = (
         "<div class=\"pdf-header\">"
-          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_HTML + "</div>"
           "<div class=\"pdf-titles\">"
             "<div class=\"pdf-center-en\">MINDEX EDUCATION &amp; TRAINING CENTRE</div>"
             "<div class=\"pdf-center-ar\">مركز مايندكس للتعليم والتدريب</div>"
@@ -43322,6 +43331,8 @@ _VIO_PLEDGE_CSS = """
 .pl-logo{width:80px;margin:0 auto 12px;}
 .pl-logo svg{width:100%;height:auto;display:block;}
 .pl-center-name{font-size:16px;font-weight:900;color:#4a148c;}
+.pl-center-en{font-size:13px;font-weight:700;color:#6B3FA0;
+              letter-spacing:1px;margin-top:3px;}
 .pl-title-row{text-align:center;margin:22px 0 26px;}
 .pl-title-line{border-top:3px double #6B3FA0;}
 .pl-title{font-size:22px;font-weight:900;color:#4a148c;
@@ -43391,8 +43402,9 @@ def _vio_render_pledge_html(row):
     )
     header = (
         "<div class=\"pl-header\">"
-          "<div class=\"pl-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pl-logo\">" + _VIO_PDF_LOGO_HTML + "</div>"
           "<div class=\"pl-center-name\">مركز مايندكس للتعليم والتدريب</div>"
+          "<div class=\"pl-center-en\">MINDEX Education &amp; Training Centre</div>"
         "</div>"
     )
     title = (
