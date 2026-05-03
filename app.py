@@ -9343,51 +9343,51 @@ function dhCopyParentLink(){
                              text-underline-offset:2px;}
           .gs-all-detail-btn:hover{color:#5a3489;}
 
-          /* Summary-table view for the all-groups overview.
-             Replaces the card grid (.gs-all-grid still wraps it).
-             Pill colours mirror the .gs-all-stat tier overrides
-             above so a user switching between contexts sees the
-             same green/amber/red. */
-          .gs-tbl-wrap{overflow-x:auto;border:0.5px solid #d8c8ec;
-                       border-radius:11px;margin-bottom:12px;
-                       background:#fff;}
-          .gs-tbl{width:100%;border-collapse:collapse;
-                  font-size:.88rem;}
-          .gs-tbl thead th{background:#f3e5f5;color:#4a148c;
-                           font-weight:800;padding:10px 8px;
-                           text-align:right;
-                           border-bottom:0.5px solid #d8c8ec;
-                           white-space:nowrap;font-size:.86rem;}
-          .gs-tbl tbody td{padding:10px 8px;
-                           border-bottom:0.5px solid #f0e6f8;
-                           vertical-align:middle;}
-          .gs-tbl tbody tr:last-child td{border-bottom:none;}
-          .gs-tbl tbody tr{cursor:pointer;
-                           transition:background .12s ease;}
-          .gs-tbl tbody tr:hover{background:#fafafe;}
-          .gs-tbl-name{font-weight:900;color:#4a148c;
-                       white-space:nowrap;}
-          .gs-tbl-count{text-align:center;font-weight:800;
-                        color:#4a148c;}
-          .gs-tbl-pill{display:inline-block;padding:3px 9px;
-                       border-radius:999px;font-weight:800;
-                       font-size:.78rem;border:0.5px solid;
-                       white-space:nowrap;}
-          .gs-tbl-pill.att-high{background:#E6F4EE;color:#1D9E75;
-                                border-color:#1D9E75;}
-          .gs-tbl-pill.att-mid {background:#FFF3E0;color:#BA7517;
-                                border-color:#BA7517;}
-          .gs-tbl-pill.att-low {background:#FCE6E6;color:#A32D2D;
-                                border-color:#A32D2D;}
-          .gs-tbl-pill.att-none{background:#fafafe;color:#8a7da5;
-                                border-color:#d8c8ec;}
-          .gs-tbl-pill.amber{background:#FAEEDA;color:#854F0B;
-                             border-color:#BA7517;}
-          .gs-tbl-pill.ovd-none{background:#fafafe;color:#8a7da5;
-                                border-color:#d8c8ec;}
-          .gs-tbl-hint{color:#6a4f8a;font-size:.82rem;
-                       text-align:center;font-style:italic;
-                       padding:4px 8px;}
+          /* Grouped-cards view for the all-groups overview.
+             Sections are headed by a purple-gradient strip carrying
+             the day pattern + group count. Cards inside use the
+             same admin-purple identity as the rest of the page. */
+          .gs-grp-section{margin-bottom:16px;}
+          .gs-grp-section-head{
+            background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+            color:#fff;font-weight:800;font-size:.95rem;
+            padding:8px 14px;border-radius:9px;margin-bottom:10px;}
+          .gs-grp-grid{display:grid;grid-template-columns:1fr 1fr;
+                       gap:10px;}
+          @media (max-width:680px){
+            .gs-grp-grid{grid-template-columns:1fr;}
+          }
+          .gs-grp-card{background:#fff;border:0.5px solid #d8c8ec;
+                       border-radius:11px;padding:12px 14px;
+                       cursor:pointer;display:flex;flex-direction:column;
+                       gap:6px;transition:border-color .12s ease;}
+          .gs-grp-card:hover{border-color:#6B3FA0;}
+          .gs-grp-card-head{display:flex;justify-content:space-between;
+                            align-items:center;gap:8px;flex-wrap:wrap;}
+          .gs-grp-name{font-weight:900;color:#4a148c;font-size:.98rem;
+                       overflow:hidden;text-overflow:ellipsis;
+                       white-space:nowrap;flex:1 1 auto;min-width:0;}
+          .gs-grp-level{background:#f3e5f5;color:#4a148c;
+                        font-size:.78rem;font-weight:700;
+                        padding:3px 9px;border-radius:8px;
+                        white-space:nowrap;}
+          .gs-grp-subtitle{color:#6a4f8a;font-size:.86rem;
+                           white-space:nowrap;overflow:hidden;
+                           text-overflow:ellipsis;}
+          .gs-grp-footer{display:flex;gap:6px;flex-wrap:wrap;
+                         align-items:center;}
+          .gs-grp-pill{display:inline-block;padding:3px 10px;
+                       border-radius:8px;font-weight:800;
+                       font-size:.78rem;}
+          .gs-grp-students{background:#f3e5f5;color:#4a148c;}
+          .gs-grp-att.att-high{background:#E6F4EE;color:#1D9E75;
+                               border:0.5px solid #1D9E75;}
+          .gs-grp-att.att-mid {background:#FFF3E0;color:#BA7517;
+                               border:0.5px solid #BA7517;}
+          .gs-grp-att.att-low {background:#FCE6E6;color:#A32D2D;
+                               border:0.5px solid #A32D2D;}
+          .gs-grp-att.att-none{background:#fafafe;color:#8a7da5;
+                               border:0.5px solid #d8c8ec;}
         </style>
 
         <!-- A) Filters card -->
@@ -10490,53 +10490,78 @@ function dhCopyParentLink(){
               return;
             }
 
-            /* Build the table immediately with the static columns
-               (name / teacher / days / time / level) populated; the
-               three lazy columns (count / att / overdue) start as
+            /* Build sections grouped by study_days. Sort sections
+               by group count DESC then alphabetical; sort cards
+               within each section alphabetically by group_name.
+               Cards render immediately with name / level / teacher
+               / time; the two lazy pills (count + att) start as
                "..." placeholders and are filled in by
-               gsRenderAllCardStats as the per-group fetches resolve
-               (Option 2 from the spec — progressive enhancement). */
-            var html =
-              '<div class="gs-tbl-wrap">' +
-                '<table class="gs-tbl">' +
-                  '<thead><tr>' +
-                    '<th>المجموعة</th>' +
-                    '<th>المعلمة</th>' +
-                    '<th>الأيام</th>' +
-                    '<th>الوقت</th>' +
-                    '<th>المستوى</th>' +
-                    '<th>طالبات</th>' +
-                    '<th>حضور</th>' +
-                    '<th>متأخرات</th>' +
-                  '</tr></thead>' +
-                  '<tbody>';
+               gsRenderAllCardStats as the per-group fetches
+               resolve (80 ms stagger — Option 2 progressive
+               enhancement, unchanged from previous round). */
+            var byDay = {};
             gsAllVisible.forEach(function(g){
-              var gid = parseInt(g.id, 10) || 0;
-              html +=
-                '<tr class="gs-tbl-row" data-gid="' + gid + '">' +
-                  '<td class="gs-tbl-name">' +
-                    gsEscape(g.group_name || '—') + '</td>' +
-                  '<td>' + gsEscape(g.teacher_name || '—') + '</td>' +
-                  '<td>' + gsEscape(g.study_days || '—') + '</td>' +
-                  '<td>' + gsEscape(g.study_time || '—') + '</td>' +
-                  '<td>' + gsEscape(g.level_course || '—') + '</td>' +
-                  '<td class="gs-tbl-count" id="gs-tbl-count-' + gid +
-                    '">...</td>' +
-                  '<td id="gs-tbl-att-' + gid + '">' +
-                    '<span class="gs-tbl-pill att-none">...</span>' +
-                  '</td>' +
-                  '<td id="gs-tbl-ovd-' + gid + '">' +
-                    '<span class="gs-tbl-pill ovd-none">...</span>' +
-                  '</td>' +
-                '</tr>';
+              var key = (g.study_days || '').trim() || 'بدون أيام';
+              if(!byDay[key]) byDay[key] = [];
+              byDay[key].push(g);
             });
-            html +=
-                  '</tbody>' +
-                '</table>' +
-              '</div>' +
-              '<div class="gs-tbl-hint">' +
-                '💡 اضغطي على أي صف لعرض تفاصيل المجموعة كاملة' +
-              '</div>';
+            Object.keys(byDay).forEach(function(k){
+              byDay[k].sort(function(a, b){
+                return (a.group_name || '').localeCompare(
+                        b.group_name || '', 'ar');
+              });
+            });
+            var dayKeys = Object.keys(byDay).sort(function(a, b){
+              var na = byDay[a].length, nb = byDay[b].length;
+              if(nb !== na) return nb - na;
+              return a.localeCompare(b, 'ar');
+            });
+
+            var html = '';
+            dayKeys.forEach(function(dk){
+              var groups = byDay[dk];
+              html +=
+                '<section class="gs-grp-section">' +
+                  '<header class="gs-grp-section-head">📅 ' +
+                    gsEscape(dk) + ' · ' + groups.length + ' مجموعات' +
+                  '</header>' +
+                  '<div class="gs-grp-grid">';
+              groups.forEach(function(g){
+                var gid     = parseInt(g.id, 10) || 0;
+                var name    = g.group_name || '—';
+                var teacher = (g.teacher_name || '').trim();
+                var level   = (g.level_course || '').trim();
+                var time    = (g.study_time || '').trim();
+                var subtitle = '';
+                if(teacher) subtitle += 'أ. ' + teacher;
+                if(time){
+                  if(subtitle) subtitle += ' · ';
+                  subtitle += time;
+                }
+                html +=
+                  '<article class="gs-grp-card" data-gid="' + gid + '">' +
+                    '<header class="gs-grp-card-head">' +
+                      '<div class="gs-grp-name">' + gsEscape(name) +
+                      '</div>' +
+                      (level
+                        ? '<div class="gs-grp-level">' +
+                            gsEscape(level) + '</div>'
+                        : '') +
+                    '</header>' +
+                    (subtitle
+                      ? '<div class="gs-grp-subtitle">' +
+                          gsEscape(subtitle) + '</div>'
+                      : '') +
+                    '<div class="gs-grp-footer">' +
+                      '<span class="gs-grp-pill gs-grp-students" ' +
+                        'id="gs-grp-stu-' + gid + '">...</span>' +
+                      '<span class="gs-grp-pill gs-grp-att att-none" ' +
+                        'id="gs-grp-att-' + gid + '">...</span>' +
+                    '</div>' +
+                  '</article>';
+              });
+              html += '</div></section>';
+            });
 
             gsAllGrid.innerHTML = html;
             if(gsAllSubtitle){
@@ -10596,27 +10621,24 @@ function dhCopyParentLink(){
           function gsRenderAllCardStats(gid){
             var entry = gsDetailCache[gid];
             if(!entry || !entry.detail) return;
-            var stats = entry.detail.stats || {};
-            var sc      = stats.student_count || 0;
-            var avg     = stats.avg_attendance_pct;
-            var withRem = stats.students_with_remaining || 0;
-            var attCls  = (avg == null) ? 'att-none' :
+            var stats  = entry.detail.stats || {};
+            var sc     = stats.student_count || 0;
+            var avg    = stats.avg_attendance_pct;
+            var attCls = (avg == null) ? 'att-none' :
               (avg >= 80 ? 'att-high' :
                avg >= 60 ? 'att-mid'  : 'att-low');
-            var attTxt  = (avg == null) ? '—' : Math.round(avg) + '%';
-            var ovdCls  = (withRem > 0) ? 'amber' : 'ovd-none';
+            var attTxt = (avg == null) ? '—' : Math.round(avg) + '%';
 
-            var countEl = document.getElementById('gs-tbl-count-' + gid);
-            var attEl   = document.getElementById('gs-tbl-att-'   + gid);
-            var ovdEl   = document.getElementById('gs-tbl-ovd-'   + gid);
-            if(countEl) countEl.textContent = String(sc);
+            /* Two pills per card per the round-7 spec: students
+               count + attendance %. Overdue is no longer surfaced
+               on the card (admins see it on the per-group detail
+               view's stat row). */
+            var stuEl = document.getElementById('gs-grp-stu-' + gid);
+            var attEl = document.getElementById('gs-grp-att-' + gid);
+            if(stuEl) stuEl.textContent = sc + ' طالبات';
             if(attEl){
-              attEl.innerHTML = '<span class="gs-tbl-pill ' + attCls +
-                '">' + gsEscape(attTxt) + '</span>';
-            }
-            if(ovdEl){
-              ovdEl.innerHTML = '<span class="gs-tbl-pill ' + ovdCls +
-                '">' + withRem + '</span>';
+              attEl.className = 'gs-grp-pill gs-grp-att ' + attCls;
+              attEl.textContent = attTxt;
             }
             gsUpdateAllSubtitle();
           }
