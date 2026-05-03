@@ -42861,6 +42861,109 @@ def api_admin_violations_student_monthly_pdf(sid):
     )
 
 
+def _vio_render_wa_message(row):
+    """Build the formal Arabic WhatsApp text for a violation row.
+
+    Action list is a comma-joined Arabic phrase of the actions
+    actually taken; when nothing is checked we still emit a
+    dash-placeholder so the line renders cleanly in WhatsApp."""
+    name  = (row.get("student_name") or "").strip()
+    date_ = (row.get("violation_date") or "").strip()
+    place = (row.get("violation_place") or "").strip()
+    vtype = (row.get("violation_type") or "").strip()
+    taken = [_VIO_PDF_ACTION_LABELS[k] for k in _VIO_ACTION_FIELDS
+             if row.get(k)]
+    actions_list = "، ".join(taken) if taken else "—"
+    lines = [
+        "السلام عليكم،",
+        "نحيطكم علماً بأنه تم تسجيل مخالفة بحق ابنتكم " + name + ".",
+        "",
+        "📅 التاريخ: " + date_,
+        "📍 المكان: "  + place,
+        "⚠️ المخالفة: " + vtype,
+        "✅ الإجراء: "  + actions_list,
+        "",
+        "نرجو منكم التواصل مع المركز.",
+        "",
+        "مع تحياتنا،",
+        "مركز مايندكس للتعليم والتدريب",
+    ]
+    return "\n".join(lines)
+
+
+@app.route("/api/admin/violations/<int:vid>/send-whatsapp",
+           methods=["POST"])
+@login_required
+def api_admin_violations_send_whatsapp(vid):
+    """Build and return the wa.me URL the client opens in a new tab.
+    Admin-only. Mirrors the /api/monthly-evaluations/<eid>/send-to-parent
+    flow line-for-line: server prepares phone + text, marks the row as
+    sent, audit-logs; the browser fires window.open(wa_url) so it
+    looks like an admin-typed message coming from the staff phone.
+
+    Refusal paths:
+      - 404 if the violation is missing or soft-deleted
+      - 400 if it's a manual entry (no roster link → no parent phone)
+      - 400 if the linked student has no parent_phone on file
+    Both refusals carry an Arabic message ready for the toast."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM violations WHERE id=? AND is_deleted=0", (vid,)
+    ).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "المخالفة غير موجودة"}), 404
+    rd = dict(row)
+
+    if not rd.get("student_id"):
+        return jsonify({"ok": False,
+                        "error": "لا يوجد رقم ولي أمر (إدخال يدوي)"}), 400
+
+    phone, raw, _stu_name, _grp_name = _ev_resolve_student_phone(
+        db, rd.get("student_id"))
+    if not phone:
+        return jsonify({"ok": False,
+                        "error": "لا يوجد رقم ولي أمر مسجل"}), 400
+
+    text = _vio_render_wa_message(rd)
+    try:
+        from urllib.parse import quote as _quote
+    except Exception:
+        _quote = lambda s: s
+    wa_url = "https://wa.me/" + phone + "?text=" + _quote(text)
+
+    try:
+        db.execute(
+            "UPDATE violations SET whatsapp_sent_at=CURRENT_TIMESTAMP, "
+            "whatsapp_sent_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (int(user.get("id") or 0) or None, vid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False,
+                        "error": "تعذر تسجيل الإرسال: " + str(ex)}), 500
+
+    try:
+        _audit("violation.whatsapp_sent",
+               target_type="violation",
+               target_id=vid,
+               new_value={"phone_clean": phone, "phone_raw": raw,
+                          "student_name": rd.get("student_name") or ""})
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "wa_url": wa_url,
+        "recipient_phone": phone,
+        "phone_raw": raw,
+        "message": text,
+    })
+
+
 @app.route("/api/admin/violations/student-monthly-pdf", methods=["GET"])
 @login_required
 def api_admin_violations_manual_monthly_pdf():
