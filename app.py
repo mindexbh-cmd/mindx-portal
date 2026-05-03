@@ -36531,6 +36531,51 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 
 </div>
 
+<!-- ── Step-6: request-to-teacher modal (UI only — no submit) ── -->
+<div class="tm-modal-overlay" id="tm-req-overlay" hidden>
+  <div class="tm-modal" role="dialog" aria-modal="true"
+       aria-labelledby="tm-req-title">
+    <header class="tm-modal-head">
+      <h3 id="tm-req-title">إرسال طلب للمعلمة</h3>
+      <button type="button" class="tm-modal-close" id="tm-req-close"
+              aria-label="إغلاق">×</button>
+    </header>
+    <form class="tm-modal-body" id="tm-req-form" onsubmit="return false;">
+      <div class="tm-field">
+        <span class="tm-radio-legend">نوع الطلب:</span>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-type" value="evaluation" checked>
+          <span>طلب تقييم لطالبة معينة</span>
+        </label>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-type" value="parent_message">
+          <span>طلب رسالة لولي أمر طالبة معينة</span>
+        </label>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-type" value="general">
+          <span>تذكير/ملاحظة إدارية عامة</span>
+        </label>
+      </div>
+      <div class="tm-field" id="tm-req-student-wrap">
+        <label for="tm-req-student">الطالبة:</label>
+        <select id="tm-req-student">
+          <option value="">— اختاري الطالبة —</option>
+        </select>
+      </div>
+      <div class="tm-field">
+        <label for="tm-req-text">نص الطلب:</label>
+        <textarea id="tm-req-text" rows="4" required></textarea>
+      </div>
+      <footer class="tm-modal-foot">
+        <button type="button" class="tm-btn tm-btn-secondary"
+                id="tm-req-cancel">إلغاء</button>
+        <button type="button" class="tm-btn tm-btn-primary"
+                id="tm-req-send">إرسال</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
 <style>
 /* ── Step-2 redesign — scoped under tm-* class names so they don't
    collide with the older .panel / .stat-card / .tabs styles still
@@ -36680,6 +36725,39 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
                     font-family:inherit;}
 .tm-btn-danger-link:hover{color:#7a1f1f;text-decoration:underline;
                           text-underline-offset:3px;}
+
+/* ── Step-6: request-to-teacher modal ──────────────────────── */
+.tm-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
+                  display:flex;align-items:center;justify-content:center;
+                  z-index:9990;padding:14px;}
+.tm-modal-overlay[hidden]{display:none;}
+.tm-modal{background:#fff;border-radius:14px;padding:0;width:100%;
+          max-width:560px;max-height:90vh;overflow:auto;
+          box-shadow:0 10px 30px rgba(0,0,0,.18);
+          border:0.5px solid #d8c8ec;}
+.tm-modal-head{display:flex;justify-content:space-between;align-items:center;
+               padding:14px 18px;border-bottom:0.5px solid #d8c8ec;}
+.tm-modal-head h3{margin:0;color:#4a148c;font-weight:900;font-size:1.05rem;}
+.tm-modal-close{background:none;border:none;font-size:1.6rem;line-height:1;
+                color:#4a148c;cursor:pointer;padding:0 6px;
+                font-family:inherit;}
+.tm-modal-close:hover{color:#5a3489;}
+.tm-modal-body{padding:18px;display:flex;flex-direction:column;gap:14px;
+               margin:0;}
+.tm-modal-foot{padding:14px 18px;border-top:0.5px solid #d8c8ec;
+               display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.tm-radio-legend{display:block;color:#4a148c;font-weight:700;font-size:.88rem;
+                 margin-bottom:8px;}
+.tm-radio{display:flex;align-items:center;gap:8px;padding:6px 0;
+          font-size:.92rem;color:#212121;cursor:pointer;}
+.tm-radio input{width:18px;height:18px;cursor:pointer;accent-color:#6B3FA0;
+                margin:0;}
+.tm-field textarea{width:100%;padding:10px 12px;border:0.5px solid #d8c8ec;
+                   border-radius:10px;background:#fff;color:#212121;
+                   font-family:inherit;font-size:.95rem;resize:vertical;
+                   min-height:90px;}
+.tm-field textarea:focus{outline:none;border-color:#6B3FA0;
+                         box-shadow:0 0 0 2px rgba(107,63,160,.15);}
 </style>
 
 <script>
@@ -37276,6 +37354,102 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 
   teacherSel.addEventListener('change', tmLoadParentMsgs);
   groupSel.addEventListener('change',   tmLoadParentMsgs);
+
+  // ── Step-6: request-to-teacher modal (UI only) ───────────────
+  // The "إرسال" button is wired to a no-op placeholder per spec —
+  // real send / DB write logic will land in a later commit. The
+  // student dropdown is populated from /api/admin/teacher/<id>/students
+  // (added in this same commit) the first time the modal is opened
+  // for a given teacher; subsequent opens reuse the cached list.
+  var reqOverlay   = document.getElementById('tm-req-overlay');
+  var reqStudent   = document.getElementById('tm-req-student');
+  var reqStuWrap   = document.getElementById('tm-req-student-wrap');
+  var reqText      = document.getElementById('tm-req-text');
+  var reqRadios    = document.querySelectorAll('input[name="tm-req-type"]');
+  var reqCloseBtn  = document.getElementById('tm-req-close');
+  var reqCancelBtn = document.getElementById('tm-req-cancel');
+  var reqSendBtn   = document.getElementById('tm-req-send');
+  var reqOpenBtn   = document.getElementById('tm-request-btn');
+  var reqStudentsCache = {};   // tid → students[]
+
+  function tmReqApplyType(){
+    var sel = '';
+    for(var i=0; i<reqRadios.length; i++){
+      if(reqRadios[i].checked){ sel = reqRadios[i].value; break; }
+    }
+    var needsStudent = (sel === 'evaluation' || sel === 'parent_message');
+    reqStuWrap.hidden = !needsStudent;
+  }
+  function tmReqResetForm(){
+    if(reqRadios.length){
+      reqRadios.forEach(function(rb, idx){ rb.checked = (idx === 0); });
+    }
+    reqStudent.value = '';
+    reqText.value = '';
+    tmReqApplyType();
+  }
+  function tmReqOpen(){
+    var tid = teacherSel.value || '';
+    if(!tid){ return; }   // safety: button is inside the teacher card
+    tmReqResetForm();
+    // Populate the student dropdown for this teacher (cached).
+    reqStudent.innerHTML = '<option value="">— اختاري الطالبة —</option>';
+    var fillStudents = function(students){
+      students.forEach(function(s){
+        var opt = document.createElement('option');
+        opt.value = String(s.id);
+        opt.textContent = (s.student_name || '') +
+          (s.group_name ? ' (' + s.group_name + ')' : '');
+        reqStudent.appendChild(opt);
+      });
+    };
+    if(reqStudentsCache[tid]){
+      fillStudents(reqStudentsCache[tid]);
+    } else {
+      fetch('/api/admin/teacher/' + encodeURIComponent(tid) + '/students',
+            {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          var list = (j && j.students) || [];
+          reqStudentsCache[tid] = list;
+          fillStudents(list);
+        })
+        .catch(function(){ /* leave the placeholder */ });
+    }
+    reqOverlay.hidden = false;
+  }
+  function tmReqClose(){ reqOverlay.hidden = true; }
+
+  // Wire listeners. Note: the original Step-2 placeholder click
+  // handler on tm-request-btn stays in place untouched — this is a
+  // SECOND addEventListener that opens the modal alongside it.
+  if(reqOpenBtn){
+    reqOpenBtn.addEventListener('click', tmReqOpen);
+  }
+  if(reqCloseBtn){  reqCloseBtn .addEventListener('click', tmReqClose); }
+  if(reqCancelBtn){ reqCancelBtn.addEventListener('click', tmReqClose); }
+  reqRadios.forEach(function(rb){
+    rb.addEventListener('change', tmReqApplyType);
+  });
+  // Click on the dimmed overlay (not the modal itself) closes too.
+  reqOverlay.addEventListener('click', function(ev){
+    if(ev.target === reqOverlay) tmReqClose();
+  });
+  // Esc key closes the modal.
+  document.addEventListener('keydown', function(ev){
+    if(ev.key === 'Escape' && !reqOverlay.hidden) tmReqClose();
+  });
+
+  // PER SPEC: the "إرسال" button MUST be a no-op until later steps
+  // wire real send/save logic. We attach a click listener purely so
+  // future maintainers see WHERE to wire it, and so accidental form
+  // submissions are blocked even if the markup is later edited.
+  if(reqSendBtn){
+    reqSendBtn.addEventListener('click', function(ev){
+      ev.preventDefault();
+      /* TODO: real send logic — intentionally no-op for now. */
+    });
+  }
 })();
 </script>
 </body></html>"""
@@ -37361,6 +37535,88 @@ def api_admin_teacher_groups(teacher_id):
         })
     out.sort(key=lambda g: g["name"])
     return jsonify({"ok": True, "groups": out})
+
+
+# ── /api/admin/teacher/<id>/students ─────────────────────────────────
+# Admin/manager-only lookup that backs the request-to-teacher modal:
+# returns every student that belongs to one of the teacher's groups
+# (matched via group_name_student OR group_online — same dual-column
+# pattern Step-1 uses for the per-group student count). Deduplicated
+# by student id so a student that appears in both columns of a group
+# is only listed once.
+@app.route('/api/admin/teacher/<int:teacher_id>/students', methods=['GET'])
+@login_required
+def api_admin_teacher_students(teacher_id):
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        trow = db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE id=? AND role='teacher'",
+            (teacher_id,)
+        ).fetchone()
+    except Exception:
+        trow = None
+    if not trow:
+        return jsonify({"ok": False, "error": "المعلمة غير موجودة"}), 404
+    teacher_user = dict(trow)
+    keys = _teacher_match_keys(teacher_user)
+    if not keys:
+        return jsonify({"ok": True, "students": []})
+    try:
+        grp_rows = db.execute(
+            "SELECT COALESCE(group_name,'') AS group_name, "
+            "COALESCE(teacher_name,'') AS teacher_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        grp_rows = []
+    group_names = []
+    seen_g = set()
+    for r in grp_rows:
+        rd = dict(r)
+        gn = (rd.get("group_name") or "").strip()
+        tn = (rd.get("teacher_name") or "").strip().lower()
+        if not gn or not tn or tn not in keys:
+            continue
+        if gn in seen_g:
+            continue
+        seen_g.add(gn)
+        group_names.append(gn)
+    if not group_names:
+        return jsonify({"ok": True, "students": []})
+    out = []
+    seen_ids = set()
+    for gn in group_names:
+        try:
+            srows = db.execute(
+                "SELECT id, COALESCE(student_name,'') AS student_name, "
+                "COALESCE(group_name_student,'') AS group_name_student, "
+                "COALESCE(group_online,'')        AS group_online "
+                "FROM students "
+                "WHERE TRIM(COALESCE(group_name_student,''))=? "
+                "OR TRIM(COALESCE(group_online,''))=?",
+                (gn, gn)
+            ).fetchall()
+        except Exception:
+            srows = []
+        for r in srows:
+            rd = dict(r)
+            sid = int(rd.get("id") or 0)
+            if not sid or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            sn = (rd.get("student_name") or "").strip()
+            out.append({
+                "id":         sid,
+                "student_name": sn,
+                "group_name": gn,
+            })
+    out.sort(key=lambda s: (s.get("student_name") or "", s["id"]))
+    return jsonify({"ok": True, "students": out})
 
 
 @app.route('/api/teacher-deliveries/summary', methods=['GET'])
