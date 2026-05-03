@@ -42760,13 +42760,61 @@ _VIO_PDF_LOGO_SVG = (
 
 _VIO_PDF_CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
-@page { size: A4; margin: 12mm; }
+@page { size: A4; margin: 1.5cm; }
 html, body {
   font-family: 'Tahoma', 'Arial', sans-serif;
   color: #212121;
   line-height: 1.5;
   direction: rtl;
   font-size: 13px;
+  background: #f5f3fa;
+}
+body {
+  max-width: 21cm;
+  margin: 18px auto;
+  padding: 22px 28px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.print-bar {
+  max-width: 21cm;
+  margin: 0 auto 12px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.print-btn {
+  background: linear-gradient(135deg, #6B3FA0, #8B5CC8);
+  color: #fff;
+  border: none;
+  padding: 11px 22px;
+  border-radius: 9px;
+  font-size: .95rem;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(107, 63, 160, 0.3);
+}
+.print-btn:hover { box-shadow: 0 6px 20px rgba(107, 63, 160, 0.4); }
+.print-hint {
+  background: #fff;
+  border: 1px dashed #d8c8ec;
+  color: #666;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+@media print {
+  html, body { background: #fff; }
+  body {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .print-bar, .print-btn, .print-hint { display: none !important; }
 }
 .pdf-header {
   display: flex;
@@ -42986,8 +43034,19 @@ def _vio_render_single_pdf_html(row):
         "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head>"
         "<meta charset=\"utf-8\">"
         "<title>تقرير مخالفة #" + str(vid) + "</title>"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<style>" + _VIO_PDF_CSS + "</style>"
         "</head><body>"
+    )
+    print_bar = (
+        "<div class=\"print-bar\">"
+          "<button type=\"button\" class=\"print-btn\" onclick=\"window.print()\">"
+            "🖨️ طباعة / حفظ كـ PDF"
+          "</button>"
+          "<span class=\"print-hint\">"
+            "اختر &quot;حفظ كـ PDF&quot; من نافذة الطباعة"
+          "</span>"
+        "</div>"
     )
     header = (
         "<div class=\"pdf-header\">"
@@ -43044,7 +43103,15 @@ def _vio_render_single_pdf_html(row):
           "</div>"
         "</footer>"
     )
-    return head + header + banner + s1 + s2 + s3 + notes_block + footer + "</body></html>"
+    auto_print = (
+        "<script>"
+          "window.addEventListener('load', function(){"
+            "setTimeout(function(){ try { window.print(); } catch(e){} }, 500);"
+          "});"
+        "</script>"
+    )
+    return (head + print_bar + header + banner + s1 + s2 + s3
+            + notes_block + footer + auto_print + "</body></html>")
 
 
 def _vio_html_to_pdf_bytes(html_str):
@@ -43159,8 +43226,19 @@ def _vio_render_monthly_pdf_html(student_name, group_name, month_label, rows):
         "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head>"
         "<meta charset=\"utf-8\">"
         "<title>تقرير شهري - " + e(student_name) + "</title>"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<style>" + _VIO_PDF_CSS + _VIO_PDF_MONTHLY_CSS + "</style>"
         "</head><body>"
+    )
+    print_bar = (
+        "<div class=\"print-bar\">"
+          "<button type=\"button\" class=\"print-btn\" onclick=\"window.print()\">"
+            "🖨️ طباعة / حفظ كـ PDF"
+          "</button>"
+          "<span class=\"print-hint\">"
+            "اختر &quot;حفظ كـ PDF&quot; من نافذة الطباعة"
+          "</span>"
+        "</div>"
     )
     header = (
         "<div class=\"pdf-header\">"
@@ -43213,16 +43291,31 @@ def _vio_render_monthly_pdf_html(student_name, group_name, month_label, rows):
           "</div>"
         "</footer>"
     )
-    return head + header + banner + summary + detail + footer + "</body></html>"
+    auto_print = (
+        "<script>"
+          "window.addEventListener('load', function(){"
+            "setTimeout(function(){ try { window.print(); } catch(e){} }, 500);"
+          "});"
+        "</script>"
+    )
+    return (head + print_bar + header + banner + summary + detail
+            + footer + auto_print + "</body></html>")
 
 
 @app.route("/api/admin/violations/<int:vid>/pdf", methods=["GET"])
 @login_required
 def api_admin_violations_single_pdf(vid):
-    """Render a single non-deleted violation as a PDF report.
-    Admin-only. Inline disposition so the browser opens it in the
-    same tab via window.open(). 404 if missing or soft-deleted —
-    mirrors the editable-surface contract from PATCH/DELETE."""
+    """Render a single non-deleted violation as a print-friendly
+    HTML page. Admin-only. 404 if missing or soft-deleted.
+
+    Stage 3 originally rendered this through Playwright/Chromium →
+    page.pdf() → application/pdf. That fails on Render hosts that
+    don't have the Chromium binary cached (the docs auto-capture
+    boot probe surfaces this with a ⚠ warning). We now serve the
+    same HTML directly with an auto-firing window.print() and a
+    prominent 🖨️ button, so the user gets the exact same artefact
+    via the browser's own "Save as PDF" path — no Chromium, no
+    Render config needed."""
     user = session.get("user") or {}
     if not _vio_can_admin(user):
         return Response("غير مصرح", status=403,
@@ -43235,38 +43328,16 @@ def api_admin_violations_single_pdf(vid):
                         mimetype="text/plain; charset=utf-8")
     decorated = _vio_decorate_rows(db, [row])[0]
     html_str = _vio_render_single_pdf_html(decorated)
-    try:
-        pdf_bytes = _vio_html_to_pdf_bytes(html_str)
-    except Exception as ex:
-        import sys as _sys
-        _sys.stderr.write("[violations-pdf] render failed: " + str(ex) + "\n")
-        return Response("تعذر توليد التقرير", status=500,
-                        mimetype="text/plain; charset=utf-8")
-    fname = "violation_" + str(vid) + ".pdf"
-    return Response(
-        pdf_bytes,
-        mimetype="application/pdf",
-        headers={"Content-Disposition": "inline; filename=\"" + fname + "\""},
-    )
+    return Response(html_str, mimetype="text/html")
 
 
 def _vio_monthly_pdf_response(rows, student_name, group_name, label, fname_part):
     """Shared bottom-half of both monthly endpoints — render the
-    HTML, hand it to Playwright, return the inline-PDF Response."""
+    same HTML the single-violation path uses, return as text/html
+    with auto-print baked in. See api_admin_violations_single_pdf
+    for the rationale (Playwright/Chromium-free fallback)."""
     html_str = _vio_render_monthly_pdf_html(student_name, group_name, label, rows)
-    try:
-        pdf_bytes = _vio_html_to_pdf_bytes(html_str)
-    except Exception as ex:
-        import sys as _sys
-        _sys.stderr.write("[violations-monthly-pdf] render failed: " + str(ex) + "\n")
-        return Response("تعذر توليد التقرير", status=500,
-                        mimetype="text/plain; charset=utf-8")
-    fname = "violations_" + fname_part + ".pdf"
-    return Response(
-        pdf_bytes,
-        mimetype="application/pdf",
-        headers={"Content-Disposition": "inline; filename=\"" + fname + "\""},
-    )
+    return Response(html_str, mimetype="text/html")
 
 
 @app.route("/api/admin/violations/student/<int:sid>/monthly-pdf",
