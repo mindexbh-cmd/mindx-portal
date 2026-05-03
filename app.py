@@ -42278,6 +42278,334 @@ def api_admin_violations_student_history():
     })
 
 
+# ── Violations PDF rendering (Stage 3) ─────────────────────────────
+# Strategy: build a self-contained HTML string per request, hand it to
+# the already-installed Playwright/Chromium, and call page.pdf() to
+# produce the bytes. Chromium handles all RTL / bidirectional shaping
+# natively — no font setup required. Mirrors the docs-screenshot
+# Playwright launch pattern (line 32570+) but ends with pg.pdf()
+# instead of pg.screenshot().
+_VIO_PDF_LOGO_SVG = (
+    '<svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">'
+    '<rect x="12" y="48" width="66" height="30" rx="4" fill="#00BCD4"/>'
+    '<ellipse cx="45" cy="36" rx="18" ry="16" fill="#9C5BB5"/>'
+    '<polygon points="33,18 38,10 45,16 52,10 57,18 33,18" fill="#FFD700"/>'
+    '<path d="M40 42 Q45 47 50 42" stroke="#7B3FA0" stroke-width="1.5" '
+    'fill="none" stroke-linecap="round"/>'
+    '<circle cx="41" cy="39" r="1.5" fill="#7B3FA0"/>'
+    '<circle cx="49" cy="39" r="1.5" fill="#7B3FA0"/>'
+    '</svg>'
+)
+
+_VIO_PDF_CSS = """
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: A4; margin: 12mm; }
+html, body {
+  font-family: 'Tahoma', 'Arial', sans-serif;
+  color: #212121;
+  line-height: 1.5;
+  direction: rtl;
+  font-size: 13px;
+}
+.pdf-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid #6B3FA0;
+  margin-bottom: 14px;
+}
+.pdf-logo { width: 70px; flex-shrink: 0; }
+.pdf-logo svg { width: 100%; height: auto; display: block; }
+.pdf-titles { flex: 1; text-align: center; }
+.pdf-center-en { font-size: 13px; font-weight: 700; color: #6B3FA0; letter-spacing: 1px; }
+.pdf-center-ar { font-size: 18px; font-weight: 900; color: #4a148c; margin-top: 4px; }
+.pdf-banner {
+  background: #f3e5f5;
+  border-right: 6px solid #6B3FA0;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pdf-banner h1 { font-size: 17px; font-weight: 900; color: #4a148c; flex: 1; }
+.pdf-sev-badge {
+  padding: 4px 12px; border-radius: 999px;
+  font-weight: 800; font-size: 12px;
+}
+.pdf-banner.pdf-sev-light  .pdf-sev-badge { background: #E1F5EC; color: #1D9E75; }
+.pdf-banner.pdf-sev-medium .pdf-sev-badge { background: #FAEEDA; color: #BA7517; }
+.pdf-banner.pdf-sev-severe .pdf-sev-badge { background: #FCE6E6; color: #A32D2D; }
+.pdf-banner.pdf-sev-light  { border-right-color: #1D9E75; background: #f4faf7; }
+.pdf-banner.pdf-sev-medium { border-right-color: #BA7517; background: #fdf9ee; }
+.pdf-banner.pdf-sev-severe { border-right-color: #A32D2D; background: #fdf3f3; }
+.pdf-report-id { color: #777; font-size: 11px; font-weight: 700; }
+.pdf-section {
+  background: #faf8fd;
+  border: 1px solid #ece4f8;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  page-break-inside: avoid;
+}
+.pdf-section h2 {
+  font-size: 13px;
+  font-weight: 900;
+  color: #4a148c;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1.2px dashed #d8c8ec;
+}
+.pdf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+.pdf-grid b, .pdf-section b { color: #4a148c; }
+.pdf-desc, .pdf-notes {
+  margin-top: 6px;
+  padding: 7px 10px;
+  background: #fff;
+  border: 1px solid #ece4f8;
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+}
+.pdf-actions {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 14px;
+  font-size: 12.5px;
+}
+.pdf-actions li {
+  padding: 5px 10px;
+  border: 1px solid #e0d6f0;
+  border-radius: 4px;
+  background: #fff;
+  color: #999;
+}
+.pdf-actions li.taken {
+  background: #f4faf7;
+  border-color: #1D9E75;
+  color: #1D9E75;
+  font-weight: 700;
+}
+.pdf-actions .ck {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  font-weight: 800;
+  margin-left: 4px;
+}
+.pdf-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 2px solid #6B3FA0;
+  page-break-inside: avoid;
+}
+.pdf-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.pdf-sigbox { text-align: center; }
+.pdf-siglabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4a148c;
+  margin-bottom: 22px;
+}
+.pdf-sigline { border-bottom: 1.5px dashed #888; height: 6px; }
+.pdf-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #666;
+  font-weight: 700;
+}
+"""
+
+_VIO_PDF_ACTION_LABELS = {
+    "action_oral_teacher":    "تنبيه شفهي من المعلمة",
+    "action_oral_supervisor": "تنبيه شفهي من المشرفة",
+    "action_written":         "تنبيه كتابي",
+    "action_message_parent":  "إرسال رسالة لولي الأمر",
+    "action_call_parent":     "اتصال بولي الأمر",
+    "action_meeting_parent":  "اجتماع مع ولي الأمر",
+}
+
+
+def _vio_render_single_pdf_html(row):
+    """Build the HTML body for a single-violation PDF report."""
+    import html as _html
+    from datetime import datetime as _dt
+    e = _html.escape
+
+    sev = (row.get("severity") or "light").strip().lower()
+    if sev not in ("light", "medium", "severe"): sev = "light"
+    sev_label = _VIO_SEVERITY_LABEL_AR.get(sev, "")
+
+    name  = e(row.get("student_name") or "")
+    group = e(row.get("group_name") or "—")
+    vdate = e(row.get("violation_date") or "")
+    vplace = e(row.get("violation_place") or "")
+    vtype = e(row.get("violation_type") or "")
+    desc  = row.get("description") or ""
+    notes = row.get("additional_notes") or ""
+    vid   = row.get("id")
+
+    actions_html = ""
+    for key, lbl in _VIO_PDF_ACTION_LABELS.items():
+        taken = bool(row.get(key))
+        cls = " class=\"taken\"" if taken else ""
+        ck  = "✓" if taken else "□"
+        actions_html += (
+            "<li" + cls + "><span class=\"ck\">" + ck + "</span> "
+            + e(lbl) + "</li>"
+        )
+
+    desc_block = ("<div class=\"pdf-desc\">" + e(desc) + "</div>") if desc else ""
+    notes_block = ""
+    if notes:
+        notes_block = (
+            "<section class=\"pdf-section\">"
+            "<h2>ملاحظات إضافية</h2>"
+            "<div class=\"pdf-notes\">" + e(notes) + "</div>"
+            "</section>"
+        )
+
+    print_ts = _dt.now().strftime("%Y-%m-%d %H:%M")
+
+    head = (
+        "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head>"
+        "<meta charset=\"utf-8\">"
+        "<title>تقرير مخالفة #" + str(vid) + "</title>"
+        "<style>" + _VIO_PDF_CSS + "</style>"
+        "</head><body>"
+    )
+    header = (
+        "<div class=\"pdf-header\">"
+          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pdf-titles\">"
+            "<div class=\"pdf-center-en\">MINDEX EDUCATION &amp; TRAINING CENTRE</div>"
+            "<div class=\"pdf-center-ar\">مركز مايندكس للتعليم والتدريب</div>"
+          "</div>"
+        "</div>"
+    )
+    banner = (
+        "<div class=\"pdf-banner pdf-sev-" + sev + "\">"
+          "<h1>تقرير مخالفة</h1>"
+          "<span class=\"pdf-sev-badge\">" + e(sev_label) + "</span>"
+          "<span class=\"pdf-report-id\">رقم: #" + str(vid) + "</span>"
+        "</div>"
+    )
+    s1 = (
+        "<section class=\"pdf-section\">"
+          "<h2>معلومات الطالبة</h2>"
+          "<div class=\"pdf-grid\">"
+            "<div><b>الاسم:</b> " + name + "</div>"
+            "<div><b>المجموعة:</b> " + group + "</div>"
+          "</div>"
+        "</section>"
+    )
+    s2 = (
+        "<section class=\"pdf-section\">"
+          "<h2>تفاصيل المخالفة</h2>"
+          "<div class=\"pdf-grid\">"
+            "<div><b>التاريخ:</b> " + vdate + "</div>"
+            "<div><b>المكان:</b> " + vplace + "</div>"
+          "</div>"
+          "<div style=\"margin-top:4px;\"><b>النوع:</b> " + vtype + "</div>"
+          + desc_block +
+        "</section>"
+    )
+    s3 = (
+        "<section class=\"pdf-section\">"
+          "<h2>الإجراءات المتخذة</h2>"
+          "<ul class=\"pdf-actions\">" + actions_html + "</ul>"
+        "</section>"
+    )
+    footer = (
+        "<footer class=\"pdf-footer\">"
+          "<div class=\"pdf-signatures\">"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">المشرفة</div><div class=\"pdf-sigline\"></div></div>"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">ولي الأمر</div><div class=\"pdf-sigline\"></div></div>"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">الطالبة</div><div class=\"pdf-sigline\"></div></div>"
+          "</div>"
+          "<div class=\"pdf-meta\">"
+            "<span>طُبع في: " + e(print_ts) + "</span>"
+            "<span>رقم التقرير: #" + str(vid) + "</span>"
+          "</div>"
+        "</footer>"
+    )
+    return head + header + banner + s1 + s2 + s3 + notes_block + footer + "</body></html>"
+
+
+def _vio_html_to_pdf_bytes(html_str):
+    """Render HTML → PDF bytes via Playwright/Chromium. Mirrors the
+    docs-screenshot launch pattern; uses set_content() instead of
+    goto() so we never hit the network. Caller is responsible for
+    its own timeout — typical render is ~1-2s on Render, locally
+    ~600-900ms. Raises on failure (no fallback)."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            ctx = browser.new_context(locale="ar")
+            pg = ctx.new_page()
+            pg.set_content(html_str, wait_until="load")
+            return pg.pdf(
+                format="A4",
+                print_background=True,
+                margin={"top": "12mm", "bottom": "12mm",
+                        "left": "12mm", "right": "12mm"},
+            )
+        finally:
+            browser.close()
+
+
+@app.route("/api/admin/violations/<int:vid>/pdf", methods=["GET"])
+@login_required
+def api_admin_violations_single_pdf(vid):
+    """Render a single non-deleted violation as a PDF report.
+    Admin-only. Inline disposition so the browser opens it in the
+    same tab via window.open(). 404 if missing or soft-deleted —
+    mirrors the editable-surface contract from PATCH/DELETE."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return Response("غير مصرح", status=403,
+                        mimetype="text/plain; charset=utf-8")
+    db = get_db()
+    row = db.execute("SELECT * FROM violations WHERE id=? AND is_deleted=0",
+                     (vid,)).fetchone()
+    if not row:
+        return Response("المخالفة غير موجودة", status=404,
+                        mimetype="text/plain; charset=utf-8")
+    decorated = _vio_decorate_rows(db, [row])[0]
+    html_str = _vio_render_single_pdf_html(decorated)
+    try:
+        pdf_bytes = _vio_html_to_pdf_bytes(html_str)
+    except Exception as ex:
+        import sys as _sys
+        _sys.stderr.write("[violations-pdf] render failed: " + str(ex) + "\n")
+        return Response("تعذر توليد التقرير", status=500,
+                        mimetype="text/plain; charset=utf-8")
+    fname = "violation_" + str(vid) + ".pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": "inline; filename=\"" + fname + "\""},
+    )
+
+
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
 # Admin/manager-only lookup for the redesigned monitoring page: returns
 # the groups owned by a specific teacher (by user id) plus the live
