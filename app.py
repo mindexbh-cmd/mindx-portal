@@ -41371,7 +41371,39 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         var row = violationsById[String(vid)];
         if (!row){ showToast('تعذر تحميل بيانات المخالفة', true); return; }
         openModal(parseInt(vid, 10), row);
+      } else if (t.closest('.vio-btn-del')){
+        deleteViolation(vid, t.closest('.vio-btn-del'));
       }
+    });
+  }
+
+  function deleteViolation(vid, btn){
+    if (!vid) return;
+    var ok = window.confirm(
+      'هل أنت متأكد من حذف هذه المخالفة؟\n' +
+      '(يمكن استعادتها من قاعدة البيانات لاحقاً)'
+    );
+    if (!ok) return;
+    if (btn) btn.disabled = true;
+    fetch('/api/admin/violations/' + encodeURIComponent(vid), {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+    .then(function(res){
+      if (res.status === 200 && res.data && res.data.ok){
+        loadViolations();
+        loadStats();
+        showToast('✓ تم حذف المخالفة', false);
+      } else {
+        if (btn) btn.disabled = false;
+        var msg = (res.data && res.data.error) || 'تعذر الحذف';
+        showToast(msg, true);
+      }
+    })
+    .catch(function(){
+      if (btn) btn.disabled = false;
+      showToast('تعذر الاتصال بالخادم', true);
     });
   }
 
