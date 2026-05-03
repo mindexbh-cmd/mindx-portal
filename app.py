@@ -42861,6 +42861,207 @@ def api_admin_violations_student_monthly_pdf(sid):
     )
 
 
+@app.route("/api/admin/violations/dashboard-stats", methods=["GET"])
+@login_required
+def api_admin_violations_dashboard_stats():
+    """Comprehensive dashboard payload — six sections in a single
+    round-trip. Admin-only. Every section filters is_deleted=0.
+
+    Sections:
+      - top_students          : top 10 by lifetime non-deleted count,
+                                with severity_max (= the most-severe
+                                severity ever recorded for them) and
+                                their most-recent group_name.
+      - top_types             : violation types ranked by count DESC
+                                with their (deterministic) severity.
+      - severity_distribution : last 30 days only, the 3-bucket count.
+      - monthly_trend         : last 6 calendar months, each with
+                                count + light/medium/severe sub-counts.
+      - by_group              : non-empty group_name buckets, count DESC.
+      - by_place              : the 3 canonical places, count DESC.
+
+    Date math + month bucketing happens in Python so the SQL stays
+    dialect-portable (no SQLite STRFTIME / Postgres TO_CHAR split)."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    from datetime import date as _date, timedelta as _timedelta
+    today = _date.today()
+    db = get_db()
+
+    # ── top_students ─────────────────────────────────────────────
+    top_students = []
+    try:
+        rows = db.execute(
+            "SELECT student_id, student_name, COUNT(*) AS c, "
+            "MAX(CASE severity WHEN 'severe' THEN 3 "
+            "                  WHEN 'medium' THEN 2 ELSE 1 END) AS sev_rank "
+            "FROM violations WHERE is_deleted = 0 "
+            "GROUP BY student_id, student_name "
+            "ORDER BY c DESC, student_name ASC LIMIT 10"
+        ).fetchall()
+    except Exception:
+        rows = []
+    for r in rows:
+        d = dict(r)
+        sid  = d.get("student_id")
+        name = d.get("student_name") or ""
+        sev_rank = int(d.get("sev_rank") or 1)
+        sev_max = ("severe" if sev_rank == 3
+                   else "medium" if sev_rank == 2 else "light")
+        # Most-recent group for this (sid, name) pair — manual entries
+        # branch on student_id IS NULL.
+        try:
+            if sid is not None:
+                grow = db.execute(
+                    "SELECT group_name FROM violations WHERE is_deleted = 0 "
+                    "AND student_id = ? AND group_name IS NOT NULL "
+                    "AND group_name <> '' ORDER BY id DESC LIMIT 1",
+                    (sid,)
+                ).fetchone()
+            else:
+                grow = db.execute(
+                    "SELECT group_name FROM violations WHERE is_deleted = 0 "
+                    "AND student_id IS NULL AND student_name = ? "
+                    "AND group_name IS NOT NULL AND group_name <> '' "
+                    "ORDER BY id DESC LIMIT 1",
+                    (name,)
+                ).fetchone()
+        except Exception:
+            grow = None
+        group_name = (grow[0] if grow else None)
+        if hasattr(grow, "keys") and grow:
+            try: group_name = dict(grow).get("group_name") or group_name
+            except Exception: pass
+        top_students.append({
+            "student_id":   sid,
+            "student_name": name,
+            "group_name":   group_name,
+            "count":        int(d.get("c") or 0),
+            "severity_max": sev_max,
+        })
+
+    # ── top_types ────────────────────────────────────────────────
+    top_types = []
+    try:
+        rows = db.execute(
+            "SELECT violation_type AS type, MIN(severity) AS severity, "
+            "COUNT(*) AS c FROM violations WHERE is_deleted = 0 "
+            "GROUP BY violation_type ORDER BY c DESC LIMIT 10"
+        ).fetchall()
+    except Exception:
+        rows = []
+    for r in rows:
+        d = dict(r)
+        top_types.append({
+            "type":     d.get("type") or "",
+            "count":    int(d.get("c") or 0),
+            "severity": d.get("severity") or "light",
+        })
+
+    # ── severity_distribution (last 30 days) ─────────────────────
+    cutoff_30 = (today - _timedelta(days=30)).isoformat()
+    sev_dist = {"light": 0, "medium": 0, "severe": 0}
+    try:
+        rows = db.execute(
+            "SELECT severity, COUNT(*) AS c FROM violations "
+            "WHERE is_deleted = 0 AND violation_date >= ? "
+            "GROUP BY severity",
+            (cutoff_30,)
+        ).fetchall()
+        for r in rows:
+            d = dict(r)
+            sev = (d.get("severity") or "").lower()
+            if sev in sev_dist:
+                sev_dist[sev] = int(d.get("c") or 0)
+    except Exception:
+        pass
+
+    # ── monthly_trend (last 6 calendar months, oldest → newest) ──
+    months = []
+    yy, mm = today.year, today.month
+    for offset in range(5, -1, -1):
+        yi, mi = yy, mm - offset
+        while mi <= 0:
+            mi += 12; yi -= 1
+        months.append("{:04d}-{:02d}".format(yi, mi))
+    bucket = {m: {"light": 0, "medium": 0, "severe": 0} for m in months}
+    cutoff_6m = months[0] + "-01"
+    try:
+        rows = db.execute(
+            "SELECT violation_date, severity FROM violations "
+            "WHERE is_deleted = 0 AND violation_date >= ?",
+            (cutoff_6m,)
+        ).fetchall()
+        for r in rows:
+            d = dict(r)
+            vd = d.get("violation_date")
+            if vd is None: continue
+            ym = str(vd)[:7]
+            if ym in bucket:
+                sev = (d.get("severity") or "light").lower()
+                if sev not in ("light", "medium", "severe"): sev = "light"
+                bucket[ym][sev] += 1
+    except Exception:
+        pass
+    monthly_trend = []
+    for m in months:
+        b = bucket[m]
+        monthly_trend.append({
+            "month":  m,
+            "count":  b["light"] + b["medium"] + b["severe"],
+            "light":  b["light"],
+            "medium": b["medium"],
+            "severe": b["severe"],
+        })
+
+    # ── by_group ─────────────────────────────────────────────────
+    by_group = []
+    try:
+        rows = db.execute(
+            "SELECT group_name, COUNT(*) AS c FROM violations "
+            "WHERE is_deleted = 0 AND group_name IS NOT NULL "
+            "AND group_name <> '' "
+            "GROUP BY group_name ORDER BY c DESC LIMIT 20"
+        ).fetchall()
+        for r in rows:
+            d = dict(r)
+            by_group.append({
+                "group_name": d.get("group_name") or "",
+                "count":      int(d.get("c") or 0),
+            })
+    except Exception:
+        pass
+
+    # ── by_place ─────────────────────────────────────────────────
+    by_place = []
+    try:
+        rows = db.execute(
+            "SELECT violation_place, COUNT(*) AS c FROM violations "
+            "WHERE is_deleted = 0 "
+            "GROUP BY violation_place ORDER BY c DESC"
+        ).fetchall()
+        for r in rows:
+            d = dict(r)
+            by_place.append({
+                "place": d.get("violation_place") or "",
+                "count": int(d.get("c") or 0),
+            })
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "top_students":          top_students,
+        "top_types":             top_types,
+        "severity_distribution": sev_dist,
+        "monthly_trend":         monthly_trend,
+        "by_group":              by_group,
+        "by_place":              by_place,
+    })
+
+
 def _vio_render_wa_message(row):
     """Build the formal Arabic WhatsApp text for a violation row.
 
