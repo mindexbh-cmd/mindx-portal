@@ -36445,1126 +36445,278 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 </div>
 <div class="wrap">
 
-  <!-- Top stats row (always visible) -->
-  <div class="stats-row" id="stats-row">
-    <div class="stat-card lessons">
-      <h4>📚 دروس اليوم</h4>
-      <div class="num" id="s-lessons-today">—</div>
-    </div>
-    <div class="stat-card messages">
-      <h4>📨 رسائل اليوم</h4>
-      <div class="num" id="s-messages-today">—</div>
-    </div>
-    <div class="stat-card evals">
-      <h4>📊 تقييمات الشهر</h4>
-      <div class="num" id="s-evals-month">—</div>
-    </div>
-    <div class="stat-card alerts">
-      <h4>⚠ تنبيهات</h4>
-      <div class="num" id="s-alerts-total">—</div>
+  <!-- ── A) Title card ──────────────────────────────────────── -->
+  <div class="tm-card tm-title-card">
+    <div class="tm-title-row">
+      <div class="tm-title-icon" aria-hidden="true">👥</div>
+      <div>
+        <h2 class="tm-title">متابعة تسليمات المعلمات</h2>
+        <div class="tm-subtitle">اختاري المعلمة لعرض تفاصيل عملها</div>
+      </div>
     </div>
   </div>
 
-  <!-- Tabs -->
-  <div class="tabs" id="tabs-row">
-    <button class="tab" data-tab="lessons" onclick="switchTab('lessons')">📚 الدروس</button>
-    <button class="tab" data-tab="messages" onclick="switchTab('messages')">📨 الرسائل</button>
-    <button class="tab" data-tab="evaluations" onclick="switchTab('evaluations')">📊 التقييمات</button>
-    <button class="tab" data-tab="alerts" onclick="switchTab('alerts')">⚠ التنبيهات
-      <span class="badge" id="tab-alerts-badge" style="display:none;">0</span>
-    </button>
-  </div>
-
-  <!-- Filter row -->
-  <div class="panel">
-    <button class="filters-toggle" id="ft-toggle" onclick="toggleFilters()">🔽 الفلاتر</button>
-    <div class="filters-row" id="filters-row">
-      <div>
-        <label>من تاريخ</label>
-        <input type="date" id="f-from">
-      </div>
-      <div>
-        <label>إلى تاريخ</label>
-        <input type="date" id="f-to">
-      </div>
-      <div>
-        <label>المعلمة</label>
-        <select id="f-teacher" multiple size="1" style="height:38px;">
-          <option value="">— الكل —</option>
+  <!-- ── B) Filters card ─────────────────────────────────────── -->
+  <div class="tm-card">
+    <div class="tm-filters-grid">
+      <div class="tm-field">
+        <label for="tm-teacher">المعلمة</label>
+        <select id="tm-teacher">
+          <option value="">— اختاري المعلمة —</option>
         </select>
       </div>
-      <div>
-        <label>المجموعة</label>
-        <select id="f-group" multiple size="1" style="height:38px;">
-          <option value="">— الكل —</option>
+      <div class="tm-field">
+        <label for="tm-group">المجموعة</label>
+        <select id="tm-group" disabled>
+          <option value="">— اختاري المعلمة أولاً —</option>
         </select>
       </div>
     </div>
-    <div class="filters-row" style="margin-top:10px;grid-template-columns:1fr;">
-      <div>
-        <label>بحث</label>
-        <input type="text" id="f-search" placeholder="ابحث في المحتوى / الملاحظات...">
+  </div>
+
+  <!-- ── C) Teacher card (hidden until a teacher is chosen) ──── -->
+  <div class="tm-card tm-teacher-card" id="tm-teacher-card" hidden>
+    <div class="tm-teacher-head">
+      <div class="tm-teacher-id">
+        <div class="tm-avatar" id="tm-avatar">—</div>
+        <div>
+          <div class="tm-teacher-name" id="tm-teacher-name">—</div>
+          <div class="tm-teacher-meta" id="tm-teacher-meta">—</div>
+        </div>
+      </div>
+      <button type="button" class="tm-btn tm-btn-primary" id="tm-request-btn">
+        إرسال طلب للمعلمة ↗
+      </button>
+    </div>
+
+    <div class="tm-stats-grid">
+      <div class="tm-stat">
+        <div class="tm-stat-label">الدروس المسلَّمة</div>
+        <div class="tm-stat-value" id="tm-stat-lessons">—</div>
+      </div>
+      <div class="tm-stat">
+        <div class="tm-stat-label">تقييمات الشهر</div>
+        <div class="tm-stat-value" id="tm-stat-evals">—</div>
+      </div>
+      <div class="tm-stat tm-stat-amber">
+        <div class="tm-stat-label">رسائل بانتظار موافقتك</div>
+        <div class="tm-stat-value" id="tm-stat-pending">—</div>
       </div>
     </div>
-    <div class="filter-acts">
-      <button class="btn" onclick="applyFilters()">🔍 تطبيق</button>
-      <button class="btn btn-ghost" onclick="resetFilters()">↺ مسح</button>
+
+    <div class="tm-tabs" role="tablist">
+      <button type="button" class="tm-tab active" data-tm-tab="lessons" role="tab">
+        متابعة التقدم في الدروس
+      </button>
+      <button type="button" class="tm-tab" data-tm-tab="evaluations" role="tab">
+        استمارة التقييم الشهري
+      </button>
+      <button type="button" class="tm-tab" data-tm-tab="messages" role="tab">
+        ماذا تريد أن يعرف ولي الأمر
+      </button>
+    </div>
+
+    <div class="tm-panels">
+      <div class="tm-panel" data-tm-panel="lessons">
+        <div class="tm-panel-empty">سيتم عرض الدروس هنا.</div>
+      </div>
+      <div class="tm-panel" data-tm-panel="evaluations" hidden>
+        <div class="tm-panel-empty">سيتم عرض التقييمات هنا.</div>
+      </div>
+      <div class="tm-panel" data-tm-panel="messages" hidden>
+        <div class="tm-panel-empty">سيتم عرض الرسائل هنا.</div>
+      </div>
     </div>
   </div>
 
-  <!-- Tab content area -->
-  <div class="panel" id="tab-content">
-    <div class="empty">جاري التحميل...</div>
-  </div>
-
 </div>
 
-<!-- Reused modals: view / edit / delete / send -->
-<div class="modal-back" id="viewBack" onclick="if(event.target===this)closeModal('viewBack')">
-  <div class="modal lg"><h3 id="viewTitle">تفاصيل</h3>
-    <div id="viewBody"></div>
-    <div class="acts"><button class="btn btn-ghost" onclick="closeModal('viewBack')">إغلاق</button></div>
-  </div>
-</div>
-<div class="modal-back" id="editBack" onclick="if(event.target===this)closeModal('editBack')">
-  <div class="modal lg"><h3 id="editTitle">تعديل</h3>
-    <div id="editBody"></div>
-    <div class="acts">
-      <button class="btn btn-ghost" onclick="closeModal('editBack')">إلغاء</button>
-      <button class="btn btn-danger" id="editDelBtn" onclick="editDelete()">حذف</button>
-      <button class="btn" id="editSaveBtn" onclick="editSave()">حفظ</button>
-    </div>
-  </div>
-</div>
-<div class="modal-back" id="sendBack" onclick="if(event.target===this)closeModal('sendBack')">
-  <div class="modal lg"><h3 id="sendTitle">إرسال للأهل</h3>
-    <div class="field"><label>رقم ولي الأمر</label><input type="text" id="s-phone" readonly></div>
-    <div class="field"><label>نص الرسالة</label><textarea id="s-text" rows="14"></textarea></div>
-    <div class="acts">
-      <button class="btn btn-ghost" onclick="closeModal('sendBack')">إلغاء</button>
-      <button class="btn btn-warn" id="sendBtn" onclick="confirmSend()">📨 إرسال</button>
-    </div>
-  </div>
-</div>
-<div class="modal-back" id="delBack" onclick="if(event.target===this)closeModal('delBack')">
-  <div class="modal"><h3>تأكيد الحذف</h3>
-    <p>هل ترغبين في حذف هذا السجل؟</p>
-    <div class="acts">
-      <button class="btn btn-ghost" onclick="closeModal('delBack')">إلغاء</button>
-      <button class="btn btn-danger" id="delConfirmBtn" onclick="confirmDelete()">حذف</button>
-    </div>
-  </div>
-</div>
+<style>
+/* ── Step-2 redesign — scoped under tm-* class names so they don't
+   collide with the older .panel / .stat-card / .tabs styles still
+   present in <head>. Solid colours, no gradients (per spec). The
+   amber palette (#FAEEDA / #854F0B / #BA7517) is reserved for the
+   parent-message pending alert only. ───────────────────────── */
+.tm-card{background:#fff;border:0.5px solid #d8c8ec;border-radius:14px;
+         padding:18px 20px;margin:0 0 14px;}
+.tm-title-row{display:flex;align-items:center;gap:14px;}
+.tm-title-icon{width:44px;height:44px;border-radius:50%;background:#f3e5f5;
+               color:#4a148c;display:flex;align-items:center;
+               justify-content:center;font-size:1.25rem;flex-shrink:0;}
+.tm-title{margin:0;color:#4a148c;font-weight:900;font-size:1.15rem;line-height:1.3;}
+.tm-subtitle{margin:4px 0 0;color:#6a4f8a;font-size:.92rem;}
 
-<div class="toast" id="toast"></div>
+.tm-filters-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:680px){.tm-filters-grid{grid-template-columns:1fr;}}
+.tm-field label{display:block;color:#4a148c;font-weight:700;font-size:.88rem;
+                margin-bottom:6px;}
+.tm-field select{width:100%;padding:10px 12px;border:0.5px solid #d8c8ec;
+                 border-radius:10px;background:#fff;color:#212121;
+                 font-family:inherit;font-size:.95rem;}
+.tm-field select:disabled{background:#f8f5fb;color:#8a7da5;cursor:not-allowed;}
+.tm-field select:focus{outline:none;border-color:#6B3FA0;
+                       box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+
+.tm-teacher-head{display:flex;justify-content:space-between;align-items:center;
+                 gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.tm-teacher-id{display:flex;align-items:center;gap:12px;flex:1;min-width:240px;}
+.tm-avatar{width:44px;height:44px;border-radius:50%;background:#6B3FA0;color:#fff;
+           display:flex;align-items:center;justify-content:center;font-weight:900;
+           font-size:1rem;flex-shrink:0;}
+.tm-teacher-name{font-weight:900;color:#4a148c;font-size:1.05rem;line-height:1.3;}
+.tm-teacher-meta{color:#6a4f8a;font-size:.86rem;margin-top:2px;}
+.tm-btn{border:none;border-radius:10px;padding:10px 18px;font-weight:800;
+        font-family:inherit;font-size:.92rem;cursor:pointer;}
+.tm-btn-primary{background:#6B3FA0;color:#fff;}
+.tm-btn-primary:hover{background:#5a3489;}
+.tm-btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+
+.tm-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+               margin-bottom:14px;}
+@media (max-width:760px){.tm-stats-grid{grid-template-columns:1fr;}}
+.tm-stat{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
+         padding:14px 16px;}
+.tm-stat-label{color:#6a4f8a;font-size:.86rem;font-weight:700;margin-bottom:4px;}
+.tm-stat-value{color:#4a148c;font-size:1.6rem;font-weight:900;line-height:1.1;}
+.tm-stat-amber{background:#FAEEDA;border-color:#BA7517;}
+.tm-stat-amber .tm-stat-label{color:#854F0B;}
+.tm-stat-amber .tm-stat-value{color:#854F0B;}
+
+.tm-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+         margin-bottom:14px;}
+@media (max-width:760px){.tm-tabs{grid-template-columns:1fr;}}
+.tm-tab{background:#f3e5f5;color:#4a148c;border:0.5px solid #d8c8ec;
+        border-radius:10px;padding:10px 14px;font-weight:800;font-size:.92rem;
+        font-family:inherit;cursor:pointer;text-align:center;}
+.tm-tab:hover{background:#e1bee7;}
+.tm-tab.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.tm-panel{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
+          padding:18px 20px;min-height:160px;}
+.tm-panel-empty{color:#8a7da5;text-align:center;padding:40px 20px;font-style:italic;}
+</style>
 
 <script>
 (function(){
-  // ── shared state ──
-  var STATE = {
-    tab: 'alerts',
-    filters: {
-      date_from: '', date_to: '',
-      teachers: [], groups: [],
-      search: ''
-    },
-    cache: { lessons: null, messages: null, evaluations: null, alerts: null, summary: null },
-    teachers: [], groups: []
-  };
+  // ── Step-2 redesign: dropdown + tab wiring. No data fetch beyond
+  // /api/lessons/teachers and /api/admin/teacher/<id>/groups —
+  // content panels are intentionally empty until later steps fill
+  // them.
+  var teacherSel = document.getElementById('tm-teacher');
+  var groupSel   = document.getElementById('tm-group');
+  var card       = document.getElementById('tm-teacher-card');
+  var avatarEl   = document.getElementById('tm-avatar');
+  var nameEl     = document.getElementById('tm-teacher-name');
+  var metaEl     = document.getElementById('tm-teacher-meta');
 
-  // Surface for sub-tab JS (commits 2-5).
-  window.TD_STATE = STATE;
+  var cache = {};
 
-  function escapeHtml(s){
-    s = s == null ? '' : String(s);
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
-            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  window.tdEscape = escapeHtml;
-  function toast(msg, isErr){
-    var t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.toggle('err', !!isErr);
-    t.classList.add('show');
-    setTimeout(function(){ t.classList.remove('show'); }, 2400);
-  }
-  window.tdToast = toast;
-  window.tdCloseModal = function(id){
-    document.getElementById(id).classList.remove('show');
-  };
-  window.closeModal = window.tdCloseModal;
-
-  // ── URL param handling ──
-  function qs(name){
-    var m = (location.search || '').match(new RegExp('[?&]'+name+'=([^&]*)'));
-    return m ? decodeURIComponent(m[1].replace(/\+/g,' ')) : '';
-  }
-  function updateUrl(){
-    var p = new URLSearchParams();
-    p.set('tab', STATE.tab);
-    if(STATE.filters.date_from) p.set('from', STATE.filters.date_from);
-    if(STATE.filters.date_to)   p.set('to',   STATE.filters.date_to);
-    if(STATE.filters.search)    p.set('q',    STATE.filters.search);
-    if(STATE.filters.teachers.length) p.set('teachers', STATE.filters.teachers.join(','));
-    if(STATE.filters.groups.length)   p.set('groups',   STATE.filters.groups.join(','));
-    var subFilter = qs('filter'); if(subFilter) p.set('filter', subFilter);
-    history.replaceState(null, '', '?' + p.toString());
-  }
-  window.tdUpdateUrl = updateUrl;
-
-  function readFiltersFromUrl(){
-    STATE.filters.date_from = qs('from');
-    STATE.filters.date_to   = qs('to');
-    STATE.filters.search    = qs('q');
-    var t = qs('teachers'); STATE.filters.teachers = t ? t.split(',').filter(Boolean) : [];
-    var g = qs('groups');   STATE.filters.groups   = g ? g.split(',').filter(Boolean) : [];
-    document.getElementById('f-from').value   = STATE.filters.date_from;
-    document.getElementById('f-to').value     = STATE.filters.date_to;
-    document.getElementById('f-search').value = STATE.filters.search;
+  function currentMonthLabel(){
+    var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+                  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    var d = new Date();
+    return months[d.getMonth()] + ' ' + d.getFullYear();
   }
 
-  function readFiltersFromForm(){
-    STATE.filters.date_from = document.getElementById('f-from').value;
-    STATE.filters.date_to   = document.getElementById('f-to').value;
-    STATE.filters.search    = document.getElementById('f-search').value;
-    var ts = document.getElementById('f-teacher');
-    STATE.filters.teachers = Array.from(ts.selectedOptions || [])
-      .map(function(o){return o.value;}).filter(Boolean);
-    var gs = document.getElementById('f-group');
-    STATE.filters.groups = Array.from(gs.selectedOptions || [])
-      .map(function(o){return o.value;}).filter(Boolean);
-  }
-  window.tdReadFiltersFromForm = readFiltersFromForm;
-
-  function applyMultiSelect(elId, values){
-    var el = document.getElementById(elId);
-    if(!el) return;
-    Array.from(el.options).forEach(function(o){
-      if(!o.value) return;
-      o.selected = values.indexOf(o.value) >= 0;
-    });
+  function initials(name){
+    var s = (name || '').trim();
+    if(!s) return '—';
+    var parts = s.split(/\s+/).filter(Boolean);
+    var first  = parts[0] ? parts[0].charAt(0) : '';
+    var second = parts[1] ? parts[1].charAt(0) : '';
+    return (first + second) || first || '—';
   }
 
-  // Build query-string for backend list endpoints. Multi-selects are
-  // applied client-side by the per-tab renderer because the backend
-  // endpoints accept only single teacher_id / group_name. We pass the
-  // FIRST selected value (if any) to narrow server output, then
-  // filter the rest in JS — keeps payloads small without expanding
-  // the existing endpoints.
-  window.tdBuildQs = function(extra){
-    var f = STATE.filters;
-    var p = [];
-    if(f.date_from) p.push('date_from=' + encodeURIComponent(f.date_from));
-    if(f.date_to)   p.push('date_to='   + encodeURIComponent(f.date_to));
-    if(f.search)    p.push('search='    + encodeURIComponent(f.search));
-    if(f.teachers.length === 1) p.push('teacher_id=' + encodeURIComponent(f.teachers[0]));
-    if(f.groups.length   === 1) p.push('group_name=' + encodeURIComponent(f.groups[0]));
-    if(extra && typeof extra === 'object'){
-      Object.keys(extra).forEach(function(k){
-        if(extra[k] != null && extra[k] !== '')
-          p.push(encodeURIComponent(k)+'='+encodeURIComponent(extra[k]));
+  // 1) Load teachers list.
+  fetch('/api/lessons/teachers', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var list = (j && j.teachers) || [];
+      list.forEach(function(t){
+        var opt = document.createElement('option');
+        opt.value = String(t.id);
+        opt.textContent = t.name || ('#'+t.id);
+        opt.dataset.name = t.name || '';
+        teacherSel.appendChild(opt);
       });
-    }
-    return p.length ? ('?' + p.join('&')) : '';
-  };
+    })
+    .catch(function(){ /* placeholder option remains */ });
 
-  // Multi-select client-side filter helper (post-fetch refine).
-  window.tdMatchesFilters = function(row){
-    var f = STATE.filters;
-    if(f.teachers.length){
-      var t = row.teacher_id ? String(row.teacher_id) : '';
-      if(f.teachers.indexOf(t) < 0) return false;
-    }
-    if(f.groups.length){
-      var g = row.group_name || '';
-      if(f.groups.indexOf(g) < 0) return false;
-    }
-    return true;
-  };
-
-  // ── tab switching ──
-  function renderTab(){
-    var box = document.getElementById('tab-content');
-    document.querySelectorAll('.tab').forEach(function(b){
-      b.classList.toggle('active', b.getAttribute('data-tab') === STATE.tab);
-    });
-    if(STATE.tab === 'alerts'){
-      if(typeof window.tdRenderAlerts === 'function') window.tdRenderAlerts(box);
-      else box.innerHTML = '<div class="empty">قسم التنبيهات قيد التحميل...</div>';
-    } else if(STATE.tab === 'lessons'){
-      if(typeof window.tdRenderLessons === 'function') window.tdRenderLessons(box);
-      else box.innerHTML = '<div class="empty">قسم الدروس قيد التحميل...</div>';
-    } else if(STATE.tab === 'messages'){
-      if(typeof window.tdRenderMessages === 'function') window.tdRenderMessages(box);
-      else box.innerHTML = '<div class="empty">قسم الرسائل قيد التحميل...</div>';
-    } else if(STATE.tab === 'evaluations'){
-      if(typeof window.tdRenderEvaluations === 'function') window.tdRenderEvaluations(box);
-      else box.innerHTML = '<div class="empty">قسم التقييمات قيد التحميل...</div>';
-    }
-  }
-  window.switchTab = function(name){
-    STATE.tab = name;
-    updateUrl();
-    renderTab();
-  };
-  window.tdRenderActiveTab = renderTab;
-
-  window.applyFilters = function(){
-    readFiltersFromForm();
-    // Invalidate cached fetches so the new filters take effect.
-    STATE.cache = { lessons:null, messages:null, evaluations:null, alerts:null, summary:null };
-    updateUrl();
-    renderTab();
-    if(typeof window.tdLoadSummary === 'function') window.tdLoadSummary();
-  };
-  window.resetFilters = function(){
-    document.getElementById('f-from').value = '';
-    document.getElementById('f-to').value   = '';
-    document.getElementById('f-search').value = '';
-    var ts = document.getElementById('f-teacher');
-    Array.from(ts.options).forEach(function(o){ o.selected = !o.value; });
-    var gs = document.getElementById('f-group');
-    Array.from(gs.options).forEach(function(o){ o.selected = !o.value; });
-    applyFilters();
-  };
-  window.toggleFilters = function(){
-    document.getElementById('filters-row').classList.toggle('show');
-  };
-
-  // ── filter dropdown population ──
-  function loadFilterOpts(){
-    return Promise.all([
-      fetch('/api/lessons/teachers', {credentials:'include'}).then(function(r){return r.json();}).catch(function(){return null;}),
-      fetch('/api/teacher/groups', {credentials:'include'}).then(function(r){return r.json();}).catch(function(){return null;})
-    ]).then(function(arr){
-      var tr = arr[0] || {}; var gr = arr[1] || {};
-      STATE.teachers = tr.teachers || [];
-      STATE.groups   = (gr.groups || []).map(function(g){
-        return typeof g === 'string' ? g : (g.name || '');
-      }).filter(Boolean);
-      var ts = document.getElementById('f-teacher');
-      ts.innerHTML = '<option value="">— الكل —</option>';
-      STATE.teachers.forEach(function(t){
-        var o = document.createElement('option');
-        o.value = String(t.id); o.textContent = t.name || ('#'+t.id);
-        ts.appendChild(o);
-      });
-      var gs = document.getElementById('f-group');
-      gs.innerHTML = '<option value="">— الكل —</option>';
-      STATE.groups.forEach(function(name){
-        var o = document.createElement('option');
-        o.value = name; o.textContent = name;
-        gs.appendChild(o);
-      });
-      // Apply URL-driven preselect.
-      applyMultiSelect('f-teacher', STATE.filters.teachers);
-      applyMultiSelect('f-group',   STATE.filters.groups);
-    });
-  }
-
-  // ── lessons tab ────────────────────────────────────────────────
-  // Reuses GET /api/lessons/log + the existing PATCH/DELETE/audit_log
-  // endpoints. No new mutations.
-  var LESSONS_PAGE = 1; var LESSONS_PER = 20;
-  var LESSONS_SORT = {col:'lesson_date', dir:'desc'};
-  function lessonsLoad(){
-    if(STATE.cache.lessons) return Promise.resolve(STATE.cache.lessons);
-    return fetch('/api/lessons/log' + window.tdBuildQs(), {credentials:'include'})
-      .then(function(r){return r.json();})
-      .then(function(j){
-        if(!j || !j.ok) return [];
-        STATE.cache.lessons = (j.entries || []).filter(window.tdMatchesFilters);
-        return STATE.cache.lessons;
-      });
-  }
-  window.tdRenderLessons = function(box){
-    box.innerHTML = '<div class="tab-head">'+
-      '<h3>📚 سجل الدروس</h3>'+
-      '<div class="links">'+
-        '<a class="full-link" href="/admin/lessons" target="_blank" rel="noopener">إدارة كاملة ↗</a>'+
-      '</div></div>'+
-      '<div id="lessons-table"><div class="empty">جاري التحميل...</div></div>'+
-      '<div class="pagination" id="lessons-pag"></div>';
-    lessonsLoad().then(function(rows){
-      lessonsRender(rows);
-    });
-  };
-  function lessonsRender(rows){
-    var box = document.getElementById('lessons-table');
-    if(!box) return;
-    if(!rows.length){
-      box.innerHTML = '<div class="empty">لا توجد دروس بالشروط المحددة</div>';
-      document.getElementById('lessons-pag').innerHTML = '';
+  // 2) Teacher change → fetch groups, populate group dropdown.
+  teacherSel.addEventListener('change', function(){
+    var tid = teacherSel.value;
+    if(!tid){
+      card.hidden = true;
+      groupSel.innerHTML = '<option value="">— اختاري المعلمة أولاً —</option>';
+      groupSel.disabled = true;
       return;
     }
-    var arr = rows.slice();
-    arr.sort(function(a,b){
-      var av = a[LESSONS_SORT.col] || ''; var bv = b[LESSONS_SORT.col] || '';
-      if(av<bv) return LESSONS_SORT.dir==='asc' ? -1 : 1;
-      if(av>bv) return LESSONS_SORT.dir==='asc' ? 1 : -1;
-      return 0;
-    });
-    var totalPages = Math.max(1, Math.ceil(arr.length / LESSONS_PER));
-    if(LESSONS_PAGE > totalPages) LESSONS_PAGE = totalPages;
-    var start = (LESSONS_PAGE-1) * LESSONS_PER;
-    var slice = arr.slice(start, start + LESSONS_PER);
-    function th(c, l){
-      var arrow = LESSONS_SORT.col===c ? (LESSONS_SORT.dir==='asc' ? ' ▲' : ' ▼') : '';
-      return '<th onclick="lessonsSortBy(\''+c+'\')">'+l+arrow+'</th>';
-    }
-    var html = '<table class="tbl"><thead><tr>'+
-      th('lesson_date','التاريخ')+
-      th('teacher_name','المعلمة')+
-      th('group_name','المجموعة')+
-      th('lesson_topic','الدرس')+
-      th('curriculum_progress','إلى أين وصلت')+
-      '<th>ملاحظات</th><th>إجراءات</th></tr></thead><tbody>';
-    slice.forEach(function(e){
-      html += '<tr>'+
-        '<td data-label="التاريخ" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.lesson_date)+'</td>'+
-        '<td data-label="المعلمة" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
-        '<td data-label="المجموعة" onclick="lessonsView('+e.id+')">'+window.tdEscape(e.group_name)+'</td>'+
-        '<td data-label="الدرس" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.lesson_topic||'').slice(0,80))+'</td>'+
-        '<td data-label="إلى أين وصلت" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.curriculum_progress||'').slice(0,80))+'</td>'+
-        '<td data-label="ملاحظات" onclick="lessonsView('+e.id+')">'+window.tdEscape((e.notes||'').slice(0,60))+'</td>'+
-        '<td data-label="إجراءات">'+
-          '<button class="act-btn view" onclick="event.stopPropagation();lessonsView('+e.id+')">عرض</button>'+
-          '<button class="act-btn edit" onclick="event.stopPropagation();lessonsEdit('+e.id+')">تعديل</button>'+
-          '<button class="act-btn del"  onclick="event.stopPropagation();lessonsDelete('+e.id+')">حذف</button>'+
-        '</td></tr>';
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-    lessonsRenderPag(totalPages);
-  }
-  function lessonsRenderPag(total){
-    var p = document.getElementById('lessons-pag');
-    if(total<=1){ p.innerHTML = ''; return; }
-    var html = '';
-    html += '<button onclick="lessonsGoPage(1)" '+(LESSONS_PAGE===1?'disabled':'')+'>«</button>';
-    html += '<button onclick="lessonsGoPage('+(LESSONS_PAGE-1)+')" '+(LESSONS_PAGE===1?'disabled':'')+'>‹</button>';
-    var s = Math.max(1, LESSONS_PAGE-2); var e = Math.min(total, s+4);
-    if(e-s < 4) s = Math.max(1, e-4);
-    for(var i=s;i<=e;i++){
-      html += '<button onclick="lessonsGoPage('+i+')" class="'+(i===LESSONS_PAGE?'active':'')+'">'+i+'</button>';
-    }
-    html += '<button onclick="lessonsGoPage('+(LESSONS_PAGE+1)+')" '+(LESSONS_PAGE===total?'disabled':'')+'>›</button>';
-    html += '<button onclick="lessonsGoPage('+total+')" '+(LESSONS_PAGE===total?'disabled':'')+'>»</button>';
-    p.innerHTML = html;
-  }
-  window.lessonsSortBy = function(col){
-    if(LESSONS_SORT.col===col){ LESSONS_SORT.dir = LESSONS_SORT.dir==='asc'?'desc':'asc'; }
-    else { LESSONS_SORT.col = col; LESSONS_SORT.dir = 'desc'; }
-    lessonsRender(STATE.cache.lessons || []);
-  };
-  window.lessonsGoPage = function(p){ LESSONS_PAGE = p; lessonsRender(STATE.cache.lessons || []); window.scrollTo({top:0,behavior:'smooth'}); };
-  window.lessonsView = function(id){
-    var e = (STATE.cache.lessons || []).find(function(x){return x.id===id;});
-    if(!e){ window.tdToast('غير موجود', true); return; }
-    document.getElementById('viewTitle').textContent =
-      'درس بتاريخ ' + (e.lesson_date||'');
-    document.getElementById('viewBody').innerHTML =
-      '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+window.tdEscape(e.teacher_name||'')+'</div>'+
-      '<div style="margin-bottom:10px;"><b>المجموعة:</b> '+window.tdEscape(e.group_name||'')+'</div>'+
-      '<div style="margin-bottom:10px;"><b>الدرس:</b><div>'+window.tdEscape(e.lesson_topic||'')+'</div></div>'+
-      '<div style="margin-bottom:10px;"><b>إلى أين وصلت في المنهج:</b><div>'+window.tdEscape(e.curriculum_progress||'')+'</div></div>'+
-      (e.notes ? '<div style="margin-bottom:10px;"><b>ملاحظات:</b><div>'+window.tdEscape(e.notes)+'</div></div>' : '')+
-      '<div style="color:#888;font-size:.84rem;margin-top:14px;">📅 أُدخل في '+window.tdEscape((e.created_at||'').slice(0,16))+'</div>';
-    document.getElementById('viewBack').classList.add('show');
-  };
-  var _editingLesson = null;
-  window.lessonsEdit = function(id){
-    var e = (STATE.cache.lessons || []).find(function(x){return x.id===id;});
-    if(!e){ window.tdToast('غير موجود', true); return; }
-    _editingLesson = e;
-    document.getElementById('editTitle').textContent = 'تعديل درس';
-    document.getElementById('editBody').innerHTML =
-      '<div class="field"><label>التاريخ</label><input type="date" id="edl-date" value="'+window.tdEscape(e.lesson_date||'')+'"></div>'+
-      '<div class="field"><label>الدرس</label><input type="text" id="edl-topic" value="'+window.tdEscape(e.lesson_topic||'')+'" maxlength="500"></div>'+
-      '<div class="field"><label>إلى أين وصلت</label><input type="text" id="edl-curr" value="'+window.tdEscape(e.curriculum_progress||'')+'" maxlength="500"></div>'+
-      '<div class="field"><label>ملاحظات</label><textarea id="edl-notes" rows="3" maxlength="2000">'+window.tdEscape(e.notes||'')+'</textarea></div>'+
-      '<div class="field"><label>سبب التعديل (اختياري)</label><input type="text" id="edl-reason" maxlength="300"></div>';
-    document.getElementById('editSaveBtn').onclick = lessonsSaveEdit;
-    document.getElementById('editDelBtn').onclick = function(){ closeModal('editBack'); lessonsDelete(id); };
-    document.getElementById('editBack').classList.add('show');
-  };
-  function lessonsSaveEdit(){
-    if(!_editingLesson) return;
-    var btn = document.getElementById('editSaveBtn');
-    btn.disabled = true; btn.textContent = '⏳';
-    var body = {
-      lesson_date:  document.getElementById('edl-date').value,
-      lesson_topic: document.getElementById('edl-topic').value.trim(),
-      curriculum_progress: document.getElementById('edl-curr').value.trim(),
-      notes:        document.getElementById('edl-notes').value.trim(),
-      reason:       document.getElementById('edl-reason').value.trim()
-    };
-    fetch('/api/lessons/log/' + _editingLesson.id, {
-      method:'PATCH', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    }).then(function(r){return r.json();}).then(function(j){
-      btn.disabled = false; btn.textContent = 'حفظ';
-      if(j && j.ok){
-        window.tdToast('تم الحفظ ✓');
-        closeModal('editBack');
-        STATE.cache.lessons = null;
-        lessonsLoad().then(function(rows){ lessonsRender(rows); });
-      } else {
-        window.tdToast((j && j.error) || 'تعذر التعديل', true);
-      }
-    });
-  }
-  var _delLessonId = null;
-  window.lessonsDelete = function(id){
-    _delLessonId = id;
-    document.getElementById('delConfirmBtn').onclick = lessonsConfirmDelete;
-    document.getElementById('delBack').classList.add('show');
-  };
-  function lessonsConfirmDelete(){
-    if(!_delLessonId) return;
-    fetch('/api/lessons/log/' + _delLessonId, {method:'DELETE', credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(j && j.ok){
-          window.tdToast('تم الحذف ✓');
-          closeModal('delBack');
-          STATE.cache.lessons = null;
-          lessonsLoad().then(function(rows){ lessonsRender(rows); });
-        } else {
-          window.tdToast((j && j.error) || 'تعذر الحذف', true);
-        }
-      });
-  }
+    var name = teacherSel.options[teacherSel.selectedIndex].dataset.name || '';
+    avatarEl.textContent = initials(name);
+    nameEl.textContent   = name || ('#' + tid);
+    metaEl.textContent   = '— · — · ' + currentMonthLabel();
+    card.hidden = false;
 
-  // ── messages tab ──────────────────────────────────────────────
-  // Reuses GET /api/parent-messages, the per-row preview/resend
-  // helpers, and the message_log delivery view — same endpoints the
-  // existing /admin/parent-messages page uses.
-  var MSG_PAGE = 1; var MSG_PER = 20;
-  var MSG_SORT = {col:'sent_date', dir:'desc'};
-  function msgLoad(){
-    if(STATE.cache.messages) return Promise.resolve(STATE.cache.messages);
-    return fetch('/api/parent-messages' + window.tdBuildQs(), {credentials:'include'})
-      .then(function(r){return r.json();})
-      .then(function(j){
-        if(!j || !j.ok) return [];
-        STATE.cache.messages = (j.entries || []).filter(window.tdMatchesFilters);
-        return STATE.cache.messages;
-      });
-  }
-  window.tdRenderMessages = function(box){
-    box.innerHTML = '<div class="tab-head">'+
-      '<h3>📨 رسائل المعلمات لأولياء الأمور</h3>'+
-      '<div class="links">'+
-        '<a class="full-link" href="/admin/parent-messages" target="_blank" rel="noopener">إدارة كاملة ↗</a>'+
-      '</div></div>'+
-      '<div id="msg-table"><div class="empty">جاري التحميل...</div></div>'+
-      '<div class="pagination" id="msg-pag"></div>';
-    msgLoad().then(function(rows){ msgRender(rows); });
-  };
-  function msgRender(rows){
-    var box = document.getElementById('msg-table');
-    if(!box) return;
-    if(!rows.length){
-      box.innerHTML = '<div class="empty">لا توجد رسائل بالشروط المحددة</div>';
-      document.getElementById('msg-pag').innerHTML = '';
+    groupSel.innerHTML = '<option value="">جارٍ التحميل...</option>';
+    groupSel.disabled = true;
+
+    if(cache[tid]){
+      populateGroups(cache[tid]);
       return;
     }
-    var arr = rows.slice();
-    arr.sort(function(a,b){
-      var av = a[MSG_SORT.col] || ''; var bv = b[MSG_SORT.col] || '';
-      if(av<bv) return MSG_SORT.dir==='asc' ? -1 : 1;
-      if(av>bv) return MSG_SORT.dir==='asc' ? 1 : -1;
-      return 0;
-    });
-    var totalPages = Math.max(1, Math.ceil(arr.length / MSG_PER));
-    if(MSG_PAGE > totalPages) MSG_PAGE = totalPages;
-    var start = (MSG_PAGE-1) * MSG_PER;
-    var slice = arr.slice(start, start + MSG_PER);
-    function th(c, l){
-      var arrow = MSG_SORT.col===c ? (MSG_SORT.dir==='asc' ? ' ▲' : ' ▼') : '';
-      return '<th onclick="msgSortBy(\''+c+'\')">'+l+arrow+'</th>';
-    }
-    var html = '<table class="tbl"><thead><tr>'+
-      th('sent_date','التاريخ')+
-      th('teacher_name','المعلمة')+
-      th('group_name','المجموعة')+
-      '<th>المحتوى</th>'+
-      '<th>عدد المرسل إليهم</th>'+
-      th('whatsapp_status','الحالة')+
-      '<th>إجراءات</th></tr></thead><tbody>';
-    slice.forEach(function(e){
-      var trunc = (e.content_covered || '').slice(0, 80);
-      if((e.content_covered||'').length > 80) trunc += '...';
-      var st = (e.status || 'draft');
-      var cls, lbl;
-      if (st === 'draft') { cls = 'draft'; lbl = 'مسودة'; }
-      else if (st === 'sent') {
-        if (e.whatsapp_status === 'failed') { cls = 'failed'; lbl = 'فشل'; }
-        else { cls = 'sent'; lbl = 'تم الإرسال'; }
-      } else { cls = 'queued'; lbl = 'قيد الانتظار'; }
-      var actionBtn = '';
-      if (st === 'draft') {
-        actionBtn = '<button class="act-btn send" onclick="event.stopPropagation();msgSend('+e.id+')">إرسال</button>';
-      } else if (e.whatsapp_status === 'failed') {
-        actionBtn = '<button class="act-btn resend" onclick="event.stopPropagation();msgResend('+e.id+')">إعادة إرسال</button>';
-      }
-      html += '<tr>'+
-        '<td data-label="التاريخ" onclick="msgView('+e.id+')">'+window.tdEscape(e.sent_date)+'</td>'+
-        '<td data-label="المعلمة" onclick="msgView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
-        '<td data-label="المجموعة" onclick="msgView('+e.id+')">'+window.tdEscape(e.group_name)+'</td>'+
-        '<td data-label="المحتوى" onclick="msgView('+e.id+')">'+window.tdEscape(trunc)+'</td>'+
-        '<td data-label="عدد المرسل إليهم">'+(e.whatsapp_sent_count||0)+'/'+(e.whatsapp_total_count||0)+'</td>'+
-        '<td data-label="الحالة"><span class="status-pill '+cls+'">'+lbl+'</span></td>'+
-        '<td data-label="إجراءات">'+
-          '<button class="act-btn view"  onclick="event.stopPropagation();msgView('+e.id+')">عرض</button>'+
-          actionBtn +
-          '<button class="act-btn del"   onclick="event.stopPropagation();msgDelete('+e.id+')">حذف</button>'+
-        '</td></tr>';
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-    msgRenderPag(totalPages);
-  }
-  function msgRenderPag(total){
-    var p = document.getElementById('msg-pag');
-    if(total<=1){ p.innerHTML = ''; return; }
-    var html = '';
-    html += '<button onclick="msgGoPage(1)" '+(MSG_PAGE===1?'disabled':'')+'>«</button>';
-    html += '<button onclick="msgGoPage('+(MSG_PAGE-1)+')" '+(MSG_PAGE===1?'disabled':'')+'>‹</button>';
-    var s = Math.max(1, MSG_PAGE-2); var e = Math.min(total, s+4);
-    if(e-s < 4) s = Math.max(1, e-4);
-    for(var i=s;i<=e;i++){
-      html += '<button onclick="msgGoPage('+i+')" class="'+(i===MSG_PAGE?'active':'')+'">'+i+'</button>';
-    }
-    html += '<button onclick="msgGoPage('+(MSG_PAGE+1)+')" '+(MSG_PAGE===total?'disabled':'')+'>›</button>';
-    html += '<button onclick="msgGoPage('+total+')" '+(MSG_PAGE===total?'disabled':'')+'>»</button>';
-    p.innerHTML = html;
-  }
-  window.msgSortBy = function(col){
-    if(MSG_SORT.col===col){ MSG_SORT.dir = MSG_SORT.dir==='asc'?'desc':'asc'; }
-    else { MSG_SORT.col = col; MSG_SORT.dir = 'desc'; }
-    msgRender(STATE.cache.messages || []);
-  };
-  window.msgGoPage = function(p){ MSG_PAGE = p; msgRender(STATE.cache.messages || []); window.scrollTo({top:0,behavior:'smooth'}); };
-  window.msgView = function(id){
-    fetch('/api/parent-messages/'+id, {credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر التحميل', true); return; }
-        var e = j.entry || {};
-        var dlv = (e.deliveries||[]).map(function(d){
-          return '<div class="recipient-row"><span class="nm">'+
-                  window.tdEscape(d.student_name||'')+
-                 '</span><span class="ph">'+window.tdEscape(d.student_whatsapp||'')+
-                 '</span><span class="st">'+window.tdEscape((d.sent_at||'').slice(0,16))+
-                 '</span></div>';
-        }).join('');
-        document.getElementById('viewTitle').textContent =
-          'رسالة بتاريخ ' + (e.sent_date||'') + ' لمجموعة ' + (e.group_name||'');
-        document.getElementById('viewBody').innerHTML =
-          '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+window.tdEscape(e.teacher_name||'')+'</div>'+
-          '<div style="margin-bottom:14px;"><b>المحتوى:</b><div>'+window.tdEscape(e.content_covered||'')+'</div></div>'+
-          '<div style="margin-bottom:14px;"><b>المهارات:</b><div>'+window.tdEscape(e.skills_focused||'')+'</div></div>'+
-          '<div style="margin-bottom:14px;"><b>الكتب:</b><div>'+window.tdEscape(e.books_used||'')+'</div></div>'+
-          (e.homework ? '<div style="margin-bottom:14px;background:#fff8e1;padding:10px;border-radius:8px;"><b>الواجب:</b><div>'+window.tdEscape(e.homework)+'</div></div>' : '')+
-          (e.parent_notes ? '<div style="margin-bottom:14px;"><b>ملاحظات:</b><div>'+window.tdEscape(e.parent_notes)+'</div></div>' : '')+
-          '<div style="margin-top:18px;"><b>سجل الإرسال ('+ (e.deliveries||[]).length +'):</b></div>'+
-          '<div>'+(dlv || '<div class="empty">لا يوجد سجل</div>')+'</div>';
-        document.getElementById('viewBack').classList.add('show');
-      });
-  };
-  // Shared send-sweep used by both msgSend (drafts) and msgResend
-  // (already-sent rows). Keeps the wa.me + finalize flow in one place.
-  function _msgRunSweep(id, endpoint, confirmMsg, doneToast){
-    if(confirmMsg && !confirm(confirmMsg)) return;
-    fetch(endpoint, {method:'POST', credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر الإرسال', true); return; }
-        var ps = j.recipients || [];
-        if(!ps.length){ window.tdToast('لا يوجد أولياء أمور لإرسال الرسالة', true); return; }
-        var sent = 0;
-        ps.forEach(function(r, i){
-          if(!r.whatsapp) return;
-          setTimeout(function(){
-            try { window.open('https://wa.me/' + r.whatsapp + '?text=' + encodeURIComponent(r.text), '_blank'); } catch(e){}
-            sent++;
-            if(i === ps.length-1){
-              fetch('/api/parent-messages/'+id+'/finalize', {
-                method:'POST', credentials:'include',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({sent_count: sent, total_count: ps.length})
-              }).then(function(){
-                window.tdToast(doneToast);
-                STATE.cache.messages = null;
-                msgLoad().then(function(rows){ msgRender(rows); });
-              });
-            }
-          }, i * 600);
-        });
-      });
-  }
-  window.msgSend = function(id){
-    _msgRunSweep(
-      id,
-      '/api/parent-messages/'+id+'/send',
-      'هل ترغبين في إرسال هذه المسودة لجميع الأهالي؟',
-      'تم الإرسال ✓'
-    );
-  };
-  window.msgResend = function(id){
-    _msgRunSweep(
-      id,
-      '/api/parent-messages/'+id+'/resend',
-      'هل ترغبين في إعادة إرسال الرسالة لجميع الأهالي؟',
-      'تم إعادة الإرسال ✓'
-    );
-  };
-  var _delMsgId = null;
-  window.msgDelete = function(id){
-    _delMsgId = id;
-    document.getElementById('delConfirmBtn').onclick = msgConfirmDelete;
-    document.getElementById('delBack').classList.add('show');
-  };
-  function msgConfirmDelete(){
-    if(!_delMsgId) return;
-    fetch('/api/parent-messages/'+_delMsgId, {method:'DELETE', credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(j && j.ok){
-          window.tdToast('تم الحذف ✓');
-          closeModal('delBack');
-          STATE.cache.messages = null;
-          msgLoad().then(function(rows){ msgRender(rows); });
-        } else {
-          window.tdToast((j && j.error) || 'تعذر الحذف', true);
-        }
-      });
-  }
-
-  // ── evaluations tab ───────────────────────────────────────────
-  // Reuses GET /api/monthly-evaluations, PATCH /<id>,
-  // /preview-message/<id>, /<id>/send-to-parent, DELETE /<id> —
-  // same endpoints the existing /admin/evaluations page uses.
-  var EV_PAGE = 1; var EV_PER = 20;
-  var EV_SORT = {col:'evaluation_date', dir:'desc'};
-  var EV_SCORE_FIELDS = [
-    {k:'score_participation', l:'المشاركة'},
-    {k:'score_behavior',      l:'السلوك'},
-    {k:'score_reading',       l:'القراءة'},
-    {k:'score_dictation',     l:'الإملاء'},
-    {k:'score_vocabulary',    l:'المفردات'},
-    {k:'score_conversation',  l:'المحادثة'},
-    {k:'score_expression',    l:'التعبير'},
-    {k:'score_grammar',       l:'القواعد'}
-  ];
-  function evScoreCls(v){
-    if(v == null) return 'mid';
-    if(v >= 8) return 'high';
-    if(v <= 4) return 'low';
-    return 'mid';
-  }
-  function evLoad(){
-    if(STATE.cache.evaluations) return Promise.resolve(STATE.cache.evaluations);
-    // The url param ?filter=missing|unreleased|sent_pending is honoured
-    // here — handled by appending the matching server query.
-    var subFilter = (function(){
-      var m = (location.search || '').match(/[?&]filter=([^&]+)/);
-      return m ? decodeURIComponent(m[1]) : '';
-    })();
-    var extra = {};
-    if(subFilter === 'unreleased') extra.released = 'no';
-    else if(subFilter === 'sent_pending'){ extra.released = 'yes'; extra.sent = 'no'; }
-    return fetch('/api/monthly-evaluations' + window.tdBuildQs(extra), {credentials:'include'})
-      .then(function(r){return r.json();})
+    fetch('/api/admin/teacher/' + encodeURIComponent(tid) + '/groups',
+          {credentials:'include'})
+      .then(function(r){ return r.json(); })
       .then(function(j){
-        if(!j || !j.ok) return [];
-        STATE.cache.evaluations = (j.entries || []).filter(window.tdMatchesFilters);
-        return STATE.cache.evaluations;
+        var groups = (j && j.groups) || [];
+        cache[tid] = groups;
+        populateGroups(groups);
+      })
+      .catch(function(){
+        groupSel.innerHTML = '<option value="">تعذّر تحميل المجموعات</option>';
+        groupSel.disabled = true;
       });
-  }
-  window.tdRenderEvaluations = function(box){
-    box.innerHTML = '<div class="tab-head">'+
-      '<h3>📊 التقييمات الشهرية</h3>'+
-      '<div class="links">'+
-        '<a class="full-link" href="/admin/evaluations" target="_blank" rel="noopener">إدارة كاملة ↗</a>'+
-      '</div></div>'+
-      '<div id="ev-table"><div class="empty">جاري التحميل...</div></div>'+
-      '<div class="pagination" id="ev-pag"></div>';
-    evLoad().then(function(rows){ evRender(rows); });
-  };
-  function evRender(rows){
-    var box = document.getElementById('ev-table');
-    if(!box) return;
-    if(!rows.length){
-      box.innerHTML = '<div class="empty">لا توجد تقييمات بالشروط المحددة</div>';
-      document.getElementById('ev-pag').innerHTML = '';
-      return;
-    }
-    var arr = rows.slice();
-    arr.sort(function(a,b){
-      var av = a[EV_SORT.col]; var bv = b[EV_SORT.col];
-      if(av==null) av = ''; if(bv==null) bv = '';
-      if(av<bv) return EV_SORT.dir==='asc' ? -1 : 1;
-      if(av>bv) return EV_SORT.dir==='asc' ? 1 : -1;
-      return 0;
+  });
+
+  function populateGroups(groups){
+    var totalStudents = groups.reduce(function(sum, g){
+      return sum + (parseInt(g.students_count, 10) || 0);
+    }, 0);
+    groupSel.innerHTML = '';
+    var allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'كل المجموعات (' + groups.length + ')';
+    groupSel.appendChild(allOpt);
+    groups.forEach(function(g){
+      var opt = document.createElement('option');
+      opt.value = String(g.id);
+      opt.dataset.name = g.name;
+      opt.textContent  = g.name + ' (' + (g.students_count || 0) + ')';
+      groupSel.appendChild(opt);
     });
-    var totalPages = Math.max(1, Math.ceil(arr.length / EV_PER));
-    if(EV_PAGE > totalPages) EV_PAGE = totalPages;
-    var start = (EV_PAGE-1) * EV_PER;
-    var slice = arr.slice(start, start + EV_PER);
-    function th(c, l){
-      var arrow = EV_SORT.col===c ? (EV_SORT.dir==='asc' ? ' ▲' : ' ▼') : '';
-      return '<th onclick="evSortBy(\''+c+'\')">'+l+arrow+'</th>';
-    }
-    var html = '<table class="tbl"><thead><tr>'+
-      th('evaluation_date','التاريخ')+
-      th('evaluation_month','الشهر')+
-      th('teacher_name','المعلمة')+
-      th('group_name','المجموعة')+
-      th('student_name','الطالب')+
-      th('overall_score','التقييم العام')+
-      '<th>منشور؟</th><th>تم الإرسال؟</th><th>إجراءات</th>'+
-      '</tr></thead><tbody>';
-    slice.forEach(function(e){
-      var sCls = evScoreCls(e.overall_score);
-      var sentLbl = e.whatsapp_sent_at ? ('تم في ' + (e.whatsapp_sent_at||'').slice(0,10)) : 'لم يُرسل';
-      var sendDisabled = !e.released_to_parent;
-      var sendCls = e.whatsapp_sent_at ? 'send sent' : 'send';
-      var sendLbl = e.whatsapp_sent_at ? '↻ إعادة إرسال' : '📨 إرسال للأهل';
-      html += '<tr>'+
-        '<td data-label="التاريخ" onclick="evView('+e.id+')">'+window.tdEscape(e.evaluation_date)+'</td>'+
-        '<td data-label="الشهر" onclick="evView('+e.id+')">'+window.tdEscape(e.month_label||e.evaluation_month)+'</td>'+
-        '<td data-label="المعلمة" onclick="evView('+e.id+')">'+window.tdEscape(e.teacher_name)+'</td>'+
-        '<td data-label="المجموعة" onclick="evView('+e.id+')">'+window.tdEscape(e.group_name)+'</td>'+
-        '<td data-label="الطالب" onclick="evView('+e.id+')">'+window.tdEscape(e.student_name)+'</td>'+
-        '<td data-label="التقييم العام"><span class="score-pill '+sCls+'">'+
-            (e.overall_score==null?'—':(e.overall_score+'/10'))+'</span></td>'+
-        '<td data-label="منشور؟">'+
-          '<label class="toggle"><input type="checkbox" '+(e.released_to_parent?'checked':'')+
-          ' onchange="evToggleRelease('+e.id+', this.checked)" onclick="event.stopPropagation();"> '+
-          (e.released_to_parent?'منشور':'غير منشور')+'</label></td>'+
-        '<td data-label="تم الإرسال؟">'+window.tdEscape(sentLbl)+'</td>'+
-        '<td data-label="إجراءات">'+
-          '<button class="act-btn view" onclick="event.stopPropagation();evView('+e.id+')">عرض</button>'+
-          '<button class="act-btn edit" onclick="event.stopPropagation();evEdit('+e.id+')">تعديل</button>'+
-          '<button class="act-btn '+sendCls+'" '+(sendDisabled?'disabled title="يرجى نشر التقييم للأهالي أولاً"':'')+
-            ' onclick="event.stopPropagation();evSend('+e.id+')">'+sendLbl+'</button>'+
-          '<button class="act-btn del" onclick="event.stopPropagation();evDelete('+e.id+')">حذف</button>'+
-        '</td></tr>';
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-    evRenderPag(totalPages);
-  }
-  function evRenderPag(total){
-    var p = document.getElementById('ev-pag');
-    if(total<=1){ p.innerHTML = ''; return; }
-    var html = '';
-    html += '<button onclick="evGoPage(1)" '+(EV_PAGE===1?'disabled':'')+'>«</button>';
-    html += '<button onclick="evGoPage('+(EV_PAGE-1)+')" '+(EV_PAGE===1?'disabled':'')+'>‹</button>';
-    var s = Math.max(1, EV_PAGE-2); var e = Math.min(total, s+4);
-    if(e-s < 4) s = Math.max(1, e-4);
-    for(var i=s;i<=e;i++){
-      html += '<button onclick="evGoPage('+i+')" class="'+(i===EV_PAGE?'active':'')+'">'+i+'</button>';
-    }
-    html += '<button onclick="evGoPage('+(EV_PAGE+1)+')" '+(EV_PAGE===total?'disabled':'')+'>›</button>';
-    html += '<button onclick="evGoPage('+total+')" '+(EV_PAGE===total?'disabled':'')+'>»</button>';
-    p.innerHTML = html;
-  }
-  window.evSortBy = function(col){
-    if(EV_SORT.col===col){ EV_SORT.dir = EV_SORT.dir==='asc'?'desc':'asc'; }
-    else { EV_SORT.col = col; EV_SORT.dir = 'desc'; }
-    evRender(STATE.cache.evaluations || []);
-  };
-  window.evGoPage = function(p){ EV_PAGE = p; evRender(STATE.cache.evaluations || []); window.scrollTo({top:0,behavior:'smooth'}); };
-  window.evView = function(id){
-    var e = (STATE.cache.evaluations || []).find(function(x){return x.id===id;});
-    if(!e){ window.tdToast('غير موجود', true); return; }
-    var bars = EV_SCORE_FIELDS.map(function(s){
-      var v = e[s.k];
-      var pct = v == null ? 0 : Math.round((v/10)*100);
-      return '<div class="bar-row">'+
-        '<span class="b-lbl">'+s.l+'</span>'+
-        '<span class="b-bar"><div style="width:'+pct+'%;"></div></span>'+
-        '<span class="b-val">'+(v==null?'—':v)+'</span>'+
-      '</div>';
-    }).join('');
-    var sentLine = e.whatsapp_sent_at ?
-      '<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;margin-bottom:10px;color:#f57c00;font-weight:700;">📨 تم الإرسال للأهل في '+
-      (e.whatsapp_sent_at||'').slice(0,16)+'</div>' : '';
-    document.getElementById('viewTitle').textContent =
-      'تقييم ' + (e.student_name||'') + ' — ' + (e.month_label||e.evaluation_month||'');
-    document.getElementById('viewBody').innerHTML =
-      sentLine +
-      '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+window.tdEscape(e.teacher_name||'')+'</div>'+
-      '<div style="margin-bottom:10px;"><b>المجموعة:</b> '+window.tdEscape(e.group_name||'')+'</div>'+
-      '<div style="margin-bottom:14px;"><b>التقييم العام:</b> <span class="score-pill '+
-        evScoreCls(e.overall_score)+'">'+(e.overall_score==null?'—':e.overall_score+'/10')+'</span></div>'+
-      bars +
-      (e.notes_behavior ? '<div style="margin-top:14px;"><b>ملاحظات السلوك:</b><div>'+window.tdEscape(e.notes_behavior)+'</div></div>' : '')+
-      (e.notes_language ? '<div style="margin-top:10px;"><b>ملاحظات اللغة:</b><div>'+window.tdEscape(e.notes_language)+'</div></div>' : '')+
-      (e.general_notes ? '<div style="margin-top:10px;"><b>ملاحظات عامة:</b><div>'+window.tdEscape(e.general_notes)+'</div></div>' : '');
-    document.getElementById('viewBack').classList.add('show');
-  };
-  var _editingEv = null;
-  window.evEdit = function(id){
-    var e = (STATE.cache.evaluations || []).find(function(x){return x.id===id;});
-    if(!e){ window.tdToast('غير موجود', true); return; }
-    _editingEv = e;
-    document.getElementById('editTitle').textContent = 'تعديل تقييم';
-    var sliders = EV_SCORE_FIELDS.map(function(s){
-      var v = e[s.k] != null ? e[s.k] : 5;
-      return '<div class="bar-row">'+
-        '<span class="b-lbl">'+s.l+'</span>'+
-        '<input type="range" min="1" max="10" step="1" value="'+v+'" '+
-          'data-k="'+s.k+'" class="td-ev-sl" oninput="this.nextElementSibling.textContent=this.value;">'+
-        '<span class="b-val" style="flex:0 0 30px;">'+v+'</span>'+
-      '</div>';
-    }).join('');
-    document.getElementById('editBody').innerHTML =
-      '<div class="field"><label>التاريخ</label><input type="date" id="ed-ev-date" value="'+window.tdEscape(e.evaluation_date||'')+'"></div>'+
-      '<div class="field"><label>الشهر</label><input type="month" id="ed-ev-month" value="'+window.tdEscape(e.evaluation_month||'')+'"></div>'+
-      '<div style="margin-bottom:10px;font-weight:800;color:#4a148c;">الدرجات (1-10):</div>'+
-      sliders +
-      '<div class="field" style="margin-top:14px;"><label>ملاحظات السلوك</label><textarea id="ed-ev-nbeh" rows="2">'+window.tdEscape(e.notes_behavior||'')+'</textarea></div>'+
-      '<div class="field"><label>ملاحظات اللغة</label><textarea id="ed-ev-nlang" rows="2">'+window.tdEscape(e.notes_language||'')+'</textarea></div>'+
-      '<div class="field"><label>ملاحظات عامة</label><textarea id="ed-ev-ngen" rows="2">'+window.tdEscape(e.general_notes||'')+'</textarea></div>';
-    document.getElementById('editSaveBtn').onclick = evSaveEdit;
-    document.getElementById('editDelBtn').onclick = function(){ closeModal('editBack'); evDelete(id); };
-    document.getElementById('editBack').classList.add('show');
-  };
-  function evSaveEdit(){
-    if(!_editingEv) return;
-    var btn = document.getElementById('editSaveBtn');
-    btn.disabled = true; btn.textContent = '⏳';
-    var body = {
-      evaluation_date:  document.getElementById('ed-ev-date').value,
-      evaluation_month: document.getElementById('ed-ev-month').value,
-      notes_behavior:   document.getElementById('ed-ev-nbeh').value.trim(),
-      notes_language:   document.getElementById('ed-ev-nlang').value.trim(),
-      general_notes:    document.getElementById('ed-ev-ngen').value.trim()
-    };
-    document.querySelectorAll('.td-ev-sl').forEach(function(sl){
-      body[sl.getAttribute('data-k')] = parseInt(sl.value, 10);
-    });
-    fetch('/api/monthly-evaluations/'+_editingEv.id, {
-      method:'PATCH', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    }).then(function(r){return r.json();}).then(function(j){
-      btn.disabled = false; btn.textContent = 'حفظ';
-      if(j && j.ok){
-        window.tdToast('تم الحفظ ✓');
-        closeModal('editBack');
-        STATE.cache.evaluations = null;
-        evLoad().then(function(rows){ evRender(rows); });
-      } else {
-        window.tdToast((j && j.error) || 'تعذر التعديل', true);
-      }
-    });
-  }
-  window.evToggleRelease = function(id, val){
-    fetch('/api/monthly-evaluations/'+id, {
-      method:'PATCH', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({released_to_parent: val ? 1 : 0})
-    }).then(function(r){return r.json();}).then(function(j){
-      if(j && j.ok){
-        window.tdToast(val ? 'تم النشر للأهالي ✓' : 'تم إلغاء النشر');
-        STATE.cache.evaluations = null;
-        evLoad().then(function(rows){ evRender(rows); });
-      } else {
-        window.tdToast((j && j.error) || 'تعذر التحديث', true);
-        STATE.cache.evaluations = null;
-        evLoad().then(function(rows){ evRender(rows); });
-      }
-    });
-  };
-  var _sendingEv = null;
-  window.evSend = function(id){
-    _sendingEv = id;
-    fetch('/api/monthly-evaluations/preview-message/'+id, {credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(!j || !j.ok){ window.tdToast((j&&j.error)||'تعذر التحميل', true); return; }
-        var e = j.entry || {};
-        document.getElementById('sendTitle').textContent =
-          'إرسال تقييم ' + (e.student_name||'') + ' لولي الأمر';
-        document.getElementById('s-phone').value =
-          j.parent_phone_raw || j.parent_phone_clean || '';
-        document.getElementById('s-text').value = j.text || '';
-        var btn = document.getElementById('sendBtn');
-        if(!j.parent_phone_clean){
-          btn.disabled = true;
-          btn.textContent = '⚠ رقم ولي الأمر غير موجود';
-        } else {
-          btn.disabled = false;
-          btn.textContent = '📨 إرسال';
-        }
-        document.getElementById('sendBack').classList.add('show');
-      });
-  };
-  window.confirmSend = function(){
-    if(!_sendingEv) return;
-    var btn = document.getElementById('sendBtn');
-    btn.disabled = true; btn.textContent = '⏳';
-    var custom = document.getElementById('s-text').value;
-    fetch('/api/monthly-evaluations/'+_sendingEv+'/send-to-parent', {
-      method:'POST', credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({custom_message: custom})
-    }).then(function(r){return r.json();}).then(function(j){
-      btn.disabled = false; btn.textContent = '📨 إرسال';
-      if(!j || !j.ok){ window.tdToast((j && j.error) || 'تعذر الإرسال', true); return; }
-      try { window.open(j.wa_url, '_blank'); } catch(e){}
-      window.tdToast('تم الإرسال للأهل ✓');
-      closeModal('sendBack');
-      STATE.cache.evaluations = null;
-      evLoad().then(function(rows){ evRender(rows); });
-    });
-  };
-  var _delEvId = null;
-  window.evDelete = function(id){
-    _delEvId = id;
-    document.getElementById('delConfirmBtn').onclick = evConfirmDelete;
-    document.getElementById('delBack').classList.add('show');
-  };
-  function evConfirmDelete(){
-    if(!_delEvId) return;
-    fetch('/api/monthly-evaluations/'+_delEvId, {method:'DELETE', credentials:'include'})
-      .then(function(r){return r.json();}).then(function(j){
-        if(j && j.ok){
-          window.tdToast('تم الحذف ✓');
-          closeModal('delBack');
-          STATE.cache.evaluations = null;
-          evLoad().then(function(rows){ evRender(rows); });
-        } else {
-          window.tdToast((j && j.error) || 'تعذر الحذف', true);
-        }
-      });
+    groupSel.disabled = (groups.length === 0);
+
+    metaEl.textContent =
+      groups.length + ' مجموعات · ' +
+      totalStudents + ' طالبة · ' +
+      currentMonthLabel();
   }
 
-  // ── alerts tab + summary loader ───────────────────────────────
-  // Single backend call /api/teacher-deliveries/summary fills the
-  // four top stats AND the alerts tab, so a page open is ONE
-  // round-trip for everything dashboard-level. Per-tab content still
-  // hits its own endpoint when the user clicks into it.
-  function summaryLoad(force){
-    if(!force && STATE.cache.summary) return Promise.resolve(STATE.cache.summary);
-    return fetch('/api/teacher-deliveries/summary', {credentials:'include'})
-      .then(function(r){return r.json();})
-      .then(function(j){
-        if(!j || !j.ok) return null;
-        STATE.cache.summary = j;
-        return j;
-      });
-  }
-  window.tdLoadSummary = function(){
-    summaryLoad(true).then(function(s){
-      if(!s) return;
-      var st = s.stats || {};
-      document.getElementById('s-lessons-today').textContent  = st.lessons_today  || 0;
-      document.getElementById('s-messages-today').textContent = st.messages_today || 0;
-      document.getElementById('s-evals-month').textContent    = st.evals_month    || 0;
-      document.getElementById('s-alerts-total').textContent   = st.alerts_total   || 0;
-      var badge = document.getElementById('tab-alerts-badge');
-      if(badge){
-        if(st.alerts_total > 0){
-          badge.textContent = st.alerts_total;
-          badge.style.display = 'inline-block';
-        } else {
-          badge.style.display = 'none';
-        }
-      }
-      // If the alerts tab is currently active, re-render with fresh
-      // data.
-      if(STATE.tab === 'alerts'){
-        var box = document.getElementById('tab-content');
-        if(box && typeof window.tdRenderAlerts === 'function')
-          window.tdRenderAlerts(box);
-      }
-    });
-  };
-  function alertOnClick(alert){
-    // Navigate to the appropriate tab with the spec's deep-link
-    // filter. URL ?filter= stays in the address bar so refreshes
-    // preserve the view.
-    var p = new URLSearchParams(location.search);
-    p.set('tab', alert.tab);
-    if(alert.filter) p.set('filter', alert.filter);
-    else p.delete('filter');
-    history.replaceState(null, '', '?' + p.toString());
-    STATE.cache.lessons = null;
-    STATE.cache.messages = null;
-    STATE.cache.evaluations = null;
-    STATE.tab = alert.tab;
-    window.tdRenderActiveTab();
-  }
-  window.tdRenderAlerts = function(box){
-    box.innerHTML = '<div class="tab-head"><h3>⚠ التنبيهات</h3></div>'+
-      '<div id="alerts-body"><div class="empty">جاري التحميل...</div></div>';
-    summaryLoad().then(function(s){
-      var body = document.getElementById('alerts-body');
-      if(!s){
-        body.innerHTML = '<div class="empty">تعذر تحميل التنبيهات</div>';
-        return;
-      }
-      var alerts = (s.alerts || []).slice();
-      var nonzero = alerts.filter(function(a){ return (a.count || 0) > 0; });
-      if(!nonzero.length){
-        body.innerHTML = '<div class="alerts-empty">✅ لا توجد تنبيهات حالياً. كل الميزات محدّثة.</div>';
-        return;
-      }
-      var html = '<div class="alerts-list">';
-      alerts.forEach(function(a){
-        var zero = (a.count || 0) === 0;
-        var sampleStr = '';
-        if(!zero && a.samples && a.samples.length){
-          sampleStr = a.samples.map(function(s){
-            if(s.group_name && s.date) return s.group_name+' — '+s.date;
-            if(s.group_name) return s.group_name + (s.last_date ? ' (آخر: '+s.last_date+')' : '');
-            if(s.teacher_name) return s.teacher_name + (s.last_date ? ' (آخر: '+s.last_date+')' : '');
-            if(s.student_name) return s.student_name;
-            return '';
-          }).filter(Boolean).join(' • ');
-        }
-        html += '<div class="alert-card '+(zero ? 'zero' : '')+'">'+
-          '<div class="a-info">'+
-            '<span class="a-icon">'+(zero ? '✓' : window.tdEscape(a.icon || '⚠'))+'</span>'+
-            '<div>'+
-              '<div class="a-text">'+window.tdEscape(a.title || '')+'</div>'+
-              (sampleStr ? '<div style="color:#888;font-size:.84rem;margin-top:4px;">'+window.tdEscape(sampleStr)+(a.count > a.samples.length ? ' …':'')+'</div>' : '')+
-            '</div>'+
-          '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
-            '<span class="a-count">'+a.count+'</span>'+
-            (zero ? '' : '<button class="btn btn-ghost" data-akey="'+window.tdEscape(a.key||'')+'">عرض القائمة</button>')+
-          '</div>'+
-        '</div>';
-      });
-      html += '</div>';
-      body.innerHTML = html;
-      body.querySelectorAll('button[data-akey]').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          var k = btn.getAttribute('data-akey');
-          var a = (s.alerts || []).find(function(x){ return x.key === k; });
-          if(a) alertOnClick(a);
-        });
+  // 3) Tab switching — content panels stay empty in this step.
+  var tabs   = document.querySelectorAll('.tm-tab');
+  var panels = document.querySelectorAll('.tm-panel');
+  tabs.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var key = btn.getAttribute('data-tm-tab');
+      tabs.forEach(function(b){ b.classList.toggle('active', b === btn); });
+      panels.forEach(function(p){
+        p.hidden = (p.getAttribute('data-tm-panel') !== key);
       });
     });
-  };
+  });
 
-  // Per-tab JS files attach themselves to window.tdRender* before
-  // the first renderTab call below.
-  document.addEventListener('DOMContentLoaded', function(){
-    // Read URL state first.
-    var qTab = qs('tab') || 'alerts';
-    if(['lessons','messages','evaluations','alerts'].indexOf(qTab) >= 0){
-      STATE.tab = qTab;
-    }
-    readFiltersFromUrl();
-    loadFilterOpts().then(function(){
-      if(typeof window.tdLoadSummary === 'function') window.tdLoadSummary();
-      renderTab();
-    });
+  // 4) "إرسال طلب للمعلمة" button — wired in Step 6.
+  document.getElementById('tm-request-btn').addEventListener('click', function(){
+    /* Step 6 will open the request modal here. */
   });
 })();
 </script>
