@@ -41788,6 +41788,59 @@ def api_admin_violations_update(vid):
     return jsonify({"ok": True, "violation": decorated})
 
 
+@app.route("/api/admin/violations/<int:vid>", methods=["DELETE"])
+@login_required
+def api_admin_violations_delete(vid):
+    """Soft-delete a single violation. Admin-only.
+
+    Per CLAUDE.md "Data safety": never hard-delete user data. We
+    flip is_deleted=1 + bump updated_at; the row stays intact for
+    the audit trail and any future "restore" feature. 404 if
+    missing OR already soft-deleted (idempotency would silently
+    succeed and confuse the UI). The full pre-delete row is
+    captured in old_value so a restore could replay it later."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM violations WHERE id=? AND is_deleted=0", (vid,)
+    ).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "المخالفة غير موجودة"}), 404
+
+    # Snapshot every column for the audit log BEFORE flipping the bit.
+    old_snapshot = {}
+    try:
+        old_snapshot = dict(row)
+        for k, v in list(old_snapshot.items()):
+            if v is None or isinstance(v, (str, int, float, bool)): continue
+            try: old_snapshot[k] = str(v)
+            except Exception: old_snapshot[k] = None
+    except Exception:
+        old_snapshot = {"id": vid}
+
+    try:
+        db.execute(
+            "UPDATE violations SET is_deleted=1, updated_at=CURRENT_TIMESTAMP "
+            "WHERE id=? AND is_deleted=0",
+            (vid,),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر حذف المخالفة: " + str(ex)}), 500
+
+    try:
+        _audit("violation.delete",
+               target_type="violation",
+               target_id=vid,
+               old_value=old_snapshot)
+    except Exception:
+        pass
+
+    return jsonify({"ok": True})
+
+
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
 # Admin/manager-only lookup for the redesigned monitoring page: returns
 # the groups owned by a specific teacher (by user id) plus the live
