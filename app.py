@@ -36795,6 +36795,21 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-sr-st.waiting{color:#8a7da5;}
 .tm-sr-st.opened{color:#1D9E75;}
 .tm-sr-st.skipped{color:#A32D2D;}
+
+/* ── Phase-4: inline edit form for pending parent messages ── */
+.tm-pmedit-row{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+.tm-pmedit-row label{color:#4a148c;font-weight:700;font-size:.88rem;}
+.tm-pmedit-row textarea{width:100%;padding:8px 12px;
+                        border:0.5px solid #d8c8ec;border-radius:8px;
+                        font-family:inherit;font-size:.92rem;
+                        background:#fff;color:#212121;resize:vertical;
+                        min-height:50px;}
+.tm-pmedit-row textarea:focus{outline:none;border-color:#6B3FA0;
+                              box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+.tm-pmedit-error{color:#A32D2D;font-weight:700;font-size:.88rem;
+                 padding:8px 12px;background:#FCE6E6;
+                 border:0.5px solid #A32D2D;border-radius:8px;
+                 margin-top:6px;}
 </style>
 
 <script>
@@ -37693,6 +37708,187 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     }).length;
     statEl.textContent = String(count);
   };
+
+  // ── Phase-4: inline edit for pending parent messages.
+  //    Reuses PATCH /api/parent-messages/<id> (admin can edit any
+  //    not-yet-sent row). Edit mode replaces the inner card body
+  //    with 4 textareas and the footer with [حفظ التعديل, إلغاء].
+  //    On save, the in-memory cache entry is updated locally and
+  //    the panel is re-rendered (no extra fetch). On cancel, the
+  //    panel re-renders straight from cache. Step-5's
+  //    tmRenderParentMsgCard is NOT modified — we manipulate the
+  //    DOM it produced directly. ───────────────────────────────
+  function tmFindMsgInCache(mid){
+    var sel = tmCurrentSelection();
+    if(!sel.tid) return null;
+    var key = sel.tid + '|' + sel.gname;
+    var entries = pmsgsCache[key];
+    if(!entries) return null;
+    for(var i = 0; i < entries.length; i++){
+      if(parseInt(entries[i].id, 10) === mid) return entries[i];
+    }
+    return null;
+  }
+
+  function tmRenderPmsgEditForm(entry){
+    function row(idSuffix, labelAr, fieldKey, value){
+      var inputId = 'tm-pmedit-' + idSuffix + '-' + entry.id;
+      return '<div class="tm-pmedit-row">' +
+        '<label for="' + inputId + '">' + labelAr + '</label>' +
+        '<textarea id="' + inputId + '" rows="2" ' +
+          'data-tm-pmedit-field="' + fieldKey + '">' +
+          tmEscape(value || '') + '</textarea>' +
+        '</div>';
+    }
+    return {
+      body:
+        row('cc','المحتوى المُغطَّى:','content_covered', entry.content_covered) +
+        row('sk','المهارات:',          'skills_focused',  entry.skills_focused)  +
+        row('bk','الكتاب:',            'books_used',      entry.books_used)      +
+        row('hw','الواجب المنزلي:',    'homework',        entry.homework)        +
+        '<div class="tm-pmedit-error" hidden></div>',
+      foot:
+        '<button type="button" class="tm-btn tm-btn-primary" ' +
+          'data-tm-pmedit="save">حفظ التعديل</button>' +
+        '<button type="button" class="tm-btn tm-btn-secondary" ' +
+          'data-tm-pmedit="cancel">إلغاء</button>'
+    };
+  }
+
+  function tmEnterPmsgEdit(card, entry){
+    var bodyEl = card.querySelector('.tm-pmcard-body');
+    var footEl = card.querySelector('.tm-pmcard-foot');
+    if(!bodyEl || !footEl) return;
+    var html = tmRenderPmsgEditForm(entry);
+    bodyEl.innerHTML = html.body;
+    footEl.innerHTML = html.foot;
+    // Focus the first textarea so the admin can start typing.
+    var firstTa = bodyEl.querySelector('textarea');
+    if(firstTa) firstTa.focus();
+  }
+
+  function tmExitPmsgEdit(){
+    // Re-render from cache — fastest restore without re-fetch.
+    var sel = tmCurrentSelection();
+    if(!sel.tid) return;
+    var key = sel.tid + '|' + sel.gname;
+    var entries = pmsgsCache[key];
+    if(entries) tmRenderParentMsgs(entries);
+  }
+
+  function tmShowPmsgEditError(card, msg){
+    var el = card.querySelector('.tm-pmedit-error');
+    if(!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function tmSavePmsgEdit(mid, button, card){
+    var fields = card.querySelectorAll('[data-tm-pmedit-field]');
+    var body = {};
+    for(var i = 0; i < fields.length; i++){
+      var k = fields[i].getAttribute('data-tm-pmedit-field');
+      body[k] = (fields[i].value || '').trim();
+    }
+    // Client-side guard — server enforces the same 3-required rule.
+    var REQUIRED_AR = {
+      content_covered: 'المحتوى المُغطَّى',
+      skills_focused:  'المهارات',
+      books_used:      'الكتاب'
+    };
+    for(var k2 in REQUIRED_AR){
+      if(Object.prototype.hasOwnProperty.call(REQUIRED_AR, k2)){
+        if(!body[k2]){
+          tmShowPmsgEditError(card,
+            'هذا الحقل مطلوب: ' + REQUIRED_AR[k2]);
+          return;
+        }
+      }
+    }
+    var origLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = 'جاري الحفظ...';
+    fetch('/api/parent-messages/' + encodeURIComponent(mid),
+          {method:'PATCH',
+           headers:{'Content-Type':'application/json'},
+           credentials:'include',
+           body: JSON.stringify(body)})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          button.disabled = false;
+          button.textContent = origLabel;
+          tmShowPmsgEditError(card,
+            (j && j.error) || 'تعذّر الحفظ');
+          return;
+        }
+        // Patch the cache entry in place, then re-render. No extra
+        // fetch — server only stripped whitespace, which we already
+        // did client-side.
+        var sel = tmCurrentSelection();
+        if(sel.tid){
+          var key = sel.tid + '|' + sel.gname;
+          var entries = pmsgsCache[key];
+          if(entries){
+            for(var i = 0; i < entries.length; i++){
+              if(parseInt(entries[i].id, 10) === mid){
+                for(var fk in body){
+                  if(Object.prototype.hasOwnProperty.call(body, fk)){
+                    entries[i][fk] = body[fk];
+                  }
+                }
+                break;
+              }
+            }
+            tmRenderParentMsgs(entries);
+            return;
+          }
+        }
+        // Fallback: cache miss — full reload to restore the card.
+        tmLoadParentMsgs();
+      })
+      .catch(function(){
+        button.disabled = false;
+        button.textContent = origLabel;
+        tmShowPmsgEditError(card, 'تعذّر الاتصال بالخادم.');
+      });
+  }
+
+  // Edit / save / cancel are wired via a SECOND click delegate on
+  // the messages panel — the Phase-2 delegate stays intact.
+  if(pmsgPanel){
+    pmsgPanel.addEventListener('click', function(ev){
+      // Save button (data-attribute is unique to the edit form).
+      var saveBtn = ev.target.closest('[data-tm-pmedit="save"]');
+      if(saveBtn){
+        var saveCard = saveBtn.closest('.tm-pmsg-card');
+        if(saveCard){
+          var smid = parseInt(saveCard.getAttribute('data-id'), 10);
+          if(smid) tmSavePmsgEdit(smid, saveBtn, saveCard);
+        }
+        return;
+      }
+      // Cancel button.
+      var cancelBtn = ev.target.closest('[data-tm-pmedit="cancel"]');
+      if(cancelBtn){
+        tmExitPmsgEdit();
+        return;
+      }
+      // Edit button: a .tm-btn-secondary INSIDE .tm-pmcard-foot of a
+      // .tm-pmsg-pending card AND without the data-tm-pmedit
+      // attribute (so the cancel button doesn't match too).
+      var editBtn = ev.target.closest('.tm-btn-secondary');
+      if(!editBtn || editBtn.hasAttribute('data-tm-pmedit')) return;
+      var foot = editBtn.closest('.tm-pmcard-foot');
+      if(!foot) return;
+      var card = foot.closest('.tm-pmsg-card.tm-pmsg-pending');
+      if(!card) return;
+      var mid = parseInt(card.getAttribute('data-id'), 10);
+      if(!mid) return;
+      var entry = tmFindMsgInCache(mid);
+      if(entry) tmEnterPmsgEdit(card, entry);
+    });
+  }
 })();
 </script>
 </body></html>"""
