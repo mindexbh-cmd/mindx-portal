@@ -8992,15 +8992,303 @@ function dhCopyParentLink(){
         <div id="sr-details" style="margin-top:10px;"></div>
       </div>
     </div>
-    <!-- Group-search pane: rebuilt from scratch in the gs-* commit
-         chain. Step 1 is structural only — empty placeholder + the
-         minimal toggle JS that keeps the radio switching working
-         (the old /static/js/group_search.js is no longer loaded).
-         Steps 2+ fill the placeholder with the real UI. -->
+    <!-- Group-search pane: rebuilt in the gs-* commit chain.
+         Step 2 wires the structure: filters card (group dropdown +
+         text search), and a hidden group card with header + 4 stats
+         + 6 tabs + 6 empty panels. Step 3 wires real data via
+         /api/groups/<id>/detail. -->
     <div class="search-mode-group" style="display:none;">
-      <div id="gs-root" style="padding:14px 16px;color:#666;
-           font-family:inherit;font-size:14px;text-align:center;">
-        &#x633;&#x64A;&#x62A;&#x645; &#x639;&#x631;&#x636; &#x627;&#x644;&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x647;&#x646;&#x627;.
+      <div id="gs-root" style="padding:12px 16px;">
+        <style>
+          /* All gs-* prefixed to avoid collision with .tm-* and the
+             existing student-search / dashboard styles. */
+          .gs-card{background:#fff;border:0.5px solid #d8c8ec;
+                   border-radius:14px;padding:16px 18px;margin:0 0 12px;}
+          .gs-filters-grid{display:grid;grid-template-columns:1fr 1fr;
+                           gap:12px;}
+          @media (max-width:680px){
+            .gs-filters-grid{grid-template-columns:1fr;}
+          }
+          .gs-field label{display:block;color:#4a148c;font-weight:700;
+                          font-size:.88rem;margin-bottom:6px;
+                          font-family:inherit;}
+          .gs-field select, .gs-field input{
+            width:100%;padding:9px 11px;
+            border:0.5px solid #d8c8ec;border-radius:9px;
+            background:#fafafe;color:#212121;
+            font-family:inherit;font-size:.95rem;}
+          .gs-field select:focus, .gs-field input:focus{
+            outline:none;border-color:#6B3FA0;
+            box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+
+          .gs-group-head{display:flex;align-items:center;gap:12px;
+                         flex-wrap:wrap;margin-bottom:14px;}
+          .gs-avatar{width:48px;height:48px;border-radius:50%;
+                     background:#f3e5f5;color:#4a148c;display:flex;
+                     align-items:center;justify-content:center;
+                     font-weight:900;font-size:.95rem;flex-shrink:0;}
+          .gs-group-name{font-weight:900;color:#4a148c;font-size:1.1rem;
+                         line-height:1.3;}
+          .gs-group-meta{color:#6a4f8a;font-size:.86rem;margin-top:2px;}
+
+          .gs-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);
+                         gap:10px;margin-bottom:14px;}
+          @media (max-width:760px){
+            .gs-stats-grid{grid-template-columns:repeat(2,1fr);}
+          }
+          @media (max-width:420px){
+            .gs-stats-grid{grid-template-columns:1fr;}
+          }
+          .gs-stat{background:#fff;border:0.5px solid #d8c8ec;
+                   border-radius:11px;padding:11px 13px;}
+          .gs-stat-label{color:#6a4f8a;font-size:.82rem;font-weight:700;
+                         margin-bottom:3px;}
+          .gs-stat-value{color:#4a148c;font-size:1.4rem;font-weight:900;
+                         line-height:1.1;}
+          /* Attendance-tier coloring (used in Step 3 once real % lands). */
+          .gs-stat-att-high{border-color:#1D9E75;}
+          .gs-stat-att-high .gs-stat-value{color:#1D9E75;}
+          .gs-stat-att-mid{border-color:#BA7517;}
+          .gs-stat-att-mid .gs-stat-value{color:#BA7517;}
+          .gs-stat-att-low{border-color:#A32D2D;}
+          .gs-stat-att-low .gs-stat-value{color:#A32D2D;}
+          /* Reserved amber palette — only on the متأخرات سداد card. */
+          .gs-stat-amber{background:#FAEEDA;border-color:#BA7517;}
+          .gs-stat-amber .gs-stat-label{color:#854F0B;}
+          .gs-stat-amber .gs-stat-value{color:#854F0B;}
+
+          .gs-tabs{display:grid;grid-template-columns:repeat(3,1fr);
+                   gap:6px;margin-bottom:14px;}
+          @media (max-width:540px){
+            .gs-tabs{grid-template-columns:repeat(2,1fr);}
+          }
+          .gs-tab{background:#f3e5f5;color:#4a148c;
+                  border:0.5px solid #d8c8ec;border-radius:9px;
+                  padding:9px 10px;font-weight:800;font-size:.88rem;
+                  font-family:inherit;cursor:pointer;text-align:center;}
+          .gs-tab:hover{background:#e1bee7;}
+          .gs-tab.active{background:#6B3FA0;color:#fff;
+                         border-color:#6B3FA0;}
+
+          .gs-panel{background:#fff;border:0.5px solid #d8c8ec;
+                    border-radius:11px;padding:16px;min-height:140px;}
+          .gs-panel-empty{color:#8a7da5;text-align:center;
+                          padding:32px 18px;font-style:italic;}
+        </style>
+
+        <!-- A) Filters card -->
+        <div class="gs-card">
+          <div class="gs-filters-grid">
+            <div class="gs-field">
+              <label for="gs-group-select">اختاري المجموعة</label>
+              <select id="gs-group-select">
+                <option value="">— اختاري المجموعة —</option>
+              </select>
+            </div>
+            <div class="gs-field">
+              <label for="gs-search-text">أو ابحثي بالاسم</label>
+              <input type="text" id="gs-search-text"
+                     placeholder="اكتبي اسم المجموعة أو المعلمة...">
+            </div>
+          </div>
+        </div>
+
+        <!-- B) Group card — hidden until a group is chosen -->
+        <div class="gs-card" id="gs-group-card" hidden>
+          <div class="gs-group-head">
+            <div class="gs-avatar" id="gs-avatar">—</div>
+            <div>
+              <div class="gs-group-name" id="gs-group-name">—</div>
+              <div class="gs-group-meta" id="gs-group-meta">—</div>
+            </div>
+          </div>
+
+          <div class="gs-stats-grid">
+            <div class="gs-stat">
+              <div class="gs-stat-label">طالبات</div>
+              <div class="gs-stat-value" id="gs-stat-students">—</div>
+            </div>
+            <div class="gs-stat" id="gs-stat-att-card">
+              <div class="gs-stat-label">حضور الشهر</div>
+              <div class="gs-stat-value" id="gs-stat-att">—</div>
+            </div>
+            <div class="gs-stat">
+              <div class="gs-stat-label">دروس</div>
+              <div class="gs-stat-value" id="gs-stat-lessons">—</div>
+            </div>
+            <div class="gs-stat gs-stat-amber">
+              <div class="gs-stat-label">متأخرات سداد</div>
+              <div class="gs-stat-value" id="gs-stat-overdue">—</div>
+            </div>
+          </div>
+
+          <!-- 6 tabs in a 3-col grid → wraps to 2 rows of 3 on
+               desktop, 2 cols × 3 rows on narrow screens. -->
+          <div class="gs-tabs" role="tablist">
+            <button type="button" class="gs-tab active"
+                    data-gs-tab="info" role="tab">معلومات عامة</button>
+            <button type="button" class="gs-tab"
+                    data-gs-tab="students" role="tab">الطالبات</button>
+            <button type="button" class="gs-tab"
+                    data-gs-tab="attendance" role="tab">الحضور</button>
+            <button type="button" class="gs-tab"
+                    data-gs-tab="lessons" role="tab">الدروس</button>
+            <button type="button" class="gs-tab"
+                    data-gs-tab="evaluations" role="tab">التقييمات</button>
+            <button type="button" class="gs-tab"
+                    data-gs-tab="finance" role="tab">المالية</button>
+          </div>
+
+          <div class="gs-panels">
+            <div class="gs-panel" data-gs-panel="info">
+              <div class="gs-panel-empty">سيتم عرض المعلومات العامة هنا.</div>
+            </div>
+            <div class="gs-panel" data-gs-panel="students" hidden>
+              <div class="gs-panel-empty">سيتم عرض قائمة الطالبات هنا.</div>
+            </div>
+            <div class="gs-panel" data-gs-panel="attendance" hidden>
+              <div class="gs-panel-empty">سيتم عرض الحضور هنا.</div>
+            </div>
+            <div class="gs-panel" data-gs-panel="lessons" hidden>
+              <div class="gs-panel-empty">سيتم عرض الدروس هنا.</div>
+            </div>
+            <div class="gs-panel" data-gs-panel="evaluations" hidden>
+              <div class="gs-panel-empty">سيتم عرض التقييمات هنا.</div>
+            </div>
+            <div class="gs-panel" data-gs-panel="finance" hidden>
+              <div class="gs-panel-empty">سيتم عرض المالية هنا.</div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+        /* Group-search Step 2 — structure-only wiring.
+         * Populates the dropdown from GET /api/groups (full
+         * student_groups rows with ids), shows the empty card on
+         * select with placeholder dashes for the stats, and runs the
+         * tab-switching logic. Step 3 will replace the placeholders
+         * with real /api/groups/<id>/detail data. */
+        (function(){
+          var sel       = document.getElementById('gs-group-select');
+          var searchTxt = document.getElementById('gs-search-text');
+          var card      = document.getElementById('gs-group-card');
+          var avatarEl  = document.getElementById('gs-avatar');
+          var nameEl    = document.getElementById('gs-group-name');
+          var metaEl    = document.getElementById('gs-group-meta');
+          if(!sel || !card) return;
+
+          /* Cache the full group list once so the text input can
+             filter the dropdown without a re-fetch (Step 3 may also
+             reuse this cache for richer search). */
+          var GROUPS = [];
+
+          function gsAbbrev(name){
+            var s = (name == null ? '' : String(name)).trim();
+            if(!s) return '—';
+            var parts = s.split(/\s+/).filter(Boolean);
+            if(parts.length >= 2){
+              return parts[0].charAt(0) + ' ' + parts[1];
+            }
+            return parts[0].substring(0, 2);
+          }
+
+          function rebuildOptions(filterStr){
+            var f = (filterStr || '').trim().toLowerCase();
+            /* Reset to placeholder + filtered groups. */
+            sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
+            GROUPS.forEach(function(g){
+              var name    = (g.group_name || '').trim();
+              var teacher = (g.teacher_name || '').trim();
+              if(!name) return;
+              if(f){
+                var hay = (name + ' ' + teacher).toLowerCase();
+                if(hay.indexOf(f) === -1) return;
+              }
+              var opt = document.createElement('option');
+              opt.value = String(g.id);
+              opt.textContent = name + (teacher ? ' — ' + teacher : '');
+              opt.dataset.name    = name;
+              opt.dataset.teacher = teacher;
+              sel.appendChild(opt);
+            });
+          }
+
+          function loadGroups(){
+            fetch('/api/groups', {credentials:'include'})
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                var arr = (j && j.groups) || [];
+                /* Dedupe by group_name + sort alphabetically. */
+                var seen = {};
+                GROUPS = [];
+                arr.forEach(function(g){
+                  var n = (g.group_name || '').trim();
+                  if(!n || seen[n]) return;
+                  seen[n] = 1;
+                  GROUPS.push(g);
+                });
+                GROUPS.sort(function(a, b){
+                  return (a.group_name || '').localeCompare(
+                          b.group_name || '', 'ar');
+                });
+                rebuildOptions('');
+              })
+              .catch(function(){ /* leave placeholder option */ });
+          }
+
+          /* Group selection → reveal the card with placeholder data.
+             Step 3 replaces the placeholders with the real detail
+             fetch. */
+          sel.addEventListener('change', function(){
+            if(!sel.value){ card.hidden = true; return; }
+            var opt = sel.options[sel.selectedIndex];
+            var name    = (opt && opt.dataset.name)    || '';
+            var teacher = (opt && opt.dataset.teacher) || '';
+            avatarEl.textContent = gsAbbrev(name);
+            nameEl  .textContent = name || '—';
+            metaEl  .textContent = teacher
+              ? ('المعلمة: ' + teacher + ' · — طالبة')
+              : '— طالبة';
+            /* Stat placeholders — Step 3 replaces these. */
+            ['gs-stat-students','gs-stat-att',
+             'gs-stat-lessons','gs-stat-overdue'].forEach(function(id){
+              var el = document.getElementById(id);
+              if(el) el.textContent = '—';
+            });
+            card.hidden = false;
+          });
+
+          /* Text input filters the dropdown options live. Doesn't
+             auto-pick — the user still chooses from the narrowed
+             list. */
+          if(searchTxt){
+            searchTxt.addEventListener('input', function(){
+              rebuildOptions(searchTxt.value);
+            });
+          }
+
+          /* Tab switching. */
+          var tabs   = card.querySelectorAll('.gs-tab');
+          var panels = card.querySelectorAll('.gs-panel');
+          tabs.forEach(function(btn){
+            btn.addEventListener('click', function(){
+              var key = btn.getAttribute('data-gs-tab');
+              tabs.forEach(function(b){
+                b.classList.toggle('active', b === btn);
+              });
+              panels.forEach(function(p){
+                p.hidden = (p.getAttribute('data-gs-panel') !== key);
+              });
+            });
+          });
+
+          if(document.readyState === 'loading'){
+            document.addEventListener('DOMContentLoaded', loadGroups);
+          } else {
+            loadGroups();
+          }
+        })();
+        </script>
       </div>
     </div>
   </div>
