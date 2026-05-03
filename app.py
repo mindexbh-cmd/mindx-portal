@@ -9146,6 +9146,45 @@ function dhCopyParentLink(){
                            border-color:#d8c8ec;}
           .gs-stu-remaining{color:#6a4f8a;font-size:.82rem;
                             font-weight:700;margin-top:6px;}
+
+          /* Step 6 — attendance tab visual bars. Bar fills are SOLID
+             color (no gradients) and use the same green / amber / red
+             hex codes as the Step-3 stat tiers. Track is a soft
+             purple #f3e5f5 — different from the reserved #FAEEDA
+             palette. */
+          .gs-att-header{display:flex;justify-content:space-between;
+                         align-items:center;gap:10px;flex-wrap:wrap;
+                         padding-bottom:10px;margin-bottom:10px;
+                         border-bottom:0.5px solid #d8c8ec;}
+          .gs-att-avg{color:#4a148c;font-weight:800;font-size:.95rem;}
+          .gs-att-avg-value{font-size:1.1rem;font-weight:900;}
+          .gs-att-avg.gs-att-color-high .gs-att-avg-value{color:#1D9E75;}
+          .gs-att-avg.gs-att-color-mid  .gs-att-avg-value{color:#BA7517;}
+          .gs-att-avg.gs-att-color-low  .gs-att-avg-value{color:#A32D2D;}
+          .gs-att-avg.gs-att-color-none .gs-att-avg-value{color:#8a7da5;}
+          .gs-att-count{color:#6a4f8a;font-size:.86rem;font-weight:700;}
+          .gs-att-list{display:flex;flex-direction:column;gap:8px;}
+          .gs-att-row{display:flex;align-items:center;gap:10px;
+                      padding:6px 4px;}
+          .gs-att-name{flex:0 0 auto;color:#4a148c;font-weight:700;
+                       font-size:.92rem;min-width:80px;
+                       max-width:160px;overflow:hidden;
+                       text-overflow:ellipsis;white-space:nowrap;}
+          .gs-att-bar-wrap{flex:1 1 auto;min-width:80px;}
+          .gs-att-bar-track{height:10px;background:#f3e5f5;
+                            border-radius:999px;overflow:hidden;}
+          .gs-att-bar-fill{height:100%;border-radius:999px;
+                           transition:width .25s ease-out;}
+          .gs-att-fill-high{background:#1D9E75;}
+          .gs-att-fill-mid{background:#BA7517;}
+          .gs-att-fill-low{background:#A32D2D;}
+          .gs-att-fill-none{background:#d8c8ec;}
+          .gs-att-pct{flex:0 0 auto;font-weight:800;font-size:.86rem;
+                      min-width:42px;text-align:left;}
+          .gs-att-color-high{color:#1D9E75;}
+          .gs-att-color-mid{color:#BA7517;}
+          .gs-att-color-low{color:#A32D2D;}
+          .gs-att-color-none{color:#8a7da5;}
         </style>
 
         <!-- A) Filters card -->
@@ -9638,6 +9677,86 @@ function dhCopyParentLink(){
               '.gs-panel[data-gs-panel="students"]');
             if(stuEl){
               stuEl.innerHTML = gsRenderStudents(payload);
+            }
+          };
+
+          /* ── Step 6 — الحضور tab. Per-student visual bars + group
+             average header. Reuses gsClassifyAttendance (Step 5) for
+             tier colour mapping. Sort: highest att% first, nulls
+             sink to bottom. */
+          function gsRenderAttendance(payload){
+            var d = payload && payload.detail;
+            var students = (d && d.students) || [];
+            var stats    = d && d.stats;
+            if(students.length === 0){
+              return '<div class="gs-panel-empty">' +
+                'لا توجد بيانات حضور لهذه المجموعة.</div>';
+            }
+            var avg = stats ? stats.avg_attendance_pct : null;
+            var avgCls = (avg == null) ? 'gs-att-color-none' :
+              (avg >= 80 ? 'gs-att-color-high' :
+               avg >= 60 ? 'gs-att-color-mid' : 'gs-att-color-low');
+            var avgTxt = (avg == null) ? '—' : Math.round(avg) + '%';
+            var sorted = students.slice().sort(function(a, b){
+              var av = parseFloat(a.att_percent);
+              var bv = parseFloat(b.att_percent);
+              var aN = isNaN(av), bN = isNaN(bv);
+              if(aN && bN) return (a.student_name||'').localeCompare(
+                                  b.student_name||'', 'ar');
+              if(aN) return 1;   /* nulls sink */
+              if(bN) return -1;
+              if(bv !== av) return bv - av;
+              return (a.student_name||'').localeCompare(
+                      b.student_name||'', 'ar');
+            });
+            var html =
+              '<div class="gs-att-header">' +
+                '<div class="gs-att-avg ' + avgCls + '">' +
+                  'متوسط حضور المجموعة: ' +
+                  '<span class="gs-att-avg-value">' + gsEscape(avgTxt) +
+                  '</span>' +
+                '</div>' +
+                '<div class="gs-att-count">' +
+                  students.length + ' طالبة</div>' +
+              '</div>' +
+              '<div class="gs-att-list">';
+            sorted.forEach(function(s){
+              var name   = gsEscape(s.student_name || '—');
+              var attCls = gsClassifyAttendance(s.att_percent);
+              var pctNum = parseFloat(s.att_percent);
+              var pctTxt, fillW;
+              if(attCls === 'none' || isNaN(pctNum)){
+                pctTxt = '—';
+                fillW  = '100';   /* full grey bar */
+              } else {
+                pctNum = Math.max(0, Math.min(100, pctNum));
+                pctTxt = Math.round(pctNum) + '%';
+                fillW  = String(pctNum);
+              }
+              html +=
+                '<div class="gs-att-row">' +
+                  '<div class="gs-att-name">' + name + '</div>' +
+                  '<div class="gs-att-bar-wrap">' +
+                    '<div class="gs-att-bar-track">' +
+                      '<div class="gs-att-bar-fill gs-att-fill-' +
+                        attCls + '" style="width:' + fillW + '%"></div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="gs-att-pct gs-att-color-' + attCls +
+                    '">' + gsEscape(pctTxt) + '</div>' +
+                '</div>';
+            });
+            html += '</div>';
+            return html;
+          }
+
+          var _gsStep5Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            _gsStep5Fill(payload);
+            var attEl = document.querySelector(
+              '.gs-panel[data-gs-panel="attendance"]');
+            if(attEl){
+              attEl.innerHTML = gsRenderAttendance(payload);
             }
           };
 
