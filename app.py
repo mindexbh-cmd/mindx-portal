@@ -9262,11 +9262,7 @@ function dhCopyParentLink(){
              (#FAEEDA / #854F0B / #BA7517), matching the متأخرات سداد
              stat card in the group header. The total-remaining card
              stays neutral so the amber attention isn't doubled. */
-          .gs-fin-summary{display:grid;grid-template-columns:1fr 1fr;
-                          gap:10px;margin-bottom:14px;}
-          @media (max-width:540px){
-            .gs-fin-summary{grid-template-columns:1fr;}
-          }
+          .gs-fin-summary{margin-bottom:14px;}
           .gs-fin-summary-card{padding:11px 14px;border-radius:11px;
                                border:0.5px solid #d8c8ec;background:#fff;}
           .gs-fin-summary-card.gs-fin-amber{background:#FAEEDA;
@@ -10221,9 +10217,8 @@ function dhCopyParentLink(){
               return (a.student_name || '').localeCompare(
                       b.student_name || '', 'ar');
             });
-            var totalRemaining = (stats && stats.total_remaining) || 0;
-            var withRemCount   = (stats && stats.students_with_remaining)
-                                 || withRem.length;
+            var withRemCount = (stats && stats.students_with_remaining)
+                               || withRem.length;
             function fmt(n){
               n = parseFloat(n) || 0;
               return (n % 1 === 0) ? String(n) : n.toFixed(2);
@@ -10235,12 +10230,6 @@ function dhCopyParentLink(){
                     'طالبات لديها متبقي</div>' +
                   '<div class="gs-fin-summary-value">' +
                     withRemCount + '</div>' +
-                '</div>' +
-                '<div class="gs-fin-summary-card">' +
-                  '<div class="gs-fin-summary-label">' +
-                    'إجمالي المتبقي</div>' +
-                  '<div class="gs-fin-summary-value">' +
-                    gsEscape(fmt(totalRemaining)) + ' د.ب</div>' +
                 '</div>' +
               '</div>' +
               '<div class="gs-fin-list">';
