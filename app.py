@@ -36524,7 +36524,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         <div id="tm-evals-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="messages" hidden>
-        <div class="tm-panel-empty">سيتم عرض الرسائل هنا.</div>
+        <div id="tm-pmsg-body"></div>
       </div>
     </div>
   </div>
@@ -36649,6 +36649,37 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-ecard-notes .tm-row-key{display:block;margin-bottom:4px;}
 .tm-ecard-notes .tm-row-val{display:block;color:#212121;line-height:1.55;
                             font-size:.92rem;}
+
+/* ── Step-5: parent-message cards (approval workflow) ──────── */
+.tm-pmsg-card{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
+              padding:14px 16px;}
+.tm-pmsg-pending{background:#FAEEDA;border:0.5px solid #d8c8ec;
+                 border-right:5px solid #BA7517;}
+.tm-pmcard-head{display:flex;justify-content:space-between;align-items:center;
+                gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.tm-pmcard-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tm-pmcard-date{color:#4a148c;font-weight:700;font-size:.92rem;}
+.tm-pmsg-pending .tm-pmcard-date{color:#854F0B;}
+.tm-pmcard-recipients{color:#4a148c;font-weight:700;font-size:.92rem;}
+.tm-pmsg-pending .tm-pmcard-recipients{color:#854F0B;}
+.tm-pmcard-recipients strong{font-weight:900;}
+.tm-badge-warning{background:#FAEEDA;color:#854F0B;
+                  border:0.5px solid #BA7517;}
+.tm-pmcard-body{background:#fff;border:0.5px solid #d8c8ec;border-radius:10px;
+                padding:12px 14px;display:flex;flex-direction:column;gap:6px;}
+.tm-pmsg-pending .tm-pmcard-body{background:#fff;}
+.tm-pmcard-row{font-size:.92rem;line-height:1.55;color:#212121;}
+.tm-pmcard-foot{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;
+                justify-content:flex-start;}
+.tm-pmcard-sent-line{margin-top:10px;color:#6a4f8a;font-size:.82rem;
+                     font-weight:700;}
+.tm-btn-success{background:#1D9E75;color:#fff;}
+.tm-btn-success:hover{background:#178360;}
+.tm-btn-danger-link{background:none;border:none;color:#A32D2D;font-weight:800;
+                    font-size:.92rem;cursor:pointer;padding:10px 14px;
+                    font-family:inherit;}
+.tm-btn-danger-link:hover{color:#7a1f1f;text-decoration:underline;
+                          text-underline-offset:3px;}
 </style>
 
 <script>
@@ -37093,6 +37124,158 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 
   teacherSel.addEventListener('change', tmLoadEvals);
   groupSel.addEventListener('change',   tmLoadEvals);
+
+  // ── Step-5: parent-messages tab — approval workflow UI ───────
+  // Reuses GET /api/parent-messages (server already accepts
+  // teacher_id and group_name). Status mapping per spec:
+  //   whatsapp_sent_count > 0 → "تم الإرسال ✓" (green, neutral bg)
+  //   else                    → "بانتظار موافقتك" (amber bg + right
+  //                                                border #BA7517)
+  // The 3 buttons on pending cards (موافقة وإرسال / تعديل / رفض) are
+  // UI-only — no click handlers are attached. parent_messages has no
+  // student_name column, so the recipient label uses the plural
+  // "إلى أولياء أمور: <group_name>" which matches the per-group
+  // broadcast nature of the data.
+  var pmsgsCache    = {};      // key = `${tid}|${gname}` → entries[]
+  var pmsgsExpanded = false;
+
+  function tmPmIsPending(e){
+    return (parseInt(e.whatsapp_sent_count, 10) || 0) <= 0;
+  }
+  function tmPmSentLine(e){
+    var raw = String(e.updated_at || e.sent_date || '').trim();
+    if(!raw) return '';
+    var m = raw.match(/^(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})?/);
+    if(!m) return raw;
+    var d = m[1], t = m[2] || '';
+    return t ? (d + ' الساعة ' + t) : d;
+  }
+  function tmPmRow(label, value, fallback){
+    var v = (value == null ? '' : String(value)).trim();
+    if(!v && fallback != null) v = fallback;
+    var valHtml = v
+      ? '<span class="tm-row-val">' + tmEscape(v) + '</span>'
+      : '<span class="tm-row-val" style="color:#8a7da5;">—</span>';
+    return '<div class="tm-pmcard-row">' +
+      '<span class="tm-row-key">' + label + '</span>' +
+      valHtml + '</div>';
+  }
+
+  function tmRenderParentMsgCard(e){
+    var pending = tmPmIsPending(e);
+    var date    = tmEscape(e.sent_date || '');
+    var grp     = tmEscape(e.group_name || '');
+    var recipients = '<div class="tm-pmcard-recipients">' +
+      'إلى أولياء أمور: <strong>' + grp + '</strong></div>';
+    var badge = pending
+      ? '<span class="tm-badge tm-badge-warning">بانتظار موافقتك</span>'
+      : '<span class="tm-badge tm-badge-success">تم الإرسال ✓</span>';
+    var bodyRows =
+      tmPmRow('المحتوى المُغطَّى:', e.content_covered) +
+      tmPmRow('المهارات:',          e.skills_focused) +
+      tmPmRow('الكتاب:',            e.books_used) +
+      tmPmRow('الواجب المنزلي:',     e.homework, 'لا يوجد');
+    var foot = '';
+    if(pending){
+      foot =
+        '<footer class="tm-pmcard-foot">' +
+          '<button type="button" class="tm-btn tm-btn-success">' +
+            'موافقة وإرسال عبر واتساب</button>' +
+          '<button type="button" class="tm-btn tm-btn-secondary">' +
+            'تعديل</button>' +
+          '<button type="button" class="tm-btn-danger-link">' +
+            'رفض</button>' +
+        '</footer>';
+    } else {
+      var sentLbl = tmEscape(tmPmSentLine(e));
+      if(sentLbl){
+        foot =
+          '<div class="tm-pmcard-sent-line">' +
+            'أُرسل عبر واتساب · ' + sentLbl + '</div>';
+      }
+    }
+    return (
+      '<article class="tm-pmsg-card' +
+        (pending ? ' tm-pmsg-pending' : '') +
+        '" data-id="' + (parseInt(e.id, 10) || 0) + '">' +
+        '<header class="tm-pmcard-head">' +
+          '<div class="tm-pmcard-meta">' +
+            '<span class="tm-pmcard-date">' + date + '</span>' +
+            badge +
+          '</div>' +
+          recipients +
+        '</header>' +
+        '<div class="tm-pmcard-body">' + bodyRows + '</div>' +
+        foot +
+      '</article>'
+    );
+  }
+
+  function tmRenderParentMsgs(entries){
+    var body = document.getElementById('tm-pmsg-body');
+    if(!body) return;
+    var total = entries.length;
+    if(total === 0){
+      body.innerHTML = '<div class="tm-panel-empty">' +
+        'لا توجد رسائل لهذا الاختيار حتى الآن.</div>';
+      return;
+    }
+    var visible = pmsgsExpanded ? entries : entries.slice(0, 5);
+    var html = '<div class="tm-card-list">';
+    visible.forEach(function(e){ html += tmRenderParentMsgCard(e); });
+    html += '</div>';
+    if(total > 5){
+      var label = pmsgsExpanded
+        ? 'عرض آخر 5 فقط'
+        : ('عرض كل الرسائل (' + total + ')');
+      html += '<div class="tm-list-foot">' +
+        '<button type="button" class="tm-btn tm-btn-secondary" ' +
+        'id="tm-pmsg-toggle">' + label + '</button></div>';
+    }
+    body.innerHTML = html;
+    var toggle = document.getElementById('tm-pmsg-toggle');
+    if(toggle){
+      toggle.addEventListener('click', function(){
+        pmsgsExpanded = !pmsgsExpanded;
+        tmRenderParentMsgs(entries);
+      });
+    }
+  }
+
+  function tmLoadParentMsgs(){
+    var sel = tmCurrentSelection();
+    var body = document.getElementById('tm-pmsg-body');
+    if(!body) return;
+    if(!sel.tid){
+      body.innerHTML = '';
+      return;
+    }
+    pmsgsExpanded = false;
+    var key = sel.tid + '|' + sel.gname;
+    if(pmsgsCache[key]){
+      tmRenderParentMsgs(pmsgsCache[key]);
+      return;
+    }
+    body.innerHTML = '<div class="tm-panel-empty">جارٍ التحميل...</div>';
+    var qs = '?teacher_id=' + encodeURIComponent(sel.tid) + '&limit=200';
+    if(sel.gname){
+      qs += '&group_name=' + encodeURIComponent(sel.gname);
+    }
+    fetch('/api/parent-messages' + qs, {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var entries = (j && j.entries) || [];
+        pmsgsCache[key] = entries;
+        tmRenderParentMsgs(entries);
+      })
+      .catch(function(){
+        body.innerHTML = '<div class="tm-panel-empty">' +
+          'تعذّر تحميل الرسائل.</div>';
+      });
+  }
+
+  teacherSel.addEventListener('change', tmLoadParentMsgs);
+  groupSel.addEventListener('change',   tmLoadParentMsgs);
 })();
 </script>
 </body></html>"""
