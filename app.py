@@ -9288,6 +9288,53 @@ function dhCopyParentLink(){
                           color:#1D9E75;font-weight:800;font-size:1rem;
                           background:#E6F4EE;border-radius:10px;
                           border:0.5px solid #1D9E75;}
+
+          /* All-groups overview cards. Tier-coloured att stat reuses
+             the same hex codes as the per-card view but with a
+             higher-specificity compound selector so it wins over
+             the base .gs-all-stat purple. The amber variant matches
+             the reserved متأخرات سداد palette. */
+          .gs-all-header{margin-bottom:14px;padding-bottom:10px;
+                         border-bottom:0.5px solid #d8c8ec;}
+          .gs-all-title{color:#4a148c;font-weight:900;font-size:1.05rem;}
+          .gs-all-subtitle{color:#6a4f8a;font-size:.86rem;margin-top:3px;}
+          .gs-all-grid{display:grid;grid-template-columns:1fr 1fr;
+                       gap:10px;}
+          @media (max-width:680px){
+            .gs-all-grid{grid-template-columns:1fr;}
+          }
+          .gs-all-card{background:#fff;border:0.5px solid #d8c8ec;
+                       border-radius:11px;padding:12px 14px;
+                       cursor:pointer;display:flex;flex-direction:column;
+                       gap:8px;transition:border-color .12s ease;}
+          .gs-all-card:hover{border-color:#6B3FA0;}
+          .gs-all-card-head{display:flex;align-items:center;gap:10px;}
+          .gs-all-card-title{flex:1;min-width:0;}
+          .gs-all-name{color:#4a148c;font-weight:900;font-size:.98rem;
+                       overflow:hidden;text-overflow:ellipsis;
+                       white-space:nowrap;}
+          .gs-all-teacher{color:#6a4f8a;font-size:.82rem;font-weight:700;}
+          .gs-all-stats{display:flex;flex-wrap:wrap;gap:6px;}
+          .gs-all-stat{font-size:.78rem;font-weight:800;color:#4a148c;
+                       background:#f3e5f5;padding:3px 9px;border-radius:8px;}
+          .gs-all-stat.att-high{color:#1D9E75;background:#E6F4EE;}
+          .gs-all-stat.att-mid {color:#BA7517;background:#FFF3E0;}
+          .gs-all-stat.att-low {color:#A32D2D;background:#FCE6E6;}
+          .gs-all-stat.att-none{color:#8a7da5;background:#fafafe;}
+          .gs-all-stat.amber{background:#FAEEDA;color:#854F0B;
+                             border:0.5px solid #BA7517;}
+          .gs-all-stat-loading{color:#8a7da5;font-style:italic;
+                               font-size:.82rem;}
+          .gs-all-stat-err{color:#A32D2D;font-size:.82rem;
+                           font-weight:700;}
+          .gs-all-foot{display:flex;justify-content:flex-end;
+                       padding-top:6px;border-top:0.5px solid #f0e6f8;}
+          .gs-all-detail-btn{background:none;border:none;color:#6B3FA0;
+                             font-weight:800;font-size:.86rem;
+                             cursor:pointer;font-family:inherit;
+                             padding:2px 0;text-decoration:underline;
+                             text-underline-offset:2px;}
+          .gs-all-detail-btn:hover{color:#5a3489;}
         </style>
 
         <!-- A) Filters card -->
@@ -9375,6 +9422,19 @@ function dhCopyParentLink(){
           </div>
         </div>
 
+        <!-- C) All-groups overview card — shown when "all" is
+             selected in the dropdown. Lazy-loads per-group stats
+             from /api/groups/<id>/detail with a small stagger. -->
+        <div class="gs-card" id="gs-all-groups-card" hidden>
+          <div class="gs-all-header">
+            <div class="gs-all-title">جميع المجموعات</div>
+            <div class="gs-all-subtitle" id="gs-all-subtitle">
+              — مجموعة · — طالبة
+            </div>
+          </div>
+          <div class="gs-all-grid" id="gs-all-grid"></div>
+        </div>
+
         <script>
         /* Group-search Step 2 — structure-only wiring.
          * Populates the dropdown from GET /api/groups (full
@@ -9408,8 +9468,13 @@ function dhCopyParentLink(){
 
           function rebuildOptions(filterStr){
             var f = (filterStr || '').trim().toLowerCase();
-            /* Reset to placeholder + filtered groups. */
-            sel.innerHTML = '<option value="">— اختاري المجموعة —</option>';
+            /* Reset to placeholder + "all" sentinel + filtered groups.
+               The "all" option is always available regardless of the
+               text-filter — it's the user's escape hatch back to the
+               overview. */
+            sel.innerHTML =
+              '<option value="">— اختاري المجموعة —</option>' +
+              '<option value="all">📋 جميع المجموعات</option>';
             GROUPS.forEach(function(g){
               var name    = (g.group_name || '').trim();
               var teacher = (g.teacher_name || '').trim();
@@ -10265,6 +10330,177 @@ function dhCopyParentLink(){
             }
           };
 
+          /* ── Enhancement: "all groups" overview. Shown when the
+             dropdown sentinel "all" is selected. Each card lazy-
+             loads its stats from /api/groups/<id>/detail with an
+             80ms stagger so a center with 50+ groups doesn't fire
+             50 fetches simultaneously. The cache populated here is
+             compatible with loadGroupDetail's shape, so drilling
+             into a group via card click is instant; the
+             change-handler enhancement above kicks fetchLessonsCount
+             on cache hit when lessonsList is missing so the lessons
+             panel populates correctly after a drill-in. ─────── */
+          var gsAllCard     = document.getElementById('gs-all-groups-card');
+          var gsAllGrid     = document.getElementById('gs-all-grid');
+          var gsAllSubtitle = document.getElementById('gs-all-subtitle');
+
+          function gsShowAllGroups(){
+            if(!gsAllGrid) return;
+            if(!GROUPS.length){
+              gsAllGrid.innerHTML = '<div class="gs-panel-empty">' +
+                'لا توجد مجموعات.</div>';
+              if(gsAllSubtitle){
+                gsAllSubtitle.textContent = '0 مجموعة · 0 طالبة';
+              }
+              return;
+            }
+            /* Build cards immediately with name + teacher + a
+               loading placeholder for stats (Option 2 from the
+               spec — progressive enhancement). */
+            var html = '';
+            GROUPS.forEach(function(g){
+              var gid     = parseInt(g.id, 10) || 0;
+              var name    = g.group_name || '—';
+              var teacher = g.teacher_name || '';
+              html +=
+                '<article class="gs-all-card" data-gid="' + gid + '">' +
+                  '<div class="gs-all-card-head">' +
+                    '<div class="gs-avatar">' +
+                      gsEscape(gsAbbrev(name)) + '</div>' +
+                    '<div class="gs-all-card-title">' +
+                      '<div class="gs-all-name">' + gsEscape(name) +
+                      '</div>' +
+                      (teacher
+                        ? '<div class="gs-all-teacher">' +
+                            gsEscape(teacher) + '</div>'
+                        : '') +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="gs-all-stats" id="gs-all-stats-' +
+                    gid + '">' +
+                    '<span class="gs-all-stat-loading">' +
+                      'جارٍ التحميل...</span>' +
+                  '</div>' +
+                  '<div class="gs-all-foot">' +
+                    '<button type="button" class="gs-all-detail-btn">' +
+                      'عرض التفاصيل ←</button>' +
+                  '</div>' +
+                '</article>';
+            });
+            gsAllGrid.innerHTML = html;
+            if(gsAllSubtitle){
+              gsAllSubtitle.textContent =
+                GROUPS.length + ' مجموعة · — طالبة';
+            }
+            gsLoadAllGroupsStats();
+          }
+
+          function gsLoadAllGroupsStats(){
+            GROUPS.forEach(function(g, idx){
+              setTimeout(function(){
+                /* Bail if user navigated away from the overview. */
+                if(sel.value !== 'all') return;
+                var gid = parseInt(g.id, 10) || 0;
+                if(!gid) return;
+                /* Cache hit (e.g. user previously drilled into this
+                   group then came back to "all"). */
+                if(gsDetailCache[gid] && gsDetailCache[gid].detail){
+                  gsRenderAllCardStats(gid);
+                  return;
+                }
+                fetch('/api/groups/' + encodeURIComponent(gid) +
+                      '/detail', {credentials:'include'})
+                  .then(function(r){ return r.json(); })
+                  .then(function(j){
+                    if(!j || !j.ok) throw new Error('not ok');
+                    /* Match loadGroupDetail's cache shape so a
+                       subsequent drill-in is instant. */
+                    if(!gsDetailCache[gid]){
+                      gsDetailCache[gid] = {detail: j,
+                                            lessonsCount: null};
+                    } else {
+                      gsDetailCache[gid].detail = j;
+                    }
+                    if(sel.value === 'all'){
+                      gsRenderAllCardStats(gid);
+                    }
+                  })
+                  .catch(function(err){
+                    if(typeof console !== 'undefined' && console.warn){
+                      console.warn('[gs] all-groups detail fetch ' +
+                                   'failed for ' + gid, err);
+                    }
+                    if(sel.value !== 'all') return;
+                    var el = document.getElementById(
+                      'gs-all-stats-' + gid);
+                    if(el){
+                      el.innerHTML = '<span class="gs-all-stat-err">' +
+                        'تعذّر التحميل</span>';
+                    }
+                  });
+              }, idx * 80);
+            });
+          }
+
+          function gsRenderAllCardStats(gid){
+            var entry = gsDetailCache[gid];
+            if(!entry || !entry.detail) return;
+            var stats = entry.detail.stats || {};
+            var sc      = stats.student_count || 0;
+            var avg     = stats.avg_attendance_pct;
+            var withRem = stats.students_with_remaining || 0;
+            var attCls  = (avg == null) ? 'att-none' :
+              (avg >= 80 ? 'att-high' :
+               avg >= 60 ? 'att-mid'  : 'att-low');
+            var attTxt = (avg == null) ? '—' : Math.round(avg) + '%';
+            var html =
+              '<span class="gs-all-stat">' + sc + ' طالبة</span>' +
+              '<span class="gs-all-stat ' + attCls + '">' +
+                'حضور ' + gsEscape(attTxt) + '</span>' +
+              '<span class="gs-all-stat' +
+                (withRem > 0 ? ' amber' : '') + '">' +
+                withRem + ' متأخرات</span>';
+            var el = document.getElementById('gs-all-stats-' + gid);
+            if(el) el.innerHTML = html;
+            gsUpdateAllSubtitle();
+          }
+
+          function gsUpdateAllSubtitle(){
+            if(!gsAllSubtitle) return;
+            var loaded = 0;
+            var total  = 0;
+            GROUPS.forEach(function(g){
+              var gid = parseInt(g.id, 10) || 0;
+              var entry = gsDetailCache[gid];
+              if(entry && entry.detail && entry.detail.stats){
+                loaded++;
+                total += (entry.detail.stats.student_count || 0);
+              }
+            });
+            if(loaded === GROUPS.length){
+              gsAllSubtitle.textContent =
+                GROUPS.length + ' مجموعة · ' + total + ' طالبة';
+            } else {
+              /* Partial total while fetches are still resolving. */
+              gsAllSubtitle.textContent =
+                GROUPS.length + ' مجموعة · ' + total + '+ طالبة';
+            }
+          }
+
+          /* Click delegate — drill into a single-group view. The
+             whole card is clickable; the "عرض التفاصيل ←" button
+             is just a visual cue. */
+          if(gsAllCard){
+            gsAllCard.addEventListener('click', function(ev){
+              var c = ev.target.closest('.gs-all-card[data-gid]');
+              if(!c) return;
+              var gid = c.getAttribute('data-gid');
+              if(!gid) return;
+              sel.value = String(gid);
+              sel.dispatchEvent(new Event('change'));
+            });
+          }
+
           /* Sort buttons live inside the students panel; re-render
              rebuilds them every time. Use event delegation on the
              panel so we bind the handler ONCE — re-renders never
@@ -10289,12 +10525,37 @@ function dhCopyParentLink(){
           /* Group selection → reveal card and dispatch the detail
              fetch. Cached groups skip the loading state. */
           sel.addEventListener('change', function(){
+            /* Enhancement: "all" sentinel → show overview, hide
+               the single-group card. */
+            if(sel.value === 'all'){
+              card.hidden = true;
+              if(gsAllCard){
+                gsAllCard.hidden = false;
+                gsShowAllGroups();
+              }
+              return;
+            }
+            /* Hide the overview on any other selection. */
+            if(gsAllCard) gsAllCard.hidden = true;
+
             if(!sel.value){ card.hidden = true; return; }
             card.hidden = false;
             var gid = sel.value;
             if(gsDetailCache[gid]){
               /* Cache hit — fill synchronously from cache. */
               fillFromDetail(gsDetailCache[gid]);
+              /* Enhancement: if the cache was populated by the
+                 all-groups overview loader, lessonsList is null
+                 — kick the parallel fetch now so the lessons panel
+                 + stat counter populate. (No-op when lessonsList
+                 is already cached.) */
+              if(gsDetailCache[gid].lessonsList == null){
+                var gname = (gsDetailCache[gid].detail &&
+                             gsDetailCache[gid].detail.group &&
+                             gsDetailCache[gid].detail.group.group_name) ||
+                            '';
+                fetchLessonsCount(gid, gname);
+              }
               return;
             }
             /* Cold path: paint a quick header from the option's
