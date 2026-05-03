@@ -9965,6 +9965,97 @@ function dhCopyParentLink(){
             }
           }
 
+          function gsSaveEdit(saveBtn){
+            var gid = sel.value;
+            if(!gid || gid === 'all') return;
+            var entry = gsDetailCache[gid];
+            if(!entry){ return; }
+            if(!confirm('هل أنت متأكد من حفظ التعديلات؟')) return;
+
+            /* Collect all editable field values keyed by the
+               server-side column name (data-gs-edit-field). */
+            var inputs = gsInfoPanel.querySelectorAll(
+              '[data-gs-edit-field]');
+            var body = {};
+            for(var i = 0; i < inputs.length; i++){
+              var key = inputs[i].getAttribute('data-gs-edit-field');
+              if(!key) continue;
+              body[key] = inputs[i].value || '';
+            }
+
+            var origLabel = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'جاري الحفظ...';
+            var errEl = document.getElementById('gs-edit-error');
+            if(errEl){ errEl.hidden = true; errEl.textContent = ''; }
+
+            fetch('/api/admin/groups/' + encodeURIComponent(gid),
+                  {method:'PATCH',
+                   headers:{'Content-Type':'application/json'},
+                   credentials:'include',
+                   body: JSON.stringify(body)})
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                if(!j || !j.ok){
+                  if(errEl){
+                    errEl.textContent = (j && j.error) || 'تعذّر الحفظ';
+                    errEl.hidden = false;
+                  }
+                  saveBtn.disabled = false;
+                  saveBtn.textContent = origLabel;
+                  return;
+                }
+                /* Update cache BEFORE re-render so the header,
+                   info tab, and any other tab that reads from
+                   detail.group all pick up the new values in one
+                   fillFromDetail pass. The endpoint returns the
+                   raw row (with level_course / study_days resolved
+                   server-side); map level_course → level for the
+                   shape gsRenderInfo expects. */
+                var grp = entry.detail && entry.detail.group;
+                if(grp && j.group){
+                  if('teacher_name' in j.group){
+                    grp.teacher_name = j.group.teacher_name || '';
+                  }
+                  if('level_course' in j.group){
+                    grp.level = j.group.level_course || '';
+                  }
+                  if('study_days' in j.group){
+                    grp.study_days = j.group.study_days || '';
+                  }
+                  if('study_time' in j.group){
+                    grp.study_time = j.group.study_time || '';
+                  }
+                  if('ramadan_time' in j.group){
+                    grp.ramadan_time = j.group.ramadan_time || '';
+                  }
+                  if('online_time' in j.group){
+                    grp.online_time = j.group.online_time || '';
+                  }
+                  if('session_duration' in j.group){
+                    grp.session_duration =
+                      j.group.session_duration || '';
+                  }
+                  if('group_name' in j.group){
+                    grp.group_name = j.group.group_name || '';
+                  }
+                }
+                /* Re-render header + every tab from updated cache.
+                   The wrapped gsRenderInfo restores the read-only
+                   view (with the admin edit button row above it). */
+                fillFromDetail(entry);
+                alert('✓ تم حفظ التعديلات');
+              })
+              .catch(function(){
+                if(errEl){
+                  errEl.textContent = 'تعذّر الاتصال بالخادم.';
+                  errEl.hidden = false;
+                }
+                saveBtn.disabled = false;
+                saveBtn.textContent = origLabel;
+              });
+          }
+
           /* Click delegate on the info panel — survives every
              re-render of the panel content. */
           var gsInfoPanel = document.querySelector(
@@ -9979,10 +10070,7 @@ function dhCopyParentLink(){
               } else if(action === 'cancel'){
                 gsExitEditMode();
               } else if(action === 'save'){
-                /* Commit 5 wires the actual PATCH. Until then, this
-                   placeholder confirms the click reached the right
-                   handler. */
-                alert('سيتم تنفيذ الحفظ في الخطوة التالية');
+                gsSaveEdit(btn);
               }
             });
           }
@@ -42065,6 +42153,156 @@ def api_groups_delete(gid):
         return jsonify({"ok": True})
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+
+
+@app.route("/api/admin/groups/<int:gid>", methods=["PATCH"])
+@login_required
+def api_admin_groups_patch(gid):
+    """Admin/manager-only sparse update of a student_groups row.
+    Backs the "تعديل المعلومات" inline-edit feature on the group
+    search detail panel (HOME_HTML).
+
+    Body fields (all optional — only present fields are written):
+      teacher_name, level (mapped to level_course), study_days,
+      study_time, ramadan_time, online_time, session_duration,
+      group_name.
+
+    Days-column resolver: if the admin renamed the canonical
+    study_days column via the table-edit modal (CLAUDE.md "تعديل
+    الجدول" workflow), _groups_days_column(db) returns the renamed
+    col_<timestamp>. We write the new days value to whichever
+    column the resolver picks so the change actually shows up in
+    the rest of the UI. Same defensive pattern /api/groups GET
+    uses for resolution on read.
+
+    Audit: writes one audit_log row tagging the changed fields
+    (new values only, per spec).
+
+    Returns {ok, group: <updated_row_dict_with_resolved_days>} on
+    success."""
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM student_groups WHERE id=?", (gid,)
+        ).fetchone()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if not row:
+        return jsonify({"ok": False, "error": "المجموعة غير موجودة"}), 404
+    rd = dict(row)
+    body = request.get_json(silent=True) or {}
+
+    # Resolve which column actually holds the days value (canonical
+    # study_days OR a renamed col_<timestamp> per the table-edit
+    # modal). Fall back defensively when validation fails.
+    days_col = "study_days"
+    try:
+        _resolved_days_col = _groups_days_column(db) or "study_days"
+        if _is_safe_ident(_resolved_days_col):
+            days_col = _resolved_days_col
+    except Exception:
+        days_col = "study_days"
+
+    # Live column list — defends against an out-of-date schema
+    # missing one of the optional columns.
+    try:
+        live_cols = {r[1] for r in db.execute(
+            "PRAGMA table_info(student_groups)"
+        ).fetchall()}
+    except Exception:
+        live_cols = set()
+
+    # Body field → DB column name mapping. Frontend uses 'level' but
+    # the DB column is 'level_course'. study_days routes to the
+    # resolved column.
+    FIELD_MAP = [
+        ("teacher_name",     "teacher_name"),
+        ("level",            "level_course"),
+        ("study_days",       days_col),
+        ("study_time",       "study_time"),
+        ("ramadan_time",     "ramadan_time"),
+        ("online_time",      "online_time"),
+        ("session_duration", "session_duration"),
+        ("group_name",       "group_name"),
+    ]
+
+    sets = []
+    params = []
+    audit_changes = {}
+    for body_key, col in FIELD_MAP:
+        if body_key not in body:
+            continue
+        if col not in live_cols:
+            continue
+        v = body.get(body_key)
+        if isinstance(v, str):
+            v = v.strip()
+        # Compare against the row's current value to record only
+        # actual changes in the audit log.
+        cur = rd.get(col)
+        if isinstance(cur, str):
+            cur = cur.strip()
+        if v != cur:
+            audit_changes[body_key] = v
+        sets.append('"' + col + '"=?')
+        params.append(v)
+
+    if not sets:
+        # Nothing in the body matched a writable column. Return the
+        # current row so the client can re-render uneventfully.
+        try:
+            resolved = _extract_days_from_row(rd)
+            if resolved:
+                rd["study_days"] = resolved
+        except Exception:
+            pass
+        return jsonify({"ok": True, "group": rd, "no_change": True})
+
+    # updated_at column is NOT in the canonical student_groups
+    # schema; only add the SET clause when a future migration adds
+    # it. Defensive — never errors on the current schema.
+    if "updated_at" in live_cols:
+        sets.append('updated_at=CURRENT_TIMESTAMP')
+
+    sql = ("UPDATE student_groups SET " + ", ".join(sets) +
+           " WHERE id=?")
+    params.append(gid)
+    try:
+        db.execute(sql, tuple(params))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    # Re-fetch so the response carries the canonical post-update
+    # state, then run the days-resolver so the client always sees
+    # study_days populated under that key (matches the trick from
+    # /api/groups GET fix in this same round).
+    try:
+        new_row = db.execute(
+            "SELECT * FROM student_groups WHERE id=?", (gid,)
+        ).fetchone()
+        new_rd = dict(new_row) if new_row else rd
+    except Exception:
+        new_rd = rd
+    try:
+        resolved = _extract_days_from_row(new_rd)
+        if resolved:
+            new_rd["study_days"] = resolved
+    except Exception:
+        pass
+
+    if audit_changes:
+        try:
+            _audit("groups.update", target_type="student_groups",
+                   target_id=gid, new_value=audit_changes)
+        except Exception:
+            pass
+
+    return jsonify({"ok": True, "group": new_rd})
+
 
 @app.route("/api/groups/cleanup-empty", methods=["POST"])
 @login_required
