@@ -9342,6 +9342,52 @@ function dhCopyParentLink(){
                              padding:2px 0;text-decoration:underline;
                              text-underline-offset:2px;}
           .gs-all-detail-btn:hover{color:#5a3489;}
+
+          /* Summary-table view for the all-groups overview.
+             Replaces the card grid (.gs-all-grid still wraps it).
+             Pill colours mirror the .gs-all-stat tier overrides
+             above so a user switching between contexts sees the
+             same green/amber/red. */
+          .gs-tbl-wrap{overflow-x:auto;border:0.5px solid #d8c8ec;
+                       border-radius:11px;margin-bottom:12px;
+                       background:#fff;}
+          .gs-tbl{width:100%;border-collapse:collapse;
+                  font-size:.88rem;}
+          .gs-tbl thead th{background:#f3e5f5;color:#4a148c;
+                           font-weight:800;padding:10px 8px;
+                           text-align:right;
+                           border-bottom:0.5px solid #d8c8ec;
+                           white-space:nowrap;font-size:.86rem;}
+          .gs-tbl tbody td{padding:10px 8px;
+                           border-bottom:0.5px solid #f0e6f8;
+                           vertical-align:middle;}
+          .gs-tbl tbody tr:last-child td{border-bottom:none;}
+          .gs-tbl tbody tr{cursor:pointer;
+                           transition:background .12s ease;}
+          .gs-tbl tbody tr:hover{background:#fafafe;}
+          .gs-tbl-name{font-weight:900;color:#4a148c;
+                       white-space:nowrap;}
+          .gs-tbl-count{text-align:center;font-weight:800;
+                        color:#4a148c;}
+          .gs-tbl-pill{display:inline-block;padding:3px 9px;
+                       border-radius:999px;font-weight:800;
+                       font-size:.78rem;border:0.5px solid;
+                       white-space:nowrap;}
+          .gs-tbl-pill.att-high{background:#E6F4EE;color:#1D9E75;
+                                border-color:#1D9E75;}
+          .gs-tbl-pill.att-mid {background:#FFF3E0;color:#BA7517;
+                                border-color:#BA7517;}
+          .gs-tbl-pill.att-low {background:#FCE6E6;color:#A32D2D;
+                                border-color:#A32D2D;}
+          .gs-tbl-pill.att-none{background:#fafafe;color:#8a7da5;
+                                border-color:#d8c8ec;}
+          .gs-tbl-pill.amber{background:#FAEEDA;color:#854F0B;
+                             border-color:#BA7517;}
+          .gs-tbl-pill.ovd-none{background:#fafafe;color:#8a7da5;
+                                border-color:#d8c8ec;}
+          .gs-tbl-hint{color:#6a4f8a;font-size:.82rem;
+                       text-align:center;font-style:italic;
+                       padding:4px 8px;}
         </style>
 
         <!-- A) Filters card -->
@@ -10420,6 +10466,17 @@ function dhCopyParentLink(){
                every downstream function (loader, subtitle updater)
                iterates the same set. */
             gsAllVisible = GROUPS.filter(gsMatchesDay);
+
+            /* Title reflects the day filter: "جميع المجموعات" by
+               default, "مجموعات <day>" when the filter is set. */
+            var titleEl = document.querySelector('.gs-all-title');
+            if(titleEl){
+              var df = gsCurrentDayFilter();
+              titleEl.textContent = df
+                ? ('مجموعات ' + df)
+                : 'جميع المجموعات';
+            }
+
             if(!gsAllVisible.length){
               var dayActive = !!gsCurrentDayFilter();
               gsAllGrid.innerHTML = '<div class="gs-panel-empty">' +
@@ -10432,39 +10489,55 @@ function dhCopyParentLink(){
               }
               return;
             }
-            /* Build cards immediately with name + teacher + a
-               loading placeholder for stats (Option 2 from the
-               spec — progressive enhancement). */
-            var html = '';
+
+            /* Build the table immediately with the static columns
+               (name / teacher / days / time / level) populated; the
+               three lazy columns (count / att / overdue) start as
+               "..." placeholders and are filled in by
+               gsRenderAllCardStats as the per-group fetches resolve
+               (Option 2 from the spec — progressive enhancement). */
+            var html =
+              '<div class="gs-tbl-wrap">' +
+                '<table class="gs-tbl">' +
+                  '<thead><tr>' +
+                    '<th>المجموعة</th>' +
+                    '<th>المعلمة</th>' +
+                    '<th>الأيام</th>' +
+                    '<th>الوقت</th>' +
+                    '<th>المستوى</th>' +
+                    '<th>طالبات</th>' +
+                    '<th>حضور</th>' +
+                    '<th>متأخرات</th>' +
+                  '</tr></thead>' +
+                  '<tbody>';
             gsAllVisible.forEach(function(g){
-              var gid     = parseInt(g.id, 10) || 0;
-              var name    = g.group_name || '—';
-              var teacher = g.teacher_name || '';
+              var gid = parseInt(g.id, 10) || 0;
               html +=
-                '<article class="gs-all-card" data-gid="' + gid + '">' +
-                  '<div class="gs-all-card-head">' +
-                    '<div class="gs-avatar">' +
-                      gsEscape(gsAbbrev(name)) + '</div>' +
-                    '<div class="gs-all-card-title">' +
-                      '<div class="gs-all-name">' + gsEscape(name) +
-                      '</div>' +
-                      (teacher
-                        ? '<div class="gs-all-teacher">' +
-                            gsEscape(teacher) + '</div>'
-                        : '') +
-                    '</div>' +
-                  '</div>' +
-                  '<div class="gs-all-stats" id="gs-all-stats-' +
-                    gid + '">' +
-                    '<span class="gs-all-stat-loading">' +
-                      'جارٍ التحميل...</span>' +
-                  '</div>' +
-                  '<div class="gs-all-foot">' +
-                    '<button type="button" class="gs-all-detail-btn">' +
-                      'عرض التفاصيل ←</button>' +
-                  '</div>' +
-                '</article>';
+                '<tr class="gs-tbl-row" data-gid="' + gid + '">' +
+                  '<td class="gs-tbl-name">' +
+                    gsEscape(g.group_name || '—') + '</td>' +
+                  '<td>' + gsEscape(g.teacher_name || '—') + '</td>' +
+                  '<td>' + gsEscape(g.study_days || '—') + '</td>' +
+                  '<td>' + gsEscape(g.study_time || '—') + '</td>' +
+                  '<td>' + gsEscape(g.level_course || '—') + '</td>' +
+                  '<td class="gs-tbl-count" id="gs-tbl-count-' + gid +
+                    '">...</td>' +
+                  '<td id="gs-tbl-att-' + gid + '">' +
+                    '<span class="gs-tbl-pill att-none">...</span>' +
+                  '</td>' +
+                  '<td id="gs-tbl-ovd-' + gid + '">' +
+                    '<span class="gs-tbl-pill ovd-none">...</span>' +
+                  '</td>' +
+                '</tr>';
             });
+            html +=
+                  '</tbody>' +
+                '</table>' +
+              '</div>' +
+              '<div class="gs-tbl-hint">' +
+                '💡 اضغطي على أي صف لعرض تفاصيل المجموعة كاملة' +
+              '</div>';
+
             gsAllGrid.innerHTML = html;
             if(gsAllSubtitle){
               gsAllSubtitle.textContent =
@@ -10530,16 +10603,21 @@ function dhCopyParentLink(){
             var attCls  = (avg == null) ? 'att-none' :
               (avg >= 80 ? 'att-high' :
                avg >= 60 ? 'att-mid'  : 'att-low');
-            var attTxt = (avg == null) ? '—' : Math.round(avg) + '%';
-            var html =
-              '<span class="gs-all-stat">' + sc + ' طالبة</span>' +
-              '<span class="gs-all-stat ' + attCls + '">' +
-                'حضور ' + gsEscape(attTxt) + '</span>' +
-              '<span class="gs-all-stat' +
-                (withRem > 0 ? ' amber' : '') + '">' +
-                withRem + ' متأخرات</span>';
-            var el = document.getElementById('gs-all-stats-' + gid);
-            if(el) el.innerHTML = html;
+            var attTxt  = (avg == null) ? '—' : Math.round(avg) + '%';
+            var ovdCls  = (withRem > 0) ? 'amber' : 'ovd-none';
+
+            var countEl = document.getElementById('gs-tbl-count-' + gid);
+            var attEl   = document.getElementById('gs-tbl-att-'   + gid);
+            var ovdEl   = document.getElementById('gs-tbl-ovd-'   + gid);
+            if(countEl) countEl.textContent = String(sc);
+            if(attEl){
+              attEl.innerHTML = '<span class="gs-tbl-pill ' + attCls +
+                '">' + gsEscape(attTxt) + '</span>';
+            }
+            if(ovdEl){
+              ovdEl.innerHTML = '<span class="gs-tbl-pill ' + ovdCls +
+                '">' + withRem + '</span>';
+            }
             gsUpdateAllSubtitle();
           }
 
@@ -10566,11 +10644,14 @@ function dhCopyParentLink(){
           }
 
           /* Click delegate — drill into a single-group view. The
-             whole card is clickable; the "عرض التفاصيل ←" button
-             is just a visual cue. */
+             selector is the generic [data-gid] so it matches any
+             ancestor that carries the attribute (the summary table
+             rows in the current rendering, but kept generic so a
+             future rendering switch doesn't silently break the
+             delegate). */
           if(gsAllCard){
             gsAllCard.addEventListener('click', function(ev){
-              var c = ev.target.closest('.gs-all-card[data-gid]');
+              var c = ev.target.closest('[data-gid]');
               if(!c) return;
               var gid = c.getAttribute('data-gid');
               if(!gid) return;
