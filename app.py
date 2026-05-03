@@ -40555,6 +40555,48 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-btn-edit:hover{background:#BBDEFB;}
 .vio-btn-del{background:#FFEBEE;color:#C62828;}
 .vio-btn-del:hover{background:#FFCDD2;}
+
+/* ── Modal (mirrors tm-modal-overlay pattern, prefixed vio-*) ───── */
+.vio-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
+                   display:none;align-items:flex-start;justify-content:center;
+                   z-index:9990;padding:24px 14px;overflow-y:auto;}
+.vio-modal-overlay.show{display:flex;}
+.vio-modal{background:#fff;border-radius:14px;padding:0;max-width:720px;
+           width:100%;max-height:calc(100vh - 48px);overflow:auto;
+           box-shadow:0 14px 48px rgba(0,0,0,.25);}
+.vio-modal-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                color:#fff;padding:14px 20px;display:flex;
+                justify-content:space-between;align-items:center;
+                border-radius:14px 14px 0 0;}
+.vio-modal-head h3{margin:0;font-size:1.1rem;font-weight:900;}
+.vio-modal-close{background:transparent;border:none;color:#fff;
+                 font-size:1.6rem;cursor:pointer;line-height:1;
+                 padding:0 4px;font-family:inherit;}
+.vio-modal-close:hover{opacity:.85;}
+.vio-modal-body{padding:18px 20px;}
+.vio-modal-foot{display:flex;gap:10px;justify-content:flex-start;
+                padding:14px 20px;border-top:1px solid #f0e6f8;
+                background:#faf8fd;border-radius:0 0 14px 14px;
+                flex-wrap:wrap;}
+.vio-section{background:#faf8fd;border-radius:10px;padding:14px;
+             margin-bottom:14px;border:1px solid #ece4f8;}
+.vio-section h4{margin:0 0 12px;font-size:.95rem;font-weight:900;
+                color:#4a148c;display:flex;align-items:center;gap:6px;}
+.vio-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media (max-width:680px){.vio-grid-2{grid-template-columns:1fr;}}
+.vio-checks{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px;}
+@media (max-width:540px){.vio-checks{grid-template-columns:1fr;}}
+.vio-check-row{display:flex;align-items:center;gap:8px;
+               background:#fff;padding:9px 12px;border-radius:8px;
+               border:1px solid #e0d6f0;cursor:pointer;
+               transition:background .12s ease,border-color .12s ease;}
+.vio-check-row:hover{background:#fdf6ff;border-color:#c4a8e8;}
+.vio-check-row input[type=checkbox]{margin:0;width:18px;height:18px;
+                                     accent-color:#6B3FA0;cursor:pointer;
+                                     flex-shrink:0;}
+.vio-check-row span{font-size:.9rem;color:#333;font-weight:600;}
+#vio-manual-name-wrap{display:none;}
+#vio-manual-name-wrap.show{display:block;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -40640,6 +40682,119 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <div class="vio-empty">سيتم عرض المخالفات هنا</div>
   </div>
 </div>
+
+<!-- ── Registration modal (Step 4 — UI only, no save handler yet) ── -->
+<div class="vio-modal-overlay" id="vio-modal-overlay" hidden>
+  <div class="vio-modal" role="dialog" aria-modal="true" aria-labelledby="vio-modal-title">
+    <div class="vio-modal-head">
+      <h3 id="vio-modal-title">تسجيل مخالفة جديدة</h3>
+      <button type="button" class="vio-modal-close" id="vio-modal-x" aria-label="إغلاق">×</button>
+    </div>
+    <div class="vio-modal-body">
+      <!-- Section 1: Student info -->
+      <div class="vio-section">
+        <h4>👤 معلومات الطالب</h4>
+        <div class="vio-field" style="margin-bottom:12px;">
+          <label for="vio-form-group">المجموعة (اختياري للتضييق)</label>
+          <select id="vio-form-group">
+            <option value="">— اختر مجموعة... —</option>
+          </select>
+        </div>
+        <div class="vio-field" style="margin-bottom:12px;">
+          <label for="vio-form-search">ابحثي عن الطالبة</label>
+          <input type="text" id="vio-form-search" placeholder="ابحثي بالاسم...">
+        </div>
+        <div class="vio-field" style="margin-bottom:12px;">
+          <label for="vio-form-student">الطالبة</label>
+          <select id="vio-form-student">
+            <option value="">— اختر طالبة... —</option>
+            <option value="__MANUAL__">✏️ كتابة يدوية</option>
+          </select>
+        </div>
+        <div class="vio-field" id="vio-manual-name-wrap" style="margin-bottom:0;">
+          <label for="vio-form-manual-name">اسم الطالبة (يدوي)</label>
+          <input type="text" id="vio-form-manual-name" placeholder="اكتبي الاسم الكامل...">
+        </div>
+      </div>
+
+      <!-- Section 2: Violation details -->
+      <div class="vio-section">
+        <h4>📋 تفاصيل المخالفة</h4>
+        <div class="vio-grid-2" style="margin-bottom:12px;">
+          <div class="vio-field">
+            <label for="vio-form-date">تاريخ المخالفة</label>
+            <input type="date" id="vio-form-date">
+          </div>
+          <div class="vio-field">
+            <label for="vio-form-place">مكان المخالفة</label>
+            <select id="vio-form-place">
+              <option value="">— اختر... —</option>
+              <option>الصف</option>
+              <option>مقر المعهد</option>
+              <option>بالقرب من مقر المعهد في الخارج</option>
+            </select>
+          </div>
+        </div>
+        <div class="vio-field" style="margin-bottom:12px;">
+          <label for="vio-form-type">نوع المخالفة</label>
+          <select id="vio-form-type">
+            <option value="">— اختر... —</option>
+            <optgroup label="🟢 خفيفة">
+              <option>النوم في الدرس</option>
+              <option>إصدار أصوات</option>
+              <option>التحدث مع الطلاب بدون إذن</option>
+            </optgroup>
+            <optgroup label="🟡 متوسطة">
+              <option>الحركة والتنقل بدون إذن</option>
+              <option>الخروج من دون إذن</option>
+              <option>استخدام الهاتف من دون إذن</option>
+              <option>الدخول إلى بعض الصفوف أو الغُرف من دون إذن</option>
+            </optgroup>
+            <optgroup label="🔴 خطيرة">
+              <option>ضرب طالب/طالبة</option>
+              <option>التكلم بكلمات بذيئة أو غير لائقة</option>
+              <option>إصدار أفعال تشوش على الطلاب الدرس</option>
+              <option>التصوير من دون إذن</option>
+              <option>إصدار أفعال غير لائقة أو غير أخلاقية</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="vio-field" style="margin-bottom:0;">
+          <label for="vio-form-desc">وصف مختصر</label>
+          <textarea id="vio-form-desc" rows="3" maxlength="200"
+            placeholder="وصف مختصر للحادثة (حتى 200 حرف)..."></textarea>
+        </div>
+      </div>
+
+      <!-- Section 3: Actions taken -->
+      <div class="vio-section">
+        <h4>✅ الإجراءات المتخذة</h4>
+        <div class="vio-checks">
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-oral-teacher"><span>تنبيه شفهي من المعلمة</span></label>
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-oral-supervisor"><span>تنبيه شفهي من المشرفة</span></label>
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-written"><span>تنبيه كتابي</span></label>
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-message-parent"><span>إرسال رسالة لولي الأمر</span></label>
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-call-parent"><span>اتصال بولي الأمر</span></label>
+          <label class="vio-check-row"><input type="checkbox" id="vio-act-meeting-parent"><span>اجتماع مع ولي الأمر</span></label>
+        </div>
+      </div>
+
+      <!-- Section 4: Additional notes -->
+      <div class="vio-section" style="margin-bottom:0;">
+        <h4>📝 ملاحظات إضافية</h4>
+        <div class="vio-field" style="margin-bottom:0;">
+          <textarea id="vio-form-notes" rows="3"
+            placeholder="ملاحظات إضافية (اختياري)..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="vio-modal-foot">
+      <button type="button" class="vio-btn vio-btn-primary" id="vio-form-save">💾 حفظ المخالفة</button>
+      <button type="button" class="vio-btn vio-btn-secondary" id="vio-form-cancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   function setNum(id, v){
@@ -40659,6 +40814,56 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       })
       .catch(function(){ /* leave the … in place */ });
   }
+
+  // ── Modal open/close (Step 4) ─────────────────────────────────
+  var overlay   = document.getElementById('vio-modal-overlay');
+  var btnNew    = document.getElementById('vio-btn-new');
+  var btnX      = document.getElementById('vio-modal-x');
+  var btnCancel = document.getElementById('vio-form-cancel');
+
+  function openModal(){
+    if (!overlay) return;
+    var dateInput = document.getElementById('vio-form-date');
+    if (dateInput && !dateInput.value){
+      dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+    overlay.removeAttribute('hidden');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(){
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+  if (btnNew)    btnNew.addEventListener('click', openModal);
+  if (btnX)      btnX.addEventListener('click', closeModal);
+  if (btnCancel) btnCancel.addEventListener('click', closeModal);
+  if (overlay){
+    overlay.addEventListener('click', function(ev){
+      if (ev.target === overlay) closeModal();
+    });
+  }
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape' && overlay && overlay.classList.contains('show')){
+      closeModal();
+    }
+  });
+
+  // ── Manual-entry toggle ───────────────────────────────────────
+  var studentSel = document.getElementById('vio-form-student');
+  var manualWrap = document.getElementById('vio-manual-name-wrap');
+  if (studentSel && manualWrap){
+    studentSel.addEventListener('change', function(){
+      if (studentSel.value === '__MANUAL__'){
+        manualWrap.classList.add('show');
+      } else {
+        manualWrap.classList.remove('show');
+      }
+    });
+  }
+
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', loadStats);
   } else {
