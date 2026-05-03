@@ -41222,8 +41222,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     btn.disabled = true;
     btn.textContent = 'جاري الحفظ...';
 
-    fetch('/api/admin/violations', {
-      method: 'POST',
+    // Branch on edit mode (Stage 2 Step 5). Capture the vid before
+    // closeModal() runs because closeModal resets vioEditMode → null.
+    var editingVid = vioEditMode;
+    var url    = '/api/admin/violations' + (editingVid ? ('/' + encodeURIComponent(editingVid)) : '');
+    var method = editingVid ? 'PATCH' : 'POST';
+    var successMsg = editingVid ? '✓ تم حفظ التعديلات' : '✓ تم تسجيل المخالفة';
+
+    fetch(url, {
+      method: method,
       credentials: 'same-origin',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
@@ -41237,7 +41244,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         resetForm();
         loadStats();
         loadViolations();
-        showToast('✓ تم تسجيل المخالفة', false);
+        showToast(successMsg, false);
       } else {
         var msg = (res.data && res.data.error) || 'تعذر حفظ المخالفة';
         showFormError(msg);
@@ -41304,6 +41311,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       '</div>'
     );
   }
+  // Map of id → row, refreshed on every loadViolations() so the edit
+  // button can pre-populate the modal without an extra GET.
+  var violationsById = {};
+
   function loadViolations(){
     var listC = document.getElementById('vio-list-container');
     if (!listC) return;
@@ -41320,9 +41331,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       .then(function(d){
         if (!d || !d.ok){
           listC.innerHTML = '<div class="vio-empty">تعذر جلب المخالفات</div>';
+          violationsById = {};
           return;
         }
         var rows = d.violations || [];
+        violationsById = {};
+        for (var k = 0; k < rows.length; k++){
+          violationsById[String(rows[k].id)] = rows[k];
+        }
         if (!rows.length){
           listC.innerHTML = '<div class="vio-empty">لا توجد مخالفات مسجلة</div>';
           return;
@@ -41333,7 +41349,30 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       })
       .catch(function(){
         listC.innerHTML = '<div class="vio-empty">تعذر جلب المخالفات</div>';
+        violationsById = {};
       });
+  }
+
+  // ── Card actions: edit / delete delegation (Stage 2) ─────────
+  // Rendered cards are torn down + recreated on every list refresh,
+  // so wire the click handler on the stable container instead of
+  // each card. closest() walks up the DOM to find which button (if
+  // any) was clicked, then which card it belongs to.
+  var listContainerEl = document.getElementById('vio-list-container');
+  if (listContainerEl){
+    listContainerEl.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var card = t.closest('.vio-card');
+      if (!card) return;
+      var vid = card.getAttribute('data-id');
+      if (!vid) return;
+      if (t.closest('.vio-btn-edit')){
+        var row = violationsById[String(vid)];
+        if (!row){ showToast('تعذر تحميل بيانات المخالفة', true); return; }
+        openModal(parseInt(vid, 10), row);
+      }
+    });
   }
 
   var fltSearchEl = document.getElementById('vio-flt-search');
