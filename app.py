@@ -40437,6 +40437,188 @@ def admin_teacher_deliveries_page():
     return ADMIN_TEACHER_DELIVERIES_HTML
 
 
+# ── Violations Management System (Stage 1 — admin-only) ──────────────
+# Foundation page: top hero + 4 stat cards. List, filters, modal, and
+# backend mutations land in subsequent steps. Admin-only at the route
+# layer (manager is excluded — different from /admin/teacher-deliveries
+# which uses _td_can_view). Stats are pure SELECT queries against the
+# violations table created in Step 1 (violations_v1 migration).
+def _vio_can_admin(user):
+    return ((user or {}).get("role") or "").strip().lower() == "admin"
+
+
+ADMIN_VIOLATIONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<title>نظام المخالفات — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.vio-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+            justify-content:space-between;align-items:center;flex-wrap:wrap;
+            gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+            position:sticky;top:0;z-index:50;}
+.vio-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.vio-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+              padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;}
+.vio-wrap{max-width:1400px;margin:18px auto;padding:0 16px;}
+.vio-hero{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+          color:#fff;padding:24px 28px;border-radius:16px;
+          margin-bottom:18px;box-shadow:0 6px 20px rgba(107,63,160,.25);}
+.vio-hero h2{margin:0;font-size:1.4rem;font-weight:900;line-height:1.3;}
+.vio-hero p{margin:6px 0 0;font-size:.92rem;opacity:.92;}
+.vio-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+                margin-bottom:14px;}
+@media (max-width:980px){.vio-stats-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:540px){.vio-stats-grid{grid-template-columns:1fr;}}
+.vio-stat-card{background:#fff;border-radius:14px;padding:16px 18px;
+               box-shadow:0 4px 14px rgba(0,0,0,.06);
+               border-right:5px solid #6B3FA0;}
+.vio-stat-card h4{margin:0 0 8px;font-size:.86rem;color:#666;font-weight:700;}
+.vio-stat-card .vio-num{font-size:1.85rem;font-weight:900;color:#4a148c;line-height:1.1;}
+.vio-stat-card.vio-critical{background:#FCE6E6;border-right-color:#A32D2D;}
+.vio-stat-card.vio-critical h4{color:#7A1F1F;}
+.vio-stat-card.vio-critical .vio-num{color:#A32D2D;}
+.vio-list-container{background:#fff;border-radius:14px;padding:24px 18px;
+                    box-shadow:0 4px 14px rgba(0,0,0,.06);
+                    color:#888;text-align:center;font-style:italic;
+                    min-height:120px;}
+</style></head>
+<body>
+<div class="vio-topbar">
+  <h1>🎓 نظام المخالفات</h1>
+  <a href="/dashboard">→ العودة للرئيسية</a>
+</div>
+<div class="vio-wrap">
+  <div class="vio-hero">
+    <h2>🎓 نظام المخالفات</h2>
+    <p>تسجيل ومتابعة مخالفات الطالبات والإجراءات المتخذة</p>
+  </div>
+  <div class="vio-stats-grid">
+    <div class="vio-stat-card">
+      <h4>إجمالي المخالفات</h4>
+      <div class="vio-num" id="vio-stat-total">…</div>
+    </div>
+    <div class="vio-stat-card">
+      <h4>مخالفات اليوم</h4>
+      <div class="vio-num" id="vio-stat-today">…</div>
+    </div>
+    <div class="vio-stat-card">
+      <h4>طلاب نشطون</h4>
+      <div class="vio-num" id="vio-stat-active">…</div>
+    </div>
+    <div class="vio-stat-card vio-critical">
+      <h4>حالات حرجة</h4>
+      <div class="vio-num" id="vio-stat-critical">…</div>
+    </div>
+  </div>
+  <div class="vio-list-container" id="vio-list-container">
+    سيتم عرض المخالفات هنا
+  </div>
+</div>
+<script>
+(function(){
+  function setNum(id, v){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = (v == null ? '0' : String(v));
+  }
+  function loadStats(){
+    fetch('/api/admin/violations/stats', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) return;
+        setNum('vio-stat-total',    d.total);
+        setNum('vio-stat-today',    d.today);
+        setNum('vio-stat-active',   d.active_students);
+        setNum('vio-stat-critical', d.critical_cases);
+      })
+      .catch(function(){ /* leave the … in place */ });
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', loadStats);
+  } else {
+    loadStats();
+  }
+})();
+</script>
+</body></html>
+"""
+
+
+@app.route('/admin/violations')
+@login_required
+def admin_violations_page():
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='font-family:Segoe UI,Tahoma,Arial,sans-serif;"
+            "padding:40px;text-align:center;color:#c62828;'>"
+            "<h1>غير مصرح</h1><p>هذه الصفحة للأدمن فقط.</p></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    return ADMIN_VIOLATIONS_HTML
+
+
+@app.route('/api/admin/violations/stats', methods=['GET'])
+@login_required
+def api_admin_violations_stats():
+    """4-card dashboard data for /admin/violations.
+
+    - total            : every non-deleted violation row.
+    - today            : non-deleted rows with violation_date = today.
+    - active_students  : distinct (student_id, student_name) tuples that
+                         have at least one non-deleted violation in the
+                         last 30 days. The tuple form de-duplicates both
+                         linked students (student_id present) and
+                         manual-entry rows (student_id NULL, name only).
+    - critical_cases   : distinct students with ≥3 lifetime non-deleted
+                         violations — same tuple-dedup convention.
+
+    Date math is computed in Python so the SQL is portable across SQLite
+    (local) and Postgres (prod) — no `date('now')` / `INTERVAL` dialect
+    differences.
+    """
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    from datetime import date as _date, timedelta as _timedelta
+    today_iso  = _date.today().isoformat()
+    cutoff_iso = (_date.today() - _timedelta(days=30)).isoformat()
+    db = get_db()
+    def _scalar(sql, params=()):
+        try:
+            row = db.execute(sql, params).fetchone()
+            return int(row[0] or 0) if row else 0
+        except Exception:
+            return 0
+    total            = _scalar("SELECT COUNT(*) FROM violations WHERE is_deleted = 0")
+    today_count      = _scalar(
+        "SELECT COUNT(*) FROM violations WHERE is_deleted = 0 "
+        "AND violation_date = ?", (today_iso,))
+    active_students  = _scalar(
+        "SELECT COUNT(*) FROM ("
+        "  SELECT DISTINCT student_id, student_name FROM violations "
+        "   WHERE is_deleted = 0 AND violation_date >= ?"
+        ") sub", (cutoff_iso,))
+    critical_cases   = _scalar(
+        "SELECT COUNT(*) FROM ("
+        "  SELECT student_id, student_name FROM violations "
+        "   WHERE is_deleted = 0 "
+        "   GROUP BY student_id, student_name "
+        "  HAVING COUNT(*) >= 3"
+        ") sub")
+    return jsonify({
+        "ok": True,
+        "total": total,
+        "today": today_count,
+        "active_students": active_students,
+        "critical_cases": critical_cases,
+    })
+
+
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
 # Admin/manager-only lookup for the redesigned monitoring page: returns
 # the groups owned by a specific teacher (by user id) plus the live
