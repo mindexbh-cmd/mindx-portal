@@ -8042,6 +8042,10 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           <span class="md-sb-link-text">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0635;&#x0644;&#x0627;&#x062D;&#x064A;&#x0627;&#x062A;</span>
         </a>
+        <a class="md-sb-link mx-admin-only" href="/admin/violations">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="md-sb-link-text">&#x1F393; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
+        </a>
       </div>
     </div>
     <!-- ⚙️ النظام (admin only) -->
@@ -8847,6 +8851,10 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
     <a class="md-quick-card mx-staff-only" href="/admin/teacher-deliveries">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F4CA;</span>
       <span class="md-quick-label">&#x627;&#x644;&#x62A;&#x642;&#x627;&#x631;&#x64A;&#x631;</span>
+    </a>
+    <a class="md-quick-card mx-admin-only" href="/admin/violations">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F393;</span>
+      <span class="md-quick-label">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
     </a>
   </div>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
@@ -40597,6 +40605,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-check-row span{font-size:.9rem;color:#333;font-weight:600;}
 #vio-manual-name-wrap{display:none;}
 #vio-manual-name-wrap.show{display:block;}
+
+/* ── Toast + form error (Step 7) ──────────────────────────────── */
+.vio-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+           background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+           font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+           opacity:0;pointer-events:none;transition:opacity .25s ease;
+           z-index:9999;max-width:90vw;text-align:center;font-size:.95rem;}
+.vio-toast.show{opacity:1;}
+.vio-toast.err{background:#C62828;}
+.vio-form-error{display:none;background:#FCE6E6;color:#A32D2D;
+                border:1px solid #f5b9b9;border-radius:8px;
+                padding:10px 14px;margin-top:8px;font-weight:700;
+                font-size:.9rem;}
+.vio-form-error.show{display:block;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -40787,6 +40809,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             placeholder="ملاحظات إضافية (اختياري)..."></textarea>
         </div>
       </div>
+
+      <div id="vio-form-error" class="vio-form-error" role="alert"></div>
     </div>
     <div class="vio-modal-foot">
       <button type="button" class="vio-btn vio-btn-primary" id="vio-form-save">💾 حفظ المخالفة</button>
@@ -40970,10 +40994,261 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     });
   }
 
+  // ── Save handler + form helpers (Step 7) ─────────────────────
+  var ACTION_LABELS = {
+    action_oral_teacher:    'تنبيه شفهي من المعلمة',
+    action_oral_supervisor: 'تنبيه شفهي من المشرفة',
+    action_written:         'تنبيه كتابي',
+    action_message_parent:  'رسالة لولي الأمر',
+    action_call_parent:     'اتصال بولي الأمر',
+    action_meeting_parent:  'اجتماع مع ولي الأمر',
+  };
+  var ACTION_KEYS = ['action_oral_teacher','action_oral_supervisor','action_written',
+                     'action_message_parent','action_call_parent','action_meeting_parent'];
+  var ACTION_CHECKBOX_IDS = {
+    action_oral_teacher:    'vio-act-oral-teacher',
+    action_oral_supervisor: 'vio-act-oral-supervisor',
+    action_written:         'vio-act-written',
+    action_message_parent:  'vio-act-message-parent',
+    action_call_parent:     'vio-act-call-parent',
+    action_meeting_parent:  'vio-act-meeting-parent',
+  };
+
+  function showFormError(msg){
+    var box = document.getElementById('vio-form-error');
+    if (!box) return;
+    box.textContent = msg;
+    box.classList.add('show');
+  }
+  function clearFormError(){
+    var box = document.getElementById('vio-form-error');
+    if (box) box.classList.remove('show');
+  }
+  function showToast(msg, isErr){
+    var t = document.getElementById('vio-toast');
+    if (!t){
+      t = document.createElement('div');
+      t.id = 'vio-toast';
+      t.className = 'vio-toast';
+      document.body.appendChild(t);
+    }
+    t.classList.remove('err');
+    if (isErr) t.classList.add('err');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+  }
+  function resetForm(){
+    var ids = ['vio-form-search','vio-form-group','vio-form-student',
+               'vio-form-manual-name','vio-form-date','vio-form-place',
+               'vio-form-type','vio-form-desc','vio-form-notes'];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    Object.keys(ACTION_CHECKBOX_IDS).forEach(function(k){
+      var el = document.getElementById(ACTION_CHECKBOX_IDS[k]);
+      if (el) el.checked = false;
+    });
+    var mw = document.getElementById('vio-manual-name-wrap');
+    if (mw) mw.classList.remove('show');
+    clearFormError();
+  }
+
+  function saveViolation(){
+    clearFormError();
+    var btn = document.getElementById('vio-form-save');
+    var sel = document.getElementById('vio-form-student');
+    var manualInp = document.getElementById('vio-form-manual-name');
+    var groupSel  = document.getElementById('vio-form-group');
+    var dateInp   = document.getElementById('vio-form-date');
+    var placeSel  = document.getElementById('vio-form-place');
+    var typeSel   = document.getElementById('vio-form-type');
+    var descInp   = document.getElementById('vio-form-desc');
+    var notesInp  = document.getElementById('vio-form-notes');
+
+    var picked = ((sel && sel.value) || '').trim();
+    var student_id   = null;
+    var student_name = '';
+    var group_name   = ((groupSel && groupSel.value) || '').trim() || null;
+
+    if (picked === '__MANUAL__'){
+      var manualVal = ((manualInp && manualInp.value) || '').trim();
+      if (!manualVal){ showFormError('اكتبي اسم الطالبة'); return; }
+      student_name = manualVal;
+      student_id   = null;
+      group_name   = null;
+    } else if (!picked){
+      showFormError('اختاري طالبة');
+      return;
+    } else {
+      var sid = parseInt(picked, 10);
+      if (isNaN(sid)){ showFormError('اختاري طالبة'); return; }
+      student_id = sid;
+      var rec = (pickerCache.students || []).filter(function(s){
+        return parseInt(s.id, 10) === sid;
+      })[0];
+      student_name = rec ? ((rec.student_name || '').trim()) : '';
+      if (!group_name && rec){
+        group_name = ((rec.group_name_student || rec.group_online || '').toString().trim()) || null;
+      }
+    }
+    if (!student_name){ showFormError('اسم الطالبة فارغ'); return; }
+    if (!dateInp.value){ showFormError('اختاري التاريخ'); return; }
+    if (!placeSel.value){ showFormError('اختاري المكان'); return; }
+    if (!typeSel.value){ showFormError('اختاري نوع المخالفة'); return; }
+
+    var body = {
+      student_id:      student_id,
+      student_name:    student_name,
+      group_name:      group_name,
+      violation_date:  dateInp.value,
+      violation_place: placeSel.value,
+      violation_type:  typeSel.value,
+      description:     ((descInp && descInp.value) || '').trim(),
+      additional_notes:((notesInp && notesInp.value) || '').trim(),
+    };
+    ACTION_KEYS.forEach(function(k){
+      var el = document.getElementById(ACTION_CHECKBOX_IDS[k]);
+      body[k] = (el && el.checked) ? 1 : 0;
+    });
+
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'جاري الحفظ...';
+
+    fetch('/api/admin/violations', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status: r.status, data: d}; }); })
+    .then(function(res){
+      btn.disabled = false;
+      btn.textContent = origText;
+      if (res.status === 200 && res.data && res.data.ok){
+        closeModal();
+        resetForm();
+        loadStats();
+        loadViolations();
+        showToast('✓ تم تسجيل المخالفة', false);
+      } else {
+        var msg = (res.data && res.data.error) || 'تعذر حفظ المخالفة';
+        showFormError(msg);
+      }
+    })
+    .catch(function(){
+      btn.disabled = false;
+      btn.textContent = origText;
+      showFormError('تعذر الاتصال بالخادم');
+    });
+  }
+
+  var btnSave = document.getElementById('vio-form-save');
+  if (btnSave) btnSave.addEventListener('click', saveViolation);
+
+  // ── List rendering + filter wiring (Step 7) ───────────────────
+  function daysAgoLabel(n){
+    if (n == null) return '';
+    if (n === 0)  return ' (اليوم)';
+    if (n === 1)  return ' (أمس)';
+    if (n > 1)    return ' (قبل ' + n + ' يوم)';
+    return '';
+  }
+  function renderViolation(v){
+    var sev = ((v.severity || '') + '').toLowerCase();
+    var sevClass  = 'vio-sev-' + (sev === 'severe' ? 'severe' : sev === 'medium' ? 'medium' : 'light');
+    var badgeCls  = (sev === 'severe' ? 'severe' : sev === 'medium' ? 'medium' : 'light');
+    var sevLabel  = v.severity_label || '';
+    var actionPills = '';
+    ACTION_KEYS.forEach(function(k){
+      if (v[k]) actionPills += '<span class="vio-action-pill">' + escapeHtml(ACTION_LABELS[k]) + '</span>';
+    });
+    var waSent = v.whatsapp_sent_at ? '<span class="vio-wa-sent">📤 تم الإرسال لولي الأمر</span>' : '';
+    var actionsRow = (actionPills || waSent)
+      ? '<div class="vio-card-actions-row">' + actionPills + (waSent ? ' ' + waSent : '') + '</div>'
+      : '';
+    var dateStr = v.violation_date || '';
+    var groupStr = v.group_name
+      ? '<span><b>المجموعة:</b> ' + escapeHtml(v.group_name) + '</span>' : '';
+    var descStr = v.description
+      ? '<div style="color:#555;line-height:1.5;">' + escapeHtml(v.description) + '</div>' : '';
+    return (
+      '<div class="vio-card ' + sevClass + '" data-id="' + escapeHtml(v.id) + '">' +
+        '<div class="vio-card-head">' +
+          '<span class="vio-card-name">' + escapeHtml(v.student_name) + '</span>' +
+          '<span class="vio-sev-badge ' + badgeCls + '">' + escapeHtml(sevLabel) + '</span>' +
+          '<span class="vio-card-count">' + escapeHtml(v.violation_count_for_student || 0) + ' مخالفة</span>' +
+        '</div>' +
+        '<div class="vio-card-body">' +
+          '<div class="vio-card-type">' + escapeHtml(v.violation_type || '') + '</div>' +
+          '<div class="vio-card-meta">' +
+            '<span><b>المكان:</b> ' + escapeHtml(v.violation_place || '') + '</span>' +
+            '<span><b>التاريخ:</b> ' + escapeHtml(dateStr) + escapeHtml(daysAgoLabel(v.days_ago)) + '</span>' +
+            groupStr +
+          '</div>' +
+          descStr +
+          actionsRow +
+        '</div>' +
+        '<div class="vio-card-foot">' +
+          '<button type="button" class="vio-btn vio-btn-pdf">📄 PDF</button>' +
+          '<button type="button" class="vio-btn vio-btn-edit">✏️ تعديل</button>' +
+          '<button type="button" class="vio-btn vio-btn-del">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+  function loadViolations(){
+    var listC = document.getElementById('vio-list-container');
+    if (!listC) return;
+    var search = (document.getElementById('vio-flt-search') || {}).value || '';
+    var typeV  = (document.getElementById('vio-flt-type')   || {}).value || '';
+    var placeV = (document.getElementById('vio-flt-place')  || {}).value || '';
+    var qs = [];
+    if (search) qs.push('search=' + encodeURIComponent(search));
+    if (typeV)  qs.push('type='   + encodeURIComponent(typeV));
+    if (placeV) qs.push('place='  + encodeURIComponent(placeV));
+    var url = '/api/admin/violations' + (qs.length ? '?' + qs.join('&') : '');
+    fetch(url, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok){
+          listC.innerHTML = '<div class="vio-empty">تعذر جلب المخالفات</div>';
+          return;
+        }
+        var rows = d.violations || [];
+        if (!rows.length){
+          listC.innerHTML = '<div class="vio-empty">لا توجد مخالفات مسجلة</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < rows.length; i++){ html += renderViolation(rows[i]); }
+        listC.innerHTML = html;
+      })
+      .catch(function(){
+        listC.innerHTML = '<div class="vio-empty">تعذر جلب المخالفات</div>';
+      });
+  }
+
+  var fltSearchEl = document.getElementById('vio-flt-search');
+  var fltTypeEl   = document.getElementById('vio-flt-type');
+  var fltPlaceEl  = document.getElementById('vio-flt-place');
+  if (fltSearchEl){
+    var _fltTimer = null;
+    fltSearchEl.addEventListener('input', function(){
+      clearTimeout(_fltTimer);
+      _fltTimer = setTimeout(loadViolations, 300);
+    });
+  }
+  if (fltTypeEl)  fltTypeEl.addEventListener('change', loadViolations);
+  if (fltPlaceEl) fltPlaceEl.addEventListener('change', loadViolations);
+
+  function init(){ loadStats(); loadViolations(); }
   if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', loadStats);
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    loadStats();
+    init();
   }
 })();
 </script>
