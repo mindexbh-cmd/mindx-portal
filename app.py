@@ -40460,6 +40460,7 @@ ADMIN_VIOLATIONS_HTML = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <title>نظام المخالفات — مايندكس</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
@@ -40659,6 +40660,96 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-hist-entry .vio-hist-type{flex:1;color:#333;min-width:120px;}
 .vio-hist-entry .vio-hist-place{color:#666;font-size:.85rem;}
 .vio-hist-empty{text-align:center;color:#888;padding:30px 20px;font-style:italic;}
+
+/* ── Dashboard panel (Stage 3 Step 6) ─────────────────────────── */
+.vio-dash-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);
+                  display:none;align-items:flex-start;justify-content:center;
+                  z-index:9995;padding:24px 14px;overflow-y:auto;}
+.vio-dash-overlay.show{display:flex;}
+.vio-dash-modal{background:#fff;border-radius:14px;max-width:1100px;width:100%;
+                max-height:calc(100vh - 48px);overflow:auto;
+                box-shadow:0 14px 48px rgba(0,0,0,.3);}
+.vio-dash-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+               padding:14px 20px;display:flex;justify-content:space-between;
+               align-items:center;border-radius:14px 14px 0 0;
+               position:sticky;top:0;z-index:1;}
+.vio-dash-head h3{margin:0;font-size:1.15rem;font-weight:900;}
+.vio-dash-close{background:transparent;border:none;color:#fff;
+                font-size:1.6rem;cursor:pointer;padding:0 4px;
+                font-family:inherit;}
+.vio-dash-body{padding:18px 20px;}
+.vio-dash-section{background:#fff;border:1px solid #ece4f8;
+                  border-radius:12px;padding:14px 16px;margin-bottom:14px;
+                  box-shadow:0 2px 6px rgba(0,0,0,.03);}
+.vio-dash-section h4{margin:0 0 12px;font-size:1rem;font-weight:900;
+                     color:#4a148c;padding-bottom:6px;
+                     border-bottom:1.5px dashed #d8c8ec;}
+.vio-dash-empty{color:#888;font-style:italic;padding:18px;text-align:center;}
+
+/* — top students / by-group horizontal bars — */
+.vio-dash-bar-row{display:grid;grid-template-columns:1fr 60px;gap:10px;
+                  align-items:center;padding:6px 0;font-size:.92rem;
+                  border-bottom:1px solid #f0e6f8;}
+.vio-dash-bar-row:last-child{border-bottom:none;}
+.vio-dash-bar-row .vio-dash-bar-name{display:flex;flex-direction:column;gap:2px;}
+.vio-dash-bar-row .vio-dash-bar-name b{color:#4a148c;}
+.vio-dash-bar-row .vio-dash-bar-name small{color:#777;font-size:.8rem;}
+.vio-dash-bar-track{background:#f0eef8;border-radius:6px;height:10px;
+                    margin-top:5px;overflow:hidden;position:relative;}
+.vio-dash-bar-fill{height:100%;border-radius:6px;
+                   background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                   transition:width .25s ease;}
+.vio-dash-bar-fill.severe{background:linear-gradient(135deg,#A32D2D,#D04848);}
+.vio-dash-bar-fill.medium{background:linear-gradient(135deg,#BA7517,#E0973F);}
+.vio-dash-bar-fill.light {background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.vio-dash-bar-row .vio-dash-bar-count{font-weight:900;color:#4a148c;
+                                       text-align:left;font-size:.95rem;}
+
+/* — severity distribution cards — */
+.vio-dash-sev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media (max-width:560px){.vio-dash-sev-grid{grid-template-columns:1fr;}}
+.vio-dash-sev-card{padding:14px;border-radius:10px;text-align:center;
+                   border:2px solid;}
+.vio-dash-sev-card.light  {background:#E1F5EC;border-color:#1D9E75;color:#0E5C44;}
+.vio-dash-sev-card.medium {background:#FAEEDA;border-color:#BA7517;color:#7A4D0E;}
+.vio-dash-sev-card.severe {background:#FCE6E6;border-color:#A32D2D;color:#7A1F1F;}
+.vio-dash-sev-card h5{margin:0 0 6px;font-size:.92rem;font-weight:800;}
+.vio-dash-sev-card .num{font-size:1.8rem;font-weight:900;line-height:1.1;}
+
+/* — by-place pills — */
+.vio-dash-place-grid{display:flex;flex-wrap:wrap;gap:10px;}
+.vio-dash-place-pill{background:#f3e5f5;color:#4a148c;
+                     padding:10px 16px;border-radius:10px;
+                     font-weight:800;font-size:.92rem;
+                     display:inline-flex;align-items:center;gap:8px;
+                     border:1.5px solid #d8c8ec;}
+.vio-dash-place-pill .ct{background:#fff;color:#4a148c;
+                          padding:2px 9px;border-radius:999px;
+                          font-size:.85rem;font-weight:900;
+                          border:1px solid #d8c8ec;}
+
+/* — chart canvas wrappers — */
+.vio-dash-chart-wrap{position:relative;height:260px;width:100%;}
+@media (max-width:560px){.vio-dash-chart-wrap{height:220px;}}
+
+/* ── Monthly report modal (Stage 3 Step 6) ────────────────────── */
+.vio-monthly-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);
+                     display:none;align-items:flex-start;justify-content:center;
+                     z-index:9996;padding:24px 14px;overflow-y:auto;}
+.vio-monthly-overlay.show{display:flex;}
+.vio-monthly-modal{background:#fff;border-radius:14px;max-width:520px;width:100%;
+                   box-shadow:0 14px 48px rgba(0,0,0,.3);overflow:hidden;}
+.vio-monthly-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+                  padding:14px 20px;display:flex;justify-content:space-between;
+                  align-items:center;}
+.vio-monthly-head h3{margin:0;font-size:1.05rem;font-weight:900;}
+.vio-monthly-close{background:transparent;border:none;color:#fff;
+                   font-size:1.6rem;cursor:pointer;padding:0 4px;
+                   font-family:inherit;}
+.vio-monthly-body{padding:18px 20px;}
+.vio-monthly-foot{display:flex;gap:10px;justify-content:flex-start;
+                  padding:14px 20px;border-top:1px solid #f0e6f8;
+                  background:#faf8fd;flex-wrap:wrap;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -40693,8 +40784,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <button type="button" class="vio-btn vio-btn-primary" id="vio-btn-new">
       + تسجيل مخالفة
     </button>
-    <button type="button" class="vio-btn vio-btn-ghost" id="vio-btn-reports">
-      📊 التقارير الشهرية
+    <button type="button" class="vio-btn vio-btn-ghost" id="vio-btn-dashboard">
+      📊 لوحة المتابعة
+    </button>
+    <button type="button" class="vio-btn vio-btn-ghost" id="vio-btn-monthly">
+      📅 تقرير شهري
     </button>
   </div>
 
@@ -40873,6 +40967,46 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <button type="button" class="vio-hist-close" id="vio-hist-close" aria-label="إغلاق">×</button>
     </div>
     <div class="vio-hist-body" id="vio-hist-body"></div>
+  </div>
+</div>
+
+<!-- ── Dashboard panel (Stage 3 Step 6) ───────────────────────── -->
+<div class="vio-dash-overlay" id="vio-dash-overlay" hidden>
+  <div class="vio-dash-modal" role="dialog" aria-modal="true">
+    <div class="vio-dash-head">
+      <h3>📊 لوحة متابعة المخالفات</h3>
+      <button type="button" class="vio-dash-close" id="vio-dash-close" aria-label="إغلاق">×</button>
+    </div>
+    <div class="vio-dash-body" id="vio-dash-body">
+      <div class="vio-dash-empty">جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Monthly report modal (Stage 3 Step 6) ──────────────────── -->
+<div class="vio-monthly-overlay" id="vio-monthly-overlay" hidden>
+  <div class="vio-monthly-modal" role="dialog" aria-modal="true">
+    <div class="vio-monthly-head">
+      <h3>📅 تقرير شهري لطالبة</h3>
+      <button type="button" class="vio-monthly-close" id="vio-monthly-close" aria-label="إغلاق">×</button>
+    </div>
+    <div class="vio-monthly-body">
+      <div class="vio-field" style="margin-bottom:14px;">
+        <label for="vio-monthly-student">الطالبة</label>
+        <select id="vio-monthly-student">
+          <option value="">— اختاري طالبة —</option>
+        </select>
+      </div>
+      <div class="vio-field" style="margin-bottom:0;">
+        <label for="vio-monthly-month">الشهر</label>
+        <input type="month" id="vio-monthly-month">
+      </div>
+      <div id="vio-monthly-error" class="vio-form-error" role="alert"></div>
+    </div>
+    <div class="vio-monthly-foot">
+      <button type="button" class="vio-btn vio-btn-primary" id="vio-monthly-generate">📄 توليد التقرير</button>
+      <button type="button" class="vio-btn vio-btn-secondary" id="vio-monthly-cancel">إلغاء</button>
+    </div>
   </div>
 </div>
 
@@ -41261,6 +41395,279 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     overlay.classList.remove('show');
     overlay.setAttribute('hidden', '');
   }
+
+  // ── Dashboard panel + monthly report (Stage 3 Step 6) ─────────
+  var _dashCharts = {};
+
+  function _destroyDashCharts(){
+    Object.keys(_dashCharts).forEach(function(k){
+      try { if (_dashCharts[k] && _dashCharts[k].destroy) _dashCharts[k].destroy(); }
+      catch(e){}
+    });
+    _dashCharts = {};
+  }
+
+  function openDashboard(){
+    var overlay = document.getElementById('vio-dash-overlay');
+    if (!overlay) return;
+    var body = document.getElementById('vio-dash-body');
+    if (body) body.innerHTML = '<div class="vio-dash-empty">جارٍ التحميل...</div>';
+    overlay.removeAttribute('hidden');
+    overlay.classList.add('show');
+    fetch('/api/admin/violations/dashboard-stats', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok){
+          if (body) body.innerHTML = '<div class="vio-dash-empty">تعذر جلب البيانات</div>';
+          return;
+        }
+        renderDashboard(d);
+      })
+      .catch(function(){
+        if (body) body.innerHTML = '<div class="vio-dash-empty">تعذر الاتصال بالخادم</div>';
+      });
+  }
+  function closeDashboard(){
+    var overlay = document.getElementById('vio-dash-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('hidden', '');
+    _destroyDashCharts();
+  }
+
+  function renderDashboard(d){
+    var body = document.getElementById('vio-dash-body');
+    if (!body) return;
+    _destroyDashCharts();
+
+    var topStudents = d.top_students || [];
+    var topTypes    = d.top_types || [];
+    var sevDist     = d.severity_distribution || {light:0,medium:0,severe:0};
+    var monthly     = d.monthly_trend || [];
+    var byGroup     = d.by_group || [];
+    var byPlace     = d.by_place || [];
+
+    function bars(items, getName, getCount, getSubtitle, getSevClass){
+      if (!items.length) return '<div class="vio-dash-empty">لا توجد بيانات</div>';
+      var maxCt = 1;
+      for (var i = 0; i < items.length; i++){
+        var c = getCount(items[i]) || 0;
+        if (c > maxCt) maxCt = c;
+      }
+      var out = '';
+      items.forEach(function(it){
+        var ct = getCount(it) || 0;
+        var pct = Math.max(4, Math.round((ct / maxCt) * 100));
+        var nm = escapeHtml(getName(it) || '');
+        var sub = getSubtitle ? getSubtitle(it) : '';
+        var subStr = sub ? '<small>' + escapeHtml(sub) + '</small>' : '';
+        var sevCls = getSevClass ? (getSevClass(it) || '') : '';
+        out +=
+          '<div class="vio-dash-bar-row">' +
+            '<div class="vio-dash-bar-name">' +
+              '<b>' + nm + '</b>' + subStr +
+              '<div class="vio-dash-bar-track">' +
+                '<div class="vio-dash-bar-fill ' + sevCls + '" style="width:' + pct + '%"></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="vio-dash-bar-count">' + ct + '</div>' +
+          '</div>';
+      });
+      return out;
+    }
+
+    var totalTrend = 0;
+    for (var t = 0; t < monthly.length; t++){ totalTrend += (monthly[t].count || 0); }
+
+    var html = '';
+    html += '<div class="vio-dash-section"><h4>الطالبات الأكثر مخالفة</h4>' +
+            bars(topStudents,
+                 function(s){ return s.student_name; },
+                 function(s){ return s.count; },
+                 function(s){ return s.group_name || ''; },
+                 function(s){ return s.severity_max || 'light'; }) +
+            '</div>';
+
+    html += '<div class="vio-dash-section"><h4>أكثر أنواع المخالفات تكراراً</h4>' +
+            (topTypes.length
+              ? '<div class="vio-dash-chart-wrap"><canvas id="vio-dash-chart-types"></canvas></div>'
+              : '<div class="vio-dash-empty">لا توجد بيانات</div>') +
+            '</div>';
+
+    html += '<div class="vio-dash-section"><h4>توزيع الخطورة (آخر 30 يوم)</h4>' +
+            '<div class="vio-dash-sev-grid">' +
+              '<div class="vio-dash-sev-card light"><h5>خفيفة</h5><div class="num">' + (sevDist.light || 0) + '</div></div>' +
+              '<div class="vio-dash-sev-card medium"><h5>متوسطة</h5><div class="num">' + (sevDist.medium || 0) + '</div></div>' +
+              '<div class="vio-dash-sev-card severe"><h5>خطيرة</h5><div class="num">' + (sevDist.severe || 0) + '</div></div>' +
+            '</div>' +
+            '</div>';
+
+    html += '<div class="vio-dash-section"><h4>الاتجاه الشهري (آخر 6 أشهر)</h4>' +
+            (totalTrend
+              ? '<div class="vio-dash-chart-wrap"><canvas id="vio-dash-chart-trend"></canvas></div>'
+              : '<div class="vio-dash-empty">لا توجد بيانات</div>') +
+            '</div>';
+
+    html += '<div class="vio-dash-section"><h4>المخالفات حسب المجموعة</h4>' +
+            bars(byGroup,
+                 function(g){ return g.group_name; },
+                 function(g){ return g.count; }) +
+            '</div>';
+
+    var places = '';
+    if (!byPlace.length){
+      places = '<div class="vio-dash-empty">لا توجد بيانات</div>';
+    } else {
+      places = '<div class="vio-dash-place-grid">';
+      byPlace.forEach(function(p){
+        places += '<div class="vio-dash-place-pill">' +
+                    escapeHtml(p.place) + ' <span class="ct">' + (p.count || 0) + '</span>' +
+                  '</div>';
+      });
+      places += '</div>';
+    }
+    html += '<div class="vio-dash-section"><h4>المخالفات حسب المكان</h4>' + places + '</div>';
+
+    body.innerHTML = html;
+
+    // Chart.js charts (deferred — Chart loads from CDN)
+    if (typeof Chart === 'function' && topTypes.length){
+      var c1 = document.getElementById('vio-dash-chart-types');
+      if (c1){
+        _dashCharts.types = new Chart(c1.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: topTypes.map(function(x){ return x.type; }),
+            datasets: [{
+              label: 'عدد المخالفات',
+              data: topTypes.map(function(x){ return x.count; }),
+              backgroundColor: topTypes.map(function(x){
+                if (x.severity === 'severe') return '#A32D2D';
+                if (x.severity === 'medium') return '#BA7517';
+                return '#1D9E75';
+              }),
+              borderRadius: 6,
+            }],
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+          },
+        });
+      }
+    }
+    if (typeof Chart === 'function' && totalTrend){
+      var c2 = document.getElementById('vio-dash-chart-trend');
+      if (c2){
+        _dashCharts.trend = new Chart(c2.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: monthly.map(function(m){ return m.month; }),
+            datasets: [
+              { label: 'خفيفة',  data: monthly.map(function(m){ return m.light;  }), backgroundColor: '#1D9E75', stack: 'a' },
+              { label: 'متوسطة', data: monthly.map(function(m){ return m.medium; }), backgroundColor: '#BA7517', stack: 'a' },
+              { label: 'خطيرة',  data: monthly.map(function(m){ return m.severe; }), backgroundColor: '#A32D2D', stack: 'a' },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', rtl: true } },
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
+          },
+        });
+      }
+    }
+  }
+
+  function _hideMonthlyError(){
+    var err = document.getElementById('vio-monthly-error');
+    if (err) err.classList.remove('show');
+  }
+  function _showMonthlyError(msg){
+    var err = document.getElementById('vio-monthly-error');
+    if (err){ err.textContent = msg; err.classList.add('show'); }
+  }
+  function openMonthly(){
+    var overlay = document.getElementById('vio-monthly-overlay');
+    if (!overlay) return;
+    var monthInp = document.getElementById('vio-monthly-month');
+    if (monthInp && !monthInp.value){
+      var now = new Date();
+      monthInp.value = now.toISOString().slice(0, 7);
+    }
+    _hideMonthlyError();
+    ensurePickerData(function(){
+      var sel = document.getElementById('vio-monthly-student');
+      if (!sel) return;
+      var students = (pickerCache.students || []).slice();
+      students.sort(function(a, b){
+        return ((a.student_name || '') + '').localeCompare(((b.student_name || '') + ''), 'ar');
+      });
+      var html = '<option value="">— اختاري طالبة —</option>';
+      students.forEach(function(s){
+        var nm = ((s.student_name || '') + '').trim();
+        if (!nm) return;
+        html += '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(nm) + '</option>';
+      });
+      sel.innerHTML = html;
+    });
+    overlay.removeAttribute('hidden');
+    overlay.classList.add('show');
+  }
+  function closeMonthly(){
+    var overlay = document.getElementById('vio-monthly-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('hidden', '');
+  }
+  function submitMonthly(){
+    _hideMonthlyError();
+    var sel  = document.getElementById('vio-monthly-student');
+    var minp = document.getElementById('vio-monthly-month');
+    if (!sel || !sel.value){ _showMonthlyError('اختاري طالبة'); return; }
+    if (!minp || !minp.value){ _showMonthlyError('اختاري الشهر'); return; }
+    var url = '/api/admin/violations/student/' +
+              encodeURIComponent(sel.value) +
+              '/monthly-pdf?month=' + encodeURIComponent(minp.value);
+    window.open(url, '_blank');
+    closeMonthly();
+  }
+
+  // Wire dashboard + monthly buttons
+  var btnDash = document.getElementById('vio-btn-dashboard');
+  if (btnDash) btnDash.addEventListener('click', openDashboard);
+  var dashCloseBtn = document.getElementById('vio-dash-close');
+  if (dashCloseBtn) dashCloseBtn.addEventListener('click', closeDashboard);
+  var dashOverlayEl = document.getElementById('vio-dash-overlay');
+  if (dashOverlayEl){
+    dashOverlayEl.addEventListener('click', function(ev){
+      if (ev.target === dashOverlayEl) closeDashboard();
+    });
+  }
+  var btnMonthly = document.getElementById('vio-btn-monthly');
+  if (btnMonthly) btnMonthly.addEventListener('click', openMonthly);
+  var monthCloseBtn  = document.getElementById('vio-monthly-close');
+  var monthCancelBtn = document.getElementById('vio-monthly-cancel');
+  var monthGenBtn    = document.getElementById('vio-monthly-generate');
+  if (monthCloseBtn)  monthCloseBtn.addEventListener('click', closeMonthly);
+  if (monthCancelBtn) monthCancelBtn.addEventListener('click', closeMonthly);
+  if (monthGenBtn)    monthGenBtn.addEventListener('click', submitMonthly);
+  var monthOverlayEl = document.getElementById('vio-monthly-overlay');
+  if (monthOverlayEl){
+    monthOverlayEl.addEventListener('click', function(ev){
+      if (ev.target === monthOverlayEl) closeMonthly();
+    });
+  }
+  // Esc closes dashboard / monthly too
+  document.addEventListener('keydown', function(ev){
+    if (ev.key !== 'Escape') return;
+    if (dashOverlayEl  && dashOverlayEl.classList.contains('show'))  closeDashboard();
+    if (monthOverlayEl && monthOverlayEl.classList.contains('show')) closeMonthly();
+  });
 
   if (studentSel){
     studentSel.addEventListener('change', function(){
