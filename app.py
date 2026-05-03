@@ -683,6 +683,7 @@ def init_db():
         ("message_reminders","تذكيرات الرسائل"),
         ("users",            "المستخدمون"),
         ("settings",         "الإعدادات"),
+        ("violations",       "نظام المخالفات"),
     ]:
         try:
             db.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)", (_tn, _tl))
@@ -901,6 +902,44 @@ def init_db():
                "ON curriculum_assignments(target_type, target_id, is_deleted)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
                "ON curriculum_files(is_deleted)")
+    # ── violations_v1: نظام المخالفات — admin-only registration of student
+    # behaviour incidents. 12 violation types auto-classified into
+    # light/medium/severe in `severity`, place ∈ {classroom/break/center},
+    # 6 boolean action flags, plus follow-up notes. WhatsApp delivery to
+    # parent is recorded via whatsapp_sent_at + whatsapp_sent_by (Stage 2/3
+    # feature — column exists from day one to avoid an ALTER later).
+    # Soft-delete via is_deleted, audit pattern via _audit("violation.*").
+    db.execute("""CREATE TABLE IF NOT EXISTS violations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT NOT NULL,
+        group_name TEXT,
+        violation_date DATE NOT NULL,
+        violation_place TEXT NOT NULL,
+        violation_type TEXT NOT NULL,
+        description TEXT,
+        action_oral_teacher INTEGER DEFAULT 0,
+        action_oral_supervisor INTEGER DEFAULT 0,
+        action_written INTEGER DEFAULT 0,
+        action_message_parent INTEGER DEFAULT 0,
+        action_call_parent INTEGER DEFAULT 0,
+        action_meeting_parent INTEGER DEFAULT 0,
+        additional_notes TEXT,
+        severity TEXT,
+        whatsapp_sent_at DATETIME,
+        whatsapp_sent_by INTEGER,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (student_id) REFERENCES students(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_violations_student_id "
+               "ON violations(student_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_violations_violation_date "
+               "ON violations(violation_date)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
+               "ON violations(is_deleted)")
     db.commit()
     db.close()
 
@@ -6100,6 +6139,64 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("curriculum_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── violations_v1: نظام المخالفات — admin-only behaviour-incident
+    # registry. See init_db() above for the canonical CREATE. Mirror
+    # here for existing DBs: CREATE TABLE IF NOT EXISTS + indices are
+    # naturally idempotent so they run unconditionally; the tag insert
+    # is gated and also seeds the Arabic table_labels row on first run
+    # since table_labels_seed_v1 has already been applied on every
+    # existing DB and won't pick up the new entry.
+    db2.execute("""CREATE TABLE IF NOT EXISTS violations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER,
+        student_name TEXT NOT NULL,
+        group_name TEXT,
+        violation_date DATE NOT NULL,
+        violation_place TEXT NOT NULL,
+        violation_type TEXT NOT NULL,
+        description TEXT,
+        action_oral_teacher INTEGER DEFAULT 0,
+        action_oral_supervisor INTEGER DEFAULT 0,
+        action_written INTEGER DEFAULT 0,
+        action_message_parent INTEGER DEFAULT 0,
+        action_call_parent INTEGER DEFAULT 0,
+        action_meeting_parent INTEGER DEFAULT 0,
+        additional_notes TEXT,
+        severity TEXT,
+        whatsapp_sent_at DATETIME,
+        whatsapp_sent_by INTEGER,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (student_id) REFERENCES students(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_violations_student_id "
+                    "ON violations(student_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_violations_violation_date "
+                    "ON violations(violation_date)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
+                    "ON violations(is_deleted)")
+    except Exception: pass
+    if "violations_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("violations", "نظام المخالفات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("violations", "نظام المخالفات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("violations_v1",))
             db2.commit()
         except Exception: pass
 
@@ -31924,6 +32021,7 @@ _TBL_AUDIT_FEATURE = {
     "curriculum_files":     ("ملفات المنهج",                  "مكتبة المناهج"),
     "curriculum_assignments": ("تخصيصات ملفات المنهج",        "مكتبة المناهج"),
     "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
+    "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
