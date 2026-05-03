@@ -36598,6 +36598,23 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   </div>
 </div>
 
+<!-- ── Phase-6: lesson-details read-only modal ───────────────── -->
+<div class="tm-modal-overlay" id="tm-lesson-overlay" hidden>
+  <div class="tm-modal" role="dialog" aria-modal="true"
+       aria-labelledby="tm-lesson-title">
+    <header class="tm-modal-head">
+      <h3 id="tm-lesson-title">تفاصيل الدرس</h3>
+      <button type="button" class="tm-modal-close" id="tm-lesson-close-x"
+              aria-label="إغلاق">×</button>
+    </header>
+    <div class="tm-modal-body" id="tm-lesson-body"></div>
+    <footer class="tm-modal-foot">
+      <button type="button" class="tm-btn tm-btn-secondary"
+              id="tm-lesson-close">إغلاق</button>
+    </footer>
+  </div>
+</div>
+
 <style>
 /* ── Step-2 redesign — scoped under tm-* class names so they don't
    collide with the older .panel / .stat-card / .tabs styles still
@@ -36810,6 +36827,15 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
                  padding:8px 12px;background:#FCE6E6;
                  border:0.5px solid #A32D2D;border-radius:8px;
                  margin-top:6px;}
+
+/* ── Phase-6: lesson-details modal body rows ──────────────── */
+.tm-detail-grid{display:flex;flex-direction:column;gap:8px;}
+.tm-detail-row{display:flex;flex-direction:column;gap:2px;
+               padding:10px 12px;background:#fafafe;
+               border:0.5px solid #d8c8ec;border-radius:8px;}
+.tm-detail-key{color:#4a148c;font-weight:700;font-size:.86rem;}
+.tm-detail-val{color:#212121;font-size:.95rem;line-height:1.6;
+               white-space:pre-line;word-break:break-word;}
 </style>
 
 <script>
@@ -37887,6 +37913,110 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       if(!mid) return;
       var entry = tmFindMsgInCache(mid);
       if(entry) tmEnterPmsgEdit(card, entry);
+    });
+  }
+
+  // ── Phase-6: lesson-details read-only modal.
+  //    Reuses the lessonsCache populated by Step 3 — no new endpoint,
+  //    no extra fetch. The "عرض التفاصيل" link in each lesson card
+  //    is wired via event delegation on #tm-lessons-body, mirroring
+  //    the same pattern Phase 4 / Phase 2 use elsewhere on this
+  //    page. Step 3's tmRenderLessonCard is NOT modified — the link
+  //    button has been there since Step 3, just without a handler.
+  //    Close paths: X / Esc / overlay click / footer button. ─────
+  function tmFindLessonInCache(lid){
+    var sel = tmCurrentSelection();
+    if(!sel.tid) return null;
+    var key = sel.tid + '|' + sel.gname;
+    var entries = lessonsCache[key];
+    if(!entries) return null;
+    for(var i = 0; i < entries.length; i++){
+      if(parseInt(entries[i].id, 10) === lid) return entries[i];
+    }
+    return null;
+  }
+  function tmFormatTimestamp(raw){
+    if(!raw) return '';
+    var m = String(raw).match(/^(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})?/);
+    if(!m) return String(raw);
+    var d = m[1], t = m[2] || '';
+    return t ? (d + ' الساعة ' + t) : d;
+  }
+  function tmRenderLessonDetail(e){
+    function row(key, val){
+      var v = (val == null ? '' : String(val)).trim();
+      if(!v) v = '—';
+      return '<div class="tm-detail-row">' +
+        '<span class="tm-detail-key">' + key + '</span>' +
+        '<span class="tm-detail-val">' + tmEscape(v) + '</span>' +
+      '</div>';
+    }
+    var date    = e.lesson_date || '';
+    var dayAr   = tmArDay(date);
+    var dateLbl = dayAr ? (dayAr + ' · ' + date) : (date || '—');
+    var teacher = (e.teacher_name || '').trim() ||
+                  (e.teacher_username || '').trim();
+    var notes   = (e.notes || '').trim();
+    var created = tmFormatTimestamp(e.created_at || '');
+    var updated = tmFormatTimestamp(e.updated_at || '');
+    var ca = String(e.created_at || '').substring(0, 16);
+    var ua = String(e.updated_at || '').substring(0, 16);
+    var showUpdated = (e.updated_at && ua && ua !== ca);
+    var html = '<div class="tm-detail-grid">';
+    html += row('التاريخ:',         dateLbl);
+    html += row('المجموعة:',        e.group_name);
+    html += row('اسم المعلمة:',     teacher);
+    html += row('اسم الدرس:',       e.lesson_topic);
+    html += row('إلى أين وصلت:',    e.curriculum_progress);
+    if(notes){
+      html += row('الملاحظات:',     notes);
+    }
+    html += row('تاريخ الإدخال:',   created);
+    if(showUpdated){
+      html += row('تاريخ آخر تعديل:', updated);
+    }
+    html += '</div>';
+    return html;
+  }
+
+  var lessonOverlay  = document.getElementById('tm-lesson-overlay');
+  var lessonBodyEl   = document.getElementById('tm-lesson-body');
+  var lessonCloseX   = document.getElementById('tm-lesson-close-x');
+  var lessonCloseBtn = document.getElementById('tm-lesson-close');
+
+  function tmOpenLessonModal(lid){
+    var entry = tmFindLessonInCache(lid);
+    if(!entry || !lessonOverlay || !lessonBodyEl) return;
+    lessonBodyEl.innerHTML = tmRenderLessonDetail(entry);
+    lessonOverlay.hidden = false;
+  }
+  function tmCloseLessonModal(){
+    if(lessonOverlay) lessonOverlay.hidden = true;
+  }
+  if(lessonCloseX){   lessonCloseX  .addEventListener('click', tmCloseLessonModal); }
+  if(lessonCloseBtn){ lessonCloseBtn.addEventListener('click', tmCloseLessonModal); }
+  if(lessonOverlay){
+    lessonOverlay.addEventListener('click', function(ev){
+      if(ev.target === lessonOverlay) tmCloseLessonModal();
+    });
+  }
+  document.addEventListener('keydown', function(ev){
+    if(ev.key === 'Escape' && lessonOverlay && !lessonOverlay.hidden){
+      tmCloseLessonModal();
+    }
+  });
+
+  // Event delegation on the lessons panel — survives every re-render.
+  var lessonsPanel = document.getElementById('tm-lessons-body');
+  if(lessonsPanel){
+    lessonsPanel.addEventListener('click', function(ev){
+      var btn = ev.target.closest('.tm-btn-link');
+      if(!btn) return;
+      var card = btn.closest('.tm-lesson-card');
+      if(!card) return;
+      var lid = parseInt(card.getAttribute('data-id'), 10);
+      if(!lid) return;
+      tmOpenLessonModal(lid);
     });
   }
 })();
