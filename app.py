@@ -40802,6 +40802,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     if (!el) return;
     el.textContent = (v == null ? '0' : String(v));
   }
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
   function loadStats(){
     fetch('/api/admin/violations/stats', {credentials:'same-origin'})
       .then(function(r){ return r.json(); })
@@ -40813,6 +40818,91 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         setNum('vio-stat-critical', d.critical_cases);
       })
       .catch(function(){ /* leave the … in place */ });
+  }
+
+  // ── Picker cache (Step 5) ─────────────────────────────────────
+  // Fetched once on first modal open, reused across opens. groups
+  // is the raw /api/groups payload (rows with group_name); students
+  // is /api/students (rows with student_name + group_name_student
+  // for in-person + group_online for online — a student may belong
+  // to either or both, so a group filter checks both fields).
+  var pickerCache = { groups: null, students: null, loaded: false, loading: null };
+
+  function ensurePickerData(cb){
+    if (pickerCache.loaded){ cb(); return; }
+    if (pickerCache.loading){ pickerCache.loading.then(cb); return; }
+    pickerCache.loading = Promise.all([
+      fetch('/api/groups',   {credentials:'same-origin'}).then(function(r){ return r.json(); }),
+      fetch('/api/students', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+    ]).then(function(rs){
+      pickerCache.groups   = (rs[0] && rs[0].groups)   || [];
+      pickerCache.students = (rs[1] && rs[1].students) || [];
+      pickerCache.loaded = true;
+      pickerCache.loading = null;
+    }).catch(function(){
+      pickerCache.groups = []; pickerCache.students = [];
+      pickerCache.loaded = true;
+      pickerCache.loading = null;
+    });
+    pickerCache.loading.then(cb);
+  }
+
+  function populateGroupDropdown(){
+    var sel = document.getElementById('vio-form-group');
+    if (!sel) return;
+    var prev = sel.value;
+    var names = (pickerCache.groups || [])
+      .map(function(g){ return ((g && g.group_name) || '').toString().trim(); })
+      .filter(Boolean);
+    var uniq = [];
+    var seen = {};
+    for (var i = 0; i < names.length; i++){
+      if (!seen[names[i]]){ seen[names[i]] = true; uniq.push(names[i]); }
+    }
+    uniq.sort(function(a, b){ return a.localeCompare(b, 'ar'); });
+    var html = '<option value="">— اختر مجموعة... —</option>';
+    for (var j = 0; j < uniq.length; j++){
+      html += '<option>' + escapeHtml(uniq[j]) + '</option>';
+    }
+    sel.innerHTML = html;
+    if (uniq.indexOf(prev) > -1){ sel.value = prev; }
+  }
+
+  function populateStudentDropdown(){
+    var sel = document.getElementById('vio-form-student');
+    if (!sel) return;
+    var groupSel  = document.getElementById('vio-form-group');
+    var searchInp = document.getElementById('vio-form-search');
+    var gname  = ((groupSel  ? groupSel.value  : '') || '').toString().trim();
+    var search = ((searchInp ? searchInp.value : '') || '').toString().trim().toLowerCase();
+    var rows = pickerCache.students || [];
+    var filtered = [];
+    for (var i = 0; i < rows.length; i++){
+      var s = rows[i] || {};
+      if (gname){
+        var inPerson = ((s.group_name_student || '') + '').trim();
+        var online   = ((s.group_online       || '') + '').trim();
+        if (inPerson !== gname && online !== gname) continue;
+      }
+      var nm = ((s.student_name || '') + '').trim();
+      if (!nm) continue;
+      if (search && nm.toLowerCase().indexOf(search) < 0) continue;
+      filtered.push(s);
+    }
+    filtered.sort(function(a, b){
+      return ((a.student_name || '') + '').localeCompare(((b.student_name || '') + ''), 'ar');
+    });
+    var html  = '<option value="">— اختر طالبة... —</option>';
+        html += '<option value="__MANUAL__">✏️ كتابة يدوية</option>';
+    for (var k = 0; k < filtered.length; k++){
+      var st = filtered[k];
+      html += '<option value="' + escapeHtml(st.id) + '">' + escapeHtml(st.student_name) + '</option>';
+    }
+    sel.innerHTML = html;
+    // Reset to "اختر طالبة..." after rebuild + collapse manual wrap.
+    sel.value = '';
+    var manualWrap = document.getElementById('vio-manual-name-wrap');
+    if (manualWrap) manualWrap.classList.remove('show');
   }
 
   // ── Modal open/close (Step 4) ─────────────────────────────────
@@ -40830,6 +40920,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     overlay.removeAttribute('hidden');
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    ensurePickerData(function(){
+      populateGroupDropdown();
+      populateStudentDropdown();
+    });
   }
   function closeModal(){
     if (!overlay) return;
@@ -40850,6 +40944,18 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       closeModal();
     }
   });
+
+  // ── Picker change/search wiring (Step 5) ──────────────────────
+  var groupSelEl  = document.getElementById('vio-form-group');
+  var searchInpEl = document.getElementById('vio-form-search');
+  if (groupSelEl)  groupSelEl.addEventListener('change', populateStudentDropdown);
+  if (searchInpEl){
+    var _searchTimer = null;
+    searchInpEl.addEventListener('input', function(){
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(populateStudentDropdown, 80);
+    });
+  }
 
   // ── Manual-entry toggle ───────────────────────────────────────
   var studentSel = document.getElementById('vio-form-student');
