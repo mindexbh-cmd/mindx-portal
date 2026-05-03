@@ -36836,6 +36836,23 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-detail-key{color:#4a148c;font-weight:700;font-size:.86rem;}
 .tm-detail-val{color:#212121;font-size:.95rem;line-height:1.6;
                white-space:pre-line;word-break:break-word;}
+
+/* ── Task-3 Step D: expanded evaluation card ──────────────── */
+.tm-eoverall{padding:14px 18px;border-radius:12px;border:0.5px solid;
+             margin-bottom:12px;display:flex;justify-content:space-between;
+             align-items:center;flex-wrap:wrap;gap:8px;}
+.tm-eoverall-label{font-weight:800;font-size:.95rem;color:inherit;}
+.tm-eoverall-value{font-weight:900;font-size:1.7rem;color:inherit;
+                   line-height:1;}
+
+.tm-escores-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+                 margin-bottom:12px;}
+@media (max-width:820px){.tm-escores-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:420px){.tm-escores-grid{grid-template-columns:1fr;}}
+
+.tm-ecard-foot{margin-top:12px;display:flex;justify-content:flex-start;
+               flex-wrap:wrap;gap:8px;align-items:center;}
+.tm-eval-sent-badge{padding:6px 14px;font-size:.86rem;}
 </style>
 
 <script>
@@ -38019,6 +38036,119 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       tmOpenLessonModal(lid);
     });
   }
+
+  // ── Task-3 Step D: expand evaluation cards to show every field.
+  //    Wraps Step-4's tmRenderEvalCard. The new card adds:
+  //      • All 8 score boxes (was just 2)
+  //      • Prominent "التقييم العام" panel with the same colour tier
+  //      • All 3 notes fields (was just notes_behavior)
+  //      • Footer that shows either a UI-only "إرسال التقييم لولي
+  //        الأمر عبر واتساب" button (when whatsapp_sent_at is null)
+  //        OR a green "تم الإرسال ✓ <date>" badge (otherwise).
+  //    Reuses Step-4's tmEscape / tmScoreClass / tmScoreText /
+  //    tmEvalMonth / tmArMonthLabel and Phase-6's tmFormatTimestamp.
+  //    Step-4's source body is NOT modified — the binding is
+  //    reassigned, same pattern Phase 2 / Step A used elsewhere.
+  //    THE SEND BUTTON HAS NO CLICK HANDLER YET — Step E will wire
+  //    it. The data-tm-eval-send marker is placed for that future
+  //    hook to find.
+  var _tmStep4RenderEvalCard = tmRenderEvalCard;
+  tmRenderEvalCard = function(e){
+    var stu   = tmEscape(e.student_name || '');
+    var grp   = tmEscape(e.group_name   || '');
+    var monAr = tmEscape(tmArMonthLabel(tmEvalMonth(e)));
+
+    var SCORE_FIELDS = [
+      {key:'score_participation', label:'المشاركة داخل الصف'},
+      {key:'score_behavior',      label:'السلوك العام'},
+      {key:'score_reading',       label:'القراءة'},
+      {key:'score_dictation',     label:'الإملاء'},
+      {key:'score_vocabulary',    label:'المفردات'},
+      {key:'score_conversation',  label:'المحادثة'},
+      {key:'score_expression',    label:'التعبير'},
+      {key:'score_grammar',       label:'القواعد'}
+    ];
+    var scoresHtml = '<div class="tm-escores-grid">';
+    SCORE_FIELDS.forEach(function(f){
+      var v   = e[f.key];
+      var cls = tmScoreClass(v);
+      var txt = tmEscape(tmScoreText(v));
+      scoresHtml +=
+        '<div class="tm-score-box ' + cls + '">' +
+          '<div class="tm-score-label">' + f.label + '</div>' +
+          '<div class="tm-score-value">' + txt + '</div>' +
+        '</div>';
+    });
+    scoresHtml += '</div>';
+
+    var oa    = e.overall_score;
+    var oaCls = tmScoreClass(oa);
+    var oaTxt = tmEscape(tmScoreText(oa));
+    var overallHtml =
+      '<div class="tm-eoverall ' + oaCls + '">' +
+        '<div class="tm-eoverall-label">التقييم العام</div>' +
+        '<div class="tm-eoverall-value">' + oaTxt + '</div>' +
+      '</div>';
+
+    var NOTE_FIELDS = [
+      {key:'notes_behavior', label:'ملاحظات على السلوك:'},
+      {key:'notes_language', label:'ملاحظات لغوية:'},
+      {key:'general_notes',  label:'ملاحظات عامة:'}
+    ];
+    var notesHtml = '';
+    NOTE_FIELDS.forEach(function(n){
+      var v = (e[n.key] == null ? '' : String(e[n.key])).trim();
+      if(!v) return;
+      notesHtml +=
+        '<div class="tm-ecard-notes">' +
+          '<span class="tm-row-key">' + n.label + '</span>' +
+          '<span class="tm-row-val">' + tmEscape(v) + '</span>' +
+        '</div>';
+    });
+
+    // Footer: either a placeholder send button (no handler — Step E
+    // will wire) OR a sent-badge with formatted timestamp.
+    var sentAt = (e.whatsapp_sent_at == null ? '' :
+                   String(e.whatsapp_sent_at)).trim();
+    var footHtml;
+    if(sentAt){
+      var sentLbl = tmEscape(tmFormatTimestamp(sentAt));
+      footHtml =
+        '<div class="tm-ecard-foot">' +
+          '<span class="tm-badge tm-badge-success tm-eval-sent-badge">' +
+            'تم الإرسال ✓ ' + sentLbl + '</span>' +
+        '</div>';
+    } else {
+      // TODO(Step E): attach click handler to data-tm-eval-send.
+      // Intentionally NO handler in this commit — UI placeholder
+      // only per the round-3 plan.
+      footHtml =
+        '<footer class="tm-ecard-foot">' +
+          '<button type="button" class="tm-btn tm-btn-success" ' +
+            'data-tm-eval-send="' + (parseInt(e.id, 10) || 0) + '">' +
+            'إرسال التقييم لولي الأمر عبر واتساب' +
+          '</button>' +
+        '</footer>';
+    }
+
+    return (
+      '<article class="tm-eval-card" data-id="' +
+        (parseInt(e.id, 10) || 0) + '">' +
+        '<header class="tm-ecard-head">' +
+          '<div class="tm-ecard-head-info">' +
+            (stu   ? '<span class="tm-ecard-student">' + stu   + '</span>' : '') +
+            (grp   ? '<span class="tm-ecard-grp">'     + grp   + '</span>' : '') +
+            (monAr ? '<span class="tm-ecard-month">'   + monAr + '</span>' : '') +
+          '</div>' +
+          '<span class="tm-badge tm-badge-internal">للإدارة فقط</span>' +
+        '</header>' +
+        overallHtml +
+        scoresHtml +
+        notesHtml +
+        footHtml +
+      '</article>'
+    );
+  };
 })();
 </script>
 </body></html>"""
