@@ -37658,6 +37658,41 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       tmApproveAndSend(mid, btn);
     });
   }
+
+  // ── Round-3 Step A: lessons + evaluations stat-counter wiring.
+  //    Same wrap-the-renderer pattern Phase 2 used for the pending
+  //    counter — the original Step-3 / Step-4 functions are saved
+  //    and the bindings are replaced with closures that call the
+  //    original then update the corresponding stat card. Step 3 and
+  //    Step 4 source bodies are NOT modified. ─────────────────────
+  function tmCurrentYM(){
+    var d = new Date();
+    var m = d.getMonth() + 1;
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m;
+  }
+
+  var _tmStep3RenderLessons = tmRenderLessons;
+  tmRenderLessons = function(entries){
+    _tmStep3RenderLessons(entries);
+    var statEl = document.getElementById('tm-stat-lessons');
+    if(statEl) statEl.textContent = String((entries || []).length);
+  };
+
+  var _tmStep4RenderEvals = tmRenderEvals;
+  tmRenderEvals = function(entries){
+    _tmStep4RenderEvals(entries);
+    var statEl = document.getElementById('tm-stat-evals');
+    if(!statEl) return;
+    var ym = tmCurrentYM();
+    var count = (entries || []).filter(function(e){
+      var em = (e.evaluation_month || '').toString();
+      if(em && em.indexOf(ym) === 0) return true;
+      var ed = (e.evaluation_date || '').toString();
+      if(ed.length >= 7 && ed.substring(0, 7) === ym) return true;
+      return false;
+    }).length;
+    statEl.textContent = String(count);
+  };
 })();
 </script>
 </body></html>"""
