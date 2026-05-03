@@ -37586,6 +37586,73 @@ def admin_teacher_deliveries_page():
     return ADMIN_TEACHER_DELIVERIES_HTML
 
 
+# ── /api/admin/teacher/<id>/groups ───────────────────────────────────
+# Admin/manager-only lookup for the redesigned monitoring page: returns
+# the groups owned by a specific teacher (by user id) plus the live
+# student count per group. Reuses _teacher_groups_for() ownership
+# logic — student_groups.teacher_name is matched (case-insensitive) to
+# the teacher's username AND human name. Student count combines the
+# in-person column (group_name_student) and the online column
+# (group_online), the same dual-column pattern used elsewhere.
+@app.route('/api/admin/teacher/<int:teacher_id>/groups', methods=['GET'])
+@login_required
+def api_admin_teacher_groups(teacher_id):
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        trow = db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE id=? AND role='teacher'",
+            (teacher_id,)
+        ).fetchone()
+    except Exception:
+        trow = None
+    if not trow:
+        return jsonify({"ok": False, "error": "المعلمة غير موجودة"}), 404
+    teacher_user = dict(trow)
+    keys = _teacher_match_keys(teacher_user)
+    if not keys:
+        return jsonify({"ok": True, "groups": []})
+    try:
+        rows = db.execute(
+            "SELECT id, COALESCE(group_name,'') AS group_name, "
+            "COALESCE(teacher_name,'') AS teacher_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    seen_names = set()
+    for r in rows:
+        rd = dict(r)
+        gn = (rd.get("group_name") or "").strip()
+        tn = (rd.get("teacher_name") or "").strip().lower()
+        if not gn or not tn or tn not in keys:
+            continue
+        if gn in seen_names:
+            continue
+        seen_names.add(gn)
+        try:
+            sc = int(db.execute(
+                "SELECT COUNT(*) FROM students "
+                "WHERE TRIM(COALESCE(group_name_student,''))=? "
+                "OR TRIM(COALESCE(group_online,''))=?",
+                (gn, gn)
+            ).fetchone()[0] or 0)
+        except Exception:
+            sc = 0
+        out.append({
+            "id": int(rd.get("id") or 0),
+            "name": gn,
+            "students_count": sc,
+        })
+    out.sort(key=lambda g: g["name"])
+    return jsonify({"ok": True, "groups": out})
+
+
 @app.route('/api/teacher-deliveries/summary', methods=['GET'])
 @login_required
 def api_teacher_deliveries_summary():
