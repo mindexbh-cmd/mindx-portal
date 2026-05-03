@@ -9004,8 +9004,15 @@ function dhCopyParentLink(){
              existing student-search / dashboard styles. */
           .gs-card{background:#fff;border:0.5px solid #d8c8ec;
                    border-radius:14px;padding:16px 18px;margin:0 0 12px;}
-          .gs-filters-grid{display:grid;grid-template-columns:1fr 1fr;
+          .gs-filters-grid{display:grid;grid-template-columns:1fr 1fr 1fr;
                            gap:12px;}
+          @media (max-width:900px){
+            .gs-filters-grid{grid-template-columns:1fr 1fr;}
+            /* Third field (day filter) wraps to its own row +
+               spans full width so it doesn't sit alone in a half
+               column. */
+            .gs-filters-grid .gs-field:last-child{grid-column:1 / -1;}
+          }
           @media (max-width:680px){
             .gs-filters-grid{grid-template-columns:1fr;}
           }
@@ -9351,6 +9358,12 @@ function dhCopyParentLink(){
               <input type="text" id="gs-search-text"
                      placeholder="اكتبي اسم المجموعة أو المعلمة...">
             </div>
+            <div class="gs-field">
+              <label for="gs-day-select">📅 اليوم</label>
+              <select id="gs-day-select">
+                <option value="all-days">كل الأيام</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -9445,11 +9458,61 @@ function dhCopyParentLink(){
         (function(){
           var sel       = document.getElementById('gs-group-select');
           var searchTxt = document.getElementById('gs-search-text');
+          var gsDaySel  = document.getElementById('gs-day-select');
           var card      = document.getElementById('gs-group-card');
           var avatarEl  = document.getElementById('gs-avatar');
           var nameEl    = document.getElementById('gs-group-name');
           var metaEl    = document.getElementById('gs-group-meta');
           if(!sel || !card) return;
+
+          /* Day filter helpers — used by rebuildOptions and the
+             all-groups view to narrow the visible set. */
+          function gsCurrentDayFilter(){
+            if(!gsDaySel) return '';
+            var v = gsDaySel.value || '';
+            return (v === 'all-days') ? '' : v;
+          }
+          function gsMatchesDay(g){
+            var df = gsCurrentDayFilter();
+            if(!df) return true;
+            return String(g.study_days || '').trim() === df;
+          }
+          function gsBuildDayOptions(){
+            if(!gsDaySel) return;
+            var seen = {};
+            var days = [];
+            GROUPS.forEach(function(g){
+              var d = String(g.study_days || '').trim();
+              if(!d) return;
+              var key = d.toLowerCase();
+              if(seen[key]) return;
+              seen[key] = 1;
+              days.push(d);
+            });
+            days.sort(function(a, b){
+              return a.localeCompare(b, 'ar');
+            });
+            var prev = gsDaySel.value;
+            gsDaySel.innerHTML =
+              '<option value="all-days">كل الأيام</option>';
+            days.forEach(function(d){
+              var opt = document.createElement('option');
+              opt.value = d;
+              opt.textContent = d;
+              gsDaySel.appendChild(opt);
+            });
+            /* Restore previous selection if still in the list. */
+            if(prev){
+              var hasPrev = false;
+              for(var i = 0; i < gsDaySel.options.length; i++){
+                if(gsDaySel.options[i].value === prev){
+                  hasPrev = true;
+                  break;
+                }
+              }
+              if(hasPrev) gsDaySel.value = prev;
+            }
+          }
 
           /* Cache the full group list once so the text input can
              filter the dropdown without a re-fetch (Step 3 may also
@@ -9470,8 +9533,8 @@ function dhCopyParentLink(){
             var f = (filterStr || '').trim().toLowerCase();
             /* Reset to placeholder + "all" sentinel + filtered groups.
                The "all" option is always available regardless of the
-               text-filter — it's the user's escape hatch back to the
-               overview. */
+               text + day filters — it's the user's escape hatch back
+               to the overview. */
             sel.innerHTML =
               '<option value="">— اختاري المجموعة —</option>' +
               '<option value="all">📋 جميع المجموعات</option>';
@@ -9483,6 +9546,7 @@ function dhCopyParentLink(){
                 var hay = (name + ' ' + teacher).toLowerCase();
                 if(hay.indexOf(f) === -1) return;
               }
+              if(!gsMatchesDay(g)) return;   /* day filter combined */
               var opt = document.createElement('option');
               opt.value = String(g.id);
               opt.textContent = name + (teacher ? ' — ' + teacher : '');
@@ -9510,6 +9574,7 @@ function dhCopyParentLink(){
                   return (a.group_name || '').localeCompare(
                           b.group_name || '', 'ar');
                 });
+                gsBuildDayOptions();
                 rebuildOptions('');
               })
               .catch(function(){ /* leave placeholder option */ });
@@ -10343,12 +10408,25 @@ function dhCopyParentLink(){
           var gsAllCard     = document.getElementById('gs-all-groups-card');
           var gsAllGrid     = document.getElementById('gs-all-grid');
           var gsAllSubtitle = document.getElementById('gs-all-subtitle');
+          /* Holds the day-filtered slice of GROUPS that the all-
+             groups view currently displays. Set by gsShowAllGroups
+             before its loader/subtitle helpers run, then read by
+             both. */
+          var gsAllVisible = [];
 
           function gsShowAllGroups(){
             if(!gsAllGrid) return;
-            if(!GROUPS.length){
+            /* Compute visible groups for the active day filter so
+               every downstream function (loader, subtitle updater)
+               iterates the same set. */
+            gsAllVisible = GROUPS.filter(gsMatchesDay);
+            if(!gsAllVisible.length){
+              var dayActive = !!gsCurrentDayFilter();
               gsAllGrid.innerHTML = '<div class="gs-panel-empty">' +
-                'لا توجد مجموعات.</div>';
+                (dayActive
+                  ? 'لا توجد مجموعات في هذا اليوم.'
+                  : 'لا توجد مجموعات.') +
+                '</div>';
               if(gsAllSubtitle){
                 gsAllSubtitle.textContent = '0 مجموعة · 0 طالبة';
               }
@@ -10358,7 +10436,7 @@ function dhCopyParentLink(){
                loading placeholder for stats (Option 2 from the
                spec — progressive enhancement). */
             var html = '';
-            GROUPS.forEach(function(g){
+            gsAllVisible.forEach(function(g){
               var gid     = parseInt(g.id, 10) || 0;
               var name    = g.group_name || '—';
               var teacher = g.teacher_name || '';
@@ -10390,13 +10468,13 @@ function dhCopyParentLink(){
             gsAllGrid.innerHTML = html;
             if(gsAllSubtitle){
               gsAllSubtitle.textContent =
-                GROUPS.length + ' مجموعة · — طالبة';
+                gsAllVisible.length + ' مجموعة · — طالبة';
             }
             gsLoadAllGroupsStats();
           }
 
           function gsLoadAllGroupsStats(){
-            GROUPS.forEach(function(g, idx){
+            gsAllVisible.forEach(function(g, idx){
               setTimeout(function(){
                 /* Bail if user navigated away from the overview. */
                 if(sel.value !== 'all') return;
@@ -10469,7 +10547,7 @@ function dhCopyParentLink(){
             if(!gsAllSubtitle) return;
             var loaded = 0;
             var total  = 0;
-            GROUPS.forEach(function(g){
+            gsAllVisible.forEach(function(g){
               var gid = parseInt(g.id, 10) || 0;
               var entry = gsDetailCache[gid];
               if(entry && entry.detail && entry.detail.stats){
@@ -10477,13 +10555,13 @@ function dhCopyParentLink(){
                 total += (entry.detail.stats.student_count || 0);
               }
             });
-            if(loaded === GROUPS.length){
+            if(loaded === gsAllVisible.length){
               gsAllSubtitle.textContent =
-                GROUPS.length + ' مجموعة · ' + total + ' طالبة';
+                gsAllVisible.length + ' مجموعة · ' + total + ' طالبة';
             } else {
               /* Partial total while fetches are still resolving. */
               gsAllSubtitle.textContent =
-                GROUPS.length + ' مجموعة · ' + total + '+ طالبة';
+                gsAllVisible.length + ' مجموعة · ' + total + '+ طالبة';
             }
           }
 
@@ -10498,6 +10576,18 @@ function dhCopyParentLink(){
               if(!gid) return;
               sel.value = String(gid);
               sel.dispatchEvent(new Event('change'));
+            });
+          }
+
+          /* Day filter — re-filters the dropdown options and (when
+             the all-groups overview is currently active) re-renders
+             it from scratch with the new visible set. */
+          if(gsDaySel){
+            gsDaySel.addEventListener('change', function(){
+              rebuildOptions(searchTxt ? searchTxt.value : '');
+              if(sel.value === 'all'){
+                gsShowAllGroups();
+              }
             });
           }
 
