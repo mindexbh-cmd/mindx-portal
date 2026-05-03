@@ -9074,6 +9074,22 @@ function dhCopyParentLink(){
                     border-radius:11px;padding:16px;min-height:140px;}
           .gs-panel-empty{color:#8a7da5;text-align:center;
                           padding:32px 18px;font-style:italic;}
+
+          /* Step 4 — معلومات عامة info grid. 2 cols on desktop,
+             1 col on mobile. Each cell = soft-bg card with a small
+             purple label + value below. */
+          .gs-info-grid{display:grid;grid-template-columns:1fr 1fr;
+                        gap:10px;}
+          @media (max-width:680px){
+            .gs-info-grid{grid-template-columns:1fr;}
+          }
+          .gs-info-card{background:#fafafe;border:0.5px solid #d8c8ec;
+                        border-radius:9px;padding:10px 12px;}
+          .gs-info-label{color:#4a148c;font-weight:700;font-size:.84rem;
+                         margin-bottom:3px;}
+          .gs-info-value{color:#212121;font-size:.95rem;line-height:1.55;
+                         word-break:break-word;white-space:pre-line;}
+          .gs-info-value.gs-empty{color:#8a7da5;font-style:italic;}
         </style>
 
         <!-- A) Filters card -->
@@ -9369,6 +9385,64 @@ function dhCopyParentLink(){
                 setStatsPlaceholder('—');
               });
           }
+
+          /* ── Step 4 — معلومات عامة tab. Wraps fillFromDetail
+             (same pattern Phase 2 used for tmRenderParentMsgs) so
+             the existing Step-3 body stays untouched. The wrapper
+             calls the original then re-renders the info panel from
+             the same payload — no extra fetch. ───────────────── */
+          function gsEscape(s){
+            s = s == null ? '' : String(s);
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+                    .replace(/'/g,'&#39;');
+          }
+
+          function gsRenderInfo(payload){
+            var d   = payload && payload.detail;
+            var grp = d && d.group;
+            if(!grp) return '';
+            /* Spec order. ramadan_time + online_time are OPTIONAL —
+               only render the card when the value is non-empty. The
+               other fields always render and fall back to "غير
+               محدد" with a muted-italic style when empty. */
+            var fields = [
+              {label:'المعلمة',     value: grp.teacher_name,     always:true},
+              {label:'المستوى',     value: grp.level,            always:true},
+              {label:'أيام الدراسة', value: grp.study_days,       always:true},
+              {label:'وقت الحصة',   value: grp.study_time,       always:true},
+              {label:'وقت رمضان',   value: grp.ramadan_time,     always:false},
+              {label:'وقت أونلاين', value: grp.online_time,      always:false},
+              {label:'مدة الحصة',   value: grp.session_duration, always:true}
+            ];
+            var html = '<div class="gs-info-grid">';
+            fields.forEach(function(f){
+              var v = (f.value == null ? '' : String(f.value)).trim();
+              if(!v && !f.always) return;
+              var displayed = v || 'غير محدد';
+              var emptyCls  = v ? '' : ' gs-empty';
+              html +=
+                '<div class="gs-info-card">' +
+                  '<div class="gs-info-label">' + gsEscape(f.label) +
+                  '</div>' +
+                  '<div class="gs-info-value' + emptyCls + '">' +
+                    gsEscape(displayed) +
+                  '</div>' +
+                '</div>';
+            });
+            html += '</div>';
+            return html;
+          }
+
+          var _gsStep3Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            _gsStep3Fill(payload);
+            var infoEl = document.querySelector(
+              '.gs-panel[data-gs-panel="info"]');
+            if(infoEl){
+              infoEl.innerHTML = gsRenderInfo(payload);
+            }
+          };
 
           /* Group selection → reveal card and dispatch the detail
              fetch. Cached groups skip the loading state. */
