@@ -41823,9 +41823,29 @@ def groups():
 @app.route("/api/groups", methods=["GET"])
 @login_required
 def api_groups_get():
+    """Returns every student_groups row as a dict. Mirrors the
+    pattern /api/groups/<id>/detail uses for days resolution: when
+    the admin has renamed the days column via the table-edit modal
+    (CLAUDE.md "تعديل الجدول" workflow → custom col_<timestamp>
+    column), the canonical study_days field is empty and the actual
+    days live in the renamed column. _extract_days_from_row tries
+    every known strategy and returns the resolved value; we
+    override study_days with it only when non-empty so callers can
+    keep reading g.study_days regardless of where the data
+    physically sits."""
     db = get_db()
     rows = db.execute("SELECT * FROM student_groups ORDER BY id ASC").fetchall()
-    return jsonify({"groups": [dict(r) for r in rows]})
+    out = []
+    for r in rows:
+        rd = dict(r)
+        try:
+            resolved = _extract_days_from_row(rd)
+        except Exception:
+            resolved = ""
+        if resolved:
+            rd["study_days"] = resolved
+        out.append(rd)
+    return jsonify({"groups": out})
 
 def _student_groups_writable_cols(db):
     # Reflect the live schema so a user who has deleted a column via the UI
