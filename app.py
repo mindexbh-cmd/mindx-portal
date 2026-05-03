@@ -42442,6 +42442,43 @@ _VIO_PDF_ACTION_LABELS = {
     "action_meeting_parent":  "اجتماع مع ولي الأمر",
 }
 
+_VIO_PDF_MONTHLY_CSS = """
+.pdf-sev-summary {
+  display: flex; gap: 8px; margin-top: 8px;
+  flex-wrap: wrap;
+}
+.pdf-sev-pill {
+  padding: 5px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 800;
+  border: 1px solid;
+}
+.pdf-sev-pill.light  { background: #E1F5EC; color: #1D9E75; border-color: #1D9E75; }
+.pdf-sev-pill.medium { background: #FAEEDA; color: #BA7517; border-color: #BA7517; }
+.pdf-sev-pill.severe { background: #FCE6E6; color: #A32D2D; border-color: #A32D2D; }
+.pdf-action-summary {
+  list-style: disc; margin: 6px 18px 0;
+  font-size: 12px; line-height: 1.7;
+}
+.pdf-action-summary li b { color: #4a148c; }
+.pdf-tbl {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; margin-top: 4px;
+}
+.pdf-tbl th, .pdf-tbl td {
+  padding: 6px 10px; border: 1px solid #d8c8ec;
+  text-align: right;
+}
+.pdf-tbl thead th {
+  background: #f3e5f5; color: #4a148c; font-weight: 900;
+}
+.pdf-tbl tbody tr:nth-child(even) td { background: #faf8fd; }
+.pdf-empty-month {
+  text-align: center; padding: 20px;
+  color: #888; font-style: italic;
+  background: #fff; border: 1px dashed #d8c8ec; border-radius: 6px;
+}
+"""
+
 
 def _vio_render_single_pdf_html(row):
     """Build the HTML body for a single-violation PDF report."""
@@ -42572,6 +42609,152 @@ def _vio_html_to_pdf_bytes(html_str):
             browser.close()
 
 
+def _vio_month_bounds(month_str):
+    """Given 'YYYY-MM' (or empty for current month) return a 5-tuple
+    (start_iso, end_iso_exclusive, label, year, month). Falls back
+    silently to the current month when input is empty / malformed."""
+    from datetime import date as _date
+    if not month_str:
+        d = _date.today()
+        year, month = d.year, d.month
+    else:
+        ok = True
+        try:
+            ys, ms = (month_str.strip() + "-").split("-", 2)[:2]
+            year = int(ys); month = int(ms)
+            if not (1 <= month <= 12): ok = False
+        except Exception:
+            ok = False
+        if not ok:
+            d = _date.today()
+            year, month = d.year, d.month
+    start = "{:04d}-{:02d}-01".format(year, month)
+    if month == 12:
+        end = "{:04d}-01-01".format(year + 1)
+    else:
+        end = "{:04d}-{:02d}-01".format(year, month + 1)
+    return (start, end, "{:04d}-{:02d}".format(year, month), year, month)
+
+
+def _vio_render_monthly_pdf_html(student_name, group_name, month_label, rows):
+    """Build the HTML body for a per-student monthly violations
+    report. `rows` is a list of decorated violation dicts already
+    filtered to the target month and sorted ASC by date so the
+    table reads chronologically."""
+    import html as _html
+    from datetime import datetime as _dt
+    e = _html.escape
+
+    total = len(rows)
+    light_count = sum(1 for r in rows if (r.get("severity") or "").lower() == "light")
+    medium_count = sum(1 for r in rows if (r.get("severity") or "").lower() == "medium")
+    severe_count = sum(1 for r in rows if (r.get("severity") or "").lower() == "severe")
+
+    action_totals = {}
+    for r in rows:
+        for k in _VIO_ACTION_FIELDS:
+            if r.get(k): action_totals[k] = action_totals.get(k, 0) + 1
+
+    actions_html = ""
+    if action_totals:
+        items = "".join(
+            "<li><b>" + e(_VIO_PDF_ACTION_LABELS[k]) + ":</b> "
+            + str(v) + (" مرة" if v == 1 else " مرات") + "</li>"
+            for k, v in action_totals.items()
+        )
+        actions_html = (
+            "<div style=\"margin-top:8px;\"><b>الإجراءات المتخذة:</b>"
+            "<ul class=\"pdf-action-summary\">" + items + "</ul></div>"
+        )
+
+    if total == 0:
+        rows_block = "<div class=\"pdf-empty-month\">لا توجد مخالفات في هذا الشهر</div>"
+    else:
+        body_rows = ""
+        for r in rows:
+            sev = (r.get("severity") or "light").lower()
+            sev_lbl = _VIO_SEVERITY_LABEL_AR.get(sev, "")
+            body_rows += (
+                "<tr>"
+                "<td>" + e(r.get("violation_date") or "") + "</td>"
+                "<td>" + e(r.get("violation_type") or "") + "</td>"
+                "<td>" + e(r.get("violation_place") or "") + "</td>"
+                "<td><span class=\"pdf-sev-badge pdf-sev-" + sev + "\">"
+                + e(sev_lbl) + "</span></td>"
+                "</tr>"
+            )
+        rows_block = (
+            "<table class=\"pdf-tbl\">"
+            "<thead><tr>"
+              "<th>التاريخ</th><th>النوع</th><th>المكان</th><th>الخطورة</th>"
+            "</tr></thead>"
+            "<tbody>" + body_rows + "</tbody>"
+            "</table>"
+        )
+
+    print_ts = _dt.now().strftime("%Y-%m-%d %H:%M")
+
+    head = (
+        "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head>"
+        "<meta charset=\"utf-8\">"
+        "<title>تقرير شهري - " + e(student_name) + "</title>"
+        "<style>" + _VIO_PDF_CSS + _VIO_PDF_MONTHLY_CSS + "</style>"
+        "</head><body>"
+    )
+    header = (
+        "<div class=\"pdf-header\">"
+          "<div class=\"pdf-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pdf-titles\">"
+            "<div class=\"pdf-center-en\">MINDEX EDUCATION &amp; TRAINING CENTRE</div>"
+            "<div class=\"pdf-center-ar\">مركز مايندكس للتعليم والتدريب</div>"
+          "</div>"
+        "</div>"
+    )
+    banner = (
+        "<div class=\"pdf-banner\">"
+          "<h1>تقرير شهري &mdash; " + e(month_label) + "</h1>"
+          "<span class=\"pdf-report-id\">" + e(student_name) + "</span>"
+        "</div>"
+    )
+    summary = (
+        "<section class=\"pdf-section\">"
+          "<h2>الملخص</h2>"
+          "<div class=\"pdf-grid\">"
+            "<div><b>الطالبة:</b> " + e(student_name) + "</div>"
+            "<div><b>المجموعة:</b> " + e(group_name or "—") + "</div>"
+            "<div><b>الشهر:</b> " + e(month_label) + "</div>"
+            "<div><b>عدد المخالفات:</b> " + str(total) + "</div>"
+          "</div>"
+          "<div class=\"pdf-sev-summary\">"
+            "<span class=\"pdf-sev-pill light\">" + str(light_count) + " خفيفة</span>"
+            "<span class=\"pdf-sev-pill medium\">" + str(medium_count) + " متوسطة</span>"
+            "<span class=\"pdf-sev-pill severe\">" + str(severe_count) + " خطيرة</span>"
+          "</div>"
+          + actions_html +
+        "</section>"
+    )
+    detail = (
+        "<section class=\"pdf-section\">"
+          "<h2>قائمة المخالفات</h2>"
+          + rows_block +
+        "</section>"
+    )
+    footer = (
+        "<footer class=\"pdf-footer\">"
+          "<div class=\"pdf-signatures\">"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">المشرفة</div><div class=\"pdf-sigline\"></div></div>"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">ولي الأمر</div><div class=\"pdf-sigline\"></div></div>"
+            "<div class=\"pdf-sigbox\"><div class=\"pdf-siglabel\">الطالبة</div><div class=\"pdf-sigline\"></div></div>"
+          "</div>"
+          "<div class=\"pdf-meta\">"
+            "<span>طُبع في: " + e(print_ts) + "</span>"
+            "<span>" + e(student_name) + " &mdash; " + e(month_label) + "</span>"
+          "</div>"
+        "</footer>"
+    )
+    return head + header + banner + summary + detail + footer + "</body></html>"
+
+
 @app.route("/api/admin/violations/<int:vid>/pdf", methods=["GET"])
 @login_required
 def api_admin_violations_single_pdf(vid):
@@ -42603,6 +42786,110 @@ def api_admin_violations_single_pdf(vid):
         pdf_bytes,
         mimetype="application/pdf",
         headers={"Content-Disposition": "inline; filename=\"" + fname + "\""},
+    )
+
+
+def _vio_monthly_pdf_response(rows, student_name, group_name, label, fname_part):
+    """Shared bottom-half of both monthly endpoints — render the
+    HTML, hand it to Playwright, return the inline-PDF Response."""
+    html_str = _vio_render_monthly_pdf_html(student_name, group_name, label, rows)
+    try:
+        pdf_bytes = _vio_html_to_pdf_bytes(html_str)
+    except Exception as ex:
+        import sys as _sys
+        _sys.stderr.write("[violations-monthly-pdf] render failed: " + str(ex) + "\n")
+        return Response("تعذر توليد التقرير", status=500,
+                        mimetype="text/plain; charset=utf-8")
+    fname = "violations_" + fname_part + ".pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": "inline; filename=\"" + fname + "\""},
+    )
+
+
+@app.route("/api/admin/violations/student/<int:sid>/monthly-pdf",
+           methods=["GET"])
+@login_required
+def api_admin_violations_student_monthly_pdf(sid):
+    """Per-student monthly PDF for a roster-linked student. Admin-only.
+    Query: ?month=YYYY-MM (defaults to current month). Resolves
+    student_name + group_name from the students table when available
+    (falls back to whatever the violations rows themselves carry)."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return Response("غير مصرح", status=403,
+                        mimetype="text/plain; charset=utf-8")
+    db = get_db()
+    start, end, label, _y, _m = _vio_month_bounds(
+        request.args.get("month") or "")
+    rows = db.execute(
+        "SELECT * FROM violations "
+        "WHERE student_id=? AND is_deleted=0 "
+        "AND violation_date >= ? AND violation_date < ? "
+        "ORDER BY violation_date ASC, id ASC",
+        (sid, start, end),
+    ).fetchall()
+    decorated = _vio_decorate_rows(db, rows)
+
+    # Pull canonical name + group from students if available; otherwise
+    # fall back to whatever the first violation row carried.
+    student_name = ""
+    group_name = ""
+    try:
+        srow = db.execute(
+            "SELECT COALESCE(student_name,'') AS sn, "
+            "COALESCE(group_name_student,'') AS gn FROM students WHERE id=?",
+            (sid,)
+        ).fetchone()
+        if srow:
+            d = dict(srow)
+            student_name = d.get("sn") or ""
+            group_name   = d.get("gn") or ""
+    except Exception:
+        pass
+    if not student_name and decorated:
+        student_name = decorated[0].get("student_name") or ""
+    if not group_name and decorated:
+        group_name = decorated[0].get("group_name") or ""
+    if not student_name:
+        student_name = "طالبة #" + str(sid)
+
+    return _vio_monthly_pdf_response(
+        decorated, student_name, group_name, label,
+        "student_" + str(sid) + "_" + label,
+    )
+
+
+@app.route("/api/admin/violations/student-monthly-pdf", methods=["GET"])
+@login_required
+def api_admin_violations_manual_monthly_pdf():
+    """Per-student monthly PDF for a manual-entry student
+    (student_id IS NULL). Admin-only. Lookup is by name string.
+    Query: ?student_name=...&month=YYYY-MM."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return Response("غير مصرح", status=403,
+                        mimetype="text/plain; charset=utf-8")
+    name = (request.args.get("student_name") or "").strip()
+    if not name:
+        return Response("يجب تمرير اسم الطالبة", status=400,
+                        mimetype="text/plain; charset=utf-8")
+    db = get_db()
+    start, end, label, _y, _m = _vio_month_bounds(
+        request.args.get("month") or "")
+    rows = db.execute(
+        "SELECT * FROM violations "
+        "WHERE student_id IS NULL AND student_name=? AND is_deleted=0 "
+        "AND violation_date >= ? AND violation_date < ? "
+        "ORDER BY violation_date ASC, id ASC",
+        (name, start, end),
+    ).fetchall()
+    decorated = _vio_decorate_rows(db, rows)
+    group_name = decorated[0].get("group_name") if decorated else ""
+    safe_part = "manual_" + label
+    return _vio_monthly_pdf_response(
+        decorated, name, group_name, label, safe_part,
     )
 
 
