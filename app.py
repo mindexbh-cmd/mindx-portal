@@ -41841,6 +41841,78 @@ def api_admin_violations_delete(vid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/violations/student-history", methods=["GET"])
+@login_required
+def api_admin_violations_student_history():
+    """Lifetime non-deleted history for one student. Admin-only.
+
+    Two lookup modes:
+      - student_id present  → WHERE student_id=? AND is_deleted=0
+      - student_id absent   → WHERE student_id IS NULL
+                              AND student_name=? AND is_deleted=0
+        (this is the "manual entry" branch — those rows have no FK
+        to students.id, so the only stable identifier is the name
+        the admin typed.)
+
+    Returns the full history (created_at DESC) plus a convenience
+    `last_violation` summary so the inline alert in the registration
+    modal can render without iterating the array. Each row is
+    decorated with severity_label / action_count / days_ago /
+    violation_count_for_student through the shared helper, so the
+    history viewer can reuse the same renderer the main list uses."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    sid_raw = (request.args.get("student_id") or "").strip()
+    name    = (request.args.get("student_name") or "").strip()
+
+    student_id = None
+    if sid_raw and sid_raw.lower() not in ("null", "none"):
+        try: student_id = int(sid_raw)
+        except Exception: student_id = None
+
+    if student_id is None and not name:
+        return jsonify({"ok": False,
+                        "error": "يجب تمرير student_id أو student_name"}), 400
+
+    db = get_db()
+    if student_id is not None:
+        sql = ("SELECT * FROM violations "
+               "WHERE student_id=? AND is_deleted=0 "
+               "ORDER BY created_at DESC, id DESC")
+        params = (student_id,)
+    else:
+        sql = ("SELECT * FROM violations "
+               "WHERE student_id IS NULL AND student_name=? AND is_deleted=0 "
+               "ORDER BY created_at DESC, id DESC")
+        params = (name,)
+
+    try:
+        rows = db.execute(sql, params).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر جلب السجل: " + str(ex)}), 500
+
+    history = _vio_decorate_rows(db, rows)
+    last = None
+    if history:
+        h0 = history[0]
+        last = {
+            "date":           h0.get("violation_date"),
+            "type":           h0.get("violation_type"),
+            "severity":       h0.get("severity"),
+            "severity_label": h0.get("severity_label"),
+            "days_ago":       h0.get("days_ago"),
+        }
+
+    return jsonify({
+        "ok": True,
+        "count": len(history),
+        "last_violation": last,
+        "history": history,
+    })
+
+
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
 # Admin/manager-only lookup for the redesigned monitoring page: returns
 # the groups owned by a specific teacher (by user id) plus the live
