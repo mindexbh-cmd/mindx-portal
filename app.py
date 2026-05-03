@@ -9256,6 +9256,42 @@ function dhCopyParentLink(){
                               font-size:.78rem;font-weight:800;
                               background:#E6F4EE;color:#1D9E75;
                               border:0.5px solid #1D9E75;}
+
+          /* Step 9 — finance tab. Two summary cards at top: the
+             count card uses the reserved amber palette
+             (#FAEEDA / #854F0B / #BA7517), matching the متأخرات سداد
+             stat card in the group header. The total-remaining card
+             stays neutral so the amber attention isn't doubled. */
+          .gs-fin-summary{display:grid;grid-template-columns:1fr 1fr;
+                          gap:10px;margin-bottom:14px;}
+          @media (max-width:540px){
+            .gs-fin-summary{grid-template-columns:1fr;}
+          }
+          .gs-fin-summary-card{padding:11px 14px;border-radius:11px;
+                               border:0.5px solid #d8c8ec;background:#fff;}
+          .gs-fin-summary-card.gs-fin-amber{background:#FAEEDA;
+                                            border-color:#BA7517;}
+          .gs-fin-summary-label{color:#6a4f8a;font-size:.82rem;
+                                font-weight:700;margin-bottom:3px;}
+          .gs-fin-amber .gs-fin-summary-label{color:#854F0B;}
+          .gs-fin-summary-value{color:#4a148c;font-size:1.4rem;
+                                font-weight:900;line-height:1.1;}
+          .gs-fin-amber .gs-fin-summary-value{color:#854F0B;}
+
+          .gs-fin-list{display:flex;flex-direction:column;gap:8px;}
+          .gs-fin-card{background:#fff;border:0.5px solid #d8c8ec;
+                       border-radius:10px;padding:11px 13px;
+                       display:flex;justify-content:space-between;
+                       align-items:center;gap:10px;flex-wrap:wrap;}
+          .gs-fin-card-info{display:flex;align-items:center;gap:10px;
+                            flex-wrap:wrap;flex:1;min-width:140px;}
+          .gs-fin-name{color:#4a148c;font-weight:900;font-size:.95rem;}
+          .gs-fin-amount{color:#A32D2D;font-weight:900;font-size:1rem;
+                         min-width:80px;text-align:left;}
+          .gs-fin-allpaid{padding:24px 16px;text-align:center;
+                          color:#1D9E75;font-weight:800;font-size:1rem;
+                          background:#E6F4EE;border-radius:10px;
+                          border:0.5px solid #1D9E75;}
         </style>
 
         <!-- A) Filters card -->
@@ -10148,6 +10184,97 @@ function dhCopyParentLink(){
           if(gsEvalsTabBtn){
             gsEvalsTabBtn.addEventListener('click', gsEnsureEvalsLoaded);
           }
+
+          /* ── Step 9 — المالية tab. Pure cache read — no fetch.
+             Reuses gsClassifyPayStatus and the pay-* badge classes
+             from Step 5 so the per-row pill colour matches the
+             الطالبات roster exactly. */
+          function gsRenderFinance(payload){
+            var d = payload && payload.detail;
+            var students = (d && d.students) || [];
+            var stats    = d && d.stats;
+            if(students.length === 0){
+              return '<div class="gs-panel-empty">' +
+                'لا توجد بيانات مالية.</div>';
+            }
+            /* Filter: students with remaining > 0 OR pay_status not
+               equal to "مدفوع بالكامل". The endpoint already sets
+               pay_remaining=0 + pay_status="مدفوع بالكامل" in the
+               fully-paid case. */
+            var withRem = students.filter(function(s){
+              var r  = parseFloat(s.pay_remaining || 0);
+              var ps = String((s.pay_status || '')).trim();
+              return (!isNaN(r) && r > 0) || (ps && ps !== 'مدفوع بالكامل');
+            });
+            /* All-paid case: surface a clean confirmation. */
+            if(withRem.length === 0){
+              return '<div class="gs-fin-allpaid">' +
+                '✓ جميع الطالبات سددن المستحقات</div>';
+            }
+            /* Sort by remaining DESC, ties by Arabic-locale name. */
+            withRem.sort(function(a, b){
+              var ar = parseFloat(a.pay_remaining || 0);
+              var br = parseFloat(b.pay_remaining || 0);
+              if(isNaN(ar)) ar = 0;
+              if(isNaN(br)) br = 0;
+              if(br !== ar) return br - ar;
+              return (a.student_name || '').localeCompare(
+                      b.student_name || '', 'ar');
+            });
+            var totalRemaining = (stats && stats.total_remaining) || 0;
+            var withRemCount   = (stats && stats.students_with_remaining)
+                                 || withRem.length;
+            function fmt(n){
+              n = parseFloat(n) || 0;
+              return (n % 1 === 0) ? String(n) : n.toFixed(2);
+            }
+            var html =
+              '<div class="gs-fin-summary">' +
+                '<div class="gs-fin-summary-card gs-fin-amber">' +
+                  '<div class="gs-fin-summary-label">' +
+                    'طالبات لديها متبقي</div>' +
+                  '<div class="gs-fin-summary-value">' +
+                    withRemCount + '</div>' +
+                '</div>' +
+                '<div class="gs-fin-summary-card">' +
+                  '<div class="gs-fin-summary-label">' +
+                    'إجمالي المتبقي</div>' +
+                  '<div class="gs-fin-summary-value">' +
+                    gsEscape(fmt(totalRemaining)) + ' د.ب</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="gs-fin-list">';
+            withRem.forEach(function(s){
+              var name   = gsEscape(s.student_name || '—');
+              var payCls = gsClassifyPayStatus(s);
+              var payTxt = String((s.pay_status || '').trim() || '—');
+              var rem    = parseFloat(s.pay_remaining || 0);
+              if(isNaN(rem)) rem = 0;
+              html +=
+                '<article class="gs-fin-card" data-id="' +
+                  (parseInt(s.id, 10) || 0) + '">' +
+                  '<div class="gs-fin-card-info">' +
+                    '<div class="gs-fin-name">' + name + '</div>' +
+                    '<span class="gs-stu-badge gs-stu-pay-' + payCls +
+                      '">' + gsEscape(payTxt) + '</span>' +
+                  '</div>' +
+                  '<div class="gs-fin-amount">' +
+                    gsEscape(fmt(rem)) + ' د.ب</div>' +
+                '</article>';
+            });
+            html += '</div>';
+            return html;
+          }
+
+          var _gsStep8Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            _gsStep8Fill(payload);
+            var finEl = document.querySelector(
+              '.gs-panel[data-gs-panel="finance"]');
+            if(finEl){
+              finEl.innerHTML = gsRenderFinance(payload);
+            }
+          };
 
           /* Sort buttons live inside the students panel; re-render
              rebuilds them every time. Use event delegation on the
