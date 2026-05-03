@@ -40482,10 +40482,79 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-stat-card.vio-critical{background:#FCE6E6;border-right-color:#A32D2D;}
 .vio-stat-card.vio-critical h4{color:#7A1F1F;}
 .vio-stat-card.vio-critical .vio-num{color:#A32D2D;}
-.vio-list-container{background:#fff;border-radius:14px;padding:24px 18px;
-                    box-shadow:0 4px 14px rgba(0,0,0,.06);
-                    color:#888;text-align:center;font-style:italic;
-                    min-height:120px;}
+.vio-list-container{background:transparent;padding:0;
+                    color:#212121;min-height:120px;}
+.vio-empty{background:#fff;border-radius:14px;padding:40px 20px;
+           box-shadow:0 4px 14px rgba(0,0,0,.06);
+           text-align:center;color:#888;font-style:italic;}
+
+/* ── Action bar ────────────────────────────────────────────────── */
+.vio-action-bar{display:flex;justify-content:flex-start;gap:10px;
+                margin-bottom:14px;flex-wrap:wrap;}
+.vio-btn{border:none;border-radius:9px;padding:10px 18px;
+         font-weight:800;font-size:.92rem;font-family:inherit;
+         cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+         transition:box-shadow .15s ease,background .15s ease;}
+.vio-btn-primary{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                 box-shadow:0 3px 10px rgba(29,158,117,.25);}
+.vio-btn-primary:hover{box-shadow:0 5px 16px rgba(29,158,117,.4);}
+.vio-btn-ghost{background:#f3e5f5;color:#4a148c;}
+.vio-btn-ghost:hover{background:#e1bee7;}
+.vio-btn-secondary{background:#fff;color:#4a148c;border:1.5px solid #d8c8ec;}
+.vio-btn-secondary:hover{background:#faf5ff;}
+
+/* ── Filter card ──────────────────────────────────────────────── */
+.vio-filter-card{background:#fff;border-radius:12px;padding:14px 16px;
+                 box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;}
+.vio-filter-row{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px;
+                align-items:end;}
+@media (max-width:880px){.vio-filter-row{grid-template-columns:1fr;}}
+.vio-field label{display:block;font-size:.82rem;color:#4a148c;font-weight:700;
+                 margin-bottom:4px;}
+.vio-field input,.vio-field select,.vio-field textarea{
+  width:100%;padding:9px 12px;border:1.5px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.92rem;background:#fafafe;}
+.vio-field input:focus,.vio-field select:focus,.vio-field textarea:focus{
+  outline:none;border-color:#8B5CC8;background:#fff;}
+
+/* ── Violation card (severity-bordered) ────────────────────────── */
+.vio-card{background:#fff;border-radius:12px;padding:14px 16px;
+          margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);
+          border-right:5px solid #6B3FA0;
+          transition:box-shadow .15s ease;}
+.vio-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08);}
+.vio-card.vio-sev-light{border-right-color:#1D9E75;}
+.vio-card.vio-sev-medium{border-right-color:#BA7517;}
+.vio-card.vio-sev-severe{border-right-color:#A32D2D;}
+.vio-card-head{display:flex;align-items:center;gap:10px;
+               flex-wrap:wrap;margin-bottom:8px;}
+.vio-card-name{font-weight:900;color:#4a148c;font-size:1.05rem;}
+.vio-sev-badge{padding:3px 10px;border-radius:999px;font-size:.76rem;font-weight:800;}
+.vio-sev-badge.light{background:#E1F5EC;color:#1D9E75;}
+.vio-sev-badge.medium{background:#FAEEDA;color:#BA7517;}
+.vio-sev-badge.severe{background:#FCE6E6;color:#A32D2D;}
+.vio-card-count{margin-right:auto;font-size:.78rem;color:#666;font-weight:700;
+                background:#f4f4f8;padding:3px 10px;border-radius:999px;}
+.vio-card-body{display:grid;gap:6px;font-size:.92rem;color:#333;}
+.vio-card-type{font-weight:700;color:#212121;}
+.vio-card-meta{display:flex;flex-wrap:wrap;gap:14px;color:#555;font-size:.86rem;}
+.vio-card-meta b{color:#4a148c;}
+.vio-card-actions-row{display:flex;flex-wrap:wrap;gap:6px;font-size:.78rem;
+                      margin-top:4px;}
+.vio-action-pill{background:#f0eef8;color:#4a148c;padding:3px 9px;
+                 border-radius:999px;font-weight:700;}
+.vio-wa-sent{display:inline-flex;align-items:center;gap:4px;color:#1b5e20;
+             font-weight:800;font-size:.82rem;background:#E8F5E9;
+             padding:3px 9px;border-radius:999px;}
+.vio-card-foot{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;
+               border-top:1px dashed #eee;padding-top:10px;}
+.vio-card-foot .vio-btn{padding:6px 12px;font-size:.82rem;border-radius:7px;}
+.vio-btn-pdf{background:#FFF7E6;color:#B26B00;}
+.vio-btn-pdf:hover{background:#FFEFCC;}
+.vio-btn-edit{background:#E3F2FD;color:#1565C0;}
+.vio-btn-edit:hover{background:#BBDEFB;}
+.vio-btn-del{background:#FFEBEE;color:#C62828;}
+.vio-btn-del:hover{background:#FFCDD2;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -40515,8 +40584,60 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <div class="vio-num" id="vio-stat-critical">…</div>
     </div>
   </div>
+
+  <div class="vio-action-bar">
+    <button type="button" class="vio-btn vio-btn-primary" id="vio-btn-new">
+      + تسجيل مخالفة
+    </button>
+    <button type="button" class="vio-btn vio-btn-ghost" id="vio-btn-reports">
+      📊 التقارير الشهرية
+    </button>
+  </div>
+
+  <div class="vio-filter-card">
+    <div class="vio-filter-row">
+      <div class="vio-field">
+        <label for="vio-flt-search">بحث باسم الطالبة</label>
+        <input type="text" id="vio-flt-search" placeholder="ابحثي بالاسم...">
+      </div>
+      <div class="vio-field">
+        <label for="vio-flt-type">نوع المخالفة</label>
+        <select id="vio-flt-type">
+          <option value="">— جميع الأنواع —</option>
+          <optgroup label="🟢 خفيفة">
+            <option>النوم في الدرس</option>
+            <option>إصدار أصوات</option>
+            <option>التحدث مع الطلاب بدون إذن</option>
+          </optgroup>
+          <optgroup label="🟡 متوسطة">
+            <option>الحركة والتنقل بدون إذن</option>
+            <option>الخروج من دون إذن</option>
+            <option>استخدام الهاتف من دون إذن</option>
+            <option>الدخول إلى بعض الصفوف أو الغُرف من دون إذن</option>
+          </optgroup>
+          <optgroup label="🔴 خطيرة">
+            <option>ضرب طالب/طالبة</option>
+            <option>التكلم بكلمات بذيئة أو غير لائقة</option>
+            <option>إصدار أفعال تشوش على الطلاب الدرس</option>
+            <option>التصوير من دون إذن</option>
+            <option>إصدار أفعال غير لائقة أو غير أخلاقية</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="vio-field">
+        <label for="vio-flt-place">مكان المخالفة</label>
+        <select id="vio-flt-place">
+          <option value="">— جميع الأماكن —</option>
+          <option>الصف</option>
+          <option>مقر المعهد</option>
+          <option>بالقرب من مقر المعهد في الخارج</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <div class="vio-list-container" id="vio-list-container">
-    سيتم عرض المخالفات هنا
+    <div class="vio-empty">سيتم عرض المخالفات هنا</div>
   </div>
 </div>
 <script>
