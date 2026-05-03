@@ -9236,26 +9236,163 @@ function dhCopyParentLink(){
               .catch(function(){ /* leave placeholder option */ });
           }
 
-          /* Group selection → reveal the card with placeholder data.
-             Step 3 replaces the placeholders with the real detail
-             fetch. */
+          /* ── Step 3 — wire group selection to /api/groups/<id>/detail.
+             Cache shape: gsDetailCache[gid] = {detail, lessonsCount}.
+             A second parallel fetch hits /api/lessons/log to fill the
+             "دروس" stat right away — Step 7 can reuse the cached
+             count when implementing the lessons tab. ─────────── */
+          var gsDetailCache = {};
+
+          function setStatsPlaceholder(text){
+            ['gs-stat-students','gs-stat-att',
+             'gs-stat-lessons','gs-stat-overdue'].forEach(function(id){
+              var el = document.getElementById(id);
+              if(el) el.textContent = text;
+            });
+          }
+
+          function applyAttClass(pct){
+            var el = document.getElementById('gs-stat-att-card');
+            if(!el) return;
+            el.classList.remove(
+              'gs-stat-att-high','gs-stat-att-mid','gs-stat-att-low');
+            if(pct == null) return;
+            if(pct >= 80)      el.classList.add('gs-stat-att-high');
+            else if(pct >= 60) el.classList.add('gs-stat-att-mid');
+            else               el.classList.add('gs-stat-att-low');
+          }
+
+          function fillFromDetail(payload){
+            var d     = payload && payload.detail;
+            var grp   = d && d.group;
+            var stats = d && d.stats;
+            var name    = (grp && grp.group_name) || '';
+            var teacher = (grp && grp.teacher_name) || '';
+            var level   = (grp && grp.level) || '';
+            var sc      = (stats && stats.student_count) || 0;
+            var avg     = stats ? stats.avg_attendance_pct : null;
+            var withRem = (stats && stats.students_with_remaining) || 0;
+
+            avatarEl.textContent = gsAbbrev(name);
+            nameEl.textContent   = name || '—';
+            var parts = [];
+            if(teacher) parts.push('المعلمة: ' + teacher);
+            parts.push(String(sc) + ' طالبة');
+            if(level)   parts.push(level);
+            metaEl.textContent = parts.join(' · ');
+
+            document.getElementById('gs-stat-students').textContent = String(sc);
+            if(avg == null){
+              document.getElementById('gs-stat-att').textContent = '—';
+              applyAttClass(null);
+            } else {
+              document.getElementById('gs-stat-att').textContent =
+                Math.round(avg) + '%';
+              applyAttClass(avg);
+            }
+            document.getElementById('gs-stat-overdue').textContent =
+              String(withRem);
+
+            /* Lessons count comes from the parallel fetch — show
+               cached value if we have it, otherwise leave '...' so
+               the user sees a loading state until it resolves. */
+            var lessonsEl = document.getElementById('gs-stat-lessons');
+            if(lessonsEl){
+              if(payload.lessonsCount != null){
+                lessonsEl.textContent = String(payload.lessonsCount);
+              }
+            }
+          }
+
+          function fetchLessonsCount(gid, groupName){
+            if(!groupName){
+              document.getElementById('gs-stat-lessons').textContent = '—';
+              return;
+            }
+            fetch('/api/lessons/log?group_name=' +
+                  encodeURIComponent(groupName) + '&limit=500',
+                  {credentials:'include'})
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                var entries = (j && j.entries) || [];
+                var n = entries.length;
+                if(gsDetailCache[gid]) gsDetailCache[gid].lessonsCount = n;
+                /* Only update the DOM if THIS group is still selected
+                   (the user may have switched in the meantime). */
+                if(sel.value === String(gid)){
+                  var el = document.getElementById('gs-stat-lessons');
+                  if(el) el.textContent = String(n);
+                }
+              })
+              .catch(function(err){
+                if(typeof console !== 'undefined' && console.warn){
+                  console.warn('[gs] lessons-count fetch failed', err);
+                }
+                if(sel.value === String(gid)){
+                  var el = document.getElementById('gs-stat-lessons');
+                  if(el) el.textContent = '—';
+                }
+              });
+          }
+
+          function loadGroupDetail(gid){
+            if(gsDetailCache[gid]){
+              /* Cache hit — fill synchronously, no loading flicker. */
+              fillFromDetail(gsDetailCache[gid]);
+              return;
+            }
+            setStatsPlaceholder('...');
+            fetch('/api/groups/' + encodeURIComponent(gid) + '/detail',
+                  {credentials:'include'})
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                if(!j || !j.ok){
+                  if(typeof console !== 'undefined' && console.warn){
+                    console.warn('[gs] group detail not ok', j);
+                  }
+                  setStatsPlaceholder('—');
+                  return;
+                }
+                var entry = {detail: j, lessonsCount: null};
+                gsDetailCache[gid] = entry;
+                /* Only update the DOM if THIS group is still selected. */
+                if(sel.value === String(gid)){
+                  fillFromDetail(entry);
+                  fetchLessonsCount(gid,
+                    (j.group && j.group.group_name) || '');
+                }
+              })
+              .catch(function(err){
+                if(typeof console !== 'undefined' && console.warn){
+                  console.warn('[gs] group detail fetch failed', err);
+                }
+                setStatsPlaceholder('—');
+              });
+          }
+
+          /* Group selection → reveal card and dispatch the detail
+             fetch. Cached groups skip the loading state. */
           sel.addEventListener('change', function(){
             if(!sel.value){ card.hidden = true; return; }
+            card.hidden = false;
+            var gid = sel.value;
+            if(gsDetailCache[gid]){
+              /* Cache hit — fill synchronously from cache. */
+              fillFromDetail(gsDetailCache[gid]);
+              return;
+            }
+            /* Cold path: paint a quick header from the option's
+               data-* attributes, show "..." in the stats, then kick
+               the async detail fetch. */
             var opt = sel.options[sel.selectedIndex];
             var name    = (opt && opt.dataset.name)    || '';
             var teacher = (opt && opt.dataset.teacher) || '';
             avatarEl.textContent = gsAbbrev(name);
             nameEl  .textContent = name || '—';
             metaEl  .textContent = teacher
-              ? ('المعلمة: ' + teacher + ' · — طالبة')
-              : '— طالبة';
-            /* Stat placeholders — Step 3 replaces these. */
-            ['gs-stat-students','gs-stat-att',
-             'gs-stat-lessons','gs-stat-overdue'].forEach(function(id){
-              var el = document.getElementById(id);
-              if(el) el.textContent = '—';
-            });
-            card.hidden = false;
+              ? ('المعلمة: ' + teacher + ' · ... طالبة')
+              : '... طالبة';
+            loadGroupDetail(gid);
           });
 
           /* Text input filters the dropdown options live. Doesn't
