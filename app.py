@@ -40564,6 +40564,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-btn-edit:hover{background:#BBDEFB;}
 .vio-btn-del{background:#FFEBEE;color:#C62828;}
 .vio-btn-del:hover{background:#FFCDD2;}
+.vio-btn-pledge{background:#FFF3E0;color:#E65100;}
+.vio-btn-pledge:hover{background:#FFE0B2;}
 
 /* ── Modal (mirrors tm-modal-overlay pattern, prefixed vio-*) ───── */
 .vio-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
@@ -41950,6 +41952,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         '</div>' +
         '<div class="vio-card-foot">' +
           '<button type="button" class="vio-btn vio-btn-pdf">📄 PDF</button>' +
+          '<button type="button" class="vio-btn vio-btn-pledge">📜 تعهد كتابي</button>' +
           '<button type="button" class="vio-btn vio-btn-edit">✏️ تعديل</button>' +
           '<button type="button" class="vio-btn vio-btn-del">🗑️ حذف</button>' +
         '</div>' +
@@ -42021,6 +42024,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       } else if (t.closest('.vio-btn-pdf')){
         window.open(
           '/api/admin/violations/' + encodeURIComponent(vid) + '/pdf',
+          '_blank'
+        );
+      } else if (t.closest('.vio-btn-pledge')){
+        window.open(
+          '/api/admin/violations/' + encodeURIComponent(vid) + '/pledge',
           '_blank'
         );
       }
@@ -43300,6 +43308,171 @@ def _vio_render_monthly_pdf_html(student_name, group_name, month_label, rows):
     )
     return (head + print_bar + header + banner + summary + detail
             + footer + auto_print + "</body></html>")
+
+
+# ── Pledge document (تعهد كتابي) — Stage 3+ feature ────────────────
+# Print-friendly HTML page rendered alongside the violation PDF, but
+# styled as a formal undertaking the student/parent/supervisor signs
+# in person. Same Chromium-free flow as the PDF endpoint: returns
+# text/html with auto-print baked in, prints clean A4 via the
+# browser's "Save as PDF" path.
+_VIO_PLEDGE_CSS = """
+.pl-header{text-align:center;padding-bottom:14px;
+           border-bottom:3px double #6B3FA0;margin-bottom:22px;}
+.pl-logo{width:80px;margin:0 auto 12px;}
+.pl-logo svg{width:100%;height:auto;display:block;}
+.pl-center-name{font-size:16px;font-weight:900;color:#4a148c;}
+.pl-title-row{text-align:center;margin:22px 0 26px;}
+.pl-title-line{border-top:3px double #6B3FA0;}
+.pl-title{font-size:22px;font-weight:900;color:#4a148c;
+          padding:10px 0;letter-spacing:2px;}
+.pl-info{font-size:14px;line-height:2.4;margin:18px 0;}
+.pl-info > div{margin-bottom:4px;}
+.pl-fill{display:inline-block;min-width:200px;
+         border-bottom:1.5px solid #888;padding:0 8px;
+         font-weight:700;color:#4a148c;}
+.pl-intro{margin:18px 0 10px;font-size:14px;font-weight:800;color:#4a148c;}
+.pl-violation-box{border:2px solid #6B3FA0;border-radius:8px;
+                  padding:12px 18px;margin:10px 0 18px;
+                  background:#faf8fd;font-size:13.5px;line-height:2.1;}
+.pl-violation-box b{color:#4a148c;}
+.pl-body{font-size:13.5px;line-height:1.95;margin:18px 0;
+         text-align:justify;}
+.pl-body p{margin-bottom:10px;}
+.pl-sigs{display:grid;grid-template-columns:1fr 1fr;
+         gap:30px 50px;margin:36px 0 22px;
+         page-break-inside:avoid;}
+.pl-sig-box{padding:6px 0;}
+.pl-sig-label{font-weight:800;color:#4a148c;
+              font-size:13px;margin-bottom:38px;}
+.pl-sig-line{border-bottom:1.5px dashed #555;height:6px;}
+.pl-date-line{text-align:center;margin-top:24px;
+              font-size:13px;font-weight:700;color:#4a148c;}
+.pl-date-fill{display:inline-block;min-width:55px;
+              border-bottom:1.5px solid #888;
+              padding:0 8px;margin:0 4px;}
+"""
+
+
+def _vio_render_pledge_html(row):
+    """Build the HTML for a printable pledge document
+    (تعهد كتابي) tied to a single violation. Uses the same
+    base print-CSS as the PDF endpoints + a pledge-specific
+    layer for the formal letterhead / signature grid."""
+    import html as _html
+    from datetime import datetime as _dt
+    e = _html.escape
+
+    name   = e(row.get("student_name") or "")
+    group  = e(row.get("group_name") or "")
+    vdate  = e(row.get("violation_date") or "")
+    vplace = e(row.get("violation_place") or "")
+    vtype  = e(row.get("violation_type") or "")
+    today_str = _dt.now().strftime("%Y-%m-%d")
+    vid    = row.get("id")
+
+    head = (
+        "<!DOCTYPE html><html lang=\"ar\" dir=\"rtl\"><head>"
+        "<meta charset=\"utf-8\">"
+        "<title>تعهد كتابي #" + str(vid) + "</title>"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<style>" + _VIO_PDF_CSS + _VIO_PLEDGE_CSS + "</style>"
+        "</head><body>"
+    )
+    print_bar = (
+        "<div class=\"print-bar\">"
+          "<button type=\"button\" class=\"print-btn\" onclick=\"window.print()\">"
+            "🖨️ طباعة / حفظ كـ PDF"
+          "</button>"
+          "<span class=\"print-hint\">"
+            "اختر &quot;حفظ كـ PDF&quot; من نافذة الطباعة"
+          "</span>"
+        "</div>"
+    )
+    header = (
+        "<div class=\"pl-header\">"
+          "<div class=\"pl-logo\">" + _VIO_PDF_LOGO_SVG + "</div>"
+          "<div class=\"pl-center-name\">مركز مايندكس للتعليم والتدريب</div>"
+        "</div>"
+    )
+    title = (
+        "<div class=\"pl-title-row\">"
+          "<div class=\"pl-title-line\"></div>"
+          "<div class=\"pl-title\">تعهد كتابي</div>"
+          "<div class=\"pl-title-line\"></div>"
+        "</div>"
+    )
+    info = (
+        "<div class=\"pl-info\">"
+          "<div>أنا الطالبة: <span class=\"pl-fill\">" + name + "</span></div>"
+          "<div>من مجموعة: <span class=\"pl-fill\">" + (group if group else "&mdash;") + "</span></div>"
+          "<div>بتاريخ: <span class=\"pl-fill\">" + e(today_str) + "</span></div>"
+        "</div>"
+    )
+    intro = "<div class=\"pl-intro\">أتعهد بعدم تكرار المخالفة التالية:</div>"
+    box = (
+        "<div class=\"pl-violation-box\">"
+          "<div><b>نوع المخالفة:</b> " + vtype + "</div>"
+          "<div><b>مكان المخالفة:</b> " + vplace + "</div>"
+          "<div><b>تاريخ المخالفة:</b> " + vdate + "</div>"
+        "</div>"
+    )
+    body_p = (
+        "<div class=\"pl-body\">"
+          "<p>كما أتعهد بالالتزام بقوانين المركز والانضباط في السلوك والتصرف "
+          "داخل قاعات الدراسة وفي محيط المركز.</p>"
+          "<p>في حال تكرار المخالفة أو الإخلال بهذا التعهد، أتحمل المسؤولية "
+          "الكاملة وأقبل أي إجراء يتخذه المركز بحقي وفق اللوائح والأنظمة "
+          "المعمول بها.</p>"
+        "</div>"
+    )
+    sigs = (
+        "<div class=\"pl-sigs\">"
+          "<div class=\"pl-sig-box\"><div class=\"pl-sig-label\">توقيع الطالبة</div><div class=\"pl-sig-line\"></div></div>"
+          "<div class=\"pl-sig-box\"><div class=\"pl-sig-label\">توقيع ولي الأمر</div><div class=\"pl-sig-line\"></div></div>"
+          "<div class=\"pl-sig-box\"><div class=\"pl-sig-label\">توقيع المشرف</div><div class=\"pl-sig-line\"></div></div>"
+          "<div class=\"pl-sig-box\"><div class=\"pl-sig-label\">ختم المركز</div><div class=\"pl-sig-line\"></div></div>"
+        "</div>"
+    )
+    date_line = (
+        "<div class=\"pl-date-line\">"
+          "التاريخ: "
+          "<span class=\"pl-date-fill\">&nbsp;</span> / "
+          "<span class=\"pl-date-fill\">&nbsp;</span> / "
+          "<span class=\"pl-date-fill\" style=\"min-width:90px;\">&nbsp;</span>"
+        "</div>"
+    )
+    auto_print = (
+        "<script>"
+          "window.addEventListener('load', function(){"
+            "setTimeout(function(){ try { window.print(); } catch(e){} }, 500);"
+          "});"
+        "</script>"
+    )
+    return (head + print_bar + header + title + info + intro + box
+            + body_p + sigs + date_line + auto_print + "</body></html>")
+
+
+@app.route("/api/admin/violations/<int:vid>/pledge", methods=["GET"])
+@login_required
+def api_admin_violations_pledge(vid):
+    """Print-friendly تعهد كتابي for a single violation. Same
+    Chromium-free pattern as the PDF endpoints — returns text/html
+    with auto-print baked in. Admin-only. 404 if missing or
+    soft-deleted."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return Response("غير مصرح", status=403,
+                        mimetype="text/plain; charset=utf-8")
+    db = get_db()
+    row = db.execute("SELECT * FROM violations WHERE id=? AND is_deleted=0",
+                     (vid,)).fetchone()
+    if not row:
+        return Response("المخالفة غير موجودة", status=404,
+                        mimetype="text/plain; charset=utf-8")
+    decorated = _vio_decorate_rows(db, [row])[0]
+    html_str = _vio_render_pledge_html(decorated)
+    return Response(html_str, mimetype="text/html")
 
 
 @app.route("/api/admin/violations/<int:vid>/pdf", methods=["GET"])
