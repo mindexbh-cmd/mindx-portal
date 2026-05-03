@@ -8962,8 +8962,17 @@ function dhCopyParentLink(){
 }
 </script>
 
+<style>
+/* Round-9 — widen the search-modal content panel so the Round-7
+   grouped-cards layout (2-col grid) doesn't crop on desktop /
+   tablet. Selector is scoped to #sr-modal's direct child only —
+   no other modal on the page is affected. */
+#sr-modal > div{max-width:95vw;}
+@media (max-width:1199px){#sr-modal > div{max-width:90vw;}}
+@media (max-width:767px) {#sr-modal > div{max-width:100vw;}}
+</style>
 <div id="sr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow:auto;">
-  <div style="background:#fff;margin:20px auto;border-radius:14px;max-width:760px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
+  <div style="background:#fff;margin:20px auto;border-radius:14px;width:95%;padding:0;overflow:hidden;box-shadow:0 8px 32px rgba(0,137,123,0.25);">
     <div class="srm-header"><span>&#x1F50D; &#x628;&#x62D;&#x62B; &#x639;&#x646; &#x637;&#x627;&#x644;&#x628;</span><span class="srm-close" onclick="srClose()">&times;</span></div>
     <div style="padding:12px 16px 0;background:#f9f5ff;border-bottom:1px solid #e0d0f8;">
       <button type="button" onclick="srOpenAddStudent()" style="background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;padding:11px 22px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 10px rgba(46,125,50,.3);">&#x2795; &#x625;&#x636;&#x627;&#x641;&#x629; &#x637;&#x627;&#x644;&#x628; &#x62C;&#x62F;&#x64A;&#x62F;</button>
