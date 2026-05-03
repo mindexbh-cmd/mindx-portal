@@ -36521,7 +36521,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         <div id="tm-lessons-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="evaluations" hidden>
-        <div class="tm-panel-empty">سيتم عرض التقييمات هنا.</div>
+        <div id="tm-evals-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="messages" hidden>
         <div class="tm-panel-empty">سيتم عرض الرسائل هنا.</div>
@@ -36620,6 +36620,35 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-list-foot{margin-top:14px;display:flex;justify-content:center;}
 .tm-btn-secondary{background:#f3e5f5;color:#4a148c;}
 .tm-btn-secondary:hover{background:#e1bee7;}
+
+/* ── Step-4: monthly-evaluation cards ──────────────────────── */
+.tm-eval-card{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
+              padding:14px 16px;}
+.tm-ecard-head{display:flex;justify-content:space-between;align-items:center;
+               gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.tm-ecard-head-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tm-ecard-student{color:#4a148c;font-weight:900;font-size:.98rem;}
+.tm-ecard-grp{color:#4a148c;font-weight:800;font-size:.88rem;
+              background:#f3e5f5;padding:3px 10px;border-radius:8px;}
+.tm-ecard-month{color:#6a4f8a;font-weight:700;font-size:.86rem;}
+.tm-badge-internal{background:#f3e5f5;color:#4a148c;
+                   border:0.5px solid #6B3FA0;}
+.tm-ecard-scores{display:grid;grid-template-columns:1fr 1fr;gap:10px;
+                 margin-bottom:12px;}
+@media (max-width:540px){.tm-ecard-scores{grid-template-columns:1fr;}}
+.tm-score-box{padding:10px 14px;border-radius:10px;border:0.5px solid #d8c8ec;
+              background:#fafafe;}
+.tm-score-label{font-size:.86rem;font-weight:700;margin-bottom:4px;color:inherit;}
+.tm-score-value{font-size:1.4rem;font-weight:900;line-height:1.1;color:inherit;}
+.tm-score-high{background:#E6F4EE;border-color:#1D9E75;color:#1D9E75;}
+.tm-score-mid{background:#FFF3E0;border-color:#BA7517;color:#BA7517;}
+.tm-score-low{background:#FCE6E6;border-color:#A32D2D;color:#A32D2D;}
+.tm-score-none{background:#fafafe;border-color:#d8c8ec;color:#8a7da5;}
+.tm-ecard-notes{background:#fafafe;border:0.5px solid #d8c8ec;border-radius:10px;
+                padding:10px 14px;}
+.tm-ecard-notes .tm-row-key{display:block;margin-bottom:4px;}
+.tm-ecard-notes .tm-row-val{display:block;color:#212121;line-height:1.55;
+                            font-size:.92rem;}
 </style>
 
 <script>
@@ -36891,6 +36920,179 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   // group change re-fires the fetch with the chosen group_name.
   teacherSel.addEventListener('change', tmLoadLessons);
   groupSel.addEventListener('change',   tmLoadLessons);
+
+  // ── Step-4: monthly-evaluation tab loader ────────────────────
+  // /api/evaluations returns ALL rows (no server-side filter), so we
+  // fetch once per page session and cache, then filter client-side
+  // by teacher_id (and optionally group_name) on every dropdown
+  // change. Sorted by evaluation_month then id, descending. Step 2's
+  // structure and Step 3's lessons logic are not modified — we only
+  // attach two extra listeners on the existing dropdowns.
+  var EVAL_MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+                        'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  var evalsAll      = null;   // null until first fetch; then array
+  var evalsLoading  = false;
+  var evalsExpanded = false;
+
+  function tmArMonthLabel(ymOrIso){
+    if(!ymOrIso) return '';
+    var s = String(ymOrIso);
+    // Accepts "YYYY-MM" or "YYYY-MM-DD" or "YYYY-MM..." — pull out
+    // the YYYY and MM tokens defensively.
+    var m = s.match(/^(\d{4})-(\d{1,2})/);
+    if(!m) return s;
+    var y = parseInt(m[1], 10);
+    var mo = parseInt(m[2], 10);
+    if(!y || !mo || mo < 1 || mo > 12) return s;
+    return EVAL_MONTHS_AR[mo - 1] + ' ' + y;
+  }
+  function tmEvalMonth(e){
+    return (e.evaluation_month || e.evaluation_date ||
+            e.form_fill_date   || '');
+  }
+  function tmScoreClass(score){
+    if(score == null || score === '') return 'tm-score-none';
+    var n = parseInt(score, 10);
+    if(isNaN(n)) return 'tm-score-none';
+    if(n >= 8) return 'tm-score-high';
+    if(n >= 5) return 'tm-score-mid';
+    return 'tm-score-low';
+  }
+  function tmScoreText(score){
+    if(score == null || score === '') return '—/10';
+    var n = parseInt(score, 10);
+    if(isNaN(n)) return '—/10';
+    return n + '/10';
+  }
+
+  function tmRenderEvalCard(e){
+    var stu     = tmEscape(e.student_name || '');
+    var grp     = tmEscape(e.group_name || '');
+    var monAr   = tmEscape(tmArMonthLabel(tmEvalMonth(e)));
+    var spCls   = tmScoreClass(e.score_participation);
+    var sbCls   = tmScoreClass(e.score_behavior);
+    var spTxt   = tmEscape(tmScoreText(e.score_participation));
+    var sbTxt   = tmEscape(tmScoreText(e.score_behavior));
+    var nb      = (e.notes_behavior || '').trim();
+    var notesH  = nb
+      ? '<div class="tm-ecard-notes">' +
+          '<span class="tm-row-key">ملاحظات على السلوك:</span>' +
+          '<span class="tm-row-val">' + tmEscape(nb) + '</span>' +
+        '</div>'
+      : '';
+    return (
+      '<article class="tm-eval-card" data-id="' +
+        (parseInt(e.id, 10) || 0) + '">' +
+        '<header class="tm-ecard-head">' +
+          '<div class="tm-ecard-head-info">' +
+            (stu   ? '<span class="tm-ecard-student">' + stu   + '</span>' : '') +
+            (grp   ? '<span class="tm-ecard-grp">'     + grp   + '</span>' : '') +
+            (monAr ? '<span class="tm-ecard-month">'   + monAr + '</span>' : '') +
+          '</div>' +
+          '<span class="tm-badge tm-badge-internal">للإدارة فقط</span>' +
+        '</header>' +
+        '<div class="tm-ecard-scores">' +
+          '<div class="tm-score-box ' + spCls + '">' +
+            '<div class="tm-score-label">المشاركة داخل الصف</div>' +
+            '<div class="tm-score-value">' + spTxt + '</div>' +
+          '</div>' +
+          '<div class="tm-score-box ' + sbCls + '">' +
+            '<div class="tm-score-label">السلوك العام</div>' +
+            '<div class="tm-score-value">' + sbTxt + '</div>' +
+          '</div>' +
+        '</div>' +
+        notesH +
+      '</article>'
+    );
+  }
+
+  function tmRenderEvals(entries){
+    var body = document.getElementById('tm-evals-body');
+    if(!body) return;
+    var total = entries.length;
+    if(total === 0){
+      body.innerHTML = '<div class="tm-panel-empty">' +
+        'لا توجد تقييمات لهذا الاختيار حتى الآن.</div>';
+      return;
+    }
+    var visible = evalsExpanded ? entries : entries.slice(0, 5);
+    var html = '<div class="tm-card-list">';
+    visible.forEach(function(e){ html += tmRenderEvalCard(e); });
+    html += '</div>';
+    if(total > 5){
+      var label = evalsExpanded
+        ? 'عرض آخر 5 فقط'
+        : ('عرض كل التقييمات (' + total + ')');
+      html += '<div class="tm-list-foot">' +
+        '<button type="button" class="tm-btn tm-btn-secondary" ' +
+        'id="tm-evals-toggle">' + label + '</button></div>';
+    }
+    body.innerHTML = html;
+    var toggle = document.getElementById('tm-evals-toggle');
+    if(toggle){
+      toggle.addEventListener('click', function(){
+        evalsExpanded = !evalsExpanded;
+        tmRenderEvals(entries);
+      });
+    }
+  }
+
+  function tmFilterAndRenderEvals(){
+    if(!evalsAll) return;
+    var sel = tmCurrentSelection();
+    if(!sel.tid){
+      var body = document.getElementById('tm-evals-body');
+      if(body) body.innerHTML = '';
+      return;
+    }
+    var tid = parseInt(sel.tid, 10);
+    var filtered = evalsAll.filter(function(e){
+      if(parseInt(e.is_deleted, 10) === 1) return false;
+      if(parseInt(e.teacher_id, 10) !== tid) return false;
+      if(sel.gname && (e.group_name || '').trim() !== sel.gname) return false;
+      return true;
+    });
+    filtered.sort(function(a, b){
+      var am = tmEvalMonth(a) || '';
+      var bm = tmEvalMonth(b) || '';
+      if(am !== bm) return bm.localeCompare(am);
+      return (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0);
+    });
+    evalsExpanded = false;
+    tmRenderEvals(filtered);
+  }
+
+  function tmLoadEvals(){
+    var sel = tmCurrentSelection();
+    var body = document.getElementById('tm-evals-body');
+    if(!body) return;
+    if(!sel.tid){
+      body.innerHTML = '';
+      return;
+    }
+    if(evalsAll){
+      tmFilterAndRenderEvals();
+      return;
+    }
+    if(evalsLoading) return;
+    evalsLoading = true;
+    body.innerHTML = '<div class="tm-panel-empty">جارٍ التحميل...</div>';
+    fetch('/api/evaluations', {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        evalsAll = (j && j.rows) || [];
+        evalsLoading = false;
+        tmFilterAndRenderEvals();
+      })
+      .catch(function(){
+        evalsLoading = false;
+        body.innerHTML = '<div class="tm-panel-empty">' +
+          'تعذّر تحميل التقييمات.</div>';
+      });
+  }
+
+  teacherSel.addEventListener('change', tmLoadEvals);
+  groupSel.addEventListener('change',   tmLoadEvals);
 })();
 </script>
 </body></html>"""
