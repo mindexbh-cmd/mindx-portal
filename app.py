@@ -41375,6 +41375,60 @@ def _vio_int01(v):
     return 0
 
 
+def _vio_decorate_rows(db, rows):
+    """Add severity_label / action_count / days_ago /
+    violation_count_for_student to each row, plus stringify any
+    non-JSON-friendly value (datetime, Decimal, etc.). Counts are
+    pre-computed once via a single GROUP BY query so we don't pay
+    an N+1 hit when callers pass a long list. Used by PATCH and
+    student-history endpoints (Stage 2). The GET-list endpoint
+    keeps its own inline copy so this helper introduction stays
+    purely additive — Stage 1 behaviour is untouched."""
+    if not rows:
+        return []
+    counts = {}
+    try:
+        for r in db.execute(
+            "SELECT student_id, student_name, COUNT(*) AS c "
+            "FROM violations WHERE is_deleted = 0 "
+            "GROUP BY student_id, student_name"
+        ).fetchall():
+            sid = r["student_id"] if hasattr(r, "keys") else r[0]
+            nm  = r["student_name"] if hasattr(r, "keys") else r[1]
+            c   = r["c"] if hasattr(r, "keys") else r[2]
+            counts[(sid, nm)] = int(c or 0)
+    except Exception:
+        counts = {}
+    from datetime import date as _date, datetime as _dt
+    today = _date.today()
+    out = []
+    for row in rows:
+        d = dict(row)
+        sev = (d.get("severity") or "").strip().lower()
+        d["severity_label"] = _VIO_SEVERITY_LABEL_AR.get(sev, "")
+        d["action_count"]   = sum(int(d.get(f) or 0) for f in _VIO_ACTION_FIELDS)
+        days_ago = None
+        vd = d.get("violation_date")
+        if vd:
+            try:
+                if hasattr(vd, "year"):
+                    parsed = vd if not hasattr(vd, "hour") else vd.date()
+                else:
+                    parsed = _dt.strptime(str(vd)[:10], "%Y-%m-%d").date()
+                days_ago = (today - parsed).days
+            except Exception:
+                days_ago = None
+        d["days_ago"] = days_ago
+        d["violation_count_for_student"] = counts.get(
+            (d.get("student_id"), d.get("student_name")), 0)
+        for k, v in list(d.items()):
+            if v is None or isinstance(v, (str, int, float, bool)): continue
+            try: d[k] = str(v)
+            except Exception: d[k] = None
+        out.append(d)
+    return out
+
+
 @app.route("/api/admin/violations", methods=["POST"])
 @login_required
 def api_admin_violations_create():
@@ -41596,6 +41650,142 @@ def api_admin_violations_list():
         out.append(d)
 
     return jsonify({"ok": True, "violations": out, "total": len(out)})
+
+
+@app.route("/api/admin/violations/<int:vid>", methods=["PATCH"])
+@login_required
+def api_admin_violations_update(vid):
+    """Sparse update on a single violation. Admin-only.
+
+    Behaviour:
+    - 404 if the row is missing OR already soft-deleted (Stage 2 keeps
+      soft-deleted rows out of the editable surface).
+    - Only fields present in the request body are touched — never blank
+      out a column the caller didn't send.
+    - Validates exactly the same allowlists as POST (3 places, 12 types,
+      YYYY-MM-DD dates) and re-classifies severity automatically when
+      violation_type changes.
+    - Action checkboxes are coerced through _vio_int01 the same way
+      POST does so "1"/1/true/etc. all collapse to 0|1.
+    - Audit trail records the changed fields under new_value.
+    - Returns the freshly-decorated row (severity_label, action_count,
+      days_ago, violation_count_for_student) so the client doesn't need
+      a follow-up GET to refresh the card."""
+    user = session.get("user") or {}
+    if not _vio_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM violations WHERE id=? AND is_deleted=0", (vid,)
+    ).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "المخالفة غير موجودة"}), 404
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "بيانات غير صحيحة"}), 400
+
+    def _str(v):
+        return ("" if v is None else str(v)).strip()
+
+    set_parts = []
+    params = []
+    changed = {}
+
+    if "student_name" in data:
+        v = _str(data["student_name"])
+        if not v:
+            return jsonify({"ok": False, "error": "اسم الطالبة لا يمكن أن يكون فارغاً"}), 400
+        set_parts.append("student_name=?"); params.append(v)
+        changed["student_name"] = v
+
+    if "student_id" in data:
+        sid_raw = data["student_id"]
+        sid = None
+        if sid_raw not in (None, "", "null"):
+            try: sid = int(sid_raw)
+            except Exception: sid = None
+        set_parts.append("student_id=?"); params.append(sid)
+        changed["student_id"] = sid
+
+    if "group_name" in data:
+        v = _str(data["group_name"]) or None
+        set_parts.append("group_name=?"); params.append(v)
+        changed["group_name"] = v
+
+    if "violation_date" in data:
+        v = _str(data["violation_date"])
+        if not v:
+            return jsonify({"ok": False, "error": "تاريخ المخالفة مطلوب"}), 400
+        try:
+            from datetime import datetime as _dt
+            _dt.strptime(v, "%Y-%m-%d")
+        except Exception:
+            return jsonify({"ok": False, "error": "صيغة التاريخ غير صحيحة"}), 400
+        set_parts.append("violation_date=?"); params.append(v)
+        changed["violation_date"] = v
+
+    if "violation_place" in data:
+        v = _str(data["violation_place"])
+        if v not in _VIO_PLACES:
+            return jsonify({"ok": False, "error": "مكان المخالفة غير صحيح"}), 400
+        set_parts.append("violation_place=?"); params.append(v)
+        changed["violation_place"] = v
+
+    if "violation_type" in data:
+        v = _str(data["violation_type"])
+        if v not in _VIO_SEVERITY_BY_TYPE:
+            return jsonify({"ok": False, "error": "نوع المخالفة غير صحيح"}), 400
+        new_sev = _VIO_SEVERITY_BY_TYPE[v]
+        set_parts.append("violation_type=?"); params.append(v)
+        set_parts.append("severity=?");       params.append(new_sev)
+        changed["violation_type"] = v
+        changed["severity"]       = new_sev
+
+    if "description" in data:
+        v = _str(data["description"])[:500] or None
+        set_parts.append("description=?"); params.append(v)
+        changed["description"] = v
+
+    if "additional_notes" in data:
+        v = _str(data["additional_notes"]) or None
+        set_parts.append("additional_notes=?"); params.append(v)
+        changed["additional_notes"] = v
+
+    for f in _VIO_ACTION_FIELDS:
+        if f in data:
+            iv = _vio_int01(data[f])
+            set_parts.append(f + "=?"); params.append(iv)
+            changed[f] = iv
+
+    if not set_parts:
+        return jsonify({"ok": False, "error": "لا توجد حقول للتحديث"}), 400
+
+    set_parts.append("updated_at=CURRENT_TIMESTAMP")
+
+    sql = ("UPDATE violations SET " + ", ".join(set_parts) +
+           " WHERE id=? AND is_deleted=0")
+    params.append(vid)
+    try:
+        db.execute(sql, tuple(params))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر تحديث المخالفة: " + str(ex)}), 500
+
+    try:
+        _audit("violation.update",
+               target_type="violation",
+               target_id=vid,
+               new_value=changed)
+    except Exception:
+        pass
+
+    new_row = db.execute(
+        "SELECT * FROM violations WHERE id=?", (vid,)
+    ).fetchone()
+    decorated = _vio_decorate_rows(db, [new_row])[0] if new_row else None
+    return jsonify({"ok": True, "violation": decorated})
 
 
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
