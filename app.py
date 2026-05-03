@@ -36518,7 +36518,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 
     <div class="tm-panels">
       <div class="tm-panel" data-tm-panel="lessons">
-        <div class="tm-panel-empty">سيتم عرض الدروس هنا.</div>
+        <div id="tm-lessons-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="evaluations" hidden>
         <div class="tm-panel-empty">سيتم عرض التقييمات هنا.</div>
@@ -36593,6 +36593,33 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-panel{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
           padding:18px 20px;min-height:160px;}
 .tm-panel-empty{color:#8a7da5;text-align:center;padding:40px 20px;font-style:italic;}
+
+/* ── Step-3: lessons-tab card list ─────────────────────────── */
+.tm-card-list{display:flex;flex-direction:column;gap:12px;}
+.tm-lesson-card{background:#fff;border:0.5px solid #d8c8ec;border-radius:12px;
+                padding:14px 16px;}
+.tm-lcard-head{display:flex;justify-content:space-between;align-items:center;
+               gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.tm-lcard-head-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tm-lcard-date{color:#4a148c;font-weight:700;font-size:.92rem;}
+.tm-lcard-grp{color:#4a148c;font-weight:800;font-size:.92rem;
+              background:#f3e5f5;padding:4px 10px;border-radius:8px;}
+.tm-badge{display:inline-block;padding:3px 10px;border-radius:999px;
+          font-size:.75rem;font-weight:800;line-height:1.4;}
+.tm-badge-success{background:#E6F4EE;color:#1D9E75;
+                  border:0.5px solid #1D9E75;}
+.tm-lcard-body{display:flex;flex-direction:column;gap:6px;}
+.tm-row{font-size:.92rem;line-height:1.55;color:#212121;}
+.tm-row-key{color:#4a148c;font-weight:700;margin-left:4px;}
+.tm-row-val{color:#212121;}
+.tm-lcard-foot{margin-top:10px;display:flex;justify-content:flex-end;}
+.tm-btn-link{background:none;border:none;color:#6B3FA0;font-weight:700;
+             font-size:.88rem;cursor:pointer;padding:2px 0;font-family:inherit;
+             text-decoration:underline;text-underline-offset:2px;}
+.tm-btn-link:hover{color:#5a3489;}
+.tm-list-foot{margin-top:14px;display:flex;justify-content:center;}
+.tm-btn-secondary{background:#f3e5f5;color:#4a148c;}
+.tm-btn-secondary:hover{background:#e1bee7;}
 </style>
 
 <script>
@@ -36718,6 +36745,152 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   document.getElementById('tm-request-btn').addEventListener('click', function(){
     /* Step 6 will open the request modal here. */
   });
+
+  // ── Step-3: lessons-tab loader ───────────────────────────────
+  // Reuses the existing GET /api/lessons/log endpoint (which already
+  // accepts teacher_id + group_name + limit). Renders cards into
+  // #tm-lessons-body. No change to Step-2's populateGroups — instead
+  // we register two extra listeners on the existing dropdowns:
+  //  • teacher change → load lessons for the new teacher (default
+  //    view = all her groups, since groupSel is reset to "" first).
+  //  • group change → re-render scoped to that group_name.
+  var DAY_NAMES_AR = ['الأحد','الإثنين','الثلاثاء','الأربعاء',
+                      'الخميس','الجمعة','السبت'];
+  var lessonsCache    = {};      // key = `${tid}|${gname}` → entries[]
+  var lessonsExpanded = false;   // toggled by "عرض كل الدروس"
+
+  function tmEscape(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+  }
+  function tmArDay(iso){
+    if(!iso) return '';
+    var p = String(iso).split('-');
+    if(p.length < 3) return '';
+    var y = parseInt(p[0],10),
+        m = parseInt(p[1],10),
+        d = parseInt(p[2],10);
+    if(!y || !m || !d) return '';
+    // UTC so the day name doesn't shift across local TZ.
+    return DAY_NAMES_AR[new Date(Date.UTC(y, m-1, d)).getUTCDay()];
+  }
+  function tmCurrentSelection(){
+    var tid = teacherSel.value || '';
+    var gname = '';
+    if(groupSel.value){
+      var opt = groupSel.options[groupSel.selectedIndex];
+      if(opt && opt.dataset && opt.dataset.name) gname = opt.dataset.name;
+    }
+    return {tid:tid, gname:gname};
+  }
+
+  function tmRenderLessonCard(e){
+    var grp     = tmEscape(e.group_name || '');
+    var date    = tmEscape(e.lesson_date || '');
+    var dayAr   = tmEscape(tmArDay(e.lesson_date || ''));
+    var topic   = tmEscape(e.lesson_topic || '');
+    var prog    = tmEscape(e.curriculum_progress || '');
+    var notes   = (e.notes || '').trim();
+    var dateLbl = dayAr ? (dayAr + ' · ' + date) : date;
+    var notesH  = notes
+      ? '<div class="tm-row"><span class="tm-row-key">ملاحظات:</span>' +
+        '<span class="tm-row-val">' + tmEscape(notes) + '</span></div>'
+      : '';
+    return (
+      '<article class="tm-lesson-card" data-id="' +
+        (parseInt(e.id,10)||0) + '">' +
+        '<header class="tm-lcard-head">' +
+          '<div class="tm-lcard-head-meta">' +
+            '<span class="tm-lcard-date">' + dateLbl + '</span>' +
+            '<span class="tm-badge tm-badge-success">مُسلَّم</span>' +
+          '</div>' +
+          '<div class="tm-lcard-grp">' + grp + '</div>' +
+        '</header>' +
+        '<div class="tm-lcard-body">' +
+          '<div class="tm-row"><span class="tm-row-key">الدرس:</span>' +
+          '<span class="tm-row-val">' + topic + '</span></div>' +
+          '<div class="tm-row"><span class="tm-row-key">إلى أين وصلت:</span>' +
+          '<span class="tm-row-val">' + prog + '</span></div>' +
+          notesH +
+        '</div>' +
+        '<footer class="tm-lcard-foot">' +
+          '<button type="button" class="tm-btn-link">عرض التفاصيل</button>' +
+        '</footer>' +
+      '</article>'
+    );
+  }
+
+  function tmRenderLessons(entries){
+    var body = document.getElementById('tm-lessons-body');
+    if(!body) return;
+    var total = entries.length;
+    if(total === 0){
+      body.innerHTML = '<div class="tm-panel-empty">' +
+        'لا توجد دروس مسجلة لهذا الاختيار حتى الآن.</div>';
+      return;
+    }
+    var visible = lessonsExpanded ? entries : entries.slice(0, 5);
+    var html = '<div class="tm-card-list">';
+    visible.forEach(function(e){ html += tmRenderLessonCard(e); });
+    html += '</div>';
+    if(total > 5){
+      var label = lessonsExpanded
+        ? 'عرض آخر 5 فقط'
+        : ('عرض كل الدروس (' + total + ')');
+      html += '<div class="tm-list-foot">' +
+        '<button type="button" class="tm-btn tm-btn-secondary" ' +
+        'id="tm-lessons-toggle">' + label + '</button></div>';
+    }
+    body.innerHTML = html;
+    var toggle = document.getElementById('tm-lessons-toggle');
+    if(toggle){
+      toggle.addEventListener('click', function(){
+        lessonsExpanded = !lessonsExpanded;
+        tmRenderLessons(entries);
+      });
+    }
+  }
+
+  function tmLoadLessons(){
+    var sel = tmCurrentSelection();
+    var body = document.getElementById('tm-lessons-body');
+    if(!body) return;
+    if(!sel.tid){
+      body.innerHTML = '';
+      return;
+    }
+    lessonsExpanded = false;
+    var key = sel.tid + '|' + sel.gname;
+    if(lessonsCache[key]){
+      tmRenderLessons(lessonsCache[key]);
+      return;
+    }
+    body.innerHTML = '<div class="tm-panel-empty">جارٍ التحميل...</div>';
+    var qs = '?teacher_id=' + encodeURIComponent(sel.tid) + '&limit=200';
+    if(sel.gname){
+      qs += '&group_name=' + encodeURIComponent(sel.gname);
+    }
+    fetch('/api/lessons/log' + qs, {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var entries = (j && j.entries) || [];
+        lessonsCache[key] = entries;
+        tmRenderLessons(entries);
+      })
+      .catch(function(){
+        body.innerHTML = '<div class="tm-panel-empty">' +
+          'تعذّر تحميل الدروس.</div>';
+      });
+  }
+
+  // Hook into the existing dropdowns without modifying Step-2 code:
+  // teacher change loads "all groups" view immediately (groupSel is
+  // reset to "" by Step-2's handler before its async fetch resolves);
+  // group change re-fires the fetch with the chosen group_name.
+  teacherSel.addEventListener('change', tmLoadLessons);
+  groupSel.addEventListener('change',   tmLoadLessons);
 })();
 </script>
 </body></html>"""
