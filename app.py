@@ -8992,28 +8992,15 @@ function dhCopyParentLink(){
         <div id="sr-details" style="margin-top:10px;"></div>
       </div>
     </div>
-    <!-- Group-search pane: chip-style filters + fuzzy text + results.
-         All wiring is in /static/js/group_search.js (no inline JS).
-         Each .grp-chip is a button that toggles a checkbox panel
-         absolute-positioned inside .grp-chip-wrap. Pure HTML/CSS/JS. -->
+    <!-- Group-search pane: rebuilt from scratch in the gs-* commit
+         chain. Step 1 is structural only — empty placeholder + the
+         minimal toggle JS that keeps the radio switching working
+         (the old /static/js/group_search.js is no longer loaded).
+         Steps 2+ fill the placeholder with the real UI. -->
     <div class="search-mode-group" style="display:none;">
-      <div style="padding:12px 16px;background:#faf7ff;border-bottom:1px solid #e0d0f8;">
-        <div class="grp-chip-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-          <div class="grp-chip-wrap" data-filter="days"     style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x623;&#x64A;&#x627;&#x645; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
-          <div class="grp-chip-wrap" data-filter="times"    style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x623;&#x648;&#x642;&#x627;&#x62A; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
-          <div class="grp-chip-wrap" data-filter="names"    style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
-          <div class="grp-chip-wrap" data-filter="levels"   style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x644;&#x645;&#x633;&#x62A;&#x648;&#x649; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
-          <div class="grp-chip-wrap" data-filter="teachers" style="position:relative;"><button type="button" class="grp-chip">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x629; <span class="grp-chip-count"></span> <span class="grp-chip-clear" title="&#x645;&#x633;&#x62D;">&times;</span> <span class="grp-chip-caret">&#9662;</span></button></div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input id="grp-flt-q" type="text" placeholder="&#x627;&#x628;&#x62D;&#x62B; &#x628;&#x623;&#x64A; &#x643;&#x644;&#x645;&#x629;..." style="flex:1;min-width:200px;padding:9px 12px;border:1.5px solid #c4a8e8;border-radius:9px;font-family:inherit;font-size:13.5px;">
-          <button type="button" id="grp-btn-search" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;padding:9px 18px;border-radius:9px;font-weight:800;font-family:inherit;font-size:13.5px;cursor:pointer;">&#x1F50D; &#x628;&#x62D;&#x62B;</button>
-          <button type="button" id="grp-btn-clear" style="background:#fff;color:#666;border:1.4px solid #ddd;padding:9px 14px;border-radius:9px;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;">&#x645;&#x633;&#x62D;</button>
-        </div>
-      </div>
-      <div class="srm-body">
-        <div id="grp-results" style="padding:6px 0;"></div>
-        <div id="grp-details" style="margin-top:10px;"></div>
+      <div id="gs-root" style="padding:14px 16px;color:#666;
+           font-family:inherit;font-size:14px;text-align:center;">
+        &#x633;&#x64A;&#x62A;&#x645; &#x639;&#x631;&#x636; &#x627;&#x644;&#x628;&#x62D;&#x62B; &#x639;&#x646; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; &#x647;&#x646;&#x627;.
       </div>
     </div>
   </div>
@@ -9035,7 +9022,45 @@ function dhCopyParentLink(){
   </div>
 </div>
 
-<script src="/static/js/group_search.js"></script>
+<script>
+/* Search-mode toggle (student / group). Inline replacement for the
+ * previously-loaded /static/js/group_search.js — that file is left
+ * on disk for rollback safety but is no longer loaded. The toggle's
+ * sole job is to flip visibility of .search-mode-student vs
+ * .search-mode-group when the radio changes; all data-loading lives
+ * in later commits of the group-search rebuild chain. */
+(function(){
+  function applyMode(mode){
+    var modal = document.getElementById('sr-modal');
+    if(!modal) return;
+    var paneStudent = modal.querySelector('.search-mode-student');
+    var paneGroup   = modal.querySelector('.search-mode-group');
+    if(mode === 'group'){
+      if(paneStudent) paneStudent.style.display = 'none';
+      if(paneGroup)   paneGroup.style.display   = '';
+    } else {
+      if(paneGroup)   paneGroup.style.display   = 'none';
+      if(paneStudent) paneStudent.style.display = '';
+    }
+  }
+  function bindToggle(){
+    var radios = document.querySelectorAll('input[name="search-mode"]');
+    if(!radios.length) return;
+    for(var i = 0; i < radios.length; i++){
+      radios[i].addEventListener('change', function(){
+        if(this.checked) applyMode(this.value);
+      });
+    }
+    var checked = document.querySelector('input[name="search-mode"]:checked');
+    if(checked) applyMode(checked.value);
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bindToggle);
+  } else {
+    bindToggle();
+  }
+})();
+</script>
 __STUDENT_FORM_MODAL__
 <script>
 /* ─── Add-student modal driver (search-modal) ────────────────────
