@@ -9550,35 +9550,64 @@ function dhCopyParentLink(){
             var v = gsDaySel.value || '';
             return (v === 'all-days') ? '' : v;
           }
+          /* Round-8: dropdown is now a fixed list of the 7 weekdays
+             plus "كل الأيام". Filter logic is contains-with-
+             normalization so groups whose study_days field has any
+             reasonable variant of the selected day pattern match. */
+          var GS_FIXED_DAYS = [
+            'الأحد','الإثنين','الثلاثاء','الأربعاء',
+            'الخميس','الجمعة','السبت'
+          ];
+          function gsNormalizeDay(s){
+            if(s == null) return '';
+            s = String(s).trim();
+            if(!s) return '';
+            /* Hamza fold: أ / إ / آ → ا. Mirrors what
+               _grp_arabic_normalize does on the server side. */
+            s = s.replace(/[أإآ]/g, 'ا');
+            /* Strip the definite article "ال" so the matcher
+               accepts both "الأحد" and "أحد" forms. Also strip
+               "الـ" (with tatweel) just in case the data has it. */
+            if(s.indexOf('الـ') === 0)      s = s.substring(3);
+            else if(s.indexOf('ال') === 0)  s = s.substring(2);
+            return s;
+          }
+          function gsDayInPattern(daysStr, targetDay){
+            if(daysStr == null || daysStr === '') return false;
+            if(targetDay == null || targetDay === '') return false;
+            var target = gsNormalizeDay(targetDay);
+            if(!target) return false;
+            /* Tokenize on every separator the wild data has used:
+               ASCII space, Arabic comma، Latin comma, slash,
+               hyphen, tatweel, and arbitrary whitespace. */
+            var tokens = String(daysStr).split(/[\s,،\/\-ـ]+/);
+            for(var i = 0; i < tokens.length; i++){
+              var tok = (tokens[i] || '').trim();
+              if(!tok) continue;
+              /* Strip the connector "و" ("and") when it's prefixed
+                 to a word (the most common compound form is
+                 "والأحد"). Loop in case of double-prefix glitches. */
+              while(tok.length > 1 && tok.charAt(0) === 'و'){
+                tok = tok.substring(1);
+              }
+              if(!tok) continue;
+              if(gsNormalizeDay(tok) === target) return true;
+            }
+            return false;
+          }
           function gsMatchesDay(g){
             var df = gsCurrentDayFilter();
-            if(!df) return true;
-            return String(g.study_days || '').trim() === df;
+            if(!df) return true;   /* "كل الأيام" → match all */
+            return gsDayInPattern(g && g.study_days, df);
           }
           function gsBuildDayOptions(){
             if(!gsDaySel) return;
-            var seen = {};
-            var days = [];
-            GROUPS.forEach(function(g){
-              var d = String(g.study_days || '').trim();
-              if(!d) return;
-              var key = d.toLowerCase();
-              if(seen[key]) return;
-              seen[key] = 1;
-              days.push(d);
-            });
-            days.sort(function(a, b){
-              return a.localeCompare(b, 'ar');
-            });
             var prev = gsDaySel.value;
-            gsDaySel.innerHTML =
-              '<option value="all-days">كل الأيام</option>';
-            days.forEach(function(d){
-              var opt = document.createElement('option');
-              opt.value = d;
-              opt.textContent = d;
-              gsDaySel.appendChild(opt);
+            var html = '<option value="all-days">كل الأيام</option>';
+            GS_FIXED_DAYS.forEach(function(d){
+              html += '<option value="' + d + '">' + d + '</option>';
             });
+            gsDaySel.innerHTML = html;
             /* Restore previous selection if still in the list. */
             if(prev){
               var hasPrev = false;
