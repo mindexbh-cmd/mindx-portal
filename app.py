@@ -36576,6 +36576,28 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   </div>
 </div>
 
+<!-- ── Phase-2: approve-and-send progress modal (mirrors legacy
+     /admin/parent-messages flow — 600ms stagger, recipient list with
+     per-row status pills, auto-finalize at the end) ─────────────── -->
+<div class="tm-modal-overlay" id="tm-send-overlay" hidden>
+  <div class="tm-modal" role="dialog" aria-modal="true"
+       aria-labelledby="tm-send-title">
+    <header class="tm-modal-head">
+      <h3 id="tm-send-title">جاري الإرسال...</h3>
+      <button type="button" class="tm-modal-close" id="tm-send-close-x"
+              aria-label="إغلاق" hidden>×</button>
+    </header>
+    <div class="tm-modal-body">
+      <div class="tm-send-status" id="tm-send-status">— من —</div>
+      <div class="tm-send-list" id="tm-send-list"></div>
+    </div>
+    <footer class="tm-modal-foot">
+      <button type="button" class="tm-btn tm-btn-secondary"
+              id="tm-send-close" hidden>إغلاق</button>
+    </footer>
+  </div>
+</div>
+
 <style>
 /* ── Step-2 redesign — scoped under tm-* class names so they don't
    collide with the older .panel / .stat-card / .tabs styles still
@@ -36758,6 +36780,21 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
                    min-height:90px;}
 .tm-field textarea:focus{outline:none;border-color:#6B3FA0;
                          box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+
+/* ── Phase-2: approve-and-send progress modal extras ───────── */
+.tm-send-status{color:#4a148c;font-weight:800;font-size:1rem;
+                margin-bottom:14px;text-align:center;}
+.tm-send-list{display:flex;flex-direction:column;gap:6px;
+              max-height:320px;overflow:auto;}
+.tm-send-row{display:flex;justify-content:space-between;align-items:center;
+             gap:8px;padding:8px 12px;background:#fafafe;
+             border:0.5px solid #d8c8ec;border-radius:8px;font-size:.9rem;}
+.tm-sr-name{font-weight:700;color:#4a148c;}
+.tm-sr-phone{color:#6a4f8a;direction:ltr;font-size:.82rem;}
+.tm-sr-st{font-weight:700;font-size:.82rem;}
+.tm-sr-st.waiting{color:#8a7da5;}
+.tm-sr-st.opened{color:#1D9E75;}
+.tm-sr-st.skipped{color:#A32D2D;}
 </style>
 
 <script>
@@ -37448,6 +37485,177 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     reqSendBtn.addEventListener('click', function(ev){
       ev.preventDefault();
       /* TODO: real send logic — intentionally no-op for now. */
+    });
+  }
+
+  // ── Phase-2: approve-and-send wiring (Option C — reuse existing
+  //    /api/parent-messages/<id>/send + /finalize endpoints, exactly
+  //    like the legacy /admin/parent-messages page does). No new
+  //    server endpoint. Steps 2-6 of the redesign are not modified —
+  //    we wrap the Step-5 renderer for the pending-stat counter and
+  //    use event delegation on the messages panel for the green
+  //    button so the handler survives every re-render. ──────────
+  var _tmStep5RenderPmsgs = tmRenderParentMsgs;
+  tmRenderParentMsgs = function(entries){
+    _tmStep5RenderPmsgs(entries);
+    var pendingCount = (entries || []).filter(function(e){
+      return (parseInt(e.whatsapp_sent_count, 10) || 0) <= 0;
+    }).length;
+    var statEl = document.getElementById('tm-stat-pending');
+    if(statEl) statEl.textContent = String(pendingCount);
+  };
+
+  var sendOverlay  = document.getElementById('tm-send-overlay');
+  var sendTitleEl  = document.getElementById('tm-send-title');
+  var sendStatusEl = document.getElementById('tm-send-status');
+  var sendListEl   = document.getElementById('tm-send-list');
+  var sendCloseBtn = document.getElementById('tm-send-close');
+  var sendCloseX   = document.getElementById('tm-send-close-x');
+
+  function tmSendModalReset(){
+    sendTitleEl.textContent  = 'جاري الإرسال...';
+    sendStatusEl.textContent = '0 من 0';
+    sendListEl.innerHTML     = '';
+    sendCloseBtn.hidden = true;
+    sendCloseX.hidden   = true;
+  }
+  function tmSendModalClose(){ sendOverlay.hidden = true; }
+  function tmSendModalDone(opened, total){
+    sendTitleEl.textContent  = 'انتهى الإرسال';
+    sendStatusEl.textContent = '✅ تم فتح ' + opened + ' من ' + total +
+                               ' رسالة';
+    sendCloseBtn.hidden = false;
+    sendCloseX.hidden   = false;
+  }
+  if(sendCloseBtn){ sendCloseBtn.addEventListener('click', tmSendModalClose); }
+  if(sendCloseX){   sendCloseX  .addEventListener('click', tmSendModalClose); }
+  // Overlay-click closes ONLY after the sweep is done (so the admin
+  // can't accidentally interrupt mid-send by mis-clicking).
+  if(sendOverlay){
+    sendOverlay.addEventListener('click', function(ev){
+      if(ev.target === sendOverlay && !sendCloseBtn.hidden){
+        tmSendModalClose();
+      }
+    });
+  }
+
+  function tmRunSendSweep(msgId, onFinish){
+    fetch('/api/parent-messages/' + encodeURIComponent(msgId) + '/send',
+          {method:'POST', credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          alert((j && j.error) || 'تعذّر بدء الإرسال');
+          if(onFinish) onFinish(false);
+          return;
+        }
+        var recipients = j.recipients || [];
+        var total      = j.total_count || recipients.length || 0;
+        tmSendModalReset();
+        sendOverlay.hidden = false;
+        sendStatusEl.textContent = '0 من ' + total;
+        sendListEl.innerHTML = recipients.map(function(r, i){
+          return '<div class="tm-send-row" id="tm-sr-' + i + '">' +
+            '<span class="tm-sr-name">' +
+              tmEscape(r.student_name || '') + '</span>' +
+            '<span class="tm-sr-phone">' +
+              tmEscape(r.whatsapp_raw || '-') + '</span>' +
+            '<span class="tm-sr-st waiting" id="tm-sr-st-' + i + '">' +
+              'قيد الانتظار</span>' +
+          '</div>';
+        }).join('');
+
+        var opened = 0;
+        var idx    = 0;
+        function step(){
+          if(idx >= recipients.length){
+            tmSendModalDone(opened, total);
+            // Auto-finalize: server flips status='sent' and stores
+            // sent_count exactly like the legacy page does.
+            fetch('/api/parent-messages/' +
+                  encodeURIComponent(msgId) + '/finalize',
+                  {method:'POST',
+                   headers:{'Content-Type':'application/json'},
+                   credentials:'include',
+                   body: JSON.stringify({sent_count: opened,
+                                         total_count: total})})
+              .then(function(){ if(onFinish) onFinish(true); })
+              .catch(function(){ if(onFinish) onFinish(true); });
+            return;
+          }
+          var r = recipients[idx];
+          var stEl = document.getElementById('tm-sr-st-' + idx);
+          if(!r.whatsapp){
+            if(stEl){
+              stEl.textContent = 'لا يوجد رقم';
+              stEl.className   = 'tm-sr-st skipped';
+            }
+            idx++;
+            sendStatusEl.textContent = idx + ' من ' + total;
+            setTimeout(step, 250);
+            return;
+          }
+          try {
+            window.open('https://wa.me/' + r.whatsapp +
+                        '?text=' + encodeURIComponent(r.text || ''),
+                        '_blank');
+          } catch(e){}
+          opened++;
+          if(stEl){
+            stEl.textContent = 'تم الفتح';
+            stEl.className   = 'tm-sr-st opened';
+          }
+          idx++;
+          sendStatusEl.textContent = idx + ' من ' + total;
+          setTimeout(step, 600);
+        }
+        step();
+      })
+      .catch(function(){
+        alert('تعذّر الاتصال بالخادم. حاولي مرة أخرى.');
+        if(onFinish) onFinish(false);
+      });
+  }
+
+  function tmApproveAndSend(msgId, button){
+    if(!msgId) return;
+    if(!confirm('هل أنت متأكد من إرسال هذه الرسالة لأولياء أمور المجموعة؟')){
+      return;
+    }
+    var origLabel = button ? button.textContent : '';
+    if(button){
+      button.disabled = true;
+      button.textContent = 'جاري الإرسال...';
+    }
+    tmRunSendSweep(msgId, function(){
+      if(button){
+        button.disabled = false;
+        button.textContent = origLabel;
+      }
+      // Invalidate cache for the current selection and re-fetch so
+      // the card flips amber→green and the wrapped renderer above
+      // updates the pending-stat counter.
+      var sel = tmCurrentSelection();
+      if(sel.tid){
+        var key = sel.tid + '|' + sel.gname;
+        delete pmsgsCache[key];
+        tmLoadParentMsgs();
+      }
+    });
+  }
+
+  // Event delegation on the messages panel — survives every
+  // re-render of the cards (innerHTML wipe doesn't unbind).
+  var pmsgPanel = document.getElementById('tm-pmsg-body');
+  if(pmsgPanel){
+    pmsgPanel.addEventListener('click', function(ev){
+      var btn = ev.target.closest('.tm-btn-success');
+      if(!btn) return;
+      var card = btn.closest('.tm-pmsg-card');
+      if(!card) return;
+      var mid = parseInt(card.getAttribute('data-id'), 10);
+      if(!mid) return;
+      tmApproveAndSend(mid, btn);
     });
   }
 })();
