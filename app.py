@@ -9220,6 +9220,42 @@ function dhCopyParentLink(){
                          font-size:.88rem;font-family:inherit;
                          cursor:pointer;}
           .gs-les-toggle:hover{background:#e1bee7;}
+
+          /* Step 8 — evaluations cards. Read-only summary view; the
+             admin monitoring page is the place for full scores +
+             send-to-parent. Score pill reuses the same green / amber
+             / red palette as the eval card on the monitoring page
+             (already approved for non-reserved use). */
+          .gs-eval-header{display:flex;justify-content:space-between;
+                          align-items:center;gap:10px;flex-wrap:wrap;
+                          padding-bottom:10px;margin-bottom:10px;
+                          border-bottom:0.5px solid #d8c8ec;}
+          .gs-eval-count{color:#4a148c;font-weight:800;font-size:.95rem;}
+          .gs-eval-list{display:flex;flex-direction:column;gap:8px;}
+          .gs-eval-card{background:#fff;border:0.5px solid #d8c8ec;
+                        border-radius:10px;padding:11px 13px;}
+          .gs-eval-head{display:flex;justify-content:space-between;
+                        align-items:center;gap:8px;flex-wrap:wrap;
+                        margin-bottom:8px;}
+          .gs-eval-student{color:#4a148c;font-weight:900;font-size:.98rem;}
+          .gs-eval-month{color:#6a4f8a;font-weight:700;font-size:.86rem;}
+          .gs-eval-row{display:flex;gap:6px;flex-wrap:wrap;
+                       align-items:center;}
+          .gs-eval-score-pill{padding:5px 12px;border-radius:8px;
+                              font-weight:900;font-size:.92rem;
+                              border:0.5px solid;}
+          .gs-eval-score-high{background:#E6F4EE;color:#1D9E75;
+                              border-color:#1D9E75;}
+          .gs-eval-score-mid{background:#FFF3E0;color:#BA7517;
+                             border-color:#BA7517;}
+          .gs-eval-score-low{background:#FCE6E6;color:#A32D2D;
+                             border-color:#A32D2D;}
+          .gs-eval-score-none{background:#fafafe;color:#8a7da5;
+                              border-color:#d8c8ec;}
+          .gs-eval-sent-badge{padding:3px 10px;border-radius:999px;
+                              font-size:.78rem;font-weight:800;
+                              background:#E6F4EE;color:#1D9E75;
+                              border:0.5px solid #1D9E75;}
         </style>
 
         <!-- A) Filters card -->
@@ -9942,6 +9978,175 @@ function dhCopyParentLink(){
                   gsRenderLessons(gsDetailCache[gid]);
               }
             });
+          }
+
+          /* ── Step 8 — التقييمات tab. Lazy fetch on first tab
+             click per group (the list can be large; don't pay the
+             round-trip on every group select). Result is cached on
+             gsDetailCache[gid].evalsList; subsequent fillFromDetail
+             calls render directly from cache. */
+          function gsClassifyScore(score){
+            if(score == null || score === '') return 'none';
+            var n = parseInt(score, 10);
+            if(isNaN(n)) return 'none';
+            if(n >= 8) return 'high';
+            if(n >= 5) return 'mid';
+            return 'low';
+          }
+
+          function gsRenderEvaluations(payload){
+            if(!payload) return '';
+            if(payload.evalsList == null){
+              /* Not fetched yet — caller's responsibility to ensure
+                 the tab-click handler fires the fetch. Show a clean
+                 placeholder so the panel never displays stale data
+                 from a previous group. */
+              return '<div class="gs-panel-empty">' +
+                'اضغطي تبويب التقييمات لتحميلها.</div>';
+            }
+            var entries = payload.evalsList;
+            var n = entries.length;
+            if(n === 0){
+              return '<div class="gs-panel-empty">' +
+                'لا توجد تقييمات لهذه المجموعة.</div>';
+            }
+            var sorted = entries.slice().sort(function(a, b){
+              var am = String(a.evaluation_month || '');
+              var bm = String(b.evaluation_month || '');
+              if(am !== bm) return bm.localeCompare(am);
+              return (a.student_name || '').localeCompare(
+                      b.student_name || '', 'ar');
+            });
+            var html =
+              '<div class="gs-eval-header">' +
+                '<div class="gs-eval-count">' + n + ' تقييم</div>' +
+              '</div>' +
+              '<div class="gs-eval-list">';
+            sorted.forEach(function(e){
+              var stu   = gsEscape(e.student_name || '—');
+              var month = gsEscape(e.month_label ||
+                                   e.evaluation_month || '—');
+              var oa    = e.overall_score;
+              var oaCls = gsClassifyScore(oa);
+              var oaTxt;
+              if(oa == null || oa === '' ||
+                 isNaN(parseInt(oa, 10))){
+                oaTxt = '—/10';
+              } else {
+                oaTxt = parseInt(oa, 10) + '/10';
+              }
+              var sentAt = String(e.whatsapp_sent_at || '').trim();
+              html +=
+                '<article class="gs-eval-card" data-id="' +
+                  (parseInt(e.id, 10) || 0) + '">' +
+                  '<header class="gs-eval-head">' +
+                    '<div class="gs-eval-student">' + stu + '</div>' +
+                    '<div class="gs-eval-month">' + month + '</div>' +
+                  '</header>' +
+                  '<div class="gs-eval-row">' +
+                    '<span class="gs-eval-score-pill gs-eval-score-' +
+                      oaCls + '">التقييم العام: ' +
+                      gsEscape(oaTxt) + '</span>' +
+                    (sentAt
+                      ? '<span class="gs-eval-sent-badge">' +
+                          'تم الإرسال ✓</span>'
+                      : '') +
+                  '</div>' +
+                '</article>';
+            });
+            html += '</div>';
+            return html;
+          }
+
+          function gsEnsureEvalsLoaded(){
+            var gid = sel.value;
+            if(!gid) return;
+            var entry = gsDetailCache[gid];
+            if(!entry) return;
+            if(entry.evalsList != null){
+              /* Already cached — just re-render in case the panel
+                 still shows the placeholder. */
+              var el = document.querySelector(
+                '.gs-panel[data-gs-panel="evaluations"]');
+              if(el) el.innerHTML = gsRenderEvaluations(entry);
+              return;
+            }
+            if(entry._evalsFetching) return;
+            entry._evalsFetching = true;
+            var groupName = (entry.detail && entry.detail.group &&
+                             entry.detail.group.group_name) || '';
+            if(!groupName){
+              entry._evalsFetching = false;
+              return;
+            }
+            var el = document.querySelector(
+              '.gs-panel[data-gs-panel="evaluations"]');
+            if(el){
+              el.innerHTML = '<div class="gs-panel-empty">' +
+                'جارٍ التحميل...</div>';
+            }
+            fetch('/api/monthly-evaluations?group_name=' +
+                  encodeURIComponent(groupName),
+                  {credentials:'include'})
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                var entries = (j && j.entries) || [];
+                if(gsDetailCache[gid]){
+                  gsDetailCache[gid].evalsList = entries;
+                  gsDetailCache[gid]._evalsFetching = false;
+                }
+                if(sel.value === String(gid)){
+                  var el2 = document.querySelector(
+                    '.gs-panel[data-gs-panel="evaluations"]');
+                  if(el2) el2.innerHTML =
+                    gsRenderEvaluations(gsDetailCache[gid]);
+                }
+              })
+              .catch(function(err){
+                if(typeof console !== 'undefined' && console.warn){
+                  console.warn('[gs] evals fetch failed', err);
+                }
+                if(gsDetailCache[gid]){
+                  gsDetailCache[gid]._evalsFetching = false;
+                }
+                if(sel.value === String(gid)){
+                  var el2 = document.querySelector(
+                    '.gs-panel[data-gs-panel="evaluations"]');
+                  if(el2) el2.innerHTML =
+                    '<div class="gs-panel-empty">' +
+                      'تعذّر تحميل التقييمات.</div>';
+                }
+              });
+          }
+
+          var _gsStep7Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            _gsStep7Fill(payload);
+            /* Render evals panel if cached (cache-hit on group
+               re-select); otherwise show placeholder until tab
+               click fires the lazy fetch. */
+            var evEl = document.querySelector(
+              '.gs-panel[data-gs-panel="evaluations"]');
+            if(evEl){
+              var d = payload && payload.detail;
+              var gid = d && d.group && d.group.id;
+              if(gid && gsDetailCache[gid] &&
+                 gsDetailCache[gid].evalsList){
+                evEl.innerHTML =
+                  gsRenderEvaluations(gsDetailCache[gid]);
+              } else {
+                evEl.innerHTML = '<div class="gs-panel-empty">' +
+                  'اضغطي تبويب التقييمات لتحميلها.</div>';
+              }
+            }
+          };
+
+          /* Tab-click trigger — direct listener on the evaluations
+             tab button so the lazy fetch only fires on real intent. */
+          var gsEvalsTabBtn = card.querySelector(
+            '[data-gs-tab="evaluations"]');
+          if(gsEvalsTabBtn){
+            gsEvalsTabBtn.addEventListener('click', gsEnsureEvalsLoaded);
           }
 
           /* Sort buttons live inside the students panel; re-render
