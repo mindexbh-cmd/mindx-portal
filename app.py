@@ -40615,6 +40615,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
            z-index:9999;max-width:90vw;text-align:center;font-size:.95rem;}
 .vio-toast.show{opacity:1;}
 .vio-toast.err{background:#C62828;}
+.vio-toast.warn{background:#E65100;}
 .vio-form-error{display:none;background:#FCE6E6;color:#A32D2D;
                 border:1px solid #f5b9b9;border-radius:8px;
                 padding:10px 14px;margin-top:8px;font-weight:700;
@@ -41723,7 +41724,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     var box = document.getElementById('vio-form-error');
     if (box) box.classList.remove('show');
   }
-  function showToast(msg, isErr){
+  function showToast(msg, levelOrErr){
     var t = document.getElementById('vio-toast');
     if (!t){
       t = document.createElement('div');
@@ -41731,11 +41732,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       t.className = 'vio-toast';
       document.body.appendChild(t);
     }
-    t.classList.remove('err');
-    if (isErr) t.classList.add('err');
+    t.classList.remove('err', 'warn');
+    // Backward compat: showToast(msg, true) → 'err'.
+    var level = levelOrErr === true ? 'err' : levelOrErr;
+    if (level === 'err' || level === 'warn'){
+      t.classList.add(level);
+    }
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(function(){ t.classList.remove('show'); }, 2400);
+    setTimeout(function(){ t.classList.remove('show'); }, 3200);
   }
   function resetForm(){
     var ids = ['vio-form-search','vio-form-group','vio-form-student',
@@ -41823,7 +41828,23 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     var editingVid = vioEditMode;
     var url    = '/api/admin/violations' + (editingVid ? ('/' + encodeURIComponent(editingVid)) : '');
     var method = editingVid ? 'PATCH' : 'POST';
-    var successMsg = editingVid ? '✓ تم حفظ التعديلات' : '✓ تم تسجيل المخالفة';
+    var successMsg   = editingVid ? '✓ تم حفظ التعديلات'                : '✓ تم تسجيل المخالفة';
+    var successMsgWA = editingVid ? '✓ تم حفظ التعديلات وإرسال الرسالة' : '✓ تم تسجيل المخالفة وإرسال الرسالة';
+
+    // Should we auto-send WhatsApp after save (Stage 3 Step 7)?
+    // POST: send whenever the message-parent box is checked.
+    // PATCH: only when newly checked AND not already sent — avoids
+    // re-firing the message every edit.
+    var didTickMsg = body.action_message_parent === 1;
+    var shouldSendWA = false;
+    if (!editingVid){
+      shouldSendWA = didTickMsg;
+    } else {
+      var prevRow = violationsById[String(editingVid)] || {};
+      var wasTickedBefore = !!prevRow.action_message_parent;
+      var alreadySent     = !!prevRow.whatsapp_sent_at;
+      shouldSendWA = didTickMsg && !wasTickedBefore && !alreadySent;
+    }
 
     fetch(url, {
       method: method,
@@ -41836,11 +41857,16 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       btn.disabled = false;
       btn.textContent = origText;
       if (res.status === 200 && res.data && res.data.ok){
+        var savedVid = editingVid || res.data.id;
         closeModal();
         resetForm();
         loadStats();
         loadViolations();
-        showToast(successMsg, false);
+        if (shouldSendWA && savedVid){
+          _sendWhatsappForViolation(savedVid, successMsgWA, successMsg);
+        } else {
+          showToast(successMsg, false);
+        }
       } else {
         var msg = (res.data && res.data.error) || 'تعذر حفظ المخالفة';
         showFormError(msg);
@@ -41850,6 +41876,29 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       btn.disabled = false;
       btn.textContent = origText;
       showFormError('تعذر الاتصال بالخادم');
+    });
+  }
+
+  function _sendWhatsappForViolation(vid, msgWithWA, msgWithoutWA){
+    fetch('/api/admin/violations/' + encodeURIComponent(vid) + '/send-whatsapp', {
+      method: 'POST',
+      credentials: 'same-origin',
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status: r.status, data: d}; }); })
+    .then(function(res){
+      if (res.status === 200 && res.data && res.data.ok){
+        if (res.data.wa_url) window.open(res.data.wa_url, '_blank');
+        showToast(msgWithWA, false);
+        // Refresh so the wa-sent pill appears on the card.
+        loadViolations();
+      } else {
+        var serverMsg = (res.data && res.data.error) || 'تعذر إرسال الرسالة';
+        // Save succeeded — surface the WA failure as a warning, not error.
+        showToast(msgWithoutWA + ' — ' + serverMsg, 'warn');
+      }
+    })
+    .catch(function(){
+      showToast(msgWithoutWA + ' — تعذر الاتصال بالواتساب', 'warn');
     });
   }
 
