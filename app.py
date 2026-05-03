@@ -40935,10 +40935,109 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   var btnX      = document.getElementById('vio-modal-x');
   var btnCancel = document.getElementById('vio-form-cancel');
 
-  function openModal(){
+  // Edit mode is null for "create new" and a numeric vid when the
+  // user opened the modal via the ✏️ تعديل button on a card. Save
+  // handler branches on this — null → POST, vid → PATCH (Stage 2).
+  var vioEditMode = null;
+
+  function _setModalChrome(){
+    var title = document.getElementById('vio-modal-title');
+    var saveBtn = document.getElementById('vio-form-save');
+    if (vioEditMode){
+      if (title)   title.textContent   = 'تعديل المخالفة';
+      if (saveBtn) saveBtn.textContent = '💾 حفظ التعديلات';
+    } else {
+      if (title)   title.textContent   = 'تسجيل مخالفة جديدة';
+      if (saveBtn) saveBtn.textContent = '💾 حفظ المخالفة';
+    }
+  }
+
+  function _populateFormFromRow(row){
+    if (!row) return;
+    var groupSel  = document.getElementById('vio-form-group');
+    var studentSel = document.getElementById('vio-form-student');
+    var manualWrap = document.getElementById('vio-manual-name-wrap');
+    var manualInp  = document.getElementById('vio-form-manual-name');
+
+    // Group: select existing or insert + select.
+    if (groupSel && row.group_name){
+      var gname = String(row.group_name);
+      var found = false;
+      for (var i = 0; i < groupSel.options.length; i++){
+        var optVal = groupSel.options[i].value || groupSel.options[i].text;
+        if (optVal === gname){
+          groupSel.value = groupSel.options[i].value;
+          found = true; break;
+        }
+      }
+      if (!found){
+        var opt = document.createElement('option');
+        opt.value = gname; opt.textContent = gname;
+        groupSel.appendChild(opt);
+        groupSel.value = gname;
+      }
+      // Group changed → re-filter students before we try to select one.
+      populateStudentDropdown();
+    }
+
+    // Student: linked → select option (insert if filtered out);
+    // manual → switch to __MANUAL__ + show manual wrap.
+    if (studentSel){
+      if (row.student_id){
+        var sidStr = String(row.student_id);
+        var sidFound = false;
+        for (var j = 0; j < studentSel.options.length; j++){
+          if (studentSel.options[j].value === sidStr){
+            studentSel.value = sidStr; sidFound = true; break;
+          }
+        }
+        if (!sidFound){
+          var sopt = document.createElement('option');
+          sopt.value = sidStr; sopt.textContent = row.student_name || '';
+          // Insert after the "اختر طالبة" + "كتابة يدوية" pair
+          var afterIdx = (studentSel.options.length >= 2) ? 2 : studentSel.options.length;
+          if (afterIdx < studentSel.options.length){
+            studentSel.insertBefore(sopt, studentSel.options[afterIdx]);
+          } else {
+            studentSel.appendChild(sopt);
+          }
+          studentSel.value = sidStr;
+        }
+        if (manualWrap) manualWrap.classList.remove('show');
+        if (manualInp)  manualInp.value = '';
+      } else {
+        studentSel.value = '__MANUAL__';
+        if (manualWrap) manualWrap.classList.add('show');
+        if (manualInp)  manualInp.value = row.student_name || '';
+      }
+    }
+
+    var setVal = function(id, v){
+      var el = document.getElementById(id);
+      if (el) el.value = (v == null ? '' : String(v));
+    };
+    setVal('vio-form-date',  row.violation_date);
+    setVal('vio-form-place', row.violation_place);
+    setVal('vio-form-type',  row.violation_type);
+    setVal('vio-form-desc',  row.description || '');
+    setVal('vio-form-notes', row.additional_notes || '');
+
+    Object.keys(ACTION_CHECKBOX_IDS).forEach(function(k){
+      var el = document.getElementById(ACTION_CHECKBOX_IDS[k]);
+      if (el) el.checked = !!row[k];
+    });
+
+    clearFormError();
+  }
+
+  function openModal(editVid, prefilled){
     if (!overlay) return;
+    vioEditMode = (editVid && typeof editVid !== 'object') ? editVid : null;
+    _setModalChrome();
+    // Always start clean, then populate from the row in edit mode
+    resetForm();
     var dateInput = document.getElementById('vio-form-date');
-    if (dateInput && !dateInput.value){
+    if (!vioEditMode && dateInput && !dateInput.value){
       dateInput.value = new Date().toISOString().slice(0, 10);
     }
     overlay.removeAttribute('hidden');
@@ -40947,6 +41046,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     ensurePickerData(function(){
       populateGroupDropdown();
       populateStudentDropdown();
+      if (vioEditMode && prefilled){
+        _populateFormFromRow(prefilled);
+      }
     });
   }
   function closeModal(){
@@ -40954,8 +41056,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     overlay.classList.remove('show');
     overlay.setAttribute('hidden', '');
     document.body.style.overflow = '';
+    vioEditMode = null;
+    _setModalChrome();
   }
-  if (btnNew)    btnNew.addEventListener('click', openModal);
+  // Wrap the click handlers so the click event isn't passed as editVid.
+  if (btnNew)    btnNew.addEventListener('click', function(){ openModal(); });
   if (btnX)      btnX.addEventListener('click', closeModal);
   if (btnCancel) btnCancel.addEventListener('click', closeModal);
   if (overlay){
