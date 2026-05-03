@@ -38149,6 +38149,86 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       '</article>'
     );
   };
+
+  // ── Task-3 Step E: wire the send-evaluation-to-parent button.
+  //    Reuses the existing POST /api/monthly-evaluations/<id>/send-to-parent
+  //    endpoint — same pattern the legacy /admin/evaluations page
+  //    has used for ages. Single recipient (the student's parent),
+  //    single wa.me tab. Step-D's tmRenderEvalCard is NOT modified;
+  //    we attach a click delegate on the evals panel that targets
+  //    the data-tm-eval-send marker the renderer placed on each
+  //    unsent card.
+  //    Mirrors the legacy gesture-chain timing: window.open is
+  //    called inside the same .then() block as the success branch
+  //    so the popup-blocker heuristic (fetch <1s preserves gesture)
+  //    lets the wa.me tab open. ──────────────────────────────
+  function tmFindEvalInCache(eid){
+    if(!evalsAll) return null;
+    for(var i = 0; i < evalsAll.length; i++){
+      if(parseInt(evalsAll[i].id, 10) === eid) return evalsAll[i];
+    }
+    return null;
+  }
+  function tmNowTimestampStr(){
+    // YYYY-MM-DD HH:MM:SS — same shape as the server CURRENT_TIMESTAMP
+    // would produce, so tmFormatTimestamp formats it identically.
+    var d = new Date();
+    var p = function(n){ return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  var evalsPanel = document.getElementById('tm-evals-body');
+  if(evalsPanel){
+    evalsPanel.addEventListener('click', function(ev){
+      var btn = ev.target.closest('[data-tm-eval-send]');
+      if(!btn) return;
+      var eid = parseInt(btn.getAttribute('data-tm-eval-send'), 10);
+      if(!eid) return;
+      var entry = tmFindEvalInCache(eid);
+      var stuName = (entry && entry.student_name) || '';
+      var confirmMsg = stuName
+        ? ('هل تريد إرسال التقييم لولي أمر ' + stuName + '؟')
+        : 'هل تريد إرسال التقييم لولي الأمر؟';
+      if(!confirm(confirmMsg)) return;
+
+      var origLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'جاري الإرسال...';
+
+      fetch('/api/monthly-evaluations/' + encodeURIComponent(eid) +
+            '/send-to-parent',
+            {method:'POST',
+             headers:{'Content-Type':'application/json'},
+             credentials:'include',
+             body: JSON.stringify({})})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if(!j || !j.ok){
+            btn.disabled = false;
+            btn.textContent = origLabel;
+            alert((j && j.error) || 'تعذّر الإرسال');
+            return;
+          }
+          // Open the WhatsApp tab BEFORE any alert/confirm so the
+          // user-gesture is still "fresh" — popup blockers in
+          // Chrome/Edge accept fetches that resolve quickly.
+          try { window.open(j.wa_url, '_blank'); } catch(e){}
+          // Patch the cache so the next render flips the card from
+          // button → "تم الإرسال ✓" badge without a re-fetch.
+          if(entry){
+            entry.whatsapp_sent_at = tmNowTimestampStr();
+          }
+          tmFilterAndRenderEvals();
+          alert('تم فتح واتساب — تأكدي من الإرسال');
+        })
+        .catch(function(){
+          btn.disabled = false;
+          btn.textContent = origLabel;
+          alert('تعذّر الاتصال بالخادم');
+        });
+    });
+  }
 })();
 </script>
 </body></html>"""
