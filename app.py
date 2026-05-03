@@ -40619,6 +40619,46 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                 padding:10px 14px;margin-top:8px;font-weight:700;
                 font-size:.9rem;}
 .vio-form-error.show{display:block;}
+
+/* ── History alert + viewer (Stage 2 Step 7) ──────────────────── */
+.vio-hist-alert{display:none;padding:12px 14px;border-radius:10px;
+                background:#FFF8E1;color:#7C5A00;border:1px solid #FFD876;
+                margin-top:12px;font-weight:700;font-size:.92rem;
+                line-height:1.5;flex-wrap:wrap;gap:10px;align-items:center;
+                justify-content:space-between;}
+.vio-hist-alert.show{display:flex;}
+.vio-hist-alert.critical{background:#FCE6E6;color:#7A1F1F;border-color:#F2A6A6;}
+.vio-hist-text{flex:1;min-width:240px;}
+.vio-hist-view-btn{background:#fff;border:1.5px solid currentColor;color:inherit;
+                   border-radius:7px;padding:6px 12px;font-weight:800;
+                   font-size:.82rem;cursor:pointer;font-family:inherit;
+                   white-space:nowrap;}
+.vio-hist-view-btn:hover{background:#fcf6e4;}
+
+.vio-hist-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);
+                  display:none;align-items:flex-start;justify-content:center;
+                  z-index:10000;padding:24px 14px;overflow-y:auto;}
+.vio-hist-overlay.show{display:flex;}
+.vio-hist-modal{background:#fff;border-radius:14px;max-width:640px;width:100%;
+                max-height:calc(100vh - 48px);overflow:auto;
+                box-shadow:0 14px 48px rgba(0,0,0,.3);}
+.vio-hist-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+               padding:14px 20px;display:flex;justify-content:space-between;
+               align-items:center;border-radius:14px 14px 0 0;}
+.vio-hist-head h3{margin:0;font-size:1.1rem;font-weight:900;}
+.vio-hist-close{background:transparent;border:none;color:#fff;
+                font-size:1.6rem;cursor:pointer;padding:0 4px;
+                line-height:1;font-family:inherit;}
+.vio-hist-close:hover{opacity:.85;}
+.vio-hist-body{padding:16px 20px;}
+.vio-hist-entry{display:flex;align-items:center;gap:12px;
+                padding:10px 12px;border:1px solid #ece4f8;
+                border-radius:10px;margin-bottom:8px;font-size:.92rem;
+                background:#faf8fd;flex-wrap:wrap;}
+.vio-hist-entry .vio-hist-date{font-weight:800;color:#4a148c;min-width:96px;}
+.vio-hist-entry .vio-hist-type{flex:1;color:#333;min-width:120px;}
+.vio-hist-entry .vio-hist-place{color:#666;font-size:.85rem;}
+.vio-hist-empty{text-align:center;color:#888;padding:30px 20px;font-style:italic;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -40737,6 +40777,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
           <label for="vio-form-manual-name">اسم الطالبة (يدوي)</label>
           <input type="text" id="vio-form-manual-name" placeholder="اكتبي الاسم الكامل...">
         </div>
+        <div id="vio-hist-alert" class="vio-hist-alert" role="status">
+          <span id="vio-hist-alert-text" class="vio-hist-text"></span>
+          <button type="button" id="vio-hist-view-btn" class="vio-hist-view-btn">
+            📜 عرض السجل الكامل
+          </button>
+        </div>
       </div>
 
       <!-- Section 2: Violation details -->
@@ -40816,6 +40862,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <button type="button" class="vio-btn vio-btn-primary" id="vio-form-save">💾 حفظ المخالفة</button>
       <button type="button" class="vio-btn vio-btn-secondary" id="vio-form-cancel">إلغاء</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Full history viewer overlay (Stage 2 Step 7) ───────────── -->
+<div class="vio-hist-overlay" id="vio-hist-overlay" hidden>
+  <div class="vio-hist-modal" role="dialog" aria-modal="true">
+    <div class="vio-hist-head">
+      <h3 id="vio-hist-title">سجل المخالفات</h3>
+      <button type="button" class="vio-hist-close" id="vio-hist-close" aria-label="إغلاق">×</button>
+    </div>
+    <div class="vio-hist-body" id="vio-hist-body"></div>
   </div>
 </div>
 
@@ -41028,6 +41085,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     });
 
     clearFormError();
+
+    // Edit mode: surface the history alert for the linked student.
+    // Manual entries (student_id is null) skip the fetch — same rule
+    // as the picker's change handler.
+    if (row.student_id){
+      loadHistoryAlertFor(row.student_id);
+    } else {
+      _hideHistoryAlert();
+    }
   }
 
   function openModal(editVid, prefilled){
@@ -41099,6 +41165,127 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     });
   }
 
+  // ── History alert + viewer (Stage 2 Step 7) ───────────────────
+  // Fired when the user picks a student in the modal. Manual
+  // entries skip the fetch (they're not linked to a roster id).
+  // Race-guard via _histLastKey: if a newer selection raced past
+  // an older fetch, the older response is dropped on arrival.
+  var _histLastKey = null;
+
+  function _hideHistoryAlert(){
+    var el = document.getElementById('vio-hist-alert');
+    if (el){ el.classList.remove('show'); el.classList.remove('critical'); }
+  }
+  function _renderHistoryAlert(d){
+    var el  = document.getElementById('vio-hist-alert');
+    var txt = document.getElementById('vio-hist-alert-text');
+    if (!el || !txt) return;
+    var count = (d && d.count) || 0;
+    if (count <= 0){ _hideHistoryAlert(); return; }
+    var msg = '⚠️ هذه الطالبة لديها ' + count + ' مخالفات سابقة';
+    var last = (d && d.last_violation) || null;
+    if (last && last.date && last.type){
+      msg += '، آخرها: ' + last.date + ' (' + last.type + ')';
+    }
+    if (count >= 3){
+      msg += ' — حالة حرجة، تتطلب تدخل أشد';
+      el.classList.add('critical');
+    } else {
+      el.classList.remove('critical');
+    }
+    txt.textContent = msg;
+    el.classList.add('show');
+  }
+  function loadHistoryAlertFor(studentId){
+    if (!studentId){ _hideHistoryAlert(); _histLastKey = null; return; }
+    var key = 'sid:' + studentId;
+    _histLastKey = key;
+    fetch('/api/admin/violations/student-history?student_id=' + encodeURIComponent(studentId),
+          {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (_histLastKey !== key) return;  // stale response
+        if (d && d.ok) _renderHistoryAlert(d);
+        else _hideHistoryAlert();
+      })
+      .catch(function(){
+        if (_histLastKey === key) _hideHistoryAlert();
+      });
+  }
+
+  function openHistoryViewer(){
+    if (!_histLastKey) return;
+    var parts = _histLastKey.split(':');
+    if (parts[0] !== 'sid') return;
+    var sid = parts[1];
+    var overlay = document.getElementById('vio-hist-overlay');
+    var bodyEl  = document.getElementById('vio-hist-body');
+    if (!overlay || !bodyEl) return;
+    bodyEl.innerHTML = '<div class="vio-hist-empty">جارٍ التحميل...</div>';
+    overlay.removeAttribute('hidden');
+    overlay.classList.add('show');
+    fetch('/api/admin/violations/student-history?student_id=' + encodeURIComponent(sid),
+          {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok){
+          bodyEl.innerHTML = '<div class="vio-hist-empty">تعذر جلب السجل</div>';
+          return;
+        }
+        var rows = d.history || [];
+        if (!rows.length){
+          bodyEl.innerHTML = '<div class="vio-hist-empty">لا توجد مخالفات سابقة</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < rows.length; i++){
+          var v = rows[i];
+          var sev = ((v.severity || '') + '').toLowerCase();
+          var badgeCls = (sev === 'severe' ? 'severe' : sev === 'medium' ? 'medium' : 'light');
+          html += '<div class="vio-hist-entry">' +
+                    '<span class="vio-hist-date">' + escapeHtml(v.violation_date || '') + '</span>' +
+                    '<span class="vio-sev-badge ' + badgeCls + '">' + escapeHtml(v.severity_label || '') + '</span>' +
+                    '<span class="vio-hist-type">' + escapeHtml(v.violation_type || '') + '</span>' +
+                    '<span class="vio-hist-place">' + escapeHtml(v.violation_place || '') + '</span>' +
+                  '</div>';
+        }
+        bodyEl.innerHTML = html;
+      })
+      .catch(function(){
+        bodyEl.innerHTML = '<div class="vio-hist-empty">تعذر جلب السجل</div>';
+      });
+  }
+  function closeHistoryViewer(){
+    var overlay = document.getElementById('vio-hist-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    overlay.setAttribute('hidden', '');
+  }
+
+  if (studentSel){
+    studentSel.addEventListener('change', function(){
+      var v = studentSel.value;
+      if (!v || v === '__MANUAL__'){
+        _hideHistoryAlert();
+        _histLastKey = null;
+      } else {
+        var sid = parseInt(v, 10);
+        if (!isNaN(sid)) loadHistoryAlertFor(sid);
+        else { _hideHistoryAlert(); _histLastKey = null; }
+      }
+    });
+  }
+  var histViewBtn = document.getElementById('vio-hist-view-btn');
+  if (histViewBtn) histViewBtn.addEventListener('click', openHistoryViewer);
+  var histClose   = document.getElementById('vio-hist-close');
+  if (histClose)   histClose.addEventListener('click', closeHistoryViewer);
+  var histOverlay = document.getElementById('vio-hist-overlay');
+  if (histOverlay){
+    histOverlay.addEventListener('click', function(ev){
+      if (ev.target === histOverlay) closeHistoryViewer();
+    });
+  }
+
   // ── Save handler + form helpers (Step 7) ─────────────────────
   var ACTION_LABELS = {
     action_oral_teacher:    'تنبيه شفهي من المعلمة',
@@ -41158,6 +41345,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     var mw = document.getElementById('vio-manual-name-wrap');
     if (mw) mw.classList.remove('show');
     clearFormError();
+    if (typeof _hideHistoryAlert === 'function') _hideHistoryAlert();
+    _histLastKey = null;
   }
 
   function saveViolation(){
