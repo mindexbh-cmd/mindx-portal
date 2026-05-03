@@ -9090,6 +9090,62 @@ function dhCopyParentLink(){
           .gs-info-value{color:#212121;font-size:.95rem;line-height:1.55;
                          word-break:break-word;white-space:pre-line;}
           .gs-info-value.gs-empty{color:#8a7da5;font-style:italic;}
+
+          /* Step 5 — student roster cards. Pay-status + attendance
+             badges share the same hex tiers Step-3 uses for the
+             attendance stat card (green / amber / red) but live in
+             a SEPARATE light-bg palette (#E6F4EE / #FFF3E0 / #FCE6E6)
+             so they don't clash with the reserved #FAEEDA palette
+             that's still owned by the متأخرات سداد stat card. */
+          .gs-stu-toolbar{display:flex;justify-content:space-between;
+                          align-items:center;gap:10px;flex-wrap:wrap;
+                          margin-bottom:10px;padding-bottom:10px;
+                          border-bottom:0.5px solid #d8c8ec;}
+          .gs-stu-count{color:#4a148c;font-weight:800;font-size:.95rem;}
+          .gs-stu-sort-row{display:flex;align-items:center;gap:6px;
+                           flex-wrap:wrap;}
+          .gs-stu-sort-label{color:#6a4f8a;font-size:.82rem;
+                             font-weight:700;}
+          .gs-stu-sort-btn{background:#f3e5f5;color:#4a148c;
+                           border:0.5px solid #d8c8ec;border-radius:7px;
+                           padding:5px 10px;font-weight:700;
+                           font-size:.82rem;font-family:inherit;
+                           cursor:pointer;}
+          .gs-stu-sort-btn:hover{background:#e1bee7;}
+          .gs-stu-sort-btn.active{background:#6B3FA0;color:#fff;
+                                  border-color:#6B3FA0;}
+          .gs-stu-list{display:flex;flex-direction:column;gap:8px;}
+          .gs-stu-card{background:#fff;border:0.5px solid #d8c8ec;
+                       border-radius:10px;padding:11px 13px;}
+          .gs-stu-head{display:flex;justify-content:space-between;
+                       align-items:baseline;gap:8px;margin-bottom:4px;
+                       flex-wrap:wrap;}
+          .gs-stu-name{color:#4a148c;font-weight:900;font-size:.98rem;}
+          .gs-stu-pid{color:#8a7da5;font-size:.82rem;font-weight:600;}
+          .gs-stu-phone{color:#6a4f8a;font-size:.86rem;direction:ltr;
+                        display:inline-block;margin-bottom:6px;}
+          .gs-stu-row{display:flex;gap:6px;flex-wrap:wrap;}
+          .gs-stu-badge{display:inline-block;padding:3px 9px;
+                        border-radius:999px;font-size:.78rem;
+                        font-weight:800;border:0.5px solid;}
+          .gs-stu-pay-paid{background:#E6F4EE;color:#1D9E75;
+                           border-color:#1D9E75;}
+          .gs-stu-pay-pending{background:#FFF3E0;color:#BA7517;
+                              border-color:#BA7517;}
+          .gs-stu-pay-overdue{background:#FCE6E6;color:#A32D2D;
+                              border-color:#A32D2D;}
+          .gs-stu-pay-none{background:#fafafe;color:#8a7da5;
+                           border-color:#d8c8ec;}
+          .gs-stu-att-high{background:#E6F4EE;color:#1D9E75;
+                           border-color:#1D9E75;}
+          .gs-stu-att-mid{background:#FFF3E0;color:#BA7517;
+                          border-color:#BA7517;}
+          .gs-stu-att-low{background:#FCE6E6;color:#A32D2D;
+                          border-color:#A32D2D;}
+          .gs-stu-att-none{background:#fafafe;color:#8a7da5;
+                           border-color:#d8c8ec;}
+          .gs-stu-remaining{color:#6a4f8a;font-size:.82rem;
+                            font-weight:700;margin-top:6px;}
         </style>
 
         <!-- A) Filters card -->
@@ -9443,6 +9499,168 @@ function dhCopyParentLink(){
               infoEl.innerHTML = gsRenderInfo(payload);
             }
           };
+
+          /* ── Step 5 — الطالبات roster tab. Same wrap pattern.
+             pay_status mapping note: the detail endpoint returns
+             "مدفوع بالكامل" / "لم يدفع" / "متبقي" / "—" (set by
+             _payment_compute_plan in /api/groups/<id>/detail). The
+             spec asked for "مدفوع / متأخر / قيد السداد" — we keep
+             the actual server text in the badge and map to the
+             spec's COLOR tiers (paid → green, didn't-pay → red,
+             remaining → amber, no-plan → neutral). ──────────── */
+          var gsStudentsSortMode = 'name';
+
+          function gsClassifyPayStatus(s){
+            var ps = String((s && s.pay_status) || '').trim();
+            if(ps === 'مدفوع بالكامل') return 'paid';
+            if(ps === 'لم يدفع')       return 'overdue';
+            if(ps === 'متبقي')         return 'pending';
+            return 'none';
+          }
+          function gsClassifyAttendance(p){
+            if(p == null || p === '') return 'none';
+            var n = parseFloat(p);
+            if(isNaN(n)) return 'none';
+            if(n >= 80) return 'high';
+            if(n >= 60) return 'mid';
+            return 'low';
+          }
+          function gsSortStudents(arr){
+            var copy = arr.slice();
+            function nm(x){ return (x.student_name || ''); }
+            function arCmp(a, b){
+              return nm(a).localeCompare(nm(b), 'ar');
+            }
+            if(gsStudentsSortMode === 'attendance'){
+              copy.sort(function(a, b){
+                var av = gsClassifyAttendance(a.att_percent) === 'none'
+                  ? null : parseFloat(a.att_percent);
+                var bv = gsClassifyAttendance(b.att_percent) === 'none'
+                  ? null : parseFloat(b.att_percent);
+                if(av == null && bv == null) return arCmp(a, b);
+                if(av == null) return 1;   /* nulls to the end */
+                if(bv == null) return -1;
+                if(bv !== av) return bv - av;   /* highest first */
+                return arCmp(a, b);
+              });
+            } else if(gsStudentsSortMode === 'pay'){
+              var ORDER = {overdue:0, pending:1, paid:2, none:3};
+              copy.sort(function(a, b){
+                var ar = ORDER[gsClassifyPayStatus(a)];
+                var br = ORDER[gsClassifyPayStatus(b)];
+                if(ar !== br) return ar - br;
+                return arCmp(a, b);
+              });
+            } else {
+              /* default: by name */
+              copy.sort(arCmp);
+            }
+            return copy;
+          }
+
+          function gsRenderStudents(payload){
+            var d = payload && payload.detail;
+            var students = (d && d.students) || [];
+            var n = students.length;
+            if(n === 0){
+              return '<div class="gs-panel-empty">' +
+                'لا توجد طالبات في هذه المجموعة.</div>';
+            }
+            var sorted = gsSortStudents(students);
+
+            function sortBtn(mode, label){
+              var act = (mode === gsStudentsSortMode) ? ' active' : '';
+              return '<button type="button" ' +
+                'class="gs-stu-sort-btn' + act + '" ' +
+                'data-gs-sort="' + mode + '">' + label + '</button>';
+            }
+
+            var html =
+              '<div class="gs-stu-toolbar">' +
+                '<div class="gs-stu-count">' + n + ' طالبة</div>' +
+                '<div class="gs-stu-sort-row">' +
+                  '<span class="gs-stu-sort-label">ترتيب حسب:</span>' +
+                  sortBtn('name',       'الاسم') +
+                  sortBtn('attendance', 'الحضور') +
+                  sortBtn('pay',        'الدفع') +
+                '</div>' +
+              '</div>' +
+              '<div class="gs-stu-list">';
+
+            sorted.forEach(function(s){
+              var name   = gsEscape(s.student_name || '—');
+              var pid    = gsEscape(s.personal_id || '');
+              var phone  = gsEscape(s.parent_phone || '');
+              var payCls = gsClassifyPayStatus(s);
+              var payTxt = String((s.pay_status || '').trim() || '—');
+              var attCls = gsClassifyAttendance(s.att_percent);
+              var attTxt;
+              if(attCls === 'none'){
+                attTxt = '—';
+              } else {
+                attTxt = Math.round(parseFloat(s.att_percent)) + '%';
+              }
+              var rem = parseFloat(s.pay_remaining || 0);
+              var remHtml = '';
+              if(!isNaN(rem) && rem > 0){
+                /* Format: integer if whole number, else 2 decimals. */
+                var fmt = (rem % 1 === 0)
+                  ? String(rem)
+                  : rem.toFixed(2);
+                remHtml = '<div class="gs-stu-remaining">' +
+                  'المتبقي: ' + fmt + ' د.ب</div>';
+              }
+              html +=
+                '<article class="gs-stu-card" data-id="' +
+                  (parseInt(s.id, 10) || 0) + '">' +
+                  '<div class="gs-stu-head">' +
+                    '<div class="gs-stu-name">' + name + '</div>' +
+                    (pid ? '<div class="gs-stu-pid">' + pid + '</div>' : '') +
+                  '</div>' +
+                  (phone ? '<div class="gs-stu-phone">' + phone + '</div>' : '') +
+                  '<div class="gs-stu-row">' +
+                    '<span class="gs-stu-badge gs-stu-pay-' + payCls +
+                      '">' + gsEscape(payTxt) + '</span>' +
+                    '<span class="gs-stu-badge gs-stu-att-' + attCls +
+                      '">' + gsEscape(attTxt) + '</span>' +
+                  '</div>' +
+                  remHtml +
+                '</article>';
+            });
+            html += '</div>';
+            return html;
+          }
+
+          var _gsStep4Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            _gsStep4Fill(payload);
+            var stuEl = document.querySelector(
+              '.gs-panel[data-gs-panel="students"]');
+            if(stuEl){
+              stuEl.innerHTML = gsRenderStudents(payload);
+            }
+          };
+
+          /* Sort buttons live inside the students panel; re-render
+             rebuilds them every time. Use event delegation on the
+             panel so we bind the handler ONCE — re-renders never
+             unbind it. */
+          var gsStudentsPanel = document.querySelector(
+            '.gs-panel[data-gs-panel="students"]');
+          if(gsStudentsPanel){
+            gsStudentsPanel.addEventListener('click', function(ev){
+              var btn = ev.target.closest('[data-gs-sort]');
+              if(!btn) return;
+              var mode = btn.getAttribute('data-gs-sort');
+              if(!mode || mode === gsStudentsSortMode) return;
+              gsStudentsSortMode = mode;
+              var gid = sel.value;
+              if(gid && gsDetailCache[gid]){
+                gsStudentsPanel.innerHTML =
+                  gsRenderStudents(gsDetailCache[gid]);
+              }
+            });
+          }
 
           /* Group selection → reveal card and dispatch the detail
              fetch. Cached groups skip the loading state. */
