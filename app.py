@@ -9185,6 +9185,41 @@ function dhCopyParentLink(){
           .gs-att-color-mid{color:#BA7517;}
           .gs-att-color-low{color:#A32D2D;}
           .gs-att-color-none{color:#8a7da5;}
+
+          /* Step 7 — lessons list cards. Plain white cards with a
+             small purple date pill; topic in bold, body rows for
+             progress + notes. */
+          .gs-les-header{display:flex;justify-content:space-between;
+                         align-items:center;gap:10px;flex-wrap:wrap;
+                         padding-bottom:10px;margin-bottom:10px;
+                         border-bottom:0.5px solid #d8c8ec;}
+          .gs-les-count{color:#4a148c;font-weight:800;font-size:.95rem;}
+          .gs-les-list{display:flex;flex-direction:column;gap:8px;}
+          .gs-les-card{background:#fff;border:0.5px solid #d8c8ec;
+                       border-radius:10px;padding:11px 13px;}
+          .gs-les-head{display:flex;justify-content:space-between;
+                       align-items:center;gap:8px;flex-wrap:wrap;
+                       margin-bottom:6px;}
+          .gs-les-date{color:#4a148c;font-weight:700;font-size:.86rem;
+                       background:#f3e5f5;padding:3px 10px;
+                       border-radius:8px;}
+          .gs-les-topic{color:#4a148c;font-weight:800;font-size:.95rem;
+                        margin-bottom:4px;}
+          .gs-les-row{font-size:.88rem;line-height:1.55;color:#212121;}
+          .gs-les-key{color:#4a148c;font-weight:700;margin-left:4px;}
+          .gs-les-val{color:#212121;}
+          .gs-les-notes{margin-top:4px;color:#212121;font-size:.88rem;
+                        line-height:1.55;white-space:pre-line;
+                        word-break:break-word;}
+          .gs-les-notes .gs-les-key{display:inline;}
+          .gs-les-toggle-wrap{margin-top:12px;display:flex;
+                              justify-content:center;}
+          .gs-les-toggle{background:#f3e5f5;color:#4a148c;
+                         border:0.5px solid #d8c8ec;border-radius:9px;
+                         padding:7px 16px;font-weight:800;
+                         font-size:.88rem;font-family:inherit;
+                         cursor:pointer;}
+          .gs-les-toggle:hover{background:#e1bee7;}
         </style>
 
         <!-- A) Filters card -->
@@ -9427,12 +9462,28 @@ function dhCopyParentLink(){
               .then(function(j){
                 var entries = (j && j.entries) || [];
                 var n = entries.length;
-                if(gsDetailCache[gid]) gsDetailCache[gid].lessonsCount = n;
+                if(gsDetailCache[gid]){
+                  gsDetailCache[gid].lessonsCount = n;
+                  /* Step 7: also cache the entries so the lessons
+                     tab can render without re-fetching. */
+                  gsDetailCache[gid].lessonsList  = entries;
+                }
                 /* Only update the DOM if THIS group is still selected
                    (the user may have switched in the meantime). */
                 if(sel.value === String(gid)){
                   var el = document.getElementById('gs-stat-lessons');
                   if(el) el.textContent = String(n);
+                  /* Step 7: re-render the lessons panel from the
+                     freshly-cached entries. The wrapped fillFromDetail
+                     already painted a "loading" state; this swaps it
+                     out for the real list. */
+                  if(typeof gsRenderLessons === 'function'){
+                    var lesEl = document.querySelector(
+                      '.gs-panel[data-gs-panel="lessons"]');
+                    if(lesEl && gsDetailCache[gid]){
+                      lesEl.innerHTML = gsRenderLessons(gsDetailCache[gid]);
+                    }
+                  }
                 }
               })
               .catch(function(err){
@@ -9442,6 +9493,15 @@ function dhCopyParentLink(){
                 if(sel.value === String(gid)){
                   var el = document.getElementById('gs-stat-lessons');
                   if(el) el.textContent = '—';
+                  /* Step 7: surface the failure on the lessons tab too. */
+                  if(typeof gsRenderLessons === 'function'){
+                    var lesEl = document.querySelector(
+                      '.gs-panel[data-gs-panel="lessons"]');
+                    if(lesEl){
+                      lesEl.innerHTML = '<div class="gs-panel-empty">' +
+                        'تعذّر تحميل الدروس.</div>';
+                    }
+                  }
                 }
               });
           }
@@ -9759,6 +9819,130 @@ function dhCopyParentLink(){
               attEl.innerHTML = gsRenderAttendance(payload);
             }
           };
+
+          /* ── Step 7 — الدروس tab. Reads gsDetailCache[gid].lessonsList
+             which Step 3's fetchLessonsCount now also populates. The
+             wrap below paints a "loading" state when the entries
+             haven't arrived yet; fetchLessonsCount re-renders the
+             panel as soon as the fetch resolves. */
+          var GS_AR_DAYS = ['الأحد','الإثنين','الثلاثاء','الأربعاء',
+                            'الخميس','الجمعة','السبت'];
+          function gsArDay(iso){
+            if(!iso) return '';
+            var p = String(iso).split('-');
+            if(p.length < 3) return '';
+            var y = parseInt(p[0],10),
+                m = parseInt(p[1],10),
+                d = parseInt(p[2],10);
+            if(!y || !m || !d) return '';
+            return GS_AR_DAYS[
+              new Date(Date.UTC(y, m-1, d)).getUTCDay()];
+          }
+
+          var gsLessonsExpanded = false;
+          var GS_LESSONS_DEFAULT = 10;
+
+          function gsRenderLessons(payload){
+            /* Loading state: detail loaded but lessonsList not yet
+               cached (the parallel fetch is still in flight). */
+            if(payload.lessonsList == null){
+              return '<div class="gs-panel-empty">جارٍ التحميل...</div>';
+            }
+            var entries = payload.lessonsList || [];
+            var n = entries.length;
+            if(n === 0){
+              return '<div class="gs-panel-empty">' +
+                'لا توجد دروس مسجلة لهذه المجموعة.</div>';
+            }
+            /* API already returns ORDER BY lesson_date DESC, id DESC.
+               Defensive client-side sort so any oddly-ordered data
+               still renders newest first. */
+            var sorted = entries.slice().sort(function(a, b){
+              var ad = String(a.lesson_date || '');
+              var bd = String(b.lesson_date || '');
+              if(ad !== bd) return bd.localeCompare(ad);
+              return (parseInt(b.id,10)||0) - (parseInt(a.id,10)||0);
+            });
+            var visible = gsLessonsExpanded
+              ? sorted
+              : sorted.slice(0, GS_LESSONS_DEFAULT);
+            var html =
+              '<div class="gs-les-header">' +
+                '<div class="gs-les-count">' + n + ' درس مسلَّم</div>' +
+              '</div>' +
+              '<div class="gs-les-list">';
+            visible.forEach(function(e){
+              var date  = gsEscape(e.lesson_date || '—');
+              var dayAr = gsEscape(gsArDay(e.lesson_date));
+              var dateLbl = dayAr ? (dayAr + ' · ' + date) : date;
+              var topic = gsEscape((e.lesson_topic || '').trim() || '—');
+              var prog  = gsEscape((e.curriculum_progress || '').trim());
+              var notes = (e.notes || '').trim();
+              html +=
+                '<article class="gs-les-card" data-id="' +
+                  (parseInt(e.id, 10) || 0) + '">' +
+                  '<header class="gs-les-head">' +
+                    '<span class="gs-les-date">' + dateLbl + '</span>' +
+                  '</header>' +
+                  '<div class="gs-les-topic">' + topic + '</div>';
+              if(prog){
+                html +=
+                  '<div class="gs-les-row">' +
+                    '<span class="gs-les-key">إلى أين وصلت:</span>' +
+                    '<span class="gs-les-val">' + prog + '</span>' +
+                  '</div>';
+              }
+              if(notes){
+                html +=
+                  '<div class="gs-les-notes">' +
+                    '<span class="gs-les-key">ملاحظات:</span> ' +
+                    gsEscape(notes) +
+                  '</div>';
+              }
+              html += '</article>';
+            });
+            html += '</div>';
+            if(n > GS_LESSONS_DEFAULT){
+              var label = gsLessonsExpanded
+                ? 'عرض آخر ' + GS_LESSONS_DEFAULT + ' فقط'
+                : 'عرض كل الدروس (' + n + ')';
+              html +=
+                '<div class="gs-les-toggle-wrap">' +
+                  '<button type="button" class="gs-les-toggle" ' +
+                    'data-gs-toggle="lessons">' +
+                    label +
+                  '</button>' +
+                '</div>';
+            }
+            return html;
+          }
+
+          var _gsStep6Fill = fillFromDetail;
+          fillFromDetail = function(payload){
+            gsLessonsExpanded = false;   /* reset on every fill */
+            _gsStep6Fill(payload);
+            var lesEl = document.querySelector(
+              '.gs-panel[data-gs-panel="lessons"]');
+            if(lesEl){
+              lesEl.innerHTML = gsRenderLessons(payload);
+            }
+          };
+
+          /* Toggle delegate — bound once on the lessons panel. */
+          var gsLessonsPanel = document.querySelector(
+            '.gs-panel[data-gs-panel="lessons"]');
+          if(gsLessonsPanel){
+            gsLessonsPanel.addEventListener('click', function(ev){
+              var btn = ev.target.closest('[data-gs-toggle="lessons"]');
+              if(!btn) return;
+              gsLessonsExpanded = !gsLessonsExpanded;
+              var gid = sel.value;
+              if(gid && gsDetailCache[gid]){
+                gsLessonsPanel.innerHTML =
+                  gsRenderLessons(gsDetailCache[gid]);
+              }
+            });
+          }
 
           /* Sort buttons live inside the students panel; re-render
              rebuilds them every time. Use event delegation on the
