@@ -41562,6 +41562,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         openModal(parseInt(vid, 10), row);
       } else if (t.closest('.vio-btn-del')){
         deleteViolation(vid, t.closest('.vio-btn-del'));
+      } else if (t.closest('.vio-btn-pdf')){
+        window.open(
+          '/api/admin/violations/' + encodeURIComponent(vid) + '/pdf',
+          '_blank'
+        );
       }
     });
   }
