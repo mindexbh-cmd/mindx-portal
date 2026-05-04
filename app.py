@@ -65874,23 +65874,283 @@ function evSubmitCreate(e){
 </body></html>"""
 
 
-# Stage-2.1 minimal placeholder — the full detail page (header, tab
-# bar, edit/delete modals) is built up commit-by-commit in 2.2 → 2.5.
+# Per-event detail page. Stage-2 ships only the SKELETON — the
+# placeholder content inside each tab is filled in stages 3-8 (one
+# tab per stage). Header, status dropdown, edit modal and delete
+# modal are wired here. CSS prefix: evd-* (event-detail).
 ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>تفاصيل الرحلة</title>
 <style>
-  body{font-family:'Tahoma',sans-serif;background:#fafafa;padding:24px;text-align:center;color:#444;}
-  .stub-card{max-width:640px;margin:60px auto;padding:32px;background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,0.06);}
-  a{color:#1D9E75;text-decoration:none;font-weight:700;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Tahoma','Segoe UI',sans-serif;background:#f4f5f7;color:#222;}
+  .evd-shell{max-width:1100px;margin:0 auto;padding:14px;}
+  .evd-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .evd-toolbar .left,.evd-toolbar .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .evd-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid transparent;background:#fff;color:#333;font-weight:700;font-size:.92rem;cursor:pointer;transition:.15s;text-decoration:none;}
+  .evd-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .evd-btn-back{background:#fff;color:#1D9E75;border-color:#1D9E75;}
+  .evd-btn-edit{background:#fff;color:#0d47a1;border-color:#0d47a1;}
+  .evd-btn-del {background:#fff;color:#c62828;border-color:#c62828;}
+  /* Header card with status-keyed gradient. */
+  .evd-header{position:relative;border-radius:18px;padding:24px;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.10);background:linear-gradient(135deg,#9e9e9e,#757575);overflow:hidden;}
+  .evd-header[data-status="planning"] {background:linear-gradient(135deg,#bdbdbd,#616161);}
+  .evd-header[data-status="open"]     {background:linear-gradient(135deg,#43a047,#1D9E75);}
+  .evd-header[data-status="closed"]   {background:linear-gradient(135deg,#fb8c00,#BA7517);}
+  .evd-header[data-status="completed"]{background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evd-h-title{display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:900;margin:0 0 8px;flex-wrap:wrap;}
+  .evd-h-title .name{flex:1;min-width:200px;}
+  .evd-h-meta{display:flex;flex-wrap:wrap;gap:14px 22px;color:#fff;opacity:.95;font-size:.95rem;font-weight:600;}
+  .evd-h-meta span{display:inline-flex;align-items:center;gap:4px;}
+  /* Status badge + dropdown */
+  .evd-status-wrap{position:relative;display:inline-block;}
+  .evd-status-btn{background:rgba(255,255,255,0.22);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:99px;padding:6px 14px;font-weight:800;font-size:.9rem;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .evd-status-btn:hover{background:rgba(255,255,255,0.32);}
+  .evd-status-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;color:#222;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.18);padding:6px;min-width:180px;z-index:50;display:none;}
+  .evd-status-menu.is-open{display:block;}
+  .evd-status-menu button{display:block;width:100%;text-align:right;background:none;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;color:#333;font-size:.9rem;}
+  .evd-status-menu button:hover{background:#f0f7f3;}
+  .evd-status-menu button[disabled]{opacity:.45;cursor:not-allowed;}
+  /* Tab bar */
+  .evd-tabs{display:flex;gap:2px;background:#fff;border-radius:14px;padding:6px;margin:14px 0;overflow-x:auto;scroll-behavior:smooth;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:sticky;top:0;z-index:20;}
+  .evd-tabs::-webkit-scrollbar{height:4px;}
+  .evd-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;background:transparent;border:none;font-weight:700;color:#555;cursor:pointer;font-size:.9rem;white-space:nowrap;border-bottom:3px solid transparent;transition:.15s;}
+  .evd-tab:hover{background:#f6f7f9;color:#1D9E75;}
+  .evd-tab.is-active{background:#e6f7ee;color:#1D9E75;border-bottom-color:#1D9E75;}
+  .evd-panel{display:none;background:#fff;border-radius:14px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,0.05);min-height:280px;}
+  .evd-panel.is-active{display:block;}
+  .evd-stub{text-align:center;padding:40px 20px;color:#666;}
+  .evd-stub .em{font-size:3.4rem;margin-bottom:10px;}
+  .evd-stub .h{font-size:1.05rem;font-weight:800;color:#444;margin-bottom:6px;}
+  .evd-stub .sub{font-size:.85rem;color:#888;}
+  /* Toast */
+  .evd-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:11px 22px;border-radius:24px;font-weight:700;font-size:.92rem;box-shadow:0 4px 18px rgba(0,0,0,0.2);opacity:0;transition:opacity .25s;z-index:200;pointer-events:none;}
+  .evd-toast.is-show{opacity:1;}
+  .evd-toast.is-error{background:#c62828;}
+  .evd-toast.is-success{background:#1D9E75;}
+  /* Modals (used by 2.3 + 2.4) */
+  .evd-mb{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:14px;}
+  .evd-mb.is-open{display:flex;}
+  .evd-modal{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 10px 36px rgba(0,0,0,0.25);}
+  .evd-modal h2{margin:0 0 16px;font-size:1.2rem;color:#0d47a1;}
+  .evd-modal .row{margin-bottom:12px;}
+  .evd-modal label{display:block;font-weight:700;font-size:.86rem;color:#444;margin-bottom:5px;}
+  .evd-modal input,.evd-modal select,.evd-modal textarea{width:100%;padding:9px 11px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.95rem;}
+  .evd-modal textarea{min-height:84px;resize:vertical;}
+  .evd-modal .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .evd-modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  /* Mobile */
+  @media (max-width: 720px){
+    .evd-h-title{font-size:1.25rem;}
+    .evd-h-meta{font-size:.85rem;gap:8px 14px;}
+    .evd-modal .grid2{grid-template-columns:1fr;}
+  }
 </style></head><body>
-<div class="stub-card">
-  <h1>تفاصيل الرحلة #{{EID}}</h1>
-  <p>⏳ صفحة التفاصيل قيد البناء — سيتم تفعيل تبويباتها في الالتزام التالي.</p>
-  <p><a href="/admin/events">← العودة لقائمة الرحلات</a></p>
+
+<div class="evd-shell">
+  <!-- Toolbar -->
+  <div class="evd-toolbar">
+    <div class="right">
+      <a href="/admin/events" class="evd-btn evd-btn-back">← العودة</a>
+    </div>
+    <div class="left">
+      <button class="evd-btn evd-btn-edit" id="evd-edit-btn" type="button">⚙️ تعديل</button>
+      <button class="evd-btn evd-btn-del"  id="evd-del-btn"  type="button">🗑️ حذف</button>
+    </div>
+  </div>
+
+  <!-- Status-coloured header -->
+  <div class="evd-header" id="evd-header" data-status="planning">
+    <div class="evd-h-title">
+      <span class="name" id="evd-name">…</span>
+      <div class="evd-status-wrap">
+        <button class="evd-status-btn" id="evd-status-btn" type="button">
+          <span id="evd-status-label">…</span>
+          <span style="font-size:.7rem;">▼</span>
+        </button>
+        <div class="evd-status-menu" id="evd-status-menu" role="menu"></div>
+      </div>
+    </div>
+    <div class="evd-h-meta" id="evd-meta">
+      <span id="evd-meta-date">📅 —</span>
+      <span id="evd-meta-time">⏰ —</span>
+      <span id="evd-meta-place">📍 —</span>
+      <span id="evd-meta-price">💰 —</span>
+      <span id="evd-meta-cap">👥 —</span>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="evd-tabs" id="evd-tabs" role="tablist">
+    <button class="evd-tab" data-tab="info"     role="tab">📋 المعلومات</button>
+    <button class="evd-tab" data-tab="schedule" role="tab">⏰ الخطة الزمنية</button>
+    <button class="evd-tab" data-tab="costs"    role="tab">💰 التكاليف</button>
+    <button class="evd-tab" data-tab="items"    role="tab">🛠️ الأدوات</button>
+    <button class="evd-tab" data-tab="tasks"    role="tab">✅ المهام</button>
+    <button class="evd-tab" data-tab="students" role="tab">👥 الطالبات</button>
+    <button class="evd-tab" data-tab="messages" role="tab">💬 الرسائل</button>
+    <button class="evd-tab" data-tab="print"    role="tab">🖨️ الطباعة</button>
+  </div>
+
+  <!-- Panels -->
+  <section class="evd-panel" data-panel="info"     role="tabpanel"><div class="evd-stub"><div class="em">📋</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="schedule" role="tabpanel"><div class="evd-stub"><div class="em">⏰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="costs"    role="tabpanel"><div class="evd-stub"><div class="em">💰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="items"    role="tabpanel"><div class="evd-stub"><div class="em">🛠️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="tasks"    role="tabpanel"><div class="evd-stub"><div class="em">✅</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="students" role="tabpanel"><div class="evd-stub"><div class="em">👥</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="messages" role="tabpanel"><div class="evd-stub"><div class="em">💬</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <section class="evd-panel" data-panel="print"    role="tabpanel"><div class="evd-stub"><div class="em">🖨️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+
 </div>
+
+<div class="evd-toast" id="evd-toast"></div>
+
+<script>
+var EID = parseInt('{{EID}}', 10);
+var EVENT_DATA = null;
+var STATUS_LABELS = {
+  planning:  '\u{1F4DD} قيد التخطيط',
+  open:      '\u{1F4E2} مفتوحة',
+  closed:    '\u{1F3AF} جاهزة',
+  completed: '✅ منتهية'
+};
+// Forward transitions mirror the server-side `forward` table.
+var STATUS_FORWARD = {
+  planning:  ['open'],
+  open:      ['closed', 'planning'],
+  closed:    ['completed', 'open'],
+  completed: ['closed']
+};
+var TABS = ['info','schedule','costs','items','tasks','students','messages','print'];
+
+function evdEsc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function evdToast(msg, kind){
+  var t = document.getElementById('evd-toast');
+  t.textContent = msg;
+  t.className = 'evd-toast is-show ' + (kind === 'error' ? 'is-error' : (kind === 'success' ? 'is-success' : ''));
+  setTimeout(function(){ t.classList.remove('is-show'); }, 2400);
+}
+function evdFmtDate(iso){
+  if (!iso) return '—';
+  var s = String(iso).substring(0, 10);
+  var p = s.split('-'); if (p.length !== 3) return s;
+  var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+                'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  var mi = parseInt(p[1], 10) - 1;
+  return parseInt(p[2], 10) + ' ' + (months[mi] || p[1]) + ' ' + p[0];
+}
+
+/* ── Hash-based tab routing ──────────────────────────────────── */
+function evdActivateTab(name){
+  if (TABS.indexOf(name) < 0) name = 'info';
+  document.querySelectorAll('.evd-tab').forEach(function(t){
+    t.classList.toggle('is-active', t.getAttribute('data-tab') === name);
+  });
+  document.querySelectorAll('.evd-panel').forEach(function(p){
+    p.classList.toggle('is-active', p.getAttribute('data-panel') === name);
+  });
+}
+function evdSyncTabFromHash(){
+  var h = (location.hash || '').replace('#','');
+  evdActivateTab(h || 'info');
+}
+window.addEventListener('hashchange', evdSyncTabFromHash);
+
+/* ── Header render + status dropdown ─────────────────────────── */
+function evdRenderHeader(ev){
+  EVENT_DATA = ev;
+  document.title = (ev.name || 'تفاصيل الرحلة') + ' — Mindex';
+  var hdr = document.getElementById('evd-header');
+  hdr.setAttribute('data-status', ev.status || 'planning');
+  document.getElementById('evd-name').textContent = ev.name || '—';
+  document.getElementById('evd-status-label').textContent =
+    STATUS_LABELS[ev.status] || ev.status || '—';
+  document.getElementById('evd-meta-date').textContent  = '📅 ' + evdFmtDate(ev.event_date);
+  var t = (ev.departure_time || '') + (ev.return_time ? (' - ' + ev.return_time) : '');
+  document.getElementById('evd-meta-time').textContent  = '⏰ ' + (t || '—');
+  document.getElementById('evd-meta-place').textContent = '📍 ' + (ev.meeting_point || ev.destination || '—');
+  document.getElementById('evd-meta-price').textContent = '💰 ' + (ev.price_per_student ? (ev.price_per_student + ' د.ب') : 'مجاناً');
+  var cap = ev.max_students > 0
+    ? ((ev.registered_count || 0) + '/' + ev.max_students + ' مسجلة')
+    : ((ev.registered_count || 0) + ' مسجلة');
+  document.getElementById('evd-meta-cap').textContent = '👥 ' + cap;
+  // Status menu
+  var menu = document.getElementById('evd-status-menu');
+  var allowed = (STATUS_FORWARD[ev.status] || []);
+  var html = '';
+  allowed.forEach(function(s){
+    html += '<button type="button" data-set="' + s + '">' + evdEsc(STATUS_LABELS[s]) + '</button>';
+  });
+  if (!html) html = '<button type="button" disabled>لا توجد انتقالات متاحة</button>';
+  menu.innerHTML = html;
+  menu.querySelectorAll('button[data-set]').forEach(function(b){
+    b.addEventListener('click', function(){
+      evdSetStatus(b.getAttribute('data-set'));
+    });
+  });
+}
+function evdToggleStatusMenu(){
+  document.getElementById('evd-status-menu').classList.toggle('is-open');
+}
+document.addEventListener('click', function(e){
+  var btn = e.target.closest && e.target.closest('#evd-status-btn');
+  var menu = document.getElementById('evd-status-menu');
+  if (!menu) return;
+  if (btn){ evdToggleStatusMenu(); return; }
+  if (!e.target.closest('.evd-status-wrap')) menu.classList.remove('is-open');
+});
+function evdSetStatus(next){
+  document.getElementById('evd-status-menu').classList.remove('is-open');
+  fetch('/api/admin/events/' + EID + '/status', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status: next})
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
+    evdToast('تم تحديث الحالة', 'success');
+    evdLoadEvent();
+  })
+  .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+/* ── Initial load ────────────────────────────────────────────── */
+function evdLoadEvent(){
+  return fetch('/api/admin/events/' + EID)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok){
+        evdToast(j.error || 'تعذّر الجلب', 'error');
+        setTimeout(function(){ window.location.href = '/admin/events'; }, 1200);
+        return;
+      }
+      evdRenderHeader(j.event);
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  // Tab clicks update hash; the hashchange listener does the work.
+  document.querySelectorAll('.evd-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      var name = t.getAttribute('data-tab');
+      if ('#' + name === location.hash){ evdActivateTab(name); return; }
+      location.hash = '#' + name;
+    });
+  });
+  evdSyncTabFromHash();
+  evdLoadEvent();
+});
+</script>
+
 </body></html>"""
 
 
