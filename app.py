@@ -1031,6 +1031,33 @@ def init_db():
     )""")
     db.execute("CREATE INDEX IF NOT EXISTS idx_items_event "
                "ON ev_items(event_id, is_deleted, order_index)")
+    # Per-event task list — three categories before/during/after (5.3).
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_tasks(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to_user_id INTEGER,
+        assigned_to_name TEXT,
+        due_date DATE,
+        due_time TEXT,
+        status TEXT DEFAULT 'pending',
+        completion_notes TEXT,
+        order_index INTEGER DEFAULT 0,
+        completed_at DATETIME,
+        completed_by_user_id INTEGER,
+        completed_by_name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_event "
+               "ON ev_tasks(event_id, is_deleted, category, status)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned "
+               "ON ev_tasks(assigned_to_user_id, status)")
     db.commit()
     db.close()
 
@@ -6500,6 +6527,54 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_items_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_tasks_v1: per-event task list with before/during/after
+    # categories, assignee, due date+time, status flow (5.3).
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_tasks(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        assigned_to_user_id INTEGER,
+        assigned_to_name TEXT,
+        due_date DATE,
+        due_time TEXT,
+        status TEXT DEFAULT 'pending',
+        completion_notes TEXT,
+        order_index INTEGER DEFAULT 0,
+        completed_at DATETIME,
+        completed_by_user_id INTEGER,
+        completed_by_name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_tasks_event "
+                    "ON ev_tasks(event_id, is_deleted, category, status)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned "
+                    "ON ev_tasks(assigned_to_user_id, status)")
+    except Exception: pass
+    if "ev_tasks_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_tasks", "مهام الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_tasks", "مهام الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_tasks_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29966,6 +30041,7 @@ BUILT_IN_TABLE_LABELS = {
     "ev_schedule":       "الخطة الزمنية للرحلات",
     "ev_costs":          "تكاليف الرحلات",
     "ev_items":          "أدوات الرحلات",
+    "ev_tasks":          "مهام الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32385,6 +32461,7 @@ _TBL_AUDIT_FEATURE = {
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
     "ev_costs":             ("تكاليف الرحلات",                  "نظام الفعاليات والرحلات v2"),
     "ev_items":             ("أدوات الرحلات",                   "نظام الفعاليات والرحلات v2"),
+    "ev_tasks":             ("مهام الرحلات",                    "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -64836,6 +64913,59 @@ def _events_seed_default_items(db, event_id):
         print("[events] default-items seed failed: " + str(ex), file=_sys.stderr)
 
 
+# Default task template (5.3). Seeded on every new event AND used
+# as the "reload-template" source so admins can pull missing items
+# back later.
+_EV_TASK_CATEGORIES = ("before", "during", "after")
+_EV_TASK_STATUSES = ("pending", "in_progress", "completed", "cancelled")
+
+_EV_DEFAULT_TASKS = {
+    "before": [
+        "التواصل مع الأهل",
+        "استلام المبالغ من الطالبات",
+        "حجز المواصلات",
+        "حجز المكان / شراء التذاكر",
+        "حجز / تجهيز المأكولات",
+        "إعداد قائمة الطالبات النهائية",
+        "تحضير شنطة الإسعافات",
+        "إرسال رسالة تذكير قبل الرحلة بيوم",
+    ],
+    "during": [
+        "النداء قبل الانطلاق",
+        "متابعة الطالبات أثناء الرحلة",
+        "التواصل مع الأهل في الطوارئ",
+        "النداء قبل العودة",
+    ],
+    "after": [
+        "التأكد من توزيع الطالبات على الأهل",
+        "كتابة تقرير الرحلة",
+        "إرسال شكر للأهل",
+        "إعداد التقرير المالي النهائي",
+    ],
+}
+
+
+def _events_seed_default_tasks(db, event_id, created_by_user_id=None):
+    """Best-effort seed of the 16 default template tasks. order_index
+    is per-category 0..N-1 so the UI can render them grouped without
+    extra sort math."""
+    if not event_id:
+        return
+    try:
+        for cat, titles in _EV_DEFAULT_TASKS.items():
+            for i, title in enumerate(titles):
+                db.execute(
+                    "INSERT INTO ev_tasks(event_id, category, title, status, order_index) "
+                    "VALUES(?,?,?,?,?)",
+                    (event_id, cat, title, "pending", i))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] default-tasks seed failed: " + str(ex), file=_sys.stderr)
+
+
 def _events_can_admin(user):
     """Manager-class — admin/manager. Reuses the existing role
     taxonomy."""
@@ -65073,6 +65203,10 @@ def api_admin_events_create():
         pass
     try:
         _events_seed_default_items(db, new_id)
+    except Exception:
+        pass
+    try:
+        _events_seed_default_tasks(db, new_id, user.get("id"))
     except Exception:
         pass
     # Optional copy-from-previous: only the high-level fields for
@@ -65779,6 +65913,374 @@ def api_admin_events_items_delete(eid, iid):
     except Exception:
         pass
     return jsonify({"ok": True, "id": iid})
+
+
+# ── Tasks (5.3) ────────────────────────────────────────────────
+def _events_tasks_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT 1 FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return False
+    return bool(row)
+
+
+def _events_tasks_row(rd):
+    return {
+        "id":                   rd.get("id"),
+        "event_id":             rd.get("event_id"),
+        "category":             rd.get("category") or "before",
+        "title":                rd.get("title") or "",
+        "description":          rd.get("description") or "",
+        "assigned_to_user_id":  rd.get("assigned_to_user_id"),
+        "assigned_to_name":     rd.get("assigned_to_name") or "",
+        "due_date":             rd.get("due_date") or "",
+        "due_time":             rd.get("due_time") or "",
+        "status":               rd.get("status") or "pending",
+        "completion_notes":     rd.get("completion_notes") or "",
+        "order_index":          int(rd.get("order_index") or 0),
+        "completed_at":         rd.get("completed_at") or "",
+        "completed_by_user_id": rd.get("completed_by_user_id"),
+        "completed_by_name":    rd.get("completed_by_name") or "",
+        "created_at":           rd.get("created_at") or "",
+        "updated_at":           rd.get("updated_at") or "",
+    }
+
+
+def _events_tasks_summary(rows):
+    out = {
+        "total":         len(rows),
+        "completed":     0,
+        "pending":       0,
+        "in_progress":   0,
+        "cancelled":     0,
+        "pct_complete":  0.0,
+        "by_category": {
+            "before": {"total": 0, "completed": 0},
+            "during": {"total": 0, "completed": 0},
+            "after":  {"total": 0, "completed": 0},
+        },
+        "overdue":       0,
+    }
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    for r in rows:
+        st = (r.get("status") or "pending").lower()
+        if st in out: out[st] += 1
+        cat = (r.get("category") or "before").lower()
+        if cat in out["by_category"]:
+            out["by_category"][cat]["total"] += 1
+            if st == "completed":
+                out["by_category"][cat]["completed"] += 1
+        # Overdue if pending/in_progress AND has a due date < today.
+        due = (r.get("due_date") or "")[:10]
+        if due and due < today and st in ("pending", "in_progress"):
+            out["overdue"] += 1
+    if out["total"] > 0:
+        out["pct_complete"] = round(out["completed"] / out["total"] * 100, 1)
+    return out
+
+
+@app.route('/api/admin/events/<int:eid>/tasks', methods=['GET'])
+@login_required
+def api_admin_events_tasks_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_tasks_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM ev_tasks "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY category, order_index, id", (eid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] tasks list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    grouped = {"before": [], "during": [], "after": []}
+    flat = []
+    for r in rows:
+        rd = _events_tasks_row(dict(r))
+        flat.append(rd)
+        cat = rd["category"] if rd["category"] in grouped else "before"
+        grouped[cat].append(rd)
+    summary = _events_tasks_summary(flat)
+    # Inline list of available assignees so the client doesn't have
+    # to round-trip again when opening the add/edit modal.
+    try:
+        urows = db.execute(
+            "SELECT id, username, role FROM users "
+            "WHERE LOWER(COALESCE(role, '')) IN ('admin','manager') "
+            "ORDER BY username").fetchall()
+    except Exception:
+        urows = []
+    avail = []
+    for r in urows:
+        rd = dict(r)
+        avail.append({"user_id": rd.get("id"), "name": rd.get("username") or "",
+                      "role": (rd.get("role") or "").lower()})
+    return jsonify({
+        "ok":                  True,
+        "tasks":               grouped,
+        "summary":             summary,
+        "available_assignees": avail,
+    })
+
+
+@app.route('/api/admin/events/<int:eid>/tasks', methods=['POST'])
+@login_required
+def api_admin_events_tasks_create(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_tasks_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    cat = (d.get("category") or "").strip().lower()
+    if cat not in _EV_TASK_CATEGORIES:
+        return jsonify({"ok": False, "error": "القسم غير معروف"}), 400
+    title = (d.get("title") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+    desc = (d.get("description") or "").strip() or None
+    due_date = (d.get("due_date") or "").strip() or None
+    due_time = (d.get("due_time") or "").strip() or None
+    assignee = d.get("assigned_to_user_id")
+    try:
+        assignee = int(assignee) if assignee not in (None, "", 0, "0") else None
+    except Exception:
+        assignee = None
+    assignee_name = _events_resolve_user_label(db, assignee) if assignee else None
+    try:
+        cur = db.execute(
+            "SELECT COALESCE(MAX(order_index), -1) FROM ev_tasks "
+            "WHERE event_id = ? AND category = ? AND is_deleted = 0",
+            (eid, cat)).fetchone()
+        next_order = int((cur[0] if cur else -1) or -1) + 1
+    except Exception:
+        next_order = 0
+    try:
+        db.execute(
+            "INSERT INTO ev_tasks(event_id, category, title, description, "
+            "                     assigned_to_user_id, assigned_to_name, "
+            "                     due_date, due_time, status, order_index) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (eid, cat, title, desc, assignee, assignee_name,
+             due_date, due_time, "pending", next_order))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] tasks insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        tid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        tid = None
+    try:
+        row = db.execute("SELECT * FROM ev_tasks WHERE id = ?", (tid,)).fetchone()
+        task = _events_tasks_row(dict(row)) if row else None
+    except Exception:
+        task = None
+    try:
+        _audit("event.tasks.create", target_type="ev_tasks", target_id=tid,
+               new_value={"event_id": eid, "category": cat, "title": title})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": tid, "task": task})
+
+
+@app.route('/api/admin/events/<int:eid>/tasks/<int:tid>', methods=['PATCH'])
+@login_required
+def api_admin_events_tasks_update(eid, tid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_tasks_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_tasks WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (tid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "المهمة غير موجودة"}), 404
+    cur = dict(row)
+    d = request.get_json(silent=True) or {}
+    upd = {}
+    if "category" in d:
+        v = (d.get("category") or "").strip().lower()
+        if v not in _EV_TASK_CATEGORIES:
+            return jsonify({"ok": False, "error": "القسم غير معروف"}), 400
+        upd["category"] = v
+    if "title" in d:
+        v = (d.get("title") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+        upd["title"] = v
+    if "description" in d:
+        upd["description"] = (d.get("description") or "").strip() or None
+    if "completion_notes" in d:
+        upd["completion_notes"] = (d.get("completion_notes") or "").strip() or None
+    if "due_date" in d:
+        upd["due_date"] = (d.get("due_date") or "").strip() or None
+    if "due_time" in d:
+        upd["due_time"] = (d.get("due_time") or "").strip() or None
+    if "order_index" in d:
+        try:
+            upd["order_index"] = max(0, int(d.get("order_index") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if "assigned_to_user_id" in d:
+        v = d.get("assigned_to_user_id")
+        try:
+            v = int(v) if v not in (None, "", 0, "0") else None
+        except Exception:
+            v = None
+        upd["assigned_to_user_id"] = v
+        upd["assigned_to_name"]    = _events_resolve_user_label(db, v) if v else None
+    if "status" in d:
+        v = (d.get("status") or "").strip().lower()
+        if v not in _EV_TASK_STATUSES:
+            return jsonify({"ok": False, "error": "حالة غير معروفة"}), 400
+        upd["status"] = v
+        # Status transition stamps:
+        if v == "completed" and (cur.get("status") or "") != "completed":
+            from datetime import datetime as _dt
+            upd["completed_at"]         = _dt.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            upd["completed_by_user_id"] = user.get("id")
+            upd["completed_by_name"]    = (user.get("username") or "")
+        elif v != "completed" and (cur.get("status") or "") == "completed":
+            upd["completed_at"]         = None
+            upd["completed_by_user_id"] = None
+            upd["completed_by_name"]    = None
+    if not upd:
+        return jsonify({"ok": True, "id": tid, "task": _events_tasks_row(cur), "noop": True})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_tasks SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (tid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] tasks update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute("SELECT * FROM ev_tasks WHERE id = ?", (tid,)).fetchone()
+        task = _events_tasks_row(dict(new_row)) if new_row else None
+    except Exception:
+        task = None
+    try:
+        _audit("event.tasks.update", target_type="ev_tasks", target_id=tid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": tid, "task": task})
+
+
+@app.route('/api/admin/events/<int:eid>/tasks/<int:tid>', methods=['DELETE'])
+@login_required
+def api_admin_events_tasks_delete(eid, tid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_tasks_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_tasks WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (tid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "المهمة غير موجودة"}), 404
+    try:
+        db.execute(
+            "UPDATE ev_tasks SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (tid,))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.tasks.delete", target_type="ev_tasks", target_id=tid,
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": tid})
+
+
+@app.route('/api/admin/events/<int:eid>/tasks/reload-template', methods=['POST'])
+@login_required
+def api_admin_events_tasks_reload_template(eid):
+    """Re-add any default-template tasks that don't already exist
+    (matched by exact title within the same category, ignoring
+    soft-deleted rows). Doesn't duplicate existing rows."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_tasks_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT category, title FROM ev_tasks "
+            "WHERE event_id = ? AND is_deleted = 0", (eid,)).fetchall()
+    except Exception:
+        rows = []
+    have = set()
+    for r in rows:
+        rd = dict(r)
+        have.add(((rd.get("category") or "").lower(), (rd.get("title") or "").strip()))
+    added = 0
+    try:
+        for cat, titles in _EV_DEFAULT_TASKS.items():
+            # Find current MAX order for this category so we append.
+            cur = db.execute(
+                "SELECT COALESCE(MAX(order_index), -1) FROM ev_tasks "
+                "WHERE event_id = ? AND category = ? AND is_deleted = 0",
+                (eid, cat)).fetchone()
+            next_order = int((cur[0] if cur else -1) or -1) + 1
+            for title in titles:
+                if (cat, title) in have:
+                    continue
+                db.execute(
+                    "INSERT INTO ev_tasks(event_id, category, title, status, order_index) "
+                    "VALUES(?,?,?,?,?)",
+                    (eid, cat, title, "pending", next_order))
+                next_order += 1
+                added += 1
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] tasks reload-template failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر إعادة التحميل"}), 500
+    total_template = sum(len(v) for v in _EV_DEFAULT_TASKS.values())
+    try:
+        _audit("event.tasks.reload_template", target_type="ev_event",
+               target_id=eid, new_value={"added": added})
+    except Exception:
+        pass
+    return jsonify({
+        "ok":             True,
+        "added_count":    added,
+        "existing_count": total_template - added,
+        "total_template": total_template,
+    })
 
 
 @app.route('/api/admin/events/assignees', methods=['GET'])
