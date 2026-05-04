@@ -1024,6 +1024,40 @@ def init_db():
                "ON trip_registrations(student_id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_pid "
                "ON trip_registrations(student_pid)")
+    # ── trip_payments: per-registration payment ledger.
+    # Full payment only — at most ONE active row per registration_id
+    # (enforced by the partial unique index below). Cash payments leave
+    # receipt_image_path NULL; benefit payments require a receipt image
+    # under /static/trip_receipts/<trip_id>/. Soft-deletes only — never
+    # physically remove a row, financial audit trail must survive.
+    db.execute("""CREATE TABLE IF NOT EXISTS trip_payments(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        registration_id INTEGER NOT NULL,
+        trip_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        payment_method TEXT NOT NULL,
+        receipt_image_path TEXT,
+        payment_date DATE NOT NULL,
+        collected_by_user_id INTEGER NOT NULL,
+        collected_by_name TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
+        deleted_by_user_id INTEGER,
+        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id),
+        FOREIGN KEY (trip_id) REFERENCES trips(id),
+        FOREIGN KEY (collected_by_user_id) REFERENCES users(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_payments_trip "
+               "ON trip_payments(trip_id, is_deleted)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_payments_collector "
+               "ON trip_payments(collected_by_user_id)")
+    # Partial unique index: at most ONE active payment per registration.
+    try:
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_payments_reg_active "
+                   "ON trip_payments(registration_id) WHERE is_deleted = 0")
+    except Exception: pass
     db.commit()
     db.close()
 
@@ -6483,6 +6517,54 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_registrations_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── trip_payments_v1: per-registration payment ledger (stage 3).
+    # See init_db() for column docs. Full-payment-only invariant
+    # enforced by the partial unique index on registration_id.
+    db2.execute("""CREATE TABLE IF NOT EXISTS trip_payments(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        registration_id INTEGER NOT NULL,
+        trip_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        payment_method TEXT NOT NULL,
+        receipt_image_path TEXT,
+        payment_date DATE NOT NULL,
+        collected_by_user_id INTEGER NOT NULL,
+        collected_by_name TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
+        deleted_by_user_id INTEGER,
+        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id),
+        FOREIGN KEY (trip_id) REFERENCES trips(id),
+        FOREIGN KEY (collected_by_user_id) REFERENCES users(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_payments_trip "
+                    "ON trip_payments(trip_id, is_deleted)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_payments_collector "
+                    "ON trip_payments(collected_by_user_id)")
+        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_payments_reg_active "
+                    "ON trip_payments(registration_id) WHERE is_deleted = 0")
+    except Exception: pass
+    if "trip_payments_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("trip_payments", "دفعات الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("trip_payments", "دفعات الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("trip_payments_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29964,6 +30046,7 @@ BUILT_IN_TABLE_LABELS = {
     "parent_message_reads": "اطّلاع أولياء الأمور",
     "trips":             "الرحلات والفعاليات",
     "trip_registrations":"تسجيلات الرحلات",
+    "trip_payments":     "دفعات الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32381,6 +32464,7 @@ _TBL_AUDIT_FEATURE = {
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "trips":                ("الرحلات والفعاليات",              "نظام الرحلات والفعاليات"),
     "trip_registrations":   ("تسجيلات الرحلات",                 "نظام الرحلات والفعاليات"),
+    "trip_payments":        ("دفعات الرحلات",                   "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -65239,6 +65323,26 @@ def _mx_strip_response_surrogates(response):
 # resolve to the same canonical key.
 _TRIPS_MANAGER_NAMES = ("أحمد إبراهيم", "أحمد يونس", "رائد")
 _TRIPS_MANAGER_NAMES_FOLDED = {_grp_norm(n) for n in _TRIPS_MANAGER_NAMES}
+
+
+def _trip_receipts_root():
+    """Absolute filesystem path that holds receipt images. Lives under
+    Flask's static_folder so existing routing serves them. The
+    auth-gated /static/trip_receipts/<...> wrapper added in commit 2
+    sits in front and rejects unauthenticated requests."""
+    base = app.static_folder or os.path.join(os.path.dirname(__file__), "static")
+    return os.path.join(base, "trip_receipts")
+
+
+# Ensure the receipts directory exists at module-import time. Best-
+# effort — if the disk is read-only the upload endpoint will surface
+# the failure with a clean 500.
+try:
+    os.makedirs(_trip_receipts_root(), exist_ok=True)
+except Exception as _ex_dir:
+    import sys as _sys_dir
+    print("[trips] receipts dir bootstrap failed: " + str(_ex_dir),
+          file=_sys_dir.stderr)
 
 
 def _trips_can_admin(user):
