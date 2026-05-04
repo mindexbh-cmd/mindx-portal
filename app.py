@@ -1058,6 +1058,38 @@ def init_db():
                "ON ev_tasks(event_id, is_deleted, category, status)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned "
                "ON ev_tasks(assigned_to_user_id, status)")
+    # Per-event registration list — payment + attendance per student (6.1)
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_registrations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        student_id INTEGER,
+        student_name TEXT NOT NULL,
+        parent_name TEXT,
+        parent_phone TEXT,
+        group_id INTEGER,
+        group_name TEXT,
+        payment_status TEXT DEFAULT 'pending',
+        payment_amount REAL DEFAULT 0,
+        payment_notes TEXT,
+        attendance_status TEXT DEFAULT 'pending',
+        attendance_notes TEXT,
+        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        registered_by_user_id INTEGER,
+        registered_by_name TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (student_id) REFERENCES students(id),
+        FOREIGN KEY (group_id) REFERENCES student_groups(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_reg_event "
+               "ON ev_registrations(event_id, is_deleted)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_reg_student "
+               "ON ev_registrations(student_id, event_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_reg_payment "
+               "ON ev_registrations(event_id, payment_status)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_reg_attendance "
+               "ON ev_registrations(event_id, attendance_status)")
     db.commit()
     db.close()
 
@@ -6575,6 +6607,59 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_tasks_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_registrations_v1: per-event student registrations
+    # (payment + attendance per row, 6.1).
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_registrations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        student_id INTEGER,
+        student_name TEXT NOT NULL,
+        parent_name TEXT,
+        parent_phone TEXT,
+        group_id INTEGER,
+        group_name TEXT,
+        payment_status TEXT DEFAULT 'pending',
+        payment_amount REAL DEFAULT 0,
+        payment_notes TEXT,
+        attendance_status TEXT DEFAULT 'pending',
+        attendance_notes TEXT,
+        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        registered_by_user_id INTEGER,
+        registered_by_name TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (student_id) REFERENCES students(id),
+        FOREIGN KEY (group_id) REFERENCES student_groups(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_reg_event "
+                    "ON ev_registrations(event_id, is_deleted)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_reg_student "
+                    "ON ev_registrations(student_id, event_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_reg_payment "
+                    "ON ev_registrations(event_id, payment_status)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_reg_attendance "
+                    "ON ev_registrations(event_id, attendance_status)")
+    except Exception: pass
+    if "ev_registrations_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_registrations", "تسجيل الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_registrations", "تسجيل الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_registrations_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30042,6 +30127,7 @@ BUILT_IN_TABLE_LABELS = {
     "ev_costs":          "تكاليف الرحلات",
     "ev_items":          "أدوات الرحلات",
     "ev_tasks":          "مهام الرحلات",
+    "ev_registrations":  "تسجيل الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32462,6 +32548,7 @@ _TBL_AUDIT_FEATURE = {
     "ev_costs":             ("تكاليف الرحلات",                  "نظام الفعاليات والرحلات v2"),
     "ev_items":             ("أدوات الرحلات",                   "نظام الفعاليات والرحلات v2"),
     "ev_tasks":             ("مهام الرحلات",                    "نظام الفعاليات والرحلات v2"),
+    "ev_registrations":     ("تسجيل الرحلات",                   "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -65915,6 +66002,474 @@ def api_admin_events_items_delete(eid, iid):
     return jsonify({"ok": True, "id": iid})
 
 
+# ── Registrations (6.1) ────────────────────────────────────────
+_EV_REG_PAY_STATUSES = ("pending", "paid", "partial", "refunded", "waived")
+_EV_REG_ATT_STATUSES = ("pending", "present", "late", "absent", "cancelled", "medical_emergency")
+
+
+def _events_reg_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT id, max_students, price_per_student, target_group_ids "
+            "FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return None
+    return dict(row) if row else None
+
+
+def _events_reg_row(rd):
+    return {
+        "id":                     rd.get("id"),
+        "event_id":               rd.get("event_id"),
+        "student_id":             rd.get("student_id"),
+        "student_name":           rd.get("student_name") or "",
+        "parent_name":            rd.get("parent_name") or "",
+        "parent_phone":           rd.get("parent_phone") or "",
+        "group_id":               rd.get("group_id"),
+        "group_name":             rd.get("group_name") or "",
+        "payment_status":         rd.get("payment_status") or "pending",
+        "payment_amount":         float(rd.get("payment_amount") or 0),
+        "payment_notes":          rd.get("payment_notes") or "",
+        "attendance_status":      rd.get("attendance_status") or "pending",
+        "attendance_notes":       rd.get("attendance_notes") or "",
+        "registered_at":          rd.get("registered_at") or "",
+        "registered_by_user_id":  rd.get("registered_by_user_id"),
+        "registered_by_name":     rd.get("registered_by_name") or "",
+        "updated_at":             rd.get("updated_at") or "",
+    }
+
+
+def _events_reg_summary(rows, expected_price=0.0, capacity=0):
+    pay = {k: 0 for k in _EV_REG_PAY_STATUSES}
+    att = {k: 0 for k in _EV_REG_ATT_STATUSES}
+    total_collected = 0.0
+    for r in rows:
+        ps = (r.get("payment_status") or "pending").lower()
+        if ps in pay: pay[ps] += 1
+        as_ = (r.get("attendance_status") or "pending").lower()
+        if as_ in att: att[as_] += 1
+        total_collected += float(r.get("payment_amount") or 0)
+    n = len(rows)
+    expected_total = float(expected_price or 0) * max(n, int(capacity or 0))
+    return {
+        "total":           n,
+        "payment":         pay,
+        "attendance":      att,
+        "total_collected": round(total_collected, 3),
+        "total_expected":  round(expected_total, 3),
+        "collection_pct":  round(total_collected / expected_total * 100, 1)
+                            if expected_total > 0 else 0.0,
+    }
+
+
+def _events_reg_target_groups(ev_row):
+    """Parse target_group_ids JSON; tolerate strings + lists alike."""
+    raw = ev_row.get("target_group_ids") or "[]"
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    try:
+        import json as _j
+        v = _j.loads(raw)
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+    except Exception:
+        return []
+    return []
+
+
+def _events_reg_available_students(db, eid, ev_row):
+    """List of students from the event's target groups who aren't
+    already registered (or whose registration is soft-deleted).
+    Falls back to ALL students when the event has no target groups
+    yet, so an admin starting from scratch can still pick names."""
+    target_ids = _events_reg_target_groups(ev_row)
+    # Resolve target_group_ids to group_name strings (legacy table
+    # design uses group_name as the joinable token from the
+    # students.group_name column).
+    group_names = []
+    if target_ids:
+        try:
+            ph = ",".join(["?"] * len(target_ids))
+            rows = db.execute(
+                "SELECT group_name FROM student_groups WHERE id IN (" + ph + ")",
+                tuple(int(x) for x in target_ids if str(x).isdigit())
+            ).fetchall()
+            group_names = [
+                ((dict(r).get("group_name") or "").strip())
+                for r in rows
+                if (dict(r).get("group_name") or "").strip()
+            ]
+        except Exception:
+            group_names = []
+    try:
+        already = db.execute(
+            "SELECT student_id FROM ev_registrations "
+            "WHERE event_id = ? AND is_deleted = 0 AND student_id IS NOT NULL",
+            (eid,)).fetchall()
+        already_ids = {int(dict(r).get("student_id") or 0) for r in already}
+    except Exception:
+        already_ids = set()
+    # The students table has: student_name, group_name_student,
+    # mother_phone, father_phone, other_phone — no `parent_name`
+    # column. Surface the best-available phone (mother → father →
+    # other) and leave parent_name blank for the admin to fill in.
+    sql = ("SELECT id, student_name, group_name_student, "
+           "       mother_phone, father_phone, other_phone "
+           "FROM students")
+    params = []
+    if group_names:
+        ph = ",".join(["?"] * len(group_names))
+        sql += " WHERE TRIM(group_name_student) IN (" + ph + ")"
+        params = list(group_names)
+    sql += " ORDER BY student_name"
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        sid = int(rd.get("id") or 0)
+        if sid in already_ids:
+            continue
+        phone = ((rd.get("mother_phone") or "").strip()
+                 or (rd.get("father_phone") or "").strip()
+                 or (rd.get("other_phone")  or "").strip())
+        out.append({
+            "id":           sid,
+            "name":         (rd.get("student_name") or "").strip(),
+            "group_name":   (rd.get("group_name_student") or "").strip(),
+            "parent_name":  "",
+            "parent_phone": phone,
+        })
+    return out
+
+
+@app.route('/api/admin/events/<int:eid>/registrations', methods=['GET'])
+@login_required
+def api_admin_events_reg_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    ev = _events_reg_event_exists(db, eid)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM ev_registrations "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY registered_at DESC, id DESC",
+            (eid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] reg list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    out = [_events_reg_row(dict(r)) for r in rows]
+    summary = _events_reg_summary(
+        out,
+        expected_price=ev.get("price_per_student") or 0,
+        capacity=ev.get("max_students") or 0)
+    available = _events_reg_available_students(db, eid, ev)
+    return jsonify({
+        "ok":                 True,
+        "registrations":      out,
+        "summary":            summary,
+        "available_students": available,
+    })
+
+
+@app.route('/api/admin/events/<int:eid>/registrations', methods=['POST'])
+@login_required
+def api_admin_events_reg_create(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    ev = _events_reg_event_exists(db, eid)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    student_id = d.get("student_id")
+    try:
+        student_id = int(student_id) if student_id not in (None, "", 0, "0") else None
+    except Exception:
+        student_id = None
+    student_name = (d.get("student_name") or "").strip()
+    parent_name  = (d.get("parent_name") or "").strip() or None
+    parent_phone = (d.get("parent_phone") or "").strip() or None
+    group_id     = d.get("group_id")
+    try:
+        group_id = int(group_id) if group_id not in (None, "", 0, "0") else None
+    except Exception:
+        group_id = None
+    group_name = (d.get("group_name") or "").strip() or None
+    # If the client picked a known student, snapshot from the
+    # students table — fills in missing name / group / phone fields.
+    # The students schema has no parent_name; phone preference is
+    # mother → father → other.
+    if student_id:
+        try:
+            srow = db.execute(
+                "SELECT student_name, group_name_student, "
+                "       mother_phone, father_phone, other_phone "
+                "FROM students WHERE id = ?", (student_id,)).fetchone()
+            if srow:
+                sd = dict(srow)
+                if not student_name: student_name = (sd.get("student_name") or "").strip()
+                if not group_name  : group_name   = (sd.get("group_name_student") or "").strip() or None
+                if not parent_phone:
+                    cand = ((sd.get("mother_phone") or "").strip()
+                            or (sd.get("father_phone") or "").strip()
+                            or (sd.get("other_phone") or "").strip())
+                    parent_phone = cand or None
+        except Exception:
+            pass
+    if not student_name:
+        return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
+    # Duplicate check — by student_id OR by exact student_name on
+    # the same event.
+    try:
+        if student_id:
+            dup = db.execute(
+                "SELECT id FROM ev_registrations "
+                "WHERE event_id = ? AND student_id = ? AND is_deleted = 0",
+                (eid, student_id)).fetchone()
+        else:
+            dup = db.execute(
+                "SELECT id FROM ev_registrations "
+                "WHERE event_id = ? AND TRIM(student_name) = ? AND is_deleted = 0",
+                (eid, student_name)).fetchone()
+    except Exception:
+        dup = None
+    if dup:
+        return jsonify({"ok": False, "error": "الطالبة مسجلة بالفعل في هذه الرحلة"}), 409
+    try:
+        db.execute(
+            "INSERT INTO ev_registrations(event_id, student_id, student_name, "
+            "                             parent_name, parent_phone, group_id, group_name, "
+            "                             registered_by_user_id, registered_by_name) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            (eid, student_id, student_name, parent_name, parent_phone,
+             group_id, group_name,
+             user.get("id"), (user.get("username") or "")))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] reg insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        rid = None
+    try:
+        row = db.execute("SELECT * FROM ev_registrations WHERE id = ?", (rid,)).fetchone()
+        out = _events_reg_row(dict(row)) if row else None
+    except Exception:
+        out = None
+    try:
+        _audit("event.reg.create", target_type="ev_registrations", target_id=rid,
+               new_value={"event_id": eid, "student_name": student_name,
+                          "student_id": student_id})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": rid, "registration": out})
+
+
+@app.route('/api/admin/events/<int:eid>/registrations/<int:rid>', methods=['PATCH'])
+@login_required
+def api_admin_events_reg_update(eid, rid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    ev = _events_reg_event_exists(db, eid)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_registrations "
+            "WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (rid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "التسجيل غير موجود"}), 404
+    cur = dict(row)
+    d = request.get_json(silent=True) or {}
+    upd = {}
+    if "student_name" in d:
+        v = (d.get("student_name") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
+        upd["student_name"] = v
+    if "parent_name" in d:
+        upd["parent_name"] = (d.get("parent_name") or "").strip() or None
+    if "parent_phone" in d:
+        upd["parent_phone"] = (d.get("parent_phone") or "").strip() or None
+    if "group_id" in d:
+        v = d.get("group_id")
+        try:
+            upd["group_id"] = int(v) if v not in (None, "", 0, "0") else None
+        except Exception:
+            upd["group_id"] = None
+    if "group_name" in d:
+        upd["group_name"] = (d.get("group_name") or "").strip() or None
+    if "payment_status" in d:
+        v = (d.get("payment_status") or "").strip().lower()
+        if v not in _EV_REG_PAY_STATUSES:
+            return jsonify({"ok": False, "error": "حالة الدفع غير معروفة"}), 400
+        upd["payment_status"] = v
+    if "payment_amount" in d:
+        try:
+            upd["payment_amount"] = max(0.0, float(d.get("payment_amount") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "المبلغ يجب أن يكون رقماً"}), 400
+    if "payment_notes" in d:
+        upd["payment_notes"] = (d.get("payment_notes") or "").strip() or None
+    if "attendance_status" in d:
+        v = (d.get("attendance_status") or "").strip().lower()
+        if v not in _EV_REG_ATT_STATUSES:
+            return jsonify({"ok": False, "error": "حالة الحضور غير معروفة"}), 400
+        upd["attendance_status"] = v
+    if "attendance_notes" in d:
+        upd["attendance_notes"] = (d.get("attendance_notes") or "").strip() or None
+    # If the admin marks payment_status='paid' without specifying an
+    # amount AND the row's current amount is 0, fill from the event's
+    # default price.
+    if upd.get("payment_status") == "paid":
+        new_amt = upd.get("payment_amount", float(cur.get("payment_amount") or 0))
+        if not new_amt or new_amt <= 0:
+            try:
+                price = float(ev.get("price_per_student") or 0)
+                if price > 0:
+                    upd["payment_amount"] = price
+            except Exception:
+                pass
+    if not upd:
+        return jsonify({"ok": True, "id": rid, "registration": _events_reg_row(cur), "noop": True})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_registrations SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (rid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] reg update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute("SELECT * FROM ev_registrations WHERE id = ?", (rid,)).fetchone()
+        out = _events_reg_row(dict(new_row)) if new_row else None
+    except Exception:
+        out = None
+    try:
+        _audit("event.reg.update", target_type="ev_registrations", target_id=rid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": rid, "registration": out})
+
+
+@app.route('/api/admin/events/<int:eid>/registrations/<int:rid>', methods=['DELETE'])
+@login_required
+def api_admin_events_reg_delete(eid, rid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_reg_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_registrations "
+            "WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (rid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "التسجيل غير موجود"}), 404
+    try:
+        db.execute(
+            "UPDATE ev_registrations SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (rid,))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.reg.delete", target_type="ev_registrations", target_id=rid,
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": rid})
+
+
+@app.route('/api/admin/events/<int:eid>/registrations/bulk-attendance', methods=['POST'])
+@login_required
+def api_admin_events_reg_bulk_attendance(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_reg_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    updates = d.get("updates") or []
+    if not isinstance(updates, list):
+        return jsonify({"ok": False, "error": "صيغة غير صحيحة"}), 400
+    # Validate and build the UPDATE payloads up front so a single bad
+    # row doesn't leave the rest half-applied.
+    valid = []
+    for u in updates:
+        try:
+            rid = int(u.get("rid"))
+        except Exception:
+            return jsonify({"ok": False, "error": "معرّف غير صحيح"}), 400
+        st = (u.get("attendance_status") or "").strip().lower()
+        if st not in _EV_REG_ATT_STATUSES:
+            return jsonify({"ok": False, "error": "حالة حضور غير معروفة"}), 400
+        notes = (u.get("attendance_notes") or "").strip() or None
+        valid.append((rid, st, notes))
+    if not valid:
+        return jsonify({"ok": True, "updated_count": 0})
+    updated = 0
+    try:
+        for (rid, st, notes) in valid:
+            cur = db.execute(
+                "SELECT id FROM ev_registrations "
+                "WHERE id = ? AND event_id = ? AND is_deleted = 0",
+                (rid, eid)).fetchone()
+            if not cur:
+                continue
+            db.execute(
+                "UPDATE ev_registrations "
+                "SET attendance_status = ?, attendance_notes = ?, "
+                "    updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?",
+                (st, notes, rid))
+            updated += 1
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] reg bulk-attendance failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        _audit("event.reg.bulk_attendance", target_type="ev_event",
+               target_id=eid, new_value={"updated": updated})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "updated_count": updated})
+
+
 # ── Tasks (5.3) ────────────────────────────────────────────────
 def _events_tasks_event_exists(db, eid):
     try:
@@ -66771,12 +67326,14 @@ def api_admin_events_alerts():
 def _events_detail_dict(rd, db=None):
     """Detail-page payload — superset of the list-card shape with the
     extra free-text fields and the per-event computed counters.
-    Stage 5.6 wires real task + item counts; payment counters stay
-    stubbed until stage 7."""
+    Stage 5.6 wires task + item counts; stage 6.1 wires real
+    registered_count and payment counters from ev_registrations."""
     base = _events_row_dict(rd)
     eid = rd.get("id")
     task_total = task_done = 0
     item_total = item_ready = 0
+    reg_total = 0
+    pay_collected = 0.0
     if db is not None and eid:
         try:
             r = db.execute(
@@ -66802,6 +67359,28 @@ def _events_detail_dict(rd, db=None):
                 item_ready = int(rd_i[1] or 0)
         except Exception:
             pass
+        try:
+            r = db.execute(
+                "SELECT COUNT(*), COALESCE(SUM(payment_amount), 0) "
+                "FROM ev_registrations "
+                "WHERE event_id = ? AND is_deleted = 0",
+                (eid,)).fetchone()
+            if r:
+                rd_r = list(r) if not hasattr(r, "keys") else [r[0], r[1]]
+                reg_total     = int(rd_r[0] or 0)
+                pay_collected = float(rd_r[1] or 0)
+        except Exception:
+            pass
+    # Override the stub registered_count / pct that _events_row_dict
+    # left at 0.
+    if reg_total > 0:
+        base["registered_count"] = reg_total
+        cap = int(base.get("max_students") or 0)
+        base["registration_pct"] = round(reg_total / cap * 100, 1) if cap > 0 else 0.0
+    # Expected revenue = price × max(reg_total, cap).
+    price = float(rd.get("price_per_student") or 0)
+    cap   = int(rd.get("max_students") or 0)
+    pay_expected = round(price * max(reg_total, cap), 3)
     base.update({
         "description":         rd.get("description") or "",
         "target_group_ids":    rd.get("target_group_ids") or "[]",
@@ -66815,9 +67394,8 @@ def _events_detail_dict(rd, db=None):
         "item_total":          item_total,
         "item_ready":          item_ready,
         "item_pct":            round(item_ready / item_total * 100, 1) if item_total else 0.0,
-        # Stage-7 will wire these:
-        "payment_collected":   0.0,
-        "payment_expected":    0.0,
+        "payment_collected":   round(pay_collected, 3),
+        "payment_expected":    pay_expected,
     })
     return base
 
