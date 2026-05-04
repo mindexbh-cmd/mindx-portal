@@ -64577,6 +64577,176 @@ def admin_trips_page():
     return ADMIN_TRIPS_HTML
 
 
+_TRIP_VALID_TYPES    = {"educational", "recreational", "religious"}
+_TRIP_VALID_STATUSES = {"active", "closed", "completed", "archived"}
+_TRIP_AR_WEEKDAYS = {
+    0: "الإثنين", 1: "الثلاثاء", 2: "الأربعاء",
+    3: "الخميس",  4: "الجمعة",   5: "السبت", 6: "الأحد",
+}
+
+
+def _trip_compute_fields(rd):
+    """Augment a raw trips row dict with the computed fields the UI
+    expects: total_expected, days_until_trip, day_name_ar,
+    is_imminent, registration_pct, collection_pct, plus the placeholder
+    counters that stages 2/3 will populate. Pure function — no DB."""
+    out = dict(rd)
+    cap   = int(out.get("max_capacity") or 0)
+    price = float(out.get("price_per_student") or 0)
+    out["total_expected"]   = round(cap * price, 2)
+    # registered_count / collected_amount remain 0 until stage 2/3 ship.
+    out["registered_count"] = int(out.get("registered_count") or 0)
+    out["collected_amount"] = float(out.get("collected_amount") or 0)
+    out["registration_pct"] = (round(out["registered_count"] / cap * 100, 1)
+                               if cap > 0 else 0.0)
+    out["collection_pct"]   = (round(out["collected_amount"] / out["total_expected"] * 100, 1)
+                               if out["total_expected"] > 0 else 0.0)
+    out["days_until_trip"]  = None
+    out["day_name_ar"]      = ""
+    out["is_imminent"]      = False
+    iso = (out.get("trip_date") or "")
+    if iso:
+        try:
+            from datetime import date as _date
+            y, m, d = [int(x) for x in str(iso)[:10].split("-")]
+            target = _date(y, m, d)
+            today  = _date.today()
+            delta  = (target - today).days
+            out["days_until_trip"] = delta
+            out["day_name_ar"]     = _TRIP_AR_WEEKDAYS.get(target.weekday(), "")
+            out["is_imminent"]     = (0 < delta <= 3)
+        except Exception:
+            pass
+    return out
+
+
+@app.route('/api/admin/trips', methods=['POST'])
+@login_required
+def api_admin_trips_create():
+    """Create a new trip. Manager-only. Validation returns 400 with a
+    clear Arabic message; success returns {ok, id, status} so the
+    client can update its cache without a full re-fetch."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    d = request.get_json(silent=True) or {}
+    name        = (d.get("name") or "").strip()
+    destination = (d.get("destination") or "").strip()
+    trip_type   = (d.get("trip_type") or "").strip()
+    trip_date   = (d.get("trip_date") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "اسم الرحلة مطلوب"}), 400
+    if not destination:
+        return jsonify({"ok": False, "error": "الوجهة مطلوبة"}), 400
+    if not trip_type:
+        return jsonify({"ok": False, "error": "اختاري نوع الرحلة"}), 400
+    if trip_type not in _TRIP_VALID_TYPES:
+        return jsonify({"ok": False, "error": "نوع الرحلة غير صحيح"}), 400
+    if not trip_date:
+        return jsonify({"ok": False, "error": "تاريخ الرحلة مطلوب"}), 400
+    # Numeric bounds — accept any sane non-negative.
+    try:
+        max_capacity = max(0, int(d.get("max_capacity") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "أقصى عدد مسموح يجب أن يكون رقماً صحيحاً"}), 400
+    try:
+        price_per_student = max(0.0, float(d.get("price_per_student") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "السعر يجب أن يكون رقماً"}), 400
+    db = get_db()
+    body = {
+        "name":                   name,
+        "destination":            destination,
+        "trip_type":              trip_type,
+        "description":            (d.get("description") or "").strip() or None,
+        "target_audience":        (d.get("target_audience") or "").strip() or None,
+        "max_capacity":           max_capacity,
+        "price_per_student":      price_per_student,
+        "trip_date":              trip_date,
+        "departure_time":         (d.get("departure_time") or "").strip() or None,
+        "return_time":            (d.get("return_time") or "").strip() or None,
+        "meeting_point":          (d.get("meeting_point") or "").strip() or None,
+        "emergency_contact":      (d.get("emergency_contact") or "").strip() or None,
+        "emergency_contact_name": (d.get("emergency_contact_name") or "").strip() or None,
+        "equipment_needed":       (d.get("equipment_needed") or "").strip() or None,
+        "status":                 "active",
+        "created_by":             user.get("id"),
+    }
+    cols = ",".join('"' + k + '"' for k in body.keys())
+    placeholders = ",".join(["?"] * len(body))
+    try:
+        cur = db.execute(
+            "INSERT INTO trips(" + cols + ") VALUES(" + placeholders + ")",
+            tuple(body.values()),
+        )
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر حفظ الرحلة"}), 500
+    try:
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        new_id = None
+    try:
+        _audit("trip.create", target_type="trip", target_id=new_id, new_value=body)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": new_id, "status": "active"})
+
+
+@app.route('/api/admin/trips', methods=['GET'])
+@login_required
+def api_admin_trips_list():
+    """List non-deleted trips, optionally filtered + searched, with the
+    UI's computed fields layered on each row. Limit defaults to 50,
+    capped at 200 so the modal always renders quickly."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    status    = (request.args.get("status") or "").strip()
+    search    = (request.args.get("search") or "").strip()
+    from_date = (request.args.get("from_date") or "").strip()
+    to_date   = (request.args.get("to_date") or "").strip()
+    try:
+        limit = int(request.args.get("limit") or 50)
+    except Exception:
+        limit = 50
+    limit = max(1, min(limit, 200))
+
+    sql = "SELECT * FROM trips WHERE is_deleted = 0"
+    params = []
+    if status and status in _TRIP_VALID_STATUSES:
+        sql += " AND status = ?"
+        params.append(status)
+    if from_date:
+        sql += " AND trip_date IS NOT NULL AND trip_date >= ?"
+        params.append(from_date)
+    if to_date:
+        sql += " AND trip_date IS NOT NULL AND trip_date <= ?"
+        params.append(to_date)
+    if search:
+        like = "%" + search + "%"
+        sql += " AND (name LIKE ? OR destination LIKE ?)"
+        params.append(like); params.append(like)
+    # NULL trip_date rows sort last; otherwise newest first.
+    sql += (" ORDER BY CASE WHEN trip_date IS NULL THEN 1 ELSE 0 END, "
+            "trip_date DESC, id DESC LIMIT ?")
+    params.append(limit)
+
+    db = get_db()
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[trips] list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
+    out = [_trip_compute_fields(dict(r)) for r in rows]
+    return jsonify({"ok": True, "trips": out, "total": len(out)})
+
+
 @app.route('/api/admin/trips/stats', methods=['GET'])
 @login_required
 def api_admin_trips_stats():
