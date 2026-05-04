@@ -64933,6 +64933,101 @@ def api_admin_events_set_status(eid):
     return jsonify({"ok": True, "id": eid, "status": new_status})
 
 
+@app.route('/api/admin/events/<int:eid>', methods=['PATCH'])
+@login_required
+def api_admin_events_update(eid):
+    """Manager-only — partial update from the quick-edit modal. Only
+    fields actually present in the body are touched, so the modal can
+    safely send a diff. Status is NOT updatable here — that flows
+    through /api/admin/events/<eid>/status to keep transition rules in
+    one place."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    d = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        cur = db.execute(
+            "SELECT * FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        cur = None
+    if not cur:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    cur = dict(cur)
+    upd = {}
+    # Field whitelist — keep aligned with create endpoint, minus status.
+    if "name" in d:
+        v = (d.get("name") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "اسم الرحلة مطلوب"}), 400
+        upd["name"] = v
+    if "destination" in d:
+        upd["destination"] = (d.get("destination") or "").strip() or None
+    if "description" in d:
+        upd["description"] = (d.get("description") or "").strip() or None
+    if "event_date" in d:
+        v = (d.get("event_date") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "تاريخ الرحلة مطلوب"}), 400
+        upd["event_date"] = v
+    if "departure_time" in d:
+        upd["departure_time"] = (d.get("departure_time") or "").strip() or None
+    if "return_time" in d:
+        upd["return_time"] = (d.get("return_time") or "").strip() or None
+    if "meeting_point" in d:
+        upd["meeting_point"] = (d.get("meeting_point") or "").strip() or None
+    if "max_students" in d:
+        try:
+            upd["max_students"] = max(0, int(d.get("max_students") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "العدد الأقصى يجب أن يكون رقماً"}), 400
+    if "price_per_student" in d:
+        try:
+            upd["price_per_student"] = max(0.0, float(d.get("price_per_student") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "السعر يجب أن يكون رقماً"}), 400
+    if "target_group_ids" in d:
+        raw_targets = d.get("target_group_ids") or []
+        if isinstance(raw_targets, str):
+            raw_targets = [t.strip() for t in raw_targets.split(",") if t.strip()]
+        if not isinstance(raw_targets, list):
+            raw_targets = []
+        import json as _json_eu
+        upd["target_group_ids"] = _json_eu.dumps(
+            [str(t).strip() for t in raw_targets if str(t).strip()],
+            ensure_ascii=False)
+    if "post_trip_notes" in d:
+        upd["post_trip_notes"] = (d.get("post_trip_notes") or "").strip() or None
+    if not upd:
+        return jsonify({"ok": True, "id": eid, "noop": True,
+                        "event": _events_detail_dict(cur)})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_events SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (eid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        _audit("event.update", target_type="ev_event", target_id=eid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    try:
+        new_row = db.execute(
+            "SELECT * FROM ev_events WHERE id = ?", (eid,)).fetchone()
+        ev_out = _events_detail_dict(dict(new_row)) if new_row else None
+    except Exception:
+        ev_out = None
+    return jsonify({"ok": True, "id": eid, "event": ev_out})
+
+
 @app.route('/api/admin/events/student-groups', methods=['GET'])
 @login_required
 def api_admin_events_student_groups():
@@ -66006,6 +66101,66 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
 
 </div>
 
+<!-- Edit modal (2.3) -->
+<div class="evd-mb" id="evd-edit-mb" role="dialog" aria-modal="true" aria-labelledby="evd-edit-title">
+  <div class="evd-modal">
+    <h2 id="evd-edit-title">⚙️ تعديل الرحلة</h2>
+    <form id="evd-edit-form">
+      <div class="row">
+        <label for="ef-name">اسم الرحلة *</label>
+        <input id="ef-name" type="text" required maxlength="120"/>
+      </div>
+      <div class="row">
+        <label for="ef-dest">الوجهة</label>
+        <input id="ef-dest" type="text" maxlength="120"/>
+      </div>
+      <div class="row">
+        <label for="ef-desc">الوصف</label>
+        <textarea id="ef-desc" maxlength="800"></textarea>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="ef-date">تاريخ الرحلة *</label>
+          <input id="ef-date" type="date" required/>
+        </div>
+        <div class="row">
+          <label for="ef-meet">نقطة التجمّع</label>
+          <input id="ef-meet" type="text" maxlength="120"/>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="ef-dep">وقت المغادرة</label>
+          <input id="ef-dep" type="time"/>
+        </div>
+        <div class="row">
+          <label for="ef-ret">وقت العودة</label>
+          <input id="ef-ret" type="time"/>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="ef-cap">العدد الأقصى</label>
+          <input id="ef-cap" type="number" min="0" max="500"/>
+        </div>
+        <div class="row">
+          <label for="ef-price">السعر للطالبة (د.ب)</label>
+          <input id="ef-price" type="number" min="0" step="0.001"/>
+        </div>
+      </div>
+      <div class="row">
+        <label for="ef-groups">الفئة المستهدفة (الفصول)</label>
+        <select id="ef-groups" multiple size="5" style="min-height:96px;"></select>
+        <div style="font-size:.78rem;color:#888;margin-top:4px;">اضغطي Ctrl/⌘ لاختيار أكثر من فصل</div>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-edit-save">💾 حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="evd-toast" id="evd-toast"></div>
 
 <script>
@@ -66137,6 +66292,93 @@ function evdLoadEvent(){
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
+/* ── Quick-edit modal (2.3) ──────────────────────────────────── */
+function evdLoadGroups(){
+  return fetch('/api/admin/events/student-groups')
+    .then(function(r){ return r.json(); })
+    .then(function(j){ return (j && j.groups) || []; })
+    .catch(function(){ return []; });
+}
+function evdOpenEdit(){
+  if (!EVENT_DATA){ evdToast('بيانات الرحلة غير محمّلة', 'error'); return; }
+  var ev = EVENT_DATA;
+  document.getElementById('ef-name' ).value = ev.name || '';
+  document.getElementById('ef-dest' ).value = ev.destination || '';
+  document.getElementById('ef-desc' ).value = ev.description || '';
+  document.getElementById('ef-date' ).value = (ev.event_date || '').substring(0, 10);
+  document.getElementById('ef-meet' ).value = ev.meeting_point || '';
+  document.getElementById('ef-dep'  ).value = ev.departure_time || '';
+  document.getElementById('ef-ret'  ).value = ev.return_time || '';
+  document.getElementById('ef-cap'  ).value = ev.max_students || '';
+  document.getElementById('ef-price').value = ev.price_per_student || '';
+  // Load groups, pre-select what's already on the event.
+  var sel = document.getElementById('ef-groups');
+  sel.innerHTML = '<option disabled>جارٍ التحميل…</option>';
+  var preselected = [];
+  try {
+    var raw = ev.target_group_ids || '[]';
+    preselected = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+    if (!Array.isArray(preselected)) preselected = [];
+  } catch(_){ preselected = []; }
+  evdLoadGroups().then(function(groups){
+    if (!groups.length){
+      sel.innerHTML = '<option disabled>لا توجد فصول</option>';
+    } else {
+      sel.innerHTML = groups.map(function(g){
+        var sId = String(g.id);
+        var on  = preselected.indexOf(sId) >= 0 ? ' selected' : '';
+        return '<option value="' + evdEsc(sId) + '"' + on + '>' + evdEsc(g.group_name) + '</option>';
+      }).join('');
+    }
+  });
+  document.getElementById('evd-edit-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('ef-name').focus(); }, 50);
+}
+function evdCloseEdit(){
+  document.getElementById('evd-edit-mb').classList.remove('is-open');
+}
+function evdSubmitEdit(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-edit-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var sel = document.getElementById('ef-groups');
+  var groupIds = Array.prototype.filter.call(sel.options, function(o){ return o.selected; })
+                                       .map(function(o){ return o.value; });
+  var body = {
+    name:              document.getElementById('ef-name').value.trim(),
+    destination:       document.getElementById('ef-dest').value.trim(),
+    description:       document.getElementById('ef-desc').value.trim(),
+    event_date:        document.getElementById('ef-date').value.trim(),
+    meeting_point:     document.getElementById('ef-meet').value.trim(),
+    departure_time:    document.getElementById('ef-dep' ).value.trim(),
+    return_time:       document.getElementById('ef-ret' ).value.trim(),
+    max_students:      document.getElementById('ef-cap' ).value || 0,
+    price_per_student: document.getElementById('ef-price').value || 0,
+    target_group_ids:  groupIds
+  };
+  fetch('/api/admin/events/' + EID, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){
+      evdToast(o.j.error || 'تعذّر الحفظ', 'error');
+      return;
+    }
+    evdCloseEdit();
+    evdToast('تم تحديث الرحلة', 'success');
+    if (o.j.event){ evdRenderHeader(o.j.event); }
+    else          { evdLoadEvent(); }
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function(){
   // Tab clicks update hash; the hashchange listener does the work.
   document.querySelectorAll('.evd-tab').forEach(function(t){
@@ -66148,6 +66390,19 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   evdSyncTabFromHash();
   evdLoadEvent();
+  // Edit modal wires
+  document.getElementById('evd-edit-btn').addEventListener('click', evdOpenEdit);
+  document.getElementById('evd-edit-cancel').addEventListener('click', evdCloseEdit);
+  document.getElementById('evd-edit-form').addEventListener('submit', evdSubmitEdit);
+  document.getElementById('evd-edit-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseEdit();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      document.querySelectorAll('.evd-mb.is-open').forEach(function(m){ m.classList.remove('is-open'); });
+      document.getElementById('evd-status-menu').classList.remove('is-open');
+    }
+  });
 });
 </script>
 
