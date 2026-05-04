@@ -59747,50 +59747,6 @@ def api_portal_trips_available():
     return jsonify({"ok": True, "trips": out})
 
 
-@app.route('/api/portal/trips/completed', methods=['GET'])
-@login_required
-def api_portal_trips_completed():
-    """Completed trips this student attended, with survey link if
-    a survey is still pending. Self-gates on student role."""
-    pair, err = _ph_require_student()
-    if err: return err
-    user, sid = pair
-    db = get_db()
-    try:
-        rows = db.execute(
-            "SELECT t.id, t.name, t.trip_date, t.destination, t.trip_type, "
-            "       r.id AS reg_id, "
-            "       s.survey_token, s.submitted_at AS survey_submitted_at "
-            "FROM trip_registrations r "
-            "JOIN trips t ON t.id = r.trip_id "
-            "LEFT JOIN trip_surveys s ON s.registration_id = r.id "
-            "WHERE r.student_id = ? AND r.is_deleted = 0 "
-            "AND r.registration_status = 'registered' "
-            "AND t.is_deleted = 0 "
-            "AND t.status IN ('completed', 'archived') "
-            "ORDER BY t.trip_date DESC",
-            (sid,),
-        ).fetchall()
-    except Exception:
-        rows = []
-    out = []
-    for r in rows:
-        rd = dict(r)
-        out.append({
-            "id":               rd.get("id"),
-            "name":             rd.get("name") or "",
-            "trip_date":        rd.get("trip_date") or "",
-            "destination":      rd.get("destination") or "",
-            "trip_type":        rd.get("trip_type") or "",
-            "survey_token":     rd.get("survey_token") or "",
-            "survey_submitted": bool(rd.get("survey_submitted_at")),
-            "survey_url":       (("/trip-survey/" + rd.get("survey_token"))
-                                 if rd.get("survey_token") and not rd.get("survey_submitted_at")
-                                 else ""),
-        })
-    return jsonify({"ok": True, "trips": out})
-
-
 @app.route('/api/portal/trips/<int:tid>/register', methods=['POST'])
 @login_required
 def api_portal_trips_register(tid):
@@ -59980,13 +59936,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <div class="h">لا توجد رحلات قادمة حالياً</div>
     <div class="hint">سيتمّ إشعارك عند فتح أي رحلة جديدة.</div>
   </div>
-  <div id="pt-completed-section" hidden style="margin-top:24px;">
-    <h2 style="color:#4a148c;font-size:1.1rem;margin:0 0 10px;
-               border-right:4px solid #6B3FA0;padding-right:10px;">
-      🌟 رحلات سابقة
-    </h2>
-    <div id="pt-completed-list" class="pt-grid"></div>
-  </div>
 </div>
 
 <div class="pt-toast" id="pt-toast" role="status" aria-live="polite"></div>
@@ -60104,43 +60053,12 @@ function ptLoad(){
       var trips = j.trips || [];
       if (!trips.length){
         document.getElementById('pt-empty').hidden = false;
-      } else {
-        document.getElementById('pt-empty').hidden = true;
-        list.innerHTML = trips.map(ptCardHTML).join('');
+        return;
       }
+      document.getElementById('pt-empty').hidden = true;
+      list.innerHTML = trips.map(ptCardHTML).join('');
     })
     .catch(function(){ ptToast('خطأ في الاتصال', 'error'); });
-  // Completed trips for the survey CTA section.
-  fetch('/api/portal/trips/completed', {credentials:'include'})
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if (!j || !j.ok) return;
-      var trips = j.trips || [];
-      if (!trips.length) return;
-      document.getElementById('pt-completed-section').hidden = false;
-      var typeEmoji = {educational:'🎓', recreational:'🎉', religious:'🕌'};
-      document.getElementById('pt-completed-list').innerHTML = trips.map(function(t){
-        var btn = '';
-        if (t.survey_url){
-          btn = '<a class="pt-btn pt-btn-primary" href="' + ptEsc(t.survey_url)
-              + '" target="_blank" rel="noopener" style="margin-top:6px;">'
-              + '<span>📝</span><span>قيّمي الرحلة</span></a>';
-        } else if (t.survey_submitted){
-          btn = '<button class="pt-btn pt-btn-secondary" disabled style="margin-top:6px;">'
-              + '✓ تمّ التقييم</button>';
-        }
-        return '<div class="pt-card" style="opacity:.92;">'
-             + '  <div class="pt-name">'
-             +    (typeEmoji[t.trip_type] || '🚌') + ' ' + ptEsc(t.name) + '</div>'
-             + '  <div class="pt-meta">'
-             + '    <div>📅 ' + ptEsc(t.trip_date) + '</div>'
-             + (t.destination ? '<div>📍 ' + ptEsc(t.destination) + '</div>' : '')
-             + '  </div>'
-             +    btn
-             + '</div>';
-      }).join('');
-    })
-    .catch(function(){});
 }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -70002,63 +69920,6 @@ def admin_trips_memory_lane_page(tid):
             "<h1>الرحلة غير موجودة</h1></body></html>",
             status=404, mimetype="text/html; charset=utf-8")
     return Response(TRIP_MEMORY_LANE_HTML, mimetype="text/html; charset=utf-8")
-
-
-@app.route('/api/admin/trips/<int:tid>/surveys/send', methods=['POST'])
-@login_required
-def api_admin_trips_surveys_send(tid):
-    """Build per-parent personalised wa.me links carrying each
-    parent's survey URL. Manager-only. Same idea as the message-send
-    endpoint but each link points at /trip-survey/<token> with a
-    token unique to that registration."""
-    user = session.get("user") or {}
-    if not _trips_can_admin(user):
-        return jsonify({"ok": False, "error": "غير مصرح"}), 403
-    db = get_db()
-    trip = _trip_get(db, tid)
-    if not trip:
-        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
-    try:
-        rows = db.execute(
-            "SELECT s.survey_token, s.parent_name, s.student_name, "
-            "       r.parent_phone "
-            "FROM trip_surveys s "
-            "LEFT JOIN trip_registrations r ON r.id = s.registration_id "
-            "WHERE s.trip_id = ? AND s.submitted_at IS NULL "
-            "AND s.survey_token IS NOT NULL",
-            (tid,),
-        ).fetchall()
-    except Exception:
-        rows = []
-    out = []
-    try:
-        from urllib.parse import quote as _q
-    except Exception:
-        _q = lambda x: x
-    base = (request.url_root or "").rstrip("/")
-    for r in rows:
-        rd = dict(r)
-        phone = (rd.get("parent_phone") or "").strip()
-        if not phone: continue
-        digits = "".join(ch for ch in phone if ch.isdigit())
-        if not digits: continue
-        survey_url = base + "/trip-survey/" + (rd.get("survey_token") or "")
-        msg = ("💚 شكراً لمشاركتكم في رحلة " + (trip.get("name") or "") + "!\n\n"
-               "نتمنى أن تأخذوا دقيقة لمشاركة تجربتكم معنا:\n" + survey_url)
-        wa_link = "https://wa.me/" + digits + "?text=" + _q(msg)
-        out.append({
-            "parent_name":   rd.get("parent_name") or "",
-            "student_name":  rd.get("student_name") or "",
-            "parent_phone":  phone,
-            "survey_url":    survey_url,
-            "whatsapp_link": wa_link,
-        })
-    try:
-        _audit("trip.surveys.send",
-               target_type="trip", target_id=tid,
-               new_value={"count": len(out)})
-    except Exception: pass
-    return jsonify({"ok": True, "count": len(out), "messages": out})
 
 
 @app.route('/api/admin/trips/<int:tid>/memory-lane', methods=['GET'])
