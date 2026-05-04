@@ -65371,6 +65371,236 @@ def api_public_trip_info(token):
     return jsonify({"ok": True, "trip": payload})
 
 
+def _trip_norm_phone(s):
+    """Strip everything but digits, return the last 8 digits (Bahrain
+    phone). Used for fuzzy match between an incoming phone string and
+    whatever's stored in students.mother_phone / father_phone /
+    other_phone / whatsapp. Empty input or fewer than 6 digits → ''."""
+    if not s: return ""
+    import re as _re_p
+    digits = _re_p.sub(r"\D+", "", str(s))
+    if len(digits) < 6:
+        return ""
+    return digits[-8:]
+
+
+def _trip_lookup_children_by_phone(db, phone):
+    """Return list of {student_id, student_name, group_name, personal_id}
+    for students whose registered parent phones (any of the 4 columns)
+    match the given phone after digit-only folding. Best-effort —
+    returns [] on any error."""
+    norm = _trip_norm_phone(phone)
+    if not norm: return []
+    try:
+        rows = db.execute(
+            "SELECT id, student_name, personal_id, group_name_student, "
+            "mother_phone, father_phone, other_phone, whatsapp "
+            "FROM students "
+            "WHERE student_name IS NOT NULL AND TRIM(student_name) <> ''"
+        ).fetchall()
+    except Exception:
+        return []
+    out = []
+    seen_ids = set()
+    for r in rows:
+        rd = dict(r)
+        for col in ("mother_phone","father_phone","other_phone","whatsapp"):
+            if _trip_norm_phone(rd.get(col)) == norm:
+                sid = rd.get("id")
+                if sid in seen_ids: break
+                seen_ids.add(sid)
+                out.append({
+                    "student_id":   sid,
+                    "student_name": (rd.get("student_name") or "").strip(),
+                    "group_name":   (rd.get("group_name_student") or "").strip(),
+                    "personal_id":  (rd.get("personal_id") or "").strip(),
+                })
+                break
+    return out
+
+
+def _trip_next_confirmation_id(db):
+    """Generate the next TR-{YYYY}-{NNNN} confirmation id by counting
+    existing rows in the current calendar year. Concurrency-wise this
+    is best-effort — small org volume; near-unique, not enforced."""
+    from datetime import datetime as _dt
+    year = _dt.now().year
+    try:
+        row = db.execute(
+            "SELECT COUNT(*) FROM trip_registrations "
+            "WHERE confirmation_id LIKE ?",
+            ("TR-" + str(year) + "-%",),
+        ).fetchone()
+        seq = int(row[0] or 0) + 1
+    except Exception:
+        seq = 1
+    return "TR-" + str(year) + "-" + ("%04d" % seq)
+
+
+def _trip_existing_registration(db, trip_id, student_id, student_name, parent_phone):
+    """Returns the existing non-deleted, non-cancelled registration row
+    for (trip, student) if any — used for duplicate detection. For
+    linked students we match on (trip_id, student_id); for external
+    entries we fall back to (trip_id, student_name, parent_phone)."""
+    try:
+        if student_id:
+            row = db.execute(
+                "SELECT id, registration_status FROM trip_registrations "
+                "WHERE trip_id = ? AND student_id = ? "
+                "AND is_deleted = 0 AND registration_status <> 'cancelled' LIMIT 1",
+                (trip_id, student_id),
+            ).fetchone()
+        else:
+            row = db.execute(
+                "SELECT id, registration_status FROM trip_registrations "
+                "WHERE trip_id = ? AND student_id IS NULL "
+                "AND TRIM(student_name) = TRIM(?) "
+                "AND parent_phone = ? "
+                "AND is_deleted = 0 AND registration_status <> 'cancelled' LIMIT 1",
+                (trip_id, student_name or "", parent_phone or ""),
+            ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _trip_create_registration(db, trip, payload, method, registered_by_user_id=None):
+    """Shared insert path used by parent portal, smart-link, and
+    admin-manual registration. Returns (status, confirmation_id, rid,
+    waitlist_position) on success or raises ValueError(error_message)
+    on validation failure. Caller is responsible for the auth check —
+    this helper trusts its inputs."""
+    student_id   = payload.get("student_id") or None
+    student_name = (payload.get("student_name") or "").strip()
+    parent_phone = (payload.get("parent_phone") or "").strip()
+    consent      = bool(payload.get("consent_given"))
+    if not student_name:
+        raise ValueError("اسم الطالبة مطلوب")
+    if not parent_phone or len(_trip_norm_phone(parent_phone)) < 6:
+        raise ValueError("رقم الواتساب غير صحيح")
+    if not consent:
+        raise ValueError("يجب الموافقة على الشروط")
+    student_pid = ""
+    if student_id:
+        try:
+            row = db.execute(
+                "SELECT personal_id FROM students WHERE id = ?",
+                (student_id,),
+            ).fetchone()
+            if row:
+                student_pid = (dict(row).get("personal_id") or "").strip()
+        except Exception:
+            pass
+    dup = _trip_existing_registration(db, trip["id"], student_id, student_name, parent_phone)
+    if dup:
+        raise ValueError("هذه الطالبة مُسجَّلة مسبقاً في هذه الرحلة")
+    cap = int(trip.get("max_capacity") or 0)
+    registered_count = _trip_count_active_regs(db, trip["id"])
+    if cap > 0 and registered_count >= cap:
+        new_status = "waitlisted"
+        try:
+            row = db.execute(
+                "SELECT COALESCE(MAX(waitlist_position), 0) FROM trip_registrations "
+                "WHERE trip_id = ? AND is_deleted = 0 "
+                "AND registration_status = 'waitlisted'",
+                (trip["id"],),
+            ).fetchone()
+            wl_pos = int(row[0] or 0) + 1
+        except Exception:
+            wl_pos = 1
+    else:
+        new_status = "registered"
+        wl_pos = None
+    confirmation_id = _trip_next_confirmation_id(db)
+    body = {
+        "trip_id":               trip["id"],
+        "student_id":            student_id,
+        "student_name":          student_name,
+        "student_pid":           student_pid or None,
+        "registration_status":   new_status,
+        "registration_method":   method,
+        "registered_by_user_id": registered_by_user_id,
+        "parent_name":           (payload.get("parent_name") or "").strip() or None,
+        "parent_phone":          parent_phone,
+        "pickup_parent_name":    (payload.get("pickup_parent_name") or "").strip() or None,
+        "medical_notes":         (payload.get("medical_notes") or "").strip() or None,
+        "additional_notes":      (payload.get("additional_notes") or "").strip() or None,
+        "consent_given":         1,
+        "waitlist_position":     wl_pos,
+        "confirmation_id":       confirmation_id,
+    }
+    cols = list(body.keys())
+    quoted = ",".join('"' + c + '"' for c in cols)
+    placeholders = ",".join(["?"] * len(cols))
+    sql = ("INSERT INTO trip_registrations(" + quoted + ", consent_at) "
+           "VALUES(" + placeholders + ", CURRENT_TIMESTAMP)")
+    db.execute(sql, tuple(body[c] for c in cols))
+    db.commit()
+    try:
+        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        rid = None
+    return new_status, confirmation_id, rid, wl_pos
+
+
+@app.route('/api/trip/<token>/lookup-by-phone', methods=['POST'])
+def api_public_trip_lookup_by_phone(token):
+    """Public — given a parent phone, return the children registered
+    in the system under that number so the parent can pick whom to
+    sign up. Returns [] for unknown phones (does NOT 404 — leaking
+    'this phone is in our system' is undesirable)."""
+    db = get_db()
+    trip = _trip_get_by_token(db, token)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    if (trip.get("status") or "") != "active":
+        return jsonify({"ok": False, "error": "التسجيل غير متاح"}), 403
+    d = request.get_json(silent=True) or {}
+    phone = (d.get("phone") or "").strip()
+    children = _trip_lookup_children_by_phone(db, phone)
+    return jsonify({"ok": True, "children": children})
+
+
+@app.route('/api/trip/<token>/register', methods=['POST'])
+def api_public_trip_register(token):
+    """Public — register a student via smart-link. Validates lifecycle
+    and consent; auto-waitlists when full. Returns confirmation_id +
+    status so the page can render the success state."""
+    db = get_db()
+    trip = _trip_get_by_token(db, token)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    if (trip.get("status") or "") != "active":
+        return jsonify({"ok": False, "error": "التسجيل مُغلق لهذه الرحلة"}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        new_status, confirmation_id, rid, wl_pos = _trip_create_registration(
+            db, trip, payload, method="whatsapp_link",
+        )
+    except ValueError as ve:
+        return jsonify({"ok": False, "error": str(ve)}), 400
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] public register failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر إكمال التسجيل"}), 500
+    try:
+        _audit("trip.register",
+               target_type="trip_registration", target_id=rid,
+               new_value={"trip_id": trip["id"], "method": "whatsapp_link",
+                          "status": new_status,
+                          "confirmation_id": confirmation_id})
+    except Exception:
+        pass
+    return jsonify({
+        "ok":                 True,
+        "confirmation_id":    confirmation_id,
+        "status":             new_status,
+        "waitlist_position":  wl_pos,
+    })
+
+
 PUBLIC_TRIP_REGISTER_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تسجيل في الرحلة — مايندكس</title>
