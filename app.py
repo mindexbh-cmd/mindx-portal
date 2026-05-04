@@ -67812,6 +67812,220 @@ document.addEventListener('DOMContentLoaded', function(){
 </body></html>"""
 
 
+TRIP_MEMORY_LANE_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>ذكرى الرحلة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(160deg,#fce4ec,#e1bee7 50%,#fff5e6);
+     min-height:100vh;margin:0;padding:0;direction:rtl;color:#212121;}
+.tml-topbar{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+            padding:14px 22px;display:flex;justify-content:space-between;
+            align-items:center;flex-wrap:wrap;gap:10px;
+            box-shadow:0 2px 10px rgba(0,0,0,.06);position:sticky;top:0;z-index:50;}
+.tml-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.tml-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+              padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.tml-wrap{max-width:880px;margin:24px auto 36px;padding:0 18px;}
+
+.tml-hero{background:linear-gradient(135deg,#6B3FA0,#e91e63 60%,#FFB74D);
+          color:#fff;padding:30px 32px;border-radius:22px;
+          margin-bottom:18px;box-shadow:0 10px 30px rgba(107,63,160,.3);
+          position:relative;overflow:hidden;}
+.tml-hero::after{content:"";position:absolute;top:-50%;left:-15%;width:55%;
+                 height:200%;background:radial-gradient(closest-side,rgba(255,255,255,.18),transparent 70%);
+                 animation:tmlPulse 8s ease-in-out infinite;pointer-events:none;}
+@keyframes tmlPulse{
+  0%,100%{transform:translateX(0) scale(1);opacity:.6;}
+  50%    {transform:translateX(20%) scale(1.1);opacity:.9;}
+}
+.tml-hero h2{margin:0;font-size:1.5rem;font-weight:900;line-height:1.3;
+             display:flex;align-items:center;gap:8px;}
+.tml-hero .date{margin:8px 0 0;font-size:.95rem;opacity:.92;}
+.tml-hero .badge{display:inline-block;background:rgba(255,255,255,.22);
+                 padding:5px 14px;border-radius:999px;font-weight:800;
+                 font-size:.85rem;margin-top:8px;}
+
+.tml-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+@media (max-width:680px){.tml-grid{grid-template-columns:1fr;}}
+.tml-card{background:#fff;border-radius:16px;padding:18px 20px;
+          box-shadow:0 6px 18px rgba(0,0,0,.06);
+          border-right:5px solid var(--c,#6B3FA0);
+          display:flex;flex-direction:column;gap:8px;}
+.tml-card[data-k="registrations"]{--c:#1565C0;}
+.tml-card[data-k="attendance"]   {--c:#1D9E75;}
+.tml-card[data-k="collection"]   {--c:#C9A227;}
+.tml-card[data-k="tasks"]        {--c:#6B3FA0;}
+.tml-card[data-k="survey"]       {--c:#e91e63;grid-column:1 / -1;}
+.tml-card .h{margin:0;font-size:1.05rem;font-weight:900;color:#212121;
+             display:flex;align-items:center;gap:6px;}
+.tml-card .em{font-size:1.4rem;}
+.tml-card .num{font-size:2.3rem;font-weight:900;font-variant-numeric:tabular-nums;
+               color:var(--c,#6B3FA0);line-height:1;margin:6px 0 2px;}
+.tml-card .sub{color:#666;font-size:.88rem;}
+.tml-card .row{display:flex;justify-content:space-between;font-size:.85rem;
+               color:#444;font-weight:700;}
+.tml-card .row strong{color:#212121;font-variant-numeric:tabular-nums;}
+
+.tml-stars{display:flex;gap:3px;margin-top:4px;}
+.tml-star{color:#FFC107;font-size:1.4rem;}
+.tml-star.off{color:#ddd;}
+
+.tml-comments{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.tml-comment{background:#fafafa;border-radius:10px;padding:10px 14px;
+             border-right:3px solid #e91e63;font-size:.88rem;color:#444;
+             line-height:1.6;}
+.tml-comment .who{display:block;color:#888;font-size:.78rem;font-weight:700;
+                  margin-top:4px;}
+
+.tml-bar{height:8px;border-radius:6px;background:#eef0f3;overflow:hidden;
+         margin-top:6px;}
+.tml-bar .fill{height:100%;border-radius:6px;
+               background:linear-gradient(90deg,var(--c,#1D9E75),#2BB585);
+               width:0%;transition:width .8s cubic-bezier(.2,.8,.2,1);}
+
+.tml-actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;}
+.tml-btn{border:0;border-radius:10px;padding:10px 18px;font-weight:800;
+         cursor:pointer;font-family:inherit;font-size:.88rem;
+         display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+         color:#fff;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+         box-shadow:0 4px 12px rgba(107,63,160,.28);}
+.tml-btn:hover{box-shadow:0 6px 16px rgba(107,63,160,.4);}
+.tml-btn.secondary{background:#f3e5f5;color:#4a148c;box-shadow:none;}
+.tml-loading{text-align:center;color:#777;padding:40px 14px;font-weight:700;}
+</style></head>
+<body>
+
+<div class="tml-topbar">
+  <h1>🌟 ذكرى الرحلة</h1>
+  <a href="/admin/trips">← العودة للرحلات</a>
+</div>
+
+<div class="tml-wrap" id="tml-root">
+  <div class="tml-loading">جارٍ التحميل...</div>
+</div>
+
+<script>
+var TID = parseInt((window.location.pathname.split('/')[3] || '0'), 10) || 0;
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function stars(n){
+  var html='<div class="tml-stars">';
+  for (var i=1;i<=5;i++) html += '<span class="tml-star' + (i <= Math.round(n) ? '' : ' off') + '">★</span>';
+  return html + '</div>';
+}
+function load(){
+  fetch('/api/admin/trips/' + TID + '/memory-lane', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){
+        document.getElementById('tml-root').innerHTML =
+          '<div style="text-align:center;color:#c62828;padding:30px;">'
+          + esc((j && j.error) || 'خطأ') + '</div>';
+        return;
+      }
+      render(j);
+    })
+    .catch(function(){
+      document.getElementById('tml-root').innerHTML =
+        '<div style="text-align:center;color:#c62828;padding:30px;">خطأ في الاتصال</div>';
+    });
+}
+function render(j){
+  var t   = j.trip || {};
+  var reg = j.registrations || {};
+  var att = j.attendance || {};
+  var col = j.collection || {};
+  var tk  = j.tasks || {};
+  var sv  = j.survey || {};
+  var typeEmoji = ({educational:'🎓', recreational:'🎉', religious:'🕌'})[t.trip_type] || '🚌';
+  var hero =
+      '<div class="tml-hero">'
+    + '  <h2>🌟 ذكرى ' + esc(t.name) + ' ' + typeEmoji + '</h2>'
+    + '  <p class="date">📅 ' + esc(t.trip_date || '') + ' '
+    +    (t.destination ? '• 📍 ' + esc(t.destination) : '') + '</p>'
+    + '  <span class="badge">' + esc(({completed:'منتهية', archived:'مؤرشفة'}[t.status] || t.status)) + '</span>'
+    + '</div>';
+  var registrationsCard =
+      '<div class="tml-card" data-k="registrations">'
+    + '  <div class="h"><span class="em">👥</span><span>المسجَّلات</span></div>'
+    + '  <div class="num">' + (reg.registered || 0) + '</div>'
+    + '  <div class="sub">طالبة شاركت</div>'
+    + '  <div class="row"><span>السعة:</span><strong>' + (reg.max_capacity || 0) + '</strong></div>'
+    + '  <div class="row"><span>قائمة الانتظار:</span><strong>' + (reg.waitlist || 0) + '</strong></div>'
+    + '</div>';
+  var attendanceCard =
+      '<div class="tml-card" data-k="attendance">'
+    + '  <div class="h"><span class="em">✅</span><span>الحضور</span></div>'
+    + '  <div class="num">' + (att.rate || 0) + '%</div>'
+    + '  <div class="tml-bar"><div class="fill" style="width:' + Math.min(100, att.rate||0) + '%"></div></div>'
+    + '  <div class="row"><span>حضرت:</span><strong>' + (att.present || 0) + '</strong></div>'
+    + '  <div class="row"><span>متأخرات:</span><strong>' + (att.late || 0) + '</strong></div>'
+    + '  <div class="row"><span>غياب:</span><strong>' + (att.absent || 0) + '</strong></div>'
+    + '</div>';
+  var collectionCard =
+      '<div class="tml-card" data-k="collection">'
+    + '  <div class="h"><span class="em">💰</span><span>التحصيل</span></div>'
+    + '  <div class="num">' + (col.rate || 0) + '%</div>'
+    + '  <div class="tml-bar" style="--c:#C9A227;"><div class="fill" style="width:' + Math.min(100, col.rate||0) + '%;background:linear-gradient(90deg,#C9A227,#f1d369);"></div></div>'
+    + '  <div class="row"><span>المُحصَّل:</span><strong>' + (col.amount || 0).toFixed(2) + ' د.ب</strong></div>'
+    + '  <div class="row"><span>المتوقَّع:</span><strong>' + (col.expected || 0).toFixed(2) + ' د.ب</strong></div>'
+    + '  <div class="row"><span>نقدي/بنفت:</span><strong>' + (col.cash||0) + ' / ' + (col.benefit||0) + '</strong></div>'
+    + '</div>';
+  var tasksCard =
+      '<div class="tml-card" data-k="tasks">'
+    + '  <div class="h"><span class="em">📋</span><span>المهام</span></div>'
+    + '  <div class="num">' + (tk.pct || 0) + '%</div>'
+    + '  <div class="tml-bar"><div class="fill" style="width:' + Math.min(100, tk.pct||0) + '%;background:linear-gradient(90deg,#6B3FA0,#8B5CC8);"></div></div>'
+    + '  <div class="row"><span>المكتمل:</span><strong>' + (tk.completed || 0) + ' / ' + (tk.total || 0) + '</strong></div>'
+    + '</div>';
+  var surveyCard;
+  if ((sv.responses || 0) > 0){
+    var commentsHtml = (sv.comments || []).map(function(c){
+      return '<div class="tml-comment">"' + esc(c.text) + '"'
+           + (c.parent_name ? '<span class="who">— ' + esc(c.parent_name) + '</span>' : '')
+           + '</div>';
+    }).join('');
+    surveyCard =
+        '<div class="tml-card" data-k="survey">'
+      + '  <div class="h"><span class="em">⭐</span><span>تقييمات الأهالي</span></div>'
+      + '  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">'
+      + '    <div class="num" style="margin:0;">' + (sv.avg_rating || 0) + '/5</div>'
+      + '    ' + stars(sv.avg_rating || 0)
+      + '  </div>'
+      + '  <div class="row"><span>عدد التقييمات:</span><strong>' + (sv.responses || 0) + ' / ' + (sv.eligible || 0) + ' (' + (sv.response_pct || 0) + '%)</strong></div>'
+      + '  <div class="row"><span>التوصية:</span><strong>' + (sv.recommend_pct || 0) + '% أوصوا بالرحلة</strong></div>'
+      + (commentsHtml ? '<div class="tml-comments"><strong style="font-size:.88rem;">💬 أفضل التعليقات:</strong>' + commentsHtml + '</div>' : '')
+      + '</div>';
+  } else {
+    surveyCard =
+        '<div class="tml-card" data-k="survey">'
+      + '  <div class="h"><span class="em">⭐</span><span>تقييمات الأهالي</span></div>'
+      + '  <div style="text-align:center;color:#aaa;padding:14px;">لم تُرسَل تقييمات بعد.</div>'
+      + '</div>';
+  }
+  var actions =
+      '<div class="tml-actions">'
+    + '  <a class="tml-btn" href="/api/admin/trips/' + TID + '/financial-report" target="_blank" rel="noopener">📊 التقرير المالي</a>'
+    + '  <a class="tml-btn secondary" href="/api/admin/trips/' + TID + '/day-report" target="_blank" rel="noopener">📋 تقرير اليوم</a>'
+    + '</div>';
+  document.getElementById('tml-root').innerHTML =
+      hero
+    + '<div class="tml-grid">'
+    + registrationsCard + attendanceCard + collectionCard + tasksCard + surveyCard
+    + '</div>'
+    + actions;
+}
+document.addEventListener('DOMContentLoaded', load);
+</script>
+</body></html>"""
+
+
 TRIP_DAY_REPORT_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تقرير يوم الرحلة — {{TRIP_NAME}} — مايندكس</title>
@@ -69685,6 +69899,130 @@ def api_admin_trips_day_bulk_present(tid):
     except Exception:
         pass
     return jsonify({"ok": True, "marked_count": inserted})
+
+
+@app.route('/admin/trips/<int:tid>/memory-lane', methods=['GET'])
+@login_required
+def admin_trips_memory_lane_page(tid):
+    """Manager-only memory-lane page for completed/archived trips.
+    Open trips redirect to /admin/trips since the memory lane only
+    makes sense once the trip is in the past."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    db = get_db()
+    if not _trip_get(db, tid):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;font-family:sans-serif;'>"
+            "<h1>الرحلة غير موجودة</h1></body></html>",
+            status=404, mimetype="text/html; charset=utf-8")
+    return Response(TRIP_MEMORY_LANE_HTML, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/api/admin/trips/<int:tid>/memory-lane', methods=['GET'])
+@login_required
+def api_admin_trips_memory_lane(tid):
+    """Aggregated retrospective for a completed/archived trip:
+    student count, attendance rate, collection rate, task completion,
+    survey stats + top comments."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    enriched = _trip_compute_fields(
+        trip,
+        _trip_load_reg_counts(db, [tid]).get(tid),
+        _trip_load_payment_summary(db, [tid]).get(tid),
+        _trip_load_task_summary(db, [tid]).get(tid),
+    )
+    # Day attendance rollup
+    try:
+        day_rows = db.execute(
+            "SELECT * FROM trip_day_attendance WHERE trip_id = ?",
+            (tid,)).fetchall()
+    except Exception:
+        day_rows = []
+    day_stats = _trip_day_compute_stats(day_rows, enriched.get("registered_count") or 0)
+    # Survey rollup
+    try:
+        s_rows = db.execute(
+            "SELECT rating, would_recommend, liked_what, improvements, "
+            "       parent_name, student_name, submitted_at "
+            "FROM trip_surveys "
+            "WHERE trip_id = ? AND submitted_at IS NOT NULL",
+            (tid,)).fetchall()
+    except Exception:
+        s_rows = []
+    s_total = len(s_rows)
+    s_avg   = (round(sum(int(dict(r).get("rating") or 0) for r in s_rows) / s_total, 1)
+               if s_total else 0.0)
+    s_rec   = sum(1 for r in s_rows if int(dict(r).get("would_recommend") or 0) == 1)
+    s_rec_pct = (round(s_rec / s_total * 100, 1) if s_total else 0.0)
+    # Top comments — non-empty liked_what, capped at 5.
+    comments = []
+    for r in s_rows:
+        rd = dict(r)
+        text = (rd.get("liked_what") or "").strip()
+        if text:
+            comments.append({
+                "text":         text,
+                "parent_name":  rd.get("parent_name") or "",
+                "student_name": rd.get("student_name") or "",
+            })
+    comments = comments[:5]
+    # Survey-eligible total = registered students.
+    eligible = enriched.get("registered_count") or 0
+    s_response_pct = (round(s_total / eligible * 100, 1) if eligible else 0.0)
+    return jsonify({
+        "ok": True,
+        "trip": {
+            "id":           trip["id"],
+            "name":         trip.get("name") or "",
+            "destination":  trip.get("destination") or "",
+            "trip_date":    trip.get("trip_date") or "",
+            "trip_type":    trip.get("trip_type") or "",
+            "status":       trip.get("status") or "",
+        },
+        "registrations": {
+            "registered":    enriched.get("registered_count") or 0,
+            "max_capacity":  enriched.get("max_capacity") or 0,
+            "waitlist":      enriched.get("waitlist_count") or 0,
+        },
+        "attendance": {
+            "rate":              day_stats.get("attendance_rate") or 0.0,
+            "present":           day_stats.get("present") or 0,
+            "late":              day_stats.get("late") or 0,
+            "absent":            day_stats.get("absent") or 0,
+            "cancelled":         day_stats.get("cancelled") or 0,
+            "medical_emergency": day_stats.get("medical_emergency") or 0,
+        },
+        "collection": {
+            "amount":    enriched.get("collected_amount") or 0,
+            "expected":  enriched.get("total_expected") or 0,
+            "rate":      enriched.get("collection_pct") or 0,
+            "cash":      enriched.get("paid_cash_count") or 0,
+            "benefit":   enriched.get("paid_benefit_count") or 0,
+        },
+        "tasks": {
+            "total":      enriched.get("task_total") or 0,
+            "completed":  enriched.get("task_completed") or 0,
+            "pct":        enriched.get("task_pct") or 0,
+        },
+        "survey": {
+            "responses":   s_total,
+            "eligible":    eligible,
+            "response_pct": s_response_pct,
+            "avg_rating":  s_avg,
+            "recommend_pct": s_rec_pct,
+            "comments":    comments,
+        },
+    })
 
 
 @app.route('/api/admin/trips/<int:tid>/day-report', methods=['GET'])
@@ -73263,6 +73601,10 @@ function tripCardHTML(tp){
     + ((tp.days_until_trip === 0) ?
         '<a class="tc-day-cta" href="/admin/trips/' + (tp.id|0) + '/day-dashboard" target="_blank" rel="noopener">'
         + '🎬 لوحة يوم الرحلة</a>' : '')
+    + ((tp.status === 'completed' || tp.status === 'archived') ?
+        '<a class="tc-day-cta" style="background:linear-gradient(135deg,#6B3FA0,#e91e63);" '
+        + 'href="/admin/trips/' + (tp.id|0) + '/memory-lane" target="_blank" rel="noopener">'
+        + '🌟 ذكرى الرحلة</a>' : '')
     + (tp.pending_auto_reminders ?
         '<button type="button" class="tc-reminder-cta" data-act="send-reminders" data-tid="' + (tp.id|0) + '">'
         + '📤 إرسال التذكيرات الآن (' + (tp.pending_auto_reminders_count || 0) + ')'
