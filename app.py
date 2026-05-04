@@ -976,6 +976,25 @@ def init_db():
                    "ON ev_events(registration_token) "
                    "WHERE registration_token IS NOT NULL")
     except Exception: pass
+    # Schedule items per event (3.2)
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_schedule(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        time_slot TEXT,
+        duration_minutes INTEGER,
+        title TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_schedule_event "
+               "ON ev_schedule(event_id, is_deleted, order_index)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_schedule_time "
+               "ON ev_schedule(event_id, time_slot)")
     db.commit()
     db.close()
 
@@ -6327,6 +6346,48 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("events_v2_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_schedule_v1: per-event categorised timeline (3.2). Items
+    # belong to one of (departure, activity, break, meal, return,
+    # other); time_slot is "HH:MM"; duration optional. Manual
+    # order_index per category lets the admin re-arrange.
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_schedule(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        time_slot TEXT,
+        duration_minutes INTEGER,
+        title TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_schedule_event "
+                    "ON ev_schedule(event_id, is_deleted, order_index)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_schedule_time "
+                    "ON ev_schedule(event_id, time_slot)")
+    except Exception: pass
+    if "ev_schedule_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_schedule", "الخطة الزمنية للرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_schedule", "الخطة الزمنية للرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_schedule_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29790,6 +29851,7 @@ BUILT_IN_TABLE_LABELS = {
     "parent_messages":   "رسائل المعلمة لأولياء الأمور",
     "parent_message_reads": "اطّلاع أولياء الأمور",
     "ev_events":         "الفعاليات والرحلات",
+    "ev_schedule":       "الخطة الزمنية للرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32206,6 +32268,7 @@ _TBL_AUDIT_FEATURE = {
     "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
+    "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
