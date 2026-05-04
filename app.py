@@ -940,6 +940,42 @@ def init_db():
                "ON violations(violation_date)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
                "ON violations(is_deleted)")
+    # ── ev_events: trips & events v2 — single-page-per-event design.
+    # Replaces the old multi-table trips system (which was reverted).
+    # All v2 tables are namespaced with the ev_ prefix to coexist
+    # cleanly with any leftover legacy `trip*` tables on prod DBs.
+    # Status flow: planning → open → closed → completed (auto-
+    # transition driven by date + capacity in stage 1.4).
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        destination TEXT,
+        description TEXT,
+        target_group_ids TEXT,
+        max_students INTEGER DEFAULT 0,
+        event_date DATE NOT NULL,
+        departure_time TEXT,
+        return_time TEXT,
+        meeting_point TEXT,
+        price_per_student REAL DEFAULT 0,
+        status TEXT DEFAULT 'planning',
+        registration_token TEXT,
+        post_trip_notes TEXT,
+        created_by_user_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_ev_events_status "
+               "ON ev_events(status, event_date)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_ev_events_date "
+               "ON ev_events(event_date, is_deleted)")
+    try:
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ev_events_token "
+                   "ON ev_events(registration_token) "
+                   "WHERE registration_token IS NOT NULL")
+    except Exception: pass
     db.commit()
     db.close()
 
@@ -6243,6 +6279,57 @@ if True:
             db2.commit()
         except Exception: pass
 
+    # ── events_v2_v1: trips & events v2. New table set, ev_ prefix.
+    # The old trip* tables (if any leftovers from before the revert)
+    # stay untouched.
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        destination TEXT,
+        description TEXT,
+        target_group_ids TEXT,
+        max_students INTEGER DEFAULT 0,
+        event_date DATE NOT NULL,
+        departure_time TEXT,
+        return_time TEXT,
+        meeting_point TEXT,
+        price_per_student REAL DEFAULT 0,
+        status TEXT DEFAULT 'planning',
+        registration_token TEXT,
+        post_trip_notes TEXT,
+        created_by_user_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_ev_events_status "
+                    "ON ev_events(status, event_date)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_ev_events_date "
+                    "ON ev_events(event_date, is_deleted)")
+        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ev_events_token "
+                    "ON ev_events(registration_token) "
+                    "WHERE registration_token IS NOT NULL")
+    except Exception: pass
+    if "events_v2_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_events", "الفعاليات والرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_events", "الفعاليات والرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("events_v2_v1",))
+            db2.commit()
+        except Exception: pass
+
     # ── evaluations_v2: monthly evaluation form (1-10 sliders).
     # The evaluations table predates this feature (see legacy CREATE
     # above with form_fill_date / class_participation / etc. columns).
@@ -7850,6 +7937,15 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
 /* Visible to admin AND manager — used by /admin/teacher-deliveries
    which the spec grants to both roles. Server still gates the URL. */
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
+/* Events v2 — sidebar/quick-card badge for upcoming events count.
+   Hidden when zero so the chrome stays clean. */
+.ev-sb-badge,.ev-qc-badge{display:inline-flex;align-items:center;
+                          justify-content:center;background:#1D9E75;
+                          color:#fff;font-size:.7rem;font-weight:900;
+                          border-radius:999px;padding:1px 7px;
+                          margin-inline-start:6px;line-height:1.4;
+                          min-width:18px;}
+.ev-sb-badge[hidden],.ev-qc-badge[hidden]{display:none !important;}
 
 </style>
 <!-- Dashboard redesign — Phase 1 design tokens. Foundation only:
@@ -8080,6 +8176,10 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
         <a class="md-sb-link mx-admin-only" href="/admin/violations">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span class="md-sb-link-text">&#x1F393; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
+        </a>
+        <a class="md-sb-link mx-admin-only" href="/admin/events" id="md-sb-events">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="11" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>
+          <span class="md-sb-link-text">&#x1F68C; &#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;<span class="ev-sb-badge" id="md-sb-events-badge" hidden>0</span></span>
         </a>
       </div>
     </div>
@@ -8890,6 +8990,10 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
     <a class="md-quick-card mx-admin-only" href="/admin/violations">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F393;</span>
       <span class="md-quick-label">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
+    </a>
+    <a class="md-quick-card mx-admin-only" href="/admin/events" id="md-qc-events">
+      <span class="md-quick-emoji" aria-hidden="true">&#x1F68C;</span>
+      <span class="md-quick-label">&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;<span class="ev-qc-badge" id="md-qc-events-badge" hidden>0</span></span>
     </a>
   </div>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
@@ -11731,6 +11835,29 @@ function dhLoadStats(){
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadStats);
 else dhLoadStats();
+/* Events v2 badge — count of trips with status open/closed for the
+   sidebar + quick-card chips. Self-gates on data-role admin/manager
+   so non-admin sessions never hit the API. */
+function dhLoadEventsNav(){
+  var role = (document.body.dataset.role || '').toLowerCase();
+  if (role !== 'admin' && role !== 'manager') return;
+  fetch('/api/admin/events', {credentials:'same-origin'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j || !j.ok) return;
+      var s = j.stats || {};
+      var n = (s.open || 0) + (s.closed || 0);
+      ['md-sb-events-badge','md-qc-events-badge'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (n > 0){ el.textContent = String(n); el.hidden = false; }
+        else      { el.hidden = true; }
+      });
+    })
+    .catch(function(){});
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadEventsNav);
+else dhLoadEventsNav();
 function _ssFmtH(v){
   var n=parseFloat(v||0);if(!n&&n!==0)return"0";
   if(Math.abs(n-Math.round(n))<0.01) return String(Math.round(n));
@@ -29662,6 +29789,7 @@ BUILT_IN_TABLE_LABELS = {
     "lessons_log":       "سجل الدروس",
     "parent_messages":   "رسائل المعلمة لأولياء الأمور",
     "parent_message_reads": "اطّلاع أولياء الأمور",
+    "ev_events":         "الفعاليات والرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32077,6 +32205,7 @@ _TBL_AUDIT_FEATURE = {
     "curriculum_assignments": ("تخصيصات ملفات المنهج",        "مكتبة المناهج"),
     "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
+    "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
