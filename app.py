@@ -22929,10 +22929,14 @@ def api_parent_lookup():
     s = dict(student)
     sid = s["id"]
     # Attendance summary by student_name (matches existing flow).
+    # Only rows with a canonical status count — empty/placeholder rows
+    # are roster scaffolding and must not inflate the denominator.
     sname = s.get("student_name") or ""
     att_rows = db.execute(
         "SELECT status FROM attendance WHERE student_name=?", (sname,)
     ).fetchall() if sname else []
+    att_rows = [r for r in att_rows
+                if (r["status"] or "").strip() in ("حاضر", "غائب", "متأخر")]
     total = len(att_rows)
     def _count(label): return sum(1 for r in att_rows if (r["status"] or "").strip() == label)
     present = _count("حاضر"); absent = _count("غائب"); late = _count("متأخر")
@@ -25624,11 +25628,15 @@ def api_group_detail(gid):
         n_pres = n_abs = n_late = 0
         for ar in arows:
             ad = dict(ar)
+            st = (ad.get("status") or "").strip()
+            # Only count rows with a real marking — empty/placeholder
+            # rows are roster scaffolding, not actual sessions.
+            if st not in ("حاضر", "غائب", "متأخر"):
+                continue
             dt = _att_normalize_date(ad.get("attendance_date"))
             gv = (ad.get("group_name") or "").strip()
             if dt and gv:
                 sessions.add((dt, gv))
-            st = (ad.get("status") or "").strip()
             if   st == "حاضر":  n_pres += 1
             elif st == "غائب":  n_abs  += 1
             elif st == "متأخر": n_late += 1
@@ -26669,6 +26677,10 @@ def api_student_details(sid):
         "SELECT status FROM attendance WHERE student_name=?",
         (student_name,)
     ).fetchall() if student_name else []
+    # Filter to canonical statuses only — empty/placeholder rows from
+    # the roster-pre-fill bug must not inflate the denominator.
+    att_rows = [r for r in att_rows
+                if (r["status"] or "").strip() in (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE, STATUS_EXCUSED)]
     total = len(att_rows)
     def _count(label):
         return sum(1 for r in att_rows if (r["status"] or "").strip() == label)
@@ -46890,13 +46902,17 @@ def api_attendance_student_stats():
         name = r["student_name"]
         if not name:
             continue
+        st = (r["status"] or "").strip()
+        # Skip rows the teacher hasn't actually marked — they're not
+        # real sessions and would deflate the attendance rate.
+        if st not in (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE):
+            continue
         d = _att_normalize_date(r["attendance_date"])
         g = (r["group_name"] or "").strip()
         bucket = stats.setdefault(name, {
             "present": 0, "absent": 0, "late": 0, "total": 0, "_sessions": set(),
         })
         bucket["_sessions"].add((d, g))
-        st = (r["status"] or "").strip()
         if st == STATUS_PRESENT:
             bucket["present"] += 1
         elif st == STATUS_ABSENT:
@@ -46979,12 +46995,16 @@ def api_attendance_summary():
         per_student = {}
         sessions = set()   # distinct (date, group) pairs across selected groups
         for r in rows:
-            d = _att_normalize_date(r["attendance_date"])
-            g = (r["group_name"] or "").strip()
             n = (r["student_name"] or "").strip()
             st = (r["status"] or "").strip()
             if not n:
                 continue
+            # Skip unmarked rows — empty/placeholder is roster scaffolding,
+            # not a real session, and would inflate total_sessions.
+            if st not in (PRESENT, ABSENT, LATE):
+                continue
+            d = _att_normalize_date(r["attendance_date"])
+            g = (r["group_name"] or "").strip()
             sessions.add((d, g))
             s = per_student.setdefault(n, {
                 "student_name": n, "present": 0, "absent": 0, "late": 0,
@@ -47087,11 +47107,14 @@ def api_attendance_summary():
         group_total_minutes = 0
         per_student = {}
         for r in rows:
-            d = _att_normalize_date(r["attendance_date"])
             n = (r["student_name"] or "").strip()
             st = (r["status"] or "").strip()
             if not n:
                 continue
+            # Skip unmarked rows so they don't count as sessions.
+            if st not in (PRESENT, ABSENT, LATE):
+                continue
+            d = _att_normalize_date(r["attendance_date"])
             group_sessions.add(d)
             s = per_student.setdefault(n, {
                 "student_name": n, "present": 0, "absent": 0, "late": 0,
@@ -47146,12 +47169,15 @@ def api_attendance_summary():
         per_student = {}
         global_sessions = set()
         for r in rows:
-            d = _att_normalize_date(r["attendance_date"])
-            g = (r["group_name"] or "").strip()
             n = (r["student_name"] or "").strip()
             st = (r["status"] or "").strip()
             if not n:
                 continue
+            # Skip unmarked rows so they don't count as sessions.
+            if st not in (PRESENT, ABSENT, LATE):
+                continue
+            d = _att_normalize_date(r["attendance_date"])
+            g = (r["group_name"] or "").strip()
             global_sessions.add((d, g))
             s = per_student.setdefault(n, {
                 "student_name": n, "present": 0, "absent": 0, "late": 0,
@@ -47217,9 +47243,12 @@ def api_attendance_summary():
             n_norm = _att_normalize_ar(n)
             if q_norm not in n_norm:
                 continue
+            st = (r["status"] or "").strip()
+            # Skip unmarked rows so they don't count as sessions.
+            if st not in (PRESENT, ABSENT, LATE):
+                continue
             d = _att_normalize_date(r["attendance_date"])
             g = (r["group_name"] or "").strip()
-            st = (r["status"] or "").strip()
             bucket = matches_map.setdefault(n_norm, {
                 "student_name": n,
                 "_dg": set(), "_groups": set(), "_counted_dur": set(),
@@ -47273,9 +47302,13 @@ def api_attendance_summary():
             g = (r["group_name"] or "").strip()
             if not g:
                 continue
+            st = (r["status"] or "").strip()
+            # Same filter as the other views in this endpoint — only
+            # canonical statuses count as a real session.
+            if st not in (PRESENT, ABSENT, LATE):
+                continue
             d = _att_normalize_date(r["attendance_date"])
             n = (r["student_name"] or "").strip()
-            st = (r["status"] or "").strip()
             gb = per_group.setdefault(g, {
                 "group_name": g,
                 "_dates": set(), "_students": {}, "total_minutes": 0,
@@ -58243,9 +58276,14 @@ def api_portal_student_attendance():
     n_present = n_absent = n_late = 0
     for r in rows:
         rd = dict(r)
+        st = (rd.get("status") or "").strip()
+        # Hide unmarked rows from the parent — they aren't real
+        # sessions (just roster scaffolding) and would otherwise show
+        # with a blank "الحالة" cell + inflate the percentage.
+        if st not in (STATUS_PRESENT, STATUS_ABSENT, STATUS_LATE):
+            continue
         d  = _att_normalize_date(rd.get("attendance_date"))
         g  = (rd.get("group_name") or "").strip()
-        st = (rd.get("status") or "").strip()
         if d and g:
             sessions.add((d, g))
         if   st == STATUS_PRESENT: n_present += 1
