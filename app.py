@@ -940,42 +940,6 @@ def init_db():
                "ON violations(violation_date)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
                "ON violations(is_deleted)")
-    # ── trips: educational/recreational/religious trip and event
-    # registry. Admin + 3 named staff create; parents register their
-    # daughters via a per-trip WhatsApp link + the parent portal
-    # (registrations table arrives in stage 2). status flow:
-    #   active → closed → completed → archived
-    # Auto-archives 7 days after the trip date once status=completed.
-    db.execute("""CREATE TABLE IF NOT EXISTS trips(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        destination TEXT,
-        trip_type TEXT,
-        description TEXT,
-        target_audience TEXT,
-        max_capacity INTEGER DEFAULT 0,
-        price_per_student REAL DEFAULT 0,
-        trip_date DATE,
-        departure_time TEXT,
-        return_time TEXT,
-        meeting_point TEXT,
-        emergency_contact TEXT,
-        emergency_contact_name TEXT,
-        equipment_needed TEXT,
-        status TEXT DEFAULT 'active',
-        created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        archived_at DATETIME,
-        is_deleted INTEGER DEFAULT 0,
-        FOREIGN KEY (created_by) REFERENCES users(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trips_status_deleted "
-               "ON trips(status, is_deleted)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trips_trip_date "
-               "ON trips(trip_date)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trips_created_by "
-               "ON trips(created_by)")
     db.commit()
     db.close()
 
@@ -6276,60 +6240,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("violations_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trips_v1: educational/recreational/religious trip & event
-    # registry. See init_db() for column docs. Stage 1 only — the
-    # trip_registrations + trip_payments tables arrive in stages 2/3
-    # of the trips system rollout.
-    db2.execute("""CREATE TABLE IF NOT EXISTS trips(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        destination TEXT,
-        trip_type TEXT,
-        description TEXT,
-        target_audience TEXT,
-        max_capacity INTEGER DEFAULT 0,
-        price_per_student REAL DEFAULT 0,
-        trip_date DATE,
-        departure_time TEXT,
-        return_time TEXT,
-        meeting_point TEXT,
-        emergency_contact TEXT,
-        emergency_contact_name TEXT,
-        equipment_needed TEXT,
-        status TEXT DEFAULT 'active',
-        created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        archived_at DATETIME,
-        is_deleted INTEGER DEFAULT 0,
-        FOREIGN KEY (created_by) REFERENCES users(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trips_status_deleted "
-                    "ON trips(status, is_deleted)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trips_trip_date "
-                    "ON trips(trip_date)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trips_created_by "
-                    "ON trips(created_by)")
-    except Exception: pass
-    if "trips_v1" not in applied:
-        try:
-            db2.execute(
-                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                ("trips", "الرحلات والفعاليات"),
-            )
-        except Exception:
-            try:
-                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                            ("trips", "الرحلات والفعاليات"))
-            except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trips_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29752,7 +29662,6 @@ BUILT_IN_TABLE_LABELS = {
     "lessons_log":       "سجل الدروس",
     "parent_messages":   "رسائل المعلمة لأولياء الأمور",
     "parent_message_reads": "اطّلاع أولياء الأمور",
-    "trips":             "الرحلات والفعاليات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32168,7 +32077,6 @@ _TBL_AUDIT_FEATURE = {
     "curriculum_assignments": ("تخصيصات ملفات المنهج",        "مكتبة المناهج"),
     "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
-    "trips":                ("الرحلات والفعاليات",              "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
