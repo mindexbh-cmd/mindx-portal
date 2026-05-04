@@ -64801,52 +64801,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .trip-empty .te-title{font-size:1.05rem;font-weight:900;color:#4a148c;
                       margin-bottom:6px;}
 .trip-empty .te-hint{font-size:.9rem;color:#666;}
-
-/* ── Timeline view ────────────────────────────────────────────────── */
-.trip-timeline{background:#fff;border-radius:14px;padding:22px 18px 18px;
-               box-shadow:0 4px 14px rgba(0,0,0,.06);
-               position:relative;overflow-x:auto;}
-.tt-track{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));
-          gap:6px;position:relative;padding-top:14px;}
-.tt-track::before{content:"";position:absolute;left:0;right:0;top:36px;height:3px;
-                  background:linear-gradient(90deg,#bbb 0%,#bbb 14%,#6B3FA0 14%,#6B3FA0 100%);
-                  border-radius:3px;}
-.tt-col{position:relative;display:flex;flex-direction:column;align-items:center;
-        gap:6px;min-height:200px;}
-.tt-anchor{font-size:.8rem;font-weight:800;color:#666;text-align:center;
-           padding:0 6px;line-height:1.3;}
-.tt-col[data-bucket="0"] .tt-anchor{color:#999;}
-.tt-col[data-bucket="1"] .tt-anchor{color:#4a148c;font-weight:900;}
-.tt-dot{width:18px;height:18px;border-radius:50%;background:#bbb;
-        border:3px solid #fff;box-shadow:0 0 0 2px rgba(107,63,160,.0);
-        z-index:2;transition:transform .2s,box-shadow .2s;cursor:default;
-        margin-top:14px;}
-.tt-col[data-bucket="0"] .tt-dot{background:#bbb;}
-.tt-col[data-bucket="1"] .tt-dot{background:#1D9E75;width:22px;height:22px;
-                                  box-shadow:0 0 0 4px rgba(29,158,117,.18);
-                                  margin-top:12px;}
-.tt-col[data-bucket="2"] .tt-dot,
-.tt-col[data-bucket="3"] .tt-dot{background:#C9A227;}
-.tt-col[data-bucket="4"] .tt-dot,
-.tt-col[data-bucket="5"] .tt-dot,
-.tt-col[data-bucket="6"] .tt-dot{background:#6B3FA0;}
-.tt-trips{display:flex;flex-direction:column;gap:8px;align-items:center;
-          width:100%;}
-.tt-trip{background:#fff;border:1.5px solid #ececf2;border-radius:10px;
-         padding:8px 10px;font-size:.78rem;cursor:pointer;
-         display:flex;flex-direction:column;align-items:center;gap:3px;
-         min-width:100px;max-width:100%;transition:transform .15s,box-shadow .2s,border-color .2s;}
-.tt-trip:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.1);
-               border-color:#6B3FA0;}
-.tt-trip[data-status="archived"]{opacity:.5;}
-.tt-trip-emoji{font-size:1.3rem;line-height:1;}
-.tt-trip-name{font-weight:800;color:#212121;text-align:center;
-              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-              max-width:100px;}
-.tt-trip-date{color:#777;font-weight:700;font-size:.72rem;}
-.tt-col[data-bucket="0"] .tt-trip{opacity:.55;}
-.tt-empty{padding:40px 14px;text-align:center;color:#888;font-size:.9rem;
-          grid-column:1 / -1;}
 </style>
 </head>
 <body>
@@ -64933,46 +64887,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
   <div id="trip-cards" class="trip-cards" hidden></div>
 
-  <div id="trip-timeline" class="trip-timeline" hidden>
-    <div class="tt-track" id="tt-track">
-      <div class="tt-col" data-bucket="0">
-        <div class="tt-anchor">السابقة</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="0"></div>
-      </div>
-      <div class="tt-col" data-bucket="1">
-        <div class="tt-anchor">اليوم</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="1"></div>
-      </div>
-      <div class="tt-col" data-bucket="2">
-        <div class="tt-anchor">+1 يوم</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="2"></div>
-      </div>
-      <div class="tt-col" data-bucket="3">
-        <div class="tt-anchor">+3 أيام</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="3"></div>
-      </div>
-      <div class="tt-col" data-bucket="4">
-        <div class="tt-anchor">أسبوع</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="4"></div>
-      </div>
-      <div class="tt-col" data-bucket="5">
-        <div class="tt-anchor">أسبوعان</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="5"></div>
-      </div>
-      <div class="tt-col" data-bucket="6">
-        <div class="tt-anchor">المستقبل</div>
-        <div class="tt-dot"></div>
-        <div class="tt-trips" data-bucket="6"></div>
-      </div>
-    </div>
-  </div>
-
   <div id="trip-empty" class="trip-empty">
     <div class="te-emoji">🚀</div>
     <div class="te-title">لا توجد رحلات بعد</div>
@@ -65014,91 +64928,6 @@ function tripLoadStats(){
     .catch(function(){});
 }
 document.addEventListener('DOMContentLoaded', tripLoadStats);
-
-/* ── View toggle (cards ↔ timeline) ────────────────────────────────
-   Persisted to sessionStorage so reloads keep the chosen view.
-   tripRenderTimeline() places trips into 7 day-distance buckets; the
-   actual data hookup happens in commit 7 once /api/admin/trips is
-   live. Until then, switching to timeline shows the empty anchor
-   track which is enough for the layout to verify. */
-function tripBucketForDays(d){
-  if (d == null || d < 0)  return 0;
-  if (d === 0)            return 1;
-  if (d === 1)            return 2;
-  if (d <= 3)             return 3;
-  if (d <= 7)             return 4;
-  if (d <= 14)            return 5;
-  return 6;
-}
-function tripRenderTimeline(trips){
-  trips = Array.isArray(trips) ? trips : (window._tripDataCache || []);
-  document.querySelectorAll('#trip-timeline .tt-trips').forEach(function(el){
-    el.innerHTML = '';
-  });
-  if (!trips.length){
-    var t = document.getElementById('tt-track');
-    if (t && !t.querySelector('.tt-empty')){
-      var em = document.createElement('div');
-      em.className = 'tt-empty';
-      em.textContent = 'لا توجد رحلات لعرضها على الجدول الزمني.';
-      t.appendChild(em);
-    }
-    return;
-  }
-  var leftover = document.querySelector('#tt-track .tt-empty');
-  if (leftover) leftover.remove();
-  var emojiByType = {educational:'🎓', recreational:'🎉', religious:'🕌'};
-  trips.forEach(function(tp){
-    var b = tripBucketForDays(tp.days_until_trip);
-    var bucket = document.querySelector('#trip-timeline .tt-trips[data-bucket="' + b + '"]');
-    if (!bucket) return;
-    var div = document.createElement('div');
-    div.className = 'tt-trip';
-    div.setAttribute('data-tid', tp.id);
-    div.setAttribute('data-status', tp.status || 'active');
-    div.setAttribute('title', (tp.name || '') + ' — ' + (tp.destination || ''));
-    var emoji = emojiByType[tp.trip_type] || '🚌';
-    div.innerHTML =
-        '<div class="tt-trip-emoji">' + emoji + '</div>' +
-        '<div class="tt-trip-name">' + (tp.name || '').replace(/[<>&]/g,'') + '</div>' +
-        '<div class="tt-trip-date">' + (tp.trip_date || '') + '</div>';
-    bucket.appendChild(div);
-  });
-}
-function tripSetView(view){
-  var btn = document.getElementById('trip-view-toggle');
-  var cards = document.getElementById('trip-cards');
-  var tl    = document.getElementById('trip-timeline');
-  var empty = document.getElementById('trip-empty');
-  if (view === 'timeline'){
-    btn.setAttribute('data-view','timeline');
-    btn.classList.add('active');
-    if (cards) cards.hidden = true;
-    if (tl) tl.hidden = false;
-    if (empty) empty.hidden = true;
-    tripRenderTimeline();
-  } else {
-    btn.setAttribute('data-view','cards');
-    btn.classList.remove('active');
-    if (tl) tl.hidden = true;
-    var hasCards = cards && cards.children.length > 0;
-    if (cards) cards.hidden = !hasCards;
-    if (empty) empty.hidden = hasCards;
-  }
-  try { sessionStorage.setItem('tripView', view); } catch(_){}
-}
-document.addEventListener('DOMContentLoaded', function(){
-  var btn = document.getElementById('trip-view-toggle');
-  if (btn){
-    btn.addEventListener('click', function(){
-      var current = btn.getAttribute('data-view') || 'cards';
-      tripSetView(current === 'cards' ? 'timeline' : 'cards');
-    });
-  }
-  var saved = '';
-  try { saved = sessionStorage.getItem('tripView') || ''; } catch(_){}
-  if (saved === 'timeline') tripSetView('timeline');
-});
 </script>
 </body></html>"""
 
