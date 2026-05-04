@@ -963,7 +963,6 @@ def init_db():
         emergency_contact_name TEXT,
         equipment_needed TEXT,
         status TEXT DEFAULT 'active',
-        smart_token TEXT,
         created_by INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -977,53 +976,6 @@ def init_db():
                "ON trips(trip_date)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_trips_created_by "
                "ON trips(created_by)")
-    # smart_token is a stage-2 column; on a fresh DB the CREATE TABLE
-    # above includes it, but legacy DBs that pre-date stage 2 won't
-    # have it yet. The else-branch migration adds the column + index
-    # later in this same boot, so failing here is harmless and
-    # absorbed.
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_smart_token "
-                   "ON trips(smart_token) WHERE smart_token IS NOT NULL")
-    except Exception: pass
-    # ── trip_registrations: per-student registration ledger for trips.
-    # Created via parent WhatsApp smart link, parent portal, or admin
-    # manual add. Waitlist entries carry a non-null waitlist_position
-    # and registration_status='waitlisted'; they auto-promote when a
-    # registered student cancels (see _trips_promote_waitlist in
-    # stage 2's auto-promotion commit).
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_registrations(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        student_id INTEGER,
-        student_name TEXT NOT NULL,
-        student_pid TEXT,
-        registration_status TEXT DEFAULT 'registered',
-        registration_method TEXT,
-        registered_by_user_id INTEGER,
-        parent_name TEXT,
-        parent_phone TEXT NOT NULL,
-        pickup_parent_name TEXT,
-        medical_notes TEXT,
-        additional_notes TEXT,
-        consent_given INTEGER DEFAULT 0,
-        consent_at DATETIME,
-        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        cancelled_at DATETIME,
-        waitlist_position INTEGER,
-        promoted_from_waitlist_at DATETIME,
-        confirmation_id TEXT,
-        is_deleted INTEGER DEFAULT 0,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (student_id) REFERENCES students(id),
-        FOREIGN KEY (registered_by_user_id) REFERENCES users(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_trip "
-               "ON trip_registrations(trip_id, registration_status, is_deleted)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_student "
-               "ON trip_registrations(student_id)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_pid "
-               "ON trip_registrations(student_pid)")
     db.commit()
     db.close()
 
@@ -6378,111 +6330,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trips_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trip_registrations_v1: per-trip student registration ledger
-    # (stage 2 — smart-link + parent portal). Adds the smart_token
-    # column to the existing trips table, creates the registrations
-    # table + indexes, backfills smart_token for any pre-existing trip
-    # rows, registers the Arabic table label, and stamps the migration
-    # tag exactly once. Idempotent — safe to re-boot multiple times.
-    try:
-        _trips_cols_now = {r[1] for r in db2.execute(
-            "PRAGMA table_info(trips)").fetchall()}
-    except Exception:
-        _trips_cols_now = set()
-    if "smart_token" not in _trips_cols_now:
-        try: db2.execute("ALTER TABLE trips ADD COLUMN smart_token TEXT")
-        except Exception: pass
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_registrations(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        student_id INTEGER,
-        student_name TEXT NOT NULL,
-        student_pid TEXT,
-        registration_status TEXT DEFAULT 'registered',
-        registration_method TEXT,
-        registered_by_user_id INTEGER,
-        parent_name TEXT,
-        parent_phone TEXT NOT NULL,
-        pickup_parent_name TEXT,
-        medical_notes TEXT,
-        additional_notes TEXT,
-        consent_given INTEGER DEFAULT 0,
-        consent_at DATETIME,
-        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        cancelled_at DATETIME,
-        waitlist_position INTEGER,
-        promoted_from_waitlist_at DATETIME,
-        confirmation_id TEXT,
-        is_deleted INTEGER DEFAULT 0,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (student_id) REFERENCES students(id),
-        FOREIGN KEY (registered_by_user_id) REFERENCES users(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_trip "
-                    "ON trip_registrations(trip_id, registration_status, is_deleted)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_student "
-                    "ON trip_registrations(student_id)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_regs_pid "
-                    "ON trip_registrations(student_pid)")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_smart_token "
-                    "ON trips(smart_token) WHERE smart_token IS NOT NULL")
-    except Exception: pass
-    if "trip_registrations_v1" not in applied:
-        # Backfill smart_token for any trip created before stage 2.
-        # Inline the token gen so this block is self-contained — the
-        # runtime _trip_generate_token() lands further down in the file
-        # and isn't available at import-time when migrations run.
-        import secrets as _secrets_back, string as _string_back
-        _alphabet_back = _string_back.ascii_letters + _string_back.digits
-        try:
-            _back_rows = db2.execute(
-                "SELECT id FROM trips WHERE smart_token IS NULL OR smart_token = ''"
-            ).fetchall()
-            _existing = set()
-            try:
-                for _er in db2.execute(
-                    "SELECT smart_token FROM trips "
-                    "WHERE smart_token IS NOT NULL AND smart_token != ''"
-                ).fetchall():
-                    _v = _er[0] if not hasattr(_er, "keys") else _er["smart_token"]
-                    if _v: _existing.add(_v)
-            except Exception:
-                pass
-            for _br in _back_rows:
-                _tid_b = _br[0] if not hasattr(_br, "keys") else _br["id"]
-                # Up to 8 retries — 12-char alphabet of 62 has 62^12 ≈ 3e21
-                # space, so collisions in practice are vanishingly rare.
-                for _try in range(8):
-                    _tk = "".join(_secrets_back.choice(_alphabet_back) for _ in range(12))
-                    if _tk in _existing: continue
-                    try:
-                        db2.execute(
-                            "UPDATE trips SET smart_token = ? WHERE id = ?",
-                            (_tk, _tid_b),
-                        )
-                        _existing.add(_tk)
-                        break
-                    except Exception:
-                        continue
-        except Exception: pass
-        try:
-            db2.execute(
-                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                ("trip_registrations", "تسجيلات الرحلات"),
-            )
-        except Exception:
-            try:
-                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                            ("trip_registrations", "تسجيلات الرحلات"))
-            except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trip_registrations_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29963,7 +29810,6 @@ BUILT_IN_TABLE_LABELS = {
     "parent_messages":   "رسائل المعلمة لأولياء الأمور",
     "parent_message_reads": "اطّلاع أولياء الأمور",
     "trips":             "الرحلات والفعاليات",
-    "trip_registrations":"تسجيلات الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32380,7 +32226,6 @@ _TBL_AUDIT_FEATURE = {
     "curriculum_access_log": ("سجل اطّلاع المنهج",             "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "trips":                ("الرحلات والفعاليات",              "نظام الرحلات والفعاليات"),
-    "trip_registrations":   ("تسجيلات الرحلات",                 "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
