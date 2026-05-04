@@ -1012,6 +1012,25 @@ def init_db():
     )""")
     db.execute("CREATE INDEX IF NOT EXISTS idx_costs_event "
                "ON ev_costs(event_id, is_deleted, order_index)")
+    # Item checklist per event (5.1)
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        notes TEXT,
+        is_ready INTEGER DEFAULT 0,
+        assigned_to_user_id INTEGER,
+        assigned_to_name TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_items_event "
+               "ON ev_items(event_id, is_deleted, order_index)")
     db.commit()
     db.close()
 
@@ -6442,6 +6461,45 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_costs_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_items_v1: per-event checklist of tools/supplies (5.1).
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        notes TEXT,
+        is_ready INTEGER DEFAULT 0,
+        assigned_to_user_id INTEGER,
+        assigned_to_name TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id),
+        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_items_event "
+                    "ON ev_items(event_id, is_deleted, order_index)")
+    except Exception: pass
+    if "ev_items_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_items", "أدوات الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_items", "أدوات الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_items_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29907,6 +29965,7 @@ BUILT_IN_TABLE_LABELS = {
     "ev_events":         "الفعاليات والرحلات",
     "ev_schedule":       "الخطة الزمنية للرحلات",
     "ev_costs":          "تكاليف الرحلات",
+    "ev_items":          "أدوات الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32325,6 +32384,7 @@ _TBL_AUDIT_FEATURE = {
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
     "ev_costs":             ("تكاليف الرحلات",                  "نظام الفعاليات والرحلات v2"),
+    "ev_items":             ("أدوات الرحلات",                   "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -64747,6 +64807,35 @@ def _events_seed_default_costs(db, event_id):
         print("[events] default-costs seed failed: " + str(ex), file=_sys.stderr)
 
 
+# Default checklist items seeded on every new event (5.1).
+_EV_DEFAULT_ITEMS = [
+    {"title": "🩹 شنطة إسعافات أولية", "quantity": 1},
+    {"title": "💧 مياه",                "quantity": 1},
+    {"title": "🍪 وجبات خفيفة",         "quantity": 1},
+    {"title": "🧻 منديل ورقي",          "quantity": 1},
+    {"title": "📋 قائمة الطالبات",       "quantity": 1},
+]
+
+
+def _events_seed_default_items(db, event_id):
+    """Best-effort seed of the five default checklist items."""
+    if not event_id:
+        return
+    try:
+        for i, c in enumerate(_EV_DEFAULT_ITEMS):
+            db.execute(
+                "INSERT INTO ev_items(event_id, title, quantity, "
+                "                     order_index) "
+                "VALUES(?,?,?,?)",
+                (event_id, c["title"], c["quantity"], i))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] default-items seed failed: " + str(ex), file=_sys.stderr)
+
+
 def _events_can_admin(user):
     """Manager-class — admin/manager. Reuses the existing role
     taxonomy."""
@@ -64980,6 +65069,10 @@ def api_admin_events_create():
     # in the helper means even a partial failure won't kill creation.
     try:
         _events_seed_default_costs(db, new_id)
+    except Exception:
+        pass
+    try:
+        _events_seed_default_items(db, new_id)
     except Exception:
         pass
     # Optional copy-from-previous: only the high-level fields for
@@ -65436,6 +65529,283 @@ def api_admin_events_costs_delete(eid, cid):
     except Exception:
         pass
     return jsonify({"ok": True, "id": cid})
+
+
+# ── Items (5.1) ────────────────────────────────────────────────
+def _events_items_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT 1 FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return False
+    return bool(row)
+
+
+def _events_items_row(rd):
+    return {
+        "id":                  rd.get("id"),
+        "event_id":            rd.get("event_id"),
+        "title":               rd.get("title") or "",
+        "quantity":            int(rd.get("quantity") or 1),
+        "notes":               rd.get("notes") or "",
+        "is_ready":            int(rd.get("is_ready") or 0),
+        "assigned_to_user_id": rd.get("assigned_to_user_id"),
+        "assigned_to_name":    rd.get("assigned_to_name") or "",
+        "order_index":         int(rd.get("order_index") or 0),
+        "created_at":          rd.get("created_at") or "",
+        "updated_at":          rd.get("updated_at") or "",
+    }
+
+
+def _events_resolve_user_label(db, uid):
+    """Best-effort lookup of a user-display name for snapshotting on
+    items/tasks. Falls back to "" when missing or query fails."""
+    if not uid:
+        return ""
+    try:
+        row = db.execute(
+            "SELECT username, role FROM users WHERE id = ?",
+            (int(uid),)).fetchone()
+    except Exception:
+        return ""
+    if not row:
+        return ""
+    rd = dict(row)
+    return rd.get("username") or ""
+
+
+def _events_items_summary(rows):
+    total = len(rows)
+    ready = sum(1 for r in rows if int(r.get("is_ready") or 0) == 1)
+    pct   = (ready / total * 100.0) if total > 0 else 0.0
+    return {
+        "total":    total,
+        "ready":    ready,
+        "pending":  total - ready,
+        "ready_pct": round(pct, 1),
+    }
+
+
+@app.route('/api/admin/events/<int:eid>/items', methods=['GET'])
+@login_required
+def api_admin_events_items_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_items_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM ev_items "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY order_index, id", (eid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] items list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    out = [_events_items_row(dict(r)) for r in rows]
+    return jsonify({"ok": True, "items": out, "summary": _events_items_summary(out)})
+
+
+@app.route('/api/admin/events/<int:eid>/items', methods=['POST'])
+@login_required
+def api_admin_events_items_create(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_items_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    title = (d.get("title") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+    try:
+        qty = max(1, int(d.get("quantity") or 1))
+    except Exception:
+        return jsonify({"ok": False, "error": "الكمية يجب أن تكون رقماً"}), 400
+    notes = (d.get("notes") or "").strip() or None
+    assignee = d.get("assigned_to_user_id")
+    try:
+        assignee = int(assignee) if assignee not in (None, "", 0, "0") else None
+    except Exception:
+        assignee = None
+    assignee_name = _events_resolve_user_label(db, assignee) if assignee else None
+    try:
+        cur = db.execute(
+            "SELECT COALESCE(MAX(order_index), -1) FROM ev_items "
+            "WHERE event_id = ? AND is_deleted = 0", (eid,)).fetchone()
+        next_order = int((cur[0] if cur else -1) or -1) + 1
+    except Exception:
+        next_order = 0
+    try:
+        db.execute(
+            "INSERT INTO ev_items(event_id, title, quantity, notes, "
+            "                     assigned_to_user_id, assigned_to_name, order_index) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (eid, title, qty, notes, assignee, assignee_name, next_order))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] items insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        iid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        iid = None
+    try:
+        row = db.execute("SELECT * FROM ev_items WHERE id = ?", (iid,)).fetchone()
+        item = _events_items_row(dict(row)) if row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.items.create", target_type="ev_items", target_id=iid,
+               new_value={"event_id": eid, "title": title, "quantity": qty})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": iid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/items/<int:iid>', methods=['PATCH'])
+@login_required
+def api_admin_events_items_update(eid, iid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_items_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_items WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (iid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الأداة غير موجودة"}), 404
+    cur = dict(row)
+    d = request.get_json(silent=True) or {}
+    upd = {}
+    if "title" in d:
+        v = (d.get("title") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+        upd["title"] = v
+    if "quantity" in d:
+        try:
+            upd["quantity"] = max(1, int(d.get("quantity") or 1))
+        except Exception:
+            return jsonify({"ok": False, "error": "الكمية يجب أن تكون رقماً"}), 400
+    if "notes" in d:
+        upd["notes"] = (d.get("notes") or "").strip() or None
+    if "is_ready" in d:
+        try:
+            upd["is_ready"] = 1 if int(d.get("is_ready") or 0) else 0
+        except Exception:
+            upd["is_ready"] = 1 if d.get("is_ready") else 0
+    if "assigned_to_user_id" in d:
+        v = d.get("assigned_to_user_id")
+        try:
+            v = int(v) if v not in (None, "", 0, "0") else None
+        except Exception:
+            v = None
+        upd["assigned_to_user_id"] = v
+        upd["assigned_to_name"]    = _events_resolve_user_label(db, v) if v else None
+    if "order_index" in d:
+        try:
+            upd["order_index"] = max(0, int(d.get("order_index") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if not upd:
+        return jsonify({"ok": True, "id": iid, "item": _events_items_row(cur), "noop": True})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_items SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (iid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] items update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute("SELECT * FROM ev_items WHERE id = ?", (iid,)).fetchone()
+        item = _events_items_row(dict(new_row)) if new_row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.items.update", target_type="ev_items", target_id=iid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": iid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/items/<int:iid>', methods=['DELETE'])
+@login_required
+def api_admin_events_items_delete(eid, iid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_items_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_items WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (iid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الأداة غير موجودة"}), 404
+    try:
+        db.execute(
+            "UPDATE ev_items SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (iid,))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.items.delete", target_type="ev_items", target_id=iid,
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": iid})
+
+
+@app.route('/api/admin/events/assignees', methods=['GET'])
+@login_required
+def api_admin_events_assignees():
+    """Manager-only — list of admin/manager users for the assignee
+    dropdowns in items + tasks. Re-used by both 5.2 and 5.4."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, username, role FROM users "
+            "WHERE LOWER(COALESCE(role, '')) IN ('admin','manager') "
+            "ORDER BY username").fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        out.append({
+            "user_id": rd.get("id"),
+            "name":    rd.get("username") or "",
+            "role":    (rd.get("role") or "").lower(),
+        })
+    return jsonify({"ok": True, "assignees": out})
 
 
 # ── Schedule (3.3) ─────────────────────────────────────────────
