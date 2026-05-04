@@ -1058,39 +1058,6 @@ def init_db():
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_payments_reg_active "
                    "ON trip_payments(registration_id) WHERE is_deleted = 0")
     except Exception: pass
-    # ── trip_tasks: per-trip task ledger (stage 4). Three categories:
-    # 'before' / 'during' / 'after'. Default 20-task template seeded on
-    # trip creation; managers can add/edit/reorder/complete.
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_tasks(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        task_title TEXT NOT NULL,
-        task_description TEXT,
-        assigned_to_user_id INTEGER,
-        assigned_to_name TEXT,
-        due_date DATE,
-        due_time TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        completion_notes TEXT,
-        order_index INTEGER DEFAULT 0,
-        completed_at DATETIME,
-        completed_by_user_id INTEGER,
-        completed_by_name TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_by_user_id INTEGER,
-        is_deleted INTEGER DEFAULT 0,
-        is_from_template INTEGER DEFAULT 0,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_trip "
-               "ON trip_tasks(trip_id, is_deleted, status)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_assigned "
-               "ON trip_tasks(assigned_to_user_id, status)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_due "
-               "ON trip_tasks(due_date, status)")
     db.commit()
     db.close()
 
@@ -6598,60 +6565,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_payments_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trip_tasks_v1: per-trip task ledger (stage 4). See init_db()
-    # for column docs. The default 20-task template lives in
-    # _TRIP_TASK_TEMPLATE and is seeded on every new trip by
-    # _trip_seed_default_tasks (best-effort, non-fatal).
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_tasks(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        task_title TEXT NOT NULL,
-        task_description TEXT,
-        assigned_to_user_id INTEGER,
-        assigned_to_name TEXT,
-        due_date DATE,
-        due_time TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        completion_notes TEXT,
-        order_index INTEGER DEFAULT 0,
-        completed_at DATETIME,
-        completed_by_user_id INTEGER,
-        completed_by_name TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_by_user_id INTEGER,
-        is_deleted INTEGER DEFAULT 0,
-        is_from_template INTEGER DEFAULT 0,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (assigned_to_user_id) REFERENCES users(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_trip "
-                    "ON trip_tasks(trip_id, is_deleted, status)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_assigned "
-                    "ON trip_tasks(assigned_to_user_id, status)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_due "
-                    "ON trip_tasks(due_date, status)")
-    except Exception: pass
-    if "trip_tasks_v1" not in applied:
-        try:
-            db2.execute(
-                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                ("trip_tasks", "مهام الرحلات"),
-            )
-        except Exception:
-            try:
-                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                            ("trip_tasks", "مهام الرحلات"))
-            except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trip_tasks_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30134,7 +30047,6 @@ BUILT_IN_TABLE_LABELS = {
     "trips":             "الرحلات والفعاليات",
     "trip_registrations":"تسجيلات الرحلات",
     "trip_payments":     "دفعات الرحلات",
-    "trip_tasks":        "مهام الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32553,7 +32465,6 @@ _TBL_AUDIT_FEATURE = {
     "trips":                ("الرحلات والفعاليات",              "نظام الرحلات والفعاليات"),
     "trip_registrations":   ("تسجيلات الرحلات",                 "نظام الرحلات والفعاليات"),
     "trip_payments":        ("دفعات الرحلات",                   "نظام الرحلات والفعاليات"),
-    "trip_tasks":           ("مهام الرحلات",                    "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -65462,79 +65373,6 @@ def admin_trips_page():
 
 _TRIP_VALID_TYPES    = {"educational", "recreational", "religious"}
 _TRIP_VALID_STATUSES = {"active", "closed", "completed", "archived"}
-_TRIP_TASK_VALID_CATEGORIES = ("before", "during", "after")
-_TRIP_TASK_VALID_STATUSES   = ("pending", "in_progress", "completed", "cancelled")
-
-# Default 20-task template seeded on every new trip. Order matters —
-# we use the position in this list as the seed value of order_index.
-# is_from_template = 1 on every seeded row so the UI can hint that a
-# row came from the template (and the reload-template endpoint can
-# tell which titles are template-owned).
-_TRIP_TASK_TEMPLATE = [
-    # ── قبل الرحلة (before) ──────────────────────────────────────
-    {"category": "before", "title": "إعداد قائمة الطالبات النهائية"},
-    {"category": "before", "title": "التواصل مع شركة المواصلات وتأكيد الحجز"},
-    {"category": "before", "title": "حجز المكان أو شراء التذاكر"},
-    {"category": "before", "title": "تحضير وثائق الإذن للأهل"},
-    {"category": "before", "title": "جمع المبالغ من الطالبات"},
-    {"category": "before", "title": "إعداد قائمة الطعام والمشروبات"},
-    {"category": "before", "title": "إرسال رسالة التذكير للأهل قبل بيوم"},
-    {"category": "before", "title": "تحضير حقيبة الإسعافات الأولية"},
-    # ── أثناء الرحلة (during) ────────────────────────────────────
-    {"category": "during", "title": "التأكد من وصول كل الطالبات لنقطة التجمع"},
-    {"category": "during", "title": "إجراء النداء قبل الانطلاق"},
-    {"category": "during", "title": "متابعة الحضور عند الوصول"},
-    {"category": "during", "title": "متابعة الطالبات أثناء الفعالية"},
-    {"category": "during", "title": "التواصل مع الأهل في حالات الطوارئ"},
-    {"category": "during", "title": "إجراء النداء قبل العودة"},
-    # ── بعد الرحلة (after) ───────────────────────────────────────
-    {"category": "after",  "title": "التأكد من توزيع الطالبات على الأهل"},
-    {"category": "after",  "title": "كتابة تقرير الرحلة"},
-    {"category": "after",  "title": "إرسال رسالة شكر للأهل"},
-    {"category": "after",  "title": "جمع التقييمات من الأهل"},
-    {"category": "after",  "title": "إعداد التقرير المالي النهائي"},
-    {"category": "after",  "title": "أرشفة صور ومستندات الرحلة"},
-]
-
-
-def _trip_seed_default_tasks(db, trip_id, created_by_user_id):
-    """Insert the 20-task default template into trip_tasks for a new
-    trip. Best-effort — never raises, so a template seed failure
-    doesn't kill the trip creation. Returns the number of rows
-    inserted (0 on any failure)."""
-    if not trip_id:
-        return 0
-    inserted = 0
-    # Per-category running index so each category's order_index starts
-    # at 1 (sortable within category, not globally).
-    cat_idx = {c: 0 for c in _TRIP_TASK_VALID_CATEGORIES}
-    try:
-        for tpl in _TRIP_TASK_TEMPLATE:
-            cat = tpl.get("category") or ""
-            if cat not in _TRIP_TASK_VALID_CATEGORIES:
-                continue
-            cat_idx[cat] += 1
-            try:
-                db.execute(
-                    "INSERT INTO trip_tasks(trip_id, category, task_title, "
-                    "  status, order_index, created_by_user_id, is_from_template) "
-                    "VALUES(?, ?, ?, 'pending', ?, ?, 1)",
-                    (trip_id, cat, tpl.get("title") or "",
-                     cat_idx[cat], created_by_user_id),
-                )
-                inserted += 1
-            except Exception:
-                continue
-        db.commit()
-    except Exception as ex:
-        try: db.rollback()
-        except Exception: pass
-        import sys as _sys
-        print("[trips] task-template seed failed: " + str(ex), file=_sys.stderr)
-        return inserted
-    return inserted
-
-
 _TRIP_AR_WEEKDAYS = {
     0: "الإثنين", 1: "الثلاثاء", 2: "الأربعاء",
     3: "الخميس",  4: "الجمعة",   5: "السبت", 6: "الأحد",
@@ -65741,17 +65579,6 @@ def api_admin_trips_create():
         new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
     except Exception:
         new_id = None
-    # Seed the default 20-task template (best-effort, non-fatal). A
-    # template seed failure must NEVER kill the trip create — the
-    # admin can always run the reload-template endpoint later if the
-    # initial seed didn't run.
-    try:
-        if new_id:
-            _trip_seed_default_tasks(db, new_id, user.get("id"))
-    except Exception as _ex_seed:
-        import sys as _sys_seed
-        print("[trips] task-template seed exception: " + str(_ex_seed),
-              file=_sys_seed.stderr)
     try:
         _audit("trip.create", target_type="trip", target_id=new_id, new_value=body)
     except Exception:
