@@ -66812,6 +66812,13 @@ def admin_events_detail_page(eid):
         # Friendly redirect with a flash hash the list page can read.
         return redirect("/admin/events#not-found")
     html = ADMIN_EVENT_DETAIL_HTML.replace("{{EID}}", str(eid))
+    # Inline the active user id for the "مهامي" filter on the tasks
+    # tab — saves a round-trip and survives without a /api/me endpoint.
+    try:
+        uid = int((user.get("id") or 0))
+    except Exception:
+        uid = 0
+    html = html.replace("{{UID}}", str(uid))
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
@@ -67709,6 +67716,56 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-skel.h-card{height:84px;margin-bottom:14px;border-radius:14px;}
   .evd-skel.h-line{height:14px;margin:8px 0;}
   .evd-skel.h-row {height:48px;margin-bottom:8px;border-radius:10px;}
+  /* Tasks panel (5.4) */
+  .evd-task-progress{background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #1565C0;}
+  .evd-task-progress h3{margin:0 0 8px;font-size:1rem;color:#0d47a1;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .evd-task-progress .pct{font-size:1.1rem;font-variant-numeric:tabular-nums;}
+  .evd-task-progress .bar{height:14px;background:#eef0f3;border-radius:8px;overflow:hidden;}
+  .evd-task-progress .bar .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#1565C0,#43a047);transition:width .8s cubic-bezier(.2,.8,.2,1);}
+  .evd-task-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;}
+  .evd-task-filters{display:flex;flex-wrap:wrap;gap:6px;margin-inline-start:auto;}
+  .evd-task-chip{background:#eef0f3;border:1.5px solid transparent;color:#555;border-radius:99px;padding:6px 14px;font-weight:800;font-size:.83rem;cursor:pointer;transition:.15s;}
+  .evd-task-chip:hover{background:#dde2e8;}
+  .evd-task-chip.is-on{background:#1D9E75;color:#fff;border-color:#1D9E75;}
+  .evd-task-overdue-pill{background:#c62828;color:#fff;font-weight:800;font-size:.78rem;padding:3px 10px;border-radius:99px;}
+  .evd-task-cat{background:#fff;border-radius:14px;padding:14px 16px 10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--tc,#9e9e9e);}
+  .evd-task-cat[data-cat="before"]{--tc:#1D9E75;}
+  .evd-task-cat[data-cat="during"]{--tc:#E65100;}
+  .evd-task-cat[data-cat="after"] {--tc:#6B3FA0;}
+  .evd-task-cat-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .evd-task-cat-h h4{margin:0;color:var(--tc);font-size:1rem;font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-task-cat-h .ratio{font-size:.85rem;color:#666;font-weight:700;}
+  .evd-task-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
+  .evd-task-row:last-child{border-bottom:0;}
+  .evd-task-row.is-leaving{animation:evdItemIn .18s ease reverse both;}
+  .evd-task-row.is-overdue{border-inline-start:3px solid #c62828;padding-inline-start:8px;}
+  .evd-task-row.is-completed{opacity:0.65;}
+  .evd-task-row.is-cancelled{opacity:0.5;}
+  .evd-task-row.is-cancelled .title-text{text-decoration:line-through;}
+  .evd-task-row .icon-btn{width:30px;height:30px;border-radius:8px;border:2px solid #c4cdd5;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;flex-shrink:0;transition:.15s;}
+  .evd-task-row .icon-btn:hover{border-color:#1D9E75;background:#e6f7ee;}
+  .evd-task-row .icon-btn[data-st="completed"]{background:#1D9E75;border-color:#1D9E75;color:#fff;}
+  .evd-task-row .icon-btn[data-st="in_progress"]{background:#fff8e1;border-color:#E65100;color:#E65100;}
+  .evd-task-row .icon-btn[data-st="cancelled"]{background:#ffebee;border-color:#c62828;color:#c62828;}
+  .evd-task-body{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .evd-task-body .title-text{font-weight:700;color:#222;}
+  .evd-task-body .desc{font-size:.82rem;color:#666;}
+  .evd-task-body .meta{font-size:.78rem;color:#777;display:flex;flex-wrap:wrap;gap:10px;}
+  .evd-task-body .meta .unassigned{color:#bbb;font-style:italic;}
+  .evd-task-body .meta .overdue-badge{color:#c62828;font-weight:800;}
+  .evd-task-body .completion{font-size:.74rem;color:#1D9E75;font-weight:700;}
+  .evd-task-row .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-task-row:hover .acts,
+  .evd-task-row:focus-within .acts{opacity:1;}
+  .evd-task-row .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
+  .evd-task-row .acts button:hover{background:#f0f3f7;color:#0d47a1;}
+  .evd-task-row .acts button.del:hover{color:#c62828;background:#ffebee;}
+  .evd-task-cat-empty{font-size:.84rem;color:#999;font-style:italic;padding:6px 0;}
+  .evd-task-celebrate{display:inline-block;animation:evdCelebrate 1.6s infinite;}
+  /* Big confetti when ALL tasks complete */
+  @keyframes evdConfettiBoom{0%{opacity:0;transform:scale(0.5);}30%{opacity:1;transform:scale(1.05);}100%{opacity:1;transform:scale(1);}}
+  .evd-task-allDone{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border-radius:14px;padding:18px;text-align:center;font-weight:800;margin-bottom:14px;animation:evdConfettiBoom .6s ease;}
+  .evd-task-allDone .em{font-size:2rem;display:block;margin-bottom:6px;}
   /* Items panel (5.2) */
   .evd-item-progress{background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--ipc,#1D9E75);}
   .evd-item-progress.is-low {--ipc:#c62828;}
@@ -67873,6 +67930,10 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-cost-donut svg{width:140px;height:140px;}
     .evd-item-row{grid-template-columns:auto 1fr;}
     .evd-item-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-task-row{grid-template-columns:auto 1fr;}
+    .evd-task-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-task-toolbar{flex-direction:column;align-items:stretch;}
+    .evd-task-filters{margin-inline-start:0;justify-content:flex-start;}
   }
 </style></head><body>
 
@@ -67956,7 +68017,15 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="tasks"    role="tabpanel"><div class="evd-stub"><div class="em">✅</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Tasks panel (5.4) -->
+  <section class="evd-panel" data-panel="tasks" role="tabpanel">
+    <div class="evd-task" id="evd-task-root">
+      <div class="evd-skel h-card" style="height:60px;"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-row"></div>
+      <div class="evd-skel h-row"></div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="students" role="tabpanel"><div class="evd-stub"><div class="em">👥</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="messages" role="tabpanel"><div class="evd-stub"><div class="em">💬</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="print"    role="tabpanel"><div class="evd-stub"><div class="em">🖨️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -68018,6 +68087,50 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
         <button type="submit" class="evd-btn evd-btn-edit" id="evd-edit-save">💾 حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Task add/edit modal (5.4) -->
+<div class="evd-mb" id="evd-task-mb" role="dialog" aria-modal="true" aria-labelledby="evd-task-title">
+  <div class="evd-modal" style="max-width:520px;">
+    <h2 id="evd-task-title">✅ مهمة جديدة</h2>
+    <form id="evd-task-form">
+      <input type="hidden" id="tf-id"/>
+      <div class="row">
+        <label>القسم *</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <label class="evd-task-chip" style="cursor:pointer;"><input type="radio" name="tf-cat" value="before" style="margin-inline-end:4px;"/> 🟢 قبل</label>
+          <label class="evd-task-chip" style="cursor:pointer;"><input type="radio" name="tf-cat" value="during" style="margin-inline-end:4px;"/> 🟡 أثناء</label>
+          <label class="evd-task-chip" style="cursor:pointer;"><input type="radio" name="tf-cat" value="after"  style="margin-inline-end:4px;"/> 🟣 بعد</label>
+        </div>
+      </div>
+      <div class="row">
+        <label for="tf-title">العنوان *</label>
+        <input id="tf-title" type="text" required maxlength="200"/>
+      </div>
+      <div class="row">
+        <label for="tf-desc">الوصف</label>
+        <textarea id="tf-desc" maxlength="600"></textarea>
+      </div>
+      <div class="row">
+        <label for="tf-assignee">المسؤولة</label>
+        <select id="tf-assignee"><option value="">— لم يُحدد —</option></select>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="tf-date">تاريخ الاستحقاق</label>
+          <input id="tf-date" type="date"/>
+        </div>
+        <div class="row">
+          <label for="tf-time">الوقت</label>
+          <input id="tf-time" type="time"/>
+        </div>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-task-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-task-save">✨ حفظ</button>
       </div>
     </form>
   </div>
@@ -68145,6 +68258,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
 
 <script>
 var EID = parseInt('{{EID}}', 10);
+window._EV_USER = {id: parseInt('{{UID}}', 10) || null};
 var EVENT_DATA = null;
 var STATUS_LABELS = {
   planning:  '\u{1F4DD} قيد التخطيط',
@@ -68195,6 +68309,7 @@ function evdActivateTab(name){
   if (name === 'schedule' && !SCHED_LOADED) evdLoadSchedule();
   if (name === 'costs'    && !COST_LOADED)  evdLoadCosts();
   if (name === 'items'    && !ITEM_LOADED)  evdLoadItems();
+  if (name === 'tasks'    && !TASK_LOADED)  evdLoadTasks();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -68629,6 +68744,369 @@ function evdSchedDelete(sid){
       if (row) row.classList.remove('is-leaving');
       evdToast('خطأ في الاتصال', 'error');
     });
+}
+
+/* ── Tasks panel (5.4) ───────────────────────────────────────── */
+var TASK_DATA = {before:[], during:[], after:[]};
+var TASK_SUMMARY = null;
+var TASK_LOADED = false;
+var TASK_FILTER = 'all';
+
+var TASK_STATUS_LABELS = {
+  pending:     'قيد الانتظار',
+  in_progress: 'جارية',
+  completed:   'مكتملة',
+  cancelled:   'ملغاة'
+};
+var TASK_CAT_META = {
+  before: {label: '🟢 قبل الرحلة', emoji:'🟢'},
+  during: {label: '🟡 أثناء الرحلة', emoji:'🟡'},
+  after:  {label: '🟣 بعد الرحلة', emoji:'🟣'}
+};
+
+function evdLoadTasks(){
+  return fetch('/api/admin/events/' + EID + '/tasks')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
+      TASK_DATA = j.tasks || TASK_DATA;
+      TASK_SUMMARY = j.summary || {};
+      ASSIGNEES = j.available_assignees || ASSIGNEES || [];
+      TASK_LOADED = true;
+      evdRenderTasks();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdTaskIsOverdue(t){
+  if (!t.due_date) return false;
+  if (t.status === 'completed' || t.status === 'cancelled') return false;
+  var due = String(t.due_date).substring(0, 10);
+  var today = (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  })();
+  return due < today;
+}
+
+function evdTaskStatusIcon(st){
+  if (st === 'completed')   return '✓';
+  if (st === 'in_progress') return '⏳';
+  if (st === 'cancelled')   return '✕';
+  return '';
+}
+function evdTaskNextStatus(cur){
+  // Click cycle: pending → completed → pending. (Other transitions
+  // are accessible via the edit modal.)
+  if (cur === 'completed') return 'pending';
+  return 'completed';
+}
+
+function evdTaskMatchesFilter(t){
+  if (TASK_FILTER === 'all') return true;
+  if (TASK_FILTER === 'mine'){
+    var u = (window._EV_USER && window._EV_USER.id) || null;
+    return u && t.assigned_to_user_id && parseInt(t.assigned_to_user_id, 10) === u;
+  }
+  if (TASK_FILTER === 'overdue') return evdTaskIsOverdue(t);
+  if (TASK_FILTER === 'today'){
+    var t2 = new Date();
+    var iso = t2.getFullYear() + '-' + String(t2.getMonth()+1).padStart(2,'0') + '-' + String(t2.getDate()).padStart(2,'0');
+    return (t.due_date || '').substring(0,10) === iso;
+  }
+  return true;
+}
+
+function evdTaskSortInPlace(arr){
+  // Status order: pending → in_progress → completed → cancelled.
+  var order = {pending:0, in_progress:1, completed:2, cancelled:3};
+  arr.sort(function(a, b){
+    var sa = order[a.status] || 0, sb = order[b.status] || 0;
+    if (sa !== sb) return sa - sb;
+    // Within same status, overdue first.
+    var oa = evdTaskIsOverdue(a) ? 0 : 1;
+    var ob = evdTaskIsOverdue(b) ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    // Then by due_date asc (empty last).
+    var da = a.due_date || '￿';
+    var db = b.due_date || '￿';
+    if (da !== db) return da < db ? -1 : 1;
+    // Finally by order_index.
+    return (a.order_index || 0) - (b.order_index || 0);
+  });
+}
+
+function evdRenderTasks(){
+  var root = document.getElementById('evd-task-root');
+  if (!root) return;
+  var s = TASK_SUMMARY || {};
+  var total = parseInt(s.total || 0, 10);
+  var completed = parseInt(s.completed || 0, 10);
+  var pct = parseFloat(s.pct_complete || 0);
+  var overdue = parseInt(s.overdue || 0, 10);
+
+  var celebrate = (total > 0 && completed === total)
+    ? '<div class="evd-task-allDone"><span class="em">🎊</span>كل المهام مكتملة!</div>'
+    : '';
+
+  var progressHTML = ''
+    + '<div class="evd-task-progress">'
+    + '  <h3><span>📊 التقدم العام</span><span class="pct">' + completed + '/' + total + ' (' + pct.toFixed(0) + '%)</span></h3>'
+    + '  <div class="bar"><div class="fill" style="width:' + pct + '%;"></div></div>'
+    + '</div>';
+
+  var filterChips = [
+    {key:'all',     label:'الكل'},
+    {key:'mine',    label:'مهامي'},
+    {key:'overdue', label:'متأخرة'},
+    {key:'today',   label:'اليوم'}
+  ];
+  var filterHTML = filterChips.map(function(f){
+    var on = TASK_FILTER === f.key ? ' is-on' : '';
+    var n  = '';
+    if (f.key === 'overdue' && overdue > 0) n = ' <span class="evd-task-overdue-pill">' + overdue + '</span>';
+    return '<button type="button" class="evd-task-chip' + on + '" data-task-filter="' + f.key + '">' + evdEsc(f.label) + n + '</button>';
+  }).join('');
+
+  var toolbarHTML = ''
+    + '<div class="evd-task-toolbar">'
+    + '  <button type="button" class="evd-btn evd-btn-edit" id="evd-task-add">+ مهمة جديدة</button>'
+    + '  <button type="button" class="evd-btn" id="evd-task-reload">🔄 إعادة تحميل القالب</button>'
+    + '  <div class="evd-task-filters">' + filterHTML + '</div>'
+    + '</div>';
+
+  var catsHTML = '';
+  ['before','during','after'].forEach(function(cat){
+    var arr = (TASK_DATA[cat] || []).slice();
+    evdTaskSortInPlace(arr);
+    var visible = arr.filter(evdTaskMatchesFilter);
+    var meta = TASK_CAT_META[cat];
+    var catSum = ((s.by_category || {})[cat] || {});
+    var catTotal = parseInt(catSum.total || 0, 10);
+    var catDone  = parseInt(catSum.completed || 0, 10);
+    var catCele  = (catTotal > 0 && catDone === catTotal)
+                     ? '<span class="evd-task-celebrate">🎉</span>' : '';
+    var rowsHTML = '';
+    if (!visible.length){
+      rowsHTML = '<div class="evd-task-cat-empty">لا توجد مهام مطابقة في هذا القسم</div>';
+    } else {
+      rowsHTML = visible.map(evdTaskRowHTML).join('');
+    }
+    catsHTML += '<div class="evd-task-cat" data-cat="' + cat + '">'
+              + '  <div class="evd-task-cat-h">'
+              + '    <h4>' + evdEsc(meta.label) + ' ' + catCele + '</h4>'
+              + '    <span class="ratio">' + catDone + '/' + catTotal + '</span>'
+              + '  </div>'
+              + rowsHTML
+              + '</div>';
+  });
+
+  root.innerHTML = celebrate + progressHTML + toolbarHTML + catsHTML;
+
+  document.getElementById('evd-task-add').addEventListener('click', function(){ evdOpenTaskAdd('before'); });
+  document.getElementById('evd-task-reload').addEventListener('click', evdTaskReloadTemplate);
+  root.querySelectorAll('button[data-task-filter]').forEach(function(b){
+    b.addEventListener('click', function(){
+      TASK_FILTER = b.getAttribute('data-task-filter');
+      evdRenderTasks();
+    });
+  });
+  // Status toggle
+  root.querySelectorAll('button[data-task-toggle]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var tid = parseInt(b.getAttribute('data-task-toggle'), 10);
+      var cur = b.getAttribute('data-task-cur') || 'pending';
+      var next = evdTaskNextStatus(cur);
+      evdTaskSetStatus(tid, next);
+    });
+  });
+  // Edit / delete
+  root.querySelectorAll('button[data-task-edit]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var tid = parseInt(b.getAttribute('data-task-edit'), 10);
+      var t = evdTaskFind(tid);
+      if (t) evdOpenTaskEdit(t);
+    });
+  });
+  root.querySelectorAll('button[data-task-del]').forEach(function(b){
+    b.addEventListener('click', function(){
+      evdTaskDelete(parseInt(b.getAttribute('data-task-del'), 10));
+    });
+  });
+}
+
+function evdTaskRowHTML(t){
+  var st = (t.status || 'pending').toLowerCase();
+  var assignee = t.assigned_to_name
+    ? ('<span>👤 ' + evdEsc(t.assigned_to_name) + '</span>')
+    : '<span class="unassigned">👤 (لم يُحدد)</span>';
+  var due = '';
+  if (t.due_date){
+    var dueLabel = evdFmtDate(t.due_date);
+    var overdue = evdTaskIsOverdue(t);
+    var icon = overdue ? '⚠️' : '📅';
+    var cls  = overdue ? ' overdue-badge' : '';
+    due = '<span class="' + cls + '">' + icon + ' ' + evdEsc(dueLabel)
+        + (t.due_time ? (' ⏰ ' + evdEsc(t.due_time)) : '') + '</span>';
+  }
+  var completion = '';
+  if (st === 'completed' && t.completed_at){
+    completion = '<div class="completion">✓ مكتملة'
+               + (t.completed_by_name ? ' — ' + evdEsc(t.completed_by_name) : '')
+               + '</div>';
+  }
+  var desc = t.description ? '<div class="desc">' + evdEsc(t.description) + '</div>' : '';
+  var stCls = ''
+    + (st === 'completed'   ? ' is-completed' : '')
+    + (st === 'cancelled'   ? ' is-cancelled' : '')
+    + (evdTaskIsOverdue(t)  ? ' is-overdue'   : '');
+  return '<div class="evd-task-row' + stCls + '" data-tid="' + (t.id|0) + '">'
+       + '  <button type="button" class="icon-btn" data-st="' + st + '" data-task-toggle="' + (t.id|0) + '" data-task-cur="' + st + '" title="تبديل الحالة" aria-label="تبديل الحالة">' + evdTaskStatusIcon(st) + '</button>'
+       + '  <div class="evd-task-body">'
+       + '    <div class="title-text">' + evdEsc(t.title) + '</div>'
+       + desc
+       + '    <div class="meta">' + assignee + due + '</div>'
+       + completion
+       + '  </div>'
+       + '  <div class="acts">'
+       + '    <button type="button" data-task-edit="' + (t.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+       + '    <button type="button" class="del" data-task-del="' + (t.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+       + '  </div>'
+       + '</div>';
+}
+
+function evdTaskFind(tid){
+  for (var k in TASK_DATA){
+    if (!TASK_DATA.hasOwnProperty(k)) continue;
+    for (var i = 0; i < TASK_DATA[k].length; i++){
+      if (TASK_DATA[k][i].id === tid) return TASK_DATA[k][i];
+    }
+  }
+  return null;
+}
+
+function evdTaskSetStatus(tid, status){
+  fetch('/api/admin/events/' + EID + '/tasks/' + tid, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status: status})
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
+    evdLoadTasks();
+  })
+  .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdOpenTaskAdd(category){
+  document.getElementById('evd-task-title').textContent = '✅ مهمة جديدة';
+  document.getElementById('tf-id').value    = '';
+  document.querySelectorAll('input[name="tf-cat"]').forEach(function(r){
+    r.checked = (r.value === (category || 'before'));
+  });
+  document.getElementById('tf-title').value = '';
+  document.getElementById('tf-desc').value  = '';
+  document.getElementById('tf-date').value  = '';
+  document.getElementById('tf-time').value  = '';
+  evdLoadAssignees().then(function(){
+    evdRenderAssigneeOptions(document.getElementById('tf-assignee'), null);
+  });
+  document.getElementById('evd-task-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('tf-title').focus(); }, 50);
+}
+
+function evdOpenTaskEdit(t){
+  document.getElementById('evd-task-title').textContent = '✏️ تعديل المهمة';
+  document.getElementById('tf-id').value    = t.id;
+  document.querySelectorAll('input[name="tf-cat"]').forEach(function(r){
+    r.checked = (r.value === (t.category || 'before'));
+  });
+  document.getElementById('tf-title').value = t.title || '';
+  document.getElementById('tf-desc').value  = t.description || '';
+  document.getElementById('tf-date').value  = (t.due_date || '').substring(0, 10);
+  document.getElementById('tf-time').value  = t.due_time || '';
+  evdLoadAssignees().then(function(){
+    evdRenderAssigneeOptions(document.getElementById('tf-assignee'), t.assigned_to_user_id);
+  });
+  document.getElementById('evd-task-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('tf-title').focus(); }, 50);
+}
+
+function evdCloseTask(){
+  document.getElementById('evd-task-mb').classList.remove('is-open');
+}
+
+function evdSubmitTask(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-task-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var tid = parseInt(document.getElementById('tf-id').value || '0', 10);
+  var cat = '';
+  document.querySelectorAll('input[name="tf-cat"]').forEach(function(r){ if (r.checked) cat = r.value; });
+  var assigneeRaw = document.getElementById('tf-assignee').value;
+  var body = {
+    category:    cat || 'before',
+    title:       document.getElementById('tf-title').value.trim(),
+    description: document.getElementById('tf-desc').value.trim(),
+    due_date:    document.getElementById('tf-date').value || '',
+    due_time:    document.getElementById('tf-time').value || '',
+    assigned_to_user_id: assigneeRaw ? parseInt(assigneeRaw, 10) : null
+  };
+  var url, method;
+  if (tid){ url = '/api/admin/events/' + EID + '/tasks/' + tid; method = 'PATCH'; }
+  else    { url = '/api/admin/events/' + EID + '/tasks';        method = 'POST';  }
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+    evdCloseTask();
+    evdToast(tid ? 'تم تحديث المهمة' : 'تم إضافة المهمة', 'success');
+    evdLoadTasks();
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdTaskDelete(tid){
+  if (!tid) return;
+  if (!confirm('هل تريدين حذف هذه المهمة؟')) return;
+  var row = document.querySelector('.evd-task-row[data-tid="' + tid + '"]');
+  if (row) row.classList.add('is-leaving');
+  fetch('/api/admin/events/' + EID + '/tasks/' + tid, {method:'DELETE'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        if (row) row.classList.remove('is-leaving');
+        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
+      }
+      evdToast('تم الحذف', 'success');
+      setTimeout(evdLoadTasks, 180);
+    })
+    .catch(function(){
+      if (row) row.classList.remove('is-leaving');
+      evdToast('خطأ في الاتصال', 'error');
+    });
+}
+
+function evdTaskReloadTemplate(){
+  if (!confirm('سيتم إضافة المهام الافتراضية المفقودة فقط. متابعة؟')) return;
+  fetch('/api/admin/events/' + EID + '/tasks/reload-template', {method:'POST'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحميل', 'error'); return; }
+      var n = parseInt(o.j.added_count || 0, 10);
+      evdToast(n > 0 ? ('تم إضافة ' + n + ' مهام جديدة') : 'كل المهام موجودة', 'success');
+      evdLoadTasks();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
 /* ── Items panel (5.2) ───────────────────────────────────────── */
@@ -69344,6 +69822,12 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-item-form').addEventListener('submit', evdSubmitItem);
   document.getElementById('evd-item-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseItem();
+  });
+  // Task modal wires (5.4)
+  document.getElementById('evd-task-cancel').addEventListener('click', evdCloseTask);
+  document.getElementById('evd-task-form').addEventListener('submit', evdSubmitTask);
+  document.getElementById('evd-task-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseTask();
   });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
