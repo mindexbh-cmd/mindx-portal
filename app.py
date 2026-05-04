@@ -67143,10 +67143,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <button class="tdd-btn tdd-btn-primary" id="tdd-bulk-present">
       <span>✅</span><span>تحديد كل غير المرصودين كحاضرات</span>
     </button>
+    <button class="tdd-btn tdd-btn-secondary" id="tdd-call-unmarked" type="button">
+      <span>📞</span><span>الاتصال بغير الواصلات (<span id="tdd-call-count">0</span>)</span>
+    </button>
     <a class="tdd-btn tdd-btn-secondary" id="tdd-day-report-link" href="#" target="_blank" rel="noopener">
       <span>📤</span><span>تقرير الحضور</span>
     </a>
   </div>
+  <div id="tdd-call-list" class="tdd-list" hidden style="margin-bottom:14px;"></div>
 
   <input type="search" class="tdd-search" id="tdd-search" placeholder="🔍 ابحثي عن طالبة...">
 
@@ -67262,8 +67266,42 @@ function renderTrip(){
   if (t.return_time)    meta.push('عودة: ' + t.return_time);
   if (t.meeting_point)  meta.push('📍 ' + t.meeting_point);
   document.getElementById('tdd-meta').textContent = meta.join(' • ');
-  // Countdown
   setupCountdown(t.trip_date, t.departure_time);
+  // Call-unmarked count badge — uses unmarked students with a phone.
+  var unmarked = (DATA.students || []).filter(function(s){
+    return !s.attendance_status && (s.parent_phone || '').trim();
+  });
+  var cc = document.getElementById('tdd-call-count');
+  if (cc) cc.textContent = unmarked.length;
+}
+function toggleCallUnmarked(){
+  var box = document.getElementById('tdd-call-list');
+  if (!box) return;
+  if (!box.hidden){ box.hidden = true; box.innerHTML=''; return; }
+  var unmarked = ((DATA && DATA.students) || []).filter(function(s){
+    return !s.attendance_status && (s.parent_phone || '').trim();
+  });
+  if (!unmarked.length){
+    box.innerHTML = '<div class="tdd-empty">جميع المسجَّلات مرصودات أو بلا أرقام تواصل.</div>';
+    box.hidden = false;
+    return;
+  }
+  box.innerHTML = unmarked.map(function(s){
+    var phone = (s.parent_phone || '').replace(/\s/g, '');
+    return ''
+      + '<a class="tdd-row" href="tel:' + esc(phone) + '" '
+      +    'style="text-decoration:none;color:inherit;display:flex;'
+      +    'flex-direction:row;align-items:center;gap:14px;">'
+      + '  <span style="font-size:1.6rem;">📞</span>'
+      + '  <span style="flex:1;">'
+      + '    <div class="nm">' + esc(s.student_name) + '</div>'
+      + '    <div class="meta"><span>📞 ' + esc(s.parent_phone) + '</span>'
+      + (s.parent_name ? '<span>— ' + esc(s.parent_name) + '</span>' : '') + '</div>'
+      + '  </span>'
+      + '  <span style="color:#26A69A;font-weight:900;">←</span>'
+      + '</a>';
+  }).join('');
+  box.hidden = false;
 }
 function setupCountdown(date, time){
   if (!date) return;
@@ -67378,6 +67416,9 @@ document.addEventListener('DOMContentLoaded', function(){
       }, 300);
     });
   }
+  // Call unmarked toggle
+  var cb = document.getElementById('tdd-call-unmarked');
+  if (cb) cb.addEventListener('click', toggleCallUnmarked);
   // Bulk
   var bb = document.getElementById('tdd-bulk-present');
   if (bb) bb.addEventListener('click', function(){
