@@ -66837,6 +66837,51 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-skel.h-card{height:84px;margin-bottom:14px;border-radius:14px;}
   .evd-skel.h-line{height:14px;margin:8px 0;}
   .evd-skel.h-row {height:48px;margin-bottom:8px;border-radius:10px;}
+  /* Costs panel (4.3) */
+  .evd-cost-calc{background:linear-gradient(135deg,#fff8e1,#ffe9b3);border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 4px 14px rgba(230,150,0,0.15);border-right:5px solid #BA7517;}
+  .evd-cost-calc h3{margin:0 0 12px;font-size:1.05rem;color:#7a4a00;font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-cost-calc .row{display:grid;grid-template-columns:170px 1fr;gap:8px 14px;padding:7px 0;border-bottom:1px dashed rgba(186,117,23,0.25);font-size:.94rem;}
+  .evd-cost-calc .row:last-child{border-bottom:0;}
+  .evd-cost-calc .lab{color:#5d3a00;font-weight:700;}
+  .evd-cost-calc .val{color:#222;font-weight:800;font-variant-numeric:tabular-nums;}
+  .evd-cost-calc .val.big{font-size:1.15rem;color:#0d47a1;}
+  .evd-cost-warn{margin:12px 0 4px;padding:11px 14px;border-radius:10px;font-weight:800;display:flex;align-items:center;gap:8px;}
+  .evd-cost-warn.is-bad {background:#ffebee;color:#c62828;border:1.5px solid #ef9a9a;}
+  .evd-cost-warn.is-mid {background:#fff8e1;color:#ef6c00;border:1.5px solid #ffcc80;}
+  .evd-cost-warn.is-good{background:#e6f7ee;color:#1D9E75;border:1.5px solid #c6ecd6;}
+  .evd-cost-sugg{margin-top:14px;background:rgba(255,255,255,0.6);padding:12px 14px;border-radius:12px;}
+  .evd-cost-sugg h4{margin:0 0 8px;font-size:.94rem;color:#5d3a00;font-weight:900;}
+  .evd-cost-sugg-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(186,117,23,0.2);}
+  .evd-cost-sugg-row:last-child{border-bottom:0;}
+  .evd-cost-sugg-row .name{color:#444;font-weight:700;font-size:.9rem;}
+  .evd-cost-sugg-row .price{font-weight:900;color:#0d47a1;font-variant-numeric:tabular-nums;font-size:.96rem;}
+  .evd-cost-sugg-row button{background:#fff;border:1.5px solid #1D9E75;color:#1D9E75;padding:5px 12px;border-radius:8px;font-weight:800;font-size:.83rem;cursor:pointer;transition:.15s;}
+  .evd-cost-sugg-row button:hover{background:#1D9E75;color:#fff;}
+  .evd-cost-list{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #1565C0;}
+  .evd-cost-list h3{margin:0 0 10px;font-size:1rem;color:#0d47a1;font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-cost-row{display:grid;grid-template-columns:1fr 130px auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
+  .evd-cost-row:last-of-type{border-bottom:0;}
+  .evd-cost-row.is-leaving{animation:evdItemIn .18s ease reverse both;}
+  .evd-cost-row .name{color:#222;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .evd-cost-row .name .badge-default{font-size:.66rem;color:#888;background:#eef0f3;padding:1px 6px;border-radius:99px;font-weight:700;}
+  .evd-cost-row .amt{display:flex;justify-content:flex-end;align-items:center;gap:4px;}
+  .evd-cost-row .amt input{width:90px;padding:5px 8px;border:1.5px solid #1565C0;border-radius:8px;font-family:inherit;font-size:.94rem;text-align:end;font-variant-numeric:tabular-nums;}
+  .evd-cost-row .amt .display{font-weight:800;color:#0d47a1;font-variant-numeric:tabular-nums;cursor:pointer;padding:5px 8px;border-radius:6px;transition:.15s;}
+  .evd-cost-row .amt .display:hover{background:#e3f2fd;}
+  .evd-cost-row .amt .saved{color:#1D9E75;opacity:0;transition:opacity .25s;}
+  .evd-cost-row .amt .saved.is-show{opacity:1;}
+  .evd-cost-row .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-cost-row:hover .acts,
+  .evd-cost-row:focus-within .acts{opacity:1;}
+  .evd-cost-row .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
+  .evd-cost-row .acts button:hover{background:#f0f3f7;color:#0d47a1;}
+  .evd-cost-row .acts button.del:hover{color:#c62828;background:#ffebee;}
+  .evd-cost-total{display:grid;grid-template-columns:1fr auto;align-items:center;padding:12px 0 4px;font-weight:900;color:#0d47a1;font-size:1.04rem;border-top:2px solid #1565C0;margin-top:6px;font-variant-numeric:tabular-nums;}
+  .evd-cost-add{display:flex;justify-content:center;margin-top:12px;}
+  .evd-cost-add button{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border:none;padding:8px 22px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;}
+  .evd-cost-add button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(29,158,117,0.3);}
+  .evd-cost-empty{text-align:center;padding:30px 18px;color:#888;}
+  .evd-cost-empty .em{font-size:2.6rem;margin-bottom:6px;}
   /* Schedule panel (3.4) */
   .evd-sched-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
   /* Item enter/leave (3.5) */
@@ -66897,6 +66942,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-sched-item{grid-template-columns:auto 1fr;}
     .evd-sched-item .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
     .evd-sched-edit .grid3{grid-template-columns:1fr;}
+    .evd-cost-calc .row{grid-template-columns:1fr;gap:2px;}
+    .evd-cost-calc .lab{font-size:.78rem;}
+    .evd-cost-row{grid-template-columns:1fr auto;}
+    .evd-cost-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-cost-sugg-row{grid-template-columns:1fr auto;gap:6px;}
+    .evd-cost-sugg-row button{grid-column:1 / -1;justify-self:end;}
   }
 </style></head><body>
 
@@ -66963,7 +67014,15 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="costs"    role="tabpanel"><div class="evd-stub"><div class="em">💰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Costs panel (4.3) -->
+  <section class="evd-panel" data-panel="costs" role="tabpanel">
+    <div class="evd-cost" id="evd-cost-root">
+      <div class="evd-skel h-card" style="height:240px;"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-row"></div>
+      <div class="evd-skel h-row"></div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="items"    role="tabpanel"><div class="evd-stub"><div class="em">🛠️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="tasks"    role="tabpanel"><div class="evd-stub"><div class="em">✅</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="students" role="tabpanel"><div class="evd-stub"><div class="em">👥</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -67027,6 +67086,32 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
         <button type="submit" class="evd-btn evd-btn-edit" id="evd-edit-save">💾 حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Cost add/edit modal (4.3) -->
+<div class="evd-mb" id="evd-cost-mb" role="dialog" aria-modal="true" aria-labelledby="evd-cost-title">
+  <div class="evd-modal" style="max-width:440px;">
+    <h2 id="evd-cost-title">💰 صنف جديد</h2>
+    <form id="evd-cost-form">
+      <input type="hidden" id="cf-id"/>
+      <div class="row">
+        <label for="cf-label">التسمية *</label>
+        <input id="cf-label" type="text" required maxlength="120" placeholder="مثلاً: مصاريف إضافية"/>
+      </div>
+      <div class="row">
+        <label for="cf-amount">المبلغ (د.ب) *</label>
+        <input id="cf-amount" type="number" min="0" step="0.001" required/>
+      </div>
+      <div class="row">
+        <label for="cf-notes">ملاحظات</label>
+        <textarea id="cf-notes" maxlength="400"></textarea>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-cost-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-cost-save">✨ حفظ</button>
       </div>
     </form>
   </div>
@@ -67144,6 +67229,7 @@ function evdActivateTab(name){
   });
   // Lazy-load tab data the first time the user lands on it.
   if (name === 'schedule' && !SCHED_LOADED) evdLoadSchedule();
+  if (name === 'costs'    && !COST_LOADED)  evdLoadCosts();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -67580,6 +67666,296 @@ function evdSchedDelete(sid){
     });
 }
 
+/* ── Costs panel (4.3) ───────────────────────────────────────── */
+var COST_DATA = [];
+var COST_SUMMARY = null;
+var COST_LOADED = false;
+
+function evdLoadCosts(){
+  return fetch('/api/admin/events/' + EID + '/costs')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
+      COST_DATA = j.costs || [];
+      COST_SUMMARY = j.summary || {};
+      COST_LOADED = true;
+      evdRenderCosts();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdFmtBHD(v){ return Number(v || 0).toFixed(3) + ' د.ب'; }
+
+function evdRenderCosts(){
+  var root = document.getElementById('evd-cost-root');
+  if (!root) return;
+  var s = COST_SUMMARY || {};
+  var total = parseFloat(s.total_cost || 0);
+  var price = parseFloat(s.current_price || 0);
+  var costMax = parseFloat(s.cost_per_student_max || 0);
+  var revenue = parseFloat(s.expected_revenue || 0);
+  var profit = parseFloat(s.profit_or_loss || 0);
+  var cap = parseInt(s.max_students || 0, 10);
+  var registered = parseInt(s.registered_count || 0, 10);
+
+  // Warning band
+  var warnHTML = '';
+  if (s.warning){
+    var cls = (price < costMax && total > 0) ? 'is-bad'
+            : (price < costMax * 1.05 ? 'is-mid' : 'is-mid');
+    var icon = (cls === 'is-bad') ? '🚨' : '⚠️';
+    warnHTML = '<div class="evd-cost-warn ' + cls + '"><span>' + icon + '</span><span>' + evdEsc(s.warning) + '</span></div>';
+  } else if (total > 0 && price > 0 && profit > 0){
+    warnHTML = '<div class="evd-cost-warn is-good"><span>✅</span><span>ربح متوقع: ' + evdFmtBHD(profit) + '</span></div>';
+  }
+
+  // Suggestion rows
+  var suggestions = [
+    {label: 'بدون ربح',   v: s.suggested_price_no_margin},
+    {label: 'ربح 10%',    v: s.suggested_price_10_margin},
+    {label: 'ربح 20%',    v: s.suggested_price_20_margin}
+  ];
+  var suggHTML = total > 0
+    ? '<div class="evd-cost-sugg">'
+      + '  <h4>💡 الأسعار المقترحة:</h4>'
+      + suggestions.map(function(g){
+          return '<div class="evd-cost-sugg-row">'
+                + '  <span class="name">' + evdEsc(g.label) + '</span>'
+                + '  <span class="price">' + evdFmtBHD(g.v) + '</span>'
+                + '  <button type="button" data-approve-price="' + (g.v || 0) + '">✓ اعتماد</button>'
+                + '</div>';
+        }).join('')
+      + '</div>'
+    : '';
+
+  // Calculator card
+  var calcHTML = ''
+    + '<div class="evd-cost-calc">'
+    + '  <h3>📊 الحاسبة الذكية</h3>'
+    + '  <div class="row"><span class="lab">إجمالي التكاليف</span><span class="val big">' + evdFmtBHD(total) + '</span></div>'
+    + '  <div class="row"><span class="lab">العدد الأقصى</span><span class="val">' + (cap > 0 ? cap + ' طالبة' : '<span style="color:#888;">غير محدود</span>') + '</span></div>'
+    + '  <div class="row"><span class="lab">المسجَّلات حالياً</span><span class="val">' + registered + ' طالبة</span></div>'
+    + (cap > 0 ? '<div class="row"><span class="lab">التكلفة لكل طالبة (عند الاكتمال)</span><span class="val">' + evdFmtBHD(costMax) + '</span></div>' : '')
+    + '  <div class="row"><span class="lab">السعر الحالي للطالبة</span><span class="val">' + evdFmtBHD(price) + '</span></div>'
+    + '  <div class="row"><span class="lab">الإيراد المتوقع</span><span class="val">' + evdFmtBHD(revenue) + '</span></div>'
+    + '  <div class="row"><span class="lab">' + (profit >= 0 ? '📈 الربح المتوقع' : '📉 الخسارة الحالية') + '</span><span class="val" style="color:' + (profit >= 0 ? '#1D9E75' : '#c62828') + ';">' + evdFmtBHD(profit) + '</span></div>'
+    + warnHTML
+    + suggHTML
+    + '</div>';
+
+  // Cost list
+  var rowsHTML = '';
+  if (!COST_DATA.length){
+    rowsHTML = '<div class="evd-cost-empty"><div class="em">📭</div><div>لا توجد بنود تكلفة بعد</div></div>';
+  } else {
+    rowsHTML = COST_DATA.map(function(c){
+      var def = c.is_default ? '<span class="badge-default">افتراضي</span>' : '';
+      return '<div class="evd-cost-row" data-cid="' + (c.id|0) + '">'
+           + '  <div class="name">' + evdEsc(c.label) + def + '</div>'
+           + '  <div class="amt">'
+           + '    <span class="display" data-cost-edit-amt="' + (c.id|0) + '" tabindex="0" title="اضغطي للتعديل">' + evdFmtBHD(c.amount) + '</span>'
+           + '    <span class="saved" data-saved="' + (c.id|0) + '">✓</span>'
+           + '  </div>'
+           + '  <div class="acts">'
+           + '    <button type="button" data-cost-edit="' + (c.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+           + '    <button type="button" class="del" data-cost-del="' + (c.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+           + '  </div>'
+           + '</div>';
+    }).join('');
+  }
+  var listHTML = ''
+    + '<div class="evd-cost-list">'
+    + '  <h3>💸 تفاصيل التكاليف</h3>'
+    + rowsHTML
+    + (COST_DATA.length ? '<div class="evd-cost-total"><span>المجموع</span><span>' + evdFmtBHD(total) + '</span></div>' : '')
+    + '  <div class="evd-cost-add">'
+    + '    <button type="button" id="evd-cost-add-btn">+ إضافة صنف جديد</button>'
+    + '  </div>'
+    + '</div>';
+
+  root.innerHTML = calcHTML + listHTML;
+
+  // Wire suggestion approve buttons
+  root.querySelectorAll('button[data-approve-price]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var v = parseFloat(b.getAttribute('data-approve-price'));
+      evdApprovePrice(v);
+    });
+  });
+  // Inline edit on amount click
+  root.querySelectorAll('.display[data-cost-edit-amt]').forEach(function(el){
+    el.addEventListener('click', function(){ evdCostInlineAmt(parseInt(el.getAttribute('data-cost-edit-amt'), 10)); });
+    el.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        evdCostInlineAmt(parseInt(el.getAttribute('data-cost-edit-amt'), 10));
+      }
+    });
+  });
+  // Edit / delete buttons
+  root.querySelectorAll('button[data-cost-edit]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var cid = parseInt(b.getAttribute('data-cost-edit'), 10);
+      var c = COST_DATA.find(function(x){ return x.id === cid; });
+      if (c) evdOpenCostEdit(c);
+    });
+  });
+  root.querySelectorAll('button[data-cost-del]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var cid = parseInt(b.getAttribute('data-cost-del'), 10);
+      evdCostDelete(cid);
+    });
+  });
+  var ab = document.getElementById('evd-cost-add-btn');
+  if (ab) ab.addEventListener('click', evdOpenCostAdd);
+}
+
+function evdCostInlineAmt(cid){
+  var row = document.querySelector('.evd-cost-row[data-cid="' + cid + '"] .amt');
+  if (!row) return;
+  var c = COST_DATA.find(function(x){ return x.id === cid; });
+  if (!c) return;
+  // Replace display with input
+  row.innerHTML = '<input type="number" min="0" step="0.001" value="' + (c.amount || 0) + '" data-cost-input="' + cid + '"/>';
+  var inp = row.querySelector('input');
+  inp.focus(); inp.select();
+  var commit = function(){
+    var v = inp.value;
+    if (v === '' || isNaN(parseFloat(v))){
+      evdRenderCosts(); return;
+    }
+    fetch('/api/admin/events/' + EID + '/costs/' + cid, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({amount: parseFloat(v)})
+    })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        evdToast(o.j.error || 'تعذّر الحفظ', 'error');
+        evdRenderCosts(); return;
+      }
+      // Optimistic local update + brief checkmark, then full reload
+      // so the calculator picks up the new total.
+      c.amount = parseFloat(v);
+      evdLoadCosts().then(function(){
+        var saved = document.querySelector('.evd-cost-row[data-cid="' + cid + '"] .saved');
+        if (saved){
+          saved.classList.add('is-show');
+          setTimeout(function(){ saved.classList.remove('is-show'); }, 1100);
+        }
+      });
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); evdRenderCosts(); });
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape'){ evdRenderCosts(); }
+  });
+}
+
+function evdOpenCostAdd(){
+  document.getElementById('evd-cost-title').textContent = '💰 صنف جديد';
+  document.getElementById('cf-id').value     = '';
+  document.getElementById('cf-label').value  = '';
+  document.getElementById('cf-amount').value = '';
+  document.getElementById('cf-notes').value  = '';
+  document.getElementById('evd-cost-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('cf-label').focus(); }, 50);
+}
+
+function evdOpenCostEdit(c){
+  document.getElementById('evd-cost-title').textContent = '✏️ تعديل الصنف';
+  document.getElementById('cf-id').value     = c.id;
+  document.getElementById('cf-label').value  = c.label || '';
+  document.getElementById('cf-amount').value = c.amount || '';
+  document.getElementById('cf-notes').value  = c.notes || '';
+  document.getElementById('evd-cost-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('cf-label').focus(); }, 50);
+}
+
+function evdCloseCost(){
+  document.getElementById('evd-cost-mb').classList.remove('is-open');
+}
+
+function evdSubmitCost(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-cost-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var cid = parseInt(document.getElementById('cf-id').value || '0', 10);
+  var body = {
+    label:  document.getElementById('cf-label').value.trim(),
+    amount: document.getElementById('cf-amount').value || 0,
+    notes:  document.getElementById('cf-notes').value.trim()
+  };
+  var url, method;
+  if (cid){
+    url = '/api/admin/events/' + EID + '/costs/' + cid;
+    method = 'PATCH';
+  } else {
+    url = '/api/admin/events/' + EID + '/costs';
+    method = 'POST';
+  }
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+    evdCloseCost();
+    evdToast(cid ? 'تم تحديث الصنف' : 'تم إضافة الصنف', 'success');
+    evdLoadCosts();
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdCostDelete(cid){
+  if (!cid) return;
+  if (!confirm('هل تريدين حذف هذا الصنف؟')) return;
+  var row = document.querySelector('.evd-cost-row[data-cid="' + cid + '"]');
+  if (row) row.classList.add('is-leaving');
+  fetch('/api/admin/events/' + EID + '/costs/' + cid, {method:'DELETE'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        if (row) row.classList.remove('is-leaving');
+        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
+      }
+      evdToast('تم الحذف', 'success');
+      setTimeout(evdLoadCosts, 180);
+    })
+    .catch(function(){
+      if (row) row.classList.remove('is-leaving');
+      evdToast('خطأ في الاتصال', 'error');
+    });
+}
+
+function evdApprovePrice(v){
+  if (!v && v !== 0) return;
+  var pretty = Number(v).toFixed(3) + ' د.ب';
+  if (!confirm('هل تريدين تحديث سعر الطالبة إلى ' + pretty + '؟')) return;
+  fetch('/api/admin/events/' + EID, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({price_per_student: v})
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
+    evdToast('تم تحديث السعر إلى ' + pretty, 'success');
+    if (o.j.event){ EVENT_DATA = o.j.event; evdRenderHeader(o.j.event); evdRenderInfo(o.j.event); }
+    evdLoadCosts();
+  })
+  .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
 /* ── Quick-edit modal (2.3) ──────────────────────────────────── */
 function evdLoadGroups(){
   return fetch('/api/admin/events/student-groups')
@@ -67721,6 +68097,12 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-sched-form').addEventListener('submit', evdSubmitSched);
   document.getElementById('evd-sched-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseSched();
+  });
+  // Cost modal wires (4.3)
+  document.getElementById('evd-cost-cancel').addEventListener('click', evdCloseCost);
+  document.getElementById('evd-cost-form').addEventListener('submit', evdSubmitCost);
+  document.getElementById('evd-cost-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseCost();
   });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
