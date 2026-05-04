@@ -69478,39 +69478,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
 .tt-cat-empty{text-align:center;color:#aaa;padding:18px 14px;font-size:.86rem;
               font-style:italic;}
-.tt-cat-allgood{text-align:center;padding:14px;font-size:.88rem;
-                font-weight:800;color:#0f6b4a;background:#e6f7ee;
-                border-radius:9px;margin:6px;}
-.tt-cat-allgood .em{font-size:1.5rem;display:block;margin-bottom:4px;}
-
-/* Drag handle — purely cosmetic until per-row drag-reorder UI ships;
-   the reorder API is already live for keyboard / external clients. */
-.tt-task .tt-drag{display:inline-block;color:#bbb;cursor:grab;
-                  font-size:.85rem;line-height:1;padding:2px 4px;
-                  user-select:none;flex-shrink:0;
-                  transition:color .15s;}
-.tt-task .tt-drag:hover{color:#666;}
-
-/* Empty-everything state when the template seed never ran */
-.tt-empty-all{background:#fff8eb;border:1.5px solid #f1d369;
-              border-radius:14px;padding:30px 18px;text-align:center;
-              color:#8d4f00;}
-.tt-empty-all .em{font-size:3rem;margin-bottom:8px;}
-.tt-empty-all h4{margin:0 0 8px;font-size:1.05rem;font-weight:900;}
-.tt-empty-all p{margin:0 0 14px;font-size:.9rem;color:#a86617;}
-.tt-empty-all button{padding:10px 18px;background:linear-gradient(135deg,#1D9E75,#2BB585);
-                     color:#fff;border:0;border-radius:9px;font-weight:800;
-                     font-family:inherit;cursor:pointer;font-size:.9rem;}
-
-/* Completion details popover */
-.tt-completion-pop{position:absolute;background:#fff;border-radius:12px;
-                   padding:10px 14px;box-shadow:0 14px 32px rgba(0,0,0,.18);
-                   min-width:220px;z-index:400;font-size:.85rem;
-                   border-right:4px solid #1D9E75;
-                   animation:tripMenuPop .15s cubic-bezier(.2,.8,.2,1);}
-.tt-completion-pop .h{font-weight:900;color:#0f6b4a;margin-bottom:4px;}
-.tt-completion-pop .row{color:#444;margin-top:3px;}
-.tt-completion-pop .row strong{color:#212121;}
 
 /* Inline task editor (commit 4 wires the form behaviour) */
 .tt-task-edit{background:#fff8eb;border:2px dashed #f1a132;
@@ -71442,33 +71409,9 @@ function tripCloseTasksPanel(){
   document.body.style.overflow = '';
   _TT_TRIP_ID = 0; _TT_DATA = null;
 }
-function tripTasksSkeleton(){
-  /* Three category sections each with 3 placeholder cards. Reuses
-     the trip-skel-* shimmer pattern from stage 1's polish commit so
-     visual language stays consistent with the cards-grid skeleton. */
-  var html = '';
-  ['before','during','after'].forEach(function(cat){
-    html += '<div class="tt-cat" data-cat="' + cat + '">'
-         +   '<div class="tt-cat-head">'
-         +     '<span class="cat-icon">' + _TT_CAT_LABEL[cat] + '</span>'
-         +     '<span class="cat-count">— / —</span>'
-         +   '</div>'
-         +   '<div class="tt-cat-body">';
-    for (var i = 0; i < 3; i++){
-      html += '<div class="trip-skel-card" style="margin-bottom:6px;">'
-           +    '<div class="trip-skel-line lg"></div>'
-           +    '<div class="trip-skel-line md"></div>'
-           +    '<div class="trip-skel-line sm"></div>'
-           + '</div>';
-    }
-    html += '  </div></div>';
-  });
-  return html;
-}
-
 function tripLoadTasks(){
   var body = document.getElementById('tt-body');
-  body.innerHTML = tripTasksSkeleton();
+  body.innerHTML = '<div class="pp-empty"><div class="em">⏳</div><div>جارٍ تحميل المهام...</div></div>';
   fetch('/api/admin/trips/' + _TT_TRIP_ID + '/tasks',
         {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
@@ -71502,26 +71445,8 @@ function tripRenderTasks(){
   // Category sections
   var cats = ['before', 'during', 'after'];
   var html = '';
-  // Whole-template empty state — surfaced when the seed never ran
-  // (or every template task got deleted). Offers a one-click reload.
-  if ((stats.total || 0) === 0){
-    html = '<div class="tt-empty-all">'
-         + '  <div class="em">📋</div>'
-         + '  <h4>لم تُضف مهام بعد</h4>'
-         + '  <p>يبدو أن قالب المهام الافتراضي لم يُحمَّل لهذه الرحلة.</p>'
-         + '  <button type="button" id="tt-empty-reload">🔄 تحميل القالب</button>'
-         + '</div>';
-    document.getElementById('tt-body').innerHTML = html;
-    var rb = document.getElementById('tt-empty-reload');
-    if (rb) rb.addEventListener('click', function(){
-      var btn = document.getElementById('tt-reload-btn');
-      if (btn) btn.click();
-    });
-    _TT_PREV_PCT = {before: 0, during: 0, after: 0, total: 0};
-    return;
-  }
   cats.forEach(function(cat){
-    var cstats = (stats.by_category && stats.by_category[cat]) || {total: 0, completed: 0, pct: 0};
+    var cstats = (stats.by_category && stats.by_category[cat]) || {total: 0, completed: 0};
     html += '<div class="tt-cat" data-cat="' + cat + '">'
           +   '<div class="tt-cat-head">'
           +     '<span class="cat-icon">' + _TT_CAT_LABEL[cat] + '</span>'
@@ -71531,33 +71456,13 @@ function tripRenderTasks(){
     var tasks = (d.tasks && d.tasks[cat]) || [];
     if (!tasks.length){
       html += '<div class="tt-cat-empty">لا توجد مهام في هذا القسم</div>';
-    } else if (cstats.total > 0 && cstats.completed >= cstats.total){
-      // All tasks in this category complete — celebrate even when
-      // the trip's overall pct hasn't hit 100 yet.
-      tasks.forEach(function(t){ html += tripTaskCardHTML(t); });
-      html += '<div class="tt-cat-allgood">'
-           +    '<span class="em">🎉</span>'
-           +    'ممتاز! كل مهام هذا القسم مكتملة'
-           + '</div>';
     } else {
       tasks.forEach(function(t){ html += tripTaskCardHTML(t); });
     }
     html += '  </div></div>';
   });
   document.getElementById('tt-body').innerHTML = html;
-  // Per-category celebration — fires once per category when its pct
-  // crosses from <100 to ≥100 against the last render.
-  cats.forEach(function(cat){
-    var cstats = (stats.by_category && stats.by_category[cat]) || {pct: 0, total: 0};
-    var prev = _TT_PREV_PCT[cat] || 0;
-    if (prev < 100 && (cstats.pct || 0) >= 100 && (cstats.total || 0) > 0){
-      tripToast('🎉 ' + _TT_CAT_LABEL[cat] + ' — مكتملة!', 'success');
-      // Smaller burst — half the default.
-      tripConfetti();
-    }
-    _TT_PREV_PCT[cat] = cstats.pct || 0;
-  });
-  // Whole-trip celebration when total pct crosses to 100.
+  // Confetti when all tasks completed (compare against last render).
   if (_TT_PREV_PCT.total < 100 && (stats.pct_complete || 0) >= 100
       && (stats.total || 0) > 0){
     tripToast('🏆 جميع المهام مكتملة!', 'success');
@@ -71581,12 +71486,10 @@ function tripTaskCardHTML(t){
   return ''
     + '<div class="tt-task" data-status="' + tripEscRP(t.status) + '" data-tkid="' + (t.id|0) + '" data-cat="' + tripEscRP(t.category) + '">'
     + '  <div class="row1">'
-    + '    <span class="tt-drag" title="السحب للتغيير قريباً">⋮⋮</span>'
     + '    <button type="button" class="check" data-act="task-check" '
     +              'data-tkid="' + (t.id|0) + '" '
     +              'aria-label="ضع علامة مكتملة" title="ضع علامة"></button>'
-    + '    <span class="title" data-act="task-completion-info" data-tkid="' + (t.id|0) + '">'
-    +        tripEscRP(t.title) + tplPill + '</span>'
+    + '    <span class="title">' + tripEscRP(t.title) + tplPill + '</span>'
     + '    <span class="actions">'
     + '      <button type="button" data-act="task-edit"   data-tkid="' + (t.id|0) + '" title="تعديل">✏️</button>'
     + '      <button type="button" data-act="task-delete" data-tkid="' + (t.id|0) + '" title="حذف">🗑️</button>'
@@ -71596,52 +71499,6 @@ function tripTaskCardHTML(t){
     + (meta.length   ? '<div class="meta">' + meta.join('') + '</div>' : '')
     + completion
     + '</div>';
-}
-
-/* ── Completion details popover ─────────────────────────────────── */
-function tripOpenCompletionPop(anchor, task){
-  tripCloseCompletionPop();
-  var pop = document.createElement('div');
-  pop.className = 'tt-completion-pop';
-  pop.id = 'tt-completion-pop';
-  var when = task.completed_at ? String(task.completed_at).substring(0,16) : '';
-  pop.innerHTML =
-      '<div class="h">✓ مكتملة</div>'
-    + '<div class="row">👤 <strong>' + tripEscRP(task.completed_by_name || '') + '</strong></div>'
-    + (when ? '<div class="row">📅 ' + tripEscRP(when) + '</div>' : '')
-    + (task.completion_notes ? '<div class="row">📝 ' + tripEscRP(task.completion_notes) + '</div>' : '');
-  // Position near the title element, anchored within the panel body
-  // so scroll behaviour stays predictable.
-  var card = anchor.closest('.tt-task');
-  if (card){
-    card.style.position = 'relative';
-    card.appendChild(pop);
-    pop.style.top = (anchor.offsetTop + anchor.offsetHeight + 4) + 'px';
-    pop.style.right = '8px';
-  } else {
-    document.body.appendChild(pop);
-    var rect = anchor.getBoundingClientRect();
-    pop.style.position = 'fixed';
-    pop.style.top   = (rect.bottom + 6) + 'px';
-    pop.style.right = (window.innerWidth - rect.right) + 'px';
-  }
-  setTimeout(function(){
-    document.addEventListener('click', _ttCompletionOutsideClick, {once:true});
-  }, 0);
-}
-function _ttCompletionOutsideClick(e){
-  if (!e.target.closest('#tt-completion-pop') &&
-      !e.target.closest('[data-act="task-completion-info"]')){
-    tripCloseCompletionPop();
-  } else {
-    setTimeout(function(){
-      document.addEventListener('click', _ttCompletionOutsideClick, {once:true});
-    }, 0);
-  }
-}
-function tripCloseCompletionPop(){
-  var p = document.getElementById('tt-completion-pop');
-  if (p) p.remove();
 }
 
 /* ── Inline edit ────────────────────────────────────────────────── */
@@ -71858,17 +71715,6 @@ document.addEventListener('DOMContentLoaded', function(){
     var ttBody = document.getElementById('tt-body');
     if (ttBody){
       ttBody.addEventListener('click', function(e){
-        // Title click → completion details popover for completed tasks.
-        var titleEl = e.target.closest('[data-act="task-completion-info"]');
-        if (titleEl){
-          tripCloseCompletionPop();
-          var tkidT = parseInt(titleEl.getAttribute('data-tkid'), 10) || 0;
-          var t = tripFindTaskByID(tkidT);
-          if (t && t.status === 'completed' && t.completed_by_name){
-            tripOpenCompletionPop(titleEl, t);
-            return;
-          }
-        }
         var btn = e.target.closest('button[data-act]');
         if (!btn) return;
         var tkid = parseInt(btn.getAttribute('data-tkid'), 10) || 0;
