@@ -67727,7 +67727,9 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-task-chip{background:#eef0f3;border:1.5px solid transparent;color:#555;border-radius:99px;padding:6px 14px;font-weight:800;font-size:.83rem;cursor:pointer;transition:.15s;}
   .evd-task-chip:hover{background:#dde2e8;}
   .evd-task-chip.is-on{background:#1D9E75;color:#fff;border-color:#1D9E75;}
-  .evd-task-overdue-pill{background:#c62828;color:#fff;font-weight:800;font-size:.78rem;padding:3px 10px;border-radius:99px;}
+  .evd-task-overdue-pill{background:#c62828;color:#fff;font-weight:800;font-size:.78rem;padding:3px 10px;border-radius:99px;margin-inline-start:4px;}
+  .evd-task-count-pill{background:rgba(0,0,0,0.08);color:inherit;font-weight:800;font-size:.78rem;padding:2px 9px;border-radius:99px;margin-inline-start:4px;}
+  .evd-task-chip.is-on .evd-task-count-pill{background:rgba(255,255,255,0.25);color:#fff;}
   .evd-task-cat{background:#fff;border-radius:14px;padding:14px 16px 10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--tc,#9e9e9e);}
   .evd-task-cat[data-cat="before"]{--tc:#1D9E75;}
   .evd-task-cat[data-cat="during"]{--tc:#E65100;}
@@ -68750,7 +68752,11 @@ function evdSchedDelete(sid){
 var TASK_DATA = {before:[], during:[], after:[]};
 var TASK_SUMMARY = null;
 var TASK_LOADED = false;
-var TASK_FILTER = 'all';
+var TASK_FILTER = (function(){
+  // Persist filter selection across reloads in the same tab.
+  try { return sessionStorage.getItem('evdTaskFilter') || 'all'; }
+  catch(_){ return 'all'; }
+})();
 
 var TASK_STATUS_LABELS = {
   pending:     'قيد الانتظار',
@@ -68855,6 +68861,22 @@ function evdRenderTasks(){
     + '  <div class="bar"><div class="fill" style="width:' + pct + '%;"></div></div>'
     + '</div>';
 
+  // Pre-compute per-filter counts so the chips can show ratios.
+  var allTasks = (TASK_DATA.before || []).concat(TASK_DATA.during || [], TASK_DATA.after || []);
+  var savedFilter = TASK_FILTER;
+  function _countForFilter(k){
+    TASK_FILTER = k;
+    var n = allTasks.filter(evdTaskMatchesFilter).length;
+    return n;
+  }
+  var counts = {
+    all:     _countForFilter('all'),
+    mine:    _countForFilter('mine'),
+    overdue: _countForFilter('overdue'),
+    today:   _countForFilter('today')
+  };
+  TASK_FILTER = savedFilter;
+
   var filterChips = [
     {key:'all',     label:'الكل'},
     {key:'mine',    label:'مهامي'},
@@ -68863,9 +68885,10 @@ function evdRenderTasks(){
   ];
   var filterHTML = filterChips.map(function(f){
     var on = TASK_FILTER === f.key ? ' is-on' : '';
-    var n  = '';
-    if (f.key === 'overdue' && overdue > 0) n = ' <span class="evd-task-overdue-pill">' + overdue + '</span>';
-    return '<button type="button" class="evd-task-chip' + on + '" data-task-filter="' + f.key + '">' + evdEsc(f.label) + n + '</button>';
+    var c = counts[f.key];
+    var pillCls = (f.key === 'overdue' && c > 0) ? 'evd-task-overdue-pill' : 'evd-task-count-pill';
+    var pill = '<span class="' + pillCls + '">' + c + '</span>';
+    return '<button type="button" class="evd-task-chip' + on + '" data-task-filter="' + f.key + '">' + evdEsc(f.label) + ' ' + pill + '</button>';
   }).join('');
 
   var toolbarHTML = ''
@@ -68908,6 +68931,7 @@ function evdRenderTasks(){
   root.querySelectorAll('button[data-task-filter]').forEach(function(b){
     b.addEventListener('click', function(){
       TASK_FILTER = b.getAttribute('data-task-filter');
+      try { sessionStorage.setItem('evdTaskFilter', TASK_FILTER); } catch(_){}
       evdRenderTasks();
     });
   });
