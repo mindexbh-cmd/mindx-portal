@@ -67067,25 +67067,9 @@ def api_admin_trips_registrations(tid):
         import sys as _sys
         print("[trips] regs list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
-    # Pre-load active payments for the trip so we can decorate each
-    # registration row with has_active_payment — the panel uses this
-    # to surface a stronger confirm dialog when cancelling a paid row.
-    paid_reg_ids = set()
-    try:
-        prows = db.execute(
-            "SELECT registration_id FROM trip_payments "
-            "WHERE trip_id = ? AND is_deleted = 0",
-            (tid,),
-        ).fetchall()
-        for pr in prows:
-            rid_p = pr[0] if not hasattr(pr, "keys") else pr["registration_id"]
-            if rid_p: paid_reg_ids.add(rid_p)
-    except Exception:
-        pass
     registered = []; waitlisted = []; cancelled = []
     for r in rows:
         d = _trip_reg_dict(dict(r))
-        d["has_active_payment"] = (d.get("id") in paid_reg_ids)
         st = d["registration_status"]
         if   st == "registered": registered.append(d)
         elif st == "waitlisted": waitlisted.append(d)
@@ -69829,20 +69813,9 @@ function tripClosePaymentsPanel(){
   document.body.style.overflow = '';
   _PP_TRIP_ID = 0; _PP_DATA = null;
 }
-function tripPaymentsSkeleton(){
-  var html = '';
-  for (var i = 0; i < 4; i++){
-    html += '<div class="trip-skel-card" style="margin-bottom:8px;">'
-          +   '<div class="trip-skel-line lg"></div>'
-          +   '<div class="trip-skel-line md"></div>'
-          +   '<div class="trip-skel-line sm"></div>'
-          + '</div>';
-  }
-  return html;
-}
 function tripLoadPayments(){
   var body = document.getElementById('pp-body');
-  body.innerHTML = tripPaymentsSkeleton();
+  body.innerHTML = '<div class="pp-empty"><div class="em">⏳</div><div>جارٍ التحميل...</div></div>';
   fetch('/api/admin/trips/' + _PP_TRIP_ID + '/payments',
         {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
@@ -69886,30 +69859,15 @@ function tripRenderPayments(){
   var html = '';
   if (!paid.length && !unpaid.length){
     html = '<div class="pp-empty"><div class="em">📭</div>'
-         + '<div>لا توجد تسجيلات في هذه الرحلة بعد.</div>'
-         + '<div style="margin-top:6px;color:#999;font-size:.82rem;">'
-         + 'ابدئي بمشاركة رابط الرحلة مع الأهالي!</div></div>';
+         + '<div>لا توجد دفعات بعد. ادعمي التحصيل بمشاركة رابط الرحلة!</div></div>';
   } else {
     if (paid.length){
       html += '<div class="pp-section-title first">✅ المدفوعات (' + paid.length + ')</div>';
       paid.forEach(function(p, i){ html += tripPaymentRowHTML(p, i + 1); });
-    } else if (unpaid.length){
-      // Registrations exist but no payments yet — friendlier copy.
-      html += '<div class="pp-empty" style="background:#fff8eb;border-radius:10px;'
-            + 'padding:14px;margin-bottom:12px;color:#8d4f00;">'
-            + '<div class="em">💵</div>'
-            + '<div>لم تُسجَّل أي دفعة بعد. ابدئي بتسجيل الدفعة الأولى!</div>'
-            + '</div>';
     }
     if (unpaid.length){
       html += '<div class="pp-section-title">⏰ المتأخرات (' + unpaid.length + ')</div>';
       unpaid.forEach(function(u, i){ html += tripUnpaidRowHTML(u, i + 1); });
-    } else if (paid.length){
-      html += '<div class="pp-section-title">⏰ المتأخرات</div>';
-      html += '<div class="pp-empty" style="background:#e6f7ee;border-radius:10px;'
-            + 'padding:14px;color:#0f6b4a;">'
-            + '<div class="em">🎉</div>'
-            + '<div>لا توجد متأخرات — الكل دفع!</div></div>';
     }
   }
   document.getElementById('pp-body').innerHTML = html;
@@ -70152,18 +70110,12 @@ document.addEventListener('DOMContentLoaded', function(){
         fd.append('receipt_image', f);
       }
       var btn = document.getElementById('pp-pay-submit');
-      var origLabel = btn.innerHTML;
       btn.disabled = true; btn.style.opacity = '.6';
-      // Different copy for benefit (file upload) vs cash (no file).
-      btn.innerHTML = (_PP_PAY_METHOD === 'benefit')
-        ? '<span>⏳</span><span>جارٍ الرفع...</span>'
-        : '<span>⏳</span><span>جارٍ الحفظ...</span>';
       fetch('/api/admin/trips/' + _PP_TRIP_ID + '/registrations/' + rid + '/payment', {
         method:'POST', credentials:'same-origin', body: fd,
       }).then(function(r){ return r.json().catch(function(){ return null; }); })
         .then(function(j){
           btn.disabled = false; btn.style.opacity = '1';
-          btn.innerHTML = origLabel;
           if (!j || !j.ok){ tripToast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
           tripClosePaymentModal();
           tripToast('✓ تم تسجيل الدفعة', 'success');
@@ -70174,31 +70126,7 @@ document.addEventListener('DOMContentLoaded', function(){
         })
         .catch(function(){
           btn.disabled = false; btn.style.opacity = '1';
-          btn.innerHTML = origLabel;
-          // Network error retry — toast carries an inline retry click.
-          // The form inputs (including the selected receipt file) are
-          // still populated so re-dispatching submit re-sends with no
-          // data loss.
-          var t = document.getElementById('trip-toast');
-          if (t){
-            t.innerHTML = '⚠️ خطأ في الاتصال — '
-                        + '<button id="pp-retry-btn" style="margin-inline-start:8px;'
-                        + 'background:#fff;color:#212121;border:0;border-radius:6px;'
-                        + 'padding:4px 10px;font-weight:800;cursor:pointer;">'
-                        + 'إعادة المحاولة</button>';
-            t.classList.remove('is-success');
-            t.classList.add('show','is-error');
-            clearTimeout(t._hideT);
-            t._hideT = setTimeout(function(){ t.classList.remove('show'); }, 6000);
-            var rb = document.getElementById('pp-retry-btn');
-            if (rb) rb.addEventListener('click', function(){
-              t.classList.remove('show');
-              var f2 = document.getElementById('pp-pay-form');
-              if (f2) f2.dispatchEvent(new Event('submit', {cancelable:true}));
-            });
-          } else {
-            tripToast('خطأ في الاتصال', 'error');
-          }
+          tripToast('خطأ في الاتصال', 'error');
         });
     });
   }
@@ -70356,22 +70284,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var rid = parseInt(b.getAttribute('data-rid'), 10) || 0;
       var act = b.getAttribute('data-act');
       if (act === 'cancel'){
-        // Stronger confirm when the row already has a recorded payment.
-        var paidFlag = false;
-        if (_RP_DATA){
-          var allRows = (_RP_DATA.registered || []).concat(_RP_DATA.waitlisted || []);
-          for (var i = 0; i < allRows.length; i++){
-            if ((allRows[i].id|0) === rid){
-              paidFlag = !!allRows[i].has_active_payment; break;
-            }
-          }
-        }
-        var msg = paidFlag
-          ? '⚠️ تحذير: هذه الطالبة دفعت بالفعل.\n\n'
-            + 'الإلغاء سيُبقي الدفعة في السجل المحاسبي ولن يحذفها تلقائياً. '
-            + 'هل تريدين متابعة الإلغاء؟'
-          : 'هل تريدين إلغاء هذا التسجيل؟';
-        if (!window.confirm(msg)) return;
+        if (!window.confirm('هل تريدين إلغاء هذا التسجيل؟')) return;
         fetch('/api/admin/trips/' + _RP_TRIP_ID + '/registrations/' + rid,
               {method:'DELETE', credentials:'same-origin'})
           .then(function(r){ return r.json(); })
@@ -70507,13 +70420,8 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){
-      // Priority: lightbox > reminder dropdown > record modal > panel.
       var lb2 = document.getElementById('pp-lightbox');
       if (lb2 && !lb2.hidden) { lb2.hidden = true; return; }
-      var rmd = document.getElementById('pp-reminder-menu');
-      if (rmd) { tripCloseReminderList(); return; }
-      var payOv = document.getElementById('pp-pay-overlay');
-      if (payOv && !payOv.hidden) { tripClosePaymentModal(); return; }
       var pp = document.getElementById('trip-pp-overlay');
       if (pp && !pp.hidden) { tripClosePaymentsPanel(); return; }
     }
