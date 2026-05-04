@@ -65091,6 +65091,320 @@ def api_admin_events_update(eid):
     return jsonify({"ok": True, "id": eid, "event": ev_out})
 
 
+# ── Schedule (3.3) ─────────────────────────────────────────────
+_EV_SCHED_CATEGORIES = ("departure", "activity", "break", "meal", "return", "other")
+
+
+def _events_schedule_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT 1 FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return False
+    return bool(row)
+
+
+def _events_schedule_validate_time(s):
+    """Accept "HH:MM" 24-hour, return canonical or raise ValueError."""
+    if s is None or s == "":
+        return None
+    s = str(s).strip()
+    parts = s.split(":")
+    if len(parts) < 2:
+        raise ValueError("صيغة الوقت غير صحيحة")
+    try:
+        h = int(parts[0]); m = int(parts[1])
+    except Exception:
+        raise ValueError("صيغة الوقت غير صحيحة")
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        raise ValueError("صيغة الوقت غير صحيحة")
+    return ("%02d:%02d" % (h, m))
+
+
+def _events_schedule_row(rd):
+    return {
+        "id":               rd.get("id"),
+        "event_id":         rd.get("event_id"),
+        "category":         rd.get("category") or "other",
+        "time_slot":        rd.get("time_slot") or "",
+        "duration_minutes": int(rd.get("duration_minutes") or 0) if rd.get("duration_minutes") not in (None, "") else None,
+        "title":            rd.get("title") or "",
+        "description":      rd.get("description") or "",
+        "order_index":      int(rd.get("order_index") or 0),
+        "created_at":       rd.get("created_at") or "",
+        "updated_at":       rd.get("updated_at") or "",
+    }
+
+
+@app.route('/api/admin/events/<int:eid>/schedule', methods=['GET'])
+@login_required
+def api_admin_events_schedule_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM ev_schedule "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY order_index, "
+            "         CASE WHEN time_slot IS NULL OR time_slot = '' THEN 1 ELSE 0 END, "
+            "         time_slot, id",
+            (eid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] schedule list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    grouped = {c: [] for c in _EV_SCHED_CATEGORIES}
+    times = []
+    total_dur = 0
+    for r in rows:
+        rd = _events_schedule_row(dict(r))
+        cat = rd["category"] if rd["category"] in grouped else "other"
+        grouped[cat].append(rd)
+        if rd["time_slot"]: times.append(rd["time_slot"])
+        if rd["duration_minutes"]: total_dur += int(rd["duration_minutes"])
+    times.sort()
+    summary = {
+        "total_items":           len(rows),
+        "total_duration_minutes": total_dur,
+        "first_time":            times[0] if times else "",
+        "last_time":             times[-1] if times else "",
+    }
+    return jsonify({"ok": True, "schedule": grouped, "summary": summary})
+
+
+@app.route('/api/admin/events/<int:eid>/schedule', methods=['POST'])
+@login_required
+def api_admin_events_schedule_create(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    category = (d.get("category") or "").strip().lower()
+    if category not in _EV_SCHED_CATEGORIES:
+        return jsonify({"ok": False, "error": "القسم غير معروف"}), 400
+    title = (d.get("title") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+    try:
+        time_slot = _events_schedule_validate_time(d.get("time_slot"))
+    except ValueError as ve:
+        return jsonify({"ok": False, "error": str(ve)}), 400
+    duration = d.get("duration_minutes")
+    if duration in ("", None):
+        duration = None
+    else:
+        try:
+            duration = max(0, int(duration))
+        except Exception:
+            return jsonify({"ok": False, "error": "المدة يجب أن تكون رقماً"}), 400
+    description = (d.get("description") or "").strip() or None
+    try:
+        cur = db.execute(
+            "SELECT COALESCE(MAX(order_index), -1) FROM ev_schedule "
+            "WHERE event_id = ? AND category = ? AND is_deleted = 0",
+            (eid, category)).fetchone()
+        next_order = int((cur[0] if cur else -1) or -1) + 1
+    except Exception:
+        next_order = 0
+    try:
+        db.execute(
+            "INSERT INTO ev_schedule(event_id, category, time_slot, duration_minutes, "
+            "                        title, description, order_index) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (eid, category, time_slot, duration, title, description, next_order))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] schedule insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        sid = None
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_schedule WHERE id = ?", (sid,)).fetchone()
+        item = _events_schedule_row(dict(row)) if row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.schedule.create", target_type="ev_schedule", target_id=sid,
+               new_value={"event_id": eid, "category": category,
+                          "title": title, "time_slot": time_slot})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": sid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/schedule/<int:sid>', methods=['PATCH'])
+@login_required
+def api_admin_events_schedule_update(eid, sid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_schedule WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (sid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "البند غير موجود"}), 404
+    cur = dict(row)
+    d = request.get_json(silent=True) or {}
+    upd = {}
+    if "category" in d:
+        c = (d.get("category") or "").strip().lower()
+        if c not in _EV_SCHED_CATEGORIES:
+            return jsonify({"ok": False, "error": "القسم غير معروف"}), 400
+        upd["category"] = c
+    if "title" in d:
+        v = (d.get("title") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+        upd["title"] = v
+    if "time_slot" in d:
+        try:
+            upd["time_slot"] = _events_schedule_validate_time(d.get("time_slot"))
+        except ValueError as ve:
+            return jsonify({"ok": False, "error": str(ve)}), 400
+    if "duration_minutes" in d:
+        v = d.get("duration_minutes")
+        if v in ("", None):
+            upd["duration_minutes"] = None
+        else:
+            try:
+                upd["duration_minutes"] = max(0, int(v))
+            except Exception:
+                return jsonify({"ok": False, "error": "المدة يجب أن تكون رقماً"}), 400
+    if "description" in d:
+        upd["description"] = (d.get("description") or "").strip() or None
+    if "order_index" in d:
+        try:
+            upd["order_index"] = max(0, int(d.get("order_index") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if not upd:
+        return jsonify({"ok": True, "id": sid, "item": _events_schedule_row(cur), "noop": True})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_schedule SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (sid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] schedule update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute(
+            "SELECT * FROM ev_schedule WHERE id = ?", (sid,)).fetchone()
+        item = _events_schedule_row(dict(new_row)) if new_row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.schedule.update", target_type="ev_schedule", target_id=sid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": sid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/schedule/<int:sid>', methods=['DELETE'])
+@login_required
+def api_admin_events_schedule_delete(eid, sid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_schedule WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (sid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "البند غير موجود"}), 404
+    try:
+        db.execute(
+            "UPDATE ev_schedule SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (sid,))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.schedule.delete", target_type="ev_schedule", target_id=sid,
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": sid})
+
+
+@app.route('/api/admin/events/<int:eid>/schedule/reorder', methods=['POST'])
+@login_required
+def api_admin_events_schedule_reorder(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    category = (d.get("category") or "").strip().lower()
+    if category not in _EV_SCHED_CATEGORIES:
+        return jsonify({"ok": False, "error": "القسم غير معروف"}), 400
+    ordered = d.get("ordered_ids") or []
+    if not isinstance(ordered, list):
+        return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    try:
+        ids = [int(x) for x in ordered]
+    except Exception:
+        return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if not ids:
+        return jsonify({"ok": True, "noop": True})
+    try:
+        rows = db.execute(
+            "SELECT id FROM ev_schedule "
+            "WHERE event_id = ? AND category = ? AND is_deleted = 0",
+            (eid, category)).fetchall()
+        valid = {int(dict(r)["id"]) for r in rows}
+    except Exception:
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    bad = [x for x in ids if x not in valid]
+    if bad:
+        return jsonify({"ok": False, "error": "بنود غير معروفة في هذا القسم"}), 400
+    try:
+        for i, sid in enumerate(ids):
+            db.execute(
+                "UPDATE ev_schedule SET order_index = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?", (i, sid))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر إعادة الترتيب"}), 500
+    return jsonify({"ok": True, "count": len(ids)})
+
+
 @app.route('/api/admin/events/<int:eid>', methods=['DELETE'])
 @login_required
 def api_admin_events_delete(eid):
