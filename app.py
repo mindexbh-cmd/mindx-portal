@@ -995,6 +995,23 @@ def init_db():
                "ON ev_schedule(event_id, is_deleted, order_index)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_schedule_time "
                "ON ev_schedule(event_id, time_slot)")
+    # Cost line-items per event (4.1)
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_costs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        label TEXT NOT NULL,
+        amount REAL DEFAULT 0,
+        notes TEXT,
+        order_index INTEGER DEFAULT 0,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_costs_event "
+               "ON ev_costs(event_id, is_deleted, order_index)")
     db.commit()
     db.close()
 
@@ -6388,6 +6405,43 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_schedule_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_costs_v1: cost line-items per event (4.1).
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_costs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        label TEXT NOT NULL,
+        amount REAL DEFAULT 0,
+        notes TEXT,
+        order_index INTEGER DEFAULT 0,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES ev_events(id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_costs_event "
+                    "ON ev_costs(event_id, is_deleted, order_index)")
+    except Exception: pass
+    if "ev_costs_v1" not in applied:
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_costs", "تكاليف الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_costs", "تكاليف الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_costs_v1",))
             db2.commit()
         except Exception: pass
 
@@ -29852,6 +29906,7 @@ BUILT_IN_TABLE_LABELS = {
     "parent_message_reads": "اطّلاع أولياء الأمور",
     "ev_events":         "الفعاليات والرحلات",
     "ev_schedule":       "الخطة الزمنية للرحلات",
+    "ev_costs":          "تكاليف الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32269,6 +32324,7 @@ _TBL_AUDIT_FEATURE = {
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
+    "ev_costs":             ("تكاليف الرحلات",                  "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -64656,6 +64712,40 @@ _EV_STATUS_COLORS = {
     "completed": "#1565C0",
 }
 
+# Default cost categories seeded on every new event (4.1). Order
+# here drives order_index 0..4. The icon is just metadata for the UI;
+# label already includes the emoji so the row renders without a
+# client-side lookup.
+_EV_DEFAULT_COSTS = [
+    {"category": "transport", "label": "🚌 المواصلات",  "icon": "🚌"},
+    {"category": "food",      "label": "🍽️ المأكولات",  "icon": "🍽️"},
+    {"category": "tickets",   "label": "🎫 التذاكر",     "icon": "🎫"},
+    {"category": "gifts",     "label": "🎁 الهدايا",     "icon": "🎁"},
+    {"category": "emergency", "label": "🚨 طوارئ",      "icon": "🚨"},
+]
+
+
+def _events_seed_default_costs(db, event_id):
+    """Best-effort seed of the five default cost categories for a
+    fresh event. Never blocks event creation — wrap callers in
+    try/except as well so a partial failure doesn't surface to
+    the admin."""
+    if not event_id:
+        return
+    try:
+        for i, c in enumerate(_EV_DEFAULT_COSTS):
+            db.execute(
+                "INSERT INTO ev_costs(event_id, category, label, amount, "
+                "                     order_index, is_default) "
+                "VALUES(?,?,?,?,?,1)",
+                (event_id, c["category"], c["label"], 0.0, i))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] default-costs seed failed: " + str(ex), file=_sys.stderr)
+
 
 def _events_can_admin(user):
     """Manager-class — admin/manager. Reuses the existing role
@@ -64886,6 +64976,12 @@ def api_admin_events_create():
         new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
     except Exception:
         new_id = None
+    # Seed default cost categories. Best-effort; isolated try wrapper
+    # in the helper means even a partial failure won't kill creation.
+    try:
+        _events_seed_default_costs(db, new_id)
+    except Exception:
+        pass
     # Optional copy-from-previous: only the high-level fields for
     # stage 1. The cross-table copy (tasks/costs/items/schedule) is
     # implemented in stage 2 when those tables exist.
