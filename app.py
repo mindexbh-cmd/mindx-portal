@@ -68061,6 +68061,138 @@ td.empty{text-align:center;color:#888;padding:18px;}
 # trip-state checks. The /api/trip/<token>/info JSON endpoint feeds the
 # same page client-side once the parent advances through the flow.
 
+@app.route('/trip-survey/<token>', methods=['GET'])
+def public_trip_survey_page(token):
+    """Parent-facing survey landing. Public — gated by survey_token
+    + 30-day window. Already-submitted tokens get a thank-you state."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT s.*, t.name AS trip_name, t.trip_date AS trip_date "
+            "FROM trip_surveys s "
+            "LEFT JOIN trips t ON t.id = s.trip_id "
+            "WHERE s.survey_token = ? LIMIT 1",
+            (token.strip() if isinstance(token, str) else "",),
+        ).fetchone()
+    except Exception:
+        row = None
+    def _err(title, body):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+            "<title>" + title + " — مايندكس</title>"
+            "<style>body{font-family:'Segoe UI',Tahoma,sans-serif;"
+            "background:linear-gradient(135deg,#fce4ec,#e1bee7);min-height:100vh;"
+            "display:flex;align-items:center;justify-content:center;direction:rtl;"
+            "margin:0;padding:24px;}.card{background:#fff;border-radius:18px;"
+            "padding:36px 30px;box-shadow:0 10px 30px rgba(0,0,0,.12);"
+            "text-align:center;max-width:420px;}.card h1{margin:0 0 8px;color:#4a148c;"
+            "font-size:1.3rem;}.card p{color:#555;line-height:1.6;}</style></head>"
+            "<body><div class='card'><h1>" + title + "</h1>"
+            "<p>" + body + "</p></div></body></html>",
+            status=404, mimetype="text/html; charset=utf-8")
+    if not row:
+        return _err("الرابط غير صحيح", "تأكدي من الرابط أو تواصلي مع الإدارة.")
+    rd = dict(row)
+    # Window: 30 days from creation.
+    try:
+        from datetime import datetime as _dt2, timedelta as _td2
+        created_at = rd.get("created_at")
+        if isinstance(created_at, str):
+            ts = _dt2.fromisoformat(created_at[:19].replace("T", " "))
+        else:
+            ts = _dt2.now()
+        if ts + _td2(days=30) < _dt2.now():
+            return _err("انتهت مدة التقييم",
+                        "نأسف، لم يعد بإمكانك المشاركة في تقييم هذه الرحلة.")
+    except Exception:
+        pass
+    return Response(PUBLIC_TRIP_SURVEY_HTML, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/api/trip-survey/<token>/info', methods=['GET'])
+def api_public_trip_survey_info(token):
+    """Public — public-safe shape: trip name, trip date, parent/student
+    snapshot, has_submitted flag. No internal fields."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT s.*, t.name AS trip_name, t.trip_date AS trip_date "
+            "FROM trip_surveys s "
+            "LEFT JOIN trips t ON t.id = s.trip_id "
+            "WHERE s.survey_token = ? LIMIT 1",
+            (token,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "رابط غير صحيح"}), 404
+    rd = dict(row)
+    return jsonify({"ok": True, "survey": {
+        "trip_name":     rd.get("trip_name") or "",
+        "trip_date":     rd.get("trip_date") or "",
+        "parent_name":   rd.get("parent_name") or "",
+        "student_name":  rd.get("student_name") or "",
+        "has_submitted": bool(rd.get("submitted_at")),
+    }})
+
+
+@app.route('/api/trip-survey/<token>', methods=['POST'])
+def api_public_trip_survey_submit(token):
+    """Public submit. Validates token + dedupe (one row per token,
+    has_submitted check). Body: {rating 1-5, liked_what, improvements,
+    would_recommend (bool), additional_comments}. Stores ip_address
+    for spam protection."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM trip_surveys WHERE survey_token = ? LIMIT 1",
+            (token,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "رابط غير صحيح"}), 404
+    rd = dict(row)
+    if rd.get("submitted_at"):
+        return jsonify({"ok": False, "error": "تم إرسال التقييم مسبقاً"}), 409
+    d = request.get_json(silent=True) or {}
+    try:
+        rating = int(d.get("rating") or 0)
+    except Exception:
+        rating = 0
+    if rating < 1 or rating > 5:
+        return jsonify({"ok": False, "error": "التقييم مطلوب من 1 إلى 5 نجوم"}), 400
+    liked        = (d.get("liked_what") or "").strip() or None
+    improvements = (d.get("improvements") or "").strip() or None
+    extra        = (d.get("additional_comments") or "").strip() or None
+    recommend    = 1 if d.get("would_recommend") else 0
+    ip = (request.remote_addr or "").strip() or None
+    try:
+        db.execute(
+            "UPDATE trip_surveys "
+            "SET rating = ?, liked_what = ?, improvements = ?, "
+            "    would_recommend = ?, additional_comments = ?, "
+            "    submitted_at = CURRENT_TIMESTAMP, ip_address = ? "
+            "WHERE id = ?",
+            (rating, liked, improvements, recommend, extra, ip, rd.get("id")),
+        )
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] survey submit failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر إرسال التقييم"}), 500
+    try:
+        _audit("trip.survey.submit",
+               target_type="trip_survey", target_id=rd.get("id"),
+               new_value={"trip_id": rd.get("trip_id"), "rating": rating,
+                          "would_recommend": recommend})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "rating": rating})
+
+
 @app.route('/trip/<token>/register', methods=['GET'])
 def public_trip_register_page(token):
     """Parent-facing registration landing page reached from a per-trip
@@ -70279,6 +70411,246 @@ def api_admin_trips_tasks_reorder(tid):
         print("[trips] task reorder failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر إعادة الترتيب"}), 500
     return jsonify({"ok": True})
+
+
+PUBLIC_TRIP_SURVEY_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>استبيان الرحلة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(160deg,#fce4ec,#e1bee7 55%,#bbdefb);
+     min-height:100vh;direction:rtl;color:#212121;
+     padding:18px 14px 36px;line-height:1.55;}
+.wrap{max-width:520px;margin:0 auto;}
+.card{background:#fff;border-radius:20px;padding:24px 24px 28px;
+      box-shadow:0 12px 30px rgba(0,0,0,.08);margin-bottom:14px;}
+.brand{text-align:center;margin-bottom:14px;}
+.brand .logo{display:inline-flex;width:74px;height:74px;border-radius:18px;
+             background:linear-gradient(135deg,#e91e63,#6B3FA0);color:#fff;
+             align-items:center;justify-content:center;font-size:2.4rem;
+             box-shadow:0 8px 22px rgba(74,20,140,.25);margin-bottom:10px;}
+.brand .name{font-size:.88rem;color:#4a148c;font-weight:800;}
+.h{font-size:1.25rem;font-weight:900;color:#4a148c;margin:0 0 4px;
+   display:flex;align-items:center;gap:8px;}
+.sub{color:#666;margin:0 0 14px;font-size:.92rem;}
+.tag{background:#f3e5f5;color:#4a148c;border-radius:9px;padding:6px 12px;
+     font-size:.82rem;font-weight:800;margin:0 0 14px;display:inline-block;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.field label{font-size:.88rem;font-weight:800;color:#444;}
+.field textarea{width:100%;border:1.5px solid #e0e0e0;border-radius:11px;
+                padding:11px 13px;font-size:1rem;background:#fafafa;
+                font-family:inherit;resize:vertical;min-height:74px;}
+.field textarea:focus{outline:none;border-color:#6B3FA0;background:#fff;}
+.stars{display:flex;gap:6px;justify-content:center;margin:8px 0 4px;}
+.star{font-size:2.2rem;cursor:pointer;color:#ddd;
+      transition:transform .15s,color .15s;user-select:none;}
+.star:hover,.star.on{color:#FFC107;transform:scale(1.15);}
+.rec-row{display:flex;gap:10px;}
+.rec-row label{flex:1;background:#fafafa;border:2px solid #e0e0e0;
+               border-radius:11px;padding:14px 10px;cursor:pointer;
+               font-weight:800;font-size:.95rem;text-align:center;
+               display:flex;align-items:center;justify-content:center;gap:6px;
+               transition:all .15s;}
+.rec-row label.on{border-color:#6B3FA0;
+                  background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                  color:#fff;box-shadow:0 4px 12px rgba(107,63,160,.32);}
+.rec-row label.on.no{background:linear-gradient(135deg,#c62828,#e57373);}
+.rec-row input{display:none;}
+.btn{width:100%;border:0;border-radius:14px;padding:14px 20px;
+     font-size:1.02rem;font-weight:800;cursor:pointer;font-family:inherit;
+     display:inline-flex;align-items:center;justify-content:center;gap:6px;
+     transition:transform .15s,box-shadow .2s,opacity .2s;
+     background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+     box-shadow:0 8px 18px rgba(107,63,160,.32);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn:active:not(:disabled){transform:scale(.98);}
+.error{display:none;background:#ffebee;color:#c62828;border-right:4px solid #c62828;
+       padding:10px 14px;border-radius:10px;font-size:.88rem;font-weight:700;
+       margin-bottom:10px;}
+.error.show{display:block;}
+.success{text-align:center;padding:24px 14px;}
+.success .em{font-size:4rem;line-height:1;margin-bottom:10px;}
+.success .h{font-size:1.4rem;justify-content:center;margin-bottom:8px;
+            color:#1D9E75;}
+.success .sub{margin-bottom:14px;}
+.loading{text-align:center;color:#777;padding:40px 14px;font-weight:700;}
+</style></head>
+<body>
+
+<div class="wrap">
+  <div class="brand">
+    <div class="logo">💚</div>
+    <div class="name">مركز مايندكس التعليمي</div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="loading" id="loading">جارٍ التحميل...</div>
+  </div>
+</div>
+
+<script>
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function getToken(){
+  var p = window.location.pathname.split('/');
+  return p[p.length - 1] || p[p.length - 2] || '';
+}
+var TOKEN = getToken();
+var SURVEY = null;
+var RATING = 0;
+var REC    = null;
+
+function load(){
+  fetch('/api/trip-survey/' + encodeURIComponent(TOKEN) + '/info')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var card = document.getElementById('card');
+      if (!j || !j.ok){
+        card.innerHTML = '<div style="text-align:center;color:#c62828;padding:30px;">'
+                       + esc((j && j.error) || 'خطأ') + '</div>';
+        return;
+      }
+      SURVEY = j.survey || {};
+      if (SURVEY.has_submitted){
+        renderAlreadyDone();
+      } else {
+        renderForm();
+      }
+    })
+    .catch(function(){
+      document.getElementById('card').innerHTML =
+        '<div style="text-align:center;color:#c62828;padding:30px;">خطأ في الاتصال</div>';
+    });
+}
+function renderAlreadyDone(){
+  document.getElementById('card').innerHTML =
+      '<div class="success">'
+    + '  <div class="em">✓</div>'
+    + '  <div class="h">شكراً لكِ!</div>'
+    + '  <div class="sub">لقد أرسلتِ تقييم هذه الرحلة من قبل.</div>'
+    + '</div>';
+}
+function renderForm(){
+  var card = document.getElementById('card');
+  card.innerHTML =
+      '<h1 class="h"><span>💚</span><span>شكراً لمشاركتكم!</span></h1>'
+    + '<p class="sub">استبيان رحلة <strong>' + esc(SURVEY.trip_name) + '</strong></p>'
+    + (SURVEY.student_name ? '<div class="tag">👧 ' + esc(SURVEY.student_name) + '</div>' : '')
+    + '<div class="error" id="err"></div>'
+    + '<div class="field"><label>كيف كانت تجربة ابنتك؟</label>'
+    + '  <div class="stars" id="stars">'
+    +    [1,2,3,4,5].map(function(n){ return '<span class="star" data-n="'+n+'">★</span>'; }).join('')
+    + '  </div>'
+    + '</div>'
+    + '<div class="field"><label>ما الذي أعجبك؟</label>'
+    + '  <textarea id="liked" rows="2" placeholder="...شاركينا أجمل اللحظات"></textarea>'
+    + '</div>'
+    + '<div class="field"><label>ما الذي يمكن تحسينه؟</label>'
+    + '  <textarea id="improvements" rows="2" placeholder="...اقتراحات أو ملاحظات"></textarea>'
+    + '</div>'
+    + '<div class="field"><label>هل توصين بالرحلة لأمهات أخريات؟</label>'
+    + '  <div class="rec-row">'
+    + '    <label data-rec="1"><input type="radio" name="rec" value="1"><span>✅ نعم</span></label>'
+    + '    <label data-rec="0" class="no"><input type="radio" name="rec" value="0"><span>✗ لا</span></label>'
+    + '  </div>'
+    + '</div>'
+    + '<div class="field"><label>ملاحظات إضافية (اختياري)</label>'
+    + '  <textarea id="extra" rows="2"></textarea>'
+    + '</div>'
+    + '<button class="btn" id="submit"><span>✨</span><span>إرسال التقييم</span></button>';
+  // Stars
+  var stars = card.querySelectorAll('.star');
+  stars.forEach(function(s){
+    s.addEventListener('click', function(){
+      RATING = parseInt(s.getAttribute('data-n'), 10) || 0;
+      stars.forEach(function(x){
+        var n = parseInt(x.getAttribute('data-n'), 10);
+        x.classList.toggle('on', n <= RATING);
+      });
+    });
+  });
+  // Recommend
+  card.querySelectorAll('.rec-row label').forEach(function(l){
+    l.addEventListener('click', function(){
+      REC = parseInt(l.getAttribute('data-rec'), 10);
+      card.querySelectorAll('.rec-row label').forEach(function(x){
+        x.classList.toggle('on', x === l);
+      });
+    });
+  });
+  // Submit
+  document.getElementById('submit').addEventListener('click', submit);
+}
+function showErr(msg){
+  var e=document.getElementById('err');
+  if(!e) return;
+  e.textContent = msg||'';
+  e.classList.add('show');
+  setTimeout(function(){e.classList.remove('show');},5000);
+}
+function submit(){
+  if (!RATING){ showErr('اختاري عدد النجوم أولاً'); return; }
+  if (REC == null){ showErr('اختاري إجابة سؤال التوصية'); return; }
+  var btn = document.getElementById('submit');
+  btn.disabled = true; btn.style.opacity = '.6';
+  fetch('/api/trip-survey/' + encodeURIComponent(TOKEN), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      rating: RATING,
+      liked_what:    (document.getElementById('liked').value || '').trim(),
+      improvements:  (document.getElementById('improvements').value || '').trim(),
+      would_recommend: REC === 1,
+      additional_comments: (document.getElementById('extra').value || '').trim(),
+    }),
+  }).then(function(r){ return r.json(); })
+    .then(function(j){
+      btn.disabled = false; btn.style.opacity = '1';
+      if (!j || !j.ok){ showErr((j && j.error) || 'تعذّر الإرسال'); return; }
+      renderSuccess();
+      confetti();
+    })
+    .catch(function(){
+      btn.disabled = false; btn.style.opacity = '1';
+      showErr('خطأ في الاتصال');
+    });
+}
+function renderSuccess(){
+  document.getElementById('card').innerHTML =
+      '<div class="success">'
+    + '  <div class="em">🎉</div>'
+    + '  <div class="h">شكراً لتقييمك!</div>'
+    + '  <div class="sub">رأيكم يساعدنا على تطوير رحلاتنا القادمة. 💚</div>'
+    + '</div>';
+}
+function confetti(){
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
+  document.body.appendChild(host);
+  var colors=['#e91e63','#6B3FA0','#1D9E75','#1565C0','#C9A227'];
+  for (var i=0;i<70;i++){
+    var p=document.createElement('span');
+    p.style.cssText='position:absolute;top:-20px;left:'+(Math.random()*100)+'vw;'
+                  +'width:'+(6+Math.random()*8)+'px;height:'+(10+Math.random()*10)+'px;'
+                  +'background:'+colors[i%colors.length]+';'
+                  +'animation:tsfFall '+(1.8+Math.random()*1.6)+'s '+(Math.random()*0.4)+'s ease-in forwards;'
+                  +'transform:rotateZ('+(Math.random()*360)+'deg);';
+    host.appendChild(p);
+  }
+  setTimeout(function(){host.remove();},4000);
+}
+var s=document.createElement('style');
+s.textContent='@keyframes tsfFall{0%{transform:translateY(0) rotateZ(0deg);opacity:1;}100%{transform:translateY(110vh) rotateZ(720deg);opacity:0;}}';
+document.head.appendChild(s);
+
+document.addEventListener('DOMContentLoaded', load);
+</script>
+</body></html>"""
 
 
 PUBLIC_TRIP_REGISTER_HTML = r"""<!DOCTYPE html>
