@@ -59334,6 +59334,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
 .card.crc::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
 .card.trips::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#1D9E75,#6B3FA0);}
+.card.ach::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#C9A227,#FFC107);}
 .empty{text-align:center;color:#888;padding:60px 20px;}
 @media (max-width:1280px){
   .cards{grid-template-columns:repeat(3,1fr);gap:16px;}
@@ -59380,6 +59381,7 @@ noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
       <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
       <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
       <li><a href="/portal/parent-hub/trips">🚌 الرحلات والفعاليات</a></li>
+      <li><a href="/portal/parent-hub/achievements">⭐ الإنجازات والمستوى</a></li>
     </ul>
   </noscript>
 </div>
@@ -59402,6 +59404,7 @@ function _renderFallbackNav(reason){
       '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
       '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
       '<li><a href="/portal/parent-hub/trips">🚌 الرحلات والفعاليات</a></li>'+
+      '<li><a href="/portal/parent-hub/achievements">⭐ الإنجازات والمستوى</a></li>'+
     '</ul>';
 }
 fetch('/api/portal/student/meta',{credentials:'include'})
@@ -59452,6 +59455,11 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +     '<span class="ic">🚌</span><h3>الرحلات والفعاليات</h3>'
       +     '<p>سجّلي ' + _esc(firstName) + ' في الرحلات القادمة</p>'
       +   '</a>'
+      +   '<a class="card ach" href="/portal/parent-hub/achievements" id="ph-ach-card">'
+      +     '<span class="badge" id="ph-ach-badge" style="display:none;">0</span>'
+      +     '<span class="ic">⭐</span><h3>الإنجازات والمستوى</h3>'
+      +     '<p>تابعي مستوى ' + _esc(firstName) + ' وإنجازاتها</p>'
+      +   '</a>'
       + '</div>';
     root.innerHTML = html;
     // Poll the unread count once and surface the badge if non-zero.
@@ -59461,6 +59469,16 @@ fetch('/api/portal/student/meta',{credentials:'include'})
         if(j && j.ok && (j.unread||0) > 0){
           var b = document.getElementById('ph-msg-badge');
           if(b){ b.textContent = j.unread; b.style.display = 'inline-block'; }
+        }
+      }).catch(function(){});
+    // Achievements badge — count of pending celebrations.
+    fetch('/api/portal/student/points', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j && j.ok){
+          var n = (j.new_celebrations || []).length;
+          var b = document.getElementById('ph-ach-badge');
+          if(b && n > 0){ b.textContent = n; b.style.display = 'inline-block'; }
         }
       }).catch(function(){});
     // Trips badge — count of upcoming trips this daughter can still
@@ -59829,6 +59847,19 @@ def portal_parent_hub_trips_page():
     return PORTAL_PARENT_TRIPS_HTML
 
 
+@app.route('/portal/parent-hub/achievements')
+@login_required
+def portal_parent_hub_achievements_page():
+    """Gamified points + achievements page for the linked student
+    account. Same role gate as the other hub sub-pages."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_ACHIEVEMENTS_HTML
+
+
 @app.route('/api/portal/trips/available', methods=['GET'])
 @login_required
 def api_portal_trips_available():
@@ -60023,6 +60054,193 @@ def api_portal_trips_register(tid):
         "status":             new_status,
         "waitlist_position":  wl_pos,
     })
+
+
+PORTAL_PARENT_ACHIEVEMENTS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الإنجازات والمستوى — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fff9e6,#fce4ec 50%,#e1bee7);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.pp-pts-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+               justify-content:space-between;align-items:center;flex-wrap:wrap;
+               gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.pp-pts-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.pp-pts-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+                 padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.pp-pts-wrap{max-width:540px;margin:18px auto 36px;padding:0 16px;}
+
+.pp-pts-tier{background:linear-gradient(135deg,var(--c1,#C9A227),var(--c2,#FFC107));
+             color:#fff;padding:34px 24px;border-radius:22px;text-align:center;
+             margin-bottom:18px;box-shadow:0 12px 32px rgba(201,162,39,.32);
+             position:relative;overflow:hidden;
+             animation:tierEntry .8s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes tierEntry{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
+.pp-pts-tier::after{content:"";position:absolute;top:-40%;left:-15%;width:60%;height:200%;
+                    background:radial-gradient(closest-side,rgba(255,255,255,.2),transparent 70%);
+                    animation:ppTierPulse 6s ease-in-out infinite;pointer-events:none;}
+@keyframes ppTierPulse{0%,100%{transform:translateX(0) scale(1);}50%{transform:translateX(20%) scale(1.1);}}
+.pp-pts-tier[data-tier="diamond"] {--c1:#1976D2;--c2:#42A5F5;}
+.pp-pts-tier[data-tier="gold"]    {--c1:#C9A227;--c2:#FFC107;}
+.pp-pts-tier[data-tier="silver"]  {--c1:#9e9e9e;--c2:#bdbdbd;}
+.pp-pts-tier[data-tier="bronze"]  {--c1:#a1887f;--c2:#bcaaa4;}
+.pp-pts-tier[data-tier="none"]    {--c1:#9e9e9e;--c2:#bdbdbd;}
+.pp-pts-tier .em{font-size:4rem;line-height:1;margin-bottom:6px;}
+.pp-pts-tier .tier{font-size:1.5rem;font-weight:900;}
+.pp-pts-tier .tot{font-size:2.6rem;font-weight:900;margin-top:14px;
+                  font-variant-numeric:tabular-nums;}
+.pp-pts-tier .tot small{font-size:1rem;opacity:.85;}
+.pp-pts-tier .bar{height:12px;background:rgba(0,0,0,.25);border-radius:8px;
+                  margin:14px auto 6px;max-width:80%;overflow:hidden;}
+.pp-pts-tier .fill{height:100%;background:rgba(255,255,255,.85);border-radius:8px;
+                   width:0%;transition:width 1.2s cubic-bezier(.2,.8,.2,1);}
+.pp-pts-tier .next{font-size:.92rem;opacity:.95;font-weight:700;}
+
+.pp-card{background:#fff;border-radius:16px;padding:18px 20px;
+         box-shadow:0 6px 18px rgba(0,0,0,.07);margin-bottom:14px;}
+.pp-card h3{margin:0 0 12px;font-size:1rem;color:#4a148c;font-weight:900;
+            border-right:4px solid #C9A227;padding-right:10px;}
+.pp-ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px;}
+.pp-ach{background:#fafafa;border-radius:12px;padding:10px 8px;text-align:center;
+        border-right:4px solid var(--c,#bdbdbd);}
+.pp-ach[data-tier="bronze"]  {--c:#a1887f;}
+.pp-ach[data-tier="silver"]  {--c:#9e9e9e;}
+.pp-ach[data-tier="gold"]    {--c:#C9A227;}
+.pp-ach[data-tier="diamond"] {--c:#1976D2;}
+.pp-ach.locked{opacity:.45;}
+.pp-ach .em{font-size:1.8rem;line-height:1;margin-bottom:4px;}
+.pp-ach .nm{font-weight:800;color:#212121;font-size:.85rem;}
+.pp-ach .ds{color:#666;font-size:.74rem;margin-top:3px;line-height:1.4;}
+.pp-log .row{padding:9px 4px;border-bottom:1px solid #ececec;display:flex;
+             justify-content:space-between;align-items:center;font-size:.88rem;}
+.pp-log .row:last-child{border-bottom:0;}
+.pp-log .row .ds{flex:1;color:#444;font-weight:700;}
+.pp-log .row .ds .when{display:block;color:#888;font-size:.74rem;font-weight:700;}
+.pp-log .row .pts{font-weight:900;font-variant-numeric:tabular-nums;font-size:1rem;}
+.pp-log .row .pts.pos{color:#1D9E75;}
+.pp-log .row .pts.neg{color:#c62828;}
+.pp-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
+</style></head>
+<body>
+
+<div class="pp-pts-topbar">
+  <h1>⭐ الإنجازات والمستوى</h1>
+  <a href="/portal/parent-hub">← العودة للبوابة</a>
+</div>
+
+<div class="pp-pts-wrap" id="root">
+  <div class="pp-loading">جارٍ التحميل...</div>
+</div>
+
+<script>
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function confetti(){
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
+  document.body.appendChild(host);
+  var colors=['#C9A227','#6B3FA0','#1D9E75','#1565C0','#e91e63','#FFC107'];
+  for (var i=0;i<90;i++){
+    var p=document.createElement('span');
+    p.style.cssText='position:absolute;top:-20px;left:'+(Math.random()*100)+'vw;'
+                  +'width:'+(6+Math.random()*8)+'px;height:'+(10+Math.random()*10)+'px;'
+                  +'background:'+colors[i%colors.length]+';'
+                  +'animation:ppfall '+(2+Math.random()*1.6)+'s '+(Math.random()*0.5)+'s ease-in forwards;'
+                  +'transform:rotateZ('+(Math.random()*360)+'deg);';
+    host.appendChild(p);
+  }
+  setTimeout(function(){host.remove();},5000);
+}
+var sk=document.createElement('style');
+sk.textContent='@keyframes ppfall{0%{transform:translateY(0) rotateZ(0deg);opacity:1;}100%{transform:translateY(110vh) rotateZ(720deg);opacity:0;}}';
+document.head.appendChild(sk);
+
+function tierEmoji(t){return ({diamond:'💎',gold:'🥇',silver:'🥈',bronze:'🥉',none:'🌱'})[t]||'🌟';}
+function tierAr(t){return ({diamond:'💎 ماسي',gold:'🥇 ذهبي',silver:'🥈 فضي',bronze:'🥉 برونزي',none:'🌱 بداية الرحلة'})[t]||t;}
+
+function load(){
+  fetch('/api/portal/student/points', {credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok){
+        document.getElementById('root').innerHTML='<div class=\"pp-loading\" style=\"color:#c62828;\">'+esc((j&&j.error)||'خطأ')+'</div>';
+        return;
+      }
+      render(j);
+      if((j.new_celebrations||[]).length>0){
+        setTimeout(function(){
+          confetti();
+          // Mark celebrated so this only fires once per achievement.
+          fetch('/api/portal/student/points/celebrate', {method:'POST',credentials:'include'}).catch(function(){});
+        }, 600);
+      }
+    })
+    .catch(function(){
+      document.getElementById('root').innerHTML='<div class=\"pp-loading\" style=\"color:#c62828;\">خطأ في الاتصال</div>';
+    });
+}
+function render(j){
+  var prog = j.tier_progress||{};
+  var nextTxt='';
+  if (prog.next_tier){
+    var rem=(prog.next_threshold||0)-(j.total_points||0);
+    nextTxt='متبقّي '+rem+' نقطة للوصول إلى '+tierAr(prog.next_tier);
+  } else { nextTxt='أحسنتِ! وصلتِ لأعلى مستوى 💎'; }
+  var unlocked = j.achievements_unlocked||[];
+  var locked   = j.achievements_locked||[];
+  var unlockedHTML='', lockedHTML='';
+  if (unlocked.length){
+    unlockedHTML='<div class=\"pp-card\"><h3>🏆 إنجازاتي ('+unlocked.length+')</h3><div class=\"pp-ach-grid\">'
+      + unlocked.map(function(a){
+        return '<div class=\"pp-ach\" data-tier=\"'+esc(a.tier)+'\">'
+             + '<div class=\"em\">'+esc(a.icon||'🏆')+'</div>'
+             + '<div class=\"nm\">'+esc(a.name_ar)+'</div>'
+             + '<div class=\"ds\">'+esc(a.description_ar)+'</div>'
+             + '</div>';
+      }).join('')+'</div></div>';
+  }
+  if (locked.length){
+    lockedHTML='<div class=\"pp-card\"><h3>🔒 إنجازات قادمة</h3><div class=\"pp-ach-grid\">'
+      + locked.map(function(a){
+        return '<div class=\"pp-ach locked\" data-tier=\"'+esc(a.tier)+'\">'
+             + '<div class=\"em\">'+esc(a.icon||'🏆')+'</div>'
+             + '<div class=\"nm\">'+esc(a.name_ar)+'</div>'
+             + '<div class=\"ds\">'+esc(a.description_ar)+'</div>'
+             + '</div>';
+      }).join('')+'</div></div>';
+  }
+  var logHTML='<div class=\"pp-card pp-log\"><h3>📜 آخر النقاط</h3>';
+  if(!j.recent_log.length){
+    logHTML+='<div class=\"pp-loading\" style=\"padding:18px;\">لم تُسجَّل أي نقاط بعد. ✨</div>';
+  } else {
+    logHTML+=j.recent_log.map(function(l){
+      var pts=(l.points||0);
+      var when=l.awarded_at?String(l.awarded_at).substring(0,16):'';
+      return '<div class=\"row\"><div class=\"ds\">'+esc(l.description_ar)
+           + '<span class=\"when\">'+esc(when)+'</span></div>'
+           + '<div class=\"pts '+(pts>=0?'pos':'neg')+'\">'+(pts>=0?'+':'')+pts+'</div></div>';
+    }).join('');
+  }
+  logHTML+='</div>';
+  document.getElementById('root').innerHTML =
+      '<div class=\"pp-pts-tier\" data-tier=\"'+esc(j.tier)+'\">'
+    + '  <div class=\"em\">'+tierEmoji(j.tier)+'</div>'
+    + '  <div class=\"tier\">'+esc(tierAr(j.tier))+'</div>'
+    + '  <div class=\"tot\">'+(j.total_points||0)+'<small> نقطة</small></div>'
+    + '  <div class=\"bar\"><div class=\"fill\" style=\"width:'+(prog.pct||0)+'%\"></div></div>'
+    + '  <div class=\"next\">'+esc(nextTxt)+'</div>'
+    + '</div>'
+    + unlockedHTML + lockedHTML + logHTML;
+}
+document.addEventListener('DOMContentLoaded', load);
+</script>
+</body></html>"""
 
 
 PORTAL_PARENT_TRIPS_HTML = r"""<!DOCTYPE html>
