@@ -64863,17 +64863,26 @@ def _trip_count_active_regs(db, trip_id):
         return 0
 
 
-def _trip_compute_fields(rd):
+def _trip_compute_fields(rd, counts=None):
     """Augment a raw trips row dict with the computed fields the UI
     expects: total_expected, days_until_trip, day_name_ar,
-    is_imminent, registration_pct, collection_pct, plus the placeholder
-    counters that stages 2/3 will populate. Pure function — no DB."""
+    is_imminent, registered_count, waitlist_count, registration_pct,
+    collection_pct, plus collection_amount placeholder for stage 3.
+
+    `counts` (optional) is a per-trip dict {'registered': N,
+    'waitlisted': M} — the list endpoint pre-loads them via
+    _trip_load_reg_counts so we don't re-query per row."""
     out = dict(rd)
     cap   = int(out.get("max_capacity") or 0)
     price = float(out.get("price_per_student") or 0)
     out["total_expected"]   = round(cap * price, 2)
-    # registered_count / collected_amount remain 0 until stage 2/3 ship.
-    out["registered_count"] = int(out.get("registered_count") or 0)
+    if counts:
+        out["registered_count"] = int(counts.get("registered", 0))
+        out["waitlist_count"]   = int(counts.get("waitlisted", 0))
+    else:
+        out["registered_count"] = int(out.get("registered_count") or 0)
+        out["waitlist_count"]   = int(out.get("waitlist_count") or 0)
+    # collected_amount stays 0 until stage 3 ships its payments table.
     out["collected_amount"] = float(out.get("collected_amount") or 0)
     out["registration_pct"] = (round(out["registered_count"] / cap * 100, 1)
                                if cap > 0 else 0.0)
@@ -65229,7 +65238,9 @@ def api_admin_trips_list():
         import sys as _sys
         print("[trips] list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
-    out = [_trip_compute_fields(dict(r)) for r in rows]
+    trip_ids = [dict(r).get("id") for r in rows]
+    counts_map = _trip_load_reg_counts(db, trip_ids)
+    out = [_trip_compute_fields(dict(r), counts_map.get(dict(r).get("id"))) for r in rows]
     return jsonify({"ok": True, "trips": out, "total": len(out)})
 
 
@@ -65273,16 +65284,32 @@ def api_admin_trips_stats():
         "SELECT COUNT(*) FROM trips WHERE is_deleted=0 "
         "AND trip_date IS NOT NULL AND trip_date BETWEEN ? AND ?",
         (year_start, year_end))
+    # Totals across all active trips — drives the dashboard summary +
+    # any future health checks that want to flag low engagement.
+    total_registrations = _scalar(
+        "SELECT COUNT(*) FROM trip_registrations r "
+        "JOIN trips t ON t.id = r.trip_id "
+        "WHERE r.is_deleted = 0 AND t.is_deleted = 0 "
+        "AND r.registration_status = 'registered' "
+        "AND t.status = 'active'")
+    total_waitlisted = _scalar(
+        "SELECT COUNT(*) FROM trip_registrations r "
+        "JOIN trips t ON t.id = r.trip_id "
+        "WHERE r.is_deleted = 0 AND t.is_deleted = 0 "
+        "AND r.registration_status = 'waitlisted' "
+        "AND t.status = 'active'")
     return jsonify({
         "ok": True,
         "stats": {
-            "active":    active,
-            "upcoming":  upcoming,
-            "imminent":  imminent,
-            "closed":    closed,
-            "completed": completed,
-            "archived":  archived,
-            "yearly":    yearly,
+            "active":              active,
+            "upcoming":            upcoming,
+            "imminent":            imminent,
+            "closed":              closed,
+            "completed":           completed,
+            "archived":            archived,
+            "yearly":              yearly,
+            "total_registrations": total_registrations,
+            "total_waitlisted":    total_waitlisted,
         },
     })
 
@@ -65435,6 +65462,89 @@ def _trip_next_confirmation_id(db):
     except Exception:
         seq = 1
     return "TR-" + str(year) + "-" + ("%04d" % seq)
+
+
+def _trip_promote_next_waitlisted(db, trip_id):
+    """When a registered student cancels, promote the next waitlisted
+    entry (lowest waitlist_position) and decrement everyone above
+    them so the queue stays contiguous. Returns the promoted row id
+    or None if there's nothing to promote. Best-effort — never raises
+    so a cancel doesn't fail just because the promotion couldn't run."""
+    try:
+        row = db.execute(
+            "SELECT id, waitlist_position, student_name FROM trip_registrations "
+            "WHERE trip_id = ? AND is_deleted = 0 "
+            "AND registration_status = 'waitlisted' "
+            "AND waitlist_position IS NOT NULL "
+            "ORDER BY waitlist_position ASC, registered_at ASC LIMIT 1",
+            (trip_id,),
+        ).fetchone()
+        if not row:
+            return None
+        rid = row[0] if not hasattr(row, "keys") else row["id"]
+        old_pos = int((row[1] if not hasattr(row, "keys") else row["waitlist_position"]) or 0)
+        db.execute(
+            "UPDATE trip_registrations "
+            "SET registration_status = 'registered', "
+            "    waitlist_position = NULL, "
+            "    promoted_from_waitlist_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?",
+            (rid,),
+        )
+        if old_pos > 0:
+            db.execute(
+                "UPDATE trip_registrations "
+                "SET waitlist_position = waitlist_position - 1 "
+                "WHERE trip_id = ? AND is_deleted = 0 "
+                "AND registration_status = 'waitlisted' "
+                "AND waitlist_position > ?",
+                (trip_id, old_pos),
+            )
+        db.commit()
+        try:
+            _audit("trip.registration.auto_promote",
+                   target_type="trip_registration", target_id=rid,
+                   old_value={"status": "waitlisted", "waitlist_position": old_pos},
+                   new_value={"status": "registered"})
+        except Exception:
+            pass
+        return rid
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] auto-promote failed: " + str(ex), file=_sys.stderr)
+        return None
+
+
+def _trip_load_reg_counts(db, trip_ids):
+    """Single-query lookup: {trip_id: {'registered': N, 'waitlisted': M}}.
+    Used by the list endpoint to inject real counts into every row's
+    computed fields. Returns {} on any error so the UI degrades to
+    'no registrations' rather than showing stale data."""
+    if not trip_ids:
+        return {}
+    out = {tid: {"registered": 0, "waitlisted": 0} for tid in trip_ids}
+    placeholders = ",".join(["?"] * len(trip_ids))
+    try:
+        rows = db.execute(
+            "SELECT trip_id, registration_status, COUNT(*) "
+            "FROM trip_registrations "
+            "WHERE is_deleted = 0 "
+            "AND registration_status IN ('registered','waitlisted') "
+            "AND trip_id IN (" + placeholders + ") "
+            "GROUP BY trip_id, registration_status",
+            tuple(trip_ids),
+        ).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        tid = r[0] if not hasattr(r, "keys") else r["trip_id"]
+        st  = r[1] if not hasattr(r, "keys") else r["registration_status"]
+        n   = r[2] if not hasattr(r, "keys") else r[2]
+        if tid in out and st in ("registered","waitlisted"):
+            out[tid][st] = int(n or 0)
+    return out
 
 
 def _trip_existing_registration(db, trip_id, student_id, student_name, parent_phone):
@@ -65814,6 +65924,7 @@ def api_admin_trips_reg_cancel(tid, rid):
     cur_d = dict(cur)
     if (cur_d.get("registration_status") or "") == "cancelled":
         return jsonify({"ok": True, "id": rid, "noop": True})
+    was_registered = (cur_d.get("registration_status") == "registered")
     try:
         db.execute(
             "UPDATE trip_registrations "
@@ -65836,7 +65947,18 @@ def api_admin_trips_reg_cancel(tid, rid):
                new_value={"status": "cancelled"})
     except Exception:
         pass
-    return jsonify({"ok": True, "id": rid, "status": "cancelled"})
+    # Auto-promote the next waitlisted entry if the cancelled row was
+    # actually occupying a registered seat. Cancelling a waitlisted
+    # entry just clears its slot — no promotion needed.
+    promoted_id = None
+    if was_registered:
+        promoted_id = _trip_promote_next_waitlisted(db, tid)
+    return jsonify({
+        "ok":           True,
+        "id":           rid,
+        "status":       "cancelled",
+        "promoted_id":  promoted_id,
+    })
 
 
 @app.route('/api/admin/trips/student-search', methods=['GET'])
@@ -67705,17 +67827,27 @@ function tripTimeText(d){
 }
 function tripBuildAlerts(tp){
   var out = [];
-  // 1) Imminent + slow registration: capacity > 0 and registered < 50%.
-  if (tp.is_imminent && (tp.max_capacity || 0) > 0
-      && (tp.registered_count || 0) < (tp.max_capacity * 0.5)){
-    out.push({cls:'', text:'⚠️ التسجيل بطيء — قريب من الموعد'});
+  var cap = tp.max_capacity || 0;
+  var reg = tp.registered_count || 0;
+  var wl  = tp.waitlist_count || 0;
+  // 1) No one signed up yet + close to the date — loudest alert.
+  if (tp.is_imminent && reg === 0){
+    out.push({cls:'', text:'🚨 لا أحد سجَّل بعد!'});
   }
-  // 2) Full capacity.
-  if ((tp.max_capacity || 0) > 0
-      && (tp.registered_count || 0) >= tp.max_capacity){
+  // 2) Slow registration: capacity > 0, < 30%, and is imminent.
+  else if (tp.is_imminent && cap > 0
+           && (tp.registration_pct || 0) < 30){
+    out.push({cls:'', text:'⚠️ تسجيل بطيء — قريب من الموعد'});
+  }
+  // 3) Full capacity.
+  if (cap > 0 && reg >= cap){
     out.push({cls:'is-full', text:'🔒 ممتلئة!'});
   }
-  // 3) Past + not archived.
+  // 4) Waitlist depth — purely informational, not a warning.
+  if (wl > 0){
+    out.push({cls:'is-archive', text:'📋 ' + wl + ' في قائمة الانتظار'});
+  }
+  // 5) Past + not archived.
   if (tp.days_until_trip != null && tp.days_until_trip < 0
       && tp.status !== 'archived'){
     out.push({cls:'is-archive', text:'📋 جاهزة للأرشفة'});
