@@ -65714,6 +65714,11 @@ function evCardHTML(e){
 }
 
 document.addEventListener('DOMContentLoaded', function(){
+  // Friendly flash when /admin/events/<bad-id> redirected here.
+  if (location.hash === '#not-found'){
+    setTimeout(function(){ evToast('الرحلة غير موجودة', 'error'); }, 200);
+    history.replaceState(null, '', '/admin/events');
+  }
   evLoadStats();
   evLoadAlerts();
   // Filter wiring
@@ -66052,7 +66057,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   /* Tab bar */
   .evd-tabs{display:flex;gap:2px;background:#fff;border-radius:14px;padding:6px;margin:14px 0;overflow-x:auto;scroll-behavior:smooth;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:sticky;top:0;z-index:20;}
   .evd-tabs::-webkit-scrollbar{height:4px;}
-  .evd-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;background:transparent;border:none;font-weight:700;color:#555;cursor:pointer;font-size:.9rem;white-space:nowrap;border-bottom:3px solid transparent;transition:.15s;}
+  .evd-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;background:transparent;border:none;font-weight:700;color:#555;cursor:pointer;font-size:.9rem;white-space:nowrap;border-bottom:3px solid transparent;transition:.15s;outline:none;}
+  .evd-tab:focus-visible{box-shadow:0 0 0 3px rgba(29,158,117,.35);}
   .evd-tab:hover{background:#f6f7f9;color:#1D9E75;}
   .evd-tab.is-active{background:#e6f7ee;color:#1D9E75;border-bottom-color:#1D9E75;}
   .evd-panel{display:none;background:#fff;border-radius:14px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,0.05);min-height:280px;}
@@ -66079,8 +66085,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   /* Mobile */
   @media (max-width: 720px){
-    .evd-h-title{font-size:1.25rem;}
+    .evd-shell{padding:10px;}
+    .evd-header{padding:18px;border-radius:14px;}
+    .evd-h-title{font-size:1.18rem;}
     .evd-h-meta{font-size:.85rem;gap:8px 14px;}
+    .evd-tab{padding:9px 11px;font-size:.83rem;}
+    .evd-panel{padding:18px;border-radius:12px;}
     .evd-modal .grid2{grid-template-columns:1fr;}
   }
 </style></head><body>
@@ -66439,11 +66449,42 @@ function evdSubmitEdit(e){
 
 document.addEventListener('DOMContentLoaded', function(){
   // Tab clicks update hash; the hashchange listener does the work.
-  document.querySelectorAll('.evd-tab').forEach(function(t){
+  document.querySelectorAll('.evd-tab').forEach(function(t, i){
+    t.setAttribute('tabindex', '0');
     t.addEventListener('click', function(){
       var name = t.getAttribute('data-tab');
       if ('#' + name === location.hash){ evdActivateTab(name); return; }
       location.hash = '#' + name;
+    });
+    // Arrow-key navigation between tabs.
+    t.addEventListener('keydown', function(e){
+      var dir = 0;
+      if (e.key === 'ArrowLeft')  dir = -1;
+      if (e.key === 'ArrowRight') dir =  1;
+      if (e.key === 'Home'){
+        e.preventDefault();
+        var first = document.querySelectorAll('.evd-tab')[0];
+        first.focus(); first.click();
+        return;
+      }
+      if (e.key === 'End'){
+        e.preventDefault();
+        var tabs = document.querySelectorAll('.evd-tab');
+        var last = tabs[tabs.length - 1];
+        last.focus(); last.click();
+        return;
+      }
+      if (!dir) return;
+      e.preventDefault();
+      // RTL: ArrowLeft visually feels like "next" in Arabic users'
+      // mental model, but ArrowRight is the ASCII-flow next. We
+      // honour ASCII flow since the tab DOM order is left→right.
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.evd-tab'));
+      var cur = tabs.indexOf(document.activeElement);
+      if (cur < 0) cur = TABS.indexOf((location.hash || '#info').replace('#',''));
+      var next = (cur + dir + tabs.length) % tabs.length;
+      tabs[next].focus();
+      tabs[next].click();
     });
   });
   evdSyncTabFromHash();
