@@ -65445,43 +65445,27 @@ def _trip_count_active_regs(db, trip_id):
         return 0
 
 
-def _trip_compute_fields(rd, counts=None, payments=None):
+def _trip_compute_fields(rd, counts=None):
     """Augment a raw trips row dict with the computed fields the UI
-    expects: total_expected (= registered_count × price, scoped to
-    actually-registered students so cancelled rows don't bloat the
-    denominator), days_until_trip, day_name_ar, is_imminent,
-    registered_count, waitlist_count, registration_pct, paid_count,
-    paid_cash_count, paid_benefit_count, collected_amount,
-    unpaid_count, collection_pct.
+    expects: total_expected, days_until_trip, day_name_ar,
+    is_imminent, registered_count, waitlist_count, registration_pct,
+    collection_pct, plus collection_amount placeholder for stage 3.
 
-    `counts`   (optional) — {'registered': N, 'waitlisted': M}
-    `payments` (optional) — {'paid_count': N, 'paid_amount': X,
-                             'paid_cash_count': N1, 'paid_benefit_count': N2}
-    The list endpoint pre-loads them via _trip_load_reg_counts +
-    _trip_load_payment_summary so this function stays pure / O(1)."""
+    `counts` (optional) is a per-trip dict {'registered': N,
+    'waitlisted': M} — the list endpoint pre-loads them via
+    _trip_load_reg_counts so we don't re-query per row."""
     out = dict(rd)
     cap   = int(out.get("max_capacity") or 0)
     price = float(out.get("price_per_student") or 0)
+    out["total_expected"]   = round(cap * price, 2)
     if counts:
         out["registered_count"] = int(counts.get("registered", 0))
         out["waitlist_count"]   = int(counts.get("waitlisted", 0))
     else:
         out["registered_count"] = int(out.get("registered_count") or 0)
         out["waitlist_count"]   = int(out.get("waitlist_count") or 0)
-    if payments:
-        out["paid_count"]          = int(payments.get("paid_count", 0))
-        out["paid_cash_count"]     = int(payments.get("paid_cash_count", 0))
-        out["paid_benefit_count"]  = int(payments.get("paid_benefit_count", 0))
-        out["collected_amount"]    = float(payments.get("paid_amount", 0))
-    else:
-        out["paid_count"]          = int(out.get("paid_count") or 0)
-        out["paid_cash_count"]     = int(out.get("paid_cash_count") or 0)
-        out["paid_benefit_count"]  = int(out.get("paid_benefit_count") or 0)
-        out["collected_amount"]    = float(out.get("collected_amount") or 0)
-    out["unpaid_count"]    = max(0, out["registered_count"] - out["paid_count"])
-    # Total expected scoped to registered (not capacity) — matches
-    # what the payments panel + financial report use.
-    out["total_expected"]  = round(out["registered_count"] * price, 2)
+    # collected_amount stays 0 until stage 3 ships its payments table.
+    out["collected_amount"] = float(out.get("collected_amount") or 0)
     out["registration_pct"] = (round(out["registered_count"] / cap * 100, 1)
                                if cap > 0 else 0.0)
     out["collection_pct"]   = (round(out["collected_amount"] / out["total_expected"] * 100, 1)
@@ -65837,12 +65821,8 @@ def api_admin_trips_list():
         print("[trips] list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
     trip_ids = [dict(r).get("id") for r in rows]
-    counts_map   = _trip_load_reg_counts(db, trip_ids)
-    payments_map = _trip_load_payment_summary(db, trip_ids)
-    out = [_trip_compute_fields(dict(r),
-                                counts_map.get(dict(r).get("id")),
-                                payments_map.get(dict(r).get("id")))
-           for r in rows]
+    counts_map = _trip_load_reg_counts(db, trip_ids)
+    out = [_trip_compute_fields(dict(r), counts_map.get(dict(r).get("id"))) for r in rows]
     return jsonify({"ok": True, "trips": out, "total": len(out)})
 
 
@@ -65900,46 +65880,18 @@ def api_admin_trips_stats():
         "WHERE r.is_deleted = 0 AND t.is_deleted = 0 "
         "AND r.registration_status = 'waitlisted' "
         "AND t.status = 'active'")
-    # Financial totals across all active trips. total_collected sums
-    # every active payment under an active trip; total_expected is
-    # registered seats × per-trip price aggregated server-side so the
-    # dashboard can show overall collection_pct.
-    def _scalar_f(sql, params=()):
-        try:
-            row = db.execute(sql, params).fetchone()
-            return float(row[0] or 0) if row else 0.0
-        except Exception:
-            return 0.0
-    total_collected = _scalar_f(
-        "SELECT COALESCE(SUM(p.amount), 0) "
-        "FROM trip_payments p "
-        "JOIN trips t ON t.id = p.trip_id "
-        "WHERE p.is_deleted = 0 AND t.is_deleted = 0 "
-        "AND t.status = 'active'")
-    total_expected = _scalar_f(
-        "SELECT COALESCE(SUM(t.price_per_student * sub.cnt), 0) FROM ("
-        "  SELECT trip_id, COUNT(*) AS cnt FROM trip_registrations "
-        "  WHERE is_deleted = 0 AND registration_status = 'registered' "
-        "  GROUP BY trip_id"
-        ") sub JOIN trips t ON t.id = sub.trip_id "
-        "WHERE t.is_deleted = 0 AND t.status = 'active'")
-    overall_collection_pct = (round(total_collected / total_expected * 100, 1)
-                              if total_expected > 0 else 0.0)
     return jsonify({
         "ok": True,
         "stats": {
-            "active":                   active,
-            "upcoming":                 upcoming,
-            "imminent":                 imminent,
-            "closed":                   closed,
-            "completed":                completed,
-            "archived":                 archived,
-            "yearly":                   yearly,
-            "total_registrations":      total_registrations,
-            "total_waitlisted":         total_waitlisted,
-            "total_collected_amount":   round(total_collected, 2),
-            "total_expected_amount":    round(total_expected, 2),
-            "overall_collection_pct":   overall_collection_pct,
+            "active":              active,
+            "upcoming":            upcoming,
+            "imminent":            imminent,
+            "closed":              closed,
+            "completed":           completed,
+            "archived":            archived,
+            "yearly":              yearly,
+            "total_registrations": total_registrations,
+            "total_waitlisted":    total_waitlisted,
         },
     })
 
@@ -66549,41 +66501,6 @@ def _trip_promote_next_waitlisted(db, trip_id):
         import sys as _sys
         print("[trips] auto-promote failed: " + str(ex), file=_sys.stderr)
         return None
-
-
-def _trip_load_payment_summary(db, trip_ids):
-    """Single-query lookup: {trip_id: {'paid_count': N, 'paid_amount': X,
-    'paid_cash_count': N1, 'paid_benefit_count': N2}}. Used by the
-    list endpoint so the smart card's collection bar reflects real
-    data without N+1 queries."""
-    if not trip_ids:
-        return {}
-    out = {tid: {"paid_count": 0, "paid_amount": 0.0,
-                 "paid_cash_count": 0, "paid_benefit_count": 0}
-           for tid in trip_ids}
-    placeholders = ",".join(["?"] * len(trip_ids))
-    try:
-        rows = db.execute(
-            "SELECT trip_id, payment_method, COUNT(*), COALESCE(SUM(amount), 0) "
-            "FROM trip_payments "
-            "WHERE is_deleted = 0 "
-            "AND trip_id IN (" + placeholders + ") "
-            "GROUP BY trip_id, payment_method",
-            tuple(trip_ids),
-        ).fetchall()
-    except Exception:
-        return out
-    for r in rows:
-        tid     = r[0] if not hasattr(r, "keys") else r["trip_id"]
-        method  = r[1] if not hasattr(r, "keys") else r["payment_method"]
-        n       = int((r[2] if not hasattr(r, "keys") else r[2]) or 0)
-        amount  = float((r[3] if not hasattr(r, "keys") else r[3]) or 0)
-        if tid not in out: continue
-        out[tid]["paid_count"]  += n
-        out[tid]["paid_amount"]  = round(out[tid]["paid_amount"] + amount, 2)
-        if   method == "cash":    out[tid]["paid_cash_count"]    += n
-        elif method == "benefit": out[tid]["paid_benefit_count"] += n
-    return out
 
 
 def _trip_load_reg_counts(db, trip_ids):
@@ -67900,18 +67817,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
               width:0%;}
 .tc-prog[data-kind="reg"]  .tc-prog-fill{--bar-start:#1565C0;--bar-end:#42A5F5;}
 .tc-prog[data-kind="cash"] .tc-prog-fill{--bar-start:#1D9E75;--bar-end:#2BB585;}
-.tc-prog[data-kind="cash"][data-tier="low"]  .tc-prog-fill{--bar-start:#c62828;--bar-end:#e57373;}
-.tc-prog[data-kind="cash"][data-tier="mid"]  .tc-prog-fill{--bar-start:#BA7517;--bar-end:#f1a132;}
-.tc-prog[data-kind="cash"][data-tier="full"] .tc-prog-fill{--bar-start:#C9A227;--bar-end:#f1d369;
-                                                            box-shadow:inset 0 0 8px rgba(255,255,255,.4);}
-.trip-card.is-fully-collected{
-  box-shadow:0 0 0 2px rgba(201,162,39,.45),0 8px 22px rgba(201,162,39,.25);
-  animation:tripFullyCollected 3.4s ease-in-out infinite;
-}
-@keyframes tripFullyCollected{
-  0%,100%{box-shadow:0 0 0 2px rgba(201,162,39,.35),0 8px 22px rgba(201,162,39,.18);}
-  50%    {box-shadow:0 0 0 3px rgba(201,162,39,.7), 0 12px 28px rgba(201,162,39,.35);}
-}
 
 /* ── Alerts row + contextual time ────────────────────────────────── */
 .tc-alerts{display:flex;flex-direction:column;gap:4px;}
@@ -69219,33 +69124,26 @@ function tripBuildAlerts(tp){
   var cap = tp.max_capacity || 0;
   var reg = tp.registered_count || 0;
   var wl  = tp.waitlist_count || 0;
-  var unp = tp.unpaid_count || 0;
-  var colPct = tp.collection_pct || 0;
-  var paid   = tp.paid_count || 0;
-  var d      = tp.days_until_trip;
-  // Registration-side alerts
+  // 1) No one signed up yet + close to the date — loudest alert.
   if (tp.is_imminent && reg === 0){
     out.push({cls:'', text:'🚨 لا أحد سجَّل بعد!'});
-  } else if (tp.is_imminent && cap > 0
-             && (tp.registration_pct || 0) < 30){
+  }
+  // 2) Slow registration: capacity > 0, < 30%, and is imminent.
+  else if (tp.is_imminent && cap > 0
+           && (tp.registration_pct || 0) < 30){
     out.push({cls:'', text:'⚠️ تسجيل بطيء — قريب من الموعد'});
   }
+  // 3) Full capacity.
   if (cap > 0 && reg >= cap){
     out.push({cls:'is-full', text:'🔒 ممتلئة!'});
   }
+  // 4) Waitlist depth — purely informational, not a warning.
   if (wl > 0){
     out.push({cls:'is-archive', text:'📋 ' + wl + ' في قائمة الانتظار'});
   }
-  // Collection-side alerts (stage 3)
-  if (paid > 0 && colPct >= 100){
-    out.push({cls:'is-full', text:'🎉 تم تحصيل المبلغ كاملاً!'});
-  } else if (reg > 0 && unp > 0 && d != null && d <= 2 && d >= 0){
-    out.push({cls:'', text:'⚠️ ' + unp + ' لم يدفعن بعد'});
-  } else if (tp.is_imminent && reg > 0 && colPct < 30){
-    out.push({cls:'', text:'💰 التحصيل بطيء'});
-  }
-  // Past + not archived.
-  if (d != null && d < 0 && tp.status !== 'archived'){
+  // 5) Past + not archived.
+  if (tp.days_until_trip != null && tp.days_until_trip < 0
+      && tp.status !== 'archived'){
     out.push({cls:'is-archive', text:'📋 جاهزة للأرشفة'});
   }
   return out;
@@ -69265,16 +69163,10 @@ function tripCardHTML(tp){
   var expected   = (tp.total_expected   || 0).toFixed(2);
   var regPct     = Math.min(100, Math.max(0, tp.registration_pct || 0));
   var colPct     = Math.min(100, Math.max(0, tp.collection_pct   || 0));
-  var colTier    = tripCollectionTier(tp.collection_pct || 0);
   var timeCls    = (tp.is_imminent ? 'is-imminent'
                     : (tp.days_until_trip != null && tp.days_until_trip < 0 ? 'is-past' : ''));
-  var fullyPaid  = (colPct >= 100 && (tp.paid_count || 0) > 0);
-  var tooltipText = (tp.paid_cash_count || 0) + ' نقدي + '
-                  + (tp.paid_benefit_count || 0) + ' بنفت | '
-                  + (tp.unpaid_count || 0) + ' لم يدفعن';
   return ''
-    + '<div class="trip-card' + imm + (fullyPaid ? ' is-fully-collected' : '') + '" '
-    +      'data-status="' + tripEsc(tp.status || 'active') + '" data-tid="' + (tp.id|0) + '">'
+    + '<div class="trip-card' + imm + '" data-status="' + tripEsc(tp.status || 'active') + '" data-tid="' + (tp.id|0) + '">'
     + '  <div class="tc-head">'
     + '    <div class="tc-name"><span class="tc-emoji">' + typeEmoji + '</span>' + tripEsc(tp.name || '') + '</div>'
     + '    <div class="tc-status">' + tripEsc(statusBadge) + '</div>'
@@ -69288,8 +69180,8 @@ function tripCardHTML(tp){
     + '      <div class="tc-prog-label"><span>👥 المسجّلات</span><span class="tc-prog-text"><strong>' + regCount + '</strong> / ' + maxCap + '</span></div>'
     + '      <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + regPct + '%"></div></div>'
     + '    </div>'
-    + '    <div class="tc-prog" data-kind="cash" data-tier="' + colTier + '" title="' + tripEsc(tooltipText) + '">'
-    + '      <div class="tc-prog-label"><span>💰 المحصّلة</span><span class="tc-prog-text"><strong>' + collected + '</strong> / ' + expected + ' د.ب (' + colPct + '%)</span></div>'
+    + '    <div class="tc-prog" data-kind="cash">'
+    + '      <div class="tc-prog-label"><span>💰 المحصّلة</span><span class="tc-prog-text"><strong>' + collected + '</strong> / ' + expected + ' د.ب</span></div>'
     + '      <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + colPct + '%"></div></div>'
     + '    </div>'
     + '  </div>'
