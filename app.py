@@ -66484,6 +66484,48 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-info-notes-locked{padding:14px;background:#fafafa;border-radius:10px;color:#777;font-size:.9rem;text-align:center;border:1px dashed #d3d8de;}
   .evd-info-notes textarea{width:100%;min-height:120px;padding:11px 12px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.95rem;resize:vertical;}
   .evd-info-notes .footer{display:flex;justify-content:flex-end;margin-top:10px;}
+  /* Schedule panel (3.4) */
+  .evd-sched-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
+  .evd-sched-summary{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;background:#fff;border-radius:12px;padding:13px 16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);font-weight:700;color:#444;font-size:.9rem;}
+  .evd-sched-summary .icon{font-size:1.3rem;}
+  .evd-sched-summary strong{color:#0d47a1;font-variant-numeric:tabular-nums;}
+  .evd-sched-cat{background:#fff;border-radius:14px;padding:14px 16px 10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--cc,#9e9e9e);}
+  .evd-sched-cat[data-cat="departure"]{--cc:#1D9E75;}
+  .evd-sched-cat[data-cat="activity"] {--cc:#1565C0;}
+  .evd-sched-cat[data-cat="break"]    {--cc:#E65100;}
+  .evd-sched-cat[data-cat="meal"]     {--cc:#6B3FA0;}
+  .evd-sched-cat[data-cat="return"]   {--cc:#37474F;}
+  .evd-sched-cat[data-cat="other"]    {--cc:#757575;}
+  .evd-sched-cat-h{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;}
+  .evd-sched-cat-h h4{margin:0;color:var(--cc);font-size:.98rem;font-weight:900;display:flex;align-items:center;gap:6px;}
+  .evd-sched-cat-h .count{font-size:.78rem;color:#888;font-weight:700;}
+  .evd-sched-item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;}
+  .evd-sched-item:last-child{border-bottom:0;}
+  .evd-sched-item .time{font-weight:800;color:#0d47a1;font-variant-numeric:tabular-nums;min-width:64px;}
+  .evd-sched-item .body{display:flex;flex-direction:column;gap:2px;}
+  .evd-sched-item .body .title{font-weight:700;color:#222;}
+  .evd-sched-item .body .desc{font-size:.82rem;color:#666;}
+  .evd-sched-item .dur{font-size:.74rem;color:var(--cc);background:rgba(0,0,0,0.05);padding:2px 8px;border-radius:99px;font-weight:700;margin-inline-start:6px;}
+  .evd-sched-item .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-sched-item:hover .acts,
+  .evd-sched-item:focus-within .acts{opacity:1;}
+  .evd-sched-item .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
+  .evd-sched-item .acts button:hover{background:#f0f3f7;color:#0d47a1;}
+  .evd-sched-item .acts button.del:hover{color:#c62828;background:#ffebee;}
+  .evd-sched-add{margin-top:6px;}
+  .evd-sched-add button{background:transparent;border:1.5px dashed var(--cc,#9e9e9e);color:var(--cc,#9e9e9e);border-radius:10px;padding:7px 14px;font-weight:800;font-size:.85rem;cursor:pointer;width:100%;transition:.15s;}
+  .evd-sched-add button:hover{background:rgba(0,0,0,0.03);transform:translateY(-1px);}
+  .evd-sched-cat-empty{font-size:.84rem;color:#999;font-style:italic;padding:6px 0;}
+  .evd-sched-empty{text-align:center;padding:50px 20px;color:#888;background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+  .evd-sched-empty .em{font-size:3.2rem;margin-bottom:6px;}
+  .evd-sched-empty .h{font-weight:800;color:#444;margin-bottom:14px;}
+  .evd-sched-empty button{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;}
+  /* Inline edit row */
+  .evd-sched-edit{display:grid;grid-template-columns:1fr;gap:8px;padding:10px;background:#f6faff;border-radius:10px;margin:6px 0;}
+  .evd-sched-edit .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .evd-sched-edit input,.evd-sched-edit textarea,.evd-sched-edit select{width:100%;padding:7px 9px;border:1px solid #d3d8de;border-radius:8px;font-family:inherit;font-size:.9rem;}
+  .evd-sched-edit textarea{min-height:54px;}
+  .evd-sched-edit .footer{display:flex;justify-content:flex-end;gap:6px;}
   /* Mobile */
   @media (max-width: 720px){
     .evd-shell{padding:10px;}
@@ -66495,6 +66537,9 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-modal .grid2{grid-template-columns:1fr;}
     .evd-info-row{grid-template-columns:1fr;gap:2px;}
     .evd-info-row .lab{font-size:.78rem;}
+    .evd-sched-item{grid-template-columns:auto 1fr;}
+    .evd-sched-item .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-sched-edit .grid3{grid-template-columns:1fr;}
   }
 </style></head><body>
 
@@ -66550,7 +66595,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-info-loading">⏳ جارٍ التحميل…</div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="schedule" role="tabpanel"><div class="evd-stub"><div class="em">⏰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Schedule panel (3.4) -->
+  <section class="evd-panel" data-panel="schedule" role="tabpanel">
+    <div class="evd-sched" id="evd-sched-root">
+      <div class="evd-sched-loading">⏳ جارٍ التحميل…</div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="costs"    role="tabpanel"><div class="evd-stub"><div class="em">💰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="items"    role="tabpanel"><div class="evd-stub"><div class="em">🛠️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="tasks"    role="tabpanel"><div class="evd-stub"><div class="em">✅</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -66615,6 +66665,49 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
         <button type="submit" class="evd-btn evd-btn-edit" id="evd-edit-save">💾 حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Schedule add/edit modal (3.4) -->
+<div class="evd-mb" id="evd-sched-mb" role="dialog" aria-modal="true" aria-labelledby="evd-sched-title">
+  <div class="evd-modal" style="max-width:480px;">
+    <h2 id="evd-sched-title">➕ بند جديد</h2>
+    <form id="evd-sched-form">
+      <input type="hidden" id="sf-id"/>
+      <div class="row">
+        <label for="sf-cat">القسم *</label>
+        <select id="sf-cat" required>
+          <option value="departure">🚌 الانطلاق</option>
+          <option value="activity">🎯 النشاط الرئيسي</option>
+          <option value="break">☕ الاستراحة</option>
+          <option value="meal">🍽️ الوجبات</option>
+          <option value="return">🏠 العودة</option>
+          <option value="other">📌 أخرى</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="sf-time">الوقت</label>
+          <input id="sf-time" type="time"/>
+        </div>
+        <div class="row">
+          <label for="sf-dur">المدة (دقائق)</label>
+          <input id="sf-dur" type="number" min="0" max="600" placeholder="اختياري"/>
+        </div>
+      </div>
+      <div class="row">
+        <label for="sf-title">العنوان *</label>
+        <input id="sf-title" type="text" required maxlength="120"/>
+      </div>
+      <div class="row">
+        <label for="sf-desc">التفاصيل</label>
+        <textarea id="sf-desc" maxlength="400"></textarea>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-sched-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-sched-save">✨ حفظ</button>
       </div>
     </form>
   </div>
@@ -66687,6 +66780,8 @@ function evdActivateTab(name){
   document.querySelectorAll('.evd-panel').forEach(function(p){
     p.classList.toggle('is-active', p.getAttribute('data-panel') === name);
   });
+  // Lazy-load tab data the first time the user lands on it.
+  if (name === 'schedule' && !SCHED_LOADED) evdLoadSchedule();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -66904,6 +66999,214 @@ function evdRenderInfo(ev){
   });
 }
 
+/* ── Schedule panel (3.4) ────────────────────────────────────── */
+var SCHED_DATA = {departure:[], activity:[], break:[], meal:[], return:[], other:[]};
+var SCHED_LOADED = false;
+var SCHED_CATS = [
+  {key:'departure', label:'🚌 الانطلاق'},
+  {key:'activity',  label:'🎯 النشاط الرئيسي'},
+  {key:'break',     label:'☕ الاستراحة'},
+  {key:'meal',      label:'🍽️ الوجبات'},
+  {key:'return',    label:'🏠 العودة'},
+  {key:'other',     label:'📌 أخرى'}
+];
+
+function evdLoadSchedule(){
+  return fetch('/api/admin/events/' + EID + '/schedule')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
+      SCHED_DATA = j.schedule || SCHED_DATA;
+      SCHED_LOADED = true;
+      evdRenderSchedule(j.summary || {});
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdFmtDuration(min){
+  min = parseInt(min || 0, 10);
+  if (!min) return '';
+  if (min < 60) return min + ' د';
+  var h = Math.floor(min / 60), m = min % 60;
+  return m ? (h + ' س ' + m + ' د') : (h + ' س');
+}
+
+function evdRenderSchedule(summary){
+  var root = document.getElementById('evd-sched-root');
+  if (!root) return;
+  summary = summary || {};
+  var total = parseInt(summary.total_items || 0, 10);
+  if (!total){
+    root.innerHTML = ''
+      + '<div class="evd-sched-empty">'
+      + '  <div class="em">📋</div>'
+      + '  <div class="h">لم يتم إضافة خطة زمنية بعد</div>'
+      + '  <button type="button" id="evd-sched-empty-add">✨ ابدئي بإضافة أول بند</button>'
+      + '</div>';
+    var ea = document.getElementById('evd-sched-empty-add');
+    if (ea) ea.addEventListener('click', function(){ evdOpenSchedAdd(''); });
+    return;
+  }
+  var sumDur = parseInt(summary.total_duration_minutes || 0, 10);
+  var first = summary.first_time || '';
+  var last  = summary.last_time  || '';
+  var html = ''
+    + '<div class="evd-sched-summary">'
+    + '  <span><span class="icon">📊</span> <strong>' + total + '</strong> بند</span>'
+    + (sumDur ? '  <span>المدة: <strong>' + evdEsc(evdFmtDuration(sumDur)) + '</strong></span>' : '')
+    + (first ? '  <span>من <strong>' + evdEsc(first) + '</strong>' + (last && last !== first ? ' إلى <strong>' + evdEsc(last) + '</strong>' : '') + '</span>' : '')
+    + '</div>';
+
+  SCHED_CATS.forEach(function(c){
+    var items = SCHED_DATA[c.key] || [];
+    html += '<div class="evd-sched-cat" data-cat="' + c.key + '">'
+          + '  <div class="evd-sched-cat-h">'
+          + '    <h4>' + evdEsc(c.label) + '</h4>'
+          + '    <span class="count">' + items.length + ' بند</span>'
+          + '  </div>'
+          + '  <div class="evd-sched-cat-body">';
+    if (!items.length){
+      html += '<div class="evd-sched-cat-empty">لا توجد بنود في هذا القسم</div>';
+    } else {
+      items.forEach(function(it){
+        html += evdSchedItemHTML(it);
+      });
+    }
+    html += '  </div>'
+          + '  <div class="evd-sched-add">'
+          + '    <button type="button" data-add="' + c.key + '">+ إضافة بند</button>'
+          + '  </div>'
+          + '</div>';
+  });
+  root.innerHTML = html;
+
+  // Wire add buttons
+  root.querySelectorAll('button[data-add]').forEach(function(b){
+    b.addEventListener('click', function(){ evdOpenSchedAdd(b.getAttribute('data-add')); });
+  });
+  // Wire edit/delete
+  root.querySelectorAll('button[data-edit]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var sid = parseInt(b.getAttribute('data-edit'), 10);
+      var it = evdSchedFindItem(sid);
+      if (it) evdOpenSchedEdit(it);
+    });
+  });
+  root.querySelectorAll('button[data-del]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var sid = parseInt(b.getAttribute('data-del'), 10);
+      evdSchedDelete(sid);
+    });
+  });
+}
+
+function evdSchedItemHTML(it){
+  var dur = evdFmtDuration(it.duration_minutes);
+  var time = it.time_slot || '—';
+  return ''
+    + '<div class="evd-sched-item" data-sid="' + (it.id|0) + '">'
+    + '  <div class="time">⏰ ' + evdEsc(time) + '</div>'
+    + '  <div class="body">'
+    + '    <div class="title">' + evdEsc(it.title) + (dur ? '<span class="dur">' + evdEsc(dur) + '</span>' : '') + '</div>'
+    + (it.description ? '<div class="desc">' + evdEsc(it.description) + '</div>' : '')
+    + '  </div>'
+    + '  <div class="acts">'
+    + '    <button type="button" data-edit="' + (it.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+    + '    <button type="button" class="del" data-del="' + (it.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+    + '  </div>'
+    + '</div>';
+}
+
+function evdSchedFindItem(sid){
+  for (var i = 0; i < SCHED_CATS.length; i++){
+    var arr = SCHED_DATA[SCHED_CATS[i].key] || [];
+    for (var j = 0; j < arr.length; j++){
+      if (parseInt(arr[j].id, 10) === sid) return arr[j];
+    }
+  }
+  return null;
+}
+
+function evdOpenSchedAdd(category){
+  document.getElementById('evd-sched-title').textContent = '➕ بند جديد';
+  document.getElementById('sf-id').value    = '';
+  document.getElementById('sf-cat').value   = category || 'departure';
+  document.getElementById('sf-time').value  = '';
+  document.getElementById('sf-dur').value   = '';
+  document.getElementById('sf-title').value = '';
+  document.getElementById('sf-desc').value  = '';
+  document.getElementById('evd-sched-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('sf-title').focus(); }, 50);
+}
+
+function evdOpenSchedEdit(it){
+  document.getElementById('evd-sched-title').textContent = '✏️ تعديل البند';
+  document.getElementById('sf-id').value    = it.id;
+  document.getElementById('sf-cat').value   = it.category || 'departure';
+  document.getElementById('sf-time').value  = it.time_slot || '';
+  document.getElementById('sf-dur').value   = it.duration_minutes || '';
+  document.getElementById('sf-title').value = it.title || '';
+  document.getElementById('sf-desc').value  = it.description || '';
+  document.getElementById('evd-sched-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('sf-title').focus(); }, 50);
+}
+
+function evdCloseSched(){
+  document.getElementById('evd-sched-mb').classList.remove('is-open');
+}
+
+function evdSubmitSched(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-sched-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var sid = parseInt(document.getElementById('sf-id').value || '0', 10);
+  var body = {
+    category:         document.getElementById('sf-cat').value,
+    time_slot:        document.getElementById('sf-time').value || '',
+    duration_minutes: document.getElementById('sf-dur').value || '',
+    title:            document.getElementById('sf-title').value.trim(),
+    description:      document.getElementById('sf-desc').value.trim()
+  };
+  var url, method;
+  if (sid){
+    url = '/api/admin/events/' + EID + '/schedule/' + sid;
+    method = 'PATCH';
+  } else {
+    url = '/api/admin/events/' + EID + '/schedule';
+    method = 'POST';
+  }
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+    evdCloseSched();
+    evdToast(sid ? 'تم تحديث البند' : 'تم إضافة البند', 'success');
+    evdLoadSchedule();
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdSchedDelete(sid){
+  if (!sid) return;
+  if (!confirm('هل تريدين حذف هذا البند؟')) return;
+  fetch('/api/admin/events/' + EID + '/schedule/' + sid, {method: 'DELETE'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحذف', 'error'); return; }
+      evdToast('تم الحذف', 'success');
+      evdLoadSchedule();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
 /* ── Quick-edit modal (2.3) ──────────────────────────────────── */
 function evdLoadGroups(){
   return fetch('/api/admin/events/student-groups')
@@ -67039,6 +67342,12 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-edit-form').addEventListener('submit', evdSubmitEdit);
   document.getElementById('evd-edit-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseEdit();
+  });
+  // Schedule modal wires (3.4)
+  document.getElementById('evd-sched-cancel').addEventListener('click', evdCloseSched);
+  document.getElementById('evd-sched-form').addEventListener('submit', evdSubmitSched);
+  document.getElementById('evd-sched-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseSched();
   });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
