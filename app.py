@@ -64797,72 +64797,6 @@ _TRIP_AR_WEEKDAYS = {
 }
 
 
-def _trip_generate_token(db):
-    """12-char URL-safe random token, collision-checked against the
-    trips.smart_token unique index. Returns the new token. After 8
-    retries we give up and let the unique-index error bubble — that
-    only happens with broken randomness."""
-    import secrets as _secrets, string as _string
-    alphabet = _string.ascii_letters + _string.digits
-    for _ in range(8):
-        candidate = "".join(_secrets.choice(alphabet) for _ in range(12))
-        try:
-            row = db.execute(
-                "SELECT 1 FROM trips WHERE smart_token = ? LIMIT 1",
-                (candidate,),
-            ).fetchone()
-            if not row:
-                return candidate
-        except Exception:
-            return candidate
-    return candidate
-
-
-def _trip_get_by_token(db, token):
-    """Return the live trip dict for a smart_token, else None.
-    Public-facing — does not include any internal-only fields. Caller
-    decides whether to gate based on status."""
-    if not token or not isinstance(token, str):
-        return None
-    try:
-        row = db.execute(
-            "SELECT * FROM trips WHERE smart_token = ? AND is_deleted = 0",
-            (token.strip(),),
-        ).fetchone()
-        return dict(row) if row else None
-    except Exception:
-        return None
-
-
-def _trip_smart_link(token):
-    """Absolute URL for the parent-facing registration page. Built
-    from the active request's host so dev/prod each get their own
-    correct URL. Returns '' if there's no token."""
-    if not token: return ""
-    try:
-        root = request.url_root or ""
-    except Exception:
-        root = ""
-    base = root.rstrip("/")
-    return base + "/trip/" + token + "/register"
-
-
-def _trip_count_active_regs(db, trip_id):
-    """Count of non-deleted registrations whose status='registered'
-    for a trip. Used in capacity checks. Excludes waitlisted +
-    cancelled rows."""
-    try:
-        row = db.execute(
-            "SELECT COUNT(*) FROM trip_registrations "
-            "WHERE trip_id = ? AND is_deleted = 0 "
-            "AND registration_status = 'registered'",
-            (trip_id,),
-        ).fetchone()
-        return int(row[0] or 0) if row else 0
-    except Exception:
-        return 0
-
-
 def _trip_compute_fields(rd):
     """Augment a raw trips row dict with the computed fields the UI
     expects: total_expected, days_until_trip, day_name_ar,
@@ -64895,9 +64829,6 @@ def _trip_compute_fields(rd):
             out["is_imminent"]     = (0 < delta <= 3)
         except Exception:
             pass
-    # Public-facing parent link. Empty string if the row has no
-    # smart_token (shouldn't happen in stage 2 but defensive).
-    out["smart_link"] = _trip_smart_link(out.get("smart_token") or "")
     return out
 
 
@@ -64951,7 +64882,6 @@ def api_admin_trips_create():
         "emergency_contact_name": (d.get("emergency_contact_name") or "").strip() or None,
         "equipment_needed":       (d.get("equipment_needed") or "").strip() or None,
         "status":                 "active",
-        "smart_token":            _trip_generate_token(db),
         "created_by":             user.get("id"),
     }
     cols = ",".join('"' + k + '"' for k in body.keys())
@@ -64976,13 +64906,7 @@ def api_admin_trips_create():
         _audit("trip.create", target_type="trip", target_id=new_id, new_value=body)
     except Exception:
         pass
-    return jsonify({
-        "ok": True,
-        "id": new_id,
-        "status": "active",
-        "smart_token": body["smart_token"],
-        "smart_link":  _trip_smart_link(body["smart_token"]),
-    })
+    return jsonify({"ok": True, "id": new_id, "status": "active"})
 
 
 def _trips_auto_archive(db):
@@ -65285,133 +65209,6 @@ def api_admin_trips_stats():
             "yearly":    yearly,
         },
     })
-
-
-# ─────────────────────────────────────────────────────────────────────
-# Public smart-link surfaces — NO LOGIN REQUIRED
-# ─────────────────────────────────────────────────────────────────────
-# These three endpoints are how a parent reaches the trip from a
-# WhatsApp link. The HTML page is rendered server-side (we do NOT
-# expose any admin-only template) and is gated on smart_token + a few
-# trip-state checks. The /api/trip/<token>/info JSON endpoint feeds the
-# same page client-side once the parent advances through the flow.
-
-@app.route('/trip/<token>/register', methods=['GET'])
-def public_trip_register_page(token):
-    """Parent-facing registration landing page reached from a per-trip
-    WhatsApp link. We render different states based on the trip's
-    lifecycle so the page never silently 'works' on a closed trip."""
-    db = get_db()
-    trip = _trip_get_by_token(db, token)
-    def _err(title, body):
-        return Response(
-            "<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
-            "<title>" + title + " — مايندكس</title>"
-            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;"
-            "background:linear-gradient(135deg,#fce4ec,#e1bee7);min-height:100vh;"
-            "display:flex;align-items:center;justify-content:center;direction:rtl;"
-            "margin:0;padding:24px;}"
-            ".card{background:#fff;border-radius:18px;padding:36px 30px;"
-            "box-shadow:0 10px 30px rgba(0,0,0,.12);text-align:center;"
-            "max-width:420px;}"
-            ".card h1{margin:0 0 8px;color:#4a148c;font-size:1.3rem;}"
-            ".card p{color:#555;line-height:1.6;}</style></head>"
-            "<body><div class='card'><h1>" + title + "</h1>"
-            "<p>" + body + "</p></div></body></html>",
-            status=404, mimetype="text/html; charset=utf-8")
-    if not trip:
-        return _err("الرحلة غير موجودة",
-                    "تأكدي من الرابط المُرسَل لكِ، أو تواصلي مع الإدارة.")
-    st = (trip.get("status") or "").strip()
-    if st in ("closed", "completed", "archived"):
-        return _err("التسجيل مُغلق لهذه الرحلة",
-                    "نعتذر، التسجيل في هذه الرحلة لم يعد متاحاً عبر هذا الرابط.")
-    return PUBLIC_TRIP_REGISTER_HTML.replace("__TRIP_TOKEN__", token)
-
-
-@app.route('/api/trip/<token>/info', methods=['GET'])
-def api_public_trip_info(token):
-    """Public-safe trip info for the registration page. Only fields a
-    parent needs — never returns admin-only metadata or audit fields."""
-    db = get_db()
-    trip = _trip_get_by_token(db, token)
-    if not trip:
-        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
-    st = (trip.get("status") or "").strip()
-    if st not in ("active", "closed"):
-        return jsonify({"ok": False, "error": "التسجيل غير متاح"}), 403
-    cap        = int(trip.get("max_capacity") or 0)
-    registered = _trip_count_active_regs(db, trip["id"])
-    available  = max(0, cap - registered) if cap > 0 else 0
-    enriched = _trip_compute_fields(trip)
-    payload = {
-        "id":                 trip["id"],
-        "name":               trip.get("name") or "",
-        "destination":        trip.get("destination") or "",
-        "trip_type":          trip.get("trip_type") or "",
-        "description":        trip.get("description") or "",
-        "target_audience":    trip.get("target_audience") or "",
-        "trip_date":          trip.get("trip_date") or "",
-        "day_name_ar":        enriched.get("day_name_ar") or "",
-        "departure_time":     trip.get("departure_time") or "",
-        "return_time":        trip.get("return_time") or "",
-        "meeting_point":      trip.get("meeting_point") or "",
-        "equipment_needed":   trip.get("equipment_needed") or "",
-        "max_capacity":       cap,
-        "registered_count":   registered,
-        "available_seats":    available,
-        "is_full":            (cap > 0 and registered >= cap),
-        "price_per_student":  float(trip.get("price_per_student") or 0),
-        "status":             st,
-        # No smart_token / created_by / smart_link in the public payload.
-    }
-    return jsonify({"ok": True, "trip": payload})
-
-
-# Stage 2 stub: the public page lives in commit 3. For now keep a
-# minimal placeholder so the route can render something while the
-# helpers are validated.
-PUBLIC_TRIP_REGISTER_HTML = r"""<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<title>تسجيل في رحلة — مايندكس</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f3ff;
-min-height:100vh;margin:0;padding:24px;direction:rtl;color:#212121;}
-.card{max-width:480px;margin:24px auto;background:#fff;border-radius:18px;
-padding:24px 22px;box-shadow:0 8px 22px rgba(0,0,0,.08);}</style>
-</head><body>
-<div class="card" id="trip-public-root" data-token="__TRIP_TOKEN__">
-  <p style="color:#777;text-align:center;">جارٍ تحميل تفاصيل الرحلة...</p>
-</div>
-<script>
-(function(){
-  var root = document.getElementById('trip-public-root');
-  if (!root) return;
-  var token = root.getAttribute('data-token') || '';
-  fetch('/api/trip/' + encodeURIComponent(token) + '/info')
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if (!j || !j.ok){
-        root.innerHTML = '<p style="color:#c62828;text-align:center;">'
-                       + (j && j.error ? j.error : 'تعذّر تحميل التفاصيل') + '</p>';
-        return;
-      }
-      var t = j.trip || {};
-      root.innerHTML =
-          '<h2 style="color:#4a148c;margin:0 0 6px;font-size:1.15rem;">🚌 '
-          + (t.name||'').replace(/[<>&]/g,'') + '</h2>'
-          + '<p style="margin:0 0 4px;color:#555;">📍 ' + (t.destination||'') + '</p>'
-          + '<p style="margin:0 0 4px;color:#555;">📅 ' + (t.trip_date||'') + ' ' + (t.day_name_ar||'') + '</p>'
-          + '<p style="margin:0 0 12px;color:#555;">💰 ' + (t.price_per_student||0).toFixed(2) + ' د.ب</p>'
-          + '<p style="margin:0;color:#888;">سيتمّ بناء واجهة التسجيل في الخطوة التالية.</p>';
-    })
-    .catch(function(){
-      root.innerHTML = '<p style="color:#c62828;text-align:center;">خطأ في الاتصال</p>';
-    });
-})();
-</script>
-</body></html>"""
 
 
 ADMIN_TRIPS_HTML = r"""<!DOCTYPE html>
