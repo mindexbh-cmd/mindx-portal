@@ -67663,6 +67663,121 @@ document.addEventListener('DOMContentLoaded', function(){
 </body></html>"""
 
 
+TRIP_DAY_REPORT_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>تقرير يوم الرحلة — {{TRIP_NAME}} — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:#fafafa;margin:0;padding:24px;direction:rtl;color:#212121;}
+.report{max-width:980px;margin:0 auto;background:#fff;border-radius:14px;
+        padding:30px 36px;box-shadow:0 6px 22px rgba(0,0,0,.08);}
+.header{display:flex;justify-content:space-between;align-items:center;
+        border-bottom:3px solid #1565C0;padding-bottom:14px;margin-bottom:18px;}
+.header h1{margin:0;color:#0d47a1;font-size:1.5rem;}
+.header .meta{font-size:.85rem;color:#777;}
+h2{font-size:1.1rem;color:#0d47a1;margin:18px 0 10px;
+   border-right:4px solid #1D9E75;padding-right:10px;}
+.trip-info{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 16px;
+           background:#fafafa;padding:14px 18px;border-radius:10px;
+           margin-bottom:14px;font-size:.92rem;}
+.trip-info .k{color:#777;font-weight:700;font-size:.78rem;}
+.trip-info .v{font-weight:900;color:#212121;font-size:.95rem;margin-top:1px;}
+.summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px;}
+@media (max-width:880px){.summary{grid-template-columns:repeat(4,1fr);}}
+.summary .cell{background:linear-gradient(135deg,#fff,#fafafa);border-radius:10px;
+               padding:10px 12px;text-align:center;border-right:4px solid var(--c,#888);}
+.summary .cell.present {--c:#1D9E75;}
+.summary .cell.late    {--c:#BA7517;}
+.summary .cell.absent  {--c:#c62828;}
+.summary .cell.cancel  {--c:#888;}
+.summary .cell.medical {--c:#e91e63;}
+.summary .cell.unmarked{--c:#777;}
+.summary .cell.rate    {--c:#1565C0;}
+.summary .cell .k{font-size:.72rem;color:#666;font-weight:700;}
+.summary .cell .v{font-size:1.2rem;font-weight:900;margin-top:2px;
+                  font-variant-numeric:tabular-nums;}
+.summary .cell.present .v{color:#1D9E75;}
+.summary .cell.late .v   {color:#BA7517;}
+.summary .cell.absent .v {color:#c62828;}
+.summary .cell.medical .v{color:#e91e63;}
+.summary .cell.rate .v   {color:#1565C0;}
+table{width:100%;border-collapse:collapse;font-size:.86rem;}
+th,td{padding:8px 10px;border-bottom:1px solid #ececec;text-align:right;}
+th{background:#fafafa;color:#0d47a1;font-weight:900;font-size:.78rem;}
+td.st{font-weight:800;font-size:.82rem;padding:6px 10px;border-radius:6px;display:inline-block;}
+td.st-present  {color:#0f6b4a;background:#e6f7ee;}
+td.st-late     {color:#8d4f00;background:#fff3e0;}
+td.st-absent   {color:#c62828;background:#ffebee;}
+td.st-cancelled{color:#666;  background:#f0f0f0;}
+td.st-medical_emergency{color:#ad1457;background:#fce4ec;}
+td.empty{text-align:center;color:#888;padding:18px;}
+.foot{margin-top:24px;padding-top:14px;border-top:1px solid #ececec;
+      font-size:.78rem;color:#888;text-align:center;}
+.no-print{margin-top:18px;text-align:center;}
+.no-print button{padding:10px 22px;background:linear-gradient(135deg,#1D9E75,#2BB585);
+                 color:#fff;border:0;border-radius:9px;font-weight:800;
+                 cursor:pointer;font-size:.9rem;font-family:inherit;}
+@media print{
+  body{background:#fff;padding:0;}
+  .report{box-shadow:none;border-radius:0;padding:18px;}
+  .no-print{display:none;}
+}
+</style></head>
+<body>
+<div class="report">
+  <div class="header">
+    <h1>📋 تقرير يوم الرحلة</h1>
+    <div class="meta">صادر بتاريخ {{GEN_AT}} — {{ACTOR}}</div>
+  </div>
+
+  <h2>تفاصيل الرحلة</h2>
+  <div class="trip-info">
+    <div><div class="k">اسم الرحلة</div><div class="v">{{TRIP_NAME}}</div></div>
+    <div><div class="k">الوجهة</div><div class="v">{{DESTINATION}}</div></div>
+    <div><div class="k">التاريخ</div><div class="v">{{TRIP_DATE}}</div></div>
+    <div><div class="k">الانطلاق</div><div class="v">{{DEPARTURE_TIME}}</div></div>
+    <div><div class="k">العودة</div><div class="v">{{RETURN_TIME}}</div></div>
+    <div><div class="k">المسجَّلات</div><div class="v">{{TOTAL_REG}}</div></div>
+  </div>
+
+  <h2>الملخص</h2>
+  <div class="summary">
+    <div class="cell present"><div class="k">حضرت</div><div class="v">{{PRESENT}}</div></div>
+    <div class="cell late">   <div class="k">متأخرة</div><div class="v">{{LATE}}</div></div>
+    <div class="cell absent"> <div class="k">لم تحضر</div><div class="v">{{ABSENT}}</div></div>
+    <div class="cell cancel"> <div class="k">ألغت</div><div class="v">{{CANCELLED}}</div></div>
+    <div class="cell medical"><div class="k">طارئ صحي</div><div class="v">{{MEDICAL}}</div></div>
+    <div class="cell unmarked"><div class="k">لم تُرصد</div><div class="v">{{UNMARKED}}</div></div>
+    <div class="cell rate">   <div class="k">نسبة الحضور</div><div class="v">{{RATE}}%</div></div>
+  </div>
+
+  <h2>قائمة الطالبات</h2>
+  <table>
+    <thead><tr>
+      <th style="width:36px;">#</th>
+      <th>الطالبة</th>
+      <th>ولي الأمر</th>
+      <th>الواتساب</th>
+      <th>الحالة</th>
+      <th>وقت الوصول</th>
+      <th>ملاحظات</th>
+      <th>رصدت بواسطة</th>
+    </tr></thead>
+    <tbody>{{ROWS}}</tbody>
+  </table>
+
+  <div class="foot">— مركز مايندكس التعليمي — تقرير يوم الرحلة —</div>
+
+  <div class="no-print">
+    <button type="button" onclick="window.print();">🖨️ اطبعي / احفظي PDF</button>
+  </div>
+</div>
+<script>setTimeout(function(){ try { window.print(); } catch(_){} }, 400);</script>
+</body></html>"""
+
+
 TRIP_FINANCIAL_REPORT_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>التقرير المالي — {{TRIP_NAME}} — مايندكس</title>
@@ -69289,6 +69404,96 @@ def api_admin_trips_day_bulk_present(tid):
     except Exception:
         pass
     return jsonify({"ok": True, "marked_count": inserted})
+
+
+@app.route('/api/admin/trips/<int:tid>/day-report', methods=['GET'])
+@login_required
+def api_admin_trips_day_report(tid):
+    """Print-friendly day-attendance report. Auto-print on load.
+    Manager-only."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;font-family:sans-serif;'>"
+            "<h1>الرحلة غير موجودة</h1></body></html>",
+            status=404, mimetype="text/html; charset=utf-8")
+    try:
+        regs = db.execute(
+            "SELECT id, student_name, parent_name, parent_phone, confirmation_id "
+            "FROM trip_registrations "
+            "WHERE trip_id = ? AND is_deleted = 0 "
+            "AND registration_status = 'registered' "
+            "ORDER BY student_name",
+            (tid,),
+        ).fetchall()
+    except Exception:
+        regs = []
+    try:
+        att_rows = db.execute(
+            "SELECT * FROM trip_day_attendance WHERE trip_id = ?",
+            (tid,)).fetchall()
+    except Exception:
+        att_rows = []
+    by_reg = {}
+    for r in att_rows:
+        rd = dict(r)
+        by_reg[rd.get("registration_id")] = rd
+    stats = _trip_day_compute_stats(att_rows, len(regs))
+
+    def _esc(s):
+        s = "" if s is None else str(s)
+        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+    rows_html = []
+    for i, r in enumerate(regs, 1):
+        rd = dict(r)
+        att = by_reg.get(rd.get("id")) or {}
+        st = att.get("attendance_status") or ""
+        rows_html.append(
+            "<tr>"
+            "<td>" + str(i) + "</td>"
+            "<td>" + _esc(rd.get("student_name") or "") + "</td>"
+            "<td>" + _esc(rd.get("parent_name") or "") + "</td>"
+            "<td>" + _esc(rd.get("parent_phone") or "") + "</td>"
+            "<td class='st st-" + _esc(st) + "'>"
+              + _esc(_TRIP_DAY_AR_LABELS.get(st) or "—") + "</td>"
+            "<td>" + _esc(att.get("arrival_time") or "—") + "</td>"
+            "<td>" + _esc(att.get("notes") or "") + "</td>"
+            "<td>" + _esc(att.get("recorded_by_name") or "") + "</td>"
+            "</tr>"
+        )
+
+    from datetime import datetime as _dt
+    generated_at = _dt.now().strftime("%Y-%m-%d %H:%M")
+    actor_name = ((user.get("name") or user.get("username") or "") or "—").strip()
+
+    html = TRIP_DAY_REPORT_HTML
+    html = html.replace("{{TRIP_NAME}}",      _esc(trip.get("name") or ""))
+    html = html.replace("{{DESTINATION}}",    _esc(trip.get("destination") or ""))
+    html = html.replace("{{TRIP_DATE}}",      _esc(trip.get("trip_date") or ""))
+    html = html.replace("{{DEPARTURE_TIME}}", _esc(trip.get("departure_time") or ""))
+    html = html.replace("{{RETURN_TIME}}",    _esc(trip.get("return_time") or ""))
+    html = html.replace("{{TOTAL_REG}}",      str(stats["total_registered"]))
+    html = html.replace("{{PRESENT}}",        str(stats["present"]))
+    html = html.replace("{{LATE}}",           str(stats["late"]))
+    html = html.replace("{{ABSENT}}",         str(stats["absent"]))
+    html = html.replace("{{CANCELLED}}",      str(stats["cancelled"]))
+    html = html.replace("{{MEDICAL}}",        str(stats["medical_emergency"]))
+    html = html.replace("{{UNMARKED}}",       str(stats["unmarked"]))
+    html = html.replace("{{RATE}}",           str(stats["attendance_rate"]))
+    html = html.replace("{{ROWS}}",
+                        "".join(rows_html) or
+                        "<tr><td colspan='8' class='empty'>لا توجد طالبات مسجَّلات</td></tr>")
+    html = html.replace("{{GEN_AT}}",         _esc(generated_at))
+    html = html.replace("{{ACTOR}}",          _esc(actor_name))
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 
 @app.route('/api/admin/trips/<int:tid>/day-stats', methods=['GET'])
