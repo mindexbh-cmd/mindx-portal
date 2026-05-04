@@ -65036,6 +65036,75 @@ def api_admin_events_alerts():
     return jsonify({"ok": True, "alerts": out, "count": len(out)})
 
 
+def _events_detail_dict(rd):
+    """Detail-page payload — superset of the list-card shape with the
+    extra free-text fields and the per-event computed counters. The
+    counters are stubbed at 0 here; stages 3-8 plug them in as the
+    registration / task / payment tables come online."""
+    base = _events_row_dict(rd)
+    base.update({
+        "description":         rd.get("description") or "",
+        "target_group_ids":    rd.get("target_group_ids") or "[]",
+        "registration_token":  rd.get("registration_token") or "",
+        "post_trip_notes":     rd.get("post_trip_notes") or "",
+        "created_at":          rd.get("created_at") or "",
+        "updated_at":          rd.get("updated_at") or "",
+        # Stage-3+ wires real values into these slots.
+        "task_total":          0,
+        "task_completed":      0,
+        "payment_collected":   0.0,
+        "payment_expected":    0.0,
+    })
+    return base
+
+
+@app.route('/admin/events/<int:eid>', methods=['GET'])
+@login_required
+def admin_events_detail_page(eid):
+    """Manager-only per-event detail page. Stage-2 ships only the
+    skeleton + tab navigation — the tab CONTENT lands in stages 3-8."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        # Friendly redirect with a flash hash the list page can read.
+        return redirect("/admin/events#not-found")
+    html = ADMIN_EVENT_DETAIL_HTML.replace("{{EID}}", str(eid))
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/api/admin/events/<int:eid>', methods=['GET'])
+@login_required
+def api_admin_events_get(eid):
+    """Manager-only — return the full event row plus computed counters
+    (counters stubbed at 0 until stages 3-8 wire them up)."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] detail fetch failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    if not row:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    return jsonify({"ok": True, "event": _events_detail_dict(dict(row))})
+
+
 ADMIN_EVENTS_LIST_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>الفعاليات والرحلات — مايندكس</title>
@@ -65802,6 +65871,26 @@ function evSubmitCreate(e){
 }
 </script>
 
+</body></html>"""
+
+
+# Stage-2.1 minimal placeholder — the full detail page (header, tab
+# bar, edit/delete modals) is built up commit-by-commit in 2.2 → 2.5.
+ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>تفاصيل الرحلة</title>
+<style>
+  body{font-family:'Tahoma',sans-serif;background:#fafafa;padding:24px;text-align:center;color:#444;}
+  .stub-card{max-width:640px;margin:60px auto;padding:32px;background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,0.06);}
+  a{color:#1D9E75;text-decoration:none;font-weight:700;}
+</style></head><body>
+<div class="stub-card">
+  <h1>تفاصيل الرحلة #{{EID}}</h1>
+  <p>⏳ صفحة التفاصيل قيد البناء — سيتم تفعيل تبويباتها في الالتزام التالي.</p>
+  <p><a href="/admin/events">← العودة لقائمة الرحلات</a></p>
+</div>
 </body></html>"""
 
 
