@@ -66808,9 +66808,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <p style="color:#212121;font-weight:800;margin:0 0 8px;" id="tp-ok-when">—</p>
       <p style="color:#777;font-size:.85rem;">💡 سنُذكّركم قبل الرحلة بيوم.</p>
       <div class="ts-actions">
-        <button class="tp-btn tp-btn-secondary" type="button" id="tp-ok-cal">
-          <span>📲</span><span>إضافة لتقويمي</span>
-        </button>
         <button class="tp-btn tp-btn-secondary" type="button" id="tp-ok-share">
           <span>💬</span><span>مشاركة عبر الواتساب</span>
         </button>
@@ -67106,42 +67103,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
               + '\n💰 ' + (TRIP.price_per_student || 0).toFixed(2) + ' د.ب';
       var url = 'https://wa.me/?text=' + encodeURIComponent(msg);
       window.open(url, '_blank');
-    });
-    /* Calendar export — generate a minimal RFC-5545 .ics and trigger
-       download. No server roundtrip; works offline once the page is
-       loaded. Falls back to a plain link click when Blob/createURL
-       isn't available (very old browsers). */
-    $('tp-ok-cal').addEventListener('click', function(){
-      if (!TRIP || !TRIP.trip_date) return;
-      var dt = TRIP.trip_date.replace(/-/g, '');
-      var dep = (TRIP.departure_time || '08:00').replace(/:/g, '') + '00';
-      var ret = (TRIP.return_time    || '15:00').replace(/:/g, '') + '00';
-      var uid = 'trip-' + (TRIP.id || '0') + '-' + Date.now() + '@mindex';
-      var ics = [
-        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mindex//Trips//AR',
-        'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-        'BEGIN:VEVENT',
-        'UID:' + uid,
-        'DTSTAMP:' + dt + 'T000000Z',
-        'DTSTART:' + dt + 'T' + dep,
-        'DTEND:'   + dt + 'T' + ret,
-        'SUMMARY:' + (TRIP.name || ''),
-        'LOCATION:' + (TRIP.destination || ''),
-        'DESCRIPTION:' + (TRIP.description || ''),
-        'END:VEVENT', 'END:VCALENDAR',
-      ].join('\r\n');
-      try {
-        var blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
-        var u = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = u;
-        a.download = 'trip-' + (TRIP.id || '0') + '.ics';
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(u);
-      } catch(_) {
-        var data = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-        window.open(data, '_blank');
-      }
     });
   });
 
@@ -68414,8 +68375,6 @@ function tripCardHTML(tp){
     + '    <button type="button" data-act="registrations" title="المسجّلات">👥</button>'
     + '    <button type="button" data-act="payments"      title="الدفعات">💰</button>'
     + '    <button type="button" data-act="edit"          title="تعديل">✏️</button>'
-    + '    <button type="button" data-act="share-wa"      title="مشاركة عبر الواتساب">💬</button>'
-    + '    <button type="button" data-act="copy-link"     title="نسخ الرابط">🔗</button>'
     + '    <button type="button" data-act="more"          title="المزيد">⋯</button>'
     + '  </div>'
     + '</div>';
@@ -68573,50 +68532,6 @@ function tripChangeStatus(tid, newStatus){
     })
     .catch(function(){ tripToast('خطأ في الاتصال', 'error'); });
 }
-function tripShareWhatsApp(tid){
-  var tp = tripFindByID(tid);
-  if (!tp){ tripToast('الرحلة غير موجودة', 'error'); return; }
-  if (!tp.smart_link){ tripToast('الرابط غير متوفّر', 'error'); return; }
-  var lines = [];
-  lines.push('🚌 رحلة جديدة: ' + (tp.name || ''));
-  if (tp.trip_date){
-    lines.push('📅 ' + tp.trip_date + (tp.day_name_ar ? ' (' + tp.day_name_ar + ')' : ''));
-  }
-  if (tp.departure_time) lines.push('⏰ ' + tp.departure_time);
-  if (tp.destination)    lines.push('📍 ' + tp.destination);
-  if ((tp.price_per_student || 0) > 0){
-    lines.push('💰 ' + (tp.price_per_student || 0).toFixed(2) + ' د.ب للطالبة');
-  }
-  lines.push('');
-  lines.push('📝 سجّلي ابنتك من هنا:');
-  lines.push(tp.smart_link);
-  var msg = lines.join('\n');
-  var url = 'https://wa.me/?text=' + encodeURIComponent(msg);
-  window.open(url, '_blank', 'noopener');
-}
-
-function tripCopyLink(tid){
-  var tp = tripFindByID(tid);
-  if (!tp || !tp.smart_link){ tripToast('الرابط غير متوفّر', 'error'); return; }
-  var ok = function(){ tripToast('تم نسخ الرابط ✓', 'success'); };
-  var fail = function(){ tripToast('تعذّر النسخ — انسخي يدوياً: ' + tp.smart_link, 'error'); };
-  if (navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(tp.smart_link).then(ok, fail);
-  } else {
-    // Fallback for older browsers — use a hidden textarea + execCommand.
-    try {
-      var ta = document.createElement('textarea');
-      ta.value = tp.smart_link;
-      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
-      document.body.appendChild(ta);
-      ta.select();
-      var done = document.execCommand && document.execCommand('copy');
-      ta.remove();
-      done ? ok() : fail();
-    } catch(_) { fail(); }
-  }
-}
-
 function tripOpenEdit(tid){
   var tp = tripFindByID(tid);
   if (!tp){ tripToast('الرحلة غير موجودة', 'error'); return; }
@@ -68655,8 +68570,6 @@ document.addEventListener('DOMContentLoaded', function(){
     if (act === 'more'){ tripOpenMenu(card, tid); return; }
     if (act === 'registrations'){ tripOpenRegPanel(tid); return; }
     if (act === 'payments'){ tripToast('قريباً ✨ - سيُفعَّل في المرحلة 3', 'success'); return; }
-    if (act === 'share-wa'){ tripShareWhatsApp(tid); return; }
-    if (act === 'copy-link'){ tripCopyLink(tid); return; }
     tripToast('قريباً ✨', 'success');
   });
   // Click outside menu closes it.
