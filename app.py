@@ -65028,6 +65028,47 @@ def api_admin_events_update(eid):
     return jsonify({"ok": True, "id": eid, "event": ev_out})
 
 
+@app.route('/api/admin/events/<int:eid>', methods=['DELETE'])
+@login_required
+def api_admin_events_delete(eid):
+    """Admin-only soft delete. Sets is_deleted = 1 so dependent
+    tables added in later stages can still join historical rows
+    without losing their FK target. Manager (non-admin) cannot
+    delete — this is the safety the spec calls for."""
+    user = session.get("user") or {}
+    role = ((user.get("role") or "")).strip().lower()
+    if role != "admin":
+        return jsonify({"ok": False, "error": "الحذف يتطلب صلاحية المدير"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, name FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    name_for_audit = dict(row).get("name")
+    try:
+        db.execute(
+            "UPDATE ev_events SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (eid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] delete failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.delete", target_type="ev_event", target_id=eid,
+               old_value={"name": name_for_audit, "is_deleted": 0},
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": eid})
+
+
 @app.route('/api/admin/events/student-groups', methods=['GET'])
 @login_required
 def api_admin_events_student_groups():
@@ -66161,6 +66202,23 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Delete confirmation modal (2.4) -->
+<div class="evd-mb" id="evd-del-mb" role="dialog" aria-modal="true" aria-labelledby="evd-del-title">
+  <div class="evd-modal" style="max-width:440px;">
+    <h2 id="evd-del-title" style="color:#c62828;">🗑️ حذف الرحلة</h2>
+    <p style="color:#555;font-size:.95rem;line-height:1.6;margin:0 0 8px;">
+      هل أنت متأكدة من حذف هذه الرحلة؟
+    </p>
+    <p style="color:#c62828;font-size:.85rem;font-weight:700;margin:0;">
+      ⚠️ هذا الإجراء لا يمكن التراجع عنه.
+    </p>
+    <div class="footer">
+      <button type="button" class="evd-btn" id="evd-del-cancel">إلغاء</button>
+      <button type="button" class="evd-btn evd-btn-del" id="evd-del-confirm">🗑️ نعم، احذفي</button>
+    </div>
+  </div>
+</div>
+
 <div class="evd-toast" id="evd-toast"></div>
 
 <script>
@@ -66396,6 +66454,34 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-edit-form').addEventListener('submit', evdSubmitEdit);
   document.getElementById('evd-edit-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseEdit();
+  });
+  // Delete modal wires (2.4)
+  document.getElementById('evd-del-btn').addEventListener('click', function(){
+    document.getElementById('evd-del-mb').classList.add('is-open');
+  });
+  document.getElementById('evd-del-cancel').addEventListener('click', function(){
+    document.getElementById('evd-del-mb').classList.remove('is-open');
+  });
+  document.getElementById('evd-del-mb').addEventListener('click', function(e){
+    if (e.target === this) this.classList.remove('is-open');
+  });
+  document.getElementById('evd-del-confirm').addEventListener('click', function(){
+    var b = this; b.disabled = true; b.style.opacity = '.6';
+    fetch('/api/admin/events/' + EID, {method: 'DELETE'})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(o){
+        if (!o.ok || !o.j.ok){
+          b.disabled = false; b.style.opacity = '1';
+          evdToast(o.j.error || 'تعذّر الحذف', 'error');
+          return;
+        }
+        evdToast('تم حذف الرحلة', 'success');
+        setTimeout(function(){ window.location.href = '/admin/events'; }, 800);
+      })
+      .catch(function(){
+        b.disabled = false; b.style.opacity = '1';
+        evdToast('خطأ في الاتصال', 'error');
+      });
   });
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){
