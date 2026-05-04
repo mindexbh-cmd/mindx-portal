@@ -67207,6 +67207,42 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-skel.h-card{height:84px;margin-bottom:14px;border-radius:14px;}
   .evd-skel.h-line{height:14px;margin:8px 0;}
   .evd-skel.h-row {height:48px;margin-bottom:8px;border-radius:10px;}
+  /* Items panel (5.2) */
+  .evd-item-progress{background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--ipc,#1D9E75);}
+  .evd-item-progress.is-low {--ipc:#c62828;}
+  .evd-item-progress.is-mid {--ipc:#E65100;}
+  .evd-item-progress.is-good{--ipc:#1D9E75;}
+  .evd-item-progress h3{margin:0 0 8px;font-size:1rem;color:var(--ipc);font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .evd-item-progress .pct{font-size:1.1rem;font-variant-numeric:tabular-nums;}
+  .evd-item-progress .bar{height:14px;background:#eef0f3;border-radius:8px;overflow:hidden;}
+  .evd-item-progress .bar .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--ipc),#43a047);transition:width .8s cubic-bezier(.2,.8,.2,1);}
+  .evd-item-list{background:#fff;border-radius:14px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #1565C0;}
+  .evd-item-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
+  .evd-item-row:last-child{border-bottom:0;}
+  .evd-item-row.is-leaving{animation:evdItemIn .18s ease reverse both;}
+  .evd-item-row.is-ready{background:linear-gradient(90deg,rgba(29,158,117,0.06),transparent 70%);}
+  .evd-item-row.is-ready .title{color:#1D9E75;text-decoration:line-through;}
+  .evd-item-check{width:30px;height:30px;border-radius:8px;border:2px solid #c4cdd5;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.05rem;color:transparent;transition:.15s;flex-shrink:0;}
+  .evd-item-check:hover{border-color:#1D9E75;background:#e6f7ee;}
+  .evd-item-check.is-ready{background:#1D9E75;border-color:#1D9E75;color:#fff;}
+  .evd-item-body{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .evd-item-body .title{font-weight:700;color:#222;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .evd-item-body .qty{font-size:.78rem;color:#0d47a1;background:#e3f2fd;padding:2px 9px;border-radius:99px;font-weight:800;}
+  .evd-item-body .meta{font-size:.78rem;color:#777;display:flex;flex-wrap:wrap;gap:10px;}
+  .evd-item-body .meta .unassigned{color:#bbb;font-style:italic;}
+  .evd-item-row .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-item-row:hover .acts,
+  .evd-item-row:focus-within .acts{opacity:1;}
+  .evd-item-row .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
+  .evd-item-row .acts button:hover{background:#f0f3f7;color:#0d47a1;}
+  .evd-item-row .acts button.del:hover{color:#c62828;background:#ffebee;}
+  .evd-item-add{display:flex;justify-content:center;margin-top:14px;}
+  .evd-item-add button{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border:none;padding:8px 22px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;}
+  .evd-item-add button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(29,158,117,0.3);}
+  .evd-item-empty{text-align:center;padding:30px 18px;color:#888;}
+  .evd-item-empty .em{font-size:2.6rem;margin-bottom:6px;}
+  .evd-item-celebrate{display:inline-block;font-size:1.6rem;animation:evdCelebrate 1.6s infinite;}
+  @keyframes evdCelebrate{0%,100%{transform:scale(1) rotate(-3deg);}50%{transform:scale(1.15) rotate(3deg);}}
   /* Costs panel (4.3) */
   .evd-cost-calc{background:linear-gradient(135deg,#fff8e1,#ffe9b3);border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 4px 14px rgba(230,150,0,0.15);border-right:5px solid #BA7517;}
   .evd-cost-calc h3{margin:0 0 12px;font-size:1.05rem;color:#7a4a00;font-weight:900;display:flex;align-items:center;gap:8px;}
@@ -67333,6 +67369,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-cost-sugg-row button{grid-column:1 / -1;justify-self:end;}
     .evd-cost-donut{grid-template-columns:1fr;gap:14px;}
     .evd-cost-donut svg{width:140px;height:140px;}
+    .evd-item-row{grid-template-columns:auto 1fr;}
+    .evd-item-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
   }
 </style></head><body>
 
@@ -67408,7 +67446,14 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="items"    role="tabpanel"><div class="evd-stub"><div class="em">🛠️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Items panel (5.2) -->
+  <section class="evd-panel" data-panel="items" role="tabpanel">
+    <div class="evd-item" id="evd-item-root">
+      <div class="evd-skel h-card" style="height:60px;"></div>
+      <div class="evd-skel h-row"></div>
+      <div class="evd-skel h-row"></div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="tasks"    role="tabpanel"><div class="evd-stub"><div class="em">✅</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="students" role="tabpanel"><div class="evd-stub"><div class="em">👥</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="messages" role="tabpanel"><div class="evd-stub"><div class="em">💬</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -67471,6 +67516,38 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
         <button type="submit" class="evd-btn evd-btn-edit" id="evd-edit-save">💾 حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Item add/edit modal (5.2) -->
+<div class="evd-mb" id="evd-item-mb" role="dialog" aria-modal="true" aria-labelledby="evd-item-title">
+  <div class="evd-modal" style="max-width:460px;">
+    <h2 id="evd-item-title">🛠️ أداة جديدة</h2>
+    <form id="evd-item-form">
+      <input type="hidden" id="if-id"/>
+      <div class="row">
+        <label for="if-title">العنوان *</label>
+        <input id="if-title" type="text" required maxlength="120" placeholder="مثلاً: مياه"/>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="if-qty">الكمية *</label>
+          <input id="if-qty" type="number" min="1" max="9999" value="1" required/>
+        </div>
+        <div class="row">
+          <label for="if-assignee">المسؤولة</label>
+          <select id="if-assignee"><option value="">— لم يُحدد —</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <label for="if-notes">ملاحظات</label>
+        <textarea id="if-notes" maxlength="400"></textarea>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-item-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-item-save">✨ حفظ</button>
       </div>
     </form>
   </div>
@@ -67615,6 +67692,7 @@ function evdActivateTab(name){
   // Lazy-load tab data the first time the user lands on it.
   if (name === 'schedule' && !SCHED_LOADED) evdLoadSchedule();
   if (name === 'costs'    && !COST_LOADED)  evdLoadCosts();
+  if (name === 'items'    && !ITEM_LOADED)  evdLoadItems();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -68044,6 +68122,220 @@ function evdSchedDelete(sid){
       // Wait for the leave animation to finish before re-render so
       // the user sees the row slide out instead of vanishing.
       setTimeout(evdLoadSchedule, 180);
+    })
+    .catch(function(){
+      if (row) row.classList.remove('is-leaving');
+      evdToast('خطأ في الاتصال', 'error');
+    });
+}
+
+/* ── Items panel (5.2) ───────────────────────────────────────── */
+var ITEM_DATA = [];
+var ITEM_SUMMARY = null;
+var ITEM_LOADED = false;
+var ASSIGNEES = null;   // memoised list, fetched once for items + tasks.
+
+function evdLoadAssignees(){
+  if (ASSIGNEES !== null) return Promise.resolve(ASSIGNEES);
+  return fetch('/api/admin/events/assignees')
+    .then(function(r){ return r.json(); })
+    .then(function(j){ ASSIGNEES = (j && j.assignees) || []; return ASSIGNEES; })
+    .catch(function(){ ASSIGNEES = []; return ASSIGNEES; });
+}
+
+function evdLoadItems(){
+  return Promise.all([
+    fetch('/api/admin/events/' + EID + '/items').then(function(r){ return r.json(); }),
+    evdLoadAssignees()
+  ]).then(function(arr){
+    var j = arr[0];
+    if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
+    ITEM_DATA = j.items || [];
+    ITEM_SUMMARY = j.summary || {};
+    ITEM_LOADED = true;
+    evdRenderItems();
+  }).catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdRenderItems(){
+  var root = document.getElementById('evd-item-root');
+  if (!root) return;
+  var s = ITEM_SUMMARY || {};
+  var total = parseInt(s.total || 0, 10);
+  var ready = parseInt(s.ready || 0, 10);
+  var pct = parseFloat(s.ready_pct || 0);
+  var pcls = pct >= 70 ? 'is-good' : (pct >= 30 ? 'is-mid' : 'is-low');
+  var celebrate = (total > 0 && ready === total)
+    ? '<span class="evd-item-celebrate">🎉</span>' : '';
+
+  var progressHTML = ''
+    + '<div class="evd-item-progress ' + pcls + '">'
+    + '  <h3><span>📊 الجاهزية ' + celebrate + '</span><span class="pct">' + ready + '/' + total + ' (' + pct.toFixed(0) + '%)</span></h3>'
+    + '  <div class="bar"><div class="fill" style="width:' + pct + '%;"></div></div>'
+    + '</div>';
+
+  var rowsHTML = '';
+  if (!ITEM_DATA.length){
+    rowsHTML = '<div class="evd-item-empty"><div class="em">📭</div><div>لا توجد أدوات بعد</div></div>';
+  } else {
+    rowsHTML = ITEM_DATA.map(function(it){
+      var ready = !!it.is_ready;
+      var assignee = it.assigned_to_name
+        ? ('<span>👤 ' + evdEsc(it.assigned_to_name) + '</span>')
+        : '<span class="unassigned">👤 (لم يُحدد)</span>';
+      var notes = it.notes ? ('<span>📝 ' + evdEsc(it.notes) + '</span>') : '';
+      return '<div class="evd-item-row ' + (ready ? 'is-ready' : '') + '" data-iid="' + (it.id|0) + '">'
+           + '  <button type="button" class="evd-item-check ' + (ready ? 'is-ready' : '') + '" data-toggle="' + (it.id|0) + '" aria-label="تبديل الجاهزية" title="تبديل الجاهزية">' + (ready ? '✓' : '') + '</button>'
+           + '  <div class="evd-item-body">'
+           + '    <div class="title">' + evdEsc(it.title) + '<span class="qty">× ' + (it.quantity || 1) + '</span></div>'
+           + '    <div class="meta">' + assignee + notes + '</div>'
+           + '  </div>'
+           + '  <div class="acts">'
+           + '    <button type="button" data-item-edit="' + (it.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+           + '    <button type="button" class="del" data-item-del="' + (it.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+           + '  </div>'
+           + '</div>';
+    }).join('');
+  }
+  var listHTML = '<div class="evd-item-list">' + rowsHTML + '</div>'
+               + '<div class="evd-item-add">'
+               + '  <button type="button" id="evd-item-add-btn">+ إضافة أداة</button>'
+               + '</div>';
+  root.innerHTML = progressHTML + listHTML;
+
+  // Wire toggles
+  root.querySelectorAll('button[data-toggle]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var iid = parseInt(b.getAttribute('data-toggle'), 10);
+      var it = ITEM_DATA.find(function(x){ return x.id === iid; });
+      if (!it) return;
+      var newReady = it.is_ready ? 0 : 1;
+      // Optimistic flip
+      b.classList.toggle('is-ready', !!newReady);
+      b.textContent = newReady ? '✓' : '';
+      var rowEl = b.closest('.evd-item-row');
+      if (rowEl) rowEl.classList.toggle('is-ready', !!newReady);
+      fetch('/api/admin/events/' + EID + '/items/' + iid, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({is_ready: newReady})
+      })
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(o){
+        if (!o.ok || !o.j.ok){
+          evdToast(o.j.error || 'تعذّر التحديث', 'error');
+          // Revert UI then refetch
+          evdLoadItems(); return;
+        }
+        evdLoadItems();   // updates progress bar + summary
+      })
+      .catch(function(){ evdToast('خطأ في الاتصال', 'error'); evdLoadItems(); });
+    });
+  });
+  // Wire edit / delete
+  root.querySelectorAll('button[data-item-edit]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var iid = parseInt(b.getAttribute('data-item-edit'), 10);
+      var it = ITEM_DATA.find(function(x){ return x.id === iid; });
+      if (it) evdOpenItemEdit(it);
+    });
+  });
+  root.querySelectorAll('button[data-item-del]').forEach(function(b){
+    b.addEventListener('click', function(){
+      evdItemDelete(parseInt(b.getAttribute('data-item-del'), 10));
+    });
+  });
+  var ab = document.getElementById('evd-item-add-btn');
+  if (ab) ab.addEventListener('click', evdOpenItemAdd);
+}
+
+function evdRenderAssigneeOptions(selectEl, currentId){
+  var opts = '<option value="">— لم يُحدد —</option>';
+  (ASSIGNEES || []).forEach(function(u){
+    var sel = (currentId && String(currentId) === String(u.user_id)) ? ' selected' : '';
+    opts += '<option value="' + (u.user_id|0) + '"' + sel + '>' + evdEsc(u.name) + ' (' + evdEsc(u.role) + ')</option>';
+  });
+  selectEl.innerHTML = opts;
+}
+
+function evdOpenItemAdd(){
+  document.getElementById('evd-item-title').textContent = '🛠️ أداة جديدة';
+  document.getElementById('if-id').value    = '';
+  document.getElementById('if-title').value = '';
+  document.getElementById('if-qty').value   = 1;
+  document.getElementById('if-notes').value = '';
+  evdLoadAssignees().then(function(){
+    evdRenderAssigneeOptions(document.getElementById('if-assignee'), null);
+  });
+  document.getElementById('evd-item-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('if-title').focus(); }, 50);
+}
+
+function evdOpenItemEdit(it){
+  document.getElementById('evd-item-title').textContent = '✏️ تعديل الأداة';
+  document.getElementById('if-id').value    = it.id;
+  document.getElementById('if-title').value = it.title || '';
+  document.getElementById('if-qty').value   = it.quantity || 1;
+  document.getElementById('if-notes').value = it.notes || '';
+  evdLoadAssignees().then(function(){
+    evdRenderAssigneeOptions(document.getElementById('if-assignee'), it.assigned_to_user_id);
+  });
+  document.getElementById('evd-item-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('if-title').focus(); }, 50);
+}
+
+function evdCloseItem(){
+  document.getElementById('evd-item-mb').classList.remove('is-open');
+}
+
+function evdSubmitItem(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-item-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var iid = parseInt(document.getElementById('if-id').value || '0', 10);
+  var assigneeRaw = document.getElementById('if-assignee').value;
+  var body = {
+    title:    document.getElementById('if-title').value.trim(),
+    quantity: document.getElementById('if-qty').value || 1,
+    notes:    document.getElementById('if-notes').value.trim(),
+    assigned_to_user_id: assigneeRaw ? parseInt(assigneeRaw, 10) : null
+  };
+  var url, method;
+  if (iid){ url = '/api/admin/events/' + EID + '/items/' + iid; method = 'PATCH'; }
+  else    { url = '/api/admin/events/' + EID + '/items';        method = 'POST';  }
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+    evdCloseItem();
+    evdToast(iid ? 'تم تحديث الأداة' : 'تم إضافة الأداة', 'success');
+    evdLoadItems();
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdItemDelete(iid){
+  if (!iid) return;
+  if (!confirm('هل تريدين حذف هذه الأداة؟')) return;
+  var row = document.querySelector('.evd-item-row[data-iid="' + iid + '"]');
+  if (row) row.classList.add('is-leaving');
+  fetch('/api/admin/events/' + EID + '/items/' + iid, {method:'DELETE'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        if (row) row.classList.remove('is-leaving');
+        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
+      }
+      evdToast('تم الحذف', 'success');
+      setTimeout(evdLoadItems, 180);
     })
     .catch(function(){
       if (row) row.classList.remove('is-leaving');
@@ -68544,6 +68836,12 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-cost-form').addEventListener('submit', evdSubmitCost);
   document.getElementById('evd-cost-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseCost();
+  });
+  // Item modal wires (5.2)
+  document.getElementById('evd-item-cancel').addEventListener('click', evdCloseItem);
+  document.getElementById('evd-item-form').addEventListener('submit', evdSubmitItem);
+  document.getElementById('evd-item-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseItem();
   });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
