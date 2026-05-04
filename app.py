@@ -66730,6 +66730,30 @@ def admin_points_page():
         mimetype="text/html; charset=utf-8")
 
 
+@app.route('/admin/students/<int:sid>/points', methods=['GET'])
+@login_required
+def admin_student_points_page(sid):
+    """Per-student points detail page. Anyone with view permission
+    on the student (manager / linked student / linked parent) can
+    open it."""
+    user = session.get("user") or {}
+    db = get_db()
+    if not _points_user_can_view(db, user, sid):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    if not _points_resolve_student_meta(db, sid):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;font-family:sans-serif;'>"
+            "<h1>الطالبة غير موجودة</h1></body></html>",
+            status=404, mimetype="text/html; charset=utf-8")
+    return Response(
+        ADMIN_STUDENT_POINTS_HTML.replace(
+            "__CAN_AWARD__", "1" if _points_can_admin(user) else "0"),
+        mimetype="text/html; charset=utf-8")
+
+
 @app.route('/api/admin/points/stats', methods=['GET'])
 @login_required
 def api_admin_points_stats():
@@ -68743,6 +68767,351 @@ document.addEventListener('DOMContentLoaded', function(){
     var rid = parseInt(btn.getAttribute('data-rid'), 10) || 0;
     var st  = btn.getAttribute('data-st');
     if (rid && st) setStatus(rid, st);
+  });
+});
+</script>
+</body></html>"""
+
+
+ADMIN_STUDENT_POINTS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>نقاط الطالبة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fff9e6,#f3e5f5 55%,#e1bee7);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.sp-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+           justify-content:space-between;align-items:center;flex-wrap:wrap;
+           gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.sp-topbar h1{margin:0;font-size:1.05rem;font-weight:900;color:#4a148c;}
+.sp-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+             padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.sp-wrap{max-width:880px;margin:18px auto 36px;padding:0 16px;}
+
+.sp-tier{background:linear-gradient(135deg,var(--c1,#C9A227),var(--c2,#FFC107));
+         color:#fff;padding:30px 28px;border-radius:18px;text-align:center;
+         margin-bottom:18px;box-shadow:0 8px 28px rgba(201,162,39,.32);
+         position:relative;overflow:hidden;}
+.sp-tier[data-tier="diamond"] {--c1:#1976D2;--c2:#42A5F5;}
+.sp-tier[data-tier="gold"]    {--c1:#C9A227;--c2:#FFC107;}
+.sp-tier[data-tier="silver"]  {--c1:#9e9e9e;--c2:#bdbdbd;}
+.sp-tier[data-tier="bronze"]  {--c1:#a1887f;--c2:#bcaaa4;}
+.sp-tier[data-tier="none"]    {--c1:#9e9e9e;--c2:#bdbdbd;}
+.sp-tier .em{font-size:3rem;line-height:1;margin-bottom:8px;}
+.sp-tier .lbl{font-size:1.3rem;font-weight:900;}
+.sp-tier .nm{font-size:1rem;opacity:.92;margin-top:4px;}
+.sp-tier .tot{font-size:2.5rem;font-weight:900;margin-top:14px;
+              font-variant-numeric:tabular-nums;}
+.sp-tier .tot small{font-size:1rem;opacity:.85;}
+.sp-tier .bar{height:10px;background:rgba(0,0,0,.25);border-radius:6px;
+              margin:10px auto 4px;max-width:80%;overflow:hidden;}
+.sp-tier .fill{height:100%;background:rgba(255,255,255,.85);border-radius:6px;
+               width:0%;transition:width .8s cubic-bezier(.2,.8,.2,1);}
+.sp-tier .next{font-size:.88rem;opacity:.9;}
+
+.sp-card{background:#fff;border-radius:14px;padding:18px 20px;
+         box-shadow:0 4px 14px rgba(0,0,0,.05);margin-bottom:14px;}
+.sp-card h3{margin:0 0 12px;font-size:1rem;color:#4a148c;font-weight:900;
+            border-right:4px solid #6B3FA0;padding-right:10px;
+            display:flex;justify-content:space-between;align-items:center;}
+.sp-card h3 .ct{color:#666;font-size:.82rem;font-weight:700;}
+
+.ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.ach{background:#fafafa;border-radius:10px;padding:10px;text-align:center;
+     border-right:4px solid var(--c,#bdbdbd);}
+.ach[data-tier="bronze"]  {--c:#a1887f;}
+.ach[data-tier="silver"]  {--c:#9e9e9e;}
+.ach[data-tier="gold"]    {--c:#C9A227;}
+.ach[data-tier="diamond"] {--c:#1976D2;}
+.ach[data-tier="special"] {--c:#e91e63;}
+.ach.locked{opacity:.5;}
+.ach .em{font-size:1.6rem;line-height:1;margin-bottom:4px;}
+.ach .nm{font-weight:800;color:#212121;font-size:.85rem;}
+.ach .ds{color:#666;font-size:.74rem;margin-top:3px;line-height:1.4;}
+
+.log-row{padding:9px 12px;border-bottom:1px solid #ececec;display:flex;
+         justify-content:space-between;align-items:center;font-size:.88rem;}
+.log-row:last-child{border-bottom:0;}
+.log-row .ds{color:#444;font-weight:700;flex:1;}
+.log-row .ds .when{display:block;color:#888;font-size:.74rem;font-weight:700;}
+.log-row .pts{font-weight:900;font-variant-numeric:tabular-nums;font-size:1rem;}
+.log-row .pts.pos{color:#1D9E75;}
+.log-row .pts.neg{color:#c62828;}
+
+.sp-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.sp-btn{border:0;border-radius:10px;padding:10px 18px;font-weight:800;
+        cursor:pointer;font-family:inherit;font-size:.9rem;
+        background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+        display:inline-flex;align-items:center;gap:6px;
+        box-shadow:0 4px 12px rgba(107,63,160,.28);}
+body[data-can-award="0"] .sp-btn{display:none;}
+
+/* Manual award modal */
+.sp-modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);
+             backdrop-filter:blur(4px);z-index:300;display:flex;
+             align-items:flex-start;justify-content:center;padding:36px 14px;}
+.sp-modal-ov[hidden]{display:none;}
+.sp-modal{background:#fff;border-radius:16px;width:min(420px,100%);
+          box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden;}
+.sp-modal .head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+                padding:14px 18px;display:flex;justify-content:space-between;
+                align-items:center;}
+.sp-modal .head h3{margin:0;font-size:1rem;font-weight:900;}
+.sp-modal .head button{background:rgba(255,255,255,.2);color:#fff;border:0;
+                       width:32px;height:32px;border-radius:8px;cursor:pointer;
+                       font-size:1.1rem;}
+.sp-modal .body{padding:18px;}
+.sp-modal .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.sp-modal .field label{font-size:.84rem;font-weight:800;color:#444;}
+.sp-modal .field input,.sp-modal .field textarea{
+  width:100%;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;
+  font-family:inherit;font-size:.94rem;background:#fafafa;}
+.sp-modal .field input:focus,.sp-modal .field textarea:focus{
+  outline:none;border-color:#6B3FA0;background:#fff;}
+.sp-modal .presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+.sp-modal .presets button{border:1.5px solid #e0e0e0;background:#fff;
+                          color:#444;padding:6px 12px;border-radius:7px;
+                          cursor:pointer;font-weight:800;font-family:inherit;
+                          font-size:.82rem;}
+.sp-modal .presets button.is-pos{color:#1D9E75;border-color:#a5d6a7;}
+.sp-modal .presets button.is-neg{color:#c62828;border-color:#ef9a9a;}
+.sp-modal .presets button:hover{background:#f5f5f5;}
+.sp-modal .foot{padding:14px 18px;background:#fafafa;display:flex;gap:8px;
+                justify-content:flex-end;border-top:1px solid #ececec;}
+.sp-modal .foot button{border:0;border-radius:9px;padding:9px 18px;
+                       font-weight:800;cursor:pointer;font-family:inherit;}
+.sp-modal .foot .save{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;}
+.sp-modal .foot .cancel{background:#ececec;color:#444;}
+
+.sp-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+          background:rgba(33,33,33,.92);color:#fff;padding:11px 18px;
+          border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
+          box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;
+          transition:opacity .25s,transform .25s;}
+.sp-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.sp-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.sp-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+
+.sp-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
+</style></head>
+<body data-can-award="__CAN_AWARD__">
+
+<div class="sp-topbar">
+  <h1>⭐ نقاط الطالبة</h1>
+  <a href="/admin/points">← لوحة النقاط</a>
+</div>
+
+<div class="sp-wrap" id="root">
+  <div class="sp-loading">جارٍ التحميل...</div>
+</div>
+
+<!-- Manual award modal -->
+<div class="sp-modal-ov" id="award-ov" hidden>
+  <div class="sp-modal" role="dialog" aria-modal="true">
+    <div class="head"><h3>⭐ منح نقاط للطالبة</h3>
+      <button type="button" data-award-close="1" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="body">
+      <p style="margin:0 0 8px;font-size:.88rem;color:#666;">
+        الطالبة: <strong id="award-name">—</strong><br>
+        النقاط الحالية: <strong id="award-cur">—</strong>
+      </p>
+      <div class="field">
+        <label>اختاري قيمة سريعة:</label>
+        <div class="presets">
+          <button type="button" class="is-pos" data-pts="5">+5</button>
+          <button type="button" class="is-pos" data-pts="10">+10</button>
+          <button type="button" class="is-pos" data-pts="20">+20</button>
+          <button type="button" class="is-pos" data-pts="50">+50</button>
+          <button type="button" class="is-neg" data-pts="-5">-5</button>
+          <button type="button" class="is-neg" data-pts="-10">-10</button>
+          <button type="button" class="is-neg" data-pts="-20">-20</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="award-pts">أو حدّدي قيمة مخصّصة</label>
+        <input id="award-pts" type="number" placeholder="مثلاً: 15">
+      </div>
+      <div class="field">
+        <label for="award-desc">السبب (إلزامي)</label>
+        <textarea id="award-desc" rows="2" placeholder="مثلاً: مشاركة فعّالة في الدرس"></textarea>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="cancel" type="button" data-award-close="1">إلغاء</button>
+      <button class="save"   type="button" id="award-save">✨ منح النقاط</button>
+    </div>
+  </div>
+</div>
+
+<div class="sp-toast" id="sp-toast"></div>
+
+<script>
+var SID = parseInt((window.location.pathname.split('/')[3] || '0'), 10) || 0;
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function toast(m, k){
+  var t=document.getElementById('sp-toast'); t.textContent=m||'';
+  t.classList.remove('is-success','is-error');
+  if(k) t.classList.add('is-'+k);
+  t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},3000);
+}
+function confetti(){
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
+  document.body.appendChild(host);
+  var colors=['#C9A227','#6B3FA0','#1D9E75','#1565C0','#e91e63'];
+  for (var i=0;i<60;i++){
+    var p=document.createElement('span');
+    p.style.cssText='position:absolute;top:-20px;left:'+(Math.random()*100)+'vw;'
+                  +'width:'+(6+Math.random()*8)+'px;height:'+(10+Math.random()*10)+'px;'
+                  +'background:'+colors[i%colors.length]+';'
+                  +'animation:spfall '+(1.8+Math.random()*1.6)+'s '+(Math.random()*0.4)+'s ease-in forwards;'
+                  +'transform:rotateZ('+(Math.random()*360)+'deg);';
+    host.appendChild(p);
+  }
+  setTimeout(function(){host.remove();},4000);
+}
+var sk=document.createElement('style');
+sk.textContent='@keyframes spfall{0%{transform:translateY(0) rotateZ(0deg);opacity:1;}100%{transform:translateY(110vh) rotateZ(720deg);opacity:0;}}';
+document.head.appendChild(sk);
+
+var DATA = null;
+function load(){
+  fetch('/api/admin/students/'+SID+'/points', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){
+        document.getElementById('root').innerHTML =
+          '<div class=\"sp-loading\" style=\"color:#c62828;\">'+esc((j&&j.error)||'خطأ')+'</div>';
+        return;
+      }
+      DATA = j;
+      render(j);
+    })
+    .catch(function(){
+      document.getElementById('root').innerHTML =
+        '<div class=\"sp-loading\" style=\"color:#c62828;\">خطأ في الاتصال</div>';
+    });
+}
+function render(j){
+  var st = j.student || {};
+  var prog = j.tier_progress || {};
+  var nextTxt = '';
+  if (prog.next_tier){
+    var rem = (prog.next_threshold || 0) - (j.total_points || 0);
+    nextTxt = 'متبقّي ' + rem + ' نقطة للوصول إلى ' + (j.tier_label || j.tier);
+    nextTxt = 'متبقّي ' + rem + ' نقطة للوصول إلى ' +
+              ({bronze:'🥉 برونزي',silver:'🥈 فضي',gold:'🥇 ذهبي',diamond:'💎 ماسي'}[prog.next_tier] || prog.next_tier);
+  } else {
+    nextTxt = 'وصلتِ لأعلى مستوى! 💎';
+  }
+  var actHTML = '';
+  if (j.achievements_unlocked.length){
+    actHTML += '<div class=\"sp-card\"><h3>🏆 الإنجازات المفتوحة <span class=\"ct\">'
+            + j.achievements_unlocked.length + ' / ' + (j.achievements_unlocked.length + j.achievements_locked.length)
+            + '</span></h3>';
+    actHTML += '<div class=\"ach-grid\">';
+    actHTML += j.achievements_unlocked.map(function(a){
+      return '<div class=\"ach\" data-tier=\"' + esc(a.tier) + '\">'
+           + '  <div class=\"em\">' + esc(a.icon || '🏆') + '</div>'
+           + '  <div class=\"nm\">' + esc(a.name_ar) + '</div>'
+           + '  <div class=\"ds\">' + esc(a.description_ar) + '</div>'
+           + '</div>';
+    }).join('');
+    actHTML += '</div></div>';
+  }
+  if (j.achievements_locked.length){
+    actHTML += '<div class=\"sp-card\"><h3>🔒 إنجازات قيد التقدم</h3><div class=\"ach-grid\">';
+    actHTML += j.achievements_locked.map(function(a){
+      return '<div class=\"ach locked\" data-tier=\"' + esc(a.tier) + '\">'
+           + '  <div class=\"em\">' + esc(a.icon || '🏆') + '</div>'
+           + '  <div class=\"nm\">' + esc(a.name_ar) + '</div>'
+           + '  <div class=\"ds\">' + esc(a.description_ar) + '</div>'
+           + '</div>';
+    }).join('');
+    actHTML += '</div></div>';
+  }
+  var logHTML = '<div class=\"sp-card\"><h3>📜 آخر النقاط</h3>';
+  if (!j.recent_log.length){
+    logHTML += '<div class=\"sp-loading\" style=\"padding:14px;\">لا توجد نقاط بعد</div>';
+  } else {
+    logHTML += j.recent_log.map(function(l){
+      var pts = (l.points || 0);
+      var when = l.awarded_at ? String(l.awarded_at).substring(0,16) : '';
+      return '<div class=\"log-row\"><div class=\"ds\">' + esc(l.description_ar)
+           + '<span class=\"when\">' + esc(when) + (l.awarded_by_name ? ' • ' + esc(l.awarded_by_name) : '') + '</span></div>'
+           + '<div class=\"pts ' + (pts >= 0 ? 'pos' : 'neg') + '\">' + (pts >= 0 ? '+' : '') + pts + '</div></div>';
+    }).join('');
+  }
+  logHTML += '</div>';
+  var actionsHTML = '<div class=\"sp-actions\"><button class=\"sp-btn\" id=\"sp-award-btn\">⭐ منح نقاط يدوياً</button></div>';
+  document.getElementById('root').innerHTML =
+      '<div class=\"sp-tier\" data-tier=\"' + esc(j.tier) + '\">'
+    + '  <div class=\"em\">' + ({diamond:'💎',gold:'🥇',silver:'🥈',bronze:'🥉',none:'🌱'}[j.tier] || '🌟') + '</div>'
+    + '  <div class=\"lbl\">' + esc(j.tier_label || '') + '</div>'
+    + '  <div class=\"nm\">' + esc(st.name) + (st.group_name ? ' — ' + esc(st.group_name) : '') + '</div>'
+    + '  <div class=\"tot\">' + (j.total_points || 0) + '<small> / ' + (prog.next_threshold || prog.current_threshold || 0) + '</small></div>'
+    + '  <div class=\"bar\"><div class=\"fill\" style=\"width:' + (prog.pct || 0) + '%\"></div></div>'
+    + '  <div class=\"next\">' + esc(nextTxt) + '</div>'
+    + '</div>'
+    + actionsHTML
+    + actHTML
+    + logHTML;
+  var ab = document.getElementById('sp-award-btn');
+  if (ab) ab.addEventListener('click', openAward);
+}
+
+function openAward(){
+  if (!DATA) return;
+  document.getElementById('award-name').textContent = (DATA.student || {}).name || '—';
+  document.getElementById('award-cur').textContent  = (DATA.total_points || 0) + ' نقطة';
+  document.getElementById('award-pts').value  = '';
+  document.getElementById('award-desc').value = '';
+  document.getElementById('award-ov').hidden  = false;
+}
+function closeAward(){ document.getElementById('award-ov').hidden = true; }
+
+document.addEventListener('DOMContentLoaded', function(){
+  load();
+  document.querySelectorAll('[data-award-close]').forEach(function(b){
+    b.addEventListener('click', closeAward);
+  });
+  var ov = document.getElementById('award-ov');
+  if (ov) ov.addEventListener('click', function(e){ if (e.target === ov) closeAward(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !document.getElementById('award-ov').hidden) closeAward();
+  });
+  // Preset chips
+  document.querySelectorAll('.sp-modal .presets button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.getElementById('award-pts').value = b.getAttribute('data-pts');
+    });
+  });
+  document.getElementById('award-save').addEventListener('click', function(){
+    var pts = parseInt((document.getElementById('award-pts').value || '0'), 10);
+    var desc = (document.getElementById('award-desc').value || '').trim();
+    if (!pts){ toast('أدخلي عدد نقاط', 'error'); return; }
+    if (!desc){ toast('السبب مطلوب', 'error'); return; }
+    fetch('/api/admin/students/'+SID+'/points/manual', {
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({points: pts, description_ar: desc}),
+    }).then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok){ toast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
+        closeAward();
+        toast('✓ تم منح ' + pts + ' نقاط', 'success');
+        confetti();
+        load();
+      })
+      .catch(function(){ toast('خطأ في الاتصال', 'error'); });
   });
 });
 </script>
