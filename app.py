@@ -66564,10 +66564,11 @@ def api_admin_trips_list():
         print("[trips] list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
     trip_ids = [dict(r).get("id") for r in rows]
-    counts_map   = _trip_load_reg_counts(db, trip_ids)
-    payments_map = _trip_load_payment_summary(db, trip_ids)
-    tasks_map    = _trip_load_task_summary(db, trip_ids)
+    counts_map    = _trip_load_reg_counts(db, trip_ids)
+    payments_map  = _trip_load_payment_summary(db, trip_ids)
+    tasks_map     = _trip_load_task_summary(db, trip_ids)
     reminders_map = _trip_load_reminder_pending(db, trip_ids)
+    survey_map    = _trip_load_survey_summary(db, trip_ids)
     out = []
     for r in rows:
         rd = dict(r)
@@ -66579,6 +66580,9 @@ def api_admin_trips_list():
         pending_n = reminders_map.get(tid_r) or 0
         enriched["pending_auto_reminders_count"] = pending_n
         enriched["pending_auto_reminders"]       = bool(pending_n)
+        sm = survey_map.get(tid_r) or {}
+        enriched["survey_count"]      = int(sm.get("survey_count") or 0)
+        enriched["survey_avg_rating"] = float(sm.get("survey_avg_rating") or 0)
         out.append(enriched)
     return jsonify({"ok": True, "trips": out, "total": len(out)})
 
@@ -68281,6 +68285,7 @@ function render(j){
       '<div class="tml-actions">'
     + '  <a class="tml-btn" href="/api/admin/trips/' + TID + '/financial-report" target="_blank" rel="noopener">📊 التقرير المالي</a>'
     + '  <a class="tml-btn secondary" href="/api/admin/trips/' + TID + '/day-report" target="_blank" rel="noopener">📋 تقرير اليوم</a>'
+    + '  <a class="tml-btn secondary" href="/api/admin/trips/' + TID + '/export.csv">📥 تنزيل CSV</a>'
     + '</div>';
   document.getElementById('tml-root').innerHTML =
       hero
@@ -68920,6 +68925,36 @@ def _trip_load_reminder_pending(db, trip_ids):
         n   = int((r[1] if not hasattr(r, "keys") else r[1]) or 0)
         if tid in out:
             out[tid] = n
+    return out
+
+
+def _trip_load_survey_summary(db, trip_ids):
+    """Single query per trip group: {trip_id: {survey_count,
+    survey_avg_rating}}. Used by the list endpoint so completed
+    trip cards can surface their rating without an extra fetch."""
+    if not trip_ids:
+        return {}
+    out = {tid: {"survey_count": 0, "survey_avg_rating": 0.0}
+           for tid in trip_ids}
+    placeholders = ",".join(["?"] * len(trip_ids))
+    try:
+        rows = db.execute(
+            "SELECT trip_id, COUNT(*), AVG(rating) "
+            "FROM trip_surveys "
+            "WHERE submitted_at IS NOT NULL "
+            "AND trip_id IN (" + placeholders + ") "
+            "GROUP BY trip_id",
+            tuple(trip_ids),
+        ).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        tid = r[0] if not hasattr(r, "keys") else r["trip_id"]
+        n   = int((r[1] if not hasattr(r, "keys") else r[1]) or 0)
+        avg = float((r[2] if not hasattr(r, "keys") else r[2]) or 0)
+        if tid in out:
+            out[tid]["survey_count"]      = n
+            out[tid]["survey_avg_rating"] = round(avg, 1)
     return out
 
 
@@ -70431,6 +70466,70 @@ def api_admin_trips_surveys_send(tid):
                new_value={"count": len(out)})
     except Exception: pass
     return jsonify({"ok": True, "count": len(out), "messages": out})
+
+
+@app.route('/api/admin/trips/<int:tid>/export.csv', methods=['GET'])
+@login_required
+def api_admin_trips_export_csv(tid):
+    """Export all registrations + payment + day-attendance for a
+    trip as CSV. Manager-only."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return Response("forbidden", status=403, mimetype="text/plain")
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return Response("not found", status=404, mimetype="text/plain")
+    try:
+        rows = db.execute(
+            "SELECT r.id AS reg_id, r.student_name, r.student_pid, "
+            "       r.parent_name, r.parent_phone, r.registration_status, "
+            "       r.registration_method, r.confirmation_id, r.registered_at, "
+            "       p.payment_method, p.amount AS paid_amount, "
+            "       p.payment_date, p.collected_by_name, "
+            "       da.attendance_status, da.arrival_time, da.notes AS day_notes "
+            "FROM trip_registrations r "
+            "LEFT JOIN trip_payments p "
+            "  ON p.registration_id = r.id AND p.is_deleted = 0 "
+            "LEFT JOIN trip_day_attendance da ON da.registration_id = r.id "
+            "WHERE r.trip_id = ? AND r.is_deleted = 0 "
+            "ORDER BY r.id",
+            (tid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[trips] export csv failed: " + str(ex), file=_sys.stderr)
+        return Response("server error", status=500, mimetype="text/plain")
+    import csv as _csv
+    from io import StringIO as _SIO
+    buf = _SIO()
+    w = _csv.writer(buf)
+    # Headers (Arabic for the printout, English for the data layer
+    # the admin probably opens in Excel — keep them paired).
+    w.writerow([
+        "id", "student_name", "student_pid",
+        "parent_name", "parent_phone", "registration_status",
+        "registration_method", "confirmation_id", "registered_at",
+        "payment_method", "paid_amount", "payment_date",
+        "collected_by_name",
+        "attendance_status", "arrival_time", "day_notes",
+    ])
+    for r in rows:
+        rd = dict(r)
+        w.writerow([rd.get(k, "") if rd.get(k) is not None else "" for k in [
+            "reg_id","student_name","student_pid","parent_name","parent_phone",
+            "registration_status","registration_method","confirmation_id",
+            "registered_at","payment_method","paid_amount","payment_date",
+            "collected_by_name","attendance_status","arrival_time","day_notes",
+        ]])
+    body = buf.getvalue()
+    # Add the UTF-8 BOM so Excel opens it correctly with Arabic text.
+    payload = "﻿" + body
+    fname = "trip_" + str(tid) + ".csv"
+    return Response(
+        payload,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=" + fname},
+    )
 
 
 @app.route('/api/admin/trips/<int:tid>/memory-lane', methods=['GET'])
@@ -74119,7 +74218,12 @@ function tripCardHTML(tp){
     + ((tp.status === 'completed' || tp.status === 'archived') ?
         '<a class="tc-day-cta" style="background:linear-gradient(135deg,#6B3FA0,#e91e63);" '
         + 'href="/admin/trips/' + (tp.id|0) + '/memory-lane" target="_blank" rel="noopener">'
-        + '🌟 ذكرى الرحلة</a>' : '')
+        + '🌟 ذكرى الرحلة'
+        + ((tp.survey_count || 0) > 0
+            ? ' <span style="opacity:.85;font-size:.85rem;">— ⭐ ' + (tp.survey_avg_rating || 0).toFixed(1)
+              + '/5 (' + tp.survey_count + ' تقييم)</span>'
+            : '')
+        + '</a>' : '')
     + (tp.pending_auto_reminders ?
         '<button type="button" class="tc-reminder-cta" data-act="send-reminders" data-tid="' + (tp.id|0) + '">'
         + '📤 إرسال التذكيرات الآن (' + (tp.pending_auto_reminders_count || 0) + ')'
