@@ -66921,6 +66921,223 @@ def serve_trip_receipt(trip_id, filename):
     return _send_r(target_file, mimetype=None, conditional=True)
 
 
+ADMIN_TRIPS_TEMPLATES_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>قوالب رسائل الرحلات — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#f0f4ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+        justify-content:space-between;align-items:center;flex-wrap:wrap;
+        gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+        position:sticky;top:0;z-index:10;}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:18px auto;padding:0 16px;display:grid;
+      grid-template-columns:1fr 280px;gap:18px;}
+@media (max-width:880px){.wrap{grid-template-columns:1fr;}}
+.t-list{display:flex;flex-direction:column;gap:14px;}
+.t-card{background:#fff;border-radius:14px;padding:18px 20px;
+        box-shadow:0 4px 14px rgba(0,0,0,.06);
+        border-right:5px solid var(--c,#6B3FA0);}
+.t-card[data-key="announcement"]{--c:#1565C0;}
+.t-card[data-key="reminder"]    {--c:#BA7517;}
+.t-card[data-key="payment_reminder"]{--c:#1D9E75;}
+.t-head{display:flex;justify-content:space-between;align-items:center;
+        margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.t-head .left{display:flex;align-items:center;gap:8px;}
+.t-head h2{margin:0;font-size:1.05rem;color:#212121;font-weight:900;}
+.t-head .em{font-size:1.4rem;}
+.t-head .pill{font-size:.75rem;font-weight:800;padding:3px 10px;
+              border-radius:999px;background:#e8eaf6;color:#3949ab;}
+.t-head .pill.is-default{background:#e6f7ee;color:#0f6b4a;}
+.t-card textarea{width:100%;border:1.5px solid #e0e0e0;border-radius:9px;
+                 padding:12px;font-size:.92rem;font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+                 background:#fafafa;min-height:160px;resize:vertical;
+                 line-height:1.7;}
+.t-card textarea:focus{outline:none;border-color:#6B3FA0;background:#fff;}
+.t-card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.t-card .actions button{border:0;border-radius:9px;padding:9px 16px;
+                        font-weight:800;cursor:pointer;font-size:.88rem;
+                        font-family:inherit;display:inline-flex;
+                        align-items:center;gap:5px;}
+.t-card .save{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+              box-shadow:0 4px 12px rgba(29,158,117,.28);}
+.t-card .save:disabled{opacity:.5;cursor:not-allowed;}
+.t-card .reset{background:#ffebee;color:#c62828;}
+.t-card .reset:disabled{opacity:.4;cursor:not-allowed;}
+body[data-is-admin="0"] .t-card .reset{display:none;}
+
+.sidebar{background:#fff;border-radius:14px;padding:18px 18px;
+         box-shadow:0 4px 14px rgba(0,0,0,.06);height:fit-content;
+         position:sticky;top:80px;}
+.sidebar h3{margin:0 0 12px;font-size:1rem;color:#4a148c;font-weight:900;}
+.sidebar .placeholders{display:flex;flex-direction:column;gap:5px;}
+.sidebar .ph{background:#f3e5f5;color:#4a148c;border:0;padding:7px 10px;
+             border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;
+             text-align:right;font-family:inherit;transition:background .12s;}
+.sidebar .ph:hover{background:#e1bee7;}
+.sidebar .hint{font-size:.78rem;color:#777;margin-top:10px;line-height:1.5;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+       background:rgba(33,33,33,.92);color:#fff;padding:11px 18px;
+       border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
+       box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;
+       transition:opacity .25s,transform .25s;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+</style></head>
+<body data-is-admin="__IS_ADMIN__">
+
+<div class="topbar">
+  <h1>📝 قوالب رسائل الرحلات</h1>
+  <a href="/admin/trips">← العودة للرحلات</a>
+</div>
+
+<div class="wrap">
+  <div class="t-list" id="t-list">
+    <div style="text-align:center;color:#666;padding:40px;">جارٍ التحميل...</div>
+  </div>
+  <div class="sidebar">
+    <h3>🏷️ المتغيرات المتاحة</h3>
+    <div class="placeholders" id="t-placeholders"></div>
+    <div class="hint">انقري على متغير لنسخه. سيتم استبداله تلقائياً عند الإرسال بالقيمة الفعلية للرحلة / الطالبة.</div>
+  </div>
+</div>
+
+<div class="toast" id="t-toast"></div>
+
+<script>
+var PLACEHOLDERS = [
+  {k:'trip_name',        d:'اسم الرحلة'},
+  {k:'destination',      d:'الوجهة'},
+  {k:'trip_date',        d:'تاريخ الرحلة'},
+  {k:'departure_time',   d:'وقت الانطلاق'},
+  {k:'return_time',      d:'وقت العودة'},
+  {k:'meeting_point',    d:'نقطة التجمع'},
+  {k:'price',            d:'السعر'},
+  {k:'smart_link',       d:'رابط التسجيل'},
+  {k:'equipment_needed', d:'الأدوات المطلوبة'},
+  {k:'emergency_contact',d:'رقم الطوارئ'},
+  {k:'parent_name',      d:'اسم ولي الأمر'},
+  {k:'student_name',     d:'اسم الطالبة'},
+];
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function toast(msg, kind){
+  var t=document.getElementById('t-toast');
+  t.textContent=msg||''; t.classList.remove('is-success','is-error');
+  if(kind) t.classList.add('is-'+kind);
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h=setTimeout(function(){t.classList.remove('show');},3000);
+}
+function renderPlaceholders(){
+  document.getElementById('t-placeholders').innerHTML =
+    PLACEHOLDERS.map(function(p){
+      return '<button class="ph" data-ph="' + p.k + '">{' + p.k + '} — ' + esc(p.d) + '</button>';
+    }).join('');
+}
+function loadTemplates(){
+  fetch('/api/admin/trips/templates', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok){
+        document.getElementById('t-list').innerHTML =
+          '<div style="text-align:center;color:#c62828;padding:40px;">تعذّر التحميل</div>';
+        return;
+      }
+      document.getElementById('t-list').innerHTML = (j.templates||[]).map(function(t){
+        var pill = t.is_default ? '<span class="pill is-default">قالب افتراضي</span>'
+                                : '<span class="pill">معدّل</span>';
+        return ''
+          + '<div class="t-card" data-key="' + esc(t.template_key) + '">'
+          + '  <div class="t-head">'
+          + '    <div class="left"><span class="em">' + esc(t.icon || '📝') + '</span>'
+          + '      <h2>' + esc(t.name || t.template_key) + '</h2>' + pill + '</div>'
+          + '  </div>'
+          + '  <textarea data-body="' + esc(t.template_key) + '">' + esc(t.body) + '</textarea>'
+          + '  <div class="actions">'
+          + '    <button class="save"  data-act="save"  data-key="' + esc(t.template_key) + '">💾 حفظ</button>'
+          + '    <button class="reset" data-act="reset" data-key="' + esc(t.template_key) + '">↩️ استعادة الافتراضي</button>'
+          + '  </div>'
+          + '</div>';
+      }).join('');
+    })
+    .catch(function(){
+      document.getElementById('t-list').innerHTML =
+        '<div style="text-align:center;color:#c62828;padding:40px;">خطأ في الاتصال</div>';
+    });
+}
+document.addEventListener('DOMContentLoaded', function(){
+  renderPlaceholders();
+  loadTemplates();
+  document.getElementById('t-placeholders').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-ph]');
+    if(!b) return;
+    var ph='{'+b.getAttribute('data-ph')+'}';
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ph).then(function(){
+        toast('تم نسخ ' + ph, 'success');
+      });
+    } else {
+      toast(ph + ' — انسخيه يدوياً', 'success');
+    }
+  });
+  document.getElementById('t-list').addEventListener('click', function(e){
+    var b=e.target.closest('button[data-act]');
+    if(!b) return;
+    var key=b.getAttribute('data-key');
+    var act=b.getAttribute('data-act');
+    if (act === 'save'){
+      var ta=document.querySelector('textarea[data-body="'+key+'"]');
+      if (!ta) return;
+      var body=(ta.value||'').trim();
+      if (!body){ toast('نص الرسالة لا يمكن أن يكون فارغاً','error'); return; }
+      b.disabled=true;
+      fetch('/api/admin/trips/templates/' + encodeURIComponent(key), {
+        method:'PATCH', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({body:body}),
+      }).then(function(r){return r.json();})
+        .then(function(j){
+          b.disabled=false;
+          if(!j||!j.ok){toast((j&&j.error)||'تعذّر الحفظ','error');return;}
+          toast('✓ تم الحفظ','success');
+          loadTemplates();
+        }).catch(function(){
+          b.disabled=false;
+          toast('خطأ في الاتصال','error');
+        });
+    } else if (act === 'reset'){
+      if (!window.confirm('استعادة النص الافتراضي؟ سيتم استبدال أي تعديلات.')) return;
+      b.disabled=true;
+      fetch('/api/admin/trips/templates/' + encodeURIComponent(key) + '/reset', {
+        method:'POST', credentials:'same-origin',
+      }).then(function(r){return r.json();})
+        .then(function(j){
+          b.disabled=false;
+          if(!j||!j.ok){toast((j&&j.error)||'تعذّر الاستعادة','error');return;}
+          toast('✓ تم الاستعادة','success');
+          loadTemplates();
+        }).catch(function(){
+          b.disabled=false;
+          toast('خطأ في الاتصال','error');
+        });
+    }
+  });
+});
+</script>
+</body></html>"""
+
+
 TRIP_FINANCIAL_REPORT_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>التقرير المالي — {{TRIP_NAME}} — مايندكس</title>
@@ -68265,6 +68482,74 @@ def api_admin_trips_messages_send(tid):
                        "icon": tpl_d.get("icon") or ""},
         "recipients": recipient_kind,
     })
+
+
+@app.route('/api/admin/trips/messages/log', methods=['GET'])
+@login_required
+def api_admin_trips_messages_log():
+    """Last N reminder-log rows. Manager-only. Optional ?trip_id,
+    ?template_key, ?send_type filters."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    sql = ("SELECT l.*, t.name AS trip_name "
+           "FROM trip_reminder_log l "
+           "LEFT JOIN trips t ON t.id = l.trip_id WHERE 1=1")
+    params = []
+    trip_id     = request.args.get("trip_id")
+    template    = (request.args.get("template_key") or "").strip()
+    send_type   = (request.args.get("send_type") or "").strip()
+    try: limit = max(1, min(int(request.args.get("limit") or 50), 200))
+    except Exception: limit = 50
+    if trip_id:
+        try:
+            sql += " AND l.trip_id = ?"; params.append(int(trip_id))
+        except Exception: pass
+    if template in _TRIP_MSG_VALID_KEYS:
+        sql += " AND l.template_key = ?"; params.append(template)
+    if send_type in ("manual", "auto"):
+        sql += " AND l.send_type = ?"; params.append(send_type)
+    sql += " ORDER BY l.id DESC LIMIT ?"
+    params.append(limit)
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[trips] message log failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر جلب السجل"}), 500
+    out = []
+    for r in rows:
+        rd = dict(r)
+        out.append({
+            "id":              rd.get("id"),
+            "trip_id":         rd.get("trip_id"),
+            "trip_name":       rd.get("trip_name") or "",
+            "registration_id": rd.get("registration_id"),
+            "template_key":    rd.get("template_key") or "",
+            "send_type":       rd.get("send_type") or "",
+            "triggered_by_name": rd.get("triggered_by_name") or "",
+            "recipient_phone":   rd.get("recipient_phone") or "",
+            "recipient_name":    rd.get("recipient_name") or "",
+            "sent_at":         rd.get("sent_at"),
+        })
+    return jsonify({"ok": True, "log": out, "count": len(out)})
+
+
+@app.route('/admin/trips/templates', methods=['GET'])
+@login_required
+def admin_trips_templates_page():
+    """Templates editor page — manager-only."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    role = ((user.get("role") or "")).strip().lower()
+    return Response(
+        ADMIN_TRIPS_TEMPLATES_HTML.replace("__IS_ADMIN__", "1" if role == "admin" else "0"),
+        mimetype="text/html; charset=utf-8")
 
 
 @app.route('/api/admin/trips/templates/<key>/reset', methods=['POST'])
@@ -70317,6 +70602,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             data-view="cards" aria-label="تبديل العرض">
       <span>📅</span><span>التقويم</span>
     </button>
+    <a class="trip-btn trip-btn-ghost" href="/admin/trips/templates"
+       style="text-decoration:none;">
+      <span>📝</span><span>القوالب</span>
+    </a>
+    <button class="trip-btn trip-btn-ghost" type="button" id="trip-msg-log-btn"
+            aria-label="سجل الرسائل">
+      <span>📜</span><span>سجل الرسائل</span>
+    </button>
   </div>
 
   <div class="trip-filters">
@@ -70740,6 +71033,19 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 <div class="pp-lightbox" id="pp-lightbox" hidden>
   <button class="pp-lb-close" type="button" data-pp-lb-close="1" aria-label="إغلاق">✕</button>
   <img id="pp-lightbox-img" src="" alt="إيصال الدفع">
+</div>
+
+<!-- ── Message history panel ────────────────────────────────────── -->
+<div class="trip-rp-overlay" id="msg-log-overlay" hidden>
+  <div class="trip-rp" role="dialog" aria-modal="true">
+    <div class="rp-head" style="background:linear-gradient(135deg,#25D366,#128C7E);">
+      <h3><span>📜</span><span>سجل الرسائل</span></h3>
+      <button class="rp-close" type="button" data-msg-log-close="1" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="rp-body" id="msg-log-body" style="padding:14px 18px;">
+      <div class="rp-empty"><div class="em">⏳</div><div>جارٍ التحميل...</div></div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Send messages modal ──────────────────────────────────────── -->
@@ -71570,6 +71876,79 @@ function tripShareWhatsApp(tid){
   var url = 'https://wa.me/?text=' + encodeURIComponent(msg);
   window.open(url, '_blank', 'noopener');
 }
+
+/* ── Message history panel ────────────────────────────────────── */
+function tripOpenMsgLog(){
+  var ov = document.getElementById('msg-log-overlay');
+  if (!ov) return;
+  ov.hidden = false;
+  document.body.style.overflow = 'hidden';
+  var body = document.getElementById('msg-log-body');
+  body.innerHTML = '<div class="rp-empty"><div class="em">⏳</div><div>جارٍ التحميل...</div></div>';
+  fetch('/api/admin/trips/messages/log?limit=50', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){
+        body.innerHTML = '<div class="rp-empty"><div class="em">⚠️</div><div>'
+                       + ((j && j.error) || 'خطأ') + '</div></div>';
+        return;
+      }
+      if (!j.count){
+        body.innerHTML = '<div class="rp-empty"><div class="em">📭</div>'
+                       + '<div>لم تُرسَل أي رسائل بعد.</div></div>';
+        return;
+      }
+      var tplLabels = {
+        announcement: '📢 إعلان',
+        reminder:     '⏰ تذكير',
+        payment_reminder: '💰 تذكير دفع',
+      };
+      var stLabels = {manual: 'يدوي', auto: 'تلقائي'};
+      body.innerHTML = (j.log || []).map(function(l){
+        var when = l.sent_at ? String(l.sent_at).substring(0, 16) : '';
+        return ''
+          + '<div class="rp-row" style="border-right:4px solid #128C7E;">'
+          + '  <div class="rp-name">' + tripEscRP(l.recipient_name || l.recipient_phone || '—') + '</div>'
+          + '  <div class="rp-meta">'
+          + '    <span>📞 ' + tripEscRP(l.recipient_phone || '') + '</span>'
+          + '    <span>' + tripEscRP(tplLabels[l.template_key] || l.template_key) + '</span>'
+          + '    <span>📅 ' + tripEscRP(when) + '</span>'
+          + '    <span>👤 ' + tripEscRP(l.triggered_by_name || '—') + '</span>'
+          + '    <span style="color:#666;">' + tripEscRP(stLabels[l.send_type] || l.send_type) + '</span>'
+          + '    <span>🚌 ' + tripEscRP(l.trip_name || '') + '</span>'
+          + '  </div>'
+          + '</div>';
+      }).join('');
+    })
+    .catch(function(){
+      body.innerHTML = '<div class="rp-empty"><div class="em">⚠️</div><div>خطأ في الاتصال</div></div>';
+    });
+}
+function tripCloseMsgLog(){
+  var ov = document.getElementById('msg-log-overlay');
+  if (!ov) return;
+  ov.hidden = true;
+  document.body.style.overflow = '';
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var btn = document.getElementById('trip-msg-log-btn');
+  if (btn) btn.addEventListener('click', tripOpenMsgLog);
+  document.querySelectorAll('[data-msg-log-close="1"]').forEach(function(b){
+    b.addEventListener('click', tripCloseMsgLog);
+  });
+  var ov = document.getElementById('msg-log-overlay');
+  if (ov){
+    ov.addEventListener('click', function(e){
+      if (e.target === ov) tripCloseMsgLog();
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      var v = document.getElementById('msg-log-overlay');
+      if (v && !v.hidden) tripCloseMsgLog();
+    }
+  });
+});
 
 /* ── Send-message modal ────────────────────────────────────────── */
 var _TT_SEND_TRIP_ID = 0;
