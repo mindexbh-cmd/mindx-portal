@@ -66271,11 +66271,19 @@ def api_admin_trips_list():
     counts_map   = _trip_load_reg_counts(db, trip_ids)
     payments_map = _trip_load_payment_summary(db, trip_ids)
     tasks_map    = _trip_load_task_summary(db, trip_ids)
-    out = [_trip_compute_fields(dict(r),
-                                counts_map.get(dict(r).get("id")),
-                                payments_map.get(dict(r).get("id")),
-                                tasks_map.get(dict(r).get("id")))
-           for r in rows]
+    reminders_map = _trip_load_reminder_pending(db, trip_ids)
+    out = []
+    for r in rows:
+        rd = dict(r)
+        tid_r = rd.get("id")
+        enriched = _trip_compute_fields(rd,
+                                        counts_map.get(tid_r),
+                                        payments_map.get(tid_r),
+                                        tasks_map.get(tid_r))
+        pending_n = reminders_map.get(tid_r) or 0
+        enriched["pending_auto_reminders_count"] = pending_n
+        enriched["pending_auto_reminders"]       = bool(pending_n)
+        out.append(enriched)
     return jsonify({"ok": True, "trips": out, "total": len(out)})
 
 
@@ -67239,6 +67247,60 @@ def _trip_promote_next_waitlisted(db, trip_id):
         import sys as _sys
         print("[trips] auto-promote failed: " + str(ex), file=_sys.stderr)
         return None
+
+
+def _trip_load_reminder_pending(db, trip_ids):
+    """For trips whose trip_date is exactly today + 1, return how
+    many registered students still need a 'reminder' template send
+    today. Dedupe key matches the index:
+        (trip_id, registration_id, 'reminder', 'manual')
+    where sent_at >= midnight today. Drives the "تذكيرات الغد جاهزة"
+    smart-card alert in stage 5."""
+    if not trip_ids:
+        return {}
+    out = {tid: 0 for tid in trip_ids}
+    from datetime import date as _date, timedelta as _td
+    tomorrow = (_date.today() + _td(days=1)).isoformat()
+    today    = _date.today().isoformat()
+    placeholders = ",".join(["?"] * len(trip_ids))
+    # Trips that match the "tomorrow" pattern.
+    try:
+        match_rows = db.execute(
+            "SELECT id FROM trips "
+            "WHERE id IN (" + placeholders + ") "
+            "AND is_deleted = 0 AND status = 'active' "
+            "AND trip_date = ?",
+            tuple(trip_ids) + (tomorrow,),
+        ).fetchall()
+    except Exception:
+        return out
+    eligible_tids = [r[0] if not hasattr(r, "keys") else r["id"]
+                     for r in match_rows]
+    if not eligible_tids:
+        return out
+    # Registered students who don't have a reminder log row from today.
+    eph = ",".join(["?"] * len(eligible_tids))
+    try:
+        regs = db.execute(
+            "SELECT trip_id, COUNT(*) FROM trip_registrations r "
+            "WHERE r.trip_id IN (" + eph + ") "
+            "AND r.is_deleted = 0 AND r.registration_status = 'registered' "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM trip_reminder_log l "
+            "  WHERE l.trip_id = r.trip_id AND l.registration_id = r.id "
+            "  AND l.template_key = 'reminder' "
+            "  AND DATE(l.sent_at) = ?"
+            ") GROUP BY trip_id",
+            tuple(eligible_tids) + (today,),
+        ).fetchall()
+    except Exception:
+        regs = []
+    for r in regs:
+        tid = r[0] if not hasattr(r, "keys") else r["trip_id"]
+        n   = int((r[1] if not hasattr(r, "keys") else r[1]) or 0)
+        if tid in out:
+            out[tid] = n
+    return out
 
 
 def _trip_load_task_summary(db, trip_ids):
@@ -69535,6 +69597,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .tc-time.is-imminent{color:#8d4f00;}
 .tc-time.is-past{color:#888;}
 
+/* Auto-reminder CTA on the smart card */
+.tc-reminder-cta{background:linear-gradient(135deg,#C9A227,#f1d369);
+                 color:#3e2c00;border:0;padding:8px 14px;border-radius:9px;
+                 font-weight:900;font-size:.85rem;cursor:pointer;
+                 font-family:inherit;display:flex;align-items:center;
+                 justify-content:center;gap:6px;margin-top:2px;
+                 box-shadow:0 4px 12px rgba(201,162,39,.32);
+                 animation:tcReminderPulse 2.4s ease-in-out infinite;}
+.tc-reminder-cta:hover{box-shadow:0 8px 18px rgba(201,162,39,.45);}
+@keyframes tcReminderPulse{
+  0%,100%{box-shadow:0 4px 12px rgba(201,162,39,.32);}
+  50%    {box-shadow:0 6px 18px rgba(201,162,39,.55);}
+}
+
 /* ── Action icons ─────────────────────────────────────────────────── */
 .tc-icons{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;}
 .tc-icons button{border:0;background:#f5f5f5;width:34px;height:34px;
@@ -71221,6 +71297,16 @@ function tripBuildAlerts(tp){
   } else if (tp.is_imminent && reg > 0 && colPct < 30){
     out.push({cls:'', text:'💰 التحصيل بطيء'});
   }
+  // Auto-reminder ready alert (stage 5) — fires when trip_date is
+  // tomorrow and there are registered students who haven't been
+  // sent a reminder today yet. Includes a one-click button that
+  // opens the send modal pre-set to template=reminder + recipients=registered.
+  if (tp.pending_auto_reminders && (tp.pending_auto_reminders_count || 0) > 0){
+    out.push({
+      cls:'is-archive',
+      text:'⏰ تذكيرات الغد جاهزة (' + tp.pending_auto_reminders_count + ')',
+    });
+  }
   // Task-side alerts (stage 4)
   var ttot = tp.task_total || 0;
   var tdon = tp.task_completed || 0;
@@ -71294,6 +71380,10 @@ function tripCardHTML(tp){
       })()
     + '  </div>'
     + (alerts ? '<div class="tc-alerts">' + alerts + '</div>' : '')
+    + (tp.pending_auto_reminders ?
+        '<button type="button" class="tc-reminder-cta" data-act="send-reminders" data-tid="' + (tp.id|0) + '">'
+        + '📤 إرسال التذكيرات الآن (' + (tp.pending_auto_reminders_count || 0) + ')'
+        + '</button>' : '')
     + (timeLine ? '<div class="tc-time ' + timeCls + '">' + tripEsc(timeLine) + '</div>' : '')
     + '  <div class="tc-icons">'
     + '    <button type="button" data-act="registrations" title="المسجّلات">👥</button>'
@@ -71485,17 +71575,18 @@ function tripShareWhatsApp(tid){
 var _TT_SEND_TRIP_ID = 0;
 var _TT_SEND_TPL_KEY = 'announcement';
 
-function tripOpenSendModal(tid){
+function tripOpenSendModal(tid, presetTpl, presetRec){
   _TT_SEND_TRIP_ID = tid|0;
-  _TT_SEND_TPL_KEY = 'announcement';
+  var tplKey = presetTpl || 'announcement';
+  var recKey = presetRec || 'registered';
+  _TT_SEND_TPL_KEY = tplKey;
   var ov = document.getElementById('tt-send-overlay');
   if (!ov) return;
-  // Reset UI
   document.querySelectorAll('#tt-send-tpl-row .tt-send-tpl').forEach(function(b){
-    b.classList.toggle('is-active', b.getAttribute('data-key') === 'announcement');
+    b.classList.toggle('is-active', b.getAttribute('data-key') === tplKey);
   });
   document.querySelectorAll('input[name="tt-send-rec"]').forEach(function(r){
-    r.checked = (r.value === 'registered');
+    r.checked = (r.value === recKey);
   });
   document.getElementById('tt-send-results-wrap').hidden = true;
   document.getElementById('tt-send-results').innerHTML  = '';
@@ -71504,6 +71595,10 @@ function tripOpenSendModal(tid){
       tp ? (' — ' + tp.name) : '';
   ov.hidden = false;
   document.body.style.overflow = 'hidden';
+  // If we got a preset (e.g. from the auto-reminder CTA), build the
+  // list immediately so the admin sees the recipient list without
+  // having to click "بناء الرسائل".
+  if (presetTpl) tripBuildSendList();
 }
 function tripCloseSendModal(){
   var ov = document.getElementById('tt-send-overlay');
@@ -71645,6 +71740,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (act === 'payments'){ tripOpenPaymentsPanel(tid); return; }
     if (act === 'tasks'){ tripOpenTasksPanel(tid); return; }
     if (act === 'share-wa'){ tripOpenSendModal(tid); return; }
+    if (act === 'send-reminders'){ tripOpenSendModal(tid, 'reminder', 'registered'); return; }
     if (act === 'copy-link'){ tripCopyLink(tid); return; }
     tripToast('قريباً ✨', 'success');
   });
