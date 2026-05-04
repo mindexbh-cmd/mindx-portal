@@ -65155,12 +65155,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
            border-right:5px solid var(--status-color,#888);
            position:relative;overflow:hidden;
            transition:transform .25s,box-shadow .25s;
-           display:flex;flex-direction:column;gap:8px;
-           animation:tripCardEnter .3s cubic-bezier(.2,.8,.2,1) backwards;}
-@keyframes tripCardEnter{
-  from{opacity:0;transform:translateY(8px) scale(.985);}
-  to  {opacity:1;transform:translateY(0)   scale(1);}
-}
+           display:flex;flex-direction:column;gap:8px;}
 .trip-card:hover{transform:translateY(-3px);
                  box-shadow:0 10px 26px rgba(0,0,0,.12);}
 .trip-card[data-status="active"]    {--status-color:#1D9E75;
@@ -65231,25 +65226,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                  transition:background .15s,transform .15s;}
 .tc-icons button:hover{background:#e8e8e8;}
 .tc-icons button:active{transform:scale(.94);}
-
-/* ── Loading skeletons ────────────────────────────────────────────── */
-.trip-skel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
-                gap:14px;}
-.trip-skel-card{background:#fff;border-radius:14px;padding:16px 18px;
-                box-shadow:0 4px 14px rgba(0,0,0,.04);
-                border-right:5px solid #e0e0e0;
-                display:flex;flex-direction:column;gap:10px;}
-.trip-skel-line{height:10px;border-radius:6px;
-                background:linear-gradient(90deg,#f0f0f0 0%,#e8e8e8 50%,#f0f0f0 100%);
-                background-size:200% 100%;
-                animation:tripSkelShimmer 1.4s ease-in-out infinite;}
-.trip-skel-line.lg{height:14px;width:62%;}
-.trip-skel-line.md{height:11px;width:80%;}
-.trip-skel-line.sm{height:8px; width:45%;}
-@keyframes tripSkelShimmer{
-  0%   {background-position:200% 0;}
-  100% {background-position:-200% 0;}
-}
 
 /* ── Empty state ──────────────────────────────────────────────────── */
 .trip-empty{background:#fff;border-radius:14px;padding:48px 24px;text-align:center;
@@ -65499,12 +65475,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <label for="trip-f-q">بحث</label>
       <input type="search" id="trip-f-q" placeholder="اسم الرحلة أو الوجهة...">
     </div>
-  </div>
-
-  <div id="trip-skeleton" class="trip-skel-grid" hidden>
-    <div class="trip-skel-card"><div class="trip-skel-line lg"></div><div class="trip-skel-line md"></div><div class="trip-skel-line sm"></div><div class="trip-skel-line md"></div></div>
-    <div class="trip-skel-card"><div class="trip-skel-line lg"></div><div class="trip-skel-line md"></div><div class="trip-skel-line sm"></div><div class="trip-skel-line md"></div></div>
-    <div class="trip-skel-card"><div class="trip-skel-line lg"></div><div class="trip-skel-line md"></div><div class="trip-skel-line sm"></div><div class="trip-skel-line md"></div></div>
   </div>
 
   <div id="trip-cards" class="trip-cards" hidden></div>
@@ -66173,26 +66143,7 @@ function tripCurrentFilters(){
   var q = document.getElementById('trip-f-q');      if (q && q.value) p.search    = q.value.trim();
   return p;
 }
-function tripSkeletonShow(on){
-  var sk = document.getElementById('trip-skeleton');
-  var grid = document.getElementById('trip-cards');
-  var empty = document.getElementById('trip-empty');
-  var btn = document.getElementById('trip-view-toggle');
-  var view = btn ? (btn.getAttribute('data-view') || 'cards') : 'cards';
-  // Skeleton is meaningful only in card view; timeline already has its
-  // own anchor track which renders fine while data is fetching.
-  if (!sk) return;
-  if (on && view === 'cards'){
-    sk.hidden = false;
-    if (grid)  grid.hidden = true;
-    if (empty) empty.hidden = true;
-  } else {
-    sk.hidden = true;
-  }
-}
-
 function tripLoadTrips(){
-  tripSkeletonShow(true);
   var p = tripCurrentFilters();
   var qs = Object.keys(p).map(function(k){
     return encodeURIComponent(k) + '=' + encodeURIComponent(p[k]);
@@ -66200,16 +66151,12 @@ function tripLoadTrips(){
   fetch('/api/admin/trips' + (qs ? '?' + qs : ''), {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
     .then(function(j){
-      tripSkeletonShow(false);
       if (!j || !j.ok) { tripRenderCards([]); return; }
       window._tripDataCache = j.trips || [];
       tripRenderCards(window._tripDataCache);
       tripRenderTimeline(window._tripDataCache);
     })
-    .catch(function(){
-      tripSkeletonShow(false);
-      tripRenderCards([]);
-    });
+    .catch(function(){ tripRenderCards([]); });
 }
 
 /* ── Card actions: edit ✏️, status menu ⋯ ───────────────────────── */
