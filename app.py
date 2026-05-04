@@ -64534,5 +64534,242 @@ def _mx_strip_response_surrogates(response):
     return response
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 🚌 Trips & Events Management — Stage 1 (Smart Foundation)
+# ─────────────────────────────────────────────────────────────────────
+# Premium trip-management system. Admin + 3 named staff (أحمد إبراهيم،
+# أحمد يونس، رائد) can create. Status flow:
+#   active → closed → completed → archived
+# Auto-archives 7 days after the trip date once status=completed.
+# ─────────────────────────────────────────────────────────────────────
+
+# Names that grant manager access alongside role=admin. Matched against
+# users.name after Arabic-folding (via _grp_norm) so أحمد إبراهيم with
+# or without diacritics, alif variants (أ/ا/إ), or extra whitespace all
+# resolve to the same canonical key.
+_TRIPS_MANAGER_NAMES = ("أحمد إبراهيم", "أحمد يونس", "رائد")
+_TRIPS_MANAGER_NAMES_FOLDED = {_grp_norm(n) for n in _TRIPS_MANAGER_NAMES}
+
+
+def _trips_can_admin(user):
+    """True for role=admin OR users whose stored name folds to one of
+    أحمد إبراهيم / أحمد يونس / رائد. Used as the auth gate for every
+    /admin/trips* surface and /api/admin/trips* endpoint."""
+    if not user:
+        return False
+    role = ((user.get("role") or "")).strip().lower()
+    if role == "admin":
+        return True
+    name_folded = _grp_norm(user.get("name") or "")
+    return bool(name_folded) and name_folded in _TRIPS_MANAGER_NAMES_FOLDED
+
+
+@app.route('/admin/trips')
+@login_required
+def admin_trips_page():
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='font-family:Segoe UI,"
+            "Tahoma,Arial,sans-serif;padding:40px;text-align:center;color:#c62828;'>"
+            "<h1>غير مصرح</h1><p>هذه الصفحة للمشرفين المخوّلين فقط.</p></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    return ADMIN_TRIPS_HTML
+
+
+@app.route('/api/admin/trips/stats', methods=['GET'])
+@login_required
+def api_admin_trips_stats():
+    """6-card dashboard data for /admin/trips. Counts non-deleted rows
+    only. The "إجمالي السنة" card is scoped to the current calendar
+    year via Python-computed bounds so SQLite/Postgres behave identically."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    from datetime import date as _date
+    today_iso = _date.today().isoformat()
+    year_start = _date(_date.today().year, 1, 1).isoformat()
+    year_end   = _date(_date.today().year, 12, 31).isoformat()
+    db = get_db()
+
+    def _scalar(sql, params=()):
+        try:
+            row = db.execute(sql, params).fetchone()
+            return int(row[0] or 0) if row else 0
+        except Exception:
+            return 0
+
+    active    = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='active'")
+    upcoming  = _scalar(
+        "SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='active' "
+        "AND trip_date IS NOT NULL AND trip_date >= ?", (today_iso,))
+    closed    = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='closed'")
+    completed = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='completed'")
+    archived  = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='archived'")
+    yearly    = _scalar(
+        "SELECT COUNT(*) FROM trips WHERE is_deleted=0 "
+        "AND trip_date IS NOT NULL AND trip_date BETWEEN ? AND ?",
+        (year_start, year_end))
+    return jsonify({
+        "ok": True,
+        "stats": {
+            "active":    active,
+            "upcoming":  upcoming,
+            "closed":    closed,
+            "completed": completed,
+            "archived":  archived,
+            "yearly":    yearly,
+        },
+    })
+
+
+ADMIN_TRIPS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<title>الرحلات والفعاليات — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#f0f4ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.trip-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+             justify-content:space-between;align-items:center;flex-wrap:wrap;
+             gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+             position:sticky;top:0;z-index:50;}
+.trip-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.trip-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+               padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.85rem;
+               transition:background .2s;}
+.trip-topbar a:hover{background:#e1bee7;}
+.trip-wrap{max-width:1400px;margin:18px auto;padding:0 16px;}
+.trip-hero{background:linear-gradient(135deg,#6B3FA0,#8B5CC8 60%,#A574DC);
+           color:#fff;padding:28px 32px;border-radius:18px;
+           margin-bottom:18px;box-shadow:0 8px 28px rgba(107,63,160,.28);
+           position:relative;overflow:hidden;}
+.trip-hero::after{content:"";position:absolute;top:-40%;left:-10%;width:60%;
+                  height:200%;background:radial-gradient(closest-side,rgba(255,255,255,.18),transparent 70%);
+                  animation:tripHeroPulse 7s ease-in-out infinite;pointer-events:none;}
+@keyframes tripHeroPulse{
+  0%,100%{transform:translateX(0) scale(1);opacity:.55;}
+  50%    {transform:translateX(20%) scale(1.1);opacity:.85;}
+}
+.trip-hero h2{margin:0;font-size:1.55rem;font-weight:900;line-height:1.3;
+              display:flex;align-items:center;gap:10px;}
+.trip-hero p{margin:8px 0 0;font-size:.95rem;opacity:.92;max-width:60ch;}
+.trip-stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;
+                 margin-bottom:18px;}
+@media (max-width:1180px){.trip-stats-grid{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:680px) {.trip-stats-grid{grid-template-columns:repeat(2,1fr);}}
+.trip-stat-card{background:#fff;border-radius:14px;padding:18px 18px;
+                box-shadow:0 4px 14px rgba(0,0,0,.06);
+                border-right:5px solid var(--accent,#6B3FA0);
+                transition:transform .25s,box-shadow .25s;
+                position:relative;overflow:hidden;}
+.trip-stat-card:hover{transform:translateY(-3px);
+                      box-shadow:0 10px 24px rgba(0,0,0,.12);}
+.trip-stat-card .ts-icon{font-size:1.4rem;line-height:1;margin-bottom:6px;
+                         display:inline-flex;align-items:center;
+                         justify-content:center;width:36px;height:36px;
+                         border-radius:10px;background:var(--soft,#f3e5f5);}
+.trip-stat-card .ts-label{font-size:.85rem;color:#555;font-weight:700;
+                          margin-top:4px;line-height:1.3;}
+.trip-stat-card .ts-value{font-size:1.85rem;font-weight:900;
+                          color:var(--accent,#6B3FA0);margin-top:2px;
+                          font-variant-numeric:tabular-nums;}
+.trip-stat-card[data-key="active"]    {--accent:#1D9E75;--soft:#e6f7ee;}
+.trip-stat-card[data-key="upcoming"]  {--accent:#1565C0;--soft:#e3f2fd;}
+.trip-stat-card[data-key="closed"]    {--accent:#BA7517;--soft:#fff3e0;}
+.trip-stat-card[data-key="completed"] {--accent:#6B3FA0;--soft:#f3e5f5;}
+.trip-stat-card[data-key="archived"]  {--accent:#888888;--soft:#f0f0f0;}
+.trip-stat-card[data-key="yearly"]    {--accent:#C9A227;--soft:#fff9db;}
+</style>
+</head>
+<body>
+
+<div class="trip-topbar">
+  <h1>🚌 الرحلات والفعاليات</h1>
+  <a href="/dashboard">← الرئيسية</a>
+</div>
+
+<div class="trip-wrap">
+
+  <div class="trip-hero">
+    <h2>🚌 الرحلات والفعاليات</h2>
+    <p>إدارة الرحلات التعليمية، الترفيهية، والدينية. تابعي عدد المسجّلات، المبالغ المحصّلة، والمواعيد القادمة من مكان واحد.</p>
+  </div>
+
+  <div class="trip-stats-grid" id="trip-stats">
+    <div class="trip-stat-card" data-key="active">
+      <div class="ts-icon">🟢</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">الرحلات النشطة</div>
+    </div>
+    <div class="trip-stat-card" data-key="upcoming">
+      <div class="ts-icon">🔵</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">الرحلات القادمة</div>
+    </div>
+    <div class="trip-stat-card" data-key="closed">
+      <div class="ts-icon">🟠</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">مغلقة للتسجيل</div>
+    </div>
+    <div class="trip-stat-card" data-key="completed">
+      <div class="ts-icon">🟣</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">منتهية</div>
+    </div>
+    <div class="trip-stat-card" data-key="archived">
+      <div class="ts-icon">⚪</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">مؤرشفة</div>
+    </div>
+    <div class="trip-stat-card" data-key="yearly">
+      <div class="ts-icon">🟡</div>
+      <div class="ts-value" data-counter="0">0</div>
+      <div class="ts-label">إجمالي السنة</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Counter animation: 0 → value over 800ms (eased) ──────────── */
+function tripAnimateCounter(el, target){
+  var start = parseInt(el.getAttribute('data-counter') || '0', 10) || 0;
+  target = parseInt(target, 10) || 0;
+  if (start === target){ el.textContent = String(target); return; }
+  var dur = 800, t0 = performance.now();
+  function step(now){
+    var p = Math.min(1, (now - t0) / dur);
+    var eased = 1 - Math.pow(1 - p, 3);
+    var v = Math.round(start + (target - start) * eased);
+    el.textContent = String(v);
+    if (p < 1) requestAnimationFrame(step);
+    else { el.setAttribute('data-counter', String(target)); }
+  }
+  requestAnimationFrame(step);
+}
+function tripLoadStats(){
+  fetch('/api/admin/trips/stats', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok) return;
+      var s = j.stats || {};
+      document.querySelectorAll('#trip-stats .trip-stat-card').forEach(function(card){
+        var k = card.getAttribute('data-key');
+        var v = (s[k] != null) ? s[k] : 0;
+        var num = card.querySelector('.ts-value');
+        if (num) tripAnimateCounter(num, v);
+      });
+    })
+    .catch(function(){});
+}
+document.addEventListener('DOMContentLoaded', tripLoadStats);
+</script>
+</body></html>"""
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
