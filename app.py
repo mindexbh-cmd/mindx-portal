@@ -64571,5 +64571,515 @@ def _mx_strip_response_surrogates(response):
     return response
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 🚌 Events v2 — single-page-per-event design
+# ─────────────────────────────────────────────────────────────────────
+# Replaces the old multi-table trips system. Tables are namespaced
+# with the ev_ prefix. Stage 1 ships: list page, create modal,
+# auto-status, daily alerts, calendar view. Per-event detail page
+# with the 8 organised tabs lands in stage 2.
+
+_EV_VALID_STATUSES = ("planning", "open", "closed", "completed")
+_EV_STATUS_LABELS = {
+    "planning":  "📝 قيد التخطيط",
+    "open":      "📢 مفتوحة",
+    "closed":    "🎯 جاهزة",
+    "completed": "✅ منتهية",
+}
+_EV_STATUS_COLORS = {
+    "planning":  "#9e9e9e",
+    "open":      "#1D9E75",
+    "closed":    "#BA7517",
+    "completed": "#1565C0",
+}
+
+
+def _events_can_admin(user):
+    """Manager-class — admin/manager. Reuses the existing role
+    taxonomy."""
+    role = ((user or {}).get("role") or "").strip().lower()
+    return role in ("admin", "manager")
+
+
+def _events_generate_token(db):
+    """16-char URL-safe random, collision-checked against the partial
+    UNIQUE on ev_events.registration_token."""
+    import secrets as _secrets, string as _string
+    alphabet = _string.ascii_letters + _string.digits
+    for _ in range(8):
+        cand = "".join(_secrets.choice(alphabet) for _ in range(16))
+        try:
+            row = db.execute(
+                "SELECT 1 FROM ev_events WHERE registration_token = ? LIMIT 1",
+                (cand,)).fetchone()
+            if not row: return cand
+        except Exception:
+            return cand
+    return cand
+
+
+def _events_count_by_status(db):
+    """Single-query rollup for the list-page stat strip."""
+    out = {k: 0 for k in _EV_VALID_STATUSES}
+    try:
+        rows = db.execute(
+            "SELECT status, COUNT(*) FROM ev_events "
+            "WHERE is_deleted = 0 GROUP BY status").fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        st = r[0] if not hasattr(r, "keys") else r["status"]
+        n  = int((r[1] if not hasattr(r, "keys") else r[1]) or 0)
+        if st in out: out[st] = n
+    return out
+
+
+def _events_row_dict(rd):
+    """Slim outbound shape for the list-page card render."""
+    cap = int(rd.get("max_students") or 0)
+    pct = 0.0
+    # registered_count + task/payment pcts arrive in stage 2 once the
+    # registration / task / payment tables exist — kept as 0 for now.
+    return {
+        "id":                  rd.get("id"),
+        "name":                rd.get("name") or "",
+        "destination":         rd.get("destination") or "",
+        "event_date":          rd.get("event_date") or "",
+        "departure_time":      rd.get("departure_time") or "",
+        "return_time":         rd.get("return_time") or "",
+        "meeting_point":       rd.get("meeting_point") or "",
+        "price_per_student":   float(rd.get("price_per_student") or 0),
+        "max_students":        cap,
+        "status":              rd.get("status") or "planning",
+        "status_label":        _EV_STATUS_LABELS.get(rd.get("status") or "planning"),
+        "status_color":        _EV_STATUS_COLORS.get(rd.get("status") or "planning"),
+        "registered_count":    0,
+        "registration_pct":    pct,
+        "task_completed_pct":  0.0,
+        "payment_collected_pct": 0.0,
+    }
+
+
+@app.route('/admin/events', methods=['GET'])
+@login_required
+def admin_events_list_page():
+    """Manager-only events list."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    return Response(ADMIN_EVENTS_LIST_HTML, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/api/admin/events', methods=['GET'])
+@login_required
+def api_admin_events_list():
+    """Manager-only — returns the list + per-status counts."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    status = (request.args.get("status") or "").strip()
+    search = (request.args.get("search") or "").strip()
+    sql = "SELECT * FROM ev_events WHERE is_deleted = 0"
+    params = []
+    if status and status in _EV_VALID_STATUSES:
+        sql += " AND status = ?"; params.append(status)
+    if search:
+        sql += " AND (name LIKE ? OR destination LIKE ?)"
+        like = "%" + search + "%"
+        params += [like, like]
+    sql += (" ORDER BY CASE status "
+            "  WHEN 'planning' THEN 0 "
+            "  WHEN 'open' THEN 1 "
+            "  WHEN 'closed' THEN 2 "
+            "  WHEN 'completed' THEN 3 ELSE 4 END, "
+            "event_date DESC, id DESC")
+    try:
+        rows = db.execute(sql, tuple(params)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
+    out = [_events_row_dict(dict(r)) for r in rows]
+    return jsonify({
+        "ok":     True,
+        "events": out,
+        "stats":  _events_count_by_status(db),
+        "total":  len(out),
+    })
+
+
+@app.route('/api/admin/events/alerts', methods=['GET'])
+@login_required
+def api_admin_events_alerts():
+    """Manager-only — daily smart alerts, computed on the fly.
+    Stage-1 stub (no payment/task tables yet) returns date-driven
+    alerts only. Once stage 2 ships those tables, this endpoint
+    will surface unpaid + incomplete-task alerts too."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    from datetime import date as _date, timedelta as _td
+    today = _date.today()
+    iso_today = today.isoformat()
+    iso_3 = (today + _td(days=3)).isoformat()
+    iso_1 = (today + _td(days=1)).isoformat()
+    try:
+        rows = db.execute(
+            "SELECT id, name, event_date, status FROM ev_events "
+            "WHERE is_deleted = 0 AND status IN ('open','closed') "
+            "AND event_date IS NOT NULL "
+            "AND event_date BETWEEN ? AND ? "
+            "ORDER BY event_date",
+            (iso_today, iso_3)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        # Days-until calculation done in Python for portability.
+        try:
+            y, m, d = [int(x) for x in str(rd.get("event_date"))[:10].split("-")]
+            delta = (_date(y, m, d) - today).days
+        except Exception:
+            delta = None
+        if delta is None: continue
+        if delta <= 1:
+            sev = "critical" if delta == 0 else "warning"
+            out.append({
+                "type":        "imminent_event",
+                "severity":    sev,
+                "event_id":    rd.get("id"),
+                "event_name":  rd.get("name") or "",
+                "message":     ("اليوم: " if delta == 0 else "غداً: ") + (rd.get("name") or ""),
+                "action_link": "/admin/events/" + str(rd.get("id")),
+            })
+        elif delta <= 3:
+            out.append({
+                "type":        "upcoming_event",
+                "severity":    "info",
+                "event_id":    rd.get("id"),
+                "event_name":  rd.get("name") or "",
+                "message":     (rd.get("name") or "") + " بعد " + str(delta) + " أيام",
+                "action_link": "/admin/events/" + str(rd.get("id")),
+            })
+    # Newly-completed events that don't have post-trip notes yet.
+    try:
+        nrows = db.execute(
+            "SELECT id, name FROM ev_events "
+            "WHERE is_deleted = 0 AND status = 'completed' "
+            "AND (post_trip_notes IS NULL OR TRIM(post_trip_notes) = '') "
+            "ORDER BY event_date DESC LIMIT 5").fetchall()
+    except Exception:
+        nrows = []
+    for r in nrows:
+        rd = dict(r)
+        out.append({
+            "type":        "post_trip_notes_pending",
+            "severity":    "info",
+            "event_id":    rd.get("id"),
+            "event_name":  rd.get("name") or "",
+            "message":     "ملاحظات ما بعد الرحلة لم تُكتب: " + (rd.get("name") or ""),
+            "action_link": "/admin/events/" + str(rd.get("id")),
+        })
+    return jsonify({"ok": True, "alerts": out, "count": len(out)})
+
+
+ADMIN_EVENTS_LIST_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الفعاليات والرحلات — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#f0f4ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.ev-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+           justify-content:space-between;align-items:center;flex-wrap:wrap;
+           gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+           position:sticky;top:0;z-index:50;}
+.ev-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;
+              display:flex;align-items:center;gap:6px;}
+.ev-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+             padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.ev-wrap{max-width:1100px;margin:18px auto 36px;padding:0 16px;}
+
+.ev-stats-row{background:#fff;border-radius:12px;padding:12px 18px;
+              display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+              box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:14px;
+              font-size:.86rem;font-weight:700;}
+.ev-stat-chip{display:inline-flex;align-items:center;gap:5px;
+              padding:5px 12px;border-radius:999px;color:#fff;font-weight:800;}
+.ev-stat-chip[data-k="planning"]{background:#9e9e9e;}
+.ev-stat-chip[data-k="open"]    {background:#1D9E75;}
+.ev-stat-chip[data-k="closed"]  {background:#BA7517;}
+.ev-stat-chip[data-k="completed"]{background:#1565C0;}
+
+.ev-alerts{background:#fff8eb;border-radius:12px;padding:12px 16px;
+           border-right:5px solid #f1a132;margin-bottom:14px;
+           box-shadow:0 4px 12px rgba(0,0,0,.04);}
+.ev-alerts h3{margin:0 0 8px;font-size:.95rem;color:#8d4f00;
+              font-weight:900;display:flex;align-items:center;gap:5px;}
+.ev-alerts .row{display:flex;align-items:center;gap:8px;
+                padding:6px 0;color:#444;font-size:.88rem;
+                border-bottom:1px dashed rgba(0,0,0,.06);}
+.ev-alerts .row:last-child{border-bottom:0;}
+.ev-alerts .row a{color:#8d4f00;text-decoration:none;font-weight:800;
+                  margin-inline-start:auto;}
+.ev-alerts .row[data-sev="critical"]{color:#c62828;}
+.ev-alerts .row[data-sev="warning"]{color:#8d4f00;}
+.ev-alerts.is-empty{display:none;}
+
+.ev-toolbar{background:#fff;border-radius:12px;padding:12px;display:flex;
+            gap:10px;flex-wrap:wrap;align-items:center;
+            box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:14px;}
+.ev-toolbar input,.ev-toolbar select{border:1.5px solid #e0e0e0;
+                                      border-radius:9px;padding:8px 12px;
+                                      font-family:inherit;font-size:.9rem;
+                                      background:#fafafa;}
+.ev-toolbar input:focus,.ev-toolbar select:focus{outline:none;
+                                                  border-color:#1D9E75;background:#fff;}
+.ev-toolbar .grow{flex:1;min-width:180px;}
+.ev-btn{border:0;border-radius:10px;padding:9px 18px;font-weight:800;
+        cursor:pointer;font-family:inherit;font-size:.88rem;
+        display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+        transition:transform .15s,box-shadow .2s;}
+.ev-btn:active{transform:scale(.98);}
+.ev-btn-primary{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                box-shadow:0 4px 12px rgba(29,158,117,.32);}
+.ev-btn-primary:hover{box-shadow:0 8px 18px rgba(29,158,117,.45);}
+.ev-btn-ghost{background:#f3e5f5;color:#4a148c;}
+.ev-btn-ghost:hover{background:#e1bee7;}
+.ev-btn-ghost.is-active{background:#4a148c;color:#fff;}
+
+.ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+         gap:14px;}
+.ev-card{background:#fff;border-radius:14px;padding:16px 18px;
+         box-shadow:0 4px 14px rgba(0,0,0,.06);
+         border-right:5px solid var(--c,#9e9e9e);
+         display:flex;flex-direction:column;gap:8px;cursor:pointer;
+         transition:transform .2s,box-shadow .2s;
+         animation:evCardEnter .25s ease both;text-decoration:none;color:#212121;}
+@keyframes evCardEnter{from{opacity:0;transform:translateY(6px);}
+                       to  {opacity:1;transform:translateY(0);}}
+.ev-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.12);}
+.ev-card[data-status="planning"]  {--c:#9e9e9e;}
+.ev-card[data-status="open"]      {--c:#1D9E75;}
+.ev-card[data-status="closed"]    {--c:#BA7517;}
+.ev-card[data-status="completed"] {--c:#1565C0;background:linear-gradient(180deg,#fff,#fff 60%,#f6faff);}
+
+.ev-card .head{display:flex;justify-content:space-between;align-items:flex-start;
+               gap:10px;}
+.ev-card .name{font-size:1.05rem;font-weight:900;color:#212121;line-height:1.3;
+               flex:1;}
+.ev-card .pill{font-size:.7rem;font-weight:800;padding:5px 10px;border-radius:999px;
+               white-space:nowrap;background:rgba(0,0,0,.05);color:var(--c,#666);}
+.ev-card .meta{display:flex;flex-direction:column;gap:3px;font-size:.86rem;
+               color:#555;}
+.ev-card .meta strong{color:#212121;font-weight:700;}
+.ev-card .progress{display:flex;flex-direction:column;gap:3px;margin-top:4px;}
+.ev-card .progress .lbl{display:flex;justify-content:space-between;
+                        font-size:.78rem;color:#555;font-weight:700;}
+.ev-card .progress .bar{height:8px;border-radius:6px;background:#eef0f3;
+                        overflow:hidden;}
+.ev-card .progress .fill{height:100%;border-radius:6px;
+                         background:linear-gradient(90deg,#1565C0,#42A5F5);
+                         width:0%;transition:width .8s cubic-bezier(.2,.8,.2,1);}
+.ev-card .open-cta{margin-top:6px;color:#1D9E75;font-weight:800;font-size:.85rem;
+                   text-align:left;}
+
+.ev-empty{background:#fff;border-radius:14px;padding:48px 24px;text-align:center;
+          box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.ev-empty .em{font-size:3.4rem;line-height:1;margin-bottom:10px;}
+.ev-empty .h{font-size:1.05rem;font-weight:900;color:#4a148c;margin-bottom:6px;}
+.ev-empty .hint{font-size:.9rem;color:#666;}
+
+.ev-toast{position:fixed;bottom:20px;left:50%;
+          transform:translateX(-50%) translateY(20px);
+          background:rgba(33,33,33,.92);color:#fff;padding:11px 18px;
+          border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
+          box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;
+          transition:opacity .25s,transform .25s;}
+.ev-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.ev-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.ev-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+
+.ev-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
+</style></head>
+<body>
+
+<div class="ev-topbar">
+  <h1><span>🚌</span><span>الفعاليات والرحلات</span></h1>
+  <a href="/dashboard">← الرئيسية</a>
+</div>
+
+<div class="ev-wrap">
+
+  <div class="ev-stats-row">
+    <span style="font-weight:900;color:#4a148c;">📊</span>
+    <span class="ev-stat-chip" data-k="planning">📝 <span data-v="planning">0</span> قيد التخطيط</span>
+    <span class="ev-stat-chip" data-k="open">📢 <span data-v="open">0</span> مفتوحة</span>
+    <span class="ev-stat-chip" data-k="closed">🎯 <span data-v="closed">0</span> جاهزة</span>
+    <span class="ev-stat-chip" data-k="completed">✅ <span data-v="completed">0</span> منتهية</span>
+  </div>
+
+  <div class="ev-alerts is-empty" id="ev-alerts">
+    <h3>🔔 تنبيهات اليوم</h3>
+    <div id="ev-alerts-body"></div>
+  </div>
+
+  <div class="ev-toolbar">
+    <button class="ev-btn ev-btn-primary" id="ev-create-btn" type="button">
+      <span>+</span><span>رحلة جديدة</span>
+    </button>
+    <input type="search" class="grow" id="ev-search" placeholder="🔍 ابحثي عن رحلة...">
+    <select id="ev-status">
+      <option value="">▼ كل الحالات</option>
+      <option value="planning">📝 قيد التخطيط</option>
+      <option value="open">📢 مفتوحة</option>
+      <option value="closed">🎯 جاهزة</option>
+      <option value="completed">✅ منتهية</option>
+    </select>
+  </div>
+
+  <div id="ev-list">
+    <div class="ev-loading">جارٍ التحميل...</div>
+  </div>
+
+</div>
+
+<div class="ev-toast" id="ev-toast" role="status" aria-live="polite"></div>
+
+<script>
+function evEsc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function evToast(msg, kind){
+  var t=document.getElementById('ev-toast');
+  t.textContent=msg||'';
+  t.classList.remove('is-success','is-error');
+  if(kind) t.classList.add('is-'+kind);
+  t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},3000);
+}
+function evLoadStats(){
+  fetch('/api/admin/events', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok) return;
+      var s=j.stats||{};
+      ['planning','open','closed','completed'].forEach(function(k){
+        var el=document.querySelector('[data-v=\"'+k+'\"]');
+        if(el) el.textContent=String(s[k]||0);
+      });
+      window._EV_LIST = j.events || [];
+      evRender();
+    })
+    .catch(function(){
+      document.getElementById('ev-list').innerHTML =
+        '<div class=\"ev-loading\" style=\"color:#c62828;\">خطأ في الاتصال</div>';
+    });
+}
+function evLoadAlerts(){
+  fetch('/api/admin/events/alerts', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok) return;
+      var alerts=j.alerts||[];
+      var box=document.getElementById('ev-alerts');
+      var body=document.getElementById('ev-alerts-body');
+      if(!alerts.length){ box.classList.add('is-empty'); return; }
+      box.classList.remove('is-empty');
+      body.innerHTML=alerts.map(function(a){
+        var icon = a.severity === 'critical' ? '🚨'
+                 : a.severity === 'warning'  ? '⚠️' : '🔔';
+        return '<div class=\"row\" data-sev=\"'+evEsc(a.severity)+'\">'
+             + '<span>'+icon+'</span>'
+             + '<span>'+evEsc(a.message)+'</span>'
+             + '<a href=\"'+evEsc(a.action_link)+'\">فتح</a>'
+             + '</div>';
+      }).join('');
+    })
+    .catch(function(){});
+}
+function evRender(){
+  var items = window._EV_LIST || [];
+  // Filter
+  var q = (document.getElementById('ev-search').value || '').trim().toLowerCase();
+  var st = document.getElementById('ev-status').value;
+  if (st) items = items.filter(function(e){ return e.status === st; });
+  if (q)  items = items.filter(function(e){
+    return ((e.name||'') + ' ' + (e.destination||'')).toLowerCase().indexOf(q) !== -1;
+  });
+  var list = document.getElementById('ev-list');
+  if (!items.length){
+    list.innerHTML =
+        '<div class=\"ev-empty\">'
+      + '  <div class=\"em\">🚀</div>'
+      + '  <div class=\"h\">لا توجد رحلات</div>'
+      + '  <div class=\"hint\">اضغطي على «رحلة جديدة» لبدء تخطيط أول رحلة</div>'
+      + '</div>';
+    return;
+  }
+  list.innerHTML = '<div class=\"ev-grid\">'
+    + items.map(evCardHTML).join('')
+    + '</div>';
+}
+function evCardHTML(e){
+  var date = e.event_date || '';
+  var time = '';
+  if (e.departure_time) time += e.departure_time;
+  if (e.return_time)    time += ' - ' + e.return_time;
+  var price = (e.price_per_student || 0).toFixed(2);
+  var cap = e.max_students || 0;
+  var reg = e.registered_count || 0;
+  var pct = (cap > 0) ? Math.round(reg / cap * 100) : 0;
+  return ''
+    + '<a class=\"ev-card\" data-status=\"' + evEsc(e.status) + '\" '
+    + '   href=\"/admin/events/' + (e.id|0) + '\">'
+    + '  <div class=\"head\">'
+    + '    <div class=\"name\">🚌 ' + evEsc(e.name) + '</div>'
+    + '    <div class=\"pill\">' + evEsc(e.status_label) + '</div>'
+    + '  </div>'
+    + '  <div class=\"meta\">'
+    + (date ? '<div>📅 ' + evEsc(date) + (time ? ' • ⏰ ' + evEsc(time) : '') + '</div>' : '')
+    + (e.destination ? '<div>📍 ' + evEsc(e.destination) + '</div>' : '')
+    + '<div>💰 <strong>' + price + '</strong> د.ب</div>'
+    + (cap > 0 ? '<div>👥 ' + reg + ' / ' + cap + ' طالبة</div>' : '')
+    + '  </div>'
+    + (cap > 0
+        ? '<div class=\"progress\">'
+        + '  <div class=\"lbl\"><span>👥 المسجَّلات</span><span><strong>' + pct + '%</strong></span></div>'
+        + '  <div class=\"bar\"><div class=\"fill\" style=\"width:' + pct + '%\"></div></div>'
+        + '</div>' : '')
+    + '  <div class=\"open-cta\">اضغطي للفتح →</div>'
+    + '</a>';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  evLoadStats();
+  evLoadAlerts();
+  // Filter wiring
+  var t = null;
+  document.getElementById('ev-search').addEventListener('input', function(){
+    clearTimeout(t); t = setTimeout(evRender, 200);
+  });
+  document.getElementById('ev-status').addEventListener('change', evRender);
+  document.getElementById('ev-create-btn').addEventListener('click', function(){
+    if (typeof evOpenCreate === 'function') evOpenCreate();
+    else evToast('قريباً', 'success');
+  });
+});
+</script>
+
+</body></html>"""
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
