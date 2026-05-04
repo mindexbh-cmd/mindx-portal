@@ -65387,7 +65387,7 @@ def api_admin_events_update(eid):
         upd["post_trip_notes"] = (d.get("post_trip_notes") or "").strip() or None
     if not upd:
         return jsonify({"ok": True, "id": eid, "noop": True,
-                        "event": _events_detail_dict(cur)})
+                        "event": _events_detail_dict(cur, db)})
     sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
     try:
         db.execute("UPDATE ev_events SET " + sets + " WHERE id = ?",
@@ -65408,7 +65408,7 @@ def api_admin_events_update(eid):
     try:
         new_row = db.execute(
             "SELECT * FROM ev_events WHERE id = ?", (eid,)).fetchone()
-        ev_out = _events_detail_dict(dict(new_row)) if new_row else None
+        ev_out = _events_detail_dict(dict(new_row), db) if new_row else None
     except Exception:
         ev_out = None
     return jsonify({"ok": True, "id": eid, "event": ev_out})
@@ -66768,12 +66768,40 @@ def api_admin_events_alerts():
     return jsonify({"ok": True, "alerts": out, "count": len(out)})
 
 
-def _events_detail_dict(rd):
+def _events_detail_dict(rd, db=None):
     """Detail-page payload — superset of the list-card shape with the
-    extra free-text fields and the per-event computed counters. The
-    counters are stubbed at 0 here; stages 3-8 plug them in as the
-    registration / task / payment tables come online."""
+    extra free-text fields and the per-event computed counters.
+    Stage 5.6 wires real task + item counts; payment counters stay
+    stubbed until stage 7."""
     base = _events_row_dict(rd)
+    eid = rd.get("id")
+    task_total = task_done = 0
+    item_total = item_ready = 0
+    if db is not None and eid:
+        try:
+            r = db.execute(
+                "SELECT COUNT(*), "
+                "       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) "
+                "FROM ev_tasks WHERE event_id = ? AND is_deleted = 0",
+                (eid,)).fetchone()
+            if r:
+                rd_t = list(r) if not hasattr(r, "keys") else [r[0], r[1]]
+                task_total = int(rd_t[0] or 0)
+                task_done  = int(rd_t[1] or 0)
+        except Exception:
+            pass
+        try:
+            r = db.execute(
+                "SELECT COUNT(*), "
+                "       SUM(CASE WHEN is_ready = 1 THEN 1 ELSE 0 END) "
+                "FROM ev_items WHERE event_id = ? AND is_deleted = 0",
+                (eid,)).fetchone()
+            if r:
+                rd_i = list(r) if not hasattr(r, "keys") else [r[0], r[1]]
+                item_total = int(rd_i[0] or 0)
+                item_ready = int(rd_i[1] or 0)
+        except Exception:
+            pass
     base.update({
         "description":         rd.get("description") or "",
         "target_group_ids":    rd.get("target_group_ids") or "[]",
@@ -66781,9 +66809,13 @@ def _events_detail_dict(rd):
         "post_trip_notes":     rd.get("post_trip_notes") or "",
         "created_at":          rd.get("created_at") or "",
         "updated_at":          rd.get("updated_at") or "",
-        # Stage-3+ wires real values into these slots.
-        "task_total":          0,
-        "task_completed":      0,
+        "task_total":          task_total,
+        "task_completed":      task_done,
+        "task_pct":            round(task_done / task_total * 100, 1) if task_total else 0.0,
+        "item_total":          item_total,
+        "item_ready":          item_ready,
+        "item_pct":            round(item_ready / item_total * 100, 1) if item_total else 0.0,
+        # Stage-7 will wire these:
         "payment_collected":   0.0,
         "payment_expected":    0.0,
     })
@@ -66841,7 +66873,7 @@ def api_admin_events_get(eid):
         return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
     if not row:
         return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
-    return jsonify({"ok": True, "event": _events_detail_dict(dict(row))})
+    return jsonify({"ok": True, "event": _events_detail_dict(dict(row), db)})
 
 
 ADMIN_EVENTS_LIST_HTML = r"""<!DOCTYPE html>
@@ -67648,6 +67680,9 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-h-title .name{flex:1;min-width:200px;}
   .evd-h-meta{display:flex;flex-wrap:wrap;gap:14px 22px;color:#fff;opacity:.95;font-size:.95rem;font-weight:600;}
   .evd-h-meta span{display:inline-flex;align-items:center;gap:4px;}
+  .evd-h-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .evd-h-chips a{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.20);color:#fff;text-decoration:none;font-weight:800;font-size:.82rem;padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,0.4);transition:.15s;}
+  .evd-h-chips a:hover{background:rgba(255,255,255,0.32);}
   /* Status badge + dropdown */
   .evd-status-wrap{position:relative;display:inline-block;}
   .evd-status-btn{background:rgba(255,255,255,0.22);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:99px;padding:6px 14px;font-weight:800;font-size:.9rem;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
@@ -67970,6 +68005,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <span id="evd-meta-price">💰 —</span>
       <span id="evd-meta-cap">👥 —</span>
     </div>
+    <div class="evd-h-chips" id="evd-h-chips" hidden></div>
   </div>
 
   <!-- Tab bar -->
@@ -68337,6 +68373,23 @@ function evdRenderHeader(ev){
     ? ((ev.registered_count || 0) + '/' + ev.max_students + ' مسجلة')
     : ((ev.registered_count || 0) + ' مسجلة');
   document.getElementById('evd-meta-cap').textContent = '👥 ' + cap;
+  // Header chips with task/item progress (5.6).
+  var chips = document.getElementById('evd-h-chips');
+  if (chips){
+    var bits = [];
+    if ((ev.task_total || 0) > 0){
+      bits.push('<a href="#tasks">✅ المهام: ' + (ev.task_completed || 0) + '/' + ev.task_total + '</a>');
+    }
+    if ((ev.item_total || 0) > 0){
+      bits.push('<a href="#items">🛠️ الأدوات: ' + (ev.item_ready || 0) + '/' + ev.item_total + '</a>');
+    }
+    if (bits.length){
+      chips.innerHTML = bits.join('');
+      chips.hidden = false;
+    } else {
+      chips.hidden = true;
+    }
+  }
   // Status menu
   var menu = document.getElementById('evd-status-menu');
   var allowed = (STATUS_FORWARD[ev.status] || []);
@@ -68780,8 +68833,25 @@ function evdLoadTasks(){
       ASSIGNEES = j.available_assignees || ASSIGNEES || [];
       TASK_LOADED = true;
       evdRenderTasks();
+      evdRefreshHeaderChips();   // task counts changed, refresh header
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+// Quietly re-fetch the event row so the header chips stay in sync
+// after a task/item mutation.
+function evdRefreshHeaderChips(){
+  fetch('/api/admin/events/' + EID)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.ok && j.event){
+        // Only update the header — info panel re-render would be
+        // wasteful since the event details didn't change.
+        EVENT_DATA = Object.assign(EVENT_DATA || {}, j.event);
+        evdRenderHeader(j.event);
+      }
+    })
+    .catch(function(){ /* non-fatal */ });
 }
 
 function evdTaskIsOverdue(t){
@@ -69158,6 +69228,7 @@ function evdLoadItems(){
     ITEM_SUMMARY = j.summary || {};
     ITEM_LOADED = true;
     evdRenderItems();
+    evdRefreshHeaderChips();
   }).catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
