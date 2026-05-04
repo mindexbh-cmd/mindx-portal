@@ -68164,47 +68164,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .pp-empty{text-align:center;color:#888;padding:30px 14px;font-size:.9rem;}
 .pp-empty .em{font-size:2.2rem;margin-bottom:8px;}
 
-/* Record-payment modal */
-.pp-pay-summary{background:#fafafa;border-radius:10px;padding:12px 14px;
-                margin-bottom:12px;display:flex;flex-direction:column;
-                gap:4px;font-size:.92rem;}
-.pp-pay-summary .row{display:flex;justify-content:space-between;}
-.pp-pay-summary strong{color:#1D9E75;font-weight:900;
-                       font-variant-numeric:tabular-nums;}
-.pp-method-pick{display:flex;gap:8px;}
-.pp-method-pick .pp-method-btn{flex:1;border:2px solid #e0e0e0;
-                                background:#fff;color:#444;border-radius:11px;
-                                padding:14px 10px;cursor:pointer;
-                                font-family:inherit;font-size:.95rem;
-                                font-weight:800;display:flex;flex-direction:column;
-                                align-items:center;gap:4px;
-                                transition:all .15s;}
-.pp-method-pick .pp-method-btn:hover{border-color:#6B3FA0;color:#4a148c;}
-.pp-method-pick .pp-method-btn.is-active[data-method="cash"]{
-  background:linear-gradient(135deg,#1565C0,#42A5F5);color:#fff;border-color:#1565C0;
-  box-shadow:0 4px 10px rgba(21,101,192,.28);}
-.pp-method-pick .pp-method-btn.is-active[data-method="benefit"]{
-  background:linear-gradient(135deg,#BA7517,#f1a132);color:#fff;border-color:#BA7517;
-  box-shadow:0 4px 10px rgba(186,117,23,.32);}
-.pp-method-pick .pp-method-btn .em{font-size:1.5rem;line-height:1;}
-
-.pp-file-input{display:flex;flex-direction:column;gap:6px;}
-.pp-file-drop{border:2px dashed #c9b8e0;border-radius:11px;padding:18px 14px;
-              text-align:center;cursor:pointer;background:#fafafa;
-              transition:border-color .15s,background .15s;color:#666;
-              font-size:.9rem;font-weight:700;}
-.pp-file-drop:hover{border-color:#6B3FA0;background:#f3e5f5;}
-.pp-file-drop.has-file{border-color:#1D9E75;background:#e6f7ee;color:#0f6b4a;}
-.pp-file-preview{margin-top:8px;display:flex;flex-direction:column;gap:4px;
-                 align-items:center;}
-.pp-file-preview img{max-width:200px;max-height:140px;border-radius:8px;
-                     box-shadow:0 4px 12px rgba(0,0,0,.12);}
-.pp-file-preview .pp-file-meta{font-size:.78rem;color:#777;}
-.pp-required-msg{color:#c62828;font-weight:800;font-size:.85rem;
-                 background:#ffebee;border-right:3px solid #c62828;
-                 padding:8px 12px;border-radius:8px;display:none;}
-.pp-required-msg.show{display:block;}
-
 /* Receipt lightbox */
 .pp-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);
              z-index:600;display:flex;align-items:center;justify-content:center;
@@ -68649,75 +68608,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         <div>جارٍ تحميل البيانات المالية...</div>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- ── Record payment modal ─────────────────────────────────────── -->
-<div class="trip-modal-overlay" id="pp-pay-overlay" hidden>
-  <div class="trip-modal" role="dialog" aria-modal="true">
-    <div class="tm-head">
-      <h3><span>💵</span><span>تسجيل دفعة</span></h3>
-      <button class="tm-close" type="button" aria-label="إغلاق" data-pp-pay-close="1">✕</button>
-    </div>
-    <form id="pp-pay-form" autocomplete="off" enctype="multipart/form-data">
-      <input type="hidden" id="pp-pay-rid" value="">
-      <div class="tm-body">
-
-        <div class="pp-pay-summary">
-          <div class="row"><span>الطالبة</span><span id="pp-pay-student" style="font-weight:800;">—</span></div>
-          <div class="row"><span>المبلغ المطلوب</span><strong id="pp-pay-amount">—</strong></div>
-        </div>
-
-        <div class="tm-section">
-          <h4>طريقة الدفع</h4>
-          <div class="pp-method-pick" id="pp-method-pick">
-            <button type="button" class="pp-method-btn" data-method="cash">
-              <span class="em">💵</span><span>نقدي</span>
-            </button>
-            <button type="button" class="pp-method-btn" data-method="benefit">
-              <span class="em">💳</span><span>بنفت</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="tm-section">
-          <h4>التفاصيل</h4>
-          <div class="tm-grid">
-            <div class="tm-field">
-              <label for="pp-pay-date">تاريخ الدفع</label>
-              <input id="pp-pay-date" type="date">
-            </div>
-            <div class="tm-field" id="pp-pay-receipt-wrap" hidden>
-              <label>📷 صورة الإيصال <span class="req">*</span></label>
-              <div class="pp-file-input">
-                <label for="pp-pay-receipt" class="pp-file-drop" id="pp-pay-drop">
-                  <span id="pp-pay-drop-text">اضغطي لاختيار صورة الإيصال</span>
-                </label>
-                <input id="pp-pay-receipt" type="file"
-                       accept="image/png,image/jpeg,image/webp"
-                       style="display:none;">
-                <div class="hint">JPG / PNG / WEBP — حتى 5 ميجابايت</div>
-                <div class="pp-file-preview" id="pp-pay-preview"></div>
-                <div class="pp-required-msg" id="pp-pay-receipt-req">
-                  صورة الإيصال مطلوبة لطريقة البنفت
-                </div>
-              </div>
-            </div>
-            <div class="tm-field full">
-              <label for="pp-pay-notes">ملاحظات (اختياري)</label>
-              <textarea id="pp-pay-notes" rows="2" placeholder="مثال: استلمت من والدة الطالبة..."></textarea>
-            </div>
-          </div>
-        </div>
-
-      </div>
-      <div class="tm-foot">
-        <button type="button" class="trip-btn trip-btn-secondary" data-pp-pay-close="1">إلغاء</button>
-        <button type="submit" class="trip-btn trip-btn-primary" id="pp-pay-submit">
-          <span>✨</span><span>حفظ الدفعة</span>
-        </button>
-      </div>
-    </form>
   </div>
 </div>
 
@@ -69575,144 +69465,6 @@ function tripUnpaidRowHTML(u, idx){
     + '</div>';
 }
 
-/* ── Record-payment modal ───────────────────────────────────────── */
-var _PP_PAY_METHOD = '';
-
-function tripOpenRecordPayment(rid){
-  if (!_PP_DATA){ tripToast('لا توجد بيانات مالية', 'error'); return; }
-  var unpaid = (_PP_DATA.unpaid || []).find(function(u){
-    return (u.registration_id|0) === (rid|0);
-  });
-  if (!unpaid){ tripToast('التسجيل غير موجود في المتأخرات', 'error'); return; }
-  document.getElementById('pp-pay-rid').value = rid;
-  document.getElementById('pp-pay-student').textContent = unpaid.student_name || '';
-  var price = (_PP_DATA.trip && _PP_DATA.trip.price_per_student) || 0;
-  document.getElementById('pp-pay-amount').textContent = price.toFixed(2) + ' د.ب';
-  // Reset
-  _PP_PAY_METHOD = '';
-  document.querySelectorAll('#pp-method-pick .pp-method-btn').forEach(function(b){
-    b.classList.remove('is-active');
-  });
-  document.getElementById('pp-pay-receipt-wrap').hidden = true;
-  document.getElementById('pp-pay-receipt').value = '';
-  document.getElementById('pp-pay-preview').innerHTML = '';
-  document.getElementById('pp-pay-drop').classList.remove('has-file');
-  document.getElementById('pp-pay-drop-text').textContent = 'اضغطي لاختيار صورة الإيصال';
-  document.getElementById('pp-pay-receipt-req').classList.remove('show');
-  document.getElementById('pp-pay-notes').value = '';
-  // Default date = today
-  var now = new Date();
-  var iso = now.getFullYear() + '-'
-          + String(now.getMonth()+1).padStart(2,'0') + '-'
-          + String(now.getDate()).padStart(2,'0');
-  document.getElementById('pp-pay-date').value = iso;
-  // Show modal
-  document.getElementById('pp-pay-overlay').hidden = false;
-}
-
-function tripClosePaymentModal(){
-  document.getElementById('pp-pay-overlay').hidden = true;
-}
-
-function tripPickPaymentMethod(method){
-  _PP_PAY_METHOD = method;
-  document.querySelectorAll('#pp-method-pick .pp-method-btn').forEach(function(b){
-    b.classList.toggle('is-active', b.getAttribute('data-method') === method);
-  });
-  document.getElementById('pp-pay-receipt-wrap').hidden = (method !== 'benefit');
-  document.getElementById('pp-pay-receipt-req').classList.remove('show');
-}
-
-function tripPaymentReceiptPreview(file){
-  var preview = document.getElementById('pp-pay-preview');
-  var drop    = document.getElementById('pp-pay-drop');
-  var dropTxt = document.getElementById('pp-pay-drop-text');
-  preview.innerHTML = '';
-  if (!file){
-    drop.classList.remove('has-file');
-    dropTxt.textContent = 'اضغطي لاختيار صورة الإيصال';
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024){
-    tripToast('حجم الصورة يتجاوز 5 ميجابايت', 'error');
-    document.getElementById('pp-pay-receipt').value = '';
-    drop.classList.remove('has-file');
-    return;
-  }
-  drop.classList.add('has-file');
-  dropTxt.textContent = '✓ ' + (file.name || 'تم الاختيار');
-  var url = URL.createObjectURL(file);
-  preview.innerHTML = '<img src="' + url + '" alt="معاينة">'
-                    + '<div class="pp-file-meta">' + (file.size/1024).toFixed(1) + ' ك.ب</div>';
-}
-
-document.addEventListener('DOMContentLoaded', function(){
-  document.querySelectorAll('[data-pp-pay-close="1"]').forEach(function(b){
-    b.addEventListener('click', tripClosePaymentModal);
-  });
-  var ov = document.getElementById('pp-pay-overlay');
-  if (ov){
-    ov.addEventListener('click', function(e){
-      if (e.target === ov) tripClosePaymentModal();
-    });
-  }
-  var pick = document.getElementById('pp-method-pick');
-  if (pick){
-    pick.addEventListener('click', function(e){
-      var b = e.target.closest('.pp-method-btn');
-      if (!b) return;
-      tripPickPaymentMethod(b.getAttribute('data-method'));
-    });
-  }
-  var fileInput = document.getElementById('pp-pay-receipt');
-  if (fileInput){
-    fileInput.addEventListener('change', function(){
-      var f = fileInput.files && fileInput.files[0];
-      tripPaymentReceiptPreview(f || null);
-    });
-  }
-  var form = document.getElementById('pp-pay-form');
-  if (form){
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      var rid = parseInt(document.getElementById('pp-pay-rid').value, 10) || 0;
-      if (!rid){ tripToast('التسجيل غير معروف', 'error'); return; }
-      if (!_PP_PAY_METHOD){ tripToast('اختاري طريقة الدفع', 'error'); return; }
-      var fd = new FormData();
-      fd.append('payment_method', _PP_PAY_METHOD);
-      fd.append('payment_date', document.getElementById('pp-pay-date').value || '');
-      fd.append('notes', document.getElementById('pp-pay-notes').value || '');
-      if (_PP_PAY_METHOD === 'benefit'){
-        var f = fileInput.files && fileInput.files[0];
-        if (!f){
-          document.getElementById('pp-pay-receipt-req').classList.add('show');
-          return;
-        }
-        fd.append('receipt_image', f);
-      }
-      var btn = document.getElementById('pp-pay-submit');
-      btn.disabled = true; btn.style.opacity = '.6';
-      fetch('/api/admin/trips/' + _PP_TRIP_ID + '/registrations/' + rid + '/payment', {
-        method:'POST', credentials:'same-origin', body: fd,
-      }).then(function(r){ return r.json().catch(function(){ return null; }); })
-        .then(function(j){
-          btn.disabled = false; btn.style.opacity = '1';
-          if (!j || !j.ok){ tripToast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
-          tripClosePaymentModal();
-          tripToast('✓ تم تسجيل الدفعة', 'success');
-          tripConfetti();
-          tripLoadPayments();
-          tripLoadStats();
-          tripLoadTrips();
-        })
-        .catch(function(){
-          btn.disabled = false; btn.style.opacity = '1';
-          tripToast('خطأ في الاتصال', 'error');
-        });
-    });
-  }
-});
-
 /* ── Registrations panel ─────────────────────────────────────────── */
 var _RP_TRIP_ID = 0;
 var _RP_DATA    = null;
@@ -70012,7 +69764,9 @@ document.addEventListener('DOMContentLoaded', function(){
       var rid = parseInt(btn.getAttribute('data-rid') || '0', 10) || 0;
       var pid = parseInt(btn.getAttribute('data-pid') || '0', 10) || 0;
       if (act === 'payment-record'){
-        tripOpenRecordPayment(rid);
+        // Record-payment modal lands in commit 4. Until then, surface
+        // a friendly toast so the button is observable in tests.
+        tripToast('سيُفعَّل في الخطوة التالية ✨', 'success');
       } else if (act === 'payment-delete' && pid){
         if (!window.confirm('هل تريدين حذف هذه الدفعة؟ (للأدمن فقط)')) return;
         fetch('/api/admin/trips/' + _PP_TRIP_ID + '/payments/' + pid,
