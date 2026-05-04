@@ -69444,57 +69444,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .pts-row[data-tier="silver"]  .tier-badge{background:#f5f5f5;color:#616161;}
 .pts-row[data-tier="bronze"]  .tier-badge{background:#efebe9;color:#5d4037;}
 .pts-row .ach-count{color:#666;font-size:.82rem;font-weight:700;}
-.pts-row .quick-award{background:#f3e5f5;color:#4a148c;border:0;
-                       padding:5px 10px;border-radius:8px;font-size:.78rem;
-                       font-weight:800;cursor:pointer;font-family:inherit;
-                       transition:background .12s;}
-.pts-row .quick-award:hover{background:#e1bee7;}
-
-/* Inline award modal on the dashboard */
-.pts-mod-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);
-            backdrop-filter:blur(4px);z-index:300;display:flex;
-            align-items:flex-start;justify-content:center;padding:36px 14px;}
-.pts-mod-ov[hidden]{display:none;}
-.pts-mod{background:#fff;border-radius:16px;width:min(420px,100%);
-         box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden;
-         animation:tripModalSlide .25s cubic-bezier(.2,.8,.2,1);}
-.pts-mod .head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
-               padding:14px 18px;display:flex;justify-content:space-between;
-               align-items:center;}
-.pts-mod .head h3{margin:0;font-size:1rem;font-weight:900;}
-.pts-mod .head button{background:rgba(255,255,255,.2);color:#fff;border:0;
-                      width:32px;height:32px;border-radius:8px;cursor:pointer;
-                      font-size:1.1rem;}
-.pts-mod .body{padding:16px 18px;}
-.pts-mod .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
-.pts-mod .field label{font-size:.84rem;font-weight:800;color:#444;}
-.pts-mod .field input,.pts-mod .field textarea{width:100%;border:1.5px solid #e0e0e0;
-                                                border-radius:10px;padding:10px 12px;
-                                                font-family:inherit;font-size:.94rem;
-                                                background:#fafafa;}
-.pts-mod .field input:focus,.pts-mod .field textarea:focus{outline:none;
-                                                            border-color:#6B3FA0;background:#fff;}
-.pts-mod .presets{display:flex;flex-wrap:wrap;gap:6px;}
-.pts-mod .presets button{border:1.5px solid #e0e0e0;background:#fff;color:#444;
-                         padding:6px 12px;border-radius:7px;cursor:pointer;
-                         font-weight:800;font-family:inherit;font-size:.82rem;}
-.pts-mod .presets button.is-pos{color:#1D9E75;border-color:#a5d6a7;}
-.pts-mod .presets button.is-neg{color:#c62828;border-color:#ef9a9a;}
-.pts-mod .foot{padding:14px 18px;background:#fafafa;display:flex;gap:8px;
-               justify-content:flex-end;border-top:1px solid #ececec;}
-.pts-mod .foot button{border:0;border-radius:9px;padding:9px 18px;font-weight:800;
-                      cursor:pointer;font-family:inherit;}
-.pts-mod .foot .save{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;}
-.pts-mod .foot .cancel{background:#ececec;color:#444;}
-
-.pts-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
-           background:rgba(33,33,33,.92);color:#fff;padding:11px 18px;
-           border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
-           box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;
-           transition:opacity .25s,transform .25s;}
-.pts-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-.pts-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
-.pts-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
 
 .pts-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
 </style></head>
@@ -69554,46 +69503,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   </div>
 </div>
 
-<!-- Inline manual award modal -->
-<div class="pts-mod-ov" id="pts-mod-ov" hidden>
-  <div class="pts-mod" role="dialog" aria-modal="true">
-    <div class="head"><h3>⭐ منح نقاط للطالبة</h3>
-      <button type="button" data-pts-mod-close="1" aria-label="إغلاق">✕</button>
-    </div>
-    <div class="body">
-      <p style="margin:0 0 10px;font-size:.88rem;color:#666;">
-        الطالبة: <strong id="pts-mod-name">—</strong>
-      </p>
-      <div class="field">
-        <label>اختاري قيمة سريعة</label>
-        <div class="presets">
-          <button type="button" class="is-pos" data-pts="5">+5</button>
-          <button type="button" class="is-pos" data-pts="10">+10</button>
-          <button type="button" class="is-pos" data-pts="20">+20</button>
-          <button type="button" class="is-pos" data-pts="50">+50</button>
-          <button type="button" class="is-neg" data-pts="-5">-5</button>
-          <button type="button" class="is-neg" data-pts="-10">-10</button>
-          <button type="button" class="is-neg" data-pts="-20">-20</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="pts-mod-pts">قيمة مخصّصة</label>
-        <input id="pts-mod-pts" type="number" placeholder="مثلاً: 15">
-      </div>
-      <div class="field">
-        <label for="pts-mod-desc">السبب (إلزامي)</label>
-        <textarea id="pts-mod-desc" rows="2" placeholder="مثلاً: مشاركة فعّالة في الدرس"></textarea>
-      </div>
-    </div>
-    <div class="foot">
-      <button class="cancel" type="button" data-pts-mod-close="1">إلغاء</button>
-      <button class="save"   type="button" id="pts-mod-save">✨ منح النقاط</button>
-    </div>
-  </div>
-</div>
-
-<div class="pts-toast" id="pts-toast"></div>
-
 <script>
 function esc(s){
   s=(s==null)?'':String(s);
@@ -69647,7 +69556,7 @@ function loadLeaderboard(){
       }
       list.innerHTML = board.map(function(s){
         var medal = (s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : s.rank === 3 ? '🥉' : '#' + s.rank);
-        return '<div class=\"pts-row\" data-tier=\"' + esc(s.tier) + '\" data-sid=\"' + (s.student_id|0) + '\" data-name=\"' + esc(s.student_name) + '\">'
+        return '<div class=\"pts-row\" data-tier=\"' + esc(s.tier) + '\" data-sid=\"' + (s.student_id|0) + '\">'
              + '  <div class=\"rank\">' + medal + '</div>'
              + '  <div class=\"nm\">' + esc(s.student_name)
              + (s.group_name ? '<span class=\"grp\">' + esc(s.group_name) + '</span>' : '')
@@ -69655,7 +69564,6 @@ function loadLeaderboard(){
              + '  <div class=\"tier-badge\">' + esc(TIER_BADGES[s.tier] || s.tier) + '</div>'
              + '  <div class=\"ach-count\">🏆 ' + (s.achievement_count || 0) + '</div>'
              + '  <div class=\"pts\">' + (s.points || 0) + '</div>'
-             + '  <button class=\"quick-award\" data-act=\"quick-award\" data-sid=\"' + (s.student_id|0) + '\" data-name=\"' + esc(s.student_name) + '\">⭐ منح</button>'
              + '</div>';
       }).join('');
     })
@@ -69675,98 +69583,12 @@ document.addEventListener('DOMContentLoaded', function(){
     if (el) el.addEventListener('change', loadLeaderboard);
   });
   document.getElementById('pts-list').addEventListener('click', function(e){
-    var qBtn = e.target.closest('button[data-act=\"quick-award\"]');
-    if (qBtn){
-      e.preventDefault(); e.stopPropagation();
-      openAwardModal(parseInt(qBtn.getAttribute('data-sid'), 10) || 0,
-                     qBtn.getAttribute('data-name') || '');
-      return;
-    }
     var row = e.target.closest('.pts-row');
     if (!row) return;
     var sid = parseInt(row.getAttribute('data-sid'), 10) || 0;
     if (sid) window.location.href = '/admin/students/' + sid + '/points';
   });
-  // Modal wiring
-  document.querySelectorAll('[data-pts-mod-close]').forEach(function(b){
-    b.addEventListener('click', closeAwardModal);
-  });
-  var ov = document.getElementById('pts-mod-ov');
-  if (ov) ov.addEventListener('click', function(e){ if (e.target === ov) closeAwardModal(); });
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && !document.getElementById('pts-mod-ov').hidden) closeAwardModal();
-  });
-  document.querySelectorAll('.pts-mod .presets button').forEach(function(b){
-    b.addEventListener('click', function(){
-      document.getElementById('pts-mod-pts').value = b.getAttribute('data-pts');
-    });
-  });
-  document.getElementById('pts-mod-save').addEventListener('click', submitAward);
 });
-
-var _AWARD_SID = 0;
-function openAwardModal(sid, name){
-  _AWARD_SID = sid;
-  document.getElementById('pts-mod-name').textContent = name || '—';
-  document.getElementById('pts-mod-pts').value  = '';
-  document.getElementById('pts-mod-desc').value = '';
-  document.getElementById('pts-mod-ov').hidden  = false;
-  setTimeout(function(){
-    var p = document.getElementById('pts-mod-pts');
-    if (p) p.focus();
-  }, 80);
-}
-function closeAwardModal(){ document.getElementById('pts-mod-ov').hidden = true; }
-function ptsToast(m, k){
-  var t = document.getElementById('pts-toast');
-  t.textContent = m||'';
-  t.classList.remove('is-success','is-error');
-  if (k) t.classList.add('is-'+k);
-  t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 3000);
-}
-function ptsConfetti(){
-  var host=document.createElement('div');
-  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
-  document.body.appendChild(host);
-  var colors=['#C9A227','#6B3FA0','#1D9E75','#1565C0','#e91e63'];
-  for (var i=0;i<60;i++){
-    var p=document.createElement('span');
-    p.style.cssText='position:absolute;top:-20px;left:'+(Math.random()*100)+'vw;'
-                  +'width:'+(6+Math.random()*8)+'px;height:'+(10+Math.random()*10)+'px;'
-                  +'background:'+colors[i%colors.length]+';'
-                  +'animation:ptsfall '+(1.8+Math.random()*1.6)+'s '+(Math.random()*0.4)+'s ease-in forwards;'
-                  +'transform:rotateZ('+(Math.random()*360)+'deg);';
-    host.appendChild(p);
-  }
-  setTimeout(function(){host.remove();},4000);
-}
-var _ptsk=document.createElement('style');
-_ptsk.textContent='@keyframes ptsfall{0%{transform:translateY(0) rotateZ(0deg);opacity:1;}100%{transform:translateY(110vh) rotateZ(720deg);opacity:0;}}';
-document.head.appendChild(_ptsk);
-
-function submitAward(){
-  if (!_AWARD_SID){ ptsToast('لم تُختر الطالبة', 'error'); return; }
-  var pts = parseInt((document.getElementById('pts-mod-pts').value || '0'), 10);
-  var desc = (document.getElementById('pts-mod-desc').value || '').trim();
-  if (!pts){ ptsToast('أدخلي عدد نقاط', 'error'); return; }
-  if (!desc){ ptsToast('السبب مطلوب', 'error'); return; }
-  var name = document.getElementById('pts-mod-name').textContent || 'الطالبة';
-  fetch('/api/admin/students/'+_AWARD_SID+'/points/manual', {
-    method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({points: pts, description_ar: desc}),
-  }).then(function(r){ return r.json(); })
-    .then(function(j){
-      if (!j || !j.ok){ ptsToast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
-      closeAwardModal();
-      ptsToast('✓ تم منح ' + pts + ' نقاط لـ ' + name, 'success');
-      ptsConfetti();
-      loadStats();
-      loadLeaderboard();
-    })
-    .catch(function(){ ptsToast('خطأ في الاتصال', 'error'); });
-}
 </script>
 </body></html>"""
 
