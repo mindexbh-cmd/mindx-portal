@@ -44528,7 +44528,7 @@ def api_teacher_attendance_save():
     if group not in _teacher_groups_for(db, user):
         return jsonify({"ok": False, "error": "forbidden"}), 403
     iso_date = _att_normalize_date(date_raw) or date_raw
-    inserted = 0; updated = 0; skipped = 0
+    inserted = 0; updated = 0; skipped = 0; cleared = 0
     for raw in rows:
         if not isinstance(raw, dict):
             skipped += 1; continue
@@ -44536,9 +44536,11 @@ def api_teacher_attendance_save():
         sname = " ".join(sname.split())
         if not sname:
             skipped += 1; continue
-        status = (raw.get('status') or '').strip()
-        if status:
-            status = STATUS_REMAP.get(status, status)
+        # Canonicalise. Empty / placeholder / unknown values mean the
+        # teacher hasn't actually marked this student — we skip the
+        # insert below, or delete a previously-saved row so clearing the
+        # dropdown reverts the save.
+        status = _attendance_canonical_status(raw.get('status'))
         contact = (raw.get('contact_number') or '').strip()
         body = {
             "attendance_date": iso_date,
@@ -44587,6 +44589,23 @@ def api_teacher_attendance_save():
             ).fetchone()
         except Exception:
             existing = None
+        # No real status marked: don't create a row, and remove any
+        # previously-saved row so the page accurately reflects "unmarked".
+        if not status:
+            if existing:
+                try:
+                    rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
+                    db.execute("DELETE FROM attendance WHERE id=?", (rid,))
+                    cleared += 1
+                except Exception as ex:
+                    import sys as _sys
+                    print("[teacher attendance] clear failed: " + str(ex), file=_sys.stderr)
+                    try: db.rollback()
+                    except Exception: pass
+                    skipped += 1
+            else:
+                skipped += 1
+            continue
         try:
             if existing:
                 rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
@@ -44607,6 +44626,7 @@ def api_teacher_attendance_save():
         "inserted": inserted,
         "updated":  updated,
         "skipped":  skipped,
+        "cleared":  cleared,
     })
 
 
@@ -44703,7 +44723,18 @@ def api_attendance_add():
     against the live schema so an extra NOT-NULL column on the prod
     DB doesn't poison the request. Logs exceptions to stderr."""
     d = request.get_json() or {}
+    # If the caller explicitly sent a status, fold it through the
+    # canonicaliser. A non-canonical status submitted with a row means
+    # "unmark" — we delete an existing row or skip the insert. Body keys
+    # without `status` are partial updates and must be left alone (no
+    # accidental delete on a non-status edit).
+    status_sent = isinstance(d, dict) and ('status' in d)
+    canonical_status = (
+        _attendance_canonical_status(d.get('status')) if status_sent else None
+    )
     body = _attendance_normalize_body(d)
+    if status_sent:
+        body['status'] = canonical_status
     db = get_db()
     # Auto-bind to student via personal_id at write time so future
     # name edits don't break linkage. Only set when not already in body.
@@ -44730,6 +44761,22 @@ def api_attendance_add():
                 ).fetchone()
             except Exception:
                 existing = None
+        # Caller explicitly sent a non-canonical status (empty / placeholder
+        # / unknown) — interpret as "unmark this student".
+        if status_sent and not canonical_status:
+            if existing:
+                rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
+                try:
+                    db.execute("DELETE FROM attendance WHERE id=?", (rid,))
+                    db.commit()
+                except Exception as ex:
+                    try: db.rollback()
+                    except Exception: pass
+                    import sys as _sys
+                    print("[attendance] clear failed: " + str(ex), file=_sys.stderr)
+                    return jsonify({"ok": False, "error": str(ex)}), 400
+                return jsonify({"ok": True, "id": rid, "cleared": True})
+            return jsonify({"ok": True, "skipped": True})
         if existing:
             rid = existing[0] if not hasattr(existing, "keys") else existing["id"]
             try:
@@ -47564,6 +47611,25 @@ STATUS_REMAP = {
     "late":    "متأخر",
     "present": "حاضر",
 }
+
+# Real canonical statuses — anything outside this set is "no marking".
+ATTENDANCE_CANONICAL_STATUSES = {"حاضر", "غائب", "متأخر"}
+# Literal placeholder values the client may submit when the dropdown
+# is still on its default option. Treat them as "no marking" so they
+# don't pollute the attendance table with rows that aren't real records.
+ATTENDANCE_PLACEHOLDER_STATUSES = {"اختر", "— اختر —"}
+
+
+def _attendance_canonical_status(value):
+    """Fold an incoming status to one of {حاضر, غائب, متأخر}, or '' when
+    the row is unmarked (empty / NULL / dropdown placeholder / anything
+    outside the canonical set). Used by the save endpoints to decide
+    whether to write a row at all — see ATTENDANCE RULE in CLAUDE.md."""
+    s = (value or "").strip()
+    if not s or s in ATTENDANCE_PLACEHOLDER_STATUSES:
+        return ""
+    s = STATUS_REMAP.get(s, s)
+    return s if s in ATTENDANCE_CANONICAL_STATUSES else ""
 
 
 # Matches primary-key values that are empty/whitespace-only or only
