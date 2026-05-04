@@ -65157,6 +65157,45 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
 .ev-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
 
+/* Calendar view */
+.ev-cal{background:#fff;border-radius:14px;padding:18px 20px;
+        box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.ev-cal-header{display:flex;justify-content:space-between;align-items:center;
+               margin-bottom:14px;}
+.ev-cal-header h3{margin:0;font-size:1.05rem;color:#4a148c;font-weight:900;}
+.ev-cal-nav{display:flex;gap:6px;align-items:center;}
+.ev-cal-nav button{background:#f3e5f5;color:#4a148c;border:0;
+                   width:34px;height:34px;border-radius:9px;cursor:pointer;
+                   font-size:1rem;font-weight:900;font-family:inherit;}
+.ev-cal-nav button:hover{background:#e1bee7;}
+.ev-cal-nav .month-label{font-weight:900;color:#212121;
+                          font-size:.95rem;min-width:140px;text-align:center;}
+.ev-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.ev-cal-dow{text-align:center;font-size:.78rem;font-weight:800;color:#666;
+            padding:8px 0;background:#fafafa;border-radius:7px;}
+.ev-cal-day{aspect-ratio:1;background:#fafafa;border-radius:9px;padding:6px 8px;
+            display:flex;flex-direction:column;align-items:flex-start;
+            cursor:default;position:relative;border:1.5px solid transparent;
+            transition:border-color .12s,background .12s;}
+.ev-cal-day .num{font-weight:800;font-size:.86rem;color:#444;}
+.ev-cal-day.is-today{background:#fff3e0;border-color:#f1a132;}
+.ev-cal-day.is-today .num{color:#8d4f00;}
+.ev-cal-day.has-events{cursor:pointer;background:#e6f7ee;
+                        border-color:#1D9E75;}
+.ev-cal-day.has-events:hover{background:#c8e6c9;}
+.ev-cal-day.is-other-month{opacity:.35;}
+.ev-cal-day .count{position:absolute;bottom:6px;right:6px;
+                    font-weight:900;color:#1D9E75;font-size:.78rem;
+                    background:#fff;border-radius:999px;padding:1px 6px;
+                    line-height:1.4;}
+.ev-cal-day .names{font-size:.7rem;color:#0f6b4a;font-weight:700;
+                    margin-top:2px;line-height:1.2;
+                    overflow:hidden;text-overflow:ellipsis;
+                    display:-webkit-box;-webkit-line-clamp:2;
+                    -webkit-box-orient:vertical;}
+.ev-cal-empty{text-align:center;color:#aab;padding:24px;font-style:italic;
+              font-size:.9rem;}
+
 /* Create-event modal */
 .ev-mod-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);
            backdrop-filter:blur(4px);z-index:300;display:flex;
@@ -65257,11 +65296,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <option value="closed">🎯 جاهزة</option>
       <option value="completed">✅ منتهية</option>
     </select>
+    <button class="ev-btn ev-btn-ghost" id="ev-view-toggle" type="button"
+            data-view="list" aria-label="تبديل العرض">
+      <span>📅</span><span id="ev-view-toggle-text">عرض التقويم</span>
+    </button>
   </div>
 
   <div id="ev-list">
     <div class="ev-loading">جارٍ التحميل...</div>
   </div>
+
+  <div id="ev-cal-view" hidden></div>
 
 </div>
 
@@ -65473,6 +65518,19 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   document.getElementById('ev-status').addEventListener('change', evRender);
   document.getElementById('ev-create-btn').addEventListener('click', evOpenCreate);
+  // View toggle (list ↔ calendar)
+  var vt = document.getElementById('ev-view-toggle');
+  if (vt) vt.addEventListener('click', function(){
+    var cur = vt.getAttribute('data-view') || 'list';
+    evSetView(cur === 'list' ? 'calendar' : 'list');
+  });
+  var saved = '';
+  try { saved = sessionStorage.getItem('evView') || ''; } catch(_){}
+  if (saved === 'calendar'){
+    // Render list first so the data is loaded; the calendar reads
+    // from window._EV_LIST. Switch after a tick.
+    setTimeout(function(){ evSetView('calendar'); }, 200);
+  }
   // Modal close handlers
   document.querySelectorAll('[data-ev-close="1"]').forEach(function(b){
     b.addEventListener('click', evCloseCreate);
@@ -65539,6 +65597,150 @@ function evLoadGroups(){
     .catch(function(){
       box.innerHTML = '<span style="color:#c62828;font-size:.85rem;">خطأ في التحميل</span>';
     });
+}
+
+/* ── Calendar view toggle ────────────────────────────────────── */
+var _EV_CAL_REF = new Date();   // anchor month
+var _EV_VIEW    = 'list';
+var _EV_DAY_FILTER = '';        // ISO date when user picks a day
+
+function evSetView(view){
+  _EV_VIEW = view;
+  var btn = document.getElementById('ev-view-toggle');
+  var lbl = document.getElementById('ev-view-toggle-text');
+  var listEl = document.getElementById('ev-list');
+  var calEl  = document.getElementById('ev-cal-view');
+  if (view === 'calendar'){
+    btn.setAttribute('data-view', 'calendar');
+    btn.classList.add('is-active');
+    if (lbl) lbl.textContent = 'عرض القائمة';
+    if (listEl) listEl.hidden = true;
+    if (calEl)  calEl.hidden  = false;
+    evRenderCalendar();
+  } else {
+    btn.setAttribute('data-view', 'list');
+    btn.classList.remove('is-active');
+    if (lbl) lbl.textContent = 'عرض التقويم';
+    if (calEl)  calEl.hidden  = true;
+    if (listEl) listEl.hidden = false;
+    evRender();
+  }
+  try { sessionStorage.setItem('evView', view); } catch(_){}
+}
+
+var _AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو',
+                  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+var _AR_DOW    = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+
+function evRenderCalendar(){
+  var calEl = document.getElementById('ev-cal-view');
+  if (!calEl) return;
+  var ref = _EV_CAL_REF;
+  var year = ref.getFullYear();
+  var month = ref.getMonth(); // 0-11
+  var first = new Date(year, month, 1);
+  var lastDay = new Date(year, month + 1, 0).getDate();
+  // Sunday as the first column (Bahrain locale convention).
+  var firstDow = first.getDay();
+  var todayIso = (function(){
+    var t = new Date();
+    return t.getFullYear() + '-' +
+           String(t.getMonth()+1).padStart(2,'0') + '-' +
+           String(t.getDate()).padStart(2,'0');
+  })();
+  // Build a {iso → [event]} map for the visible window.
+  var byDate = {};
+  ((window._EV_LIST) || []).forEach(function(e){
+    var iso = (e.event_date || '').substring(0, 10);
+    if (!iso) return;
+    (byDate[iso] = byDate[iso] || []).push(e);
+  });
+  var html = '<div class="ev-cal">'
+           + '  <div class="ev-cal-header">'
+           + '    <h3>📅 ' + _AR_MONTHS[month] + ' ' + year + '</h3>'
+           + '    <div class="ev-cal-nav">'
+           + '      <button type="button" data-cal-nav="prev" title="السابق">›</button>'
+           + '      <span class="month-label">' + _AR_MONTHS[month] + ' ' + year + '</span>'
+           + '      <button type="button" data-cal-nav="today" title="اليوم">●</button>'
+           + '      <button type="button" data-cal-nav="next" title="التالي">‹</button>'
+           + '    </div>'
+           + '  </div>'
+           + '  <div class="ev-cal-grid">';
+  // Day-of-week headers
+  for (var i = 0; i < 7; i++){
+    html += '<div class="ev-cal-dow">' + _AR_DOW[i] + '</div>';
+  }
+  // Leading blanks
+  for (var j = 0; j < firstDow; j++){
+    html += '<div class="ev-cal-day is-other-month">&nbsp;</div>';
+  }
+  // Real days
+  for (var d = 1; d <= lastDay; d++){
+    var iso = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var evs = byDate[iso] || [];
+    var cls = 'ev-cal-day';
+    if (iso === todayIso) cls += ' is-today';
+    if (evs.length)       cls += ' has-events';
+    var nameLine = evs.length
+      ? '<div class="names" title="' + evEsc(evs.map(function(x){return x.name;}).join(', ')) + '">'
+        + evs.map(function(x){ return evEsc(x.name); }).join(' • ') + '</div>' : '';
+    var countBadge = evs.length > 1
+      ? '<span class="count">' + evs.length + '</span>' : '';
+    html += '<div class="' + cls + '" data-iso="' + iso + '">'
+          + '<span class="num">' + d + '</span>'
+          + nameLine
+          + countBadge
+          + '</div>';
+  }
+  // Trailing blanks (fill to multiple of 7)
+  var totalCells = firstDow + lastDay;
+  var trailing = (7 - (totalCells % 7)) % 7;
+  for (var k = 0; k < trailing; k++){
+    html += '<div class="ev-cal-day is-other-month">&nbsp;</div>';
+  }
+  html += '  </div>';
+  if (!Object.keys(byDate).length){
+    html += '<div class="ev-cal-empty">لا توجد رحلات في هذا الشهر</div>';
+  }
+  html += '</div>';
+  calEl.innerHTML = html;
+  // Wire navigation
+  calEl.querySelectorAll('[data-cal-nav]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var nav = b.getAttribute('data-cal-nav');
+      if (nav === 'prev')      _EV_CAL_REF = new Date(year, month - 1, 1);
+      else if (nav === 'next') _EV_CAL_REF = new Date(year, month + 1, 1);
+      else if (nav === 'today')_EV_CAL_REF = new Date();
+      evRenderCalendar();
+    });
+  });
+  // Day click → filter list view to that day
+  calEl.querySelectorAll('.ev-cal-day.has-events').forEach(function(c){
+    c.addEventListener('click', function(){
+      var iso = c.getAttribute('data-iso');
+      _EV_DAY_FILTER = iso;
+      evSetView('list');
+      // Filter visible cards
+      var filtered = ((window._EV_LIST) || []).filter(function(e){
+        return (e.event_date || '').substring(0, 10) === iso;
+      });
+      var grid = document.getElementById('ev-list');
+      grid.innerHTML = '<div style="margin-bottom:10px;color:#4a148c;font-weight:800;">'
+                     + '📅 رحلات يوم ' + evEsc(iso)
+                     + ' <button class="ev-btn ev-btn-ghost" id="ev-clear-day" '
+                     + 'style="padding:4px 12px;font-size:.8rem;margin-inline-start:8px;">'
+                     + '✕ مسح الفلتر</button></div>'
+                     + (filtered.length
+                          ? '<div class="ev-grid">' + filtered.map(evCardHTML).join('') + '</div>'
+                          : '<div class="ev-empty"><div class="em">📭</div>'
+                            + '<div class="h">لا توجد رحلات في هذا اليوم</div></div>');
+      var cb = document.getElementById('ev-clear-day');
+      if (cb) cb.addEventListener('click', function(){
+        _EV_DAY_FILTER = '';
+        evRender();
+      });
+    });
+  });
 }
 
 function evSubmitCreate(e){
