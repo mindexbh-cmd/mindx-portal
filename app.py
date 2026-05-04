@@ -64847,6 +64847,103 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .tt-col[data-bucket="0"] .tt-trip{opacity:.55;}
 .tt-empty{padding:40px 14px;text-align:center;color:#888;font-size:.9rem;
           grid-column:1 / -1;}
+
+/* ── Modal (create / edit) ────────────────────────────────────────── */
+.trip-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);
+                    backdrop-filter:blur(4px);z-index:300;display:flex;
+                    align-items:flex-start;justify-content:center;
+                    padding:36px 14px;overflow-y:auto;
+                    animation:tripModalFade .2s ease;}
+.trip-modal-overlay[hidden]{display:none;}
+@keyframes tripModalFade{from{opacity:0;}to{opacity:1;}}
+.trip-modal{background:#fff;border-radius:18px;width:min(640px,100%);
+            box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;
+            animation:tripModalSlide .25s cubic-bezier(.2,.8,.2,1);}
+@keyframes tripModalSlide{from{opacity:0;transform:translateY(-10px) scale(.97);}
+                          to  {opacity:1;transform:translateY(0)     scale(1);}}
+.tm-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+         padding:18px 22px;display:flex;justify-content:space-between;
+         align-items:center;}
+.tm-head h3{margin:0;font-size:1.1rem;font-weight:900;display:flex;
+            align-items:center;gap:8px;}
+.tm-close{background:rgba(255,255,255,.2);border:0;color:#fff;
+          width:32px;height:32px;border-radius:9px;cursor:pointer;
+          font-size:1.1rem;font-weight:900;line-height:1;
+          transition:background .15s;}
+.tm-close:hover{background:rgba(255,255,255,.35);}
+.tm-body{padding:18px 22px;}
+.tm-section{background:#fafafa;border-radius:12px;padding:14px 16px;
+            margin-bottom:12px;border-right:4px solid #6B3FA0;}
+.tm-section h4{margin:0 0 10px;font-size:.95rem;font-weight:900;
+               color:#4a148c;display:flex;align-items:center;gap:6px;}
+.tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.tm-grid .full{grid-column:1 / -1;}
+@media (max-width:540px){.tm-grid{grid-template-columns:1fr;}}
+.tm-field{display:flex;flex-direction:column;gap:4px;}
+.tm-field label{font-size:.8rem;color:#555;font-weight:800;}
+.tm-field label .req{color:#c62828;margin-inline-start:3px;}
+.tm-field input,.tm-field textarea,.tm-field select{
+  width:100%;border:1.5px solid #e0e0e0;border-radius:9px;padding:9px 11px;
+  font-size:.92rem;background:#fff;font-family:inherit;
+  transition:border-color .15s;}
+.tm-field input:focus,.tm-field textarea:focus,.tm-field select:focus{
+  outline:none;border-color:#6B3FA0;}
+.tm-field textarea{resize:vertical;min-height:60px;}
+.tm-field .hint{font-size:.74rem;color:#777;font-weight:700;}
+
+.tm-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.tm-chip{border:1.5px solid #e0e0e0;background:#fff;color:#444;
+         padding:7px 14px;border-radius:999px;cursor:pointer;
+         font-size:.85rem;font-weight:800;font-family:inherit;
+         display:inline-flex;align-items:center;gap:5px;
+         transition:all .15s;}
+.tm-chip:hover{border-color:#6B3FA0;color:#4a148c;}
+.tm-chip.is-active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                   color:#fff;border-color:#6B3FA0;
+                   box-shadow:0 4px 10px rgba(107,63,160,.25);}
+
+.tm-stepper{display:flex;align-items:center;gap:6px;}
+.tm-stepper button{width:34px;height:36px;border:1.5px solid #e0e0e0;
+                   background:#fafafa;border-radius:9px;cursor:pointer;
+                   font-size:1.1rem;font-weight:900;color:#4a148c;
+                   transition:all .15s;}
+.tm-stepper button:hover{background:#f3e5f5;border-color:#6B3FA0;}
+.tm-stepper input{flex:1;text-align:center;}
+
+.tm-suffix{position:relative;}
+.tm-suffix input{padding-inline-start:50px;}
+.tm-suffix .suffix-tag{position:absolute;inset-inline-start:1px;top:1px;
+                       bottom:1px;display:flex;align-items:center;
+                       padding:0 12px;background:#f3e5f5;color:#4a148c;
+                       border-radius:8px 0 0 8px;font-size:.82rem;
+                       font-weight:800;}
+
+.tm-foot{padding:14px 22px;background:#fafafa;display:flex;justify-content:flex-end;
+         gap:10px;border-top:1px solid #ececec;}
+.tm-foot .trip-btn-secondary{background:#ececec;color:#444;}
+.tm-foot .trip-btn-secondary:hover{background:#dcdcdc;}
+
+/* ── Toast ────────────────────────────────────────────────────────── */
+.trip-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+            background:rgba(33,33,33,.92);color:#fff;padding:12px 20px;
+            border-radius:12px;font-weight:800;font-size:.92rem;z-index:500;
+            backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.35);
+            opacity:0;transition:opacity .25s,transform .25s;
+            display:flex;align-items:center;gap:8px;pointer-events:none;}
+.trip-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.trip-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.trip-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+
+/* ── Confetti ─────────────────────────────────────────────────────── */
+.trip-confetti-host{position:fixed;inset:0;pointer-events:none;z-index:999;
+                    overflow:hidden;}
+.trip-confetti{position:absolute;width:10px;height:14px;
+               top:-20px;will-change:transform,opacity;
+               animation:tripConfettiFall var(--dur,2.4s) ease-in forwards;}
+@keyframes tripConfettiFall{
+  0%   {transform:translateY(0) rotateZ(0deg);opacity:1;}
+  100% {transform:translateY(110vh) rotateZ(720deg);opacity:0;}
+}
 </style>
 </head>
 <body>
@@ -64981,6 +65078,140 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
 </div>
 
+<!-- ── Create / edit trip modal ───────────────────────────────────── -->
+<div class="trip-modal-overlay" id="trip-modal-overlay" hidden>
+  <div class="trip-modal" role="dialog" aria-modal="true" aria-labelledby="tm-title">
+    <div class="tm-head">
+      <h3 id="tm-title"><span>✨</span><span>إنشاء رحلة جديدة</span></h3>
+      <button class="tm-close" type="button" aria-label="إغلاق" data-tm-close="1">✕</button>
+    </div>
+    <form id="trip-form" autocomplete="off">
+      <input type="hidden" id="tm-id" value="">
+      <div class="tm-body">
+
+        <!-- 📋 المعلومات الأساسية -->
+        <div class="tm-section">
+          <h4>📋 المعلومات الأساسية</h4>
+          <div class="tm-grid">
+            <div class="tm-field full">
+              <label for="tm-name">اسم الرحلة <span class="req">*</span></label>
+              <input id="tm-name" name="name" type="text" required
+                     placeholder="مثال: رحلة المتحف الوطني">
+            </div>
+            <div class="tm-field full">
+              <label for="tm-destination">📍 الوجهة <span class="req">*</span></label>
+              <input id="tm-destination" name="destination" type="text" required
+                     placeholder="مثال: المنامة - المتحف الوطني">
+            </div>
+            <div class="tm-field full">
+              <label>نوع الرحلة <span class="req">*</span></label>
+              <div class="tm-chips" id="tm-chips-type" data-name="trip_type">
+                <button type="button" class="tm-chip" data-value="educational">🎓 تعليمية</button>
+                <button type="button" class="tm-chip" data-value="recreational">🎉 ترفيهية</button>
+                <button type="button" class="tm-chip" data-value="religious">🕌 دينية</button>
+              </div>
+            </div>
+            <div class="tm-field full">
+              <label for="tm-description">وصف مختصر</label>
+              <textarea id="tm-description" name="description" rows="2"
+                        placeholder="مختصر عن أهداف الرحلة وأنشطتها..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⏰ التوقيت -->
+        <div class="tm-section">
+          <h4>⏰ التوقيت</h4>
+          <div class="tm-grid">
+            <div class="tm-field">
+              <label for="tm-date">تاريخ الرحلة <span class="req">*</span></label>
+              <input id="tm-date" name="trip_date" type="date" required>
+              <div class="hint" id="tm-day-name">&nbsp;</div>
+            </div>
+            <div class="tm-field">
+              <label for="tm-meeting">نقطة التجمع</label>
+              <input id="tm-meeting" name="meeting_point" type="text"
+                     placeholder="مثال: مدخل المركز الرئيسي">
+            </div>
+            <div class="tm-field">
+              <label for="tm-departure">وقت الانطلاق</label>
+              <input id="tm-departure" name="departure_time" type="time">
+            </div>
+            <div class="tm-field">
+              <label for="tm-return">وقت العودة</label>
+              <input id="tm-return" name="return_time" type="time">
+            </div>
+          </div>
+        </div>
+
+        <!-- 👥 التفاصيل -->
+        <div class="tm-section">
+          <h4>👥 التفاصيل</h4>
+          <div class="tm-grid">
+            <div class="tm-field full">
+              <label>الفئة المستهدفة</label>
+              <div class="tm-chips" id="tm-chips-audience" data-name="target_audience">
+                <button type="button" class="tm-chip" data-value="ابتدائي">🧒 ابتدائي</button>
+                <button type="button" class="tm-chip" data-value="متوسط">👧 متوسط</button>
+                <button type="button" class="tm-chip" data-value="ثانوي">👩 ثانوي</button>
+                <button type="button" class="tm-chip" data-value="الكل">👥 الكل</button>
+              </div>
+            </div>
+            <div class="tm-field">
+              <label for="tm-capacity">أقصى عدد مسموح</label>
+              <div class="tm-stepper">
+                <button type="button" data-step="-1" aria-label="إنقاص">−</button>
+                <input id="tm-capacity" name="max_capacity" type="number"
+                       min="0" step="1" value="0">
+                <button type="button" data-step="+1" aria-label="زيادة">+</button>
+              </div>
+            </div>
+            <div class="tm-field">
+              <label for="tm-price">السعر للطالبة</label>
+              <div class="tm-suffix">
+                <span class="suffix-tag">د.ب</span>
+                <input id="tm-price" name="price_per_student" type="number"
+                       min="0" step="0.01" value="0">
+              </div>
+            </div>
+            <div class="tm-field full">
+              <label for="tm-equipment">الأدوات المطلوبة</label>
+              <textarea id="tm-equipment" name="equipment_needed" rows="2"
+                        placeholder="مثال: قنينة ماء، قبعة، حذاء رياضي..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🚨 الطوارئ -->
+        <div class="tm-section">
+          <h4>🚨 الطوارئ</h4>
+          <div class="tm-grid">
+            <div class="tm-field">
+              <label for="tm-em-name">اسم المسؤول</label>
+              <input id="tm-em-name" name="emergency_contact_name" type="text">
+            </div>
+            <div class="tm-field">
+              <label for="tm-em-tel">رقم الطوارئ</label>
+              <input id="tm-em-tel" name="emergency_contact" type="tel"
+                     placeholder="+973...">
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="tm-foot">
+        <button type="button" class="trip-btn trip-btn-secondary" data-tm-close="1">إلغاء</button>
+        <button type="submit" class="trip-btn trip-btn-primary" id="tm-submit">
+          <span>✨</span><span>إنشاء الرحلة</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast container — only one visible at a time -->
+<div class="trip-toast" id="trip-toast" role="status" aria-live="polite"></div>
+
 <script>
 /* ── Counter animation: 0 → value over 800ms (eased) ──────────── */
 function tripAnimateCounter(el, target){
@@ -65098,6 +65329,144 @@ document.addEventListener('DOMContentLoaded', function(){
   var saved = '';
   try { saved = sessionStorage.getItem('tripView') || ''; } catch(_){}
   if (saved === 'timeline') tripSetView('timeline');
+});
+
+/* ── Toast helper ─────────────────────────────────────────────────── */
+function tripToast(msg, kind){
+  var t = document.getElementById('trip-toast');
+  if (!t) return;
+  t.textContent = msg || '';
+  t.classList.remove('is-success','is-error');
+  if (kind === 'success') t.classList.add('is-success');
+  if (kind === 'error')   t.classList.add('is-error');
+  t.classList.add('show');
+  clearTimeout(t._hideT);
+  t._hideT = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+/* ── Confetti ─────────────────────────────────────────────────────── */
+function tripConfetti(){
+  var host = document.createElement('div');
+  host.className = 'trip-confetti-host';
+  document.body.appendChild(host);
+  var colors = ['#1D9E75','#6B3FA0','#C9A227','#1565C0','#e91e63','#ff7043'];
+  for (var i = 0; i < 80; i++){
+    var p = document.createElement('span');
+    p.className = 'trip-confetti';
+    p.style.left = (Math.random() * 100) + 'vw';
+    p.style.background = colors[i % colors.length];
+    p.style.setProperty('--dur', (1.8 + Math.random() * 1.6) + 's');
+    p.style.animationDelay = (Math.random() * 0.4) + 's';
+    p.style.transform = 'rotateZ(' + (Math.random() * 360) + 'deg)';
+    p.style.width  = (6 + Math.random() * 8) + 'px';
+    p.style.height = (10 + Math.random() * 10) + 'px';
+    host.appendChild(p);
+  }
+  setTimeout(function(){ host.remove(); }, 3800);
+}
+
+/* ── Modal helpers ────────────────────────────────────────────────── */
+function tripModalOpen(){
+  var ov = document.getElementById('trip-modal-overlay');
+  if (!ov) return;
+  ov.hidden = false;
+  document.body.style.overflow = 'hidden';
+  // Reset form to "create" defaults; commit 9's edit flow will call
+  // tripModalOpen(payload) with prefill, but stage 1 only creates.
+  var f = document.getElementById('trip-form');
+  if (f) f.reset();
+  document.getElementById('tm-id').value = '';
+  document.getElementById('tm-day-name').innerHTML = '&nbsp;';
+  // Clear chip activations.
+  document.querySelectorAll('#trip-modal-overlay .tm-chip.is-active').forEach(function(b){
+    b.classList.remove('is-active');
+  });
+  setTimeout(function(){
+    var n = document.getElementById('tm-name'); if (n) n.focus();
+  }, 80);
+}
+function tripModalClose(){
+  var ov = document.getElementById('trip-modal-overlay');
+  if (!ov) return;
+  ov.hidden = true;
+  document.body.style.overflow = '';
+}
+
+/* Arabic weekday lookup for the trip-date hint. */
+var TRIP_AR_DAYS = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function tripUpdateDayName(){
+  var d = document.getElementById('tm-date');
+  var lbl = document.getElementById('tm-day-name');
+  if (!d || !lbl) return;
+  var v = (d.value || '').trim();
+  if (!v){ lbl.innerHTML = '&nbsp;'; return; }
+  try {
+    var dt = new Date(v + 'T00:00:00');
+    if (isNaN(dt.getTime())){ lbl.innerHTML = '&nbsp;'; return; }
+    lbl.textContent = '📅 ' + TRIP_AR_DAYS[dt.getDay()];
+  } catch(_) { lbl.innerHTML = '&nbsp;'; }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  /* Open / close wiring */
+  var openBtn = document.getElementById('trip-create-btn');
+  if (openBtn) openBtn.addEventListener('click', tripModalOpen);
+  document.querySelectorAll('[data-tm-close="1"]').forEach(function(b){
+    b.addEventListener('click', tripModalClose);
+  });
+  var ov = document.getElementById('trip-modal-overlay');
+  if (ov){
+    ov.addEventListener('click', function(e){
+      if (e.target === ov) tripModalClose();
+    });
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      var v = document.getElementById('trip-modal-overlay');
+      if (v && !v.hidden) tripModalClose();
+    }
+  });
+
+  /* Chips: single-select per group, keyed by data-name */
+  document.querySelectorAll('.tm-chips').forEach(function(grp){
+    grp.addEventListener('click', function(e){
+      var b = e.target.closest('.tm-chip');
+      if (!b || !grp.contains(b)) return;
+      grp.querySelectorAll('.tm-chip').forEach(function(x){ x.classList.remove('is-active'); });
+      b.classList.add('is-active');
+    });
+  });
+
+  /* Stepper +/- on max_capacity */
+  document.querySelectorAll('.tm-stepper').forEach(function(grp){
+    grp.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-step]');
+      if (!b) return;
+      var inp = grp.querySelector('input[type="number"]');
+      if (!inp) return;
+      var step = parseInt(b.getAttribute('data-step'), 10) || 0;
+      var v = parseInt(inp.value, 10) || 0;
+      var min = parseInt(inp.getAttribute('min') || '0', 10) || 0;
+      v = Math.max(min, v + step);
+      inp.value = String(v);
+    });
+  });
+
+  /* Live weekday hint under trip-date */
+  var dt = document.getElementById('tm-date');
+  if (dt){
+    dt.addEventListener('change', tripUpdateDayName);
+    dt.addEventListener('input',  tripUpdateDayName);
+  }
+
+  /* Stub submit — commit 7 replaces this with the real POST. */
+  var f = document.getElementById('trip-form');
+  if (f){
+    f.addEventListener('submit', function(e){
+      e.preventDefault();
+      // commit 7 takes over from here.
+    });
+  }
 });
 </script>
 </body></html>"""
