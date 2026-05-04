@@ -69895,6 +69895,62 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   <img id="pp-lightbox-img" src="" alt="إيصال الدفع">
 </div>
 
+<!-- ── New task modal ──────────────────────────────────────────── -->
+<div class="trip-modal-overlay" id="tt-add-overlay" hidden>
+  <div class="trip-modal" role="dialog" aria-modal="true">
+    <div class="tm-head">
+      <h3><span>➕</span><span>مهمة جديدة</span></h3>
+      <button class="tm-close" type="button" aria-label="إغلاق" data-tt-add-close="1">✕</button>
+    </div>
+    <form id="tt-add-form" autocomplete="off">
+      <div class="tm-body">
+        <div class="tm-section">
+          <h4>الفئة</h4>
+          <div class="tm-chips" id="tt-add-cats" data-name="category">
+            <button type="button" class="tm-chip" data-value="before">🟢 قبل</button>
+            <button type="button" class="tm-chip" data-value="during">🟡 أثناء</button>
+            <button type="button" class="tm-chip" data-value="after">🟣 بعد</button>
+          </div>
+        </div>
+        <div class="tm-section">
+          <h4>📝 التفاصيل</h4>
+          <div class="tm-grid">
+            <div class="tm-field full">
+              <label for="tt-add-title">عنوان المهمة <span class="req">*</span></label>
+              <input id="tt-add-title" type="text" required
+                     placeholder="مثال: حجز المكان">
+            </div>
+            <div class="tm-field full">
+              <label for="tt-add-desc">الوصف (اختياري)</label>
+              <textarea id="tt-add-desc" rows="2"></textarea>
+            </div>
+            <div class="tm-field full">
+              <label for="tt-add-assignee">المسؤول (اختياري)</label>
+              <select id="tt-add-assignee">
+                <option value="">— غير معيّن —</option>
+              </select>
+            </div>
+            <div class="tm-field">
+              <label for="tt-add-date">📅 تاريخ الاستحقاق</label>
+              <input id="tt-add-date" type="date">
+            </div>
+            <div class="tm-field">
+              <label for="tt-add-time">⏰ الوقت</label>
+              <input id="tt-add-time" type="time">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tm-foot">
+        <button type="button" class="trip-btn trip-btn-secondary" data-tt-add-close="1">إلغاء</button>
+        <button type="submit" class="trip-btn trip-btn-primary" id="tt-add-submit">
+          <span>✨</span><span>إضافة المهمة</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ── Tasks panel ──────────────────────────────────────────────── -->
 <div class="trip-tt-overlay" id="trip-tt-overlay" hidden>
   <div class="trip-tt" role="dialog" aria-modal="true" aria-labelledby="tt-title">
@@ -71308,6 +71364,201 @@ function tripTaskCardHTML(t){
     + '</div>';
 }
 
+/* ── Inline edit ────────────────────────────────────────────────── */
+function tripFindTaskByID(tkid){
+  if (!_TT_DATA) return null;
+  var cats = ['before','during','after'];
+  for (var c = 0; c < cats.length; c++){
+    var arr = (_TT_DATA.tasks || {})[cats[c]] || [];
+    for (var i = 0; i < arr.length; i++){
+      if ((arr[i].id|0) === (tkid|0)) return arr[i];
+    }
+  }
+  return null;
+}
+function _ttAssigneeOptions(selected){
+  var ass = (_TT_DATA && _TT_DATA.available_assignees) || [];
+  var sel = String(selected || '');
+  var html = '<option value="">— غير معيّن —</option>';
+  ass.forEach(function(a){
+    var v = String(a.user_id || '');
+    html += '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>'
+          + tripEscRP(a.name || '') + '</option>';
+  });
+  return html;
+}
+function tripBeginInlineEdit(tkid){
+  var t = tripFindTaskByID(tkid);
+  if (!t) return;
+  var card = document.querySelector('.tt-task[data-tkid="' + tkid + '"]');
+  if (!card) return;
+  var stOpts = ['pending','in_progress','completed','cancelled'];
+  var stLabels = {pending:'معلّقة', in_progress:'قيد التنفيذ',
+                  completed:'مكتملة', cancelled:'ملغاة'};
+  var stHTML = stOpts.map(function(s){
+    return '<option value="' + s + '"' + (s === t.status ? ' selected' : '') + '>'
+         + stLabels[s] + '</option>';
+  }).join('');
+  var html =
+      '<div class="tt-task-edit" data-tkid="' + tkid + '">'
+    + '  <div class="field"><label>عنوان المهمة</label>'
+    +      '<input type="text" data-fld="title" value="' + tripEscRP(t.title || '') + '">'
+    + '  </div>'
+    + '  <div class="field"><label>الوصف</label>'
+    +      '<textarea data-fld="description" rows="2">' + tripEscRP(t.description || '') + '</textarea>'
+    + '  </div>'
+    + '  <div class="grid">'
+    + '    <div class="field"><label>المسؤول</label>'
+    +        '<select data-fld="assigned_to_user_id">' + _ttAssigneeOptions(t.assigned_to_user_id) + '</select>'
+    + '    </div>'
+    + '    <div class="field"><label>الحالة</label>'
+    +        '<select data-fld="status">' + stHTML + '</select>'
+    + '    </div>'
+    + '    <div class="field"><label>📅 التاريخ</label>'
+    +        '<input type="date" data-fld="due_date" value="' + tripEscRP(t.due_date || '') + '">'
+    + '    </div>'
+    + '    <div class="field"><label>⏰ الوقت</label>'
+    +        '<input type="time" data-fld="due_time" value="' + tripEscRP(t.due_time || '') + '">'
+    + '    </div>'
+    + '  </div>'
+    + '  <div class="actions">'
+    + '    <button type="button" class="btn-cancel" data-act="edit-cancel" data-tkid="' + tkid + '">إلغاء</button>'
+    + '    <button type="button" class="btn-save"   data-act="edit-save"   data-tkid="' + tkid + '">💾 حفظ</button>'
+    + '  </div>'
+    + '</div>';
+  // Replace the card's interior with the editor; preserve the wrapper
+  // so tripCancelInlineEdit can swap back to the read-only render.
+  card.setAttribute('data-editing', '1');
+  card.innerHTML = html;
+}
+function tripCancelInlineEdit(tkid){
+  // Easiest path: re-render the whole panel so the card reverts.
+  tripRenderTasks();
+}
+function tripCommitInlineEdit(tkid){
+  var card = document.querySelector('.tt-task[data-tkid="' + tkid + '"]');
+  if (!card) return;
+  var ed = card.querySelector('.tt-task-edit');
+  if (!ed) return;
+  var payload = {};
+  ed.querySelectorAll('[data-fld]').forEach(function(el){
+    var k = el.getAttribute('data-fld');
+    var v = (el.value == null) ? '' : String(el.value).trim();
+    if (k === 'assigned_to_user_id'){
+      payload[k] = v ? parseInt(v, 10) || null : null;
+    } else {
+      payload[k] = v;
+    }
+  });
+  if (!payload.title){ tripToast('عنوان المهمة مطلوب', 'error'); return; }
+  fetch('/api/admin/trips/' + _TT_TRIP_ID + '/tasks/' + tkid, {
+    method:'PATCH', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  }).then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){ tripToast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
+      tripToast('✓ تم الحفظ', 'success');
+      tripLoadTasks();
+      tripLoadStats();
+      tripLoadTrips();
+    })
+    .catch(function(){ tripToast('خطأ في الاتصال','error'); });
+}
+
+/* ── New-task modal ─────────────────────────────────────────────── */
+function tripOpenNewTaskModal(){
+  var ov = document.getElementById('tt-add-overlay');
+  if (!ov) return;
+  // Reset form
+  var f = document.getElementById('tt-add-form');
+  if (f) f.reset();
+  document.querySelectorAll('#tt-add-cats .tm-chip.is-active').forEach(function(b){
+    b.classList.remove('is-active');
+  });
+  // Default category: before
+  var def = document.querySelector('#tt-add-cats .tm-chip[data-value="before"]');
+  if (def) def.classList.add('is-active');
+  // Refresh the assignee dropdown with the latest list.
+  document.getElementById('tt-add-assignee').innerHTML = _ttAssigneeOptions('');
+  ov.hidden = false;
+  setTimeout(function(){
+    var t = document.getElementById('tt-add-title'); if (t) t.focus();
+  }, 80);
+}
+function tripCloseNewTaskModal(){
+  var ov = document.getElementById('tt-add-overlay');
+  if (ov) ov.hidden = true;
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  var addOv = document.getElementById('tt-add-overlay');
+  if (!addOv) return;
+  document.querySelectorAll('[data-tt-add-close="1"]').forEach(function(b){
+    b.addEventListener('click', tripCloseNewTaskModal);
+  });
+  addOv.addEventListener('click', function(e){
+    if (e.target === addOv) tripCloseNewTaskModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      var v = document.getElementById('tt-add-overlay');
+      if (v && !v.hidden) tripCloseNewTaskModal();
+    }
+  });
+  // Single-select category chips.
+  var cats = document.getElementById('tt-add-cats');
+  if (cats){
+    cats.addEventListener('click', function(e){
+      var b = e.target.closest('.tm-chip');
+      if (!b) return;
+      cats.querySelectorAll('.tm-chip').forEach(function(x){
+        x.classList.remove('is-active');
+      });
+      b.classList.add('is-active');
+    });
+  }
+  // Submit
+  var form = document.getElementById('tt-add-form');
+  if (form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var title = (document.getElementById('tt-add-title').value || '').trim();
+      var sel   = document.querySelector('#tt-add-cats .tm-chip.is-active');
+      var cat   = sel ? sel.getAttribute('data-value') : '';
+      if (!cat)   { tripToast('اختاري الفئة', 'error'); return; }
+      if (!title) { tripToast('عنوان المهمة مطلوب', 'error'); return; }
+      var asnRaw = document.getElementById('tt-add-assignee').value || '';
+      var payload = {
+        category:    cat,
+        title:       title,
+        description: (document.getElementById('tt-add-desc').value || '').trim(),
+        assigned_to_user_id: asnRaw ? parseInt(asnRaw, 10) || null : null,
+        due_date:    (document.getElementById('tt-add-date').value || '').trim(),
+        due_time:    (document.getElementById('tt-add-time').value || '').trim(),
+      };
+      var btn = document.getElementById('tt-add-submit');
+      btn.disabled = true; btn.style.opacity = '.6';
+      fetch('/api/admin/trips/' + _TT_TRIP_ID + '/tasks', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      }).then(function(r){ return r.json(); })
+        .then(function(j){
+          btn.disabled = false; btn.style.opacity = '1';
+          if (!j || !j.ok){ tripToast((j && j.error) || 'تعذّر الإضافة', 'error'); return; }
+          tripCloseNewTaskModal();
+          tripToast('✓ تمت الإضافة', 'success');
+          tripLoadTasks();
+        })
+        .catch(function(){
+          btn.disabled = false; btn.style.opacity = '1';
+          tripToast('خطأ في الاتصال','error');
+        });
+    });
+  }
+});
+
 /* Action delegation inside the panel body */
 document.addEventListener('DOMContentLoaded', function(){
   var ttOv = document.getElementById('trip-tt-overlay');
@@ -71360,17 +71611,18 @@ document.addEventListener('DOMContentLoaded', function(){
             })
             .catch(function(){ tripToast('خطأ في الاتصال','error'); });
         } else if (act === 'task-edit'){
-          // Inline edit form lands in commit 4. Stub for now.
-          tripToast('سيُفعَّل قريباً ✨', 'success');
+          tripBeginInlineEdit(tkid);
+        } else if (act === 'edit-save'){
+          tripCommitInlineEdit(tkid);
+        } else if (act === 'edit-cancel'){
+          tripCancelInlineEdit(tkid);
         }
       });
     }
-    // Toolbar buttons (commit 4 wires the modal; commit 3 stubs).
+    // Toolbar: open the new-task modal.
     var addBtn = document.getElementById('tt-add-btn');
     if (addBtn){
-      addBtn.addEventListener('click', function(){
-        tripToast('قريباً — قيد التطوير', 'success');
-      });
+      addBtn.addEventListener('click', tripOpenNewTaskModal);
     }
     var rldBtn = document.getElementById('tt-reload-btn');
     if (rldBtn){
