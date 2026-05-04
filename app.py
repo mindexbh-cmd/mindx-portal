@@ -64754,199 +64754,6 @@ def api_admin_trips_create():
     return jsonify({"ok": True, "id": new_id, "status": "active"})
 
 
-def _trips_auto_archive(db):
-    """Move completed trips into the archived bucket once their
-    trip_date is more than 7 days in the past. Best-effort — we
-    swallow errors so a list-fetch never 500s on a transient DB
-    issue. Returns the number of rows updated for log visibility."""
-    from datetime import date as _date, timedelta as _timedelta
-    cutoff = (_date.today() - _timedelta(days=7)).isoformat()
-    try:
-        cur = db.execute(
-            "UPDATE trips SET status='archived', archived_at=CURRENT_TIMESTAMP, "
-            "updated_at=CURRENT_TIMESTAMP "
-            "WHERE is_deleted = 0 AND status = 'completed' "
-            "AND trip_date IS NOT NULL AND trip_date < ?",
-            (cutoff,),
-        )
-        db.commit()
-        try:    return int(cur.rowcount or 0)
-        except Exception: return 0
-    except Exception as ex:
-        try: db.rollback()
-        except Exception: pass
-        import sys as _sys
-        print("[trips] auto-archive failed: " + str(ex), file=_sys.stderr)
-        return 0
-
-
-# Allowed transitions enforced server-side. Source-of-truth for the
-# UI's confirmation dialogs — never let the client invent a new edge.
-_TRIP_ALLOWED_TRANSITIONS = {
-    "active":    {"closed", "completed", "archived"},
-    "closed":    {"active",  "completed", "archived"},
-    "completed": {"archived"},
-    "archived":  set(),  # terminal — never auto-revivable
-}
-
-
-def _trip_get(db, tid):
-    try:
-        row = db.execute(
-            "SELECT * FROM trips WHERE id = ? AND is_deleted = 0",
-            (tid,),
-        ).fetchone()
-        return dict(row) if row else None
-    except Exception:
-        return None
-
-
-@app.route('/api/admin/trips/<int:tid>/status', methods=['PATCH'])
-@login_required
-def api_admin_trips_set_status(tid):
-    """Transition a trip's status. Validates the from→to transition,
-    gates archive to admin-only, and refuses to archive a trip that
-    isn't yet completed (parents/staff use ✅ منتهية first, then admin
-    archives via 📦 once it's been wrapped up)."""
-    user = session.get("user") or {}
-    if not _trips_can_admin(user):
-        return jsonify({"ok": False, "error": "غير مصرح"}), 403
-    d = request.get_json(silent=True) or {}
-    new_status = (d.get("new_status") or "").strip()
-    if new_status not in _TRIP_VALID_STATUSES:
-        return jsonify({"ok": False, "error": "حالة غير معروفة"}), 400
-    db = get_db()
-    row = _trip_get(db, tid)
-    if not row:
-        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
-    cur = (row.get("status") or "active").strip()
-    if cur == new_status:
-        return jsonify({"ok": True, "id": tid, "status": cur, "noop": True})
-    allowed = _TRIP_ALLOWED_TRANSITIONS.get(cur, set())
-    if new_status not in allowed:
-        return jsonify({
-            "ok": False,
-            "error": "لا يمكن الانتقال من «" + cur + "» إلى «" + new_status + "»",
-        }), 400
-    role = ((user.get("role") or "")).strip().lower()
-    if new_status == "archived" and role != "admin":
-        return jsonify({"ok": False, "error": "الأرشفة للأدمن فقط"}), 403
-    # Extra guardrail: archiving a trip that hasn't been marked completed
-    # is almost always a mistake — refuse it explicitly so the admin
-    # has to pass through completed first. Keeps the lifecycle clear.
-    if new_status == "archived" and cur != "completed":
-        return jsonify({
-            "ok": False,
-            "error": "أرشفي الرحلة بعد أن تُحدَّد «منتهية» أوّلاً",
-        }), 400
-    try:
-        archived_set = ", archived_at = CURRENT_TIMESTAMP" if new_status == "archived" else ""
-        db.execute(
-            "UPDATE trips SET status = ?, updated_at = CURRENT_TIMESTAMP" + archived_set + " "
-            "WHERE id = ?",
-            (new_status, tid),
-        )
-        db.commit()
-    except Exception as ex:
-        try: db.rollback()
-        except Exception: pass
-        import sys as _sys
-        print("[trips] status update failed: " + str(ex), file=_sys.stderr)
-        return jsonify({"ok": False, "error": "تعذّر تحديث الحالة"}), 500
-    try:
-        _audit("trip.status",
-               target_type="trip", target_id=tid,
-               old_value={"status": cur},
-               new_value={"status": new_status})
-    except Exception:
-        pass
-    return jsonify({"ok": True, "id": tid, "status": new_status})
-
-
-# Sparse-update fields. Anything not in this set is ignored — the
-# status edge has its own dedicated endpoint above with auth + lifecycle
-# guardrails, so we never let it through here.
-_TRIP_PATCH_FIELDS = {
-    "name", "destination", "trip_type", "description", "target_audience",
-    "max_capacity", "price_per_student", "trip_date",
-    "departure_time", "return_time", "meeting_point",
-    "emergency_contact", "emergency_contact_name", "equipment_needed",
-}
-
-
-@app.route('/api/admin/trips/<int:tid>', methods=['PATCH'])
-@login_required
-def api_admin_trips_update(tid):
-    """Sparse update on a trip. Only the keys listed in _TRIP_PATCH_FIELDS
-    are accepted; numeric coercion mirrors the create path; trip_type
-    must stay in the canonical set when sent."""
-    user = session.get("user") or {}
-    if not _trips_can_admin(user):
-        return jsonify({"ok": False, "error": "غير مصرح"}), 403
-    d = request.get_json(silent=True) or {}
-    db = get_db()
-    row = _trip_get(db, tid)
-    if not row:
-        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
-    body = {}
-    if "name" in d:
-        v = (d.get("name") or "").strip()
-        if not v: return jsonify({"ok": False, "error": "اسم الرحلة لا يمكن أن يكون فارغاً"}), 400
-        body["name"] = v
-    if "destination" in d:
-        v = (d.get("destination") or "").strip()
-        if not v: return jsonify({"ok": False, "error": "الوجهة لا يمكن أن تكون فارغة"}), 400
-        body["destination"] = v
-    if "trip_type" in d:
-        v = (d.get("trip_type") or "").strip()
-        if v and v not in _TRIP_VALID_TYPES:
-            return jsonify({"ok": False, "error": "نوع الرحلة غير صحيح"}), 400
-        body["trip_type"] = v
-    if "trip_date" in d:
-        v = (d.get("trip_date") or "").strip()
-        if not v: return jsonify({"ok": False, "error": "تاريخ الرحلة مطلوب"}), 400
-        body["trip_date"] = v
-    if "max_capacity" in d:
-        try: body["max_capacity"] = max(0, int(d.get("max_capacity") or 0))
-        except Exception:
-            return jsonify({"ok": False, "error": "أقصى عدد مسموح يجب أن يكون رقماً"}), 400
-    if "price_per_student" in d:
-        try: body["price_per_student"] = max(0.0, float(d.get("price_per_student") or 0))
-        except Exception:
-            return jsonify({"ok": False, "error": "السعر يجب أن يكون رقماً"}), 400
-    for k in ("description", "target_audience", "departure_time", "return_time",
-              "meeting_point", "emergency_contact", "emergency_contact_name",
-              "equipment_needed"):
-        if k in d:
-            body[k] = (d.get(k) or "").strip() or None
-    if not body:
-        return jsonify({"ok": True, "id": tid, "noop": True})
-    sets = ", ".join('"' + k + '" = ?' for k in body.keys())
-    try:
-        db.execute(
-            "UPDATE trips SET " + sets + ", updated_at = CURRENT_TIMESTAMP "
-            "WHERE id = ?",
-            tuple(body.values()) + (tid,),
-        )
-        db.commit()
-    except Exception as ex:
-        try: db.rollback()
-        except Exception: pass
-        import sys as _sys
-        print("[trips] update failed: " + str(ex), file=_sys.stderr)
-        return jsonify({"ok": False, "error": "تعذّر تحديث الرحلة"}), 500
-    try:
-        # old_value is the original row trimmed to the touched fields,
-        # so a diff is reproducible from the audit row alone.
-        _audit("trip.update",
-               target_type="trip", target_id=tid,
-               old_value={k: row.get(k) for k in body.keys() if k in row},
-               new_value=body)
-    except Exception:
-        pass
-    return jsonify({"ok": True, "id": tid})
-
-
 @app.route('/api/admin/trips', methods=['GET'])
 @login_required
 def api_admin_trips_list():
@@ -64965,12 +64772,6 @@ def api_admin_trips_list():
     except Exception:
         limit = 50
     limit = max(1, min(limit, 200))
-
-    db = get_db()
-    # Auto-archive any completed trip whose date is more than 7 days
-    # in the past — runs once per list-fetch so the "أرشفة بعد أسبوع"
-    # guarantee holds without a cron. Best-effort, non-fatal.
-    _trips_auto_archive(db)
 
     sql = "SELECT * FROM trips WHERE is_deleted = 0"
     params = []
@@ -64992,6 +64793,7 @@ def api_admin_trips_list():
             "trip_date DESC, id DESC LIMIT ?")
     params.append(limit)
 
+    db = get_db()
     try:
         rows = db.execute(sql, tuple(params)).fetchall()
     except Exception as ex:
@@ -65366,22 +65168,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .trip-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .trip-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
 .trip-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
-
-/* ── Action menu (⋯) ──────────────────────────────────────────────── */
-.tc-menu{position:absolute;background:#fff;border-radius:12px;padding:6px;
-         box-shadow:0 14px 32px rgba(0,0,0,.18);min-width:200px;z-index:200;
-         display:flex;flex-direction:column;gap:2px;
-         animation:tripMenuPop .15s cubic-bezier(.2,.8,.2,1);}
-@keyframes tripMenuPop{from{opacity:0;transform:translateY(-4px);}
-                       to  {opacity:1;transform:translateY(0);}}
-.tc-menu button{border:0;background:transparent;text-align:right;
-                font-size:.88rem;font-weight:700;padding:9px 12px;
-                border-radius:8px;cursor:pointer;color:#212121;
-                font-family:inherit;display:flex;align-items:center;gap:8px;
-                transition:background .12s;}
-.tc-menu button:hover{background:#f3e5f5;}
-.tc-menu button[data-act="status-archived"]{color:#777;}
-.tc-menu .tc-menu-sep{height:1px;background:#ececec;margin:4px 0;}
 
 /* ── Confetti ─────────────────────────────────────────────────────── */
 .trip-confetti-host{position:fixed;inset:0;pointer-events:none;z-index:999;
@@ -65815,50 +65601,21 @@ function tripConfetti(){
 }
 
 /* ── Modal helpers ────────────────────────────────────────────────── */
-function tripModalOpen(prefill){
+function tripModalOpen(){
   var ov = document.getElementById('trip-modal-overlay');
   if (!ov) return;
   ov.hidden = false;
   document.body.style.overflow = 'hidden';
+  // Reset form to "create" defaults; commit 9's edit flow will call
+  // tripModalOpen(payload) with prefill, but stage 1 only creates.
   var f = document.getElementById('trip-form');
   if (f) f.reset();
   document.getElementById('tm-id').value = '';
   document.getElementById('tm-day-name').innerHTML = '&nbsp;';
+  // Clear chip activations.
   document.querySelectorAll('#trip-modal-overlay .tm-chip.is-active').forEach(function(b){
     b.classList.remove('is-active');
   });
-  // Title + submit-button labels depend on mode.
-  var titleEl  = document.getElementById('tm-title');
-  var submitEl = document.getElementById('tm-submit');
-  if (prefill && prefill.id){
-    if (titleEl)  titleEl.innerHTML  = '<span>✏️</span><span>تعديل الرحلة</span>';
-    if (submitEl) submitEl.innerHTML = '<span>💾</span><span>حفظ التعديلات</span>';
-    document.getElementById('tm-id').value = String(prefill.id);
-    // Plain inputs.
-    [['name','tm-name'],['destination','tm-destination'],['description','tm-description'],
-     ['trip_date','tm-date'],['departure_time','tm-departure'],['return_time','tm-return'],
-     ['meeting_point','tm-meeting'],['equipment_needed','tm-equipment'],
-     ['emergency_contact_name','tm-em-name'],['emergency_contact','tm-em-tel'],
-     ['max_capacity','tm-capacity'],['price_per_student','tm-price']
-    ].forEach(function(p){
-      var el = document.getElementById(p[1]);
-      if (el && prefill[p[0]] != null) el.value = prefill[p[0]];
-    });
-    // Chip groups.
-    [['trip_type','tm-chips-type'],['target_audience','tm-chips-audience']
-    ].forEach(function(p){
-      var grp = document.getElementById(p[1]);
-      if (!grp) return;
-      var v = prefill[p[0]] || '';
-      grp.querySelectorAll('.tm-chip').forEach(function(b){
-        if (b.getAttribute('data-value') === v) b.classList.add('is-active');
-      });
-    });
-    tripUpdateDayName();
-  } else {
-    if (titleEl)  titleEl.innerHTML  = '<span>✨</span><span>إنشاء رحلة جديدة</span>';
-    if (submitEl) submitEl.innerHTML = '<span>✨</span><span>إنشاء الرحلة</span>';
-  }
   setTimeout(function(){
     var n = document.getElementById('tm-name'); if (n) n.focus();
   }, 80);
@@ -65988,9 +65745,6 @@ function tripCollectFormPayload(){
 function tripHandleSubmit(e){
   e.preventDefault();
   var payload = tripCollectFormPayload();
-  var idEl = document.getElementById('tm-id');
-  var tid  = idEl ? (parseInt(idEl.value, 10) || 0) : 0;
-  var isEdit = (tid > 0);
   // Inline validation (server is the source of truth, but this keeps
   // the modal responsive and avoids a roundtrip for trivial mistakes).
   if (!payload.name)        { tripToast('اسم الرحلة مطلوب', 'error'); return; }
@@ -65999,10 +65753,8 @@ function tripHandleSubmit(e){
   if (!payload.trip_date)   { tripToast('تاريخ الرحلة مطلوب', 'error'); return; }
   var btn = document.getElementById('tm-submit');
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; }
-  var url    = isEdit ? '/api/admin/trips/' + tid : '/api/admin/trips';
-  var method = isEdit ? 'PATCH' : 'POST';
-  fetch(url, {
-    method: method,
+  fetch('/api/admin/trips', {
+    method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -66011,12 +65763,12 @@ function tripHandleSubmit(e){
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
       var b = p.body || {};
       if (!b.ok){
-        tripToast(b.error || (isEdit ? 'تعذّر التحديث' : 'تعذّر إنشاء الرحلة'), 'error');
+        tripToast(b.error || 'تعذّر إنشاء الرحلة', 'error');
         return;
       }
       tripModalClose();
-      if (!isEdit) tripConfetti();
-      tripToast(isEdit ? '✓ تم حفظ التعديلات' : '✓ تم إنشاء الرحلة بنجاح', 'success');
+      tripConfetti();
+      tripToast('✓ تم إنشاء الرحلة بنجاح', 'success');
       tripLoadStats();
       tripLoadTrips();
     })
@@ -66158,140 +65910,6 @@ function tripLoadTrips(){
     })
     .catch(function(){ tripRenderCards([]); });
 }
-
-/* ── Card actions: edit ✏️, status menu ⋯ ───────────────────────── */
-function tripFindByID(tid){
-  var arr = window._tripDataCache || [];
-  for (var i = 0; i < arr.length; i++) if ((arr[i].id|0) === (tid|0)) return arr[i];
-  return null;
-}
-function tripCloseMenu(){
-  document.querySelectorAll('.tc-menu').forEach(function(m){ m.remove(); });
-}
-function tripIsAdminRole(){
-  return ((document.body && document.body.dataset.role) || '').toLowerCase() === 'admin';
-}
-function tripOpenMenu(card, tid){
-  tripCloseMenu();
-  var tp = tripFindByID(tid);
-  if (!tp) return;
-  var btn = card.querySelector('button[data-act="more"]');
-  var menu = document.createElement('div');
-  menu.className = 'tc-menu';
-  menu.setAttribute('data-tid', tid);
-  // Build the option list based on current status. Allowed transitions
-  // are mirrored from the server's _TRIP_ALLOWED_TRANSITIONS so the UI
-  // doesn't show a button the API would reject.
-  var opts = [];
-  var cur = tp.status || 'active';
-  if (cur === 'active'){
-    opts.push({act:'status-closed',    label:'🔒 إغلاق التسجيل', confirm:'هل تريدين إغلاق التسجيل؟'});
-    opts.push({act:'status-completed', label:'✅ تحديد كمنتهية',  confirm:'هل الرحلة منتهية فعلاً؟'});
-  } else if (cur === 'closed'){
-    opts.push({act:'status-active',    label:'🟢 إعادة فتح التسجيل', confirm:'هل تريدين إعادة الفتح؟'});
-    opts.push({act:'status-completed', label:'✅ تحديد كمنتهية',     confirm:'هل الرحلة منتهية فعلاً؟'});
-  } else if (cur === 'completed'){
-    if (tripIsAdminRole()){
-      opts.push({act:'status-archived', label:'📦 أرشفة الرحلة', confirm:'هل تريدين أرشفة هذه الرحلة؟'});
-    }
-  }
-  if (!opts.length){
-    opts.push({act:'noop', label:'لا توجد خيارات لهذه الحالة', disabled:true});
-  }
-  opts.forEach(function(o){
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('data-act', o.act);
-    if (o.confirm) b.setAttribute('data-confirm', o.confirm);
-    if (o.disabled) b.disabled = true;
-    b.textContent = o.label;
-    menu.appendChild(b);
-  });
-  // Position: anchored under the more-button.
-  card.appendChild(menu);
-  if (btn){
-    var rectCard = card.getBoundingClientRect();
-    var rectBtn  = btn.getBoundingClientRect();
-    menu.style.top   = (rectBtn.bottom - rectCard.top + 6) + 'px';
-    menu.style.right = (rectCard.right - rectBtn.right) + 'px';
-  } else {
-    menu.style.top = '40px';
-    menu.style.right = '12px';
-  }
-  menu.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-act]');
-    if (!b || b.disabled) return;
-    var act = b.getAttribute('data-act');
-    var ask = b.getAttribute('data-confirm');
-    if (act.indexOf('status-') === 0){
-      var ns = act.substring(7);
-      if (ask && !window.confirm(ask)) { return; }
-      tripChangeStatus(tid, ns);
-    }
-    tripCloseMenu();
-  });
-}
-function tripChangeStatus(tid, newStatus){
-  fetch('/api/admin/trips/' + tid + '/status', {
-    method:'PATCH', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({new_status: newStatus}),
-  }).then(function(r){ return r.json().then(function(j){ return {s:r.status, b:j}; }); })
-    .then(function(p){
-      var b = p.b || {};
-      if (!b.ok){ tripToast(b.error || 'تعذّر تحديث الحالة', 'error'); return; }
-      tripToast('✓ تم تحديث الحالة', 'success');
-      tripLoadStats();
-      tripLoadTrips();
-    })
-    .catch(function(){ tripToast('خطأ في الاتصال', 'error'); });
-}
-function tripOpenEdit(tid){
-  var tp = tripFindByID(tid);
-  if (!tp){ tripToast('الرحلة غير موجودة', 'error'); return; }
-  tripModalOpen({
-    id:                     tp.id,
-    name:                   tp.name || '',
-    destination:            tp.destination || '',
-    trip_type:              tp.trip_type || '',
-    description:            tp.description || '',
-    target_audience:        tp.target_audience || '',
-    max_capacity:           tp.max_capacity || 0,
-    price_per_student:      tp.price_per_student || 0,
-    trip_date:              tp.trip_date || '',
-    departure_time:         tp.departure_time || '',
-    return_time:            tp.return_time || '',
-    meeting_point:          tp.meeting_point || '',
-    equipment_needed:       tp.equipment_needed || '',
-    emergency_contact:      tp.emergency_contact || '',
-    emergency_contact_name: tp.emergency_contact_name || '',
-  });
-}
-
-/* Delegated click handler on the cards grid */
-document.addEventListener('DOMContentLoaded', function(){
-  var grid = document.getElementById('trip-cards');
-  if (!grid) return;
-  grid.addEventListener('click', function(e){
-    var btn = e.target.closest('.tc-icons button[data-act]');
-    if (!btn) return;
-    var card = btn.closest('.trip-card');
-    if (!card) return;
-    var tid = parseInt(card.getAttribute('data-tid'), 10) || 0;
-    if (!tid) return;
-    var act = btn.getAttribute('data-act');
-    if (act === 'edit'){ tripOpenEdit(tid); return; }
-    if (act === 'more'){ tripOpenMenu(card, tid); return; }
-    // 'registrations' / 'payments' arrive in stages 2 / 3.
-    tripToast('قريباً ✨', 'success');
-  });
-  // Click outside menu closes it.
-  document.addEventListener('click', function(e){
-    if (!e.target.closest('.tc-menu') && !e.target.closest('button[data-act="more"]')){
-      tripCloseMenu();
-    }
-  });
-});
 </script>
 </body></html>"""
 
