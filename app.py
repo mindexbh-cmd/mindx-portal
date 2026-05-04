@@ -58700,6 +58700,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 .card.msg::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#E91E63,#C2185B);}
 .card.evals::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#FF9800,#F57C00);}
 .card.crc::before  {content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#1E88E5,#1565C0);}
+.card.trips::before{content:'';position:absolute;top:0;right:0;width:6px;height:100%;background:linear-gradient(180deg,#1D9E75,#6B3FA0);}
 .empty{text-align:center;color:#888;padding:60px 20px;}
 @media (max-width:1280px){
   .cards{grid-template-columns:repeat(3,1fr);gap:16px;}
@@ -58745,6 +58746,7 @@ noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
       <li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>
       <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
       <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
+      <li><a href="/portal/parent-hub/trips">🚌 الرحلات والفعاليات</a></li>
     </ul>
   </noscript>
 </div>
@@ -58766,6 +58768,7 @@ function _renderFallbackNav(reason){
       '<li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>'+
       '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
       '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
+      '<li><a href="/portal/parent-hub/trips">🚌 الرحلات والفعاليات</a></li>'+
     '</ul>';
 }
 fetch('/api/portal/student/meta',{credentials:'include'})
@@ -58811,6 +58814,11 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +     '<span class="ic">📚</span><h3>كتب المنهج</h3>'
       +     '<p>الكتب والمناهج المتاحة لـ ' + _esc(firstName) + '</p>'
       +   '</a>'
+      +   '<a class="card trips" href="/portal/parent-hub/trips" id="ph-trips-card">'
+      +     '<span class="badge" id="ph-trips-badge" style="display:none;">0</span>'
+      +     '<span class="ic">🚌</span><h3>الرحلات والفعاليات</h3>'
+      +     '<p>سجّلي ' + _esc(firstName) + ' في الرحلات القادمة</p>'
+      +   '</a>'
       + '</div>';
     root.innerHTML = html;
     // Poll the unread count once and surface the badge if non-zero.
@@ -58820,6 +58828,19 @@ fetch('/api/portal/student/meta',{credentials:'include'})
         if(j && j.ok && (j.unread||0) > 0){
           var b = document.getElementById('ph-msg-badge');
           if(b){ b.textContent = j.unread; b.style.display = 'inline-block'; }
+        }
+      }).catch(function(){});
+    // Trips badge — count of upcoming trips this daughter can still
+    // register for. Hidden when zero.
+    fetch('/api/portal/trips/available', {credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j && j.ok){
+          var n = (j.trips || []).filter(function(t){
+            return t.is_open_for_registration;
+          }).length;
+          var b = document.getElementById('ph-trips-badge');
+          if(b && n > 0){ b.textContent = n; b.style.display = 'inline-block'; }
         }
       }).catch(function(){});
   })
@@ -59159,6 +59180,463 @@ def portal_parent_hub_attendance_page():
     if int(user.get("must_change_pw") or 0):
         return redirect("/portal/change-password")
     return PORTAL_PARENT_ATTENDANCE_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
+
+
+@app.route('/portal/parent-hub/trips')
+@login_required
+def portal_parent_hub_trips_page():
+    """Parent-portal sub-page for browsing available trips and
+    registering the linked student. Same role gate as the other hub
+    sub-pages — student-account only."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_PARENT_TRIPS_HTML
+
+
+@app.route('/api/portal/trips/available', methods=['GET'])
+@login_required
+def api_portal_trips_available():
+    """Return active+future trips with the linked student's
+    registration status for each. Self-gates to student-role; the
+    same _ph_require_student helper every other parent-hub API uses."""
+    pair, err = _ph_require_student()
+    if err: return err
+    user, sid = pair
+    db = get_db()
+    from datetime import date as _date
+    today_iso = _date.today().isoformat()
+    try:
+        rows = db.execute(
+            "SELECT * FROM trips "
+            "WHERE is_deleted = 0 AND status = 'active' "
+            "AND trip_date IS NOT NULL AND trip_date >= ? "
+            "ORDER BY trip_date ASC, id DESC",
+            (today_iso,),
+        ).fetchall()
+    except Exception:
+        return jsonify({"ok": True, "trips": []})
+    trip_ids = [dict(r).get("id") for r in rows]
+    counts_map = _trip_load_reg_counts(db, trip_ids)
+    # Pre-load this student's existing registrations so we don't
+    # query per row.
+    existing = {}
+    if trip_ids:
+        try:
+            placeholders = ",".join(["?"] * len(trip_ids))
+            ex_rows = db.execute(
+                "SELECT trip_id, registration_status, waitlist_position, confirmation_id "
+                "FROM trip_registrations "
+                "WHERE student_id = ? AND is_deleted = 0 "
+                "AND trip_id IN (" + placeholders + ")",
+                (sid,) + tuple(trip_ids),
+            ).fetchall()
+            for er in ex_rows:
+                d = dict(er)
+                existing[d.get("trip_id")] = d
+        except Exception:
+            pass
+    out = []
+    for r in rows:
+        rd = dict(r)
+        enriched = _trip_compute_fields(rd, counts_map.get(rd.get("id")))
+        my = existing.get(rd.get("id"))
+        cap = int(rd.get("max_capacity") or 0)
+        is_full = cap > 0 and (enriched.get("registered_count") or 0) >= cap
+        my_status = (my or {}).get("registration_status") or ""
+        is_open = (my_status not in ("registered", "waitlisted"))
+        out.append({
+            "id":                rd.get("id"),
+            "name":              rd.get("name") or "",
+            "destination":       rd.get("destination") or "",
+            "trip_type":         rd.get("trip_type") or "",
+            "description":       rd.get("description") or "",
+            "trip_date":         rd.get("trip_date") or "",
+            "day_name_ar":       enriched.get("day_name_ar") or "",
+            "departure_time":    rd.get("departure_time") or "",
+            "return_time":       rd.get("return_time") or "",
+            "meeting_point":     rd.get("meeting_point") or "",
+            "equipment_needed":  rd.get("equipment_needed") or "",
+            "max_capacity":      cap,
+            "registered_count":  enriched.get("registered_count") or 0,
+            "available_seats":   max(0, cap - (enriched.get("registered_count") or 0)) if cap > 0 else 0,
+            "is_full":           is_full,
+            "price_per_student": float(rd.get("price_per_student") or 0),
+            "days_until_trip":   enriched.get("days_until_trip"),
+            "is_imminent":       enriched.get("is_imminent") or False,
+            "my_status":         my_status,
+            "my_waitlist_position": (my or {}).get("waitlist_position"),
+            "my_confirmation_id":   (my or {}).get("confirmation_id") or "",
+            "is_open_for_registration": is_open,
+        })
+    return jsonify({"ok": True, "trips": out})
+
+
+@app.route('/api/portal/trips/<int:tid>/register', methods=['POST'])
+@login_required
+def api_portal_trips_register(tid):
+    """Register the logged-in student in a trip via the parent portal.
+    The student_id is derived server-side from the session — the
+    client cannot register a different student through this surface."""
+    pair, err = _ph_require_student()
+    if err: return err
+    user, sid = pair
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    if (trip.get("status") or "") != "active":
+        return jsonify({"ok": False, "error": "التسجيل مُغلق لهذه الرحلة"}), 403
+    # Resolve the student's name + phone from the row so the parent
+    # only has to confirm — and so we don't trust client-side names.
+    try:
+        srow = db.execute(
+            "SELECT student_name, mother_phone, father_phone, other_phone, whatsapp "
+            "FROM students WHERE id = ?", (sid,),
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "حساب الطالبة غير موجود"}), 404
+    sd = dict(srow)
+    payload_in = request.get_json(silent=True) or {}
+    parent_phone = (payload_in.get("parent_phone") or "").strip()
+    if not parent_phone:
+        # Fall back to whatever phone is on the student record.
+        for col in ("mother_phone","father_phone","whatsapp","other_phone"):
+            if (sd.get(col) or "").strip():
+                parent_phone = (sd.get(col) or "").strip()
+                break
+    payload = {
+        "student_id":          sid,
+        "student_name":        sd.get("student_name") or "",
+        "parent_phone":        parent_phone,
+        "parent_name":         (payload_in.get("parent_name") or "").strip(),
+        "pickup_parent_name":  (payload_in.get("pickup_parent_name") or "").strip(),
+        "medical_notes":       (payload_in.get("medical_notes") or "").strip(),
+        "additional_notes":    (payload_in.get("additional_notes") or "").strip(),
+        "consent_given":       bool(payload_in.get("consent_given")),
+    }
+    try:
+        new_status, confirmation_id, rid, wl_pos = _trip_create_registration(
+            db, trip, payload, method="parent_portal",
+            registered_by_user_id=user.get("id"),
+        )
+    except ValueError as ve:
+        return jsonify({"ok": False, "error": str(ve)}), 400
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] portal register failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر إكمال التسجيل"}), 500
+    try:
+        _audit("trip.register",
+               target_type="trip_registration", target_id=rid,
+               new_value={"trip_id": tid, "method": "parent_portal",
+                          "status": new_status,
+                          "confirmation_id": confirmation_id})
+    except Exception:
+        pass
+    return jsonify({
+        "ok":                 True,
+        "confirmation_id":    confirmation_id,
+        "status":             new_status,
+        "waitlist_position":  wl_pos,
+    })
+
+
+PORTAL_PARENT_TRIPS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الرحلات المتاحة — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:880px;margin:24px auto;padding:0 16px;}
+.hero{background:linear-gradient(135deg,#1D9E75,#6B3FA0);color:#fff;
+      padding:22px 24px;border-radius:18px;margin-bottom:18px;
+      box-shadow:0 8px 24px rgba(107,63,160,.22);}
+.hero h2{margin:0;font-size:1.3rem;font-weight:900;line-height:1.3;
+         display:flex;align-items:center;gap:8px;}
+.hero p{margin:8px 0 0;opacity:.92;font-size:.92rem;}
+.empty{background:#fff;border-radius:14px;padding:48px 24px;text-align:center;
+       box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.empty .em{font-size:3.4rem;margin-bottom:10px;}
+.empty .h{font-size:1.05rem;font-weight:900;color:#4a148c;margin-bottom:6px;}
+.empty .hint{color:#666;font-size:.9rem;}
+.pt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+         gap:14px;}
+.pt-card{background:#fff;border-radius:14px;padding:18px 20px;
+         box-shadow:0 6px 18px rgba(0,0,0,.07);
+         border-right:5px solid #1D9E75;
+         display:flex;flex-direction:column;gap:8px;
+         transition:transform .2s,box-shadow .2s;}
+.pt-card:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(0,0,0,.1);}
+.pt-card.is-full{border-right-color:#BA7517;}
+.pt-card.is-registered{border-right-color:#1565C0;background:#e3f2fd;}
+.pt-card.is-waitlisted{border-right-color:#BA7517;background:#fff8eb;}
+.pt-name{font-size:1.05rem;font-weight:900;color:#212121;line-height:1.3;}
+.pt-meta{display:flex;flex-direction:column;gap:3px;color:#555;font-size:.88rem;}
+.pt-meta strong{color:#212121;font-weight:800;}
+.pt-prog{display:flex;flex-direction:column;gap:3px;}
+.pt-prog .lbl{display:flex;justify-content:space-between;font-size:.8rem;
+              color:#555;font-weight:700;}
+.pt-prog .bar{height:8px;border-radius:6px;background:#eef0f3;overflow:hidden;}
+.pt-prog .fill{height:100%;border-radius:6px;
+               background:linear-gradient(90deg,#1565C0,#42A5F5);
+               transition:width .8s cubic-bezier(.2,.8,.2,1);}
+.pt-pill{display:inline-flex;align-items:center;gap:5px;
+         padding:5px 12px;border-radius:999px;font-size:.8rem;font-weight:800;
+         align-self:flex-start;}
+.pt-pill.is-registered{background:#e3f2fd;color:#0d47a1;}
+.pt-pill.is-waitlisted{background:#fff3e0;color:#8d4f00;}
+.pt-btn{border:0;border-radius:11px;padding:12px 18px;font-size:.95rem;
+        font-weight:800;cursor:pointer;display:inline-flex;
+        align-items:center;justify-content:center;gap:6px;
+        font-family:inherit;transition:transform .15s,box-shadow .2s,opacity .2s;}
+.pt-btn:active{transform:scale(.97);}
+.pt-btn-primary{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                box-shadow:0 6px 16px rgba(29,158,117,.28);}
+.pt-btn-primary:hover{box-shadow:0 10px 22px rgba(29,158,117,.42);}
+.pt-btn-secondary{background:#f3e5f5;color:#4a148c;}
+.pt-btn:disabled{opacity:.55;cursor:not-allowed;}
+
+/* Inline registration form within a card */
+.pt-form{display:none;background:#fafafa;border-radius:12px;padding:14px;
+         margin-top:6px;}
+.pt-form.show{display:flex;flex-direction:column;gap:10px;
+               animation:ptFadeIn .25s ease both;}
+@keyframes ptFadeIn{from{opacity:0;transform:translateY(-4px);}
+                    to  {opacity:1;transform:translateY(0);}}
+.pt-form label{font-size:.78rem;font-weight:800;color:#444;
+               display:block;margin-bottom:4px;}
+.pt-form input,.pt-form textarea{
+  width:100%;border:1.5px solid #e0e0e0;border-radius:9px;
+  padding:9px 11px;font-size:.92rem;background:#fff;font-family:inherit;}
+.pt-form textarea{resize:vertical;min-height:54px;}
+.pt-form input:focus,.pt-form textarea:focus{outline:none;border-color:#6B3FA0;}
+.pt-form .pf-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media (max-width:540px){.pt-form .pf-row{grid-template-columns:1fr;}}
+.pt-form .pf-consent{background:#fff9db;border-right:3px solid #f1d369;
+                     border-radius:9px;padding:8px 12px;
+                     display:flex;gap:8px;align-items:flex-start;}
+.pt-form .pf-consent input{margin:3px 0 0;width:18px;height:18px;
+                            flex-shrink:0;accent-color:#1D9E75;}
+.pt-form .pf-consent label{font-size:.84rem;color:#444;line-height:1.5;
+                            cursor:pointer;font-weight:700;margin:0;}
+.pt-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+          background:rgba(33,33,33,.92);color:#fff;padding:11px 18px;
+          border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
+          box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;
+          transition:opacity .25s,transform .25s;display:flex;
+          align-items:center;gap:6px;}
+.pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.pt-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+.pt-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+</style></head>
+<body>
+
+<div class="topbar">
+  <h1>🚌 الرحلات والفعاليات</h1>
+  <a href="/portal/parent-hub">← العودة للبوابة</a>
+</div>
+
+<div class="wrap">
+  <div class="hero">
+    <h2>🚌 الرحلات المتاحة لابنتك</h2>
+    <p>سجّلي ابنتك في الرحلات القادمة بضغطة واحدة. التسجيل آمن ولا يحتاج رابطاً منفصلاً.</p>
+  </div>
+  <div id="pt-list" class="pt-grid"></div>
+  <div id="pt-empty" class="empty" hidden>
+    <div class="em">📭</div>
+    <div class="h">لا توجد رحلات قادمة حالياً</div>
+    <div class="hint">سيتمّ إشعارك عند فتح أي رحلة جديدة.</div>
+  </div>
+</div>
+
+<div class="pt-toast" id="pt-toast" role="status" aria-live="polite"></div>
+
+<script>
+function ptEsc(s){
+  s = (s == null) ? '' : String(s);
+  return s.replace(/[<>&"']/g, function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+function ptToast(msg, kind){
+  var t = document.getElementById('pt-toast');
+  t.textContent = msg;
+  t.classList.remove('is-error','is-success');
+  if (kind) t.classList.add('is-' + kind);
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+function ptDayText(d){
+  if (d == null) return '';
+  if (d === 0)  return '🎯 اليوم!';
+  if (d === 1)  return '⏰ غداً';
+  if (d > 1)    return '⏰ بعد ' + d + ' أيام';
+  return '';
+}
+function ptCardHTML(t){
+  var typeEmoji = ({educational:'🎓', recreational:'🎉', religious:'🕌'})[t.trip_type] || '🚌';
+  var cls = '';
+  if (t.my_status === 'registered') cls = ' is-registered';
+  else if (t.my_status === 'waitlisted') cls = ' is-waitlisted';
+  else if (t.is_full) cls = ' is-full';
+  var pill = '';
+  if (t.my_status === 'registered'){
+    pill = '<span class="pt-pill is-registered">✓ مسجَّلة — '
+         + ptEsc(t.my_confirmation_id) + '</span>';
+  } else if (t.my_status === 'waitlisted'){
+    pill = '<span class="pt-pill is-waitlisted">📋 في قائمة الانتظار #'
+         + (t.my_waitlist_position || '?') + '</span>';
+  }
+  var prog = '';
+  if (t.max_capacity > 0){
+    var pct = Math.min(100, Math.round((t.registered_count || 0) / t.max_capacity * 100));
+    prog = '<div class="pt-prog">'
+         + '<div class="lbl"><span>👥 المتاح</span><span>'
+         +   (t.available_seats || 0) + ' / ' + t.max_capacity + ' مقعد</span></div>'
+         + '<div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>'
+         + '</div>';
+  }
+  var dateLine = ptEsc(t.trip_date)
+               + (t.day_name_ar ? ' (' + ptEsc(t.day_name_ar) + ')' : '');
+  var timeLine = '';
+  if (t.departure_time) timeLine += t.departure_time;
+  if (t.return_time)    timeLine += ' — ' + t.return_time;
+
+  var btn = '';
+  if (t.my_status === 'registered'){
+    btn = '<button class="pt-btn pt-btn-secondary" disabled>✓ مسجَّلة</button>';
+  } else if (t.my_status === 'waitlisted'){
+    btn = '<button class="pt-btn pt-btn-secondary" disabled>📋 في قائمة الانتظار</button>';
+  } else if (t.is_full){
+    btn = '<button class="pt-btn pt-btn-primary" data-act="register" data-tid="' + (t.id|0) + '">'
+        + '<span>📋</span><span>الانضمام لقائمة الانتظار</span></button>';
+  } else {
+    btn = '<button class="pt-btn pt-btn-primary" data-act="register" data-tid="' + (t.id|0) + '">'
+        + '<span>📝</span><span>سجّلي ابنتك</span></button>';
+  }
+  return ''
+    + '<div class="pt-card' + cls + '" data-tid="' + (t.id|0) + '">'
+    + '  <div class="pt-name">' + typeEmoji + ' ' + ptEsc(t.name) + '</div>'
+    + (pill ? pill : '')
+    + '  <div class="pt-meta">'
+    + (t.destination ? '<div>📍 <strong>' + ptEsc(t.destination) + '</strong></div>' : '')
+    +   '<div>📅 ' + dateLine + '</div>'
+    + (timeLine ? '<div>⏰ ' + ptEsc(timeLine) + '</div>' : '')
+    +   '<div>💰 <strong>' + (t.price_per_student||0).toFixed(2) + '</strong> د.ب للطالبة</div>'
+    + (t.is_imminent && !t.my_status ? '<div style="color:#8d4f00;font-weight:800;">'
+                                     + ptDayText(t.days_until_trip) + '</div>' : '')
+    + '  </div>'
+    + prog
+    + (btn ? btn : '')
+    + ptInlineFormHTML(t)
+    + '</div>';
+}
+function ptInlineFormHTML(t){
+  return ''
+    + '<div class="pt-form" data-form-for="' + (t.id|0) + '">'
+    + '  <div class="pf-row">'
+    + '    <div><label>اسم ولي الأمر</label><input type="text" data-fld="parent_name"></div>'
+    + '    <div><label>رقم الواتساب <span style="color:#c62828">*</span></label>'
+    + '         <input type="tel" data-fld="parent_phone" placeholder="+973 XXXX XXXX"></div>'
+    + '  </div>'
+    + '  <div><label>من سيستلم الطالبة</label><input type="text" data-fld="pickup_parent_name"></div>'
+    + '  <div><label>🩺 ملاحظات طبية</label><textarea data-fld="medical_notes" rows="2"></textarea></div>'
+    + '  <div><label>📋 ملاحظات إضافية</label><textarea data-fld="additional_notes" rows="2"></textarea></div>'
+    + '  <div class="pf-consent">'
+    + '    <input type="checkbox" data-fld="consent_given" id="cs-' + (t.id|0) + '">'
+    + '    <label for="cs-' + (t.id|0) + '">'
+    + '      أوافق على إرسال ابنتي في هذه الرحلة وأقرّ بصحّة المعلومات.'
+    + '    </label>'
+    + '  </div>'
+    + '  <button class="pt-btn pt-btn-primary" data-act="confirm" data-tid="' + (t.id|0) + '">'
+    + '    <span>✨</span><span>تأكيد التسجيل</span></button>'
+    + '</div>';
+}
+
+function ptLoad(){
+  var list = document.getElementById('pt-list');
+  list.innerHTML = '';
+  fetch('/api/portal/trips/available', {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){ ptToast(j && j.error || 'خطأ', 'error'); return; }
+      var trips = j.trips || [];
+      if (!trips.length){
+        document.getElementById('pt-empty').hidden = false;
+        return;
+      }
+      document.getElementById('pt-empty').hidden = true;
+      list.innerHTML = trips.map(ptCardHTML).join('');
+    })
+    .catch(function(){ ptToast('خطأ في الاتصال', 'error'); });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  ptLoad();
+  document.getElementById('pt-list').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var tid = parseInt(btn.getAttribute('data-tid'), 10) || 0;
+    var act = btn.getAttribute('data-act');
+    if (act === 'register'){
+      // Toggle the inline form open.
+      var card = btn.closest('.pt-card');
+      var form = card.querySelector('.pt-form[data-form-for="' + tid + '"]');
+      if (form){
+        form.classList.toggle('show');
+        var phone = form.querySelector('[data-fld="parent_phone"]');
+        if (phone) phone.focus();
+      }
+    } else if (act === 'confirm'){
+      var form = document.querySelector('.pt-form[data-form-for="' + tid + '"]');
+      var payload = {};
+      form.querySelectorAll('[data-fld]').forEach(function(el){
+        var k = el.getAttribute('data-fld');
+        if (el.type === 'checkbox') payload[k] = el.checked;
+        else payload[k] = (el.value || '').trim();
+      });
+      if (!payload.consent_given){ ptToast('يجب الموافقة على الشروط', 'error'); return; }
+      btn.disabled = true; btn.style.opacity = '.6';
+      fetch('/api/portal/trips/' + tid + '/register', {
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      }).then(function(r){ return r.json(); })
+        .then(function(j){
+          btn.disabled = false; btn.style.opacity = '1';
+          if (!j || !j.ok){ ptToast((j && j.error) || 'تعذّر التسجيل', 'error'); return; }
+          var msg = j.status === 'waitlisted'
+                  ? '📋 أُضيفت لقائمة الانتظار (#' + (j.waitlist_position || '?') + ')'
+                  : '✓ تم التسجيل بنجاح — ' + (j.confirmation_id || '');
+          ptToast(msg, 'success');
+          ptLoad();
+        })
+        .catch(function(){
+          btn.disabled = false; btn.style.opacity = '1';
+          ptToast('خطأ في الاتصال', 'error');
+        });
+    }
+  });
+});
+</script>
+</body></html>"""
 
 
 @app.route('/portal/parent-hub/points')
