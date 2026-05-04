@@ -44978,7 +44978,12 @@ def api_attendance_by_date_summary():
             elif st == "متأخر":
                 entry["late"] += 1
             sn = (rd.get("student_name") or "").strip()
-            if sn:
+            # Only count a student as "recorded" when status is a real
+            # marked value — not empty/NULL and not the "— اختر —"
+            # placeholder. When teachers open the attendance page the
+            # system pre-creates rows with empty status for the whole
+            # roster, and those should not inflate the recorded count.
+            if sn and st in ("حاضر", "غائب", "متأخر"):
                 recorded_names_by_group.setdefault(g, set()).add(sn)
     except Exception:
         rec = {}
