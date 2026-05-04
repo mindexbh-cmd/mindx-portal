@@ -1186,68 +1186,6 @@ def init_db():
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_surveys_uniq "
                    "ON trip_surveys(trip_id, registration_id)")
     except Exception: pass
-    # ── Points & Achievements system (separate from legacy
-    # behaviors/point_events). Event-based ledger — totals are SUM
-    # over non-deleted rows. event_source carries a stable key
-    # (e.g. "attendance:2026-05-04:gname") that the auto-award hooks
-    # use for idempotency.
-    db.execute("""CREATE TABLE IF NOT EXISTS student_points_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        points INTEGER NOT NULL,
-        event_type TEXT NOT NULL,
-        event_source TEXT,
-        description_ar TEXT NOT NULL,
-        awarded_by_user_id INTEGER,
-        awarded_by_name TEXT,
-        awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
-        deleted_at DATETIME,
-        deleted_by_user_id INTEGER,
-        FOREIGN KEY (student_id) REFERENCES students(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_points_student "
-               "ON student_points_log(student_id, awarded_at)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_points_event "
-               "ON student_points_log(event_type)")
-    # Per-event-source idempotency check — partial UNIQUE on
-    # (student_id, event_source) for non-deleted rows so the
-    # auto-award hooks never double-credit the same source.
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_points_source "
-                   "ON student_points_log(student_id, event_source) "
-                   "WHERE is_deleted = 0 AND event_source IS NOT NULL")
-    except Exception: pass
-
-    db.execute("""CREATE TABLE IF NOT EXISTS achievements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        name_ar TEXT NOT NULL,
-        description_ar TEXT NOT NULL,
-        icon TEXT,
-        points_reward INTEGER DEFAULT 0,
-        tier TEXT,
-        criteria_json TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_achievements_key "
-               "ON achievements(key)")
-
-    db.execute("""CREATE TABLE IF NOT EXISTS student_achievements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        achievement_id INTEGER NOT NULL,
-        unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        progress_value INTEGER DEFAULT 0,
-        is_celebrated INTEGER DEFAULT 0,
-        FOREIGN KEY (student_id) REFERENCES students(id),
-        FOREIGN KEY (achievement_id) REFERENCES achievements(id)
-    )""")
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_achievements_unique "
-                   "ON student_achievements(student_id, achievement_id)")
-    except Exception: pass
     db.commit()
     db.close()
 
@@ -6988,83 +6926,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_surveys_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── points_system_v1: standalone points + achievements ledger.
-    # Coexists with the legacy behaviors/point_events system — this
-    # one is event-based (every signal becomes one row) and drives
-    # the gamification tier + achievement gallery.
-    db2.execute("""CREATE TABLE IF NOT EXISTS student_points_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        points INTEGER NOT NULL,
-        event_type TEXT NOT NULL,
-        event_source TEXT,
-        description_ar TEXT NOT NULL,
-        awarded_by_user_id INTEGER,
-        awarded_by_name TEXT,
-        awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
-        deleted_at DATETIME,
-        deleted_by_user_id INTEGER,
-        FOREIGN KEY (student_id) REFERENCES students(id)
-    )""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS achievements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        name_ar TEXT NOT NULL,
-        description_ar TEXT NOT NULL,
-        icon TEXT,
-        points_reward INTEGER DEFAULT 0,
-        tier TEXT,
-        criteria_json TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS student_achievements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        achievement_id INTEGER NOT NULL,
-        unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        progress_value INTEGER DEFAULT 0,
-        is_celebrated INTEGER DEFAULT 0,
-        FOREIGN KEY (student_id) REFERENCES students(id),
-        FOREIGN KEY (achievement_id) REFERENCES achievements(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_points_student "
-                    "ON student_points_log(student_id, awarded_at)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_points_event "
-                    "ON student_points_log(event_type)")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_points_source "
-                    "ON student_points_log(student_id, event_source) "
-                    "WHERE is_deleted = 0 AND event_source IS NOT NULL")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_achievements_key "
-                    "ON achievements(key)")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_achievements_unique "
-                    "ON student_achievements(student_id, achievement_id)")
-    except Exception: pass
-    if "points_system_v1" not in applied:
-        for _name_lbl in [
-            ("student_points_log",  "سجل نقاط الطالبات"),
-            ("achievements",        "الإنجازات"),
-            ("student_achievements","إنجازات الطالبات"),
-        ]:
-            try:
-                db2.execute(
-                    "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                    "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                    _name_lbl,
-                )
-            except Exception:
-                try:
-                    db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                                _name_lbl)
-                except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("points_system_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30570,9 +30431,6 @@ BUILT_IN_TABLE_LABELS = {
     "trip_reminder_log": "سجل رسائل الرحلات",
     "trip_day_attendance": "حضور يوم الرحلة",
     "trip_surveys":      "تقييمات الرحلات",
-    "student_points_log":"سجل نقاط الطالبات",
-    "achievements":      "الإنجازات",
-    "student_achievements":"إنجازات الطالبات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32996,9 +32854,6 @@ _TBL_AUDIT_FEATURE = {
     "trip_reminder_log":    ("سجل رسائل الرحلات",              "نظام الرحلات والفعاليات"),
     "trip_day_attendance":  ("حضور يوم الرحلة",                "نظام الرحلات والفعاليات"),
     "trip_surveys":         ("تقييمات الرحلات",                "نظام الرحلات والفعاليات"),
-    "student_points_log":   ("سجل نقاط الطالبات",              "نظام النقاط والإنجازات"),
-    "achievements":         ("الإنجازات",                       "نظام النقاط والإنجازات"),
-    "student_achievements": ("إنجازات الطالبات",                "نظام النقاط والإنجازات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
