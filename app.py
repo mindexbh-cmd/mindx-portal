@@ -12185,15 +12185,33 @@ function dhLoadTripsNav(){
     .then(function(j){
       if (!j || !j.ok) return;
       var s = j.stats || {};
-      var n = s.active || 0;
+      // Badge text prefers per-user task count when there's pending
+      // work — managers want to see "you have N tasks" before active
+      // trip count. Falls back to active trip count otherwise.
+      var myTasks = s.my_pending_tasks_count || 0;
+      var labelN  = (myTasks > 0) ? myTasks : (s.active || 0);
       ['md-sb-trips-badge','md-qc-trips-badge'].forEach(function(id){
         var el = document.getElementById(id);
         if (!el) return;
-        if (n > 0){ el.textContent = String(n); el.hidden = false; }
-        else      { el.hidden = true; }
+        if (labelN > 0){
+          el.textContent = String(labelN);
+          el.hidden = false;
+          // Stronger visual when overdue tasks exist.
+          if ((s.my_overdue_tasks_count || 0) > 0){
+            el.style.background = '#c62828';
+            el.title = (s.my_overdue_tasks_count) + ' مهام متأخرة';
+          } else if (myTasks > 0){
+            el.style.background = '#6B3FA0';
+            el.title = myTasks + ' مهام تنتظرك';
+          } else {
+            el.style.background = ''; el.title = '';
+          }
+        } else { el.hidden = true; }
       });
-      if ((s.imminent || 0) > 0) document.body.dataset.tripImminent = '1';
-      else delete document.body.dataset.tripImminent;
+      if ((s.imminent || 0) > 0 || (s.my_overdue_tasks_count || 0) > 0)
+        document.body.dataset.tripImminent = '1';
+      else
+        delete document.body.dataset.tripImminent;
     })
     .catch(function(){});
 }
@@ -65607,7 +65625,7 @@ def _trip_count_active_regs(db, trip_id):
         return 0
 
 
-def _trip_compute_fields(rd, counts=None, payments=None):
+def _trip_compute_fields(rd, counts=None, payments=None, tasks=None):
     """Augment a raw trips row dict with the computed fields the UI
     expects: total_expected (= registered_count × price, scoped to
     actually-registered students so cancelled rows don't bloat the
@@ -65648,6 +65666,16 @@ def _trip_compute_fields(rd, counts=None, payments=None):
                                if cap > 0 else 0.0)
     out["collection_pct"]   = (round(out["collected_amount"] / out["total_expected"] * 100, 1)
                                if out["total_expected"] > 0 else 0.0)
+    if tasks:
+        out["task_total"]     = int(tasks.get("task_total", 0))
+        out["task_completed"] = int(tasks.get("task_completed", 0))
+        out["task_overdue"]   = int(tasks.get("task_overdue", 0))
+    else:
+        out["task_total"]     = int(out.get("task_total") or 0)
+        out["task_completed"] = int(out.get("task_completed") or 0)
+        out["task_overdue"]   = int(out.get("task_overdue") or 0)
+    out["task_pct"] = (round(out["task_completed"] / out["task_total"] * 100, 1)
+                       if out["task_total"] > 0 else 0.0)
     out["days_until_trip"]  = None
     out["day_name_ar"]      = ""
     out["is_imminent"]      = False
@@ -66012,9 +66040,11 @@ def api_admin_trips_list():
     trip_ids = [dict(r).get("id") for r in rows]
     counts_map   = _trip_load_reg_counts(db, trip_ids)
     payments_map = _trip_load_payment_summary(db, trip_ids)
+    tasks_map    = _trip_load_task_summary(db, trip_ids)
     out = [_trip_compute_fields(dict(r),
                                 counts_map.get(dict(r).get("id")),
-                                payments_map.get(dict(r).get("id")))
+                                payments_map.get(dict(r).get("id")),
+                                tasks_map.get(dict(r).get("id")))
            for r in rows]
     return jsonify({"ok": True, "trips": out, "total": len(out)})
 
@@ -66098,6 +66128,30 @@ def api_admin_trips_stats():
         "WHERE t.is_deleted = 0 AND t.status = 'active'")
     overall_collection_pct = (round(total_collected / total_expected * 100, 1)
                               if total_expected > 0 else 0.0)
+    # Per-user task counts — drives the dashboard nav badge so a
+    # manager who has open work sees it from the home page. Scoped
+    # to active trips only so a closed/archived trip's leftovers
+    # don't create badge noise.
+    my_uid = user.get("id") or 0
+    my_pending = _scalar(
+        "SELECT COUNT(*) FROM trip_tasks tt "
+        "JOIN trips t ON t.id = tt.trip_id "
+        "WHERE tt.is_deleted = 0 AND t.is_deleted = 0 "
+        "AND tt.assigned_to_user_id = ? "
+        "AND tt.status IN ('pending', 'in_progress') "
+        "AND t.status = 'active'",
+        (my_uid,)) if my_uid else 0
+    from datetime import date as _date2
+    today_iso2 = _date2.today().isoformat()
+    my_overdue = _scalar(
+        "SELECT COUNT(*) FROM trip_tasks tt "
+        "JOIN trips t ON t.id = tt.trip_id "
+        "WHERE tt.is_deleted = 0 AND t.is_deleted = 0 "
+        "AND tt.assigned_to_user_id = ? "
+        "AND tt.status = 'pending' "
+        "AND tt.due_date IS NOT NULL AND tt.due_date < ? "
+        "AND t.status = 'active'",
+        (my_uid, today_iso2)) if my_uid else 0
     return jsonify({
         "ok": True,
         "stats": {
@@ -66113,6 +66167,8 @@ def api_admin_trips_stats():
             "total_collected_amount":   round(total_collected, 2),
             "total_expected_amount":    round(total_expected, 2),
             "overall_collection_pct":   overall_collection_pct,
+            "my_pending_tasks_count":   my_pending,
+            "my_overdue_tasks_count":   my_overdue,
         },
     })
 
@@ -66953,6 +67009,59 @@ def _trip_promote_next_waitlisted(db, trip_id):
         import sys as _sys
         print("[trips] auto-promote failed: " + str(ex), file=_sys.stderr)
         return None
+
+
+def _trip_load_task_summary(db, trip_ids):
+    """Single-query lookup: {trip_id: {'task_total': N,
+    'task_completed': M, 'task_overdue': O}}. Overdue = pending status
+    with due_date < today. Used by the list endpoint so the smart
+    card's task progress reflects real data without N+1."""
+    if not trip_ids:
+        return {}
+    out = {tid: {"task_total": 0, "task_completed": 0, "task_overdue": 0}
+           for tid in trip_ids}
+    placeholders = ",".join(["?"] * len(trip_ids))
+    try:
+        rows = db.execute(
+            "SELECT trip_id, status, COUNT(*) FROM trip_tasks "
+            "WHERE is_deleted = 0 "
+            "AND trip_id IN (" + placeholders + ") "
+            "GROUP BY trip_id, status",
+            tuple(trip_ids),
+        ).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        tid    = r[0] if not hasattr(r, "keys") else r["trip_id"]
+        status = r[1] if not hasattr(r, "keys") else r["status"]
+        n      = int((r[2] if not hasattr(r, "keys") else r[2]) or 0)
+        if tid not in out: continue
+        # cancelled rows don't count toward total — they were dropped.
+        if status == "cancelled":
+            continue
+        out[tid]["task_total"] += n
+        if status == "completed":
+            out[tid]["task_completed"] += n
+    # Overdue: pending tasks whose due_date is past today.
+    from datetime import date as _date
+    today_iso = _date.today().isoformat()
+    try:
+        ov_rows = db.execute(
+            "SELECT trip_id, COUNT(*) FROM trip_tasks "
+            "WHERE is_deleted = 0 AND status = 'pending' "
+            "AND due_date IS NOT NULL AND due_date < ? "
+            "AND trip_id IN (" + placeholders + ") "
+            "GROUP BY trip_id",
+            (today_iso,) + tuple(trip_ids),
+        ).fetchall()
+    except Exception:
+        ov_rows = []
+    for r in ov_rows:
+        tid = r[0] if not hasattr(r, "keys") else r["trip_id"]
+        n   = int((r[1] if not hasattr(r, "keys") else r[1]) or 0)
+        if tid in out:
+            out[tid]["task_overdue"] = n
+    return out
 
 
 def _trip_load_payment_summary(db, trip_ids):
@@ -68826,6 +68935,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
               width:0%;}
 .tc-prog[data-kind="reg"]  .tc-prog-fill{--bar-start:#1565C0;--bar-end:#42A5F5;}
 .tc-prog[data-kind="cash"] .tc-prog-fill{--bar-start:#1D9E75;--bar-end:#2BB585;}
+.tc-prog[data-kind="task"] .tc-prog-fill{--bar-start:#6B3FA0;--bar-end:#8B5CC8;}
+.tc-prog[data-kind="task"][data-tier="low"]  .tc-prog-fill{--bar-start:#c62828;--bar-end:#e57373;}
+.tc-prog[data-kind="task"][data-tier="mid"]  .tc-prog-fill{--bar-start:#BA7517;--bar-end:#f1a132;}
+.tc-prog[data-kind="task"][data-tier="full"] .tc-prog-fill{--bar-start:#C9A227;--bar-end:#f1d369;
+                                                            box-shadow:inset 0 0 8px rgba(255,255,255,.4);}
 .tc-prog[data-kind="cash"][data-tier="low"]  .tc-prog-fill{--bar-start:#c62828;--bar-end:#e57373;}
 .tc-prog[data-kind="cash"][data-tier="mid"]  .tc-prog-fill{--bar-start:#BA7517;--bar-end:#f1a132;}
 .tc-prog[data-kind="cash"][data-tier="full"] .tc-prog-fill{--bar-start:#C9A227;--bar-end:#f1d369;
@@ -70411,6 +70525,18 @@ function tripBuildAlerts(tp){
   } else if (tp.is_imminent && reg > 0 && colPct < 30){
     out.push({cls:'', text:'💰 التحصيل بطيء'});
   }
+  // Task-side alerts (stage 4)
+  var ttot = tp.task_total || 0;
+  var tdon = tp.task_completed || 0;
+  var tpct = tp.task_pct || 0;
+  var tovd = tp.task_overdue || 0;
+  if (ttot > 0 && tpct >= 100){
+    out.push({cls:'is-full', text:'🏆 كل المهام مكتملة!'});
+  } else if (tovd > 0){
+    out.push({cls:'', text:'🚨 ' + tovd + ' مهام متأخرة'});
+  } else if (tp.is_imminent && ttot > 0 && tpct < 30){
+    out.push({cls:'', text:'⚠️ المهام متأخرة'});
+  }
   // Past + not archived.
   if (d != null && d < 0 && tp.status !== 'archived'){
     out.push({cls:'is-archive', text:'📋 جاهزة للأرشفة'});
@@ -70459,6 +70585,17 @@ function tripCardHTML(tp){
     + '      <div class="tc-prog-label"><span>💰 المحصّلة</span><span class="tc-prog-text"><strong>' + collected + '</strong> / ' + expected + ' د.ب (' + colPct + '%)</span></div>'
     + '      <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + colPct + '%"></div></div>'
     + '    </div>'
+    + (function(){
+        var tt = tp.task_total || 0;
+        if (tt === 0) return '';
+        var td  = tp.task_completed || 0;
+        var tpc = tp.task_pct || 0;
+        var ttier = tripCollectionTier(tpc);
+        return '<div class="tc-prog" data-kind="task" data-tier="' + ttier + '">'
+             + '<div class="tc-prog-label"><span>✅ المهام</span><span class="tc-prog-text"><strong>' + td + '</strong> / ' + tt + ' (' + tpc + '%)</span></div>'
+             + '<div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + Math.min(100, tpc) + '%"></div></div>'
+             + '</div>';
+      })()
     + '  </div>'
     + (alerts ? '<div class="tc-alerts">' + alerts + '</div>' : '')
     + (timeLine ? '<div class="tc-time ' + timeCls + '">' + tripEsc(timeLine) + '</div>' : '')
