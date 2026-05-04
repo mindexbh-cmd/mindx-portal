@@ -64712,6 +64712,153 @@ def api_admin_events_list():
     })
 
 
+@app.route('/api/admin/events', methods=['POST'])
+@login_required
+def api_admin_events_create():
+    """Manager-only — create a new event. Body fields:
+        name (required), destination, description, target_group_ids (list),
+        max_students, event_date (required), departure_time, return_time,
+        meeting_point, price_per_student,
+        copy_from_id (optional, future), copy_options (optional, future).
+    The copy_from sections (tasks/items/schedule/costs) become real once
+    stage 2 ships those tables — for now we accept the payload but only
+    duplicate the basic event row."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    d = request.get_json(silent=True) or {}
+    name      = (d.get("name") or "").strip()
+    event_date = (d.get("event_date") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "اسم الرحلة مطلوب"}), 400
+    if not event_date:
+        return jsonify({"ok": False, "error": "تاريخ الرحلة مطلوب"}), 400
+    try:
+        max_students = max(0, int(d.get("max_students") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "العدد الأقصى يجب أن يكون رقماً"}), 400
+    try:
+        price = max(0.0, float(d.get("price_per_student") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "السعر يجب أن يكون رقماً"}), 400
+    # target_group_ids — accept either a list or a CSV string.
+    raw_targets = d.get("target_group_ids") or []
+    if isinstance(raw_targets, str):
+        raw_targets = [t.strip() for t in raw_targets.split(",") if t.strip()]
+    if not isinstance(raw_targets, list):
+        raw_targets = []
+    import json as _json_e
+    target_json = _json_e.dumps(
+        [str(t).strip() for t in raw_targets if str(t).strip()],
+        ensure_ascii=False,
+    )
+    db = get_db()
+    body = {
+        "name":              name,
+        "destination":       (d.get("destination") or "").strip() or None,
+        "description":       (d.get("description") or "").strip() or None,
+        "target_group_ids":  target_json,
+        "max_students":      max_students,
+        "event_date":        event_date,
+        "departure_time":    (d.get("departure_time") or "").strip() or None,
+        "return_time":       (d.get("return_time") or "").strip() or None,
+        "meeting_point":     (d.get("meeting_point") or "").strip() or None,
+        "price_per_student": price,
+        "status":            "planning",
+        "registration_token": _events_generate_token(db),
+        "created_by_user_id": user.get("id"),
+    }
+    cols = list(body.keys())
+    quoted = ",".join('"' + c + '"' for c in cols)
+    placeholders = ",".join(["?"] * len(cols))
+    try:
+        db.execute(
+            "INSERT INTO ev_events(" + quoted + ") VALUES(" + placeholders + ")",
+            tuple(body[c] for c in cols))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر حفظ الرحلة"}), 500
+    try:
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        new_id = None
+    # Optional copy-from-previous: only the high-level fields for
+    # stage 1. The cross-table copy (tasks/costs/items/schedule) is
+    # implemented in stage 2 when those tables exist.
+    copy_from = d.get("copy_from_id")
+    if copy_from and new_id:
+        try:
+            srow = db.execute(
+                "SELECT description, meeting_point, price_per_student, "
+                "       max_students, target_group_ids "
+                "FROM ev_events WHERE id = ? AND is_deleted = 0",
+                (int(copy_from),)).fetchone()
+            if srow:
+                sd = dict(srow)
+                # Only fill fields the client didn't already provide.
+                upd = {}
+                if not body.get("description") and sd.get("description"):
+                    upd["description"] = sd.get("description")
+                if not body.get("meeting_point") and sd.get("meeting_point"):
+                    upd["meeting_point"] = sd.get("meeting_point")
+                if not raw_targets and sd.get("target_group_ids"):
+                    upd["target_group_ids"] = sd.get("target_group_ids")
+                if not max_students and sd.get("max_students"):
+                    upd["max_students"] = sd.get("max_students")
+                if not price and sd.get("price_per_student"):
+                    upd["price_per_student"] = sd.get("price_per_student")
+                if upd:
+                    sets = ", ".join('"' + k + '" = ?' for k in upd.keys())
+                    db.execute(
+                        "UPDATE ev_events SET " + sets + " WHERE id = ?",
+                        tuple(upd.values()) + (new_id,))
+                    db.commit()
+        except Exception:
+            pass
+    try:
+        _audit("event.create", target_type="ev_event", target_id=new_id,
+               new_value={"name": name, "event_date": event_date,
+                          "max_students": max_students})
+    except Exception:
+        pass
+    return jsonify({
+        "ok":       True,
+        "id":       new_id,
+        "redirect": "/admin/events/" + str(new_id),
+        "registration_token": body["registration_token"],
+    })
+
+
+@app.route('/api/admin/events/student-groups', methods=['GET'])
+@login_required
+def api_admin_events_student_groups():
+    """Manager-only helper for the create modal's target-audience
+    multi-select. Returns the live list of student groups."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, group_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> '' "
+            "ORDER BY group_name").fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        out.append({
+            "id":         rd.get("id"),
+            "group_name": (rd.get("group_name") or "").strip(),
+        })
+    return jsonify({"ok": True, "groups": out})
+
+
 @app.route('/api/admin/events/alerts', methods=['GET'])
 @login_required
 def api_admin_events_alerts():
@@ -64909,6 +65056,72 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .ev-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
 
 .ev-loading{text-align:center;color:#777;padding:30px;font-weight:700;}
+
+/* Create-event modal */
+.ev-mod-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);
+           backdrop-filter:blur(4px);z-index:300;display:flex;
+           align-items:flex-start;justify-content:center;
+           padding:36px 14px;overflow-y:auto;
+           animation:evModalFade .2s ease;}
+.ev-mod-ov[hidden]{display:none;}
+@keyframes evModalFade{from{opacity:0;}to{opacity:1;}}
+.ev-mod{background:#fff;border-radius:18px;width:min(640px,100%);
+        box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;
+        animation:evModalSlide .25s cubic-bezier(.2,.8,.2,1);}
+@keyframes evModalSlide{from{opacity:0;transform:translateY(-10px) scale(.97);}
+                        to  {opacity:1;transform:translateY(0)     scale(1);}}
+.ev-mod .head{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+              padding:18px 22px;display:flex;justify-content:space-between;
+              align-items:center;}
+.ev-mod .head h3{margin:0;font-size:1.1rem;font-weight:900;display:flex;
+                 align-items:center;gap:8px;}
+.ev-mod .close{background:rgba(255,255,255,.2);border:0;color:#fff;
+               width:32px;height:32px;border-radius:9px;cursor:pointer;
+               font-size:1.1rem;font-weight:900;line-height:1;
+               transition:background .15s;}
+.ev-mod .close:hover{background:rgba(255,255,255,.35);}
+.ev-mod .body{padding:18px 22px;}
+.ev-mod .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.ev-mod .field label{font-size:.84rem;font-weight:800;color:#444;}
+.ev-mod .field label .req{color:#c62828;margin-inline-start:3px;}
+.ev-mod .field input,.ev-mod .field textarea,.ev-mod .field select{
+  width:100%;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;
+  font-family:inherit;font-size:.94rem;background:#fafafa;}
+.ev-mod .field input:focus,.ev-mod .field textarea:focus,
+.ev-mod .field select:focus{outline:none;border-color:#1D9E75;background:#fff;}
+.ev-mod .field textarea{resize:vertical;min-height:60px;}
+.ev-mod .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media (max-width:540px){.ev-mod .grid2{grid-template-columns:1fr;}}
+.ev-mod .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+@media (max-width:540px){.ev-mod .grid3{grid-template-columns:1fr;}}
+.ev-mod .group-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+                    gap:6px;background:#fafafa;border:1.5px solid #e0e0e0;
+                    border-radius:10px;padding:10px;max-height:160px;
+                    overflow-y:auto;}
+.ev-mod .group-list label{display:flex;align-items:center;gap:6px;
+                          font-size:.86rem;font-weight:700;color:#444;
+                          cursor:pointer;font-family:inherit;}
+.ev-mod .group-list input{margin:0;width:18px;height:18px;
+                          accent-color:#1D9E75;}
+.ev-mod .copy-section{background:#f3e5f5;border-radius:10px;padding:10px 14px;
+                       margin-top:6px;}
+.ev-mod .copy-section h5{margin:0 0 8px;color:#4a148c;font-size:.88rem;
+                          font-weight:900;}
+.ev-mod .copy-section .opts{display:grid;grid-template-columns:repeat(2,1fr);
+                             gap:6px;font-size:.82rem;}
+.ev-mod .copy-section .opts label{display:flex;align-items:center;gap:5px;
+                                    cursor:pointer;font-family:inherit;
+                                    color:#555;font-weight:700;}
+.ev-mod .copy-section .opts input{margin:0;accent-color:#6B3FA0;}
+.ev-mod .foot{padding:14px 22px;background:#fafafa;display:flex;gap:8px;
+              justify-content:flex-end;border-top:1px solid #ececec;}
+.ev-mod .foot button{border:0;border-radius:10px;padding:10px 18px;
+                     font-weight:800;cursor:pointer;font-family:inherit;
+                     font-size:.92rem;display:inline-flex;align-items:center;
+                     gap:6px;}
+.ev-mod .foot .save{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                     box-shadow:0 4px 12px rgba(29,158,117,.3);}
+.ev-mod .foot .cancel{background:#ececec;color:#444;}
 </style></head>
 <body>
 
@@ -64950,6 +65163,94 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <div class="ev-loading">جارٍ التحميل...</div>
   </div>
 
+</div>
+
+<!-- Create-event modal -->
+<div class="ev-mod-ov" id="ev-create-ov" hidden>
+  <div class="ev-mod" role="dialog" aria-modal="true" aria-labelledby="ev-create-title">
+    <div class="head">
+      <h3 id="ev-create-title"><span>🚌</span><span>رحلة جديدة</span></h3>
+      <button class="close" type="button" data-ev-close="1" aria-label="إغلاق">✕</button>
+    </div>
+    <form id="ev-create-form" autocomplete="off">
+      <div class="body">
+        <div class="field">
+          <label for="ev-name">اسم الرحلة <span class="req">*</span></label>
+          <input id="ev-name" name="name" type="text" required
+                 placeholder="مثال: رحلة المتحف الوطني">
+        </div>
+        <div class="field">
+          <label for="ev-dest">الوجهة</label>
+          <input id="ev-dest" name="destination" type="text"
+                 placeholder="مثال: المنامة - المتحف الوطني">
+        </div>
+        <div class="grid3">
+          <div class="field">
+            <label for="ev-date">تاريخ الرحلة <span class="req">*</span></label>
+            <input id="ev-date" name="event_date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="ev-dep">من</label>
+            <input id="ev-dep" name="departure_time" type="time">
+          </div>
+          <div class="field">
+            <label for="ev-ret">إلى</label>
+            <input id="ev-ret" name="return_time" type="time">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ev-meet">نقطة التجمع</label>
+          <input id="ev-meet" name="meeting_point" type="text"
+                 placeholder="مثال: مدخل المركز الرئيسي">
+        </div>
+        <div class="field">
+          <label>الفئة المستهدفة (مجموعات)</label>
+          <div class="group-list" id="ev-groups-list">
+            <span style="color:#888;font-size:.85rem;">جارٍ التحميل...</span>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="ev-cap">أقصى عدد طالبات</label>
+            <input id="ev-cap" name="max_students" type="number" min="0" value="0">
+          </div>
+          <div class="field">
+            <label for="ev-price">السعر للطالبة (د.ب)</label>
+            <input id="ev-price" name="price_per_student" type="number"
+                   min="0" step="0.01" value="0">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ev-desc">وصف مختصر</label>
+          <textarea id="ev-desc" name="description" rows="2"
+                    placeholder="مختصر عن أهداف الرحلة..."></textarea>
+        </div>
+        <div class="copy-section">
+          <h5>📋 نسخ من رحلة سابقة (اختياري)</h5>
+          <div class="field" style="margin-bottom:6px;">
+            <select id="ev-copy-from">
+              <option value="">— لا تنسخي —</option>
+            </select>
+          </div>
+          <div class="opts">
+            <label><input type="checkbox" id="ev-copy-tasks">    نسخ المهام</label>
+            <label><input type="checkbox" id="ev-copy-items">    نسخ الأدوات</label>
+            <label><input type="checkbox" id="ev-copy-schedule"> نسخ الخطة الزمنية</label>
+            <label><input type="checkbox" id="ev-copy-costs">    نسخ التكاليف</label>
+          </div>
+          <div style="font-size:.75rem;color:#888;margin-top:6px;">
+            ملاحظة: نسخ المهام / الأدوات / الخطة / التكاليف يُفعَّل في الخطوة التالية.
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <button type="button" class="cancel" data-ev-close="1">إلغاء</button>
+        <button type="submit" class="save" id="ev-save-btn">
+          <span>✨</span><span>إنشاء الرحلة</span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="ev-toast" id="ev-toast" role="status" aria-live="polite"></div>
@@ -65071,11 +65372,132 @@ document.addEventListener('DOMContentLoaded', function(){
     clearTimeout(t); t = setTimeout(evRender, 200);
   });
   document.getElementById('ev-status').addEventListener('change', evRender);
-  document.getElementById('ev-create-btn').addEventListener('click', function(){
-    if (typeof evOpenCreate === 'function') evOpenCreate();
-    else evToast('قريباً', 'success');
+  document.getElementById('ev-create-btn').addEventListener('click', evOpenCreate);
+  // Modal close handlers
+  document.querySelectorAll('[data-ev-close="1"]').forEach(function(b){
+    b.addEventListener('click', evCloseCreate);
   });
+  var ov = document.getElementById('ev-create-ov');
+  if (ov) ov.addEventListener('click', function(e){
+    if (e.target === ov) evCloseCreate();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      var v = document.getElementById('ev-create-ov');
+      if (v && !v.hidden) evCloseCreate();
+    }
+  });
+  document.getElementById('ev-create-form').addEventListener('submit', evSubmitCreate);
 });
+
+function evOpenCreate(){
+  var ov = document.getElementById('ev-create-ov');
+  if (!ov) return;
+  // Reset form
+  var f = document.getElementById('ev-create-form');
+  if (f) f.reset();
+  ov.hidden = false;
+  document.body.style.overflow = 'hidden';
+  // Populate target-groups list
+  evLoadGroups();
+  // Populate copy-from options from cached events list
+  var sel = document.getElementById('ev-copy-from');
+  sel.innerHTML = '<option value="">— لا تنسخي —</option>';
+  ((window._EV_LIST) || []).forEach(function(e){
+    var o = document.createElement('option');
+    o.value = e.id;
+    o.textContent = e.name + (e.event_date ? ' (' + e.event_date + ')' : '');
+    sel.appendChild(o);
+  });
+  setTimeout(function(){
+    var n = document.getElementById('ev-name'); if (n) n.focus();
+  }, 80);
+}
+
+function evCloseCreate(){
+  var ov = document.getElementById('ev-create-ov');
+  if (!ov) return;
+  ov.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function evLoadGroups(){
+  var box = document.getElementById('ev-groups-list');
+  fetch('/api/admin/events/student-groups', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok || !(j.groups || []).length){
+        box.innerHTML = '<span style="color:#888;font-size:.85rem;">لا توجد مجموعات</span>';
+        return;
+      }
+      box.innerHTML = (j.groups || []).map(function(g){
+        return '<label><input type="checkbox" name="ev-target-grp" '
+             + 'value="' + evEsc(g.group_name) + '">'
+             + '<span>' + evEsc(g.group_name) + '</span></label>';
+      }).join('');
+    })
+    .catch(function(){
+      box.innerHTML = '<span style="color:#c62828;font-size:.85rem;">خطأ في التحميل</span>';
+    });
+}
+
+function evSubmitCreate(e){
+  e.preventDefault();
+  var name = (document.getElementById('ev-name').value || '').trim();
+  var date = (document.getElementById('ev-date').value || '').trim();
+  if (!name){ evToast('اسم الرحلة مطلوب', 'error'); return; }
+  if (!date){ evToast('تاريخ الرحلة مطلوب', 'error'); return; }
+  var targets = [];
+  document.querySelectorAll('input[name="ev-target-grp"]:checked').forEach(function(cb){
+    targets.push(cb.value);
+  });
+  var copyFrom = document.getElementById('ev-copy-from').value || '';
+  var payload = {
+    name:              name,
+    destination:       (document.getElementById('ev-dest').value  || '').trim(),
+    event_date:        date,
+    departure_time:    (document.getElementById('ev-dep').value   || '').trim(),
+    return_time:       (document.getElementById('ev-ret').value   || '').trim(),
+    meeting_point:     (document.getElementById('ev-meet').value  || '').trim(),
+    target_group_ids:  targets,
+    max_students:      parseInt(document.getElementById('ev-cap').value, 10) || 0,
+    price_per_student: parseFloat(document.getElementById('ev-price').value) || 0,
+    description:       (document.getElementById('ev-desc').value  || '').trim(),
+    copy_from_id:      copyFrom ? parseInt(copyFrom, 10) || null : null,
+    copy_options: {
+      tasks:    document.getElementById('ev-copy-tasks').checked,
+      items:    document.getElementById('ev-copy-items').checked,
+      schedule: document.getElementById('ev-copy-schedule').checked,
+      costs:    document.getElementById('ev-copy-costs').checked,
+    },
+  };
+  var btn = document.getElementById('ev-save-btn');
+  btn.disabled = true; btn.style.opacity = '.7';
+  fetch('/api/admin/events', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  }).then(function(r){ return r.json(); })
+    .then(function(j){
+      btn.disabled = false; btn.style.opacity = '1';
+      if (!j || !j.ok){ evToast((j && j.error) || 'تعذّر الحفظ', 'error'); return; }
+      evToast('✨ تم إنشاء الرحلة', 'success');
+      evCloseCreate();
+      // Navigate to the per-event detail page (lands in stage 2);
+      // for now, just refresh the list.
+      if (j.redirect){
+        // Defer the redirect slightly so the toast shows. Stage 2
+        // will own /admin/events/<id>.
+        setTimeout(function(){ window.location.href = j.redirect; }, 600);
+      } else {
+        evLoadStats();
+      }
+    })
+    .catch(function(){
+      btn.disabled = false; btn.style.opacity = '1';
+      evToast('خطأ في الاتصال', 'error');
+    });
+}
 </script>
 
 </body></html>"""
