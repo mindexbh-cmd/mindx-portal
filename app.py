@@ -65629,15 +65629,222 @@ document.addEventListener('DOMContentLoaded', function(){
     dt.addEventListener('input',  tripUpdateDayName);
   }
 
-  /* Stub submit — commit 7 replaces this with the real POST. */
+  /* Real submit: validate chips, POST, confetti, close, refresh */
   var f = document.getElementById('trip-form');
   if (f){
-    f.addEventListener('submit', function(e){
-      e.preventDefault();
-      // commit 7 takes over from here.
+    f.addEventListener('submit', tripHandleSubmit);
+  }
+
+  /* Filter wiring: instant on select/date, 300ms debounce on search. */
+  ['trip-f-status','trip-f-from','trip-f-to'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', function(){ tripLoadTrips(); });
+  });
+  var qEl = document.getElementById('trip-f-q');
+  if (qEl){
+    var qT = null;
+    qEl.addEventListener('input', function(){
+      clearTimeout(qT);
+      qT = setTimeout(function(){ tripLoadTrips(); }, 300);
     });
   }
+
+  tripLoadTrips();
 });
+
+/* ── Submit handler: read form + chips, POST, confetti on 200 ─── */
+function tripCollectFormPayload(){
+  var p = {};
+  var f = document.getElementById('trip-form');
+  if (!f) return p;
+  // Plain inputs.
+  ['name','destination','description','trip_date','departure_time',
+   'return_time','meeting_point','equipment_needed','emergency_contact',
+   'emergency_contact_name'].forEach(function(k){
+    var el = f.querySelector('[name="' + k + '"]');
+    if (el) p[k] = (el.value || '').trim();
+  });
+  // Numeric.
+  var cap = f.querySelector('[name="max_capacity"]');
+  var pri = f.querySelector('[name="price_per_student"]');
+  if (cap) p.max_capacity      = parseInt(cap.value, 10) || 0;
+  if (pri) p.price_per_student = parseFloat(pri.value) || 0;
+  // Chip groups.
+  document.querySelectorAll('.tm-chips').forEach(function(grp){
+    var name = grp.getAttribute('data-name');
+    var sel  = grp.querySelector('.tm-chip.is-active');
+    if (name && sel) p[name] = sel.getAttribute('data-value') || '';
+  });
+  return p;
+}
+function tripHandleSubmit(e){
+  e.preventDefault();
+  var payload = tripCollectFormPayload();
+  // Inline validation (server is the source of truth, but this keeps
+  // the modal responsive and avoids a roundtrip for trivial mistakes).
+  if (!payload.name)        { tripToast('اسم الرحلة مطلوب', 'error'); return; }
+  if (!payload.destination) { tripToast('الوجهة مطلوبة', 'error'); return; }
+  if (!payload.trip_type)   { tripToast('اختاري نوع الرحلة', 'error'); return; }
+  if (!payload.trip_date)   { tripToast('تاريخ الرحلة مطلوب', 'error'); return; }
+  var btn = document.getElementById('tm-submit');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; }
+  fetch('/api/admin/trips', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; }); })
+    .then(function(p){
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      var b = p.body || {};
+      if (!b.ok){
+        tripToast(b.error || 'تعذّر إنشاء الرحلة', 'error');
+        return;
+      }
+      tripModalClose();
+      tripConfetti();
+      tripToast('✓ تم إنشاء الرحلة بنجاح', 'success');
+      tripLoadStats();
+      tripLoadTrips();
+    })
+    .catch(function(){
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      tripToast('خطأ في الاتصال', 'error');
+    });
+}
+
+/* ── Smart card rendering ─────────────────────────────────────────── */
+function tripEsc(s){
+  s = (s == null) ? '' : String(s);
+  return s.replace(/[<>&"']/g, function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+function tripStatusLabel(st){
+  return ({active:'🟢 نشطة', closed:'🟠 مغلقة',
+           completed:'🟣 منتهية', archived:'⚪ مؤرشفة'})[st] || st;
+}
+function tripTypeEmoji(t){
+  return ({educational:'🎓', recreational:'🎉', religious:'🕌'})[t] || '🚌';
+}
+function tripTimeText(d){
+  if (d == null) return '';
+  if (d > 7)  return '⏰ ' + d + ' يوم متبقّي';
+  if (d > 1)  return '⏰ بعد ' + d + ' أيام';
+  if (d === 1) return '⏰ غداً!';
+  if (d === 0) return '🎯 اليوم!';
+  if (d === -1) return '🎉 ذكريات الأمس';
+  if (d < 0)  return '🎉 ذكريات قبل ' + Math.abs(d) + ' يوم';
+  return '';
+}
+function tripBuildAlerts(tp){
+  var out = [];
+  // 1) Imminent + slow registration: capacity > 0 and registered < 50%.
+  if (tp.is_imminent && (tp.max_capacity || 0) > 0
+      && (tp.registered_count || 0) < (tp.max_capacity * 0.5)){
+    out.push({cls:'', text:'⚠️ التسجيل بطيء — قريب من الموعد'});
+  }
+  // 2) Full capacity.
+  if ((tp.max_capacity || 0) > 0
+      && (tp.registered_count || 0) >= tp.max_capacity){
+    out.push({cls:'is-full', text:'🔒 ممتلئة!'});
+  }
+  // 3) Past + not archived.
+  if (tp.days_until_trip != null && tp.days_until_trip < 0
+      && tp.status !== 'archived'){
+    out.push({cls:'is-archive', text:'📋 جاهزة للأرشفة'});
+  }
+  return out;
+}
+function tripCardHTML(tp){
+  var typeEmoji = tripTypeEmoji(tp.trip_type);
+  var statusBadge = tripStatusLabel(tp.status);
+  var dateLine = (tp.trip_date || '') + (tp.day_name_ar ? (' · ' + tp.day_name_ar) : '');
+  var timeLine = tripTimeText(tp.days_until_trip);
+  var imm = tp.is_imminent ? ' is-imminent' : '';
+  var alerts = tripBuildAlerts(tp).map(function(a){
+    return '<div class="tc-alert ' + a.cls + '">' + tripEsc(a.text) + '</div>';
+  }).join('');
+  var regCount   = tp.registered_count || 0;
+  var maxCap     = tp.max_capacity || 0;
+  var collected  = (tp.collected_amount || 0).toFixed(2);
+  var expected   = (tp.total_expected   || 0).toFixed(2);
+  var regPct     = Math.min(100, Math.max(0, tp.registration_pct || 0));
+  var colPct     = Math.min(100, Math.max(0, tp.collection_pct   || 0));
+  var timeCls    = (tp.is_imminent ? 'is-imminent'
+                    : (tp.days_until_trip != null && tp.days_until_trip < 0 ? 'is-past' : ''));
+  return ''
+    + '<div class="trip-card' + imm + '" data-status="' + tripEsc(tp.status || 'active') + '" data-tid="' + (tp.id|0) + '">'
+    + '  <div class="tc-head">'
+    + '    <div class="tc-name"><span class="tc-emoji">' + typeEmoji + '</span>' + tripEsc(tp.name || '') + '</div>'
+    + '    <div class="tc-status">' + tripEsc(statusBadge) + '</div>'
+    + '  </div>'
+    + '  <div class="tc-meta">'
+    + (tp.destination ? '<div class="tc-row">📍 <strong>' + tripEsc(tp.destination) + '</strong></div>' : '')
+    + (tp.trip_date   ? '<div class="tc-row">📅 ' + tripEsc(dateLine) + '</div>' : '')
+    + '  </div>'
+    + '  <div class="tc-prog-block">'
+    + '    <div class="tc-prog" data-kind="reg">'
+    + '      <div class="tc-prog-label"><span>👥 المسجّلات</span><span class="tc-prog-text"><strong>' + regCount + '</strong> / ' + maxCap + '</span></div>'
+    + '      <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + regPct + '%"></div></div>'
+    + '    </div>'
+    + '    <div class="tc-prog" data-kind="cash">'
+    + '      <div class="tc-prog-label"><span>💰 المحصّلة</span><span class="tc-prog-text"><strong>' + collected + '</strong> / ' + expected + ' د.ب</span></div>'
+    + '      <div class="tc-prog-bar"><div class="tc-prog-fill" style="width:' + colPct + '%"></div></div>'
+    + '    </div>'
+    + '  </div>'
+    + (alerts ? '<div class="tc-alerts">' + alerts + '</div>' : '')
+    + (timeLine ? '<div class="tc-time ' + timeCls + '">' + tripEsc(timeLine) + '</div>' : '')
+    + '  <div class="tc-icons">'
+    + '    <button type="button" data-act="registrations" title="المسجّلات">👥</button>'
+    + '    <button type="button" data-act="payments"      title="الدفعات">💰</button>'
+    + '    <button type="button" data-act="edit"          title="تعديل">✏️</button>'
+    + '    <button type="button" data-act="more"          title="المزيد">⋯</button>'
+    + '  </div>'
+    + '</div>';
+}
+
+function tripRenderCards(trips){
+  var grid = document.getElementById('trip-cards');
+  var empty = document.getElementById('trip-empty');
+  var view  = (document.getElementById('trip-view-toggle') || {}).getAttribute
+              && document.getElementById('trip-view-toggle').getAttribute('data-view');
+  if (!grid) return;
+  if (!trips.length){
+    grid.innerHTML = '';
+    grid.hidden = true;
+    if (empty && view !== 'timeline') empty.hidden = false;
+    return;
+  }
+  if (empty) empty.hidden = true;
+  grid.innerHTML = trips.map(tripCardHTML).join('');
+  grid.hidden = (view === 'timeline');
+}
+
+/* ── Loader: read filter inputs, fetch, fan out to views ──────────── */
+function tripCurrentFilters(){
+  var p = {};
+  var s = document.getElementById('trip-f-status'); if (s && s.value) p.status = s.value;
+  var f = document.getElementById('trip-f-from');   if (f && f.value) p.from_date = f.value;
+  var t = document.getElementById('trip-f-to');     if (t && t.value) p.to_date   = t.value;
+  var q = document.getElementById('trip-f-q');      if (q && q.value) p.search    = q.value.trim();
+  return p;
+}
+function tripLoadTrips(){
+  var p = tripCurrentFilters();
+  var qs = Object.keys(p).map(function(k){
+    return encodeURIComponent(k) + '=' + encodeURIComponent(p[k]);
+  }).join('&');
+  fetch('/api/admin/trips' + (qs ? '?' + qs : ''), {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok) { tripRenderCards([]); return; }
+      window._tripDataCache = j.trips || [];
+      tripRenderCards(window._tripDataCache);
+      tripRenderTimeline(window._tripDataCache);
+    })
+    .catch(function(){ tripRenderCards([]); });
+}
 </script>
 </body></html>"""
 
