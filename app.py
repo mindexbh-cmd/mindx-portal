@@ -64618,6 +64618,41 @@ def _events_generate_token(db):
     return cand
 
 
+def _events_auto_status(db):
+    """Auto-transition status by date:
+       open → closed: when event_date <= today + 1 day (capacity-
+                       triggered close happens once the registration
+                       table exists in stage 2; for now we close on
+                       date alone).
+       closed → completed: when event_date < today.
+    The planning → open flip stays manual (admin clicks "فتح
+    التسجيل"). Best-effort, never raises."""
+    try:
+        from datetime import date as _date, timedelta as _td
+        today = _date.today().isoformat()
+        tomorrow = (_date.today() + _td(days=1)).isoformat()
+        # closed → completed
+        db.execute(
+            "UPDATE ev_events "
+            "SET status = 'completed', updated_at = CURRENT_TIMESTAMP "
+            "WHERE is_deleted = 0 AND status = 'closed' "
+            "AND event_date IS NOT NULL AND event_date < ?",
+            (today,))
+        # open → closed (event date is today or tomorrow)
+        db.execute(
+            "UPDATE ev_events "
+            "SET status = 'closed', updated_at = CURRENT_TIMESTAMP "
+            "WHERE is_deleted = 0 AND status = 'open' "
+            "AND event_date IS NOT NULL AND event_date <= ?",
+            (tomorrow,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] auto-status failed: " + str(ex), file=_sys.stderr)
+
+
 def _events_count_by_status(db):
     """Single-query rollup for the list-page stat strip."""
     out = {k: 0 for k in _EV_VALID_STATUSES}
@@ -64681,6 +64716,8 @@ def api_admin_events_list():
     if not _events_can_admin(user):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
     db = get_db()
+    # Auto-transition status before reading. Best-effort, non-fatal.
+    _events_auto_status(db)
     status = (request.args.get("status") or "").strip()
     search = (request.args.get("search") or "").strip()
     sql = "SELECT * FROM ev_events WHERE is_deleted = 0"
@@ -64831,6 +64868,69 @@ def api_admin_events_create():
         "redirect": "/admin/events/" + str(new_id),
         "registration_token": body["registration_token"],
     })
+
+
+@app.route('/api/admin/events/<int:eid>/status', methods=['PATCH'])
+@login_required
+def api_admin_events_set_status(eid):
+    """Manual status transition. The auto-status helper handles the
+    date-driven flips; this endpoint is what the "فتح التسجيل" button
+    on the detail page (stage 2) calls. Allowed transitions:
+       planning  → open
+       open      → closed (also valid if admin closes early)
+       closed    → completed
+       any       → planning (rollback path; admin only)
+    """
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    d = request.get_json(silent=True) or {}
+    new_status = (d.get("status") or "").strip()
+    if new_status not in _EV_VALID_STATUSES:
+        return jsonify({"ok": False, "error": "حالة غير معروفة"}), 400
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT status FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    cur = (dict(row).get("status") or "").strip()
+    role = ((user.get("role") or "")).strip().lower()
+    # Forward allowed transitions:
+    forward = {
+        "planning": {"open"},
+        "open":     {"closed", "planning"},
+        "closed":   {"completed", "open"},
+        "completed": {"closed"},  # rollback edge for admin only
+    }
+    rollback_to_planning = (new_status == "planning" and role == "admin")
+    if cur == new_status:
+        return jsonify({"ok": True, "id": eid, "status": cur, "noop": True})
+    if not rollback_to_planning and new_status not in forward.get(cur, set()):
+        return jsonify({"ok": False,
+                        "error": "لا يمكن الانتقال من «" + cur + "» إلى «" + new_status + "»"}), 400
+    try:
+        db.execute(
+            "UPDATE ev_events SET status = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?",
+            (new_status, eid))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] status update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        _audit("event.status", target_type="ev_event", target_id=eid,
+               old_value={"status": cur},
+               new_value={"status": new_status})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": eid, "status": new_status})
 
 
 @app.route('/api/admin/events/student-groups', methods=['GET'])
