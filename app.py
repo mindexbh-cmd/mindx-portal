@@ -66986,21 +66986,422 @@ def serve_trip_receipt(trip_id, filename):
     return _send_r(target_file, mimetype=None, conditional=True)
 
 
-# Placeholder — full premium UI lands in stage 6 commit 6.3.
 TRIP_DAY_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>لوحة يوم الرحلة — مايندكس</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f5f3ff;
-min-height:100vh;margin:0;padding:24px;direction:rtl;}.card{max-width:480px;
-margin:24px auto;background:#fff;border-radius:18px;padding:24px;
-box-shadow:0 8px 22px rgba(0,0,0,.08);text-align:center;}</style>
-</head><body>
-<div class="card">
-  <h2 style="color:#4a148c;">⏳ لوحة يوم الرحلة</h2>
-  <p>قيد التحضير...</p>
-  <p><a href="/admin/trips" style="color:#4a148c;">← العودة للرحلات</a></p>
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#0f1626,#1c2c47);min-height:100vh;margin:0;
+     padding:0;direction:rtl;color:#e8e9ee;}
+.tdd-topbar{background:rgba(255,255,255,.07);backdrop-filter:blur(8px);
+            padding:14px 22px;display:flex;justify-content:space-between;
+            align-items:center;flex-wrap:wrap;gap:10px;
+            border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:50;}
+.tdd-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#fff;}
+.tdd-topbar a{color:#fff;text-decoration:none;background:rgba(255,255,255,.12);
+              padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.tdd-topbar a:hover{background:rgba(255,255,255,.22);}
+.tdd-wrap{max-width:1100px;margin:18px auto;padding:0 16px 36px;}
+
+.tdd-hero{background:linear-gradient(135deg,#1565C0,#26A69A);
+          color:#fff;padding:24px 28px;border-radius:18px;
+          margin-bottom:18px;box-shadow:0 8px 28px rgba(38,166,154,.28);
+          display:flex;justify-content:space-between;align-items:center;
+          flex-wrap:wrap;gap:14px;}
+.tdd-hero h2{margin:0;font-size:1.4rem;font-weight:900;line-height:1.3;
+             display:flex;align-items:center;gap:8px;}
+.tdd-hero p{margin:6px 0 0;opacity:.92;font-size:.95rem;}
+.tdd-countdown{background:rgba(0,0,0,.25);padding:14px 22px;border-radius:14px;
+               text-align:center;font-variant-numeric:tabular-nums;min-width:160px;}
+.tdd-countdown .clock{font-size:1.6rem;font-weight:900;letter-spacing:1px;}
+.tdd-countdown .label{font-size:.8rem;opacity:.85;margin-top:2px;}
+
+.tdd-stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px;}
+@media (max-width:980px){.tdd-stats{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:580px){.tdd-stats{grid-template-columns:repeat(2,1fr);}}
+.tdd-stat{background:rgba(255,255,255,.07);backdrop-filter:blur(6px);
+          border-radius:12px;padding:12px 14px;text-align:center;
+          border-right:5px solid var(--c,#888);transition:transform .15s;}
+.tdd-stat:hover{transform:translateY(-2px);}
+.tdd-stat[data-k="present"]{--c:#1D9E75;}
+.tdd-stat[data-k="late"]   {--c:#BA7517;}
+.tdd-stat[data-k="absent"] {--c:#c62828;}
+.tdd-stat[data-k="cancelled"]{--c:#888;}
+.tdd-stat[data-k="medical_emergency"]{--c:#e91e63;}
+.tdd-stat[data-k="unmarked"]{--c:#777;}
+.tdd-stat .icn{font-size:1.4rem;margin-bottom:2px;}
+.tdd-stat .v{font-size:1.5rem;font-weight:900;color:#fff;
+             font-variant-numeric:tabular-nums;}
+.tdd-stat .l{font-size:.78rem;color:#aab;font-weight:700;}
+
+.tdd-progress{background:rgba(255,255,255,.07);border-radius:12px;padding:12px 16px;
+              margin-bottom:14px;}
+.tdd-progress .head{display:flex;justify-content:space-between;font-size:.9rem;
+                    font-weight:800;margin-bottom:6px;color:#fff;}
+.tdd-progress .head .pct{color:#1D9E75;font-variant-numeric:tabular-nums;}
+.tdd-progress .bar{height:10px;border-radius:6px;background:rgba(0,0,0,.35);
+                   overflow:hidden;}
+.tdd-progress .fill{height:100%;border-radius:6px;
+                    background:linear-gradient(90deg,#1D9E75,#2BB585);
+                    transition:width .8s cubic-bezier(.2,.8,.2,1);width:0%;}
+
+.tdd-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+.tdd-btn{border:0;border-radius:10px;padding:10px 16px;font-weight:800;
+         cursor:pointer;font-family:inherit;font-size:.88rem;
+         display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+         transition:transform .15s,box-shadow .2s,opacity .2s;}
+.tdd-btn:active{transform:scale(.98);}
+.tdd-btn-primary{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                 box-shadow:0 4px 12px rgba(29,158,117,.32);}
+.tdd-btn-secondary{background:rgba(255,255,255,.12);color:#fff;}
+.tdd-btn-secondary:hover{background:rgba(255,255,255,.22);}
+
+.tdd-search{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.15);
+            border-radius:11px;padding:10px 14px;color:#fff;width:100%;
+            font-size:.95rem;font-family:inherit;margin-bottom:10px;}
+.tdd-search:focus{outline:none;border-color:#26A69A;background:rgba(255,255,255,.12);}
+.tdd-search::placeholder{color:#aab;}
+
+.tdd-list{display:flex;flex-direction:column;gap:8px;}
+.tdd-row{background:rgba(255,255,255,.07);border-radius:11px;padding:12px 14px;
+         border-right:5px solid var(--rc,#666);
+         display:flex;flex-direction:column;gap:6px;transition:background .15s;}
+.tdd-row:hover{background:rgba(255,255,255,.1);}
+.tdd-row[data-status="present"]          {--rc:#1D9E75;}
+.tdd-row[data-status="late"]             {--rc:#BA7517;}
+.tdd-row[data-status="absent"]           {--rc:#c62828;}
+.tdd-row[data-status="cancelled"]        {--rc:#888;opacity:.75;}
+.tdd-row[data-status="medical_emergency"]{--rc:#e91e63;}
+.tdd-row .row-head{display:flex;justify-content:space-between;align-items:center;
+                   gap:8px;flex-wrap:wrap;}
+.tdd-row .nm{font-size:.96rem;font-weight:900;color:#fff;}
+.tdd-row .meta{color:#aab;font-size:.82rem;display:flex;flex-wrap:wrap;gap:6px 14px;}
+.tdd-row .meta a{color:#26A69A;text-decoration:none;font-weight:700;}
+.tdd-row .arrival{color:#1D9E75;font-weight:800;font-size:.85rem;}
+.tdd-row .notes  {color:#f1a132;font-size:.85rem;font-style:italic;}
+.tdd-row .actions{display:flex;flex-wrap:wrap;gap:5px;}
+.tdd-row .actions button{border:0;background:rgba(255,255,255,.1);color:#fff;
+                          padding:6px 11px;border-radius:8px;font-size:.85rem;
+                          font-weight:800;cursor:pointer;font-family:inherit;
+                          display:inline-flex;align-items:center;gap:4px;
+                          transition:all .12s;}
+.tdd-row .actions button:hover{background:rgba(255,255,255,.2);}
+.tdd-row .actions button[data-st="present"].on   {background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.tdd-row .actions button[data-st="late"].on      {background:linear-gradient(135deg,#BA7517,#f1a132);}
+.tdd-row .actions button[data-st="absent"].on    {background:linear-gradient(135deg,#c62828,#e57373);}
+.tdd-row .actions button[data-st="cancelled"].on {background:linear-gradient(135deg,#666,#999);}
+.tdd-row .actions button[data-st="medical_emergency"].on{background:linear-gradient(135deg,#e91e63,#f06292);}
+
+.tdd-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+           background:rgba(33,33,33,.95);color:#fff;padding:11px 18px;
+           border-radius:10px;font-weight:800;font-size:.9rem;z-index:500;
+           box-shadow:0 8px 22px rgba(0,0,0,.6);opacity:0;
+           transition:opacity .25s,transform .25s;}
+.tdd-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.tdd-toast.is-success{background:linear-gradient(135deg,#1D9E75,#2BB585);}
+.tdd-toast.is-error{background:linear-gradient(135deg,#c62828,#e53935);}
+
+.tdd-empty{text-align:center;color:#aab;padding:40px 14px;font-size:.95rem;
+           background:rgba(255,255,255,.05);border-radius:12px;}
+</style></head>
+<body>
+
+<div class="tdd-topbar">
+  <h1>🎬 لوحة يوم الرحلة</h1>
+  <a href="/admin/trips">← العودة للرحلات</a>
 </div>
+
+<div class="tdd-wrap">
+  <div class="tdd-hero">
+    <div>
+      <h2 id="tdd-name">—</h2>
+      <p id="tdd-meta">—</p>
+    </div>
+    <div class="tdd-countdown" id="tdd-cd">
+      <div class="clock" id="tdd-clock">--:--</div>
+      <div class="label" id="tdd-clock-label">—</div>
+    </div>
+  </div>
+
+  <div class="tdd-stats" id="tdd-stats">
+    <div class="tdd-stat" data-k="present"><div class="icn">✅</div><div class="v" data-v="present">0</div><div class="l">حضرت</div></div>
+    <div class="tdd-stat" data-k="late"><div class="icn">⏰</div><div class="v" data-v="late">0</div><div class="l">متأخرة</div></div>
+    <div class="tdd-stat" data-k="absent"><div class="icn">❌</div><div class="v" data-v="absent">0</div><div class="l">لم تحضر</div></div>
+    <div class="tdd-stat" data-k="cancelled"><div class="icn">🚫</div><div class="v" data-v="cancelled">0</div><div class="l">ألغت</div></div>
+    <div class="tdd-stat" data-k="medical_emergency"><div class="icn">🩺</div><div class="v" data-v="medical_emergency">0</div><div class="l">طارئ</div></div>
+    <div class="tdd-stat" data-k="unmarked"><div class="icn">📝</div><div class="v" data-v="unmarked">0</div><div class="l">لم تُرصد</div></div>
+  </div>
+
+  <div class="tdd-progress">
+    <div class="head"><span>📊 نسبة الحضور</span><span class="pct"><span id="tdd-pct">0</span>%</span></div>
+    <div class="bar"><div class="fill" id="tdd-fill"></div></div>
+  </div>
+
+  <div class="tdd-actions">
+    <button class="tdd-btn tdd-btn-primary" id="tdd-bulk-present">
+      <span>✅</span><span>تحديد كل غير المرصودين كحاضرات</span>
+    </button>
+    <a class="tdd-btn tdd-btn-secondary" id="tdd-day-report-link" href="#" target="_blank" rel="noopener">
+      <span>📤</span><span>تقرير الحضور</span>
+    </a>
+  </div>
+
+  <input type="search" class="tdd-search" id="tdd-search" placeholder="🔍 ابحثي عن طالبة...">
+
+  <div class="tdd-list" id="tdd-list">
+    <div class="tdd-empty">جارٍ التحميل...</div>
+  </div>
+</div>
+
+<div class="tdd-toast" id="tdd-toast"></div>
+
+<script>
+var TID = parseInt((window.location.pathname.split('/')[3] || '0'), 10) || 0;
+var DATA = null;
+var SEARCH = '';
+var STATUS_LABELS = {
+  present:'حضرت', late:'متأخرة', absent:'لم تحضر',
+  cancelled:'ألغت', medical_emergency:'طارئ صحي'
+};
+var STATUS_GLYPHS = {
+  present:'✅', late:'⏰', absent:'❌', cancelled:'🚫', medical_emergency:'🩺'
+};
+
+function esc(s){
+  s=(s==null)?'':String(s);
+  return s.replace(/[<>&"']/g,function(c){
+    return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'})[c];});
+}
+function toast(msg, kind){
+  var t=document.getElementById('tdd-toast');
+  t.textContent=msg||'';
+  t.classList.remove('is-success','is-error');
+  if(kind) t.classList.add('is-'+kind);
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h=setTimeout(function(){t.classList.remove('show');},3000);
+}
+
+/* Confetti — small inline burst when 100% present. */
+function confetti(){
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
+  document.body.appendChild(host);
+  var colors=['#1D9E75','#26A69A','#C9A227','#1565C0','#e91e63'];
+  for (var i=0;i<70;i++){
+    var p=document.createElement('span');
+    p.style.cssText='position:absolute;top:-20px;left:'+(Math.random()*100)+'vw;'
+                  +'width:'+(6+Math.random()*8)+'px;height:'+(10+Math.random()*10)+'px;'
+                  +'background:'+colors[i%colors.length]+';'
+                  +'animation:tddFall '+(1.8+Math.random()*1.6)+'s '+(Math.random()*0.4)+'s ease-in forwards;'
+                  +'transform:rotateZ('+(Math.random()*360)+'deg);';
+    host.appendChild(p);
+  }
+  setTimeout(function(){host.remove();},4000);
+}
+var s=document.createElement('style');
+s.textContent='@keyframes tddFall{0%{transform:translateY(0) rotateZ(0deg);opacity:1;}100%{transform:translateY(110vh) rotateZ(720deg);opacity:0;}}';
+document.head.appendChild(s);
+
+function load(){
+  fetch('/api/admin/trips/'+TID+'/day-attendance', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok){
+        document.getElementById('tdd-list').innerHTML =
+          '<div class="tdd-empty">تعذّر التحميل: '+esc((j&&j.error)||'')+'</div>';
+        return;
+      }
+      DATA = j;
+      renderTrip();
+      renderStats(j.stats);
+      renderList();
+      // Wire the day-report link
+      var lnk = document.getElementById('tdd-day-report-link');
+      if (lnk) lnk.href = '/api/admin/trips/'+TID+'/day-report';
+    })
+    .catch(function(){
+      document.getElementById('tdd-list').innerHTML =
+        '<div class="tdd-empty">خطأ في الاتصال</div>';
+    });
+}
+function refreshStats(){
+  fetch('/api/admin/trips/'+TID+'/day-stats', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if (j && j.ok) renderStats(j.stats);
+    }).catch(function(){});
+}
+var _PREV_RATE = 0;
+function renderStats(stats){
+  if (!stats) return;
+  document.querySelectorAll('#tdd-stats [data-v]').forEach(function(el){
+    var k=el.getAttribute('data-v');
+    el.textContent = stats[k] || 0;
+  });
+  document.getElementById('tdd-pct').textContent = stats.attendance_rate || 0;
+  document.getElementById('tdd-fill').style.width = Math.min(100, stats.attendance_rate || 0) + '%';
+  // Big confetti when present hits total_registered (and we have any).
+  if (_PREV_RATE < 100 && (stats.attendance_rate || 0) >= 100
+      && (stats.total_registered || 0) > 0
+      && (stats.present || 0) === (stats.total_registered || 0)){
+    toast('🎉 الجميع حضرت!', 'success');
+    confetti();
+  }
+  _PREV_RATE = stats.attendance_rate || 0;
+}
+function renderTrip(){
+  if (!DATA || !DATA.trip) return;
+  var t = DATA.trip;
+  document.getElementById('tdd-name').textContent = '🚌 ' + (t.name || '');
+  var meta = [];
+  if (t.trip_date) meta.push(t.trip_date);
+  if (t.departure_time) meta.push('انطلاق: ' + t.departure_time);
+  if (t.return_time)    meta.push('عودة: ' + t.return_time);
+  if (t.meeting_point)  meta.push('📍 ' + t.meeting_point);
+  document.getElementById('tdd-meta').textContent = meta.join(' • ');
+  // Countdown
+  setupCountdown(t.trip_date, t.departure_time);
+}
+function setupCountdown(date, time){
+  if (!date) return;
+  function tick(){
+    var now = new Date();
+    var target = new Date(date + 'T' + (time || '00:00') + ':00');
+    var diff = target - now;
+    var clk = document.getElementById('tdd-clock');
+    var lbl = document.getElementById('tdd-clock-label');
+    if (!clk || !lbl) return;
+    if (diff > 0){
+      var m = Math.floor(diff / 60000);
+      var h = Math.floor(m / 60);
+      m = m - (h * 60);
+      clk.textContent = (h > 0 ? h + ' س ' : '') + m + ' د';
+      lbl.textContent = 'للانطلاق';
+    } else {
+      var elapsed = Math.floor(-diff / 60000);
+      var eh = Math.floor(elapsed / 60);
+      var em = elapsed - (eh * 60);
+      clk.textContent = (eh > 0 ? eh + ' س ' : '') + em + ' د';
+      lbl.textContent = 'منذ الانطلاق';
+    }
+  }
+  tick();
+  setInterval(tick, 30000);
+}
+function renderList(){
+  var students = (DATA && DATA.students) || [];
+  if (SEARCH){
+    var q = SEARCH.toLowerCase();
+    students = students.filter(function(s){
+      var hay = ((s.student_name||'') + ' ' + (s.parent_name||'') + ' ' + (s.parent_phone||'')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+  }
+  if (!students.length){
+    document.getElementById('tdd-list').innerHTML =
+      '<div class="tdd-empty">'+ (SEARCH ? 'لا نتائج للبحث' : 'لا توجد طالبات مسجَّلات') +'</div>';
+    return;
+  }
+  var html = students.map(function(s, idx){
+    var st = s.attendance_status || '';
+    var actBtns = ['present','late','absent','cancelled','medical_emergency'].map(function(k){
+      return '<button data-act="set-status" data-rid="'+ (s.registration_id|0) +'" data-st="'+ k +'" class="' + (st === k ? 'on' : '') + '">'
+           + STATUS_GLYPHS[k] + ' ' + STATUS_LABELS[k] + '</button>';
+    }).join('');
+    var phoneLink = s.parent_phone
+      ? '<a href="tel:' + esc(s.parent_phone.replace(/\s/g,'')) + '">📞 ' + esc(s.parent_phone) + '</a>'
+      : '';
+    var arrival = s.arrival_time ? '<div class="arrival">⏰ وصلت في ' + esc(s.arrival_time) + '</div>' : '';
+    var notes = s.notes ? '<div class="notes">🩺 ' + esc(s.notes) + '</div>' : '';
+    return ''
+      + '<div class="tdd-row" data-status="' + esc(st) + '" data-rid="' + (s.registration_id|0) + '">'
+      + '  <div class="row-head">'
+      + '    <div class="nm">' + (idx+1) + '. ' + esc(s.student_name) + '</div>'
+      + '  </div>'
+      + '  <div class="meta">'
+      + (phoneLink ? '<span>' + phoneLink + '</span>' : '')
+      + (s.parent_name ? '<span>— ' + esc(s.parent_name) + '</span>' : '')
+      + (s.confirmation_id ? '<span>🆔 ' + esc(s.confirmation_id) + '</span>' : '')
+      + '  </div>'
+      + arrival
+      + notes
+      + '  <div class="actions">' + actBtns + '</div>'
+      + '</div>';
+  }).join('');
+  document.getElementById('tdd-list').innerHTML = html;
+}
+
+function setStatus(rid, status){
+  var payload = {registration_id: rid, attendance_status: status};
+  if (status === 'present' || status === 'late'){
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2,'0');
+    var mm = String(now.getMinutes()).padStart(2,'0');
+    var t = window.prompt('وقت الوصول (HH:MM):', hh + ':' + mm);
+    if (t === null) return;
+    if (t.trim()) payload.arrival_time = t.trim();
+  } else if (status === 'medical_emergency'){
+    var n = window.prompt('ملاحظات حالة الطارئ الصحي (مطلوبة):', '');
+    if (n === null) return;
+    if (!n.trim()){ toast('الملاحظات مطلوبة','error'); return; }
+    payload.notes = n.trim();
+  }
+  fetch('/api/admin/trips/'+TID+'/day-attendance', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  }).then(function(r){return r.json();})
+    .then(function(j){
+      if (!j || !j.ok){ toast((j && j.error) || 'تعذّر التحديث','error'); return; }
+      toast('✓ ' + STATUS_LABELS[status], 'success');
+      load();
+    })
+    .catch(function(){ toast('خطأ في الاتصال','error'); });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  load();
+  // Auto-refresh stats every 30s
+  setInterval(refreshStats, 30000);
+  // Search debounced
+  var sb = document.getElementById('tdd-search');
+  if (sb){
+    var t = null;
+    sb.addEventListener('input', function(){
+      clearTimeout(t);
+      t = setTimeout(function(){
+        SEARCH = (sb.value || '').trim();
+        renderList();
+      }, 300);
+    });
+  }
+  // Bulk
+  var bb = document.getElementById('tdd-bulk-present');
+  if (bb) bb.addEventListener('click', function(){
+    if (!window.confirm('تحديد كل غير المرصودين كحاضرات؟')) return;
+    fetch('/api/admin/trips/'+TID+'/day-attendance/bulk-mark-present', {
+      method:'POST', credentials:'same-origin',
+    }).then(function(r){return r.json();})
+      .then(function(j){
+        if (!j || !j.ok){ toast((j && j.error) || 'تعذّر التحديد','error'); return; }
+        toast('✓ تم تحديد ' + (j.marked_count || 0) + ' طالبة', 'success');
+        load();
+      })
+      .catch(function(){ toast('خطأ في الاتصال','error'); });
+  });
+  // Status pill clicks
+  document.getElementById('tdd-list').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-act="set-status"]');
+    if (!btn) return;
+    var rid = parseInt(btn.getAttribute('data-rid'), 10) || 0;
+    var st  = btn.getAttribute('data-st');
+    if (rid && st) setStatus(rid, st);
+  });
+});
+</script>
 </body></html>"""
 
 
@@ -70275,6 +70676,19 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .tc-time.is-imminent{color:#8d4f00;}
 .tc-time.is-past{color:#888;}
 
+/* Trip-day CTA on cards whose date is today */
+.tc-day-cta{background:linear-gradient(135deg,#1565C0,#26A69A);color:#fff;
+            border:0;padding:10px 14px;border-radius:9px;font-weight:900;
+            font-size:.92rem;cursor:pointer;text-decoration:none;
+            display:flex;align-items:center;justify-content:center;gap:6px;
+            margin-top:2px;box-shadow:0 4px 12px rgba(38,166,154,.32);
+            animation:tcDayPulse 2.4s ease-in-out infinite;}
+.tc-day-cta:hover{box-shadow:0 8px 18px rgba(38,166,154,.45);}
+@keyframes tcDayPulse{
+  0%,100%{box-shadow:0 4px 12px rgba(38,166,154,.32);}
+  50%    {box-shadow:0 6px 18px rgba(38,166,154,.55);}
+}
+
 /* Auto-reminder CTA on the smart card */
 .tc-reminder-cta{background:linear-gradient(135deg,#C9A227,#f1d369);
                  color:#3e2c00;border:0;padding:8px 14px;border-radius:9px;
@@ -72079,6 +72493,9 @@ function tripCardHTML(tp){
       })()
     + '  </div>'
     + (alerts ? '<div class="tc-alerts">' + alerts + '</div>' : '')
+    + ((tp.days_until_trip === 0) ?
+        '<a class="tc-day-cta" href="/admin/trips/' + (tp.id|0) + '/day-dashboard" target="_blank" rel="noopener">'
+        + '🎬 لوحة يوم الرحلة</a>' : '')
     + (tp.pending_auto_reminders ?
         '<button type="button" class="tc-reminder-cta" data-act="send-reminders" data-tid="' + (tp.id|0) + '">'
         + '📤 إرسال التذكيرات الآن (' + (tp.pending_auto_reminders_count || 0) + ')'
