@@ -1091,46 +1091,6 @@ def init_db():
                "ON trip_tasks(assigned_to_user_id, status)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_trip_tasks_due "
                "ON trip_tasks(due_date, status)")
-    # ── trip_message_templates: 3 default templates
-    # (announcement / reminder / payment_reminder), seeded on a fresh
-    # DB. Bodies use {placeholder} tokens that the render helper
-    # substitutes from the trip + registration context.
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_message_templates(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        template_key TEXT UNIQUE NOT NULL,
-        name TEXT,
-        icon TEXT,
-        subject TEXT,
-        body TEXT NOT NULL,
-        is_default INTEGER DEFAULT 1,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    # ── trip_reminder_log: every send (manual or auto). Drives the
-    # "تذكيرات الغد جاهزة" dedupe so we never spam the same parent
-    # twice on the same day. Manual sends are also logged so the
-    # admin has a full message history.
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_reminder_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER,
-        template_key TEXT NOT NULL,
-        send_type TEXT NOT NULL,
-        triggered_by_user_id INTEGER,
-        triggered_by_name TEXT,
-        recipient_phone TEXT,
-        recipient_name TEXT,
-        message_body TEXT,
-        whatsapp_link TEXT,
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_reminder_log_trip "
-               "ON trip_reminder_log(trip_id, send_type, sent_at)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_reminder_log_dedupe "
-               "ON trip_reminder_log(trip_id, registration_id, template_key, send_type)")
     db.commit()
     db.close()
 
@@ -6692,101 +6652,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_tasks_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trip_messages_v1: WhatsApp templates + reminder log (stage 5).
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_message_templates(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        template_key TEXT UNIQUE NOT NULL,
-        name TEXT,
-        icon TEXT,
-        subject TEXT,
-        body TEXT NOT NULL,
-        is_default INTEGER DEFAULT 1,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_reminder_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER,
-        template_key TEXT NOT NULL,
-        send_type TEXT NOT NULL,
-        triggered_by_user_id INTEGER,
-        triggered_by_name TEXT,
-        recipient_phone TEXT,
-        recipient_name TEXT,
-        message_body TEXT,
-        whatsapp_link TEXT,
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_reminder_log_trip "
-                    "ON trip_reminder_log(trip_id, send_type, sent_at)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_reminder_log_dedupe "
-                    "ON trip_reminder_log(trip_id, registration_id, template_key, send_type)")
-    except Exception: pass
-    if "trip_messages_v1" not in applied:
-        # Seed the 3 default templates. Inline the seed logic so this
-        # is self-contained at import time (the runtime helper lives
-        # further down in the module).
-        for _tpl in [
-            ("announcement", "📢", "إعلان رحلة جديدة", "رحلة جديدة في مايندكس",
-             "🚌 رحلة جديدة في مركز مايندكس!\n\n"
-             "📌 {trip_name}\n📍 {destination}\n📅 {trip_date}\n"
-             "⏰ من {departure_time} إلى {return_time}\n"
-             "💰 السعر: {price} د.ب للطالبة\n\n"
-             "📝 سجلي ابنتك من هنا:\n{smart_link}\n\nنتطلع لمشاركتكم! 🌟"),
-            ("reminder", "⏰", "تذكير ما قبل الرحلة", "غداً موعد الرحلة",
-             "🌟 تذكير لطيف لـ{parent_name}\n\n"
-             "غداً موعد رحلة {trip_name}!\n\n"
-             "📅 الموعد: {trip_date}\n⏰ الانطلاق: {departure_time}\n"
-             "📍 نقطة التجمع: {meeting_point}\n👧 الطالبة: {student_name}\n\n"
-             "📝 لا تنسوا: {equipment_needed}\n🚨 رقم الطوارئ: {emergency_contact}\n\n"
-             "نراكم غداً بإذن الله! 💚"),
-            ("payment_reminder", "💰", "تذكير دفع", "تذكير دفع رحلة",
-             "💰 تذكير لطيف بخصوص رحلة {trip_name}\n\n"
-             "عزيزي {parent_name}،\n"
-             "الطالبة {student_name} مسجلة في الرحلة لكن المبلغ لم يُسلَّم بعد.\n\n"
-             "💰 المبلغ المطلوب: {price} د.ب\n📅 موعد الرحلة: {trip_date}\n\n"
-             "يرجى التواصل معنا للترتيب. شكراً لتعاونكم! 🌟"),
-        ]:
-            _key, _icon, _name, _subj, _body = _tpl
-            try:
-                _row = db2.execute(
-                    "SELECT 1 FROM trip_message_templates WHERE template_key = ?",
-                    (_key,),
-                ).fetchone()
-                if not _row:
-                    db2.execute(
-                        "INSERT INTO trip_message_templates(template_key, name, icon, "
-                        "  subject, body, is_default, is_active) "
-                        "VALUES(?, ?, ?, ?, ?, 1, 1)",
-                        (_key, _name, _icon, _subj, _body),
-                    )
-            except Exception: pass
-        for _name_lbl in [
-            ("trip_message_templates", "قوالب رسائل الرحلات"),
-            ("trip_reminder_log",      "سجل رسائل الرحلات"),
-        ]:
-            try:
-                db2.execute(
-                    "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                    "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                    _name_lbl,
-                )
-            except Exception:
-                try:
-                    db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                                _name_lbl)
-                except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trip_messages_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30288,8 +30153,6 @@ BUILT_IN_TABLE_LABELS = {
     "trip_registrations":"تسجيلات الرحلات",
     "trip_payments":     "دفعات الرحلات",
     "trip_tasks":        "مهام الرحلات",
-    "trip_message_templates": "قوالب رسائل الرحلات",
-    "trip_reminder_log": "سجل رسائل الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32709,8 +32572,6 @@ _TBL_AUDIT_FEATURE = {
     "trip_registrations":   ("تسجيلات الرحلات",                 "نظام الرحلات والفعاليات"),
     "trip_payments":        ("دفعات الرحلات",                   "نظام الرحلات والفعاليات"),
     "trip_tasks":           ("مهام الرحلات",                    "نظام الرحلات والفعاليات"),
-    "trip_message_templates": ("قوالب رسائل الرحلات",           "نظام الرحلات والفعاليات"),
-    "trip_reminder_log":    ("سجل رسائل الرحلات",              "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -65621,97 +65482,6 @@ _TRIP_VALID_TYPES    = {"educational", "recreational", "religious"}
 _TRIP_VALID_STATUSES = {"active", "closed", "completed", "archived"}
 _TRIP_TASK_VALID_CATEGORIES = ("before", "during", "after")
 _TRIP_TASK_VALID_STATUSES   = ("pending", "in_progress", "completed", "cancelled")
-_TRIP_MSG_VALID_KEYS        = ("announcement", "reminder", "payment_reminder")
-
-# Default 3-template seed for trip_message_templates. Bodies use
-# {placeholder} tokens substituted at send-time by
-# _trip_render_message_body() against the per-trip + per-registration
-# context built by _trip_build_message_context().
-_TRIP_MSG_DEFAULTS = [
-    {
-        "key": "announcement",
-        "name": "إعلان رحلة جديدة",
-        "icon": "📢",
-        "subject": "رحلة جديدة في مايندكس",
-        "body":
-            "🚌 رحلة جديدة في مركز مايندكس!\n\n"
-            "📌 {trip_name}\n"
-            "📍 {destination}\n"
-            "📅 {trip_date}\n"
-            "⏰ من {departure_time} إلى {return_time}\n"
-            "💰 السعر: {price} د.ب للطالبة\n\n"
-            "📝 سجلي ابنتك من هنا:\n"
-            "{smart_link}\n\n"
-            "نتطلع لمشاركتكم! 🌟",
-    },
-    {
-        "key": "reminder",
-        "name": "تذكير ما قبل الرحلة",
-        "icon": "⏰",
-        "subject": "غداً موعد الرحلة",
-        "body":
-            "🌟 تذكير لطيف لـ{parent_name}\n\n"
-            "غداً موعد رحلة {trip_name}!\n\n"
-            "📅 الموعد: {trip_date}\n"
-            "⏰ الانطلاق: {departure_time}\n"
-            "📍 نقطة التجمع: {meeting_point}\n"
-            "👧 الطالبة: {student_name}\n\n"
-            "📝 لا تنسوا: {equipment_needed}\n"
-            "🚨 رقم الطوارئ: {emergency_contact}\n\n"
-            "نراكم غداً بإذن الله! 💚",
-    },
-    {
-        "key": "payment_reminder",
-        "name": "تذكير دفع",
-        "icon": "💰",
-        "subject": "تذكير دفع رحلة",
-        "body":
-            "💰 تذكير لطيف بخصوص رحلة {trip_name}\n\n"
-            "عزيزي {parent_name}،\n"
-            "الطالبة {student_name} مسجلة في الرحلة لكن المبلغ لم يُسلَّم بعد.\n\n"
-            "💰 المبلغ المطلوب: {price} د.ب\n"
-            "📅 موعد الرحلة: {trip_date}\n\n"
-            "يرجى التواصل معنا للترتيب. شكراً لتعاونكم! 🌟",
-    },
-]
-
-
-def _trip_seed_default_templates(db):
-    """Seed the 3 default message templates if they don't exist yet.
-    Idempotent — uses INSERT ... ON CONFLICT DO NOTHING so existing
-    edits are preserved. Best-effort, never raises."""
-    for tpl in _TRIP_MSG_DEFAULTS:
-        try:
-            try:
-                db.execute(
-                    "INSERT INTO trip_message_templates(template_key, name, icon, "
-                    "  subject, body, is_default, is_active) "
-                    "VALUES(?, ?, ?, ?, ?, 1, 1) "
-                    "ON CONFLICT(template_key) DO NOTHING",
-                    (tpl["key"], tpl["name"], tpl["icon"],
-                     tpl.get("subject") or "", tpl["body"]),
-                )
-            except Exception:
-                # SQLite < 3.24 / older Postgres path — fall back to
-                # an existence check.
-                row = db.execute(
-                    "SELECT 1 FROM trip_message_templates WHERE template_key = ?",
-                    (tpl["key"],),
-                ).fetchone()
-                if not row:
-                    db.execute(
-                        "INSERT INTO trip_message_templates(template_key, name, icon, "
-                        "  subject, body, is_default, is_active) "
-                        "VALUES(?, ?, ?, ?, ?, 1, 1)",
-                        (tpl["key"], tpl["name"], tpl["icon"],
-                         tpl.get("subject") or "", tpl["body"]),
-                    )
-        except Exception as ex:
-            import sys as _sys
-            print("[trips] template seed failed for " + tpl["key"] + ": " + str(ex),
-                  file=_sys.stderr)
-    try: db.commit()
-    except Exception: pass
 
 # Default 20-task template seeded on every new trip. Order matters —
 # we use the position in this list as the seed value of order_index.
