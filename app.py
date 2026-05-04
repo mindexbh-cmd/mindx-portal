@@ -66083,6 +66083,30 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-modal textarea{min-height:84px;resize:vertical;}
   .evd-modal .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .evd-modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  /* Info panel (3.1) */
+  .evd-info-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
+  .evd-info-card{background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:4px solid var(--ic,#1D9E75);}
+  .evd-info-card[data-sec="basics"]   {--ic:#1D9E75;}
+  .evd-info-card[data-sec="when"]     {--ic:#1565C0;}
+  .evd-info-card[data-sec="audience"] {--ic:#6B3FA0;}
+  .evd-info-card[data-sec="finance"]  {--ic:#E65100;}
+  .evd-info-card[data-sec="notes"]    {--ic:#37474F;}
+  .evd-info-card h3{margin:0 0 12px;font-size:1rem;color:var(--ic);font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-info-row{display:grid;grid-template-columns:170px 1fr;gap:8px 14px;padding:7px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;}
+  .evd-info-row:last-child{border-bottom:0;}
+  .evd-info-row .lab{color:#666;font-weight:700;}
+  .evd-info-row .val{color:#222;font-weight:600;font-variant-numeric:tabular-nums;}
+  .evd-info-row .val .muted{color:#aaa;font-weight:500;}
+  .evd-info-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .evd-info-chip{background:#e6f7ee;color:#1D9E75;font-weight:700;font-size:.82rem;padding:4px 10px;border-radius:99px;border:1px solid #c6ecd6;}
+  .evd-info-seats{display:inline-block;font-weight:800;padding:3px 12px;border-radius:99px;font-size:.86rem;}
+  .evd-info-seats.ok  {background:#e6f7ee;color:#1D9E75;border:1px solid #c6ecd6;}
+  .evd-info-seats.low {background:#fff3e0;color:#E65100;border:1px solid #ffcc80;}
+  .evd-info-seats.full{background:#ffebee;color:#c62828;border:1px solid #ffcdd2;}
+  .evd-info-actions{display:flex;justify-content:flex-end;margin-top:10px;}
+  .evd-info-notes-locked{padding:14px;background:#fafafa;border-radius:10px;color:#777;font-size:.9rem;text-align:center;border:1px dashed #d3d8de;}
+  .evd-info-notes textarea{width:100%;min-height:120px;padding:11px 12px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.95rem;resize:vertical;}
+  .evd-info-notes .footer{display:flex;justify-content:flex-end;margin-top:10px;}
   /* Mobile */
   @media (max-width: 720px){
     .evd-shell{padding:10px;}
@@ -66092,6 +66116,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-tab{padding:9px 11px;font-size:.83rem;}
     .evd-panel{padding:18px;border-radius:12px;}
     .evd-modal .grid2{grid-template-columns:1fr;}
+    .evd-info-row{grid-template-columns:1fr;gap:2px;}
+    .evd-info-row .lab{font-size:.78rem;}
   }
 </style></head><body>
 
@@ -66141,7 +66167,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   </div>
 
   <!-- Panels -->
-  <section class="evd-panel" data-panel="info"     role="tabpanel"><div class="evd-stub"><div class="em">📋</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Info panel (3.1) -->
+  <section class="evd-panel" data-panel="info" role="tabpanel">
+    <div class="evd-info" id="evd-info-root">
+      <div class="evd-info-loading">⏳ جارٍ التحميل…</div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="schedule" role="tabpanel"><div class="evd-stub"><div class="em">⏰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="costs"    role="tabpanel"><div class="evd-stub"><div class="em">💰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="items"    role="tabpanel"><div class="evd-stub"><div class="em">🛠️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -66340,7 +66371,7 @@ function evdSetStatus(next){
   .then(function(o){
     if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
     evdToast('تم تحديث الحالة', 'success');
-    evdLoadEvent();
+    evdLoadEvent();   // re-fetches → triggers both header + info render
   })
   .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
@@ -66356,8 +66387,144 @@ function evdLoadEvent(){
         return;
       }
       evdRenderHeader(j.event);
+      evdRenderInfo(j.event);
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+/* ── Info panel (3.1) ────────────────────────────────────────── */
+var GROUP_NAMES_BY_ID = {};   // memoised — fetched once.
+
+function evdLoadGroupNames(){
+  if (Object.keys(GROUP_NAMES_BY_ID).length) return Promise.resolve();
+  return fetch('/api/admin/events/student-groups')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      ((j && j.groups) || []).forEach(function(g){
+        GROUP_NAMES_BY_ID[String(g.id)] = g.group_name || ('#' + g.id);
+      });
+    })
+    .catch(function(){ /* non-fatal */ });
+}
+function evdFmtTime12(t24){
+  if (!t24) return '';
+  var p = String(t24).split(':');
+  if (p.length < 2) return t24;
+  var h = parseInt(p[0], 10), m = p[1];
+  var suf = (h < 12) ? 'صباحاً' : (h < 18 ? 'ظهراً' : 'مساءً');
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + suf;
+}
+function evdRenderInfo(ev){
+  var root = document.getElementById('evd-info-root');
+  if (!root) return;
+  evdLoadGroupNames().then(function(){
+    var raw = ev.target_group_ids || '[]';
+    var ids = [];
+    try { ids = (typeof raw === 'string') ? JSON.parse(raw) : raw; }
+    catch(_){ ids = []; }
+    if (!Array.isArray(ids)) ids = [];
+    var chips = ids.length
+      ? '<div class="evd-info-chips">' + ids.map(function(id){
+          return '<span class="evd-info-chip">' + evdEsc(GROUP_NAMES_BY_ID[String(id)] || ('#' + id)) + '</span>';
+        }).join('') + '</div>'
+      : '<span class="muted">— لا توجد مجموعات محددة —</span>';
+
+    var cap = parseInt(ev.max_students || 0, 10);
+    var reg = parseInt(ev.registered_count || 0, 10);
+    var avail = (cap > 0) ? Math.max(0, cap - reg) : null;
+    var seatsClass = 'ok';
+    if (avail === 0) seatsClass = 'full';
+    else if (avail !== null && avail <= 5) seatsClass = 'low';
+    var seatsHTML = (cap > 0)
+      ? '<span class="evd-info-seats ' + seatsClass + '">'
+        + (avail === 0 ? 'مكتمل' : (avail + ' مقعد')) + '</span>'
+      : '<span class="muted">غير محدود</span>';
+
+    var price = parseFloat(ev.price_per_student || 0) || 0;
+    var collected = parseFloat(ev.payment_collected || 0) || 0;
+    var expected = (cap > 0 ? cap : reg) * price;
+    if (expected < reg * price) expected = reg * price;
+    var remaining = Math.max(0, expected - collected);
+    var fmtBHD = function(v){ return Number(v).toFixed(3) + ' د.ب'; };
+
+    var status = ev.status || 'planning';
+    var notesHTML = '';
+    if (status === 'completed'){
+      notesHTML = '<div class="evd-info-notes">'
+        + '<textarea id="evd-info-notes-ta" placeholder="اكتبي ملاحظاتك بعد الرحلة هنا…">'
+        + evdEsc(ev.post_trip_notes || '')
+        + '</textarea>'
+        + '<div class="footer">'
+        + '  <button class="evd-btn evd-btn-edit" type="button" id="evd-info-notes-save">💾 حفظ الملاحظات</button>'
+        + '</div>'
+        + '</div>';
+    } else {
+      notesHTML = '<div class="evd-info-notes-locked">📝 ملاحظات ما بعد الرحلة (متاحة بعد الانتهاء)</div>';
+    }
+
+    var html = ''
+      + '<div class="evd-info-card" data-sec="basics">'
+      + '  <h3>📌 الأساسيات</h3>'
+      + '  <div class="evd-info-row"><span class="lab">اسم الرحلة</span><span class="val">' + (ev.name ? evdEsc(ev.name) : '<span class="muted">—</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">الوجهة</span><span class="val">' + (ev.destination ? evdEsc(ev.destination) : '<span class="muted">—</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">الوصف</span><span class="val" style="white-space:pre-wrap;">' + (ev.description ? evdEsc(ev.description) : '<span class="muted">—</span>') + '</span></div>'
+      + '</div>'
+      + '<div class="evd-info-card" data-sec="when">'
+      + '  <h3>📅 الموعد والمكان</h3>'
+      + '  <div class="evd-info-row"><span class="lab">التاريخ</span><span class="val">' + (ev.event_date ? evdFmtDate(ev.event_date) : '<span class="muted">—</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">وقت الذهاب</span><span class="val">' + (ev.departure_time ? evdEsc(evdFmtTime12(ev.departure_time)) : '<span class="muted">—</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">وقت الرجوع</span><span class="val">' + (ev.return_time ? evdEsc(evdFmtTime12(ev.return_time)) : '<span class="muted">—</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">نقطة التجمّع</span><span class="val">' + (ev.meeting_point ? evdEsc(ev.meeting_point) : '<span class="muted">—</span>') + '</span></div>'
+      + '</div>'
+      + '<div class="evd-info-card" data-sec="audience">'
+      + '  <h3>👥 الفئة المستهدفة</h3>'
+      + '  <div class="evd-info-row"><span class="lab">المجموعات</span><span class="val">' + chips + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">العدد الأقصى</span><span class="val">' + (cap > 0 ? (cap + ' طالبة') : '<span class="muted">غير محدود</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">المسجَّلات</span><span class="val">' + reg + ' طالبة</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">المقاعد المتاحة</span><span class="val">' + seatsHTML + '</span></div>'
+      + '</div>'
+      + '<div class="evd-info-card" data-sec="finance">'
+      + '  <h3>💰 المعلومات المالية</h3>'
+      + '  <div class="evd-info-row"><span class="lab">السعر للطالبة</span><span class="val">' + (price > 0 ? fmtBHD(price) : '<span class="muted">مجاناً</span>') + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">الإيراد المتوقع</span><span class="val">' + fmtBHD(expected) + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">المحصَّل حالياً</span><span class="val">' + fmtBHD(collected) + '</span></div>'
+      + '  <div class="evd-info-row"><span class="lab">المتبقي</span><span class="val">' + fmtBHD(remaining) + '</span></div>'
+      + '</div>'
+      + '<div class="evd-info-card" data-sec="notes">'
+      + '  <h3>📝 ملاحظات ما بعد الرحلة</h3>'
+      + notesHTML
+      + '</div>'
+      + '<div class="evd-info-actions">'
+      + '  <button class="evd-btn evd-btn-edit" type="button" id="evd-info-edit">⚙️ تعديل المعلومات</button>'
+      + '</div>';
+    root.innerHTML = html;
+
+    var eb = document.getElementById('evd-info-edit');
+    if (eb) eb.addEventListener('click', evdOpenEdit);
+    var nb = document.getElementById('evd-info-notes-save');
+    if (nb) nb.addEventListener('click', function(){
+      var ta = document.getElementById('evd-info-notes-ta');
+      var v  = ta.value;
+      nb.disabled = true; nb.style.opacity = '.6';
+      fetch('/api/admin/events/' + EID, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({post_trip_notes: v})
+      })
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(o){
+        nb.disabled = false; nb.style.opacity = '1';
+        if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+        evdToast('تم حفظ الملاحظات', 'success');
+        if (o.j.event) EVENT_DATA = o.j.event;
+      })
+      .catch(function(){
+        nb.disabled = false; nb.style.opacity = '1';
+        evdToast('خطأ في الاتصال', 'error');
+      });
+    });
+  });
 }
 
 /* ── Quick-edit modal (2.3) ──────────────────────────────────── */
@@ -66438,7 +66605,7 @@ function evdSubmitEdit(e){
     }
     evdCloseEdit();
     evdToast('تم تحديث الرحلة', 'success');
-    if (o.j.event){ evdRenderHeader(o.j.event); }
+    if (o.j.event){ evdRenderHeader(o.j.event); evdRenderInfo(o.j.event); }
     else          { evdLoadEvent(); }
   })
   .catch(function(){
