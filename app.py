@@ -8932,10 +8932,6 @@ body[data-trip-imminent="1"] .mx-trips-only{
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="11" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7"  cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><line x1="6" y1="9" x2="9" y2="9"/></svg>
           <span class="md-sb-link-text">&#x1F68C; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A;<span class="mx-trips-badge" id="md-sb-trips-badge" hidden>0</span></span>
         </a>
-        <a class="md-sb-link mx-admin-only" href="/admin/points" id="md-sb-points">
-          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>
-          <span class="md-sb-link-text">&#x2B50; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637; &#x648;&#x627;&#x644;&#x625;&#x646;&#x62C;&#x627;&#x632;&#x627;&#x62A;<span class="mx-trips-badge" id="md-sb-points-badge" hidden style="background:#C9A227;">0</span></span>
-        </a>
       </div>
     </div>
     <!-- ⚙️ النظام (admin only) -->
@@ -9749,10 +9745,6 @@ body[data-trip-imminent="1"] .mx-trips-only{
     <a class="md-quick-card mx-trips-only" href="/admin/trips" id="md-qc-trips">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F68C;</span>
       <span class="md-quick-label">&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A;<span class="mx-trips-badge" id="md-qc-trips-badge" hidden>0</span></span>
-    </a>
-    <a class="md-quick-card mx-admin-only" href="/admin/points" id="md-qc-points">
-      <span class="md-quick-emoji" aria-hidden="true">&#x2B50;</span>
-      <span class="md-quick-label">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637; &#x648;&#x627;&#x644;&#x625;&#x646;&#x62C;&#x627;&#x632;&#x627;&#x62A;<span class="mx-trips-badge" id="md-qc-points-badge" hidden style="background:#C9A227;">0</span></span>
     </a>
   </div>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
@@ -12638,33 +12630,6 @@ function dhLoadTripsNav(){
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadTripsNav);
 else dhLoadTripsNav();
-/* Points badge — shows today's awarded sum + this week's unlocks
-   on the dashboard quick-card. Self-gates on data-role='admin'
-   because the API is admin/manager-class. */
-function dhLoadPointsNav(){
-  var role = (document.body.dataset.role || '').toLowerCase();
-  if (!(role === 'admin' || role === 'manager' || role === 'reception')) return;
-  fetch('/api/admin/points/stats', {credentials:'same-origin'})
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){
-      if (!j || !j.ok) return;
-      // Show today's points if any, else fall back to week unlocks.
-      var n = (j.today_points || 0) + (j.week_unlocks || 0);
-      ['md-sb-points-badge','md-qc-points-badge'].forEach(function(id){
-        var el = document.getElementById(id);
-        if (!el) return;
-        if (n > 0){
-          el.textContent = String(n);
-          el.hidden = false;
-          el.title = 'اليوم: ' + (j.today_points || 0) + ' نقطة • هذا الأسبوع: '
-                   + (j.week_unlocks || 0) + ' إنجازات';
-        } else { el.hidden = true; }
-      });
-    })
-    .catch(function(){});
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadPointsNav);
-else dhLoadPointsNav();
 function _ssFmtH(v){
   var n=parseFloat(v||0);if(!n&&n!==0)return"0";
   if(Math.abs(n-Math.round(n))<0.01) return String(Math.round(n));
