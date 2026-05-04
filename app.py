@@ -5927,6 +5927,49 @@ if True:
         except Exception:
             pass
 
+    # ── attendance_purge_empty_status_v1 (one-shot) ──────────────────
+    # Until commit 7704092, /api/teacher/attendance saved one row per
+    # student in the roster every time the teacher pressed "حفظ
+    # التعديلات" — including students whose dropdown was still on
+    # "— اختر —" (status="" / NULL). Those scaffolding rows then drove
+    # per-student attendance percentages down. This block deletes them
+    # ONCE so existing prod data converges to the new "only canonical
+    # statuses are stored" invariant. Idempotent via the migration tag;
+    # gated like every other one-shot in this section.
+    if "attendance_purge_empty_status_v1" not in applied:
+        try:
+            n_bad = db2.execute(
+                "SELECT COUNT(*) FROM attendance "
+                "WHERE status IS NULL "
+                "   OR TRIM(status) = '' "
+                "   OR TRIM(status) IN ('— اختر —', 'اختر')"
+            ).fetchone()[0]
+            db2.execute(
+                "DELETE FROM attendance "
+                "WHERE status IS NULL "
+                "   OR TRIM(status) = '' "
+                "   OR TRIM(status) IN ('— اختر —', 'اختر')"
+            )
+            db2.execute(
+                "INSERT INTO schema_migrations(tag) VALUES(?)",
+                ("attendance_purge_empty_status_v1",),
+            )
+            db2.commit()
+            import sys as _sys_p
+            print(
+                "[cleanup] deleted " + str(int(n_bad or 0))
+                + " empty-status attendance rows",
+                file=_sys_p.stderr,
+            )
+        except Exception as _ex_p:
+            try: db2.rollback()
+            except Exception: pass
+            import sys as _sys_p
+            print(
+                "[cleanup] attendance_purge_empty_status_v1 failed: " + str(_ex_p),
+                file=_sys_p.stderr,
+            )
+
     # ── lessons_v1: lesson tracking. Teachers log per group per session
     # what was taught + curriculum progress. Admin sees all entries with
     # statistics, gets a notification when an attendance was recorded
