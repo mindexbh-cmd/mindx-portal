@@ -1155,37 +1155,6 @@ def init_db():
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_day_att_uniq "
                    "ON trip_day_attendance(trip_id, registration_id)")
     except Exception: pass
-    # ── trip_surveys (stage 7): post-trip parent survey responses.
-    # One row per (trip_id, registration_id), keyed by a per-row
-    # survey_token issued when the trip flips to status='completed'.
-    # Tokens valid for 30 days; the public submit endpoint validates
-    # token + dedupe.
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_surveys(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER NOT NULL,
-        survey_token TEXT,
-        parent_name TEXT,
-        student_name TEXT,
-        rating INTEGER,
-        liked_what TEXT,
-        improvements TEXT,
-        would_recommend INTEGER,
-        additional_comments TEXT,
-        submitted_at DATETIME,
-        ip_address TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_surveys_trip "
-               "ON trip_surveys(trip_id)")
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_surveys_token "
-                   "ON trip_surveys(survey_token) WHERE survey_token IS NOT NULL")
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_surveys_uniq "
-                   "ON trip_surveys(trip_id, registration_id)")
-    except Exception: pass
     db.commit()
     db.close()
 
@@ -6881,51 +6850,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_day_attendance_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trip_surveys_v1 (stage 7): post-trip parent survey.
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_surveys(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER NOT NULL,
-        survey_token TEXT,
-        parent_name TEXT,
-        student_name TEXT,
-        rating INTEGER,
-        liked_what TEXT,
-        improvements TEXT,
-        would_recommend INTEGER,
-        additional_comments TEXT,
-        submitted_at DATETIME,
-        ip_address TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_surveys_trip "
-                    "ON trip_surveys(trip_id)")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_surveys_token "
-                    "ON trip_surveys(survey_token) WHERE survey_token IS NOT NULL")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_surveys_uniq "
-                    "ON trip_surveys(trip_id, registration_id)")
-    except Exception: pass
-    if "trip_surveys_v1" not in applied:
-        try:
-            db2.execute(
-                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                ("trip_surveys", "تقييمات الرحلات"),
-            )
-        except Exception:
-            try:
-                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                            ("trip_surveys", "تقييمات الرحلات"))
-            except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trip_surveys_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30430,7 +30354,6 @@ BUILT_IN_TABLE_LABELS = {
     "trip_message_templates": "قوالب رسائل الرحلات",
     "trip_reminder_log": "سجل رسائل الرحلات",
     "trip_day_attendance": "حضور يوم الرحلة",
-    "trip_surveys":      "تقييمات الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32853,7 +32776,6 @@ _TBL_AUDIT_FEATURE = {
     "trip_message_templates": ("قوالب رسائل الرحلات",           "نظام الرحلات والفعاليات"),
     "trip_reminder_log":    ("سجل رسائل الرحلات",              "نظام الرحلات والفعاليات"),
     "trip_day_attendance":  ("حضور يوم الرحلة",                "نظام الرحلات والفعاليات"),
-    "trip_surveys":         ("تقييمات الرحلات",                "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -65953,71 +65875,6 @@ def _trip_generate_token(db):
     return candidate
 
 
-def _trip_seed_surveys_on_completion(db, trip_id):
-    """When a trip flips to status='completed', mint a survey_token
-    for every registered student that doesn't already have a survey
-    row. Tokens are 16-char URL-safe random strings, collision-checked
-    against the partial UNIQUE index. Best-effort — never raises so a
-    seed failure can't kill the status transition."""
-    if not trip_id:
-        return 0
-    import secrets as _secrets_s, string as _string_s
-    alphabet = _string_s.ascii_letters + _string_s.digits
-    try:
-        regs = db.execute(
-            "SELECT id, parent_name, student_name FROM trip_registrations "
-            "WHERE trip_id = ? AND is_deleted = 0 "
-            "AND registration_status = 'registered'",
-            (trip_id,),
-        ).fetchall()
-    except Exception:
-        return 0
-    inserted = 0
-    for r in regs:
-        rd = dict(r)
-        try:
-            existing = db.execute(
-                "SELECT 1 FROM trip_surveys "
-                "WHERE trip_id = ? AND registration_id = ? LIMIT 1",
-                (trip_id, rd.get("id")),
-            ).fetchone()
-        except Exception:
-            existing = None
-        if existing:
-            continue
-        # Mint a unique token (8 retries before letting the unique
-        # index error bubble — ~1e29 space, collisions ~impossible).
-        token = ""
-        for _ in range(8):
-            cand = "".join(_secrets_s.choice(alphabet) for _ in range(16))
-            try:
-                hit = db.execute(
-                    "SELECT 1 FROM trip_surveys WHERE survey_token = ? LIMIT 1",
-                    (cand,),
-                ).fetchone()
-                if not hit:
-                    token = cand; break
-            except Exception:
-                token = cand; break
-        if not token:
-            continue
-        try:
-            db.execute(
-                "INSERT INTO trip_surveys(trip_id, registration_id, survey_token, "
-                "  parent_name, student_name) "
-                "VALUES(?, ?, ?, ?, ?)",
-                (trip_id, rd.get("id"), token,
-                 (rd.get("parent_name") or "").strip(),
-                 (rd.get("student_name") or "").strip()),
-            )
-            inserted += 1
-        except Exception:
-            continue
-    try: db.commit()
-    except Exception: pass
-    return inserted
-
-
 def _trip_get_by_token(db, token):
     """Return the live trip dict for a smart_token, else None.
     Public-facing — does not include any internal-only fields. Caller
@@ -66337,12 +66194,6 @@ def api_admin_trips_set_status(tid):
                new_value={"status": new_status})
     except Exception:
         pass
-    # On flip to 'completed', mint survey tokens for the registered
-    # students. Best-effort (the helper swallows errors) so a survey
-    # seed failure can't poison the status response.
-    if new_status == "completed":
-        try: _trip_seed_surveys_on_completion(db, tid)
-        except Exception: pass
     return jsonify({"ok": True, "id": tid, "status": new_status})
 
 
