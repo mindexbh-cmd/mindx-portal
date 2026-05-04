@@ -64683,6 +64683,124 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .trip-stat-card[data-key="completed"] {--accent:#6B3FA0;--soft:#f3e5f5;}
 .trip-stat-card[data-key="archived"]  {--accent:#888888;--soft:#f0f0f0;}
 .trip-stat-card[data-key="yearly"]    {--accent:#C9A227;--soft:#fff9db;}
+
+/* ── Action bar ───────────────────────────────────────────────────── */
+.trip-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+              margin-bottom:14px;}
+.trip-btn{border:0;border-radius:10px;padding:10px 18px;font-size:.92rem;
+          font-weight:800;cursor:pointer;display:inline-flex;align-items:center;
+          gap:6px;transition:transform .15s,box-shadow .2s,background .2s;}
+.trip-btn:active{transform:scale(.97);}
+.trip-btn-primary{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+                  box-shadow:0 4px 12px rgba(29,158,117,.28);}
+.trip-btn-primary:hover{box-shadow:0 8px 20px rgba(29,158,117,.4);}
+.trip-btn-ghost{background:#f3e5f5;color:#4a148c;}
+.trip-btn-ghost:hover{background:#e1bee7;}
+.trip-btn-ghost.active{background:#4a148c;color:#fff;}
+
+/* ── Filters ──────────────────────────────────────────────────────── */
+.trip-filters{display:grid;grid-template-columns:200px 180px 180px 1fr;gap:10px;
+              background:#fff;border-radius:12px;padding:12px 14px;
+              box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:14px;}
+@media (max-width:880px){.trip-filters{grid-template-columns:1fr 1fr;}}
+@media (max-width:540px){.trip-filters{grid-template-columns:1fr;}}
+.trip-filters label{font-size:.78rem;color:#666;font-weight:700;
+                    display:block;margin-bottom:4px;}
+.trip-filters select,.trip-filters input{width:100%;border:1.5px solid #e0e0e0;
+                                          border-radius:9px;padding:8px 10px;
+                                          font-size:.9rem;background:#fafafa;
+                                          font-family:inherit;}
+.trip-filters select:focus,.trip-filters input:focus{outline:none;
+                                                      border-color:#6B3FA0;
+                                                      background:#fff;}
+
+/* ── Cards grid ───────────────────────────────────────────────────── */
+.trip-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+            gap:14px;}
+.trip-card{background:#fff;border-radius:14px;padding:16px 18px;
+           box-shadow:0 4px 14px rgba(0,0,0,.06);
+           border-right:5px solid var(--status-color,#888);
+           position:relative;overflow:hidden;
+           transition:transform .25s,box-shadow .25s;
+           display:flex;flex-direction:column;gap:8px;}
+.trip-card:hover{transform:translateY(-3px);
+                 box-shadow:0 10px 26px rgba(0,0,0,.12);}
+.trip-card[data-status="active"]    {--status-color:#1D9E75;
+                                      --status-soft:#e6f7ee;
+                                      background:linear-gradient(180deg,#fff,#fff 60%,#f6fcf9);}
+.trip-card[data-status="closed"]    {--status-color:#BA7517;--status-soft:#fff3e0;}
+.trip-card[data-status="completed"] {--status-color:#6B3FA0;--status-soft:#f3e5f5;}
+.trip-card[data-status="archived"]  {--status-color:#888888;--status-soft:#f0f0f0;
+                                      opacity:.86;}
+
+/* Imminent (≤3 days) — golden pulse border */
+.trip-card.is-imminent{
+  box-shadow:0 0 0 2px rgba(201,162,39,.0),0 4px 14px rgba(0,0,0,.06);
+  animation:tripImminentPulse 2.4s ease-in-out infinite;
+}
+@keyframes tripImminentPulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(201,162,39,.0),0 4px 14px rgba(0,0,0,.06);}
+  50%    {box-shadow:0 0 0 3px rgba(201,162,39,.55),0 8px 22px rgba(201,162,39,.25);}
+}
+
+.tc-head{display:flex;justify-content:space-between;align-items:flex-start;
+         gap:10px;}
+.tc-name{font-size:1.05rem;font-weight:900;color:#212121;line-height:1.3;
+         flex:1;}
+.tc-name .tc-emoji{margin-inline-end:6px;}
+.tc-status{font-size:.7rem;font-weight:800;padding:5px 10px;border-radius:999px;
+           white-space:nowrap;display:inline-flex;align-items:center;gap:4px;
+           background:var(--status-soft,#f0f0f0);color:var(--status-color,#888);}
+
+.tc-meta{display:flex;flex-direction:column;gap:3px;font-size:.85rem;
+         color:#555;}
+.tc-meta .tc-row{display:flex;align-items:center;gap:6px;}
+.tc-meta .tc-row strong{color:#212121;font-weight:700;}
+
+/* ── Progress bars ────────────────────────────────────────────────── */
+.tc-prog-block{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.tc-prog{display:flex;flex-direction:column;gap:3px;}
+.tc-prog-label{display:flex;justify-content:space-between;font-size:.78rem;
+               color:#555;font-weight:700;}
+.tc-prog-label .tc-prog-text strong{color:#212121;}
+.tc-prog-bar{height:8px;border-radius:6px;background:#eef0f3;overflow:hidden;
+             position:relative;}
+.tc-prog-fill{height:100%;border-radius:6px;
+              background:linear-gradient(90deg,var(--bar-start,#1D9E75),var(--bar-end,#2BB585));
+              transition:width .8s cubic-bezier(.2,.8,.2,1);
+              width:0%;}
+.tc-prog[data-kind="reg"]  .tc-prog-fill{--bar-start:#1565C0;--bar-end:#42A5F5;}
+.tc-prog[data-kind="cash"] .tc-prog-fill{--bar-start:#1D9E75;--bar-end:#2BB585;}
+
+/* ── Alerts row + contextual time ────────────────────────────────── */
+.tc-alerts{display:flex;flex-direction:column;gap:4px;}
+.tc-alert{font-size:.78rem;font-weight:700;padding:6px 10px;border-radius:8px;
+          background:#fff4e0;color:#8d4f00;border-right:3px solid #f1a132;
+          display:flex;align-items:center;gap:6px;}
+.tc-alert.is-full   {background:#e6f7ee;color:#0f6b4a;border-right-color:#1D9E75;}
+.tc-alert.is-archive{background:#f0f0f0;color:#444;     border-right-color:#888;}
+
+.tc-time{font-size:.82rem;color:#666;font-weight:700;display:flex;
+         align-items:center;gap:6px;}
+.tc-time.is-imminent{color:#8d4f00;}
+.tc-time.is-past{color:#888;}
+
+/* ── Action icons ─────────────────────────────────────────────────── */
+.tc-icons{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;}
+.tc-icons button{border:0;background:#f5f5f5;width:34px;height:34px;
+                 border-radius:9px;cursor:pointer;font-size:.95rem;
+                 display:inline-flex;align-items:center;justify-content:center;
+                 transition:background .15s,transform .15s;}
+.tc-icons button:hover{background:#e8e8e8;}
+.tc-icons button:active{transform:scale(.94);}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.trip-empty{background:#fff;border-radius:14px;padding:48px 24px;text-align:center;
+            box-shadow:0 4px 14px rgba(0,0,0,.06);}
+.trip-empty .te-emoji{font-size:3.4rem;line-height:1;margin-bottom:10px;}
+.trip-empty .te-title{font-size:1.05rem;font-weight:900;color:#4a148c;
+                      margin-bottom:6px;}
+.trip-empty .te-hint{font-size:.9rem;color:#666;}
 </style>
 </head>
 <body>
@@ -64730,6 +64848,49 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       <div class="ts-value" data-counter="0">0</div>
       <div class="ts-label">إجمالي السنة</div>
     </div>
+  </div>
+
+  <div class="trip-actions">
+    <button class="trip-btn trip-btn-primary" id="trip-create-btn" type="button">
+      <span>✨</span><span>إنشاء رحلة جديدة</span>
+    </button>
+    <button class="trip-btn trip-btn-ghost" id="trip-view-toggle" type="button"
+            data-view="cards" aria-label="تبديل العرض">
+      <span>📅</span><span>التقويم</span>
+    </button>
+  </div>
+
+  <div class="trip-filters">
+    <div>
+      <label for="trip-f-status">الحالة</label>
+      <select id="trip-f-status">
+        <option value="">— الكل —</option>
+        <option value="active">نشطة</option>
+        <option value="closed">مغلقة</option>
+        <option value="completed">منتهية</option>
+        <option value="archived">مؤرشفة</option>
+      </select>
+    </div>
+    <div>
+      <label for="trip-f-from">من تاريخ</label>
+      <input type="date" id="trip-f-from">
+    </div>
+    <div>
+      <label for="trip-f-to">إلى تاريخ</label>
+      <input type="date" id="trip-f-to">
+    </div>
+    <div>
+      <label for="trip-f-q">بحث</label>
+      <input type="search" id="trip-f-q" placeholder="اسم الرحلة أو الوجهة...">
+    </div>
+  </div>
+
+  <div id="trip-cards" class="trip-cards" hidden></div>
+
+  <div id="trip-empty" class="trip-empty">
+    <div class="te-emoji">🚀</div>
+    <div class="te-title">لا توجد رحلات بعد</div>
+    <div class="te-hint">ابدئي بإنشاء أول رحلة باستخدام زر <strong>"إنشاء رحلة جديدة"</strong> أعلاه.</div>
   </div>
 
 </div>
