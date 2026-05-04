@@ -65187,6 +65187,257 @@ def api_admin_events_update(eid):
     return jsonify({"ok": True, "id": eid, "event": ev_out})
 
 
+# ── Costs (4.2) ────────────────────────────────────────────────
+def _events_costs_row(rd):
+    return {
+        "id":           rd.get("id"),
+        "event_id":     rd.get("event_id"),
+        "category":     rd.get("category") or "custom",
+        "label":        rd.get("label") or "",
+        "amount":       float(rd.get("amount") or 0),
+        "notes":        rd.get("notes") or "",
+        "order_index":  int(rd.get("order_index") or 0),
+        "is_default":   int(rd.get("is_default") or 0),
+        "created_at":   rd.get("created_at") or "",
+        "updated_at":   rd.get("updated_at") or "",
+    }
+
+
+def _events_costs_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT id, max_students, price_per_student "
+            "FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return None
+    return dict(row) if row else None
+
+
+def _events_costs_summary(rows, event_row):
+    """Computes the calculator block from raw cost rows + the parent
+    event. Returns the same shape regardless of capacity / price /
+    registration state so the UI never has to branch on null fields."""
+    total = sum(float(r.get("amount") or 0) for r in rows)
+    cap   = int((event_row or {}).get("max_students") or 0)
+    price = float((event_row or {}).get("price_per_student") or 0)
+    # Stage-7 wires the registered count; for now we treat 0 as
+    # "no signups yet" which matches the stub on _events_detail_dict.
+    registered = 0
+    cost_actual = (total / registered) if registered > 0 else 0.0
+    cost_max    = (total / cap) if cap > 0 else 0.0
+    no_margin = cost_max
+    pri_10  = round(no_margin * 1.10, 3)
+    pri_20  = round(no_margin * 1.20, 3)
+    revenue = price * (registered if registered > 0 else cap)
+    profit  = revenue - total
+    is_profitable = (price > 0 and price >= cost_max and total > 0) or (price > 0 and total == 0)
+    warning = None
+    if total == 0:
+        warning = None  # nothing to warn about yet
+    elif price <= 0:
+        warning = "السعر غير محدّد بعد"
+    elif price < cost_max:
+        warning = "السعر أقل من التكلفة"
+    elif price < cost_max * 1.05:
+        warning = "السعر يغطي التكلفة بالكاد"
+    return {
+        "total_cost":                round(total, 3),
+        "registered_count":          registered,
+        "max_students":              cap,
+        "cost_per_student_actual":   round(cost_actual, 3),
+        "cost_per_student_max":      round(cost_max, 3),
+        "current_price":             round(price, 3),
+        "suggested_price_no_margin": round(no_margin, 3),
+        "suggested_price_10_margin": round(pri_10, 3),
+        "suggested_price_20_margin": round(pri_20, 3),
+        "expected_revenue":          round(revenue, 3),
+        "profit_or_loss":            round(profit, 3),
+        "is_profitable":             bool(is_profitable),
+        "warning":                   warning,
+    }
+
+
+@app.route('/api/admin/events/<int:eid>/costs', methods=['GET'])
+@login_required
+def api_admin_events_costs_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    ev = _events_costs_event_exists(db, eid)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM ev_costs "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY order_index, id", (eid,)).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[events] costs list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
+    out = [_events_costs_row(dict(r)) for r in rows]
+    summary = _events_costs_summary(out, ev)
+    return jsonify({"ok": True, "costs": out, "summary": summary})
+
+
+@app.route('/api/admin/events/<int:eid>/costs', methods=['POST'])
+@login_required
+def api_admin_events_costs_create(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_costs_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    label = (d.get("label") or "").strip()
+    if not label:
+        return jsonify({"ok": False, "error": "التسمية مطلوبة"}), 400
+    category = (d.get("category") or "custom").strip().lower() or "custom"
+    try:
+        amount = max(0.0, float(d.get("amount") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "المبلغ يجب أن يكون رقماً"}), 400
+    notes = (d.get("notes") or "").strip() or None
+    try:
+        cur = db.execute(
+            "SELECT COALESCE(MAX(order_index), -1) FROM ev_costs "
+            "WHERE event_id = ? AND is_deleted = 0", (eid,)).fetchone()
+        next_order = int((cur[0] if cur else -1) or -1) + 1
+    except Exception:
+        next_order = 0
+    try:
+        db.execute(
+            "INSERT INTO ev_costs(event_id, category, label, amount, notes, "
+            "                     order_index, is_default) "
+            "VALUES(?,?,?,?,?,?,0)",
+            (eid, category, label, amount, notes, next_order))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] costs insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ"}), 500
+    try:
+        cid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        cid = None
+    try:
+        row = db.execute("SELECT * FROM ev_costs WHERE id = ?", (cid,)).fetchone()
+        item = _events_costs_row(dict(row)) if row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.costs.create", target_type="ev_costs", target_id=cid,
+               new_value={"event_id": eid, "label": label, "amount": amount})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": cid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/costs/<int:cid>', methods=['PATCH'])
+@login_required
+def api_admin_events_costs_update(eid, cid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_costs_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_costs WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (cid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الصنف غير موجود"}), 404
+    cur = dict(row)
+    d = request.get_json(silent=True) or {}
+    upd = {}
+    if "label" in d:
+        v = (d.get("label") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "التسمية مطلوبة"}), 400
+        upd["label"] = v
+    if "amount" in d:
+        try:
+            upd["amount"] = max(0.0, float(d.get("amount") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "المبلغ يجب أن يكون رقماً"}), 400
+    if "notes" in d:
+        upd["notes"] = (d.get("notes") or "").strip() or None
+    if "order_index" in d:
+        try:
+            upd["order_index"] = max(0, int(d.get("order_index") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if "category" in d:
+        upd["category"] = (d.get("category") or "custom").strip().lower() or "custom"
+    if not upd:
+        return jsonify({"ok": True, "id": cid, "item": _events_costs_row(cur), "noop": True})
+    sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
+    try:
+        db.execute("UPDATE ev_costs SET " + sets + " WHERE id = ?",
+                   tuple(upd.values()) + (cid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] costs update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute("SELECT * FROM ev_costs WHERE id = ?", (cid,)).fetchone()
+        item = _events_costs_row(dict(new_row)) if new_row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.costs.update", target_type="ev_costs", target_id=cid,
+               old_value={k: cur.get(k) for k in upd.keys()},
+               new_value=upd)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": cid, "item": item})
+
+
+@app.route('/api/admin/events/<int:eid>/costs/<int:cid>', methods=['DELETE'])
+@login_required
+def api_admin_events_costs_delete(eid, cid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_costs_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_costs WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (cid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "الصنف غير موجود"}), 404
+    try:
+        db.execute(
+            "UPDATE ev_costs SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?", (cid,))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("event.costs.delete", target_type="ev_costs", target_id=cid,
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": cid})
+
+
 # ── Schedule (3.3) ─────────────────────────────────────────────
 _EV_SCHED_CATEGORIES = ("departure", "activity", "break", "meal", "return", "other")
 
