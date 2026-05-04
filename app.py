@@ -7940,27 +7940,6 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
 /* Visible to admin AND manager — used by /admin/teacher-deliveries
    which the spec grants to both roles. Server still gates the URL. */
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
-/* Trips manager — shown to role=admin OR users matching the 3 named
-   staff in _trips_can_admin. The TRIPS_MGR_PLACEHOLDER substitution
-   in the /dashboard route flips data-trip-mgr to "1" / "0". */
-body:not([data-trip-mgr="1"]) .mx-trips-only{display:none !important;}
-/* Subtle pulse on the trips entry points when imminent > 0. JS sets
-   data-trip-imminent="1" on body once the stats endpoint reports a
-   non-zero count; defaults to no pulse so the dashboard never starts
-   noisy. */
-@keyframes tripsNavPulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,0);}
-  50%    {box-shadow:0 0 0 6px rgba(201,162,39,.28);}
-}
-body[data-trip-imminent="1"] .mx-trips-only{
-  animation:tripsNavPulse 2.4s ease-in-out infinite;
-  border-radius:10px;
-}
-.mx-trips-badge{display:inline-flex;align-items:center;justify-content:center;
-                background:#C9A227;color:#fff;font-size:.7rem;font-weight:900;
-                border-radius:999px;padding:1px 7px;margin-inline-start:6px;
-                line-height:1.4;min-width:18px;}
-.mx-trips-badge[hidden]{display:none !important;}
 
 </style>
 <!-- Dashboard redesign — Phase 1 design tokens. Foundation only:
@@ -7977,7 +7956,6 @@ body[data-trip-imminent="1"] .mx-trips-only{
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <script>document.body && (document.body.dataset.username = (window._mxUserUsername = "USER_USERNAME_PLACEHOLDER"));</script>
-<script>document.body && (document.body.dataset.tripMgr = "TRIPS_MGR_PLACEHOLDER");</script>
 <div class="dh-topbar">
   <!-- Phase 2 — fixed 64px deep purple header. Settings + logout
        preserved as items inside the avatar dropdown. The hamburger
@@ -8192,10 +8170,6 @@ body[data-trip-imminent="1"] .mx-trips-only{
         <a class="md-sb-link mx-admin-only" href="/admin/violations">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span class="md-sb-link-text">&#x1F393; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
-        </a>
-        <a class="md-sb-link mx-trips-only" href="/admin/trips" id="md-sb-trips">
-          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="11" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7"  cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><line x1="6" y1="9" x2="9" y2="9"/></svg>
-          <span class="md-sb-link-text">&#x1F68C; &#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A;<span class="mx-trips-badge" id="md-sb-trips-badge" hidden>0</span></span>
         </a>
       </div>
     </div>
@@ -9006,10 +8980,6 @@ body[data-trip-imminent="1"] .mx-trips-only{
     <a class="md-quick-card mx-admin-only" href="/admin/violations">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F393;</span>
       <span class="md-quick-label">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
-    </a>
-    <a class="md-quick-card mx-trips-only" href="/admin/trips" id="md-qc-trips">
-      <span class="md-quick-emoji" aria-hidden="true">&#x1F68C;</span>
-      <span class="md-quick-label">&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A;<span class="mx-trips-badge" id="md-qc-trips-badge" hidden>0</span></span>
     </a>
   </div>
   <div class="dh-section-title dh-legacy-stats">&#x1F4CA; &#x625;&#x62D;&#x635;&#x627;&#x626;&#x64A;&#x627;&#x62A;</div>
@@ -11851,32 +11821,6 @@ function dhLoadStats(){
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadStats);
 else dhLoadStats();
-/* Trips badge + pulse — populates the active-count chip on the
-   sidebar link and the dashboard quick-card, and sets
-   data-trip-imminent="1" on body when there's anything within 3 days
-   so the CSS pulse keyframe kicks in. Self-gates on data-trip-mgr so
-   non-managers never hit the API (which would 403 anyway). */
-function dhLoadTripsNav(){
-  if ((document.body && document.body.dataset.tripMgr) !== '1') return;
-  fetch('/api/admin/trips/stats', {credentials:'same-origin'})
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){
-      if (!j || !j.ok) return;
-      var s = j.stats || {};
-      var n = s.active || 0;
-      ['md-sb-trips-badge','md-qc-trips-badge'].forEach(function(id){
-        var el = document.getElementById(id);
-        if (!el) return;
-        if (n > 0){ el.textContent = String(n); el.hidden = false; }
-        else      { el.hidden = true; }
-      });
-      if ((s.imminent || 0) > 0) document.body.dataset.tripImminent = '1';
-      else delete document.body.dataset.tripImminent;
-    })
-    .catch(function(){});
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadTripsNav);
-else dhLoadTripsNav();
 function _ssFmtH(v){
   var n=parseFloat(v||0);if(!n&&n!==0)return"0";
   if(Math.abs(n-Math.round(n))<0.01) return String(Math.round(n));
@@ -23024,7 +22968,6 @@ def dashboard():
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
         .replace("USER_USERNAME_PLACEHOLDER", username)
-        .replace("TRIPS_MGR_PLACEHOLDER", "1" if _trips_can_admin(user) else "0")
         .replace("DH_CTRL_DISP_PLACEHOLDER", ("flex" if role == "admin" else "none"))
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
@@ -64813,11 +64756,10 @@ def api_admin_trips_stats():
     user = session.get("user") or {}
     if not _trips_can_admin(user):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
-    from datetime import date as _date, timedelta as _timedelta
-    today_iso     = _date.today().isoformat()
-    imminent_iso  = (_date.today() + _timedelta(days=3)).isoformat()
-    year_start    = _date(_date.today().year, 1, 1).isoformat()
-    year_end      = _date(_date.today().year, 12, 31).isoformat()
+    from datetime import date as _date
+    today_iso = _date.today().isoformat()
+    year_start = _date(_date.today().year, 1, 1).isoformat()
+    year_end   = _date(_date.today().year, 12, 31).isoformat()
     db = get_db()
 
     def _scalar(sql, params=()):
@@ -64831,12 +64773,6 @@ def api_admin_trips_stats():
     upcoming  = _scalar(
         "SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='active' "
         "AND trip_date IS NOT NULL AND trip_date >= ?", (today_iso,))
-    # Imminent = active trips with trip_date in (today, today+3]. Drives
-    # the sidebar/dashboard pulse animation in commit 8.
-    imminent  = _scalar(
-        "SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='active' "
-        "AND trip_date IS NOT NULL AND trip_date > ? AND trip_date <= ?",
-        (today_iso, imminent_iso))
     closed    = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='closed'")
     completed = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='completed'")
     archived  = _scalar("SELECT COUNT(*) FROM trips WHERE is_deleted=0 AND status='archived'")
@@ -64849,7 +64785,6 @@ def api_admin_trips_stats():
         "stats": {
             "active":    active,
             "upcoming":  upcoming,
-            "imminent":  imminent,
             "closed":    closed,
             "completed": completed,
             "archived":  archived,
