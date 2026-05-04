@@ -43345,13 +43345,6 @@ def api_admin_violations_create():
     except Exception:
         pass
 
-    # Points auto-deduct on violation create. Best-effort.
-    try:
-        if student_id and new_id:
-            _points_hook_violation(db, new_id, student_id, severity)
-    except Exception:
-        pass
-
     return jsonify({"ok": True, "id": new_id, "severity": severity})
 
 
@@ -45604,10 +45597,6 @@ def api_teacher_attendance_save():
             try: db.rollback()
             except Exception: pass
             skipped += 1
-            continue
-        # Points auto-award (best-effort, never blocks).
-        try: _points_hook_attendance(db, body)
-        except Exception: pass
     db.commit()
     return jsonify({
         "ok": True,
@@ -45775,8 +45764,6 @@ def api_attendance_add():
                 import sys as _sys
                 print("[attendance] update failed: " + str(ex), file=_sys.stderr)
                 return jsonify({"ok": False, "error": str(ex)}), 400
-            try: _points_hook_attendance(db, body)
-            except Exception: pass
             return jsonify({"ok": True, "id": rid, "updated": True})
         try:
             new_id = _attendance_dynamic_insert(db, body)
@@ -45786,8 +45773,6 @@ def api_attendance_add():
             import sys as _sys
             print("[attendance] insert failed: " + str(ex), file=_sys.stderr)
             return jsonify({"ok": False, "error": str(ex)}), 400
-        try: _points_hook_attendance(db, body)
-        except Exception: pass
         return jsonify({"ok": True, "id": new_id, "updated": False})
     except Exception as ex:
         try: db.rollback()
@@ -64404,12 +64389,6 @@ def api_mev_create():
                           "evaluation_month": eval_month,
                           "overall_score": overall})
     except Exception: pass
-    # Points auto-award when an evaluation lands in the "ممتاز" band
-    # (overall_score ≥ 9 / 10). Idempotent on the eval id.
-    try:
-        if int(overall or 0) >= 9 and student_id and new_id:
-            _points_hook_evaluation_excellent(db, new_id, int(student_id))
-    except Exception: pass
     return jsonify({"ok": True, "success": True, "id": new_id,
                     "overall_score": overall})
 
@@ -66240,150 +66219,6 @@ except Exception as _ex_seed_pts:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Auto-award hooks — called from existing systems (attendance,
-# violations, trips, tasks, evaluations). Every hook is best-effort:
-# wrapped in try/except so a points hook can NEVER fail the parent
-# operation. Idempotency is enforced by the partial UNIQUE on
-# (student_id, event_source).
-# ─────────────────────────────────────────────────────────────────────
-
-def _points_resolve_student_id(db, student_name, personal_id=None):
-    """Look up a student id by personal_id (preferred) then by name.
-    Returns None if neither resolves. Used by the attendance hook
-    where the route only sees a name + (optionally) a pid."""
-    sid = None
-    if personal_id:
-        try:
-            row = db.execute(
-                "SELECT id FROM students WHERE TRIM(personal_id) = TRIM(?) LIMIT 1",
-                (str(personal_id),),
-            ).fetchone()
-            if row:
-                sid = row[0] if not hasattr(row, "keys") else row["id"]
-        except Exception:
-            pass
-    if sid: return sid
-    if student_name:
-        try:
-            row = db.execute(
-                "SELECT id FROM students WHERE TRIM(student_name) = TRIM(?) LIMIT 1",
-                (str(student_name),),
-            ).fetchone()
-            if row:
-                sid = row[0] if not hasattr(row, "keys") else row["id"]
-        except Exception:
-            pass
-    return sid
-
-
-def _points_hook_attendance(db, body):
-    """Auto-award hook for attendance writes. Called from
-    api_teacher_attendance_save / api_attendance_add after a
-    successful insert/update. Best-effort, never raises."""
-    try:
-        status = (body.get("status") or "").strip()
-        if status not in ("حاضر", "غائب", "متأخر"):
-            return
-        sid = _points_resolve_student_id(
-            db, body.get("student_name"), body.get("personal_id"),
-        )
-        if not sid:
-            return
-        date  = (body.get("attendance_date") or "").strip()
-        group = (body.get("group_name") or "").strip()
-        if not date:
-            return
-        src_base = "attendance:" + date + ":" + group + ":" + str(sid)
-        if status == "حاضر":
-            _points_award(db, sid, 1, "attendance", src_base, "حضور")
-            # Early-bird bonus — if recorded before 08:00 server-time.
-            from datetime import datetime as _dt_e
-            if _dt_e.now().hour < 8:
-                _points_award(db, sid, 2, "early_attendance",
-                              src_base + ":early", "حضور مبكر")
-        elif status == "غائب":
-            _points_award(db, sid, -2, "absence_unexcused",
-                          src_base, "غياب بدون عذر")
-    except Exception as ex:
-        import sys as _sys
-        print("[points] attendance hook failed: " + str(ex), file=_sys.stderr)
-
-
-def _points_hook_violation(db, violation_id, student_id, severity):
-    """Auto-deduct on violation create. Severity → cost map:
-        small:-5, medium:-10, large:-20  (default -5 for unknown)."""
-    try:
-        if not student_id or not violation_id:
-            return
-        sev = (severity or "").strip().lower()
-        deduct = {"small": -5, "medium": -10, "large": -20}.get(sev, -5)
-        _points_award(db, student_id, deduct, "violation",
-                      "violation:" + str(violation_id), "مخالفة سلوكية")
-    except Exception as ex:
-        import sys as _sys
-        print("[points] violation hook failed: " + str(ex), file=_sys.stderr)
-
-
-def _points_hook_trip_completion(db, trip_id):
-    """When a trip flips to status='completed', award 15 points to
-    every registered student whose trip-day attendance was 'present'
-    or 'late' (both count as attended). Idempotent via the
-    per-(student, source) UNIQUE."""
-    try:
-        if not trip_id:
-            return
-        rows = db.execute(
-            "SELECT r.student_id FROM trip_registrations r "
-            "JOIN trip_day_attendance da "
-            "  ON da.registration_id = r.id "
-            "WHERE r.trip_id = ? AND r.is_deleted = 0 "
-            "AND r.registration_status = 'registered' "
-            "AND da.attendance_status IN ('present', 'late')",
-            (trip_id,),
-        ).fetchall()
-        for r in rows:
-            rd = dict(r) if hasattr(r, "keys") else {"student_id": r[0]}
-            sid = rd.get("student_id")
-            if not sid: continue
-            _points_award(db, sid, 15, "trip_participation",
-                          "trip:" + str(trip_id),
-                          "مشاركة في رحلة")
-    except Exception as ex:
-        import sys as _sys
-        print("[points] trip-completion hook failed: " + str(ex), file=_sys.stderr)
-
-
-def _points_hook_task_completed(db, task_id, trip_id, student_id=None):
-    """Award +5 when a trip-task transitions to 'completed'. The
-    student_id is the assignee; without it we can't credit anyone
-    so the hook is a no-op."""
-    try:
-        if not task_id or not student_id:
-            return
-        _points_award(db, student_id, 5, "task_completed",
-                      "task:" + str(task_id),
-                      "إكمال مهمة")
-    except Exception as ex:
-        import sys as _sys
-        print("[points] task hook failed: " + str(ex), file=_sys.stderr)
-
-
-def _points_hook_evaluation_excellent(db, eval_id, student_id):
-    """Award +10 when an evaluation is recorded as 'excellent' /
-    'ممتاز'. Caller decides which evaluations qualify; this hook
-    just enforces idempotency on the eval id."""
-    try:
-        if not eval_id or not student_id:
-            return
-        _points_award(db, student_id, 10, "evaluation_excellent",
-                      "eval:" + str(eval_id),
-                      "تقييم ممتاز")
-    except Exception as ex:
-        import sys as _sys
-        print("[points] eval hook failed: " + str(ex), file=_sys.stderr)
-
-
-# ─────────────────────────────────────────────────────────────────────
 # 🚌 Trips & Events Management — Stage 1 (Smart Foundation)
 # ─────────────────────────────────────────────────────────────────────
 # Premium trip-management system. Admin + 3 named staff (أحمد إبراهيم،
@@ -67028,9 +66863,6 @@ def api_admin_trips_set_status(tid):
     # seed failure can't poison the status response.
     if new_status == "completed":
         try: _trip_seed_surveys_on_completion(db, tid)
-        except Exception: pass
-        # Points auto-award for every student who actually attended.
-        try: _points_hook_trip_completion(db, tid)
         except Exception: pass
     return jsonify({"ok": True, "id": tid, "status": new_status})
 
@@ -71802,31 +71634,6 @@ def api_admin_trips_tasks_update(tid, tkid):
     except Exception:
         pass
     fresh = _trip_task_get(db, tid, tkid)
-    # Points auto-award when transitioning to 'completed'. Awards
-    # the assignee — tasks without an assignee don't credit anyone.
-    if (body.get("status") == "completed"
-        and (cur.get("status") or "") != "completed"):
-        try:
-            assignee_uid = (fresh or {}).get("assigned_to_user_id")
-            if assignee_uid:
-                # Map back to a student, if the assignee user is a
-                # student-account. Manager accounts get no points.
-                try:
-                    urow = db.execute(
-                        "SELECT linked_student_id, role FROM users "
-                        "WHERE id = ? LIMIT 1",
-                        (assignee_uid,),
-                    ).fetchone()
-                    if urow:
-                        ud = dict(urow)
-                        if (ud.get("role") or "").strip().lower() == "student":
-                            sid = int(ud.get("linked_student_id") or 0)
-                            if sid:
-                                _points_hook_task_completed(db, tkid, tid, sid)
-                except Exception:
-                    pass
-        except Exception:
-            pass
     return jsonify({"ok": True, "task": _trip_task_dict(fresh) if fresh else None})
 
 
