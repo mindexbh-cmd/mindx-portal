@@ -1131,30 +1131,6 @@ def init_db():
                "ON trip_reminder_log(trip_id, send_type, sent_at)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_trip_reminder_log_dedupe "
                "ON trip_reminder_log(trip_id, registration_id, template_key, send_type)")
-    # ── trip_day_attendance: trip-day live attendance ledger
-    # (stage 6). One row per (trip_id, registration_id) — partial
-    # unique index enforces. 5 statuses: present / absent / late /
-    # cancelled / medical_emergency.
-    db.execute("""CREATE TABLE IF NOT EXISTS trip_day_attendance(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER NOT NULL,
-        attendance_status TEXT NOT NULL,
-        arrival_time TEXT,
-        notes TEXT,
-        recorded_by_user_id INTEGER,
-        recorded_by_name TEXT,
-        recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_trip_day_att_trip "
-               "ON trip_day_attendance(trip_id, attendance_status)")
-    try:
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_day_att_uniq "
-                   "ON trip_day_attendance(trip_id, registration_id)")
-    except Exception: pass
     db.commit()
     db.close()
 
@@ -6811,45 +6787,6 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("trip_messages_v1",))
-            db2.commit()
-        except Exception: pass
-
-    # ── trip_day_attendance_v1: trip-day live attendance (stage 6).
-    db2.execute("""CREATE TABLE IF NOT EXISTS trip_day_attendance(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        registration_id INTEGER NOT NULL,
-        attendance_status TEXT NOT NULL,
-        arrival_time TEXT,
-        notes TEXT,
-        recorded_by_user_id INTEGER,
-        recorded_by_name TEXT,
-        recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips(id),
-        FOREIGN KEY (registration_id) REFERENCES trip_registrations(id)
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_trip_day_att_trip "
-                    "ON trip_day_attendance(trip_id, attendance_status)")
-        db2.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_day_att_uniq "
-                    "ON trip_day_attendance(trip_id, registration_id)")
-    except Exception: pass
-    if "trip_day_attendance_v1" not in applied:
-        try:
-            db2.execute(
-                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
-                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
-                ("trip_day_attendance", "حضور يوم الرحلة"),
-            )
-        except Exception:
-            try:
-                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
-                            ("trip_day_attendance", "حضور يوم الرحلة"))
-            except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("trip_day_attendance_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30353,7 +30290,6 @@ BUILT_IN_TABLE_LABELS = {
     "trip_tasks":        "مهام الرحلات",
     "trip_message_templates": "قوالب رسائل الرحلات",
     "trip_reminder_log": "سجل رسائل الرحلات",
-    "trip_day_attendance": "حضور يوم الرحلة",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32775,7 +32711,6 @@ _TBL_AUDIT_FEATURE = {
     "trip_tasks":           ("مهام الرحلات",                    "نظام الرحلات والفعاليات"),
     "trip_message_templates": ("قوالب رسائل الرحلات",           "نظام الرحلات والفعاليات"),
     "trip_reminder_log":    ("سجل رسائل الرحلات",              "نظام الرحلات والفعاليات"),
-    "trip_day_attendance":  ("حضور يوم الرحلة",                "نظام الرحلات والفعاليات"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
