@@ -66484,8 +66484,18 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-info-notes-locked{padding:14px;background:#fafafa;border-radius:10px;color:#777;font-size:.9rem;text-align:center;border:1px dashed #d3d8de;}
   .evd-info-notes textarea{width:100%;min-height:120px;padding:11px 12px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.95rem;resize:vertical;}
   .evd-info-notes .footer{display:flex;justify-content:flex-end;margin-top:10px;}
+  /* Skeleton loading shimmer (3.5) */
+  @keyframes evdShimmer{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
+  .evd-skel{display:block;border-radius:8px;background:linear-gradient(90deg,#eef0f3 0%,#f6f7f9 50%,#eef0f3 100%);background-size:200px 100%;background-repeat:no-repeat;animation:evdShimmer 1.4s linear infinite;}
+  .evd-skel.h-card{height:84px;margin-bottom:14px;border-radius:14px;}
+  .evd-skel.h-line{height:14px;margin:8px 0;}
+  .evd-skel.h-row {height:48px;margin-bottom:8px;border-radius:10px;}
   /* Schedule panel (3.4) */
   .evd-sched-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
+  /* Item enter/leave (3.5) */
+  @keyframes evdItemIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  .evd-sched-item{animation:evdItemIn .22s ease both;}
+  .evd-sched-item.is-leaving{animation:evdItemIn .18s ease reverse both;}
   .evd-sched-summary{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;background:#fff;border-radius:12px;padding:13px 16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);font-weight:700;color:#444;font-size:.9rem;}
   .evd-sched-summary .icon{font-size:1.3rem;}
   .evd-sched-summary strong{color:#0d47a1;font-variant-numeric:tabular-nums;}
@@ -66592,13 +66602,18 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   <!-- Info panel (3.1) -->
   <section class="evd-panel" data-panel="info" role="tabpanel">
     <div class="evd-info" id="evd-info-root">
-      <div class="evd-info-loading">⏳ جارٍ التحميل…</div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-card"></div>
     </div>
   </section>
   <!-- Schedule panel (3.4) -->
   <section class="evd-panel" data-panel="schedule" role="tabpanel">
     <div class="evd-sched" id="evd-sched-root">
-      <div class="evd-sched-loading">⏳ جارٍ التحميل…</div>
+      <div class="evd-skel h-card" style="height:54px;"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-row"></div>
+      <div class="evd-skel h-row"></div>
     </div>
   </section>
   <section class="evd-panel" data-panel="costs"    role="tabpanel"><div class="evd-stub"><div class="em">💰</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
@@ -67197,14 +67212,25 @@ function evdSubmitSched(e){
 function evdSchedDelete(sid){
   if (!sid) return;
   if (!confirm('هل تريدين حذف هذا البند؟')) return;
+  // Animate the row out before the refetch lands.
+  var row = document.querySelector('.evd-sched-item[data-sid="' + sid + '"]');
+  if (row) row.classList.add('is-leaving');
   fetch('/api/admin/events/' + EID + '/schedule/' + sid, {method: 'DELETE'})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
     .then(function(o){
-      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحذف', 'error'); return; }
+      if (!o.ok || !o.j.ok){
+        if (row) row.classList.remove('is-leaving');
+        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
+      }
       evdToast('تم الحذف', 'success');
-      evdLoadSchedule();
+      // Wait for the leave animation to finish before re-render so
+      // the user sees the row slide out instead of vanishing.
+      setTimeout(evdLoadSchedule, 180);
     })
-    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+    .catch(function(){
+      if (row) row.classList.remove('is-leaving');
+      evdToast('خطأ في الاتصال', 'error');
+    });
 }
 
 /* ── Quick-edit modal (2.3) ──────────────────────────────────── */
