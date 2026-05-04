@@ -67561,6 +67561,512 @@ def api_admin_trips_reg_promote(tid, rid):
     return jsonify({"ok": True, "id": rid, "status": "registered"})
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Trip tasks (stage 4) — checklist + responsibilities per trip
+# ─────────────────────────────────────────────────────────────────────
+
+def _trips_available_assignees(db):
+    """Return [{user_id, name, role}] for admin + the 3 named managers.
+    Used by the tasks panel's assignee dropdown + by validation when a
+    PATCH/POST body specifies an assigned_to_user_id."""
+    out = []
+    seen = set()
+    try:
+        rows = db.execute(
+            "SELECT id, name, username, role FROM users "
+            "WHERE COALESCE(is_active, 1) <> 0 "
+            "ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, id"
+        ).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        rd = dict(r)
+        role = (rd.get("role") or "").strip().lower()
+        name = (rd.get("name") or rd.get("username") or "").strip()
+        folded = _grp_norm(name)
+        is_admin = (role == "admin")
+        is_named_mgr = bool(folded) and folded in _TRIPS_MANAGER_NAMES_FOLDED
+        if (is_admin or is_named_mgr) and rd.get("id") not in seen:
+            seen.add(rd.get("id"))
+            out.append({
+                "user_id": rd.get("id"),
+                "name":    name,
+                "role":    role,
+            })
+    return out
+
+
+def _trip_task_dict(rd):
+    """Outbound shape for a single task row — strips internal flags
+    and normalises None → '' / 0 for predictable client rendering."""
+    return {
+        "id":                  rd.get("id"),
+        "trip_id":             rd.get("trip_id"),
+        "category":            rd.get("category") or "",
+        "title":               rd.get("task_title") or "",
+        "description":         rd.get("task_description") or "",
+        "assigned_to_user_id": rd.get("assigned_to_user_id"),
+        "assigned_to_name":    rd.get("assigned_to_name") or "",
+        "due_date":            rd.get("due_date") or "",
+        "due_time":            rd.get("due_time") or "",
+        "status":              rd.get("status") or "pending",
+        "completion_notes":    rd.get("completion_notes") or "",
+        "order_index":         int(rd.get("order_index") or 0),
+        "completed_at":        rd.get("completed_at"),
+        "completed_by_user_id": rd.get("completed_by_user_id"),
+        "completed_by_name":   rd.get("completed_by_name") or "",
+        "is_from_template":    int(rd.get("is_from_template") or 0),
+        "created_at":          rd.get("created_at"),
+        "updated_at":          rd.get("updated_at"),
+    }
+
+
+def _trip_task_get(db, trip_id, task_id):
+    """Fetch a single non-deleted task row scoped to a trip. Returns
+    None if the row is missing or belongs to a different trip."""
+    try:
+        row = db.execute(
+            "SELECT * FROM trip_tasks "
+            "WHERE id = ? AND trip_id = ? AND is_deleted = 0",
+            (task_id, trip_id),
+        ).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _trip_task_resolve_assignee(db, user_id):
+    """Look up the assignee row + verify it's eligible (admin or one
+    of the 3 named managers). Returns (user_id, name) on success or
+    (None, None) when ineligible / missing — the caller maps to a
+    400 with an Arabic error."""
+    if not user_id:
+        return (None, None)
+    try:
+        uid = int(user_id)
+    except Exception:
+        return (None, None)
+    eligible = {a["user_id"]: a["name"] for a in _trips_available_assignees(db)}
+    if uid not in eligible:
+        return (None, None)
+    return (uid, eligible[uid])
+
+
+def _trip_task_compute_stats(tasks_by_cat):
+    """Build the panel's stats block from the per-category lists."""
+    out = {
+        "total":       0, "completed":   0,
+        "pending":     0, "in_progress": 0, "cancelled": 0,
+        "pct_complete": 0.0,
+        "by_category": {},
+    }
+    for cat in _TRIP_TASK_VALID_CATEGORIES:
+        cat_tasks = tasks_by_cat.get(cat, [])
+        cat_total = len(cat_tasks)
+        cat_done  = sum(1 for t in cat_tasks if t.get("status") == "completed")
+        cat_pct   = round(cat_done / cat_total * 100, 1) if cat_total else 0.0
+        out["by_category"][cat] = {
+            "total":     cat_total,
+            "completed": cat_done,
+            "pct":       cat_pct,
+        }
+        for t in cat_tasks:
+            out["total"] += 1
+            st = t.get("status") or ""
+            if   st == "completed":   out["completed"]   += 1
+            elif st == "pending":     out["pending"]     += 1
+            elif st == "in_progress": out["in_progress"] += 1
+            elif st == "cancelled":   out["cancelled"]   += 1
+    if out["total"] > 0:
+        out["pct_complete"] = round(out["completed"] / out["total"] * 100, 1)
+    return out
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks', methods=['GET'])
+@login_required
+def api_admin_trips_tasks_list(tid):
+    """Return the trip's task ledger grouped by category + stats +
+    the eligible-assignees list for the dropdown — single round-trip
+    so the panel renders in one fetch."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT * FROM trip_tasks "
+            "WHERE trip_id = ? AND is_deleted = 0 "
+            "ORDER BY category, order_index, id",
+            (tid,),
+        ).fetchall()
+    except Exception as ex:
+        import sys as _sys
+        print("[trips] tasks list failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر جلب المهام"}), 500
+    tasks_by_cat = {c: [] for c in _TRIP_TASK_VALID_CATEGORIES}
+    for r in rows:
+        d = _trip_task_dict(dict(r))
+        cat = d["category"]
+        if cat in tasks_by_cat:
+            tasks_by_cat[cat].append(d)
+    stats = _trip_task_compute_stats(tasks_by_cat)
+    return jsonify({
+        "ok":    True,
+        "tasks": tasks_by_cat,
+        "stats": stats,
+        "available_assignees": _trips_available_assignees(db),
+        "trip": {
+            "id":   trip["id"],
+            "name": trip.get("name") or "",
+        },
+    })
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks', methods=['POST'])
+@login_required
+def api_admin_trips_tasks_create(tid):
+    """Create a manual task. order_index auto-set to (max in
+    category) + 1 so it lands at the end of its bucket."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    category = (d.get("category") or "").strip()
+    title    = (d.get("title") or "").strip()
+    if category not in _TRIP_TASK_VALID_CATEGORIES:
+        return jsonify({"ok": False, "error": "اختاري فئة صحيحة"}), 400
+    if not title:
+        return jsonify({"ok": False, "error": "عنوان المهمة مطلوب"}), 400
+    assignee_uid, assignee_name = _trip_task_resolve_assignee(
+        db, d.get("assigned_to_user_id"),
+    )
+    if d.get("assigned_to_user_id") and not assignee_uid:
+        return jsonify({"ok": False, "error": "المسؤول غير صحيح"}), 400
+    try:
+        max_idx_row = db.execute(
+            "SELECT COALESCE(MAX(order_index), 0) FROM trip_tasks "
+            "WHERE trip_id = ? AND category = ? AND is_deleted = 0",
+            (tid, category),
+        ).fetchone()
+        next_idx = int(max_idx_row[0] or 0) + 1
+    except Exception:
+        next_idx = 1
+    body = {
+        "trip_id":              tid,
+        "category":             category,
+        "task_title":           title,
+        "task_description":     (d.get("description") or "").strip() or None,
+        "assigned_to_user_id":  assignee_uid,
+        "assigned_to_name":     assignee_name,
+        "due_date":             (d.get("due_date") or "").strip() or None,
+        "due_time":             (d.get("due_time") or "").strip() or None,
+        "status":               "pending",
+        "order_index":          next_idx,
+        "created_by_user_id":   user.get("id"),
+        "is_from_template":     0,
+    }
+    cols = list(body.keys())
+    quoted = ",".join('"' + c + '"' for c in cols)
+    placeholders = ",".join(["?"] * len(cols))
+    try:
+        db.execute(
+            "INSERT INTO trip_tasks(" + quoted + ") VALUES(" + placeholders + ")",
+            tuple(body[c] for c in cols),
+        )
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] task create failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر حفظ المهمة"}), 500
+    try:
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        new_id = None
+    try:
+        _audit("trip.task.create",
+               target_type="trip_task", target_id=new_id,
+               new_value={"trip_id": tid, "category": category, "title": title})
+    except Exception:
+        pass
+    row = _trip_task_get(db, tid, new_id) if new_id else None
+    return jsonify({"ok": True, "task": _trip_task_dict(row) if row else None})
+
+
+_TRIP_TASK_PATCH_FIELDS = {
+    "title", "description", "assigned_to_user_id",
+    "due_date", "due_time", "status", "completion_notes",
+    "order_index",
+}
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks/<int:tkid>', methods=['PATCH'])
+@login_required
+def api_admin_trips_tasks_update(tid, tkid):
+    """Sparse update on a task. Status transitions to/from 'completed'
+    auto-stamp / clear the completed_at + completed_by_user_id +
+    completed_by_name trio. Assignee changes refresh the snapshot
+    name."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    cur = _trip_task_get(db, tid, tkid)
+    if not cur:
+        return jsonify({"ok": False, "error": "المهمة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    body = {}
+    if "title" in d:
+        v = (d.get("title") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "عنوان المهمة لا يمكن أن يكون فارغاً"}), 400
+        body["task_title"] = v
+    if "description" in d:
+        body["task_description"] = (d.get("description") or "").strip() or None
+    if "due_date" in d:
+        body["due_date"] = (d.get("due_date") or "").strip() or None
+    if "due_time" in d:
+        body["due_time"] = (d.get("due_time") or "").strip() or None
+    if "status" in d:
+        v = (d.get("status") or "").strip()
+        if v not in _TRIP_TASK_VALID_STATUSES:
+            return jsonify({"ok": False, "error": "حالة غير صحيحة"}), 400
+        body["status"] = v
+    if "completion_notes" in d:
+        body["completion_notes"] = (d.get("completion_notes") or "").strip() or None
+    if "order_index" in d:
+        try: body["order_index"] = max(0, int(d.get("order_index") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
+    if "assigned_to_user_id" in d:
+        raw = d.get("assigned_to_user_id")
+        if raw in (None, "", 0, "0"):
+            body["assigned_to_user_id"] = None
+            body["assigned_to_name"]    = None
+        else:
+            uid, nm = _trip_task_resolve_assignee(db, raw)
+            if not uid:
+                return jsonify({"ok": False, "error": "المسؤول غير صحيح"}), 400
+            body["assigned_to_user_id"] = uid
+            body["assigned_to_name"]    = nm
+    # Status transition side-effects.
+    if "status" in body:
+        new_st = body["status"]
+        old_st = cur.get("status") or ""
+        if new_st == "completed" and old_st != "completed":
+            body["completed_at"]         = "__NOW__"
+            body["completed_by_user_id"] = user.get("id")
+            body["completed_by_name"]    = (user.get("name") or
+                                            user.get("username") or "").strip()
+        elif new_st != "completed" and old_st == "completed":
+            body["completed_at"]         = None
+            body["completed_by_user_id"] = None
+            body["completed_by_name"]    = None
+    if not body:
+        return jsonify({"ok": True, "task": _trip_task_dict(cur), "noop": True})
+    sets = []
+    vals = []
+    for k, v in body.items():
+        if v == "__NOW__":
+            sets.append('"' + k + '" = CURRENT_TIMESTAMP')
+        else:
+            sets.append('"' + k + '" = ?')
+            vals.append(v)
+    sets.append("updated_at = CURRENT_TIMESTAMP")
+    sql = "UPDATE trip_tasks SET " + ", ".join(sets) + " WHERE id = ?"
+    vals.append(tkid)
+    try:
+        db.execute(sql, tuple(vals))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] task update failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر تحديث المهمة"}), 500
+    try:
+        _audit("trip.task.update",
+               target_type="trip_task", target_id=tkid,
+               old_value={k: cur.get(k) for k in body.keys() if k in cur},
+               new_value={k: ("__NOW__" if v == "__NOW__" else v)
+                          for k, v in body.items()})
+    except Exception:
+        pass
+    fresh = _trip_task_get(db, tid, tkid)
+    return jsonify({"ok": True, "task": _trip_task_dict(fresh) if fresh else None})
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks/<int:tkid>', methods=['DELETE'])
+@login_required
+def api_admin_trips_tasks_delete(tid, tkid):
+    """Soft-delete a task (audit trail + reload-template idempotency)."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    cur = _trip_task_get(db, tid, tkid)
+    if not cur:
+        return jsonify({"ok": False, "error": "المهمة غير موجودة"}), 404
+    try:
+        db.execute(
+            "UPDATE trip_tasks SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?",
+            (tkid,),
+        )
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] task delete failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحذف"}), 500
+    try:
+        _audit("trip.task.delete",
+               target_type="trip_task", target_id=tkid,
+               old_value={"title": cur.get("task_title"),
+                          "category": cur.get("category")},
+               new_value={"is_deleted": 1})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": tkid})
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks/reload-template', methods=['POST'])
+@login_required
+def api_admin_trips_tasks_reload_template(tid):
+    """Add any default-template tasks that aren't currently present
+    on the trip (matched by category + title). Idempotent: never
+    duplicates an existing title; preserves status/assignee on rows
+    that ARE already present. Returns the count of newly-added rows."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    # Build the existing-title set across non-deleted tasks. Match
+    # uses (category, title) so the same title in two different
+    # categories isn't conflated.
+    try:
+        rows = db.execute(
+            "SELECT category, task_title FROM trip_tasks "
+            "WHERE trip_id = ? AND is_deleted = 0",
+            (tid,),
+        ).fetchall()
+    except Exception:
+        rows = []
+    have = set()
+    for r in rows:
+        rd = dict(r)
+        have.add(((rd.get("category") or "").strip(),
+                  (rd.get("task_title") or "").strip()))
+    # Per-category running index: continue from the existing max so
+    # newly-added rows land at the bottom of their bucket.
+    cat_max = {c: 0 for c in _TRIP_TASK_VALID_CATEGORIES}
+    try:
+        idx_rows = db.execute(
+            "SELECT category, COALESCE(MAX(order_index), 0) FROM trip_tasks "
+            "WHERE trip_id = ? AND is_deleted = 0 GROUP BY category",
+            (tid,),
+        ).fetchall()
+        for r in idx_rows:
+            rd = dict(r)
+            cat_max[rd.get("category")] = int(rd.get("COALESCE(MAX(order_index), 0)") or
+                                              (r[1] if not hasattr(r, "keys") else 0) or 0)
+    except Exception:
+        pass
+    added = 0
+    existing = 0
+    for tpl in _TRIP_TASK_TEMPLATE:
+        cat   = (tpl.get("category") or "").strip()
+        title = (tpl.get("title") or "").strip()
+        if cat not in _TRIP_TASK_VALID_CATEGORIES or not title:
+            continue
+        if (cat, title) in have:
+            existing += 1
+            continue
+        cat_max[cat] = (cat_max.get(cat) or 0) + 1
+        try:
+            db.execute(
+                "INSERT INTO trip_tasks(trip_id, category, task_title, status, "
+                "  order_index, created_by_user_id, is_from_template) "
+                "VALUES(?, ?, ?, 'pending', ?, ?, 1)",
+                (tid, cat, title, cat_max[cat], user.get("id")),
+            )
+            added += 1
+            have.add((cat, title))
+        except Exception:
+            continue
+    try:
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+    try:
+        if added > 0:
+            _audit("trip.task.reload_template",
+                   target_type="trip", target_id=tid,
+                   new_value={"added": added, "existing": existing})
+    except Exception:
+        pass
+    return jsonify({
+        "ok":             True,
+        "added_count":    added,
+        "existing_count": existing,
+    })
+
+
+@app.route('/api/admin/trips/<int:tid>/tasks/reorder', methods=['POST'])
+@login_required
+def api_admin_trips_tasks_reorder(tid):
+    """Bulk-update order_index for tasks in a single category. Body:
+        { category: 'before' | 'during' | 'after',
+          ordered_ids: [tkid1, tkid2, ...] }
+    Each id gets order_index = its position in the array (1-based).
+    Tasks not in the array keep their existing order_index — the
+    caller is expected to send the full category list."""
+    user = session.get("user") or {}
+    if not _trips_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    trip = _trip_get(db, tid)
+    if not trip:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    category = (d.get("category") or "").strip()
+    if category not in _TRIP_TASK_VALID_CATEGORIES:
+        return jsonify({"ok": False, "error": "فئة غير صحيحة"}), 400
+    ordered = d.get("ordered_ids") or []
+    if not isinstance(ordered, list):
+        return jsonify({"ok": False, "error": "ترتيب المهام غير صحيح"}), 400
+    try:
+        for pos, tkid in enumerate(ordered, 1):
+            try: tkid_int = int(tkid)
+            except Exception: continue
+            db.execute(
+                "UPDATE trip_tasks SET order_index = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ? AND trip_id = ? AND category = ? AND is_deleted = 0",
+                (pos, tkid_int, tid, category),
+            )
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[trips] task reorder failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر إعادة الترتيب"}), 500
+    return jsonify({"ok": True})
+
+
 PUBLIC_TRIP_REGISTER_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تسجيل في الرحلة — مايندكس</title>
