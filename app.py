@@ -66882,6 +66882,19 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-cost-add button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(29,158,117,0.3);}
   .evd-cost-empty{text-align:center;padding:30px 18px;color:#888;}
   .evd-cost-empty .em{font-size:2.6rem;margin-bottom:6px;}
+  /* Donut breakdown (4.4) */
+  .evd-cost-donut{display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:center;background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #6B3FA0;}
+  .evd-cost-donut h3{margin:0 0 8px;font-size:1rem;color:#4a148c;font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-cost-donut svg{width:160px;height:160px;display:block;margin:0 auto;}
+  .evd-cost-donut svg .seg{transition:stroke-dasharray 1s cubic-bezier(.2,.8,.2,1);}
+  .evd-cost-donut .legend{display:flex;flex-direction:column;gap:6px;}
+  .evd-cost-donut .legend .item{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;font-size:.86rem;}
+  .evd-cost-donut .legend .swatch{width:14px;height:14px;border-radius:4px;}
+  .evd-cost-donut .legend .pct{font-weight:800;color:#0d47a1;font-variant-numeric:tabular-nums;}
+  /* Count-up flash on change */
+  @keyframes evdCountFlash{0%{color:inherit;}50%{color:#1D9E75;text-shadow:0 0 6px rgba(29,158,117,0.4);}100%{color:inherit;}}
+  .evd-cost-calc .val.is-flash{animation:evdCountFlash .55s ease;}
+  .evd-cost-total span:last-child.is-flash{animation:evdCountFlash .55s ease;}
   /* Schedule panel (3.4) */
   .evd-sched-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
   /* Item enter/leave (3.5) */
@@ -66948,6 +66961,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-cost-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
     .evd-cost-sugg-row{grid-template-columns:1fr auto;gap:6px;}
     .evd-cost-sugg-row button{grid-column:1 / -1;justify-self:end;}
+    .evd-cost-donut{grid-template-columns:1fr;gap:14px;}
+    .evd-cost-donut svg{width:140px;height:140px;}
   }
 </style></head><body>
 
@@ -67686,6 +67701,46 @@ function evdLoadCosts(){
 
 function evdFmtBHD(v){ return Number(v || 0).toFixed(3) + ' د.ب'; }
 
+var COST_PALETTE = ['#1D9E75','#1565C0','#BA7517','#6B3FA0','#c62828','#00897B','#5D4037','#F06292','#7CB342','#0097A7','#FB8C00'];
+var COST_LAST_TOTAL = null;
+
+function evdCostDonutHTML(items){
+  var nonzero = items.filter(function(c){ return parseFloat(c.amount || 0) > 0; });
+  if (!nonzero.length) return '';
+  var total = nonzero.reduce(function(s, c){ return s + parseFloat(c.amount || 0); }, 0);
+  // SVG donut: stroke-dasharray on a single circle for each segment.
+  var R = 70;             // radius
+  var C = 2 * Math.PI * R;
+  var rotation = -90;     // start at top
+  var segs = '';
+  var legendHTML = '';
+  nonzero.forEach(function(c, i){
+    var pct = parseFloat(c.amount || 0) / total;
+    var len = pct * C;
+    var col = COST_PALETTE[i % COST_PALETTE.length];
+    segs += '<circle class="seg" r="' + R + '" cx="80" cy="80"'
+          + ' fill="transparent" stroke="' + col + '" stroke-width="22"'
+          + ' stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '"'
+          + ' stroke-dashoffset="' + (-rotation * C / 360 * 0).toFixed(2) + '"'
+          + ' transform="rotate(' + rotation + ' 80 80)"/>';
+    rotation += pct * 360;
+    var pctTxt = (pct * 100).toFixed(1) + '%';
+    legendHTML += '<div class="item">'
+                + '<span class="swatch" style="background:' + col + ';"></span>'
+                + '<span>' + evdEsc(c.label) + '</span>'
+                + '<span class="pct">' + pctTxt + '</span>'
+                + '</div>';
+  });
+  return ''
+    + '<div class="evd-cost-donut">'
+    + '  <div>'
+    + '    <h3>📊 توزيع التكاليف</h3>'
+    + '    <svg viewBox="0 0 160 160">' + segs + '</svg>'
+    + '  </div>'
+    + '  <div class="legend">' + legendHTML + '</div>'
+    + '</div>';
+}
+
 function evdRenderCosts(){
   var root = document.getElementById('evd-cost-root');
   if (!root) return;
@@ -67773,7 +67828,23 @@ function evdRenderCosts(){
     + '  </div>'
     + '</div>';
 
-  root.innerHTML = calcHTML + listHTML;
+  var donutHTML = evdCostDonutHTML(COST_DATA);
+  root.innerHTML = calcHTML + donutHTML + listHTML;
+
+  // Count-up flash on total when it changed since the last render.
+  if (COST_LAST_TOTAL !== null && Math.abs(COST_LAST_TOTAL - total) > 0.001){
+    var bigVal = root.querySelector('.evd-cost-calc .row .val.big');
+    if (bigVal){
+      bigVal.classList.add('is-flash');
+      setTimeout(function(){ bigVal.classList.remove('is-flash'); }, 600);
+    }
+    var totalSpan = root.querySelector('.evd-cost-total span:last-child');
+    if (totalSpan){
+      totalSpan.classList.add('is-flash');
+      setTimeout(function(){ totalSpan.classList.remove('is-flash'); }, 600);
+    }
+  }
+  COST_LAST_TOTAL = total;
 
   // Wire suggestion approve buttons
   root.querySelectorAll('button[data-approve-price]').forEach(function(b){
