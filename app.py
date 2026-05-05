@@ -1002,6 +1002,8 @@ def init_db():
         category TEXT NOT NULL,
         label TEXT NOT NULL,
         amount REAL DEFAULT 0,
+        unit_price REAL DEFAULT 0,
+        multiplier_type TEXT DEFAULT 'fixed',
         notes TEXT,
         order_index INTEGER DEFAULT 0,
         is_default INTEGER DEFAULT 0,
@@ -6503,6 +6505,8 @@ if True:
         category TEXT NOT NULL,
         label TEXT NOT NULL,
         amount REAL DEFAULT 0,
+        unit_price REAL DEFAULT 0,
+        multiplier_type TEXT DEFAULT 'fixed',
         notes TEXT,
         order_index INTEGER DEFAULT 0,
         is_default INTEGER DEFAULT 0,
@@ -6530,6 +6534,32 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_costs_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_costs_unit_pricing_v1 (hotfix-2): per-unit pricing.
+    # Adds unit_price + multiplier_type so cost rows can be either a
+    # fixed amount (legacy behavior) or unit_price × N (per-student or
+    # per-attendee). amount column stays as a snapshot of the last
+    # computed total for back-compat with anything that reads it raw.
+    if "ev_costs_unit_pricing_v1" not in applied:
+        try:
+            _cost_cols = {r[1] for r in db2.execute(
+                "PRAGMA table_info(ev_costs)").fetchall()}
+        except Exception:
+            _cost_cols = set()
+        for _col, _decl in [
+            ("unit_price",      "REAL DEFAULT 0"),
+            ("multiplier_type", "TEXT DEFAULT 'fixed'"),
+        ]:
+            if _col not in _cost_cols:
+                try:
+                    db2.execute("ALTER TABLE ev_costs ADD COLUMN "
+                                + _col + " " + _decl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_costs_unit_pricing_v1",))
             db2.commit()
         except Exception: pass
 
@@ -65080,11 +65110,14 @@ _EV_STATUS_COLORS = {
 # label already includes the emoji so the row renders without a
 # client-side lookup.
 _EV_DEFAULT_COSTS = [
-    {"category": "transport", "label": "🚌 المواصلات",  "icon": "🚌"},
-    {"category": "food",      "label": "🍽️ المأكولات",  "icon": "🍽️"},
-    {"category": "tickets",   "label": "🎫 التذاكر",     "icon": "🎫"},
-    {"category": "gifts",     "label": "🎁 الهدايا",     "icon": "🎁"},
-    {"category": "emergency", "label": "🚨 طوارئ",      "icon": "🚨"},
+    # multiplier_type: fixed / per_student / per_attendee.
+    # Per-student bills the headcount × unit_price so the admin only
+    # has to update unit_price; the total auto-tracks registrations.
+    {"category": "transport", "label": "🚌 المواصلات",  "icon": "🚌", "multiplier_type": "fixed"},
+    {"category": "food",      "label": "🍽️ المأكولات",  "icon": "🍽️", "multiplier_type": "per_student"},
+    {"category": "tickets",   "label": "🎫 التذاكر",     "icon": "🎫", "multiplier_type": "per_student"},
+    {"category": "gifts",     "label": "🎁 الهدايا",     "icon": "🎁", "multiplier_type": "per_student"},
+    {"category": "emergency", "label": "🚨 طوارئ",      "icon": "🚨", "multiplier_type": "fixed"},
 ]
 
 
@@ -65099,9 +65132,11 @@ def _events_seed_default_costs(db, event_id):
         for i, c in enumerate(_EV_DEFAULT_COSTS):
             db.execute(
                 "INSERT INTO ev_costs(event_id, category, label, amount, "
+                "                     unit_price, multiplier_type, "
                 "                     order_index, is_default) "
-                "VALUES(?,?,?,?,?,1)",
-                (event_id, c["category"], c["label"], 0.0, i))
+                "VALUES(?,?,?,?,?,?,?,1)",
+                (event_id, c["category"], c["label"], 0.0,
+                 0.0, c.get("multiplier_type", "fixed"), i))
         db.commit()
     except Exception as ex:
         try: db.rollback()
@@ -65667,18 +65702,46 @@ def api_admin_events_update(eid):
 
 
 # ── Costs (4.2) ────────────────────────────────────────────────
-def _events_costs_row(rd):
+_EV_COST_MULTIPLIER_TYPES = ("fixed", "per_student", "per_attendee")
+
+
+def _events_costs_row(rd, ctx=None):
+    """ctx (optional) carries the multiplier denominators so the
+    server can return the computed_amount per row in one shot:
+      ctx = {"reg_count": int, "max_students": int, "attendee_count": int}
+    """
+    mult = (rd.get("multiplier_type") or "fixed").lower()
+    if mult not in _EV_COST_MULTIPLIER_TYPES:
+        mult = "fixed"
+    raw_amount = float(rd.get("amount") or 0)
+    unit_price = float(rd.get("unit_price") or 0)
+    count = 0
+    computed = raw_amount
+    if mult == "per_student" and ctx:
+        # Use registered count; fall back to capacity when no signups
+        # yet so the admin still sees a non-zero estimate while planning.
+        n_reg = int(ctx.get("reg_count") or 0)
+        n_cap = int(ctx.get("max_students") or 0)
+        count = n_reg if n_reg > 0 else n_cap
+        computed = round(unit_price * count, 3)
+    elif mult == "per_attendee" and ctx:
+        count = int(ctx.get("attendee_count") or 0)
+        computed = round(unit_price * count, 3)
     return {
-        "id":           rd.get("id"),
-        "event_id":     rd.get("event_id"),
-        "category":     rd.get("category") or "custom",
-        "label":        rd.get("label") or "",
-        "amount":       float(rd.get("amount") or 0),
-        "notes":        rd.get("notes") or "",
-        "order_index":  int(rd.get("order_index") or 0),
-        "is_default":   int(rd.get("is_default") or 0),
-        "created_at":   rd.get("created_at") or "",
-        "updated_at":   rd.get("updated_at") or "",
+        "id":               rd.get("id"),
+        "event_id":         rd.get("event_id"),
+        "category":         rd.get("category") or "custom",
+        "label":            rd.get("label") or "",
+        "amount":           raw_amount,
+        "unit_price":       unit_price,
+        "multiplier_type":  mult,
+        "multiplier_count": int(count),
+        "computed_amount":  float(computed),
+        "notes":            rd.get("notes") or "",
+        "order_index":      int(rd.get("order_index") or 0),
+        "is_default":       int(rd.get("is_default") or 0),
+        "created_at":       rd.get("created_at") or "",
+        "updated_at":       rd.get("updated_at") or "",
     }
 
 
@@ -65693,16 +65756,41 @@ def _events_costs_event_exists(db, eid):
     return dict(row) if row else None
 
 
-def _events_costs_summary(rows, event_row):
-    """Computes the calculator block from raw cost rows + the parent
-    event. Returns the same shape regardless of capacity / price /
-    registration state so the UI never has to branch on null fields."""
-    total = sum(float(r.get("amount") or 0) for r in rows)
+def _events_costs_compute_ctx(db, eid, event_row):
+    """Pre-compute the multiplier denominators once per request so
+    every cost row's computed_amount uses the same numbers."""
+    n_reg = 0
+    n_att = 0
+    try:
+        r = db.execute(
+            "SELECT COUNT(*), "
+            "       SUM(CASE WHEN attendance_status IN ('present','late') THEN 1 ELSE 0 END) "
+            "FROM ev_registrations WHERE event_id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+        if r:
+            rd = list(r) if not hasattr(r, "keys") else [r[0], r[1]]
+            n_reg = int(rd[0] or 0)
+            n_att = int(rd[1] or 0)
+    except Exception:
+        pass
+    return {
+        "reg_count":      n_reg,
+        "attendee_count": n_att,
+        "max_students":   int((event_row or {}).get("max_students") or 0),
+    }
+
+
+def _events_costs_summary(rows, event_row, ctx=None):
+    """Computes the calculator block from cost rows + the parent
+    event. rows are expected to already carry computed_amount (set
+    by _events_costs_row when ctx is passed in). Returns the same
+    shape regardless of capacity / price / registration state so the
+    UI never has to branch on null fields."""
+    # Prefer computed_amount (per-unit aware) over raw amount.
+    total = sum(float(r.get("computed_amount") if "computed_amount" in r else r.get("amount") or 0) for r in rows)
     cap   = int((event_row or {}).get("max_students") or 0)
     price = float((event_row or {}).get("price_per_student") or 0)
-    # Stage-7 wires the registered count; for now we treat 0 as
-    # "no signups yet" which matches the stub on _events_detail_dict.
-    registered = 0
+    registered = int((ctx or {}).get("reg_count") or 0)
     cost_actual = (total / registered) if registered > 0 else 0.0
     cost_max    = (total / cap) if cap > 0 else 0.0
     no_margin = cost_max
@@ -65756,9 +65844,10 @@ def api_admin_events_costs_list(eid):
         import sys as _sys
         print("[events] costs list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر القراءة"}), 500
-    out = [_events_costs_row(dict(r)) for r in rows]
-    summary = _events_costs_summary(out, ev)
-    return jsonify({"ok": True, "costs": out, "summary": summary})
+    ctx = _events_costs_compute_ctx(db, eid, ev)
+    out = [_events_costs_row(dict(r), ctx) for r in rows]
+    summary = _events_costs_summary(out, ev, ctx)
+    return jsonify({"ok": True, "costs": out, "summary": summary, "context": ctx})
 
 
 @app.route('/api/admin/events/<int:eid>/costs', methods=['POST'])
@@ -65775,10 +65864,27 @@ def api_admin_events_costs_create(eid):
     if not label:
         return jsonify({"ok": False, "error": "التسمية مطلوبة"}), 400
     category = (d.get("category") or "custom").strip().lower() or "custom"
+    mult = (d.get("multiplier_type") or "fixed").strip().lower()
+    if mult not in _EV_COST_MULTIPLIER_TYPES:
+        mult = "fixed"
+    try:
+        unit_price = max(0.0, float(d.get("unit_price") or 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "سعر الوحدة يجب أن يكون رقماً"}), 400
     try:
         amount = max(0.0, float(d.get("amount") or 0))
     except Exception:
         return jsonify({"ok": False, "error": "المبلغ يجب أن يكون رقماً"}), 400
+    # When multiplier is set, snapshot the computed total into amount
+    # for back-compat readers that haven't been updated yet.
+    if mult != "fixed":
+        ctx = _events_costs_compute_ctx(db, eid,
+                                        _events_costs_event_exists(db, eid))
+        if mult == "per_student":
+            n = int(ctx["reg_count"] or 0) or int(ctx["max_students"] or 0)
+        else:
+            n = int(ctx["attendee_count"] or 0)
+        amount = round(unit_price * n, 3)
     notes = (d.get("notes") or "").strip() or None
     try:
         cur = db.execute(
@@ -65789,10 +65895,11 @@ def api_admin_events_costs_create(eid):
         next_order = 0
     try:
         db.execute(
-            "INSERT INTO ev_costs(event_id, category, label, amount, notes, "
+            "INSERT INTO ev_costs(event_id, category, label, amount, "
+            "                     unit_price, multiplier_type, notes, "
             "                     order_index, is_default) "
-            "VALUES(?,?,?,?,?,?,0)",
-            (eid, category, label, amount, notes, next_order))
+            "VALUES(?,?,?,?,?,?,?,?,0)",
+            (eid, category, label, amount, unit_price, mult, notes, next_order))
         db.commit()
     except Exception as ex:
         try: db.rollback()
@@ -65806,12 +65913,15 @@ def api_admin_events_costs_create(eid):
         cid = None
     try:
         row = db.execute("SELECT * FROM ev_costs WHERE id = ?", (cid,)).fetchone()
-        item = _events_costs_row(dict(row)) if row else None
+        ev_now = _events_costs_event_exists(db, eid)
+        ctx_now = _events_costs_compute_ctx(db, eid, ev_now)
+        item = _events_costs_row(dict(row), ctx_now) if row else None
     except Exception:
         item = None
     try:
         _audit("event.costs.create", target_type="ev_costs", target_id=cid,
-               new_value={"event_id": eid, "label": label, "amount": amount})
+               new_value={"event_id": eid, "label": label, "amount": amount,
+                          "unit_price": unit_price, "multiplier_type": mult})
     except Exception:
         pass
     return jsonify({"ok": True, "id": cid, "item": item})
@@ -65847,6 +65957,16 @@ def api_admin_events_costs_update(eid, cid):
             upd["amount"] = max(0.0, float(d.get("amount") or 0))
         except Exception:
             return jsonify({"ok": False, "error": "المبلغ يجب أن يكون رقماً"}), 400
+    if "unit_price" in d:
+        try:
+            upd["unit_price"] = max(0.0, float(d.get("unit_price") or 0))
+        except Exception:
+            return jsonify({"ok": False, "error": "سعر الوحدة يجب أن يكون رقماً"}), 400
+    if "multiplier_type" in d:
+        v = (d.get("multiplier_type") or "fixed").strip().lower()
+        if v not in _EV_COST_MULTIPLIER_TYPES:
+            return jsonify({"ok": False, "error": "نوع الحساب غير معروف"}), 400
+        upd["multiplier_type"] = v
     if "notes" in d:
         upd["notes"] = (d.get("notes") or "").strip() or None
     if "order_index" in d:
@@ -65856,8 +65976,23 @@ def api_admin_events_costs_update(eid, cid):
             return jsonify({"ok": False, "error": "ترتيب غير صحيح"}), 400
     if "category" in d:
         upd["category"] = (d.get("category") or "custom").strip().lower() or "custom"
+    # If multiplier_type or unit_price changed, refresh the cached
+    # `amount` snapshot so downstream readers stay consistent.
+    eff_mult = upd.get("multiplier_type", cur.get("multiplier_type") or "fixed")
+    eff_unit = upd.get("unit_price",      float(cur.get("unit_price") or 0))
+    if eff_mult != "fixed" and (("unit_price" in upd) or ("multiplier_type" in upd)):
+        ev_now = _events_costs_event_exists(db, eid)
+        ctx_now = _events_costs_compute_ctx(db, eid, ev_now)
+        if eff_mult == "per_student":
+            n = int(ctx_now["reg_count"] or 0) or int(ctx_now["max_students"] or 0)
+        else:
+            n = int(ctx_now["attendee_count"] or 0)
+        upd["amount"] = round(float(eff_unit) * n, 3)
     if not upd:
-        return jsonify({"ok": True, "id": cid, "item": _events_costs_row(cur), "noop": True})
+        ctx_now = _events_costs_compute_ctx(db, eid,
+                                            _events_costs_event_exists(db, eid))
+        return jsonify({"ok": True, "id": cid,
+                        "item": _events_costs_row(cur, ctx_now), "noop": True})
     sets = ", ".join('"' + k + '" = ?' for k in upd.keys()) + ', updated_at = CURRENT_TIMESTAMP'
     try:
         db.execute("UPDATE ev_costs SET " + sets + " WHERE id = ?",
@@ -65871,7 +66006,9 @@ def api_admin_events_costs_update(eid, cid):
         return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
     try:
         new_row = db.execute("SELECT * FROM ev_costs WHERE id = ?", (cid,)).fetchone()
-        item = _events_costs_row(dict(new_row)) if new_row else None
+        ev_now = _events_costs_event_exists(db, eid)
+        ctx_now = _events_costs_compute_ctx(db, eid, ev_now)
+        item = _events_costs_row(dict(new_row), ctx_now) if new_row else None
     except Exception:
         item = None
     try:
@@ -69560,6 +69697,17 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-item-celebrate{display:inline-block;font-size:1.6rem;animation:evdCelebrate 1.6s infinite;}
   @keyframes evdCelebrate{0%,100%{transform:scale(1) rotate(-3deg);}50%{transform:scale(1.15) rotate(3deg);}}
   /* Costs panel (4.3) */
+  .evd-cost-mtype{display:flex;flex-direction:column;gap:6px;}
+  .evd-cost-mtype .opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#fafbfc;cursor:pointer;border:1.5px solid transparent;transition:.12s;}
+  .evd-cost-mtype .opt:hover{background:#f0f7f3;}
+  .evd-cost-mtype .opt input[type="radio"]:checked + span{color:#1D9E75;font-weight:900;}
+  .evd-cost-mtype .opt:has(input[type="radio"]:checked){background:#e6f7ee;border-color:#1D9E75;}
+  .evd-cost-mtype .opt span{font-weight:700;color:#444;font-size:.9rem;}
+  .evd-cost-calc-preview{margin-top:8px;background:#f6faff;border-radius:10px;padding:10px 14px;border-right:3px solid #1565C0;}
+  .evd-cost-calc-preview .ttl{font-size:.78rem;color:#666;font-weight:700;margin-bottom:4px;}
+  .evd-cost-calc-preview .eq{font-size:1.05rem;color:#0d47a1;font-weight:900;font-variant-numeric:tabular-nums;}
+  .evd-cost-row .badge-mult{display:inline-flex;align-items:center;gap:3px;font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:99px;margin-inline-start:6px;background:#e3f2fd;color:#0d47a1;border:1px solid #bbdefb;cursor:help;}
+  .evd-cost-row .badge-mult.fixed{background:#eef0f3;color:#666;border-color:#d3d8de;}
   .evd-cost-calc{background:linear-gradient(135deg,#fff8e1,#ffe9b3);border-radius:16px;padding:20px 22px;margin-bottom:14px;box-shadow:0 4px 14px rgba(230,150,0,0.15);border-right:5px solid #BA7517;}
   .evd-cost-calc h3{margin:0 0 12px;font-size:1.05rem;color:#7a4a00;font-weight:900;display:flex;align-items:center;gap:8px;}
   .evd-cost-calc .row{display:grid;grid-template-columns:170px 1fr;gap:8px 14px;padding:7px 0;border-bottom:1px dashed rgba(186,117,23,0.25);font-size:.94rem;}
@@ -70154,7 +70302,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
 
 <!-- Cost add/edit modal (4.3) -->
 <div class="evd-mb" id="evd-cost-mb" role="dialog" aria-modal="true" aria-labelledby="evd-cost-title">
-  <div class="evd-modal" style="max-width:440px;">
+  <div class="evd-modal" style="max-width:480px;">
     <h2 id="evd-cost-title">💰 صنف جديد</h2>
     <form id="evd-cost-form">
       <input type="hidden" id="cf-id"/>
@@ -70163,8 +70311,24 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
         <input id="cf-label" type="text" required maxlength="120" placeholder="مثلاً: مصاريف إضافية"/>
       </div>
       <div class="row">
+        <label>⚙️ نوع الحساب</label>
+        <div class="evd-cost-mtype" id="cf-mtype">
+          <label class="opt"><input type="radio" name="cf-mult" value="fixed" checked/><span>🔒 مبلغ ثابت</span></label>
+          <label class="opt"><input type="radio" name="cf-mult" value="per_student"/><span>👥 سعر × عدد المسجلات</span></label>
+          <label class="opt"><input type="radio" name="cf-mult" value="per_attendee"/><span>✅ سعر × عدد الحاضرات</span></label>
+        </div>
+      </div>
+      <div class="row" id="cf-amount-row">
         <label for="cf-amount">المبلغ (د.ب) *</label>
-        <input id="cf-amount" type="number" min="0" step="0.001" required/>
+        <input id="cf-amount" type="number" min="0" step="0.001"/>
+      </div>
+      <div class="row" id="cf-unit-row" style="display:none;">
+        <label for="cf-unit">سعر الوحدة (د.ب) *</label>
+        <input id="cf-unit" type="number" min="0" step="0.001"/>
+        <div class="evd-cost-calc-preview" id="cf-preview" hidden>
+          <div class="ttl">🧮 الحساب التلقائي</div>
+          <div class="eq" id="cf-preview-eq">—</div>
+        </div>
       </div>
       <div class="row">
         <label for="cf-notes">ملاحظات</label>
@@ -71488,6 +71652,7 @@ function evdItemDelete(iid){
 /* ── Costs panel (4.3) ───────────────────────────────────────── */
 var COST_DATA = [];
 var COST_SUMMARY = null;
+var COST_CTX = null;        // {reg_count, max_students, attendee_count}
 var COST_LOADED = false;
 
 function evdLoadCosts(){
@@ -71497,8 +71662,11 @@ function evdLoadCosts(){
       if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
       COST_DATA = j.costs || [];
       COST_SUMMARY = j.summary || {};
+      COST_CTX = j.context || null;
       COST_LOADED = true;
       evdRenderCosts();
+      // If the modal is open while data refreshes, refresh the preview.
+      evdRecomputeCostPreview();
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
@@ -71609,10 +71777,30 @@ function evdRenderCosts(){
   } else {
     rowsHTML = COST_DATA.map(function(c){
       var def = c.is_default ? '<span class="badge-default">افتراضي</span>' : '';
+      var mt = c.multiplier_type || 'fixed';
+      var displayAmt = (mt === 'fixed') ? c.amount : c.computed_amount;
+      var multBadge = '';
+      var clickable = true;
+      if (mt === 'per_student'){
+        var unit = parseFloat(c.unit_price || 0);
+        var n    = parseInt(c.multiplier_count || 0, 10);
+        multBadge = '<span class="badge-mult" title="' + evdEsc(unit.toFixed(3) + ' × ' + n + ' مسجلة = ' + Number(displayAmt || 0).toFixed(3) + ' د.ب') + '">📊 ' + unit.toFixed(3) + ' × ' + n + '</span>';
+        clickable = false;
+      } else if (mt === 'per_attendee'){
+        var unit2 = parseFloat(c.unit_price || 0);
+        var n2    = parseInt(c.multiplier_count || 0, 10);
+        multBadge = '<span class="badge-mult" title="' + evdEsc(unit2.toFixed(3) + ' × ' + n2 + ' حاضرة = ' + Number(displayAmt || 0).toFixed(3) + ' د.ب') + '">✅ ' + unit2.toFixed(3) + ' × ' + n2 + '</span>';
+        clickable = false;
+      } else {
+        multBadge = '<span class="badge-mult fixed" title="مبلغ ثابت">🔒</span>';
+      }
+      var amtCell = clickable
+        ? '<span class="display" data-cost-edit-amt="' + (c.id|0) + '" tabindex="0" title="اضغطي للتعديل">' + evdFmtBHD(displayAmt) + '</span>'
+        : '<span class="display" style="cursor:default;" title="هذا المبلغ يُحسب تلقائياً — استخدمي ✏️ لتغيير سعر الوحدة">' + evdFmtBHD(displayAmt) + '</span>';
       return '<div class="evd-cost-row" data-cid="' + (c.id|0) + '">'
-           + '  <div class="name">' + evdEsc(c.label) + def + '</div>'
+           + '  <div class="name">' + evdEsc(c.label) + def + multBadge + '</div>'
            + '  <div class="amt">'
-           + '    <span class="display" data-cost-edit-amt="' + (c.id|0) + '" tabindex="0" title="اضغطي للتعديل">' + evdFmtBHD(c.amount) + '</span>'
+           + '    ' + amtCell
            + '    <span class="saved" data-saved="' + (c.id|0) + '">✓</span>'
            + '  </div>'
            + '  <div class="acts">'
@@ -71730,12 +71918,48 @@ function evdCostInlineAmt(cid){
   });
 }
 
+function evdSetCostMtype(mt){
+  // Toggle which row is visible based on the chosen multiplier type.
+  var amountRow = document.getElementById('cf-amount-row');
+  var unitRow   = document.getElementById('cf-unit-row');
+  if (mt === 'fixed'){
+    if (amountRow) amountRow.style.display = '';
+    if (unitRow)   unitRow.style.display   = 'none';
+  } else {
+    if (amountRow) amountRow.style.display = 'none';
+    if (unitRow)   unitRow.style.display   = '';
+  }
+  evdRecomputeCostPreview();
+}
+
+function evdRecomputeCostPreview(){
+  var pv = document.getElementById('cf-preview');
+  var eq = document.getElementById('cf-preview-eq');
+  if (!pv || !eq) return;
+  var mt = (document.querySelector('input[name="cf-mult"]:checked') || {}).value || 'fixed';
+  if (mt === 'fixed'){ pv.hidden = true; return; }
+  var unit = parseFloat(document.getElementById('cf-unit').value || 0) || 0;
+  var ctx = COST_CTX || {reg_count:0, max_students:0, attendee_count:0};
+  var n = (mt === 'per_student')
+    ? (parseInt(ctx.reg_count || 0, 10) || parseInt(ctx.max_students || 0, 10))
+    : parseInt(ctx.attendee_count || 0, 10);
+  var lbl = (mt === 'per_student') ? 'مسجلة' : 'حاضرة';
+  var total = (unit * n);
+  eq.textContent = unit.toFixed(3) + ' × ' + n + ' ' + lbl + ' = ' + total.toFixed(3) + ' د.ب';
+  pv.hidden = false;
+}
+
 function evdOpenCostAdd(){
   document.getElementById('evd-cost-title').textContent = '💰 صنف جديد';
   document.getElementById('cf-id').value     = '';
   document.getElementById('cf-label').value  = '';
   document.getElementById('cf-amount').value = '';
+  document.getElementById('cf-unit').value   = '';
   document.getElementById('cf-notes').value  = '';
+  // Default to fixed; admin can change.
+  var fr = document.querySelector('input[name="cf-mult"][value="fixed"]');
+  if (fr) fr.checked = true;
+  evdSetCostMtype('fixed');
   document.getElementById('evd-cost-mb').classList.add('is-open');
   setTimeout(function(){ document.getElementById('cf-label').focus(); }, 50);
 }
@@ -71744,8 +71968,14 @@ function evdOpenCostEdit(c){
   document.getElementById('evd-cost-title').textContent = '✏️ تعديل الصنف';
   document.getElementById('cf-id').value     = c.id;
   document.getElementById('cf-label').value  = c.label || '';
-  document.getElementById('cf-amount').value = c.amount || '';
+  var mt = c.multiplier_type || 'fixed';
+  document.querySelectorAll('input[name="cf-mult"]').forEach(function(r){
+    r.checked = (r.value === mt);
+  });
+  document.getElementById('cf-amount').value = (c.amount && c.multiplier_type === 'fixed') ? c.amount : '';
+  document.getElementById('cf-unit').value   = (c.unit_price > 0) ? c.unit_price : '';
   document.getElementById('cf-notes').value  = c.notes || '';
+  evdSetCostMtype(mt);
   document.getElementById('evd-cost-mb').classList.add('is-open');
   setTimeout(function(){ document.getElementById('cf-label').focus(); }, 50);
 }
@@ -71759,10 +71989,13 @@ function evdSubmitCost(e){
   var btn = document.getElementById('evd-cost-save');
   btn.disabled = true; btn.style.opacity = '.6';
   var cid = parseInt(document.getElementById('cf-id').value || '0', 10);
+  var mt  = (document.querySelector('input[name="cf-mult"]:checked') || {}).value || 'fixed';
   var body = {
-    label:  document.getElementById('cf-label').value.trim(),
-    amount: document.getElementById('cf-amount').value || 0,
-    notes:  document.getElementById('cf-notes').value.trim()
+    label:           document.getElementById('cf-label').value.trim(),
+    amount:          (mt === 'fixed') ? (document.getElementById('cf-amount').value || 0) : 0,
+    unit_price:      (mt === 'fixed') ? 0 : (document.getElementById('cf-unit').value || 0),
+    multiplier_type: mt,
+    notes:           document.getElementById('cf-notes').value.trim()
   };
   var url, method;
   if (cid){
@@ -71955,6 +72188,17 @@ function evdLoadRegs(){
       REG_LOADED    = true;
       evdRenderRegs();
       evdRefreshHeaderChips();
+      // Per-unit costs depend on registration / attendee counts, so
+      // a registration change invalidates the costs cache. Refresh
+      // immediately if the costs panel is currently mounted, or
+      // mark stale so the next visit re-fetches.
+      if (COST_LOADED){
+        if (document.querySelector('.evd-panel[data-panel="costs"].is-active')){
+          evdLoadCosts();
+        } else {
+          COST_LOADED = false;
+        }
+      }
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
@@ -72822,6 +73066,12 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-cost-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseCost();
   });
+  // Per-unit pricing wires (hotfix-2)
+  document.querySelectorAll('input[name="cf-mult"]').forEach(function(r){
+    r.addEventListener('change', function(){ evdSetCostMtype(r.value); });
+  });
+  var cfUnit = document.getElementById('cf-unit');
+  if (cfUnit) cfUnit.addEventListener('input', evdRecomputeCostPreview);
   // Item modal wires (5.2)
   document.getElementById('evd-item-cancel').addEventListener('click', evdCloseItem);
   document.getElementById('evd-item-form').addEventListener('submit', evdSubmitItem);
