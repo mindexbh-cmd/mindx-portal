@@ -6282,6 +6282,39 @@ if True:
                   file=_sys.stderr)
         except Exception: pass
 
+    # ── curriculum_uploads_cleanup_v1: rmtree the curriculum PDF
+    # storage on disk (Render persistent volume + local fallback).
+    # Best-effort: any failure is logged but never aborts boot; the
+    # tag is stamped only after a successful rmdir-or-already-gone
+    # outcome on every candidate path so a half-complete cleanup
+    # re-runs on the next boot.
+    if "curriculum_uploads_cleanup_v1" not in applied:
+        import shutil as _shutil, os as _os, sys as _sys
+        _all_clean = True
+        for _path in ("/var/data/curriculum",
+                      _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                    "data", "curriculum")):
+            if _os.path.isdir(_path):
+                try:
+                    _shutil.rmtree(_path)
+                    print("[curriculum-cleanup] removed " + _path,
+                          file=_sys.stderr)
+                except Exception as _e:
+                    _all_clean = False
+                    print("[curriculum-cleanup] failed " + _path + ": "
+                          + str(_e), file=_sys.stderr)
+            else:
+                print("[curriculum-cleanup] not present " + _path,
+                      file=_sys.stderr)
+        if _all_clean:
+            try:
+                db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                            ("curriculum_uploads_cleanup_v1",))
+                db2.commit()
+                print("[curriculum-cleanup] curriculum_uploads_cleanup_v1 DONE",
+                      file=_sys.stderr)
+            except Exception: pass
+
     # ── violations_v1: نظام المخالفات — admin-only behaviour-incident
     # registry. See init_db() above for the canonical CREATE. Mirror
     # here for existing DBs: CREATE TABLE IF NOT EXISTS + indices are
