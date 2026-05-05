@@ -71247,32 +71247,34 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-stat[data-k="cash"] {--rsc:#E65100;}
   .evd-reg-stat[data-k="att"]  {--rsc:#1565C0;}
   .evd-reg-stat[data-k="rcpt"] {--rsc:#6B3FA0;}
-  /* Receipt thumbnail in row + lightbox (payment-3) */
-  .evd-receipt-thumb{width:42px;height:42px;border-radius:8px;border:2px solid #1D9E75;object-fit:cover;cursor:pointer;transition:.15s;background:#f6faff;}
-  .evd-receipt-thumb:hover{transform:scale(1.1);box-shadow:0 4px 12px rgba(29,158,117,0.30);}
-  .evd-receipt-none{color:#aaa;font-style:italic;font-size:.85rem;}
-  .evd-receipt-lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;animation:evdLightboxFade .2s ease;}
-  @keyframes evdLightboxFade{from{opacity:0;}to{opacity:1;}}
-  .evd-receipt-lightbox .close-btn{position:absolute;top:16px;left:16px;width:42px;height:42px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;font-size:1.4rem;cursor:pointer;transition:.15s;}
-  .evd-receipt-lightbox .close-btn:hover{background:rgba(255,255,255,0.30);transform:rotate(90deg);}
-  .lightbox-content{background:#fff;border-radius:16px;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.50);animation:evdLightboxPop .25s ease;}
-  @keyframes evdLightboxPop{from{transform:scale(0.92);opacity:0;}to{transform:scale(1);opacity:1;}}
-  .lightbox-content .header{padding:16px 20px;border-bottom:2px solid #f0f3f7;}
-  .lightbox-content .title{font-weight:900;color:#0d47a1;font-size:1.1rem;}
-  .lightbox-content .meta{font-size:.85rem;color:#666;margin-top:4px;}
-  .lightbox-content .image-wrap{padding:20px;background:#fafbfc;text-align:center;}
-  .lightbox-content .image-wrap img{max-width:100%;max-height:60vh;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.10);}
-  .lightbox-content .actions{padding:16px 20px;display:flex;gap:10px;border-top:2px solid #f0f3f7;flex-wrap:wrap;}
-  .act-confirm,.act-reject,.act-download{flex:1;padding:12px 18px;border-radius:10px;font-weight:900;font-size:.95rem;cursor:pointer;border:none;text-decoration:none;text-align:center;transition:.15s;}
-  .act-confirm{background:#1D9E75;color:#fff;}
-  .act-confirm:hover{background:#16805e;}
-  .act-reject{background:#c62828;color:#fff;}
-  .act-reject:hover{background:#b71c1c;}
-  .act-download{background:#1565C0;color:#fff;}
-  .act-download:hover{background:#0d47a1;}
+  /* Inline receipt panel (payment-fix). Lightbox removed — the
+     receipt now renders directly inside its registration row. */
+  .evd-reg-row-top{display:grid;grid-template-columns:34px 1fr 1fr auto auto auto;gap:10px;align-items:center;font-size:.92rem;}
+  .evd-reg-row-receipt{margin-top:12px;padding:14px;background:linear-gradient(135deg,#f0f9f5 0%,#fff 100%);border:1.5px solid #1D9E75;border-radius:12px;animation:evdReceiptIn .3s ease;}
+  @keyframes evdReceiptIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  .evd-reg-row-receipt[hidden]{display:none;}
+  .evd-reg-row-receipt .receipt-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed #c6ecd6;flex-wrap:wrap;gap:6px;}
+  .evd-reg-row-receipt .lbl{font-weight:900;color:#0e5a3e;font-size:.95rem;}
+  .evd-reg-row-receipt .ts{font-size:.78rem;color:#666;font-weight:600;}
+  .evd-reg-row-receipt .receipt-img{display:block;max-width:100%;max-height:300px;margin:0 auto 12px;border-radius:10px;border:2px solid #d3d8de;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .evd-reg-row-receipt .receipt-img:hover{transform:scale(1.02);box-shadow:0 4px 14px rgba(0,0,0,0.15);}
+  .evd-reg-row-receipt .receipt-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .evd-reg-row-receipt .receipt-actions button,
+  .evd-reg-row-receipt .receipt-actions a{padding:10px 20px;border-radius:10px;font-weight:900;font-size:.9rem;cursor:pointer;border:none;text-decoration:none;transition:.15s;display:inline-block;}
+  .evd-reg-row-receipt .act-confirm{background:#1D9E75;color:#fff;}
+  .evd-reg-row-receipt .act-confirm:hover{background:#16805e;}
+  .evd-reg-row-receipt .act-reject{background:#c62828;color:#fff;}
+  .evd-reg-row-receipt .act-reject:hover{background:#b71c1c;}
+  .evd-reg-row-receipt .act-download{background:#1565C0;color:#fff;}
+  .evd-reg-row-receipt .act-download:hover{background:#0d47a1;}
+  /* When payment is already confirmed, soften the panel + add a tag */
+  .evd-reg-row-receipt[data-paid="1"]{background:linear-gradient(135deg,#e8f5e9 0%,#fff 100%);}
+  .evd-reg-row-receipt[data-paid="1"] .lbl::after{content:" ✓ مدفوع";color:#1D9E75;font-size:.85rem;margin-inline-start:6px;}
   @media (max-width:520px){
-    .lightbox-content .actions{flex-direction:column;}
-    .act-confirm,.act-reject,.act-download{width:100%;}
+    .evd-reg-row-receipt .receipt-actions{flex-direction:column;}
+    .evd-reg-row-receipt .receipt-actions button,
+    .evd-reg-row-receipt .receipt-actions a{width:100%;}
+    .evd-reg-row-receipt .receipt-img{max-height:250px;}
   }
   .evd-reg-stat .lab{font-size:.78rem;color:#666;font-weight:700;display:flex;align-items:center;gap:5px;margin-bottom:5px;}
   .evd-reg-stat .val{font-size:1.18rem;color:#222;font-weight:900;font-variant-numeric:tabular-nums;}
@@ -71283,7 +71285,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-toolbar input.search{flex:1;min-width:160px;padding:8px 12px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.92rem;}
   .evd-reg-toolbar select.filter{padding:8px 10px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.9rem;background:#fff;}
   .evd-reg-table{background:#fff;border-radius:14px;padding:6px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #1565C0;}
-  .evd-reg-row{display:grid;grid-template-columns:34px 1fr 1fr auto auto auto auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
+  .evd-reg-row{display:flex;flex-direction:column;gap:0;padding:12px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
   .evd-reg-row:last-child{border-bottom:0;}
   .evd-reg-row.is-leaving{animation:evdItemIn .18s ease reverse both;}
   .evd-reg-row.is-stripe{background:rgba(29,158,117,0.025);}
@@ -71487,10 +71489,10 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-task-toolbar{flex-direction:column;align-items:stretch;}
     .evd-task-filters{margin-inline-start:0;justify-content:flex-start;}
     .evd-reg-stats{grid-template-columns:repeat(2,1fr);}
-    .evd-reg-row{grid-template-columns:30px 1fr auto;gap:6px;}
-    .evd-reg-row .par{display:none;}
-    .evd-reg-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
-    .evd-reg-row .pay-cell,.evd-reg-row .att-cell,.evd-reg-row .rcpt-cell{grid-column:1 / -1;justify-content:flex-end;display:flex;gap:6px;}
+    .evd-reg-row-top{grid-template-columns:30px 1fr auto;gap:6px;}
+    .evd-reg-row-top .par{display:none;}
+    .evd-reg-row-top .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-reg-row-top .pay-cell,.evd-reg-row-top .att-cell{grid-column:1 / -1;justify-content:flex-end;display:flex;gap:6px;}
     .evd-reg-bulk-btns{grid-template-columns:repeat(3,1fr);}
     .evd-prn-card{grid-template-columns:auto 1fr;}
     .evd-prn-card button{grid-column:1 / -1;justify-self:end;}
@@ -72053,25 +72055,6 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
 <div class="evd-reg-pop" id="evd-reg-pop" role="menu">
   <div class="pop-arrow"></div>
   <div id="evd-reg-pop-body"></div>
-</div>
-
-<!-- Receipt lightbox (payment-3) — opens when admin taps a receipt thumbnail -->
-<div class="evd-receipt-lightbox" id="evd-receipt-lightbox" hidden>
-  <button class="close-btn" id="evd-receipt-close" aria-label="إغلاق">✕</button>
-  <div class="lightbox-content">
-    <div class="header">
-      <div class="title">📎 إيصال الدفع</div>
-      <div class="meta" id="evd-receipt-meta">—</div>
-    </div>
-    <div class="image-wrap">
-      <img id="evd-receipt-img" src="" alt="إيصال الدفع"/>
-    </div>
-    <div class="actions">
-      <button id="evd-receipt-confirm" class="act-confirm">✅ تأكيد الدفع</button>
-      <button id="evd-receipt-reject" class="act-reject">❌ رفض الإيصال</button>
-      <a id="evd-receipt-download" class="act-download" download target="_blank" rel="noopener">⬇️ تحميل</a>
-    </div>
-  </div>
 </div>
 
 <!-- Delete confirmation modal (2.4) -->
@@ -73887,22 +73870,39 @@ function evdRegRowHTML(r, idx){
   }
   var grpChip = r.group_name ? '<span class="grp">' + evdEsc(r.group_name) + '</span>' : '';
   var stripe = (idx % 2 === 1) ? ' is-stripe' : '';
-  var receiptCell = r.receipt_image_url
-    ? '<img class="evd-receipt-thumb" data-receipt-rid="' + (r.id|0) + '" '
-      + 'src="' + evdEsc(r.receipt_image_url) + '" '
-      + 'alt="إيصال" title="اضغطي لعرض الإيصال" loading="lazy"/>'
-    : '<span class="evd-receipt-none" title="لم يتم رفع إيصال">—</span>';
+  // Inline receipt panel (rendered only when a receipt exists).
+  var receiptSection = '';
+  if (r.receipt_image_url){
+    var paidAttr = (r.payment_status === 'paid') ? ' data-paid="1"' : '';
+    var ts = r.receipt_uploaded_at ? evdEsc(r.receipt_uploaded_at) : '';
+    var url = evdEsc(r.receipt_image_url);
+    receiptSection = ''
+      + '<div class="evd-reg-row-receipt" data-rid="' + (r.id|0) + '"' + paidAttr + '>'
+      + '  <div class="receipt-header">'
+      + '    <span class="lbl">📎 إيصال الدفع</span>'
+      + (ts ? '<span class="ts">رُفع: ' + ts + '</span>' : '')
+      + '  </div>'
+      + '  <img class="receipt-img" data-rcpt-zoom="' + url + '" src="' + url + '" alt="إيصال" loading="lazy"/>'
+      + '  <div class="receipt-actions">'
+      + '    <button type="button" class="act-confirm" data-confirm-rid="' + (r.id|0) + '">✅ تأكيد الدفع</button>'
+      + '    <button type="button" class="act-reject"  data-reject-rid="' + (r.id|0) + '">❌ رفض الإيصال</button>'
+      + '    <a class="act-download" href="' + url + '" download target="_blank" rel="noopener">⬇️ تحميل</a>'
+      + '  </div>'
+      + '</div>';
+  }
   return '<div class="evd-reg-row' + stripe + '" data-rid="' + (r.id|0) + '">'
-       + '  <div class="num">' + (idx + 1) + '</div>'
-       + '  <div class="who"><span class="nm">' + evdEsc(r.student_name) + '</span>' + grpChip + '</div>'
-       + '  <div class="par"><span class="pn">' + (r.parent_name ? evdEsc(r.parent_name) : '<span class="none">— لم يُحدد —</span>') + '</span><span class="ph">' + phLink + '</span></div>'
-       + '  <div class="pay-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('pay', r.payment_status) + '</div>'
-       + '  <div class="att-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('att', r.attendance_status) + '</div>'
-       + '  <div class="rcpt-cell">' + receiptCell + '</div>'
-       + '  <div class="acts">'
-       + '    <button type="button" data-reg-edit="' + (r.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
-       + '    <button type="button" class="del" data-reg-del="' + (r.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+       + '  <div class="evd-reg-row-top">'
+       + '    <div class="num">' + (idx + 1) + '</div>'
+       + '    <div class="who"><span class="nm">' + evdEsc(r.student_name) + '</span>' + grpChip + '</div>'
+       + '    <div class="par"><span class="pn">' + (r.parent_name ? evdEsc(r.parent_name) : '<span class="none">— لم يُحدد —</span>') + '</span><span class="ph">' + phLink + '</span></div>'
+       + '    <div class="pay-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('pay', r.payment_status) + '</div>'
+       + '    <div class="att-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('att', r.attendance_status) + '</div>'
+       + '    <div class="acts">'
+       + '      <button type="button" data-reg-edit="' + (r.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+       + '      <button type="button" class="del" data-reg-del="' + (r.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+       + '    </div>'
        + '  </div>'
+       + receiptSection
        + '</div>';
 }
 
@@ -74023,61 +74023,60 @@ function evdRenderRegs(){
       evdRegOpenPopover(el, rid, kind);
     });
   });
-  // Receipt thumbnail click → open lightbox
-  root.querySelectorAll('.evd-receipt-thumb').forEach(function(img){
+  // Inline receipt panel buttons — confirm / reject / image-zoom
+  root.querySelectorAll('button[data-confirm-rid]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      evdConfirmPaymentInline(parseInt(btn.getAttribute('data-confirm-rid'), 10));
+    });
+  });
+  root.querySelectorAll('button[data-reject-rid]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      evdRejectPaymentInline(parseInt(btn.getAttribute('data-reject-rid'), 10));
+    });
+  });
+  root.querySelectorAll('img[data-rcpt-zoom]').forEach(function(img){
     img.addEventListener('click', function(){
-      var rid = parseInt(img.getAttribute('data-receipt-rid'), 10);
-      var reg = (REG_DATA || []).find(function(x){ return x.id === rid; });
-      if (reg) evdOpenReceipt(reg);
+      var u = img.getAttribute('data-rcpt-zoom');
+      if (u) window.open(u, '_blank', 'noopener');
     });
   });
 }
 
-/* Receipt lightbox (payment-3) */
-var CURRENT_RECEIPT_REG = null;
-function evdOpenReceipt(reg){
-  if (!reg || !reg.receipt_image_url){
-    evdToast('لا يوجد إيصال لهذه الطالبة', 'error');
-    return;
-  }
-  CURRENT_RECEIPT_REG = reg;
-  document.getElementById('evd-receipt-img').src = reg.receipt_image_url;
-  var meta = (reg.student_name || '—');
-  if (reg.receipt_uploaded_at) meta += ' — ' + reg.receipt_uploaded_at;
-  document.getElementById('evd-receipt-meta').textContent = meta;
-  document.getElementById('evd-receipt-download').href = reg.receipt_image_url;
-  document.getElementById('evd-receipt-lightbox').hidden = false;
-}
-function evdCloseReceipt(){
-  document.getElementById('evd-receipt-lightbox').hidden = true;
-  CURRENT_RECEIPT_REG = null;
-}
-function evdReceiptSetStatus(newSt, label){
-  if (!CURRENT_RECEIPT_REG) return;
-  var rid = CURRENT_RECEIPT_REG.id;
+/* Inline receipt verify (replaces the old lightbox) */
+function evdConfirmPaymentInline(rid){
+  if (!rid) return;
   fetch('/api/admin/events/' + EID + '/registrations/' + rid, {
     method: 'PATCH',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({payment_status: newSt}),
+    body: JSON.stringify({payment_status: 'paid'}),
     credentials: 'same-origin'
   })
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
     .then(function(o){
       if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
-      evdToast(label, 'success');
-      evdCloseReceipt();
+      evdToast('✅ تم تأكيد الدفع', 'success');
       evdLoadRegs();
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
-function evdConfirmPayment(){
-  evdReceiptSetStatus('paid', '✅ تم تأكيد الدفع');
-}
-function evdRejectPayment(){
+function evdRejectPaymentInline(rid){
+  if (!rid) return;
   if (!confirm('هل تريدين رفض هذا الإيصال وإعادة الحالة إلى «بانتظار»؟')) return;
   // Map "rejected receipt" to payment_status='pending' since "unpaid"
   // isn't one of the supported statuses (_EV_REG_PAY_STATUSES).
-  evdReceiptSetStatus('pending', 'تم رفض الإيصال');
+  fetch('/api/admin/events/' + EID + '/registrations/' + rid, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({payment_status: 'pending'}),
+    credentials: 'same-origin'
+  })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); return; }
+      evdToast('تم رفض الإيصال', 'success');
+      evdLoadRegs();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
 function evdOpenRegAdd(){
@@ -74918,17 +74917,6 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('#rf-mode-tabs button').forEach(function(b){
     b.addEventListener('click', function(){ evdRegSetMode(b.getAttribute('data-mode')); });
   });
-  // Receipt lightbox wires (payment-3)
-  var rcptCloseBtn = document.getElementById('evd-receipt-close');
-  if (rcptCloseBtn) rcptCloseBtn.addEventListener('click', evdCloseReceipt);
-  var rcptConfirm = document.getElementById('evd-receipt-confirm');
-  if (rcptConfirm) rcptConfirm.addEventListener('click', evdConfirmPayment);
-  var rcptReject = document.getElementById('evd-receipt-reject');
-  if (rcptReject) rcptReject.addEventListener('click', evdRejectPayment);
-  var rcptBox = document.getElementById('evd-receipt-lightbox');
-  if (rcptBox) rcptBox.addEventListener('click', function(e){
-    if (e.target === this) evdCloseReceipt();
-  });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
     document.getElementById('evd-del-mb').classList.add('is-open');
@@ -74963,8 +74951,6 @@ document.addEventListener('DOMContentLoaded', function(){
       document.getElementById('evd-status-menu').classList.remove('is-open');
       var pop = document.getElementById('evd-reg-pop');
       if (pop) pop.classList.remove('is-open');
-      var lb = document.getElementById('evd-receipt-lightbox');
-      if (lb && !lb.hidden) evdCloseReceipt();
     }
   });
 });
