@@ -66496,6 +66496,268 @@ def api_admin_events_reg_bulk_attendance(eid):
     return jsonify({"ok": True, "updated_count": updated})
 
 
+# ── Public registration page (7.1) ─────────────────────────────
+PUBLIC_EVENT_REG_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{TITLE}}</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Tahoma','Segoe UI',sans-serif;background:linear-gradient(135deg,#e6f7ee 0%,#f4f5f7 60%,#fff 100%);color:#222;min-height:100vh;}
+  .pubreg-wrap{max-width:520px;margin:0 auto;padding:18px;}
+  .pubreg-brand{text-align:center;color:#1D9E75;font-weight:900;font-size:1rem;margin:6px 0 14px;letter-spacing:1px;}
+  .pubreg-card{background:#fff;border-radius:18px;box-shadow:0 8px 28px rgba(29,158,117,0.10);padding:24px;}
+  .pubreg-banner{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border-radius:14px;padding:18px;margin-bottom:18px;text-align:center;}
+  .pubreg-banner .ttl{font-size:1.3rem;font-weight:900;margin-bottom:8px;}
+  .pubreg-banner .meta{font-size:.92rem;opacity:.95;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;font-weight:700;}
+  .pubreg-banner .meta span{display:inline-flex;align-items:center;gap:4px;}
+  .pubreg-banner .price{display:inline-block;background:rgba(255,255,255,0.22);padding:6px 18px;border-radius:99px;margin-top:10px;font-weight:800;font-size:.95rem;}
+  .pubreg-row{margin-bottom:12px;}
+  .pubreg-row label{display:block;font-weight:800;color:#444;font-size:.9rem;margin-bottom:5px;}
+  .pubreg-row input,.pubreg-row textarea{width:100%;padding:12px 14px;border:1.5px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:1rem;}
+  .pubreg-row input:focus,.pubreg-row textarea:focus{border-color:#1D9E75;outline:none;box-shadow:0 0 0 3px rgba(29,158,117,0.15);}
+  .pubreg-row textarea{min-height:70px;resize:vertical;}
+  .pubreg-submit{display:block;width:100%;background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border:none;padding:14px;border-radius:10px;font-weight:900;cursor:pointer;font-size:1.05rem;margin-top:8px;}
+  .pubreg-submit:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(29,158,117,0.30);}
+  .pubreg-submit:disabled{opacity:.6;cursor:not-allowed;}
+  .pubreg-err,.pubreg-ok{padding:12px;border-radius:10px;font-weight:800;text-align:center;margin-bottom:10px;}
+  .pubreg-err{background:#ffebee;color:#c62828;}
+  .pubreg-ok{background:#e6f7ee;color:#1D9E75;}
+  .pubreg-foot{text-align:center;color:#888;font-size:.78rem;margin-top:18px;}
+  .pubreg-status{text-align:center;padding:40px 18px;}
+  .pubreg-status .em{font-size:3.4rem;}
+  .pubreg-status .h{font-weight:900;color:#1D9E75;margin:10px 0 8px;font-size:1.2rem;}
+  .pubreg-status .sub{color:#666;font-size:.94rem;line-height:1.6;}
+  @media (max-width:520px){
+    .pubreg-card{padding:16px;border-radius:14px;}
+    .pubreg-banner .ttl{font-size:1.1rem;}
+  }
+</style></head><body>
+<div class="pubreg-wrap">
+  <div class="pubreg-brand">🌿 MINDEX</div>
+  <div class="pubreg-card" id="pubreg-root">{{BODY}}</div>
+  <div class="pubreg-foot">© Mindex — جميع الحقوق محفوظة</div>
+</div>
+{{SCRIPT}}
+</body></html>"""
+
+
+def _events_public_event_by_token(db, token):
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_events "
+            "WHERE registration_token = ? AND is_deleted = 0 "
+            "LIMIT 1", (token,)).fetchone()
+    except Exception:
+        return None
+    return dict(row) if row else None
+
+
+def _events_public_render_form(ev):
+    """Render the registration form with event banner."""
+    name = (ev.get("name") or "رحلة").strip()
+    dest = (ev.get("destination") or "").strip()
+    date_iso = (ev.get("event_date") or "").strip()
+    date_lbl = ""
+    if date_iso and len(date_iso) >= 10:
+        try:
+            months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو",
+                      "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+            y, m, d = date_iso[:10].split("-")
+            date_lbl = "%d %s %s" % (int(d), months[int(m)-1], y)
+        except Exception:
+            date_lbl = date_iso
+    dep = (ev.get("departure_time") or "").strip()
+    place = (ev.get("meeting_point") or dest or "").strip()
+    price = float(ev.get("price_per_student") or 0)
+    price_lbl = ("%.3f د.ب" % price) if price > 0 else "مجاناً"
+    import html as _html
+    banner = ('<div class="pubreg-banner">'
+              '<div class="ttl">🚌 ' + _html.escape(name) + '</div>'
+              '<div class="meta">'
+              + (('<span>📅 ' + _html.escape(date_lbl) + '</span>') if date_lbl else '')
+              + (('<span>⏰ ' + _html.escape(dep) + '</span>') if dep else '')
+              + (('<span>📍 ' + _html.escape(place) + '</span>') if place else '')
+              + '</div>'
+              '<div class="price">💰 ' + _html.escape(price_lbl) + '</div>'
+              '</div>')
+    form = ('<div id="pubreg-msg"></div>'
+            '<form id="pubreg-form">'
+            '<div class="pubreg-row">'
+            '  <label for="pr-name">اسم الطالبة *</label>'
+            '  <input id="pr-name" type="text" required maxlength="120" placeholder="الاسم الكامل"/>'
+            '</div>'
+            '<div class="pubreg-row">'
+            '  <label for="pr-parent">اسم الأم</label>'
+            '  <input id="pr-parent" type="text" maxlength="120" placeholder="اختياري"/>'
+            '</div>'
+            '<div class="pubreg-row">'
+            '  <label for="pr-phone">هاتف ولي الأمر *</label>'
+            '  <input id="pr-phone" type="tel" required maxlength="32" inputmode="tel" placeholder="مثلاً 33112233"/>'
+            '</div>'
+            '<div class="pubreg-row">'
+            '  <label for="pr-notes">ملاحظات (اختياري)</label>'
+            '  <textarea id="pr-notes" maxlength="400" placeholder="أي ملاحظات تودّون إخبارنا بها"></textarea>'
+            '</div>'
+            '<button type="submit" class="pubreg-submit" id="pr-submit">✨ تأكيد التسجيل</button>'
+            '</form>')
+    return banner + form
+
+
+def _events_public_render_closed(reason):
+    return ('<div class="pubreg-status">'
+            '<div class="em">🔒</div>'
+            '<div class="h">التسجيل غير متاح</div>'
+            '<div class="sub">' + reason + '</div>'
+            '</div>')
+
+
+def _events_public_render_thanks(ev_name):
+    import html as _html
+    return ('<div class="pubreg-status">'
+            '<div class="em">🎉</div>'
+            '<div class="h">شكراً لتسجيلك!</div>'
+            '<div class="sub">تم استلام طلب تسجيل الطالبة في «'
+            + _html.escape(ev_name)
+            + '».<br/>سيتواصل معك فريقنا قريباً.</div>'
+            '</div>')
+
+
+_PUBLIC_REG_SCRIPT = r"""<script>
+(function(){
+  var f = document.getElementById('pubreg-form');
+  if (!f) return;
+  var token = window.location.pathname.split('/').pop();
+  function msg(html, kind){
+    var m = document.getElementById('pubreg-msg');
+    if (m) m.innerHTML = '<div class="pubreg-' + (kind || 'err') + '">' + html + '</div>';
+  }
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var btn = document.getElementById('pr-submit');
+    btn.disabled = true; btn.textContent = '… جار الإرسال';
+    var body = {
+      student_name: (document.getElementById('pr-name').value || '').trim(),
+      parent_name:  (document.getElementById('pr-parent').value || '').trim(),
+      parent_phone: (document.getElementById('pr-phone').value || '').trim(),
+      notes:        (document.getElementById('pr-notes').value || '').trim()
+    };
+    fetch('/events/register/' + token, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        btn.disabled = false; btn.textContent = '✨ تأكيد التسجيل';
+        msg(o.j.error || 'تعذّر التسجيل، حاول لاحقاً', 'err');
+        return;
+      }
+      document.getElementById('pubreg-root').innerHTML = o.j.html || '<div class="pubreg-ok">تم التسجيل بنجاح ✅</div>';
+    })
+    .catch(function(){
+      btn.disabled = false; btn.textContent = '✨ تأكيد التسجيل';
+      msg('خطأ في الاتصال بالخادم', 'err');
+    });
+  });
+})();
+</script>"""
+
+
+@app.route('/events/register/<token>', methods=['GET'])
+def events_public_register_get(token):
+    """Public — no login required. Renders the parent-facing
+    registration form for an event identified by its share token."""
+    db = get_db()
+    ev = _events_public_event_by_token(db, token)
+    title = "تسجيل في رحلة"
+    if not ev:
+        body = _events_public_render_closed("الرابط غير صالح أو انتهت صلاحيته.")
+        script = ""
+    else:
+        st = (ev.get("status") or "planning").lower()
+        if st != "open":
+            body = _events_public_render_closed("التسجيل في هذه الرحلة غير مفتوح حالياً.")
+            script = ""
+        else:
+            cap = int(ev.get("max_students") or 0)
+            cur = 0
+            if cap > 0:
+                try:
+                    r = db.execute(
+                        "SELECT COUNT(*) FROM ev_registrations "
+                        "WHERE event_id = ? AND is_deleted = 0",
+                        (int(ev.get("id")),)).fetchone()
+                    cur = int(list(r)[0] or 0) if r else 0
+                except Exception:
+                    cur = 0
+            if cap > 0 and cur >= cap:
+                body = _events_public_render_closed("اكتمل العدد، لم تعد الرحلة تقبل تسجيلات جديدة.")
+                script = ""
+            else:
+                body = _events_public_render_form(ev)
+                script = _PUBLIC_REG_SCRIPT
+                title = "تسجيل في " + (ev.get("name") or "رحلة")
+    html = (PUBLIC_EVENT_REG_HTML
+            .replace("{{TITLE}}", title)
+            .replace("{{BODY}}", body)
+            .replace("{{SCRIPT}}", script))
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/events/register/<token>', methods=['POST'])
+def events_public_register_post(token):
+    db = get_db()
+    ev = _events_public_event_by_token(db, token)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرابط غير صالح"}), 404
+    if (ev.get("status") or "").lower() != "open":
+        return jsonify({"ok": False, "error": "التسجيل غير مفتوح حالياً"}), 400
+    d = request.get_json(silent=True) or {}
+    student_name = (d.get("student_name") or "").strip()
+    parent_name  = (d.get("parent_name") or "").strip() or None
+    parent_phone = (d.get("parent_phone") or "").strip()
+    notes        = (d.get("notes") or "").strip() or None
+    if not student_name:
+        return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
+    if not parent_phone:
+        return jsonify({"ok": False, "error": "رقم هاتف ولي الأمر مطلوب"}), 400
+    eid = int(ev.get("id"))
+    cap = int(ev.get("max_students") or 0)
+    if cap > 0:
+        try:
+            r = db.execute(
+                "SELECT COUNT(*) FROM ev_registrations "
+                "WHERE event_id = ? AND is_deleted = 0",
+                (eid,)).fetchone()
+            cur = int(list(r)[0] or 0) if r else 0
+        except Exception:
+            cur = 0
+        if cur >= cap:
+            return jsonify({"ok": False, "error": "اكتمل العدد"}), 400
+    try:
+        db.execute(
+            "INSERT INTO ev_registrations(event_id, student_id, student_name, "
+            "                             parent_name, parent_phone, "
+            "                             attendance_notes, registered_by_name) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (eid, None, student_name, parent_name, parent_phone,
+             notes, "تسجيل من الأهل"))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] public reg insert failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر الحفظ، حاول لاحقاً"}), 500
+    return jsonify({
+        "ok":   True,
+        "html": _events_public_render_thanks(ev.get("name") or "رحلة"),
+    })
+
+
 # ── Tasks (5.3) ────────────────────────────────────────────────
 def _events_tasks_event_exists(db, eid):
     try:
