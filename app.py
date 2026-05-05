@@ -63850,6 +63850,227 @@ def api_curriculum_delete(file_id):
     return jsonify({"ok": True, "id": int(file_id)})
 
 
+# ──────────────────────────────────────────────────────────────────
+# Curriculum library v2 — viewer pages (teacher / parent / iframe)
+# ──────────────────────────────────────────────────────────────────
+# All three pages render the SAME card grid against the SAME
+# /api/curriculum/list endpoint — the endpoint filters by the
+# logged-in user's role and group membership, so the page itself
+# stays role-agnostic. Viewer iframe (/portal/curriculum/view/<uuid>)
+# embeds the PDF stream from /api/curriculum/file/<uuid>; download
+# button only renders if the per-audience can_download flag is true.
+
+_CURRICULUM_LIST_GRID_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>__PAGE_TITLE__ — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px;}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media (max-width:980px){.grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:620px){.grid{grid-template-columns:1fr;}}
+.card{background:#fff;border-radius:18px;padding:20px;display:flex;
+      flex-direction:column;gap:10px;border:2px solid transparent;
+      transition:all .18s ease;box-shadow:0 8px 24px rgba(107,63,160,.14);}
+.card:hover{border-color:#6B3FA0;box-shadow:0 14px 32px rgba(107,63,160,.22);}
+.card .ic{font-size:2.4rem;line-height:1;color:#1565C0;}
+.card h3{margin:0;font-size:1.05rem;color:#4a148c;font-weight:900;line-height:1.4;}
+.card .desc{color:#666;font-size:.86rem;line-height:1.5;flex:1;}
+.card .meta{font-size:.78rem;color:#888;}
+.card .lock{display:inline-block;color:#FB8C00;font-weight:800;font-size:.82rem;}
+.card .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+     color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.88rem;cursor:pointer;font-family:inherit;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.empty{background:#fff;border-radius:18px;padding:60px 24px;text-align:center;color:#666;
+       box-shadow:0 8px 24px rgba(107,63,160,.12);}
+.empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 __PAGE_TITLE__</h1>
+  <div><a href="__BACK_HREF__">← العودة</a></div>
+</div>
+<div class="wrap">
+  <div id="list-box"><div class="empty">جاري التحميل...</div></div>
+</div>
+<script>
+(function(){
+  function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function fmtSize(n){
+    if(!n) return '';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  fetch('/api/curriculum/list',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      var box = document.getElementById('list-box');
+      if(!j || !j.ok){ box.innerHTML='<div class="empty">تعذر التحميل</div>'; return; }
+      var arr = j.files || [];
+      if(!arr.length){
+        box.innerHTML = '<div class="empty"><span class="em-ic">📚</span>'+
+                        '<div>لا توجد كتب متاحة حالياً.</div>'+
+                        '<div style="margin-top:6px;color:#999;font-size:.86rem;">سيتم إضافة المناهج هنا عند جاهزيتها.</div></div>';
+        return;
+      }
+      var html = '<div class="grid">';
+      arr.forEach(function(e){
+        var lock = e.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+        var dl = e.can_download
+          ? '<a class="btn dl" href="/api/curriculum/file/' + _esc(e.file_uuid) + '?download=1">⬇ تحميل</a>'
+          : '';
+        html += '<div class="card">'+
+          '<span class="ic">📄</span>'+
+          '<h3>'+_esc(e.title)+'</h3>'+
+          '<div class="desc">'+_esc((e.description||'').slice(0,140))+((e.description||'').length>140?'...':'')+'</div>'+
+          '<div class="meta">'+_esc((e.uploaded_at||'').slice(0,10))+(e.file_size_bytes?(' · '+fmtSize(e.file_size_bytes)):'')+' · '+lock+'</div>'+
+          '<div class="acts">'+
+            '<a class="btn" href="/portal/curriculum/view/'+_esc(e.file_uuid)+'" target="_blank" rel="noopener">📖 عرض</a>'+
+            dl +
+          '</div>'+
+        '</div>';
+      });
+      html += '</div>';
+      box.innerHTML = html;
+    })
+    .catch(function(){
+      document.getElementById('list-box').innerHTML = '<div class="empty">تعذر التحميل</div>';
+    });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/curriculum')
+@login_required
+def teacher_curriculum_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    # Allow teachers + admin/manager/uploaders so the dashboard
+    # buttons reach this page from staff accounts. The list endpoint
+    # filters by the actual session user, so admin sees everything.
+    if role not in ("teacher", "admin", "manager") and not _curriculum_can_upload(user):
+        return redirect("/dashboard")
+    return (_CURRICULUM_LIST_GRID_HTML
+            .replace("__PAGE_TITLE__", "المناهج — صفحة المعلمة")
+            .replace("__BACK_HREF__", "/teacher/hub"))
+
+
+@app.route('/portal/parent-hub/curriculum')
+@login_required
+def portal_parent_hub_curriculum_page():
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return (_CURRICULUM_LIST_GRID_HTML
+            .replace("__PAGE_TITLE__", "كتب المنهج")
+            .replace("__BACK_HREF__", "/portal/parent-hub"))
+
+
+@app.route('/api/curriculum/list', methods=['GET'])
+@login_required
+def api_curriculum_list():
+    """Files visible to the current user. Admin/manager/uploaders
+    see every non-deleted file (can_download=True). Teachers see
+    files where audience_teachers=1 AND at least one assigned group
+    fold-matches a group they own. Parents (role='student') see
+    files where audience_parents=1 AND group matches their child's
+    group_name_student / group_online."""
+    user = session.get("user") or {}
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM curriculum_files "
+            "WHERE COALESCE(is_deleted,0)=0 "
+            "ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        fid = int(dict(r).get("id") or 0)
+        try:
+            grps = [(dict(g).get("group_name") or "").strip()
+                    for g in db.execute(
+                        "SELECT group_name FROM curriculum_file_groups "
+                        "WHERE file_id=?", (fid,)).fetchall()]
+        except Exception: grps = []
+        can_view, can_dl = _curriculum_file_visible_for(db, user, r, grps)
+        if not can_view: continue
+        out.append(_curriculum_file_row_to_dict(
+            r, group_names=grps, can_download=can_dl))
+    return jsonify({"ok": True, "files": out, "count": len(out)})
+
+
+@app.route('/api/curriculum/file/<file_uuid>', methods=['GET'])
+@login_required
+def api_curriculum_file(file_uuid):
+    """Stream the PDF binary. Permission gate runs every time. The
+    ?download=1 query flag forces an attachment Content-Disposition
+    AND requires the per-audience download flag to be on. Without
+    the flag the response is inline (for the iframe viewer)."""
+    from flask import send_file as _send_f
+    user = session.get("user") or {}
+    db = get_db()
+    # Sanitize uuid: hex only, length <= 64.
+    safe_uuid = "".join(c for c in (file_uuid or "")
+                        if c in "0123456789abcdef")[:64]
+    if not safe_uuid:
+        return jsonify({"ok": False, "error": "uuid غير صالح"}), 400
+    try:
+        row = db.execute(
+            "SELECT * FROM curriculum_files WHERE file_uuid=?",
+            (safe_uuid,)
+        ).fetchone()
+    except Exception: row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    fid = int(dict(row).get("id") or 0)
+    try:
+        grps = [(dict(g).get("group_name") or "").strip()
+                for g in db.execute(
+                    "SELECT group_name FROM curriculum_file_groups "
+                    "WHERE file_id=?", (fid,)).fetchall()]
+    except Exception: grps = []
+    can_view, can_dl = _curriculum_file_visible_for(db, user, row, grps)
+    if not can_view:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    want_dl = (request.args.get("download") or "").strip() in ("1","true","yes")
+    if want_dl and not can_dl:
+        return jsonify({"ok": False, "error":
+                        "هذا الملف للقراءة فقط"}), 403
+    path = os.path.join(_curriculum_storage_dir(), safe_uuid + ".pdf")
+    if not os.path.isfile(path):
+        return jsonify({"ok": False, "error":
+                        "الملف غير موجود على القرص"}), 410
+    safe_title = (dict(row).get("title") or "ملف") + ".pdf"
+    resp = _send_f(path, mimetype="application/pdf",
+                   as_attachment=want_dl,
+                   download_name=safe_title,
+                   conditional=False)
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception: pass
+    return resp
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
