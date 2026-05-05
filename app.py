@@ -23491,6 +23491,66 @@ def logout():
     return redirect("/login")
 
 
+@app.route("/version", methods=["GET"])
+def version_endpoint():
+    """Public diagnostic endpoint. Returns the git SHA of the deployed
+    code + a list of route markers so we can verify which features are
+    live without admin login. Useful when Render's auto-deploy state
+    isn't visible — a quick curl tells us exactly what's running."""
+    import os as _os
+    from datetime import datetime as _dt
+    # Render injects RENDER_GIT_COMMIT at build time. Fall back to
+    # GIT_COMMIT (some envs use that) or to .git/HEAD when running
+    # locally from a checked-out repo.
+    sha = (_os.environ.get("RENDER_GIT_COMMIT")
+           or _os.environ.get("GIT_COMMIT")
+           or "")
+    if not sha:
+        try:
+            head_path = _os.path.join(_os.path.dirname(__file__) or ".",
+                                      ".git", "HEAD")
+            with open(head_path, "r", encoding="utf-8") as f:
+                head = f.read().strip()
+            if head.startswith("ref: "):
+                ref = head[5:].strip()
+                ref_path = _os.path.join(_os.path.dirname(__file__) or ".",
+                                         ".git", ref)
+                with open(ref_path, "r", encoding="utf-8") as f:
+                    sha = f.read().strip()
+            else:
+                sha = head
+        except Exception:
+            sha = "unknown"
+    sha_short = (sha or "unknown")[:12]
+    rules = list(app.url_map.iter_rules())
+    rule_strs = [str(r.rule) for r in rules]
+    # Probe specific routes / source markers so we can tell which
+    # commit's features are loaded. Add new markers when shipping
+    # significant features so future deploys can be checked at a glance.
+    perunit_marker = False
+    try:
+        import inspect as _inspect
+        fn = app.view_functions.get("api_admin_events_costs_create")
+        perunit_marker = bool(fn) and ("unit_price" in _inspect.getsource(fn))
+    except Exception:
+        perunit_marker = False
+    markers = {
+        "events_list":     "/admin/events" in rule_strs,
+        "public_register": any("/events/register/" in r for r in rule_strs),
+        "followup_screen": any("/followup" in r for r in rule_strs),
+        "print_full":      any("/print/full" in r for r in rule_strs),
+        "cost_perunit":    perunit_marker,
+        "msg_templates":   any("/messages/templates" in r for r in rule_strs),
+    }
+    return jsonify({
+        "ok":           True,
+        "sha":          sha_short,
+        "now":          _dt.utcnow().isoformat() + "Z",
+        "markers":      markers,
+        "total_routes": len(rules),
+    })
+
+
 @app.route("/api/me", methods=["GET"])
 @login_required
 def api_me():
