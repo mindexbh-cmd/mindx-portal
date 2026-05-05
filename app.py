@@ -68914,6 +68914,60 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-bulk-sticky button.save:hover{background:#178a64;}
   .evd-reg-bulk-sticky button.cancel{background:#fff;color:#c62828;border-color:#c62828;}
   .evd-reg-bulk-sticky button.cancel:hover{background:#ffebee;}
+  /* Messages panel (7.2) */
+  .evd-msg-card{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--mc,#1D9E75);}
+  .evd-msg-card[data-k="link"]   {--mc:#1D9E75;}
+  .evd-msg-card[data-k="tpls"]   {--mc:#1565C0;}
+  .evd-msg-card[data-k="send"]   {--mc:#E65100;}
+  .evd-msg-card h3{margin:0 0 12px;font-size:1.05rem;color:var(--mc);font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evd-msg-card h3 .badge-soon{font-size:.72rem;background:#fff8e1;color:#E65100;padding:2px 8px;border-radius:99px;margin-inline-start:6px;font-weight:800;}
+  .evd-msg-link-row{display:flex;align-items:center;gap:8px;background:#f6faff;padding:10px 12px;border-radius:10px;margin-bottom:10px;}
+  .evd-msg-link-row code{flex:1;font-family:'Courier New',monospace;font-size:.86rem;color:#0d47a1;background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #d3d8de;overflow-x:auto;white-space:nowrap;display:block;}
+  .evd-msg-link-row .copy-ok{color:#1D9E75;font-weight:800;font-size:.84rem;opacity:0;transition:opacity .25s;margin-inline-start:4px;}
+  .evd-msg-link-row .copy-ok.is-show{opacity:1;}
+  .evd-msg-actions{display:flex;flex-wrap:wrap;gap:8px;}
+  .evd-msg-actions button{background:#fff;border:1.5px solid #1D9E75;color:#1D9E75;padding:8px 16px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.88rem;display:inline-flex;align-items:center;gap:6px;}
+  .evd-msg-actions button:hover{background:#1D9E75;color:#fff;}
+  .evd-msg-actions button.share-wa{border-color:#25D366;color:#25D366;}
+  .evd-msg-actions button.share-wa:hover{background:#25D366;color:#fff;}
+  .evd-msg-warn{margin-top:10px;font-size:.82rem;color:#E65100;background:#fff8e1;padding:8px 12px;border-radius:8px;font-weight:700;}
+  .evd-msg-tpl-list{display:flex;flex-direction:column;gap:8px;}
+  .evd-msg-tpl{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 14px;border-radius:10px;background:#f6faff;border:1.5px solid transparent;cursor:pointer;transition:.15s;}
+  .evd-msg-tpl:hover{border-color:#1565C0;background:#e3f2fd;}
+  .evd-msg-tpl.is-on{background:#e6f7ee;border-color:#1D9E75;}
+  .evd-msg-tpl .em{font-size:1.4rem;}
+  .evd-msg-tpl .body .nm{font-weight:900;color:#0d47a1;font-size:.94rem;}
+  .evd-msg-tpl .body .pv{font-size:.78rem;color:#666;margin-top:2px;line-height:1.4;}
+  .evd-msg-tpl .use{background:#1565C0;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.82rem;}
+  .evd-msg-tpl .use:hover{background:#0d47a1;}
+  .evd-msg-tpl.is-on .use{background:#1D9E75;}
+  .evd-msg-send-row{margin-bottom:12px;}
+  .evd-msg-send-row label{display:block;font-weight:800;color:#444;font-size:.86rem;margin-bottom:5px;}
+  .evd-msg-send-row textarea{width:100%;min-height:100px;padding:10px 12px;border:1.5px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.94rem;resize:vertical;}
+  .evd-msg-send-row .vars{font-size:.76rem;color:#888;margin-top:4px;line-height:1.6;}
+  .evd-msg-send-row .vars code{background:#f0f3f7;padding:1px 6px;border-radius:4px;color:#0d47a1;font-size:.75rem;}
+  .evd-msg-aud{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+  .evd-msg-aud-opt{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:#fafbfc;cursor:pointer;border:1.5px solid transparent;transition:.15s;}
+  .evd-msg-aud-opt:hover{background:#f0f7f3;}
+  .evd-msg-aud-opt.is-on{background:#e6f7ee;border-color:#1D9E75;}
+  .evd-msg-aud-opt input[type="radio"]{margin:0;}
+  .evd-msg-aud-opt .lab{flex:1;font-weight:700;color:#444;font-size:.9rem;}
+  .evd-msg-aud-opt .cnt{font-weight:800;color:#1D9E75;background:rgba(29,158,117,0.10);padding:2px 10px;border-radius:99px;font-size:.78rem;}
+  .evd-msg-gen{display:block;width:100%;background:linear-gradient(135deg,#25D366,#1D9E75);color:#fff;border:none;padding:12px;border-radius:10px;font-weight:900;cursor:pointer;font-size:.96rem;}
+  .evd-msg-gen:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(29,158,117,0.30);}
+  .evd-msg-gen:disabled{opacity:.5;cursor:not-allowed;}
+  /* Generated WA-link list (modal-ish) */
+  .evd-msg-list{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);max-height:60vh;overflow-y:auto;}
+  .evd-msg-list-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px dashed #eef0f3;}
+  .evd-msg-list-row:last-child{border-bottom:0;}
+  .evd-msg-list-row .who{display:flex;flex-direction:column;gap:2px;}
+  .evd-msg-list-row .who .nm{font-weight:800;color:#222;font-size:.94rem;}
+  .evd-msg-list-row .who .pv{font-size:.78rem;color:#666;line-height:1.4;}
+  .evd-msg-list-row .wa{background:#25D366;color:#fff;border:none;padding:7px 12px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
+  .evd-msg-list-row .wa:hover{background:#128C7E;}
+  .evd-msg-list-row .wa.disabled{background:#bbb;cursor:not-allowed;pointer-events:none;}
+  .evd-msg-list-row .cp{background:#fff;border:1.5px solid #d3d8de;color:#666;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.82rem;}
+  .evd-msg-list-row .cp:hover{border-color:#1565C0;color:#1565C0;}
   /* Mobile */
   @media (max-width: 720px){
     .evd-shell{padding:10px;}
@@ -69050,7 +69104,14 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="messages" role="tabpanel"><div class="evd-stub"><div class="em">💬</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Messages panel (7.2) -->
+  <section class="evd-panel" data-panel="messages" role="tabpanel">
+    <div class="evd-msg" id="evd-msg-root">
+      <div class="evd-skel h-card" style="height:120px;"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-row"></div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="print"    role="tabpanel"><div class="evd-stub"><div class="em">🖨️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
 
 </div>
@@ -69430,6 +69491,7 @@ function evdActivateTab(name){
   if (name === 'items'    && !ITEM_LOADED)  evdLoadItems();
   if (name === 'tasks'    && !TASK_LOADED)  evdLoadTasks();
   if (name === 'students' && !REG_LOADED)   evdLoadRegs();
+  if (name === 'messages' && !MSG_LOADED)   evdLoadMsg();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -71464,6 +71526,272 @@ function evdRegBulkSave(){
   .catch(function(){
     if (btn){ btn.disabled = false; btn.style.opacity = '1'; }
     evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+/* ── Messages panel (7.2 / 7.3) ──────────────────────────────── */
+var MSG_LOADED = false;
+var MSG_TEMPLATES = [];
+var MSG_TPL_SELECTED = null;     // {id, name, icon, message}
+var MSG_TPL_TEXT = '';           // editable text after template chosen
+var MSG_AUDIENCE = 'all';
+
+// Built-in fallback templates — used when the API returns empty or
+// before stage 7.3 ships the ev_msg_templates table.
+var MSG_DEFAULT_TPLS = [
+  {id:'def_1', icon:'📢', name:'إعلان الرحلة',
+   message:'السلام عليكم، نعلنكم عن رحلة {اسم_الرحلة} يوم {التاريخ} للسعر {السعر} د.ب. للتسجيل: {رابط_التسجيل}'},
+  {id:'def_2', icon:'💰', name:'تذكير بالدفع',
+   message:'السلام عليكم، نذكركم بدفع رسوم رحلة {اسم_الرحلة} ({السعر} د.ب) قبل {التاريخ}. شكراً'},
+  {id:'def_3', icon:'⏰', name:'تذكير قبل يوم',
+   message:'السلام عليكم، تذكير بأن رحلة {اسم_الرحلة} غداً {التاريخ} الساعة {وقت_الانطلاق}. التجمع في {نقطة_التجمع}. شكراً'},
+  {id:'def_4', icon:'🙏', name:'رسالة شكر بعد الرحلة',
+   message:'السلام عليكم، شكراً جزيلاً لمشاركة {اسم_الطالبة} في رحلة {اسم_الرحلة}. كانت رحلة ممتعة!'}
+];
+
+function evdLoadMsg(){
+  // Fetch templates first (will fall back to defaults on 404), then
+  // ensure we have registration data for audience counts.
+  return fetch('/api/admin/events/' + EID + '/messages/templates')
+    .then(function(r){ return r.ok ? r.json() : {ok:false}; })
+    .then(function(j){
+      if (j && j.ok && Array.isArray(j.templates) && j.templates.length){
+        MSG_TEMPLATES = j.templates;
+      } else {
+        MSG_TEMPLATES = MSG_DEFAULT_TPLS;
+      }
+      MSG_LOADED = true;
+      // Make sure REG data is loaded too (for audience counts).
+      if (!REG_LOADED){ return evdLoadRegs(); }
+    })
+    .catch(function(){
+      MSG_TEMPLATES = MSG_DEFAULT_TPLS;
+      MSG_LOADED = true;
+      if (!REG_LOADED) return evdLoadRegs();
+    })
+    .then(function(){ evdRenderMsg(); });
+}
+
+function evdMsgPublicUrl(){
+  var ev = EVENT_DATA || {};
+  var tok = ev.registration_token || '';
+  if (!tok) return '';
+  return window.location.origin + '/events/register/' + tok;
+}
+
+function evdMsgAudienceCounts(){
+  var all = REG_DATA || [];
+  return {
+    all:     all.length,
+    unpaid:  all.filter(function(r){ return r.payment_status === 'pending' || r.payment_status === 'partial'; }).length,
+    paid:    all.filter(function(r){ return r.payment_status === 'paid'; }).length,
+    present: all.filter(function(r){ return r.attendance_status === 'present' || r.attendance_status === 'late'; }).length,
+    absent:  all.filter(function(r){ return r.attendance_status === 'absent'; }).length
+  };
+}
+
+function evdRenderMsg(){
+  var root = document.getElementById('evd-msg-root');
+  if (!root) return;
+  var ev = EVENT_DATA || {};
+  var url = evdMsgPublicUrl();
+  var status = (ev.status || 'planning').toLowerCase();
+  var statusOk = (status === 'open');
+
+  // 1. Public link card
+  var linkCard;
+  if (!url){
+    linkCard = '<div class="evd-msg-card" data-k="link">'
+             + '  <h3>🌐 رابط التسجيل العام</h3>'
+             + '  <div class="evd-msg-warn">⚠️ الرابط غير مولّد لهذه الرحلة بعد. أنشئ رحلة جديدة لتوليد الرابط تلقائياً.</div>'
+             + '</div>';
+  } else {
+    linkCard = '<div class="evd-msg-card" data-k="link">'
+             + '  <h3>🌐 رابط التسجيل العام</h3>'
+             + '  <div style="font-size:.86rem;color:#666;margin-bottom:8px;">شاركيه مع الأهل لتسجيل الطالبات تلقائياً.</div>'
+             + '  <div class="evd-msg-link-row">'
+             + '    <code id="evd-msg-link">' + evdEsc(url) + '</code>'
+             + '    <span class="copy-ok" id="evd-msg-link-ok">✓ نُسخ</span>'
+             + '  </div>'
+             + '  <div class="evd-msg-actions">'
+             + '    <button type="button" id="evd-msg-link-copy">📋 نسخ الرابط</button>'
+             + '    <button type="button" class="share-wa" id="evd-msg-link-wa">📱 مشاركة عبر واتساب</button>'
+             + '    <a class="evd-btn" target="_blank" rel="noopener" href="' + evdEsc(url) + '">👁️ معاينة</a>'
+             + '  </div>'
+             + (statusOk ? '' : '<div class="evd-msg-warn">⚠️ الرابط لا يقبل تسجيلات إلا عندما تكون حالة الرحلة «مفتوحة».</div>')
+             + '</div>';
+  }
+
+  // 2. Templates list
+  var tplListHTML = MSG_TEMPLATES.map(function(t){
+    var on = (MSG_TPL_SELECTED && MSG_TPL_SELECTED.id === t.id) ? ' is-on' : '';
+    var preview = (t.message || '').substring(0, 80) + ((t.message || '').length > 80 ? '…' : '');
+    return '<div class="evd-msg-tpl' + on + '" data-tid="' + evdEsc(t.id) + '">'
+         + '  <div class="em">' + evdEsc(t.icon || '💬') + '</div>'
+         + '  <div class="body"><div class="nm">' + evdEsc(t.name) + '</div><div class="pv">' + evdEsc(preview) + '</div></div>'
+         + '  <button type="button" class="use" data-use="' + evdEsc(t.id) + '">' + (on ? '✓ مختار' : 'استخدمي') + '</button>'
+         + '</div>';
+  }).join('');
+  var tplCard = '<div class="evd-msg-card" data-k="tpls">'
+              + '  <h3>💬 قوالب رسائل جاهزة</h3>'
+              + '  <div style="font-size:.86rem;color:#666;margin-bottom:10px;">اختاري قالب لإرسال رسالة جماعية.</div>'
+              + '  <div class="evd-msg-tpl-list">' + tplListHTML + '</div>'
+              + '</div>';
+
+  // 3. Send section (only when template selected)
+  var sendCard = '';
+  if (MSG_TPL_SELECTED){
+    var counts = evdMsgAudienceCounts();
+    var aud = [
+      {k:'all',     l:'كل المسجلات',    c:counts.all},
+      {k:'unpaid',  l:'من لم تدفعن',    c:counts.unpaid},
+      {k:'paid',    l:'من دفعن',        c:counts.paid},
+      {k:'present', l:'الحاضرات',       c:counts.present},
+      {k:'absent',  l:'الغائبات',       c:counts.absent}
+    ];
+    var audHTML = aud.map(function(a){
+      var on = MSG_AUDIENCE === a.k ? ' is-on' : '';
+      return '<label class="evd-msg-aud-opt' + on + '" data-aud="' + a.k + '">'
+           + '  <input type="radio" name="evd-msg-aud" value="' + a.k + '"' + (MSG_AUDIENCE === a.k ? ' checked' : '') + '/>'
+           + '  <span class="lab">' + evdEsc(a.l) + '</span>'
+           + '  <span class="cnt">' + a.c + '</span>'
+           + '</label>';
+    }).join('');
+    sendCard = '<div class="evd-msg-card" data-k="send">'
+             + '  <h3>📤 إرسال رسالة <span class="badge-soon">القالب: ' + evdEsc(MSG_TPL_SELECTED.name) + '</span></h3>'
+             + '  <div class="evd-msg-send-row">'
+             + '    <label for="evd-msg-text">نص الرسالة</label>'
+             + '    <textarea id="evd-msg-text" maxlength="2000">' + evdEsc(MSG_TPL_TEXT || MSG_TPL_SELECTED.message || '') + '</textarea>'
+             + '    <div class="vars">المتغيرات المتاحة: <code>{اسم_الطالبة}</code> <code>{اسم_الأم}</code> <code>{اسم_الرحلة}</code> <code>{التاريخ}</code> <code>{السعر}</code> <code>{وقت_الانطلاق}</code> <code>{نقطة_التجمع}</code> <code>{رابط_التسجيل}</code></div>'
+             + '  </div>'
+             + '  <div class="evd-msg-aud">' + audHTML + '</div>'
+             + '  <button type="button" class="evd-msg-gen" id="evd-msg-gen">📋 توليد روابط واتساب</button>'
+             + '</div>';
+  }
+
+  // 4. Generated list (filled in by evdMsgGenerate)
+  var listCard = '<div id="evd-msg-list-wrap"></div>';
+
+  root.innerHTML = linkCard + tplCard + sendCard + listCard;
+
+  // Wire link-card buttons
+  var lcp = document.getElementById('evd-msg-link-copy');
+  if (lcp){
+    lcp.addEventListener('click', function(){
+      var u = url;
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(u).then(function(){
+          var ok = document.getElementById('evd-msg-link-ok');
+          if (ok){ ok.classList.add('is-show'); setTimeout(function(){ ok.classList.remove('is-show'); }, 1400); }
+          evdToast('تم نسخ الرابط', 'success');
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = u; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(_){}
+        document.body.removeChild(ta);
+        evdToast('تم نسخ الرابط', 'success');
+      }
+    });
+  }
+  var lwa = document.getElementById('evd-msg-link-wa');
+  if (lwa){
+    lwa.addEventListener('click', function(){
+      var msg = 'السلام عليكم، يمكنكم تسجيل بناتكم في رحلة ' + (ev.name || '') + ' عبر الرابط: ' + url;
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    });
+  }
+
+  // Wire template-list rows
+  root.querySelectorAll('.evd-msg-tpl').forEach(function(el){
+    var pick = function(){
+      var tid = el.getAttribute('data-tid');
+      var t = MSG_TEMPLATES.find(function(x){ return String(x.id) === String(tid); });
+      if (!t) return;
+      MSG_TPL_SELECTED = t;
+      MSG_TPL_TEXT = t.message || '';
+      evdRenderMsg();
+    };
+    el.addEventListener('click', function(e){
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      pick();
+    });
+    var btn = el.querySelector('.use');
+    if (btn) btn.addEventListener('click', function(e){ e.stopPropagation(); pick(); });
+  });
+
+  // Wire send section
+  var ta = document.getElementById('evd-msg-text');
+  if (ta) ta.addEventListener('input', function(){ MSG_TPL_TEXT = ta.value; });
+  root.querySelectorAll('.evd-msg-aud-opt').forEach(function(opt){
+    opt.addEventListener('click', function(){
+      MSG_AUDIENCE = opt.getAttribute('data-aud');
+      evdRenderMsg();
+    });
+  });
+  var gen = document.getElementById('evd-msg-gen');
+  if (gen) gen.addEventListener('click', evdMsgGenerate);
+}
+
+function evdMsgGenerate(){
+  var btn = document.getElementById('evd-msg-gen');
+  if (btn){ btn.disabled = true; btn.textContent = '… جار التحضير'; }
+  var body = {
+    template_id: (MSG_TPL_SELECTED && MSG_TPL_SELECTED.id) || null,
+    audience:    MSG_AUDIENCE || 'all',
+    custom_text: MSG_TPL_TEXT || ''
+  };
+  fetch('/api/admin/events/' + EID + '/messages/render', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (btn){ btn.disabled = false; btn.textContent = '📋 توليد روابط واتساب'; }
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحضير', 'error'); return; }
+    evdMsgRenderList(o.j.messages || []);
+  })
+  .catch(function(){
+    if (btn){ btn.disabled = false; btn.textContent = '📋 توليد روابط واتساب'; }
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdMsgRenderList(rows){
+  var wrap = document.getElementById('evd-msg-list-wrap');
+  if (!wrap) return;
+  if (!rows.length){
+    wrap.innerHTML = '<div class="evd-msg-card"><div style="text-align:center;color:#888;padding:14px;">— لا توجد مستلمات في هذه الفئة —</div></div>';
+    return;
+  }
+  var rowsHTML = rows.map(function(m, i){
+    var disabled = m.wa_link ? '' : ' disabled';
+    var href = m.wa_link ? (' href="' + evdEsc(m.wa_link) + '" target="_blank" rel="noopener"') : '';
+    return '<div class="evd-msg-list-row">'
+         + '  <div class="who"><span class="nm">' + (i+1) + '. ' + evdEsc(m.student_name || m.parent_name || '—') + '</span><span class="pv">' + evdEsc(m.rendered_text || '').substring(0, 110) + ((m.rendered_text || '').length > 110 ? '…' : '') + '</span></div>'
+         + '  <a class="wa' + disabled + '"' + href + '>📱 افتحي واتساب</a>'
+         + '  <button type="button" class="cp" data-cp="' + i + '">📋 نسخ النص</button>'
+         + '</div>';
+  }).join('');
+  wrap.innerHTML = '<div class="evd-msg-card" data-k="send">'
+                 + '  <h3>📋 الرسائل المُولّدة (' + rows.length + ')</h3>'
+                 + '  <div class="evd-msg-list">' + rowsHTML + '</div>'
+                 + '</div>';
+  wrap.querySelectorAll('button[data-cp]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var idx = parseInt(b.getAttribute('data-cp'), 10);
+      var txt = (rows[idx] && rows[idx].rendered_text) || '';
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(function(){ evdToast('تم نسخ النص', 'success'); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(_){}
+        document.body.removeChild(ta);
+        evdToast('تم نسخ النص', 'success');
+      }
+    });
   });
 }
 
