@@ -8715,8 +8715,7 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <span class="md-sb-link-text">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x627;&#x62A;</span>
         </a>
-        <!-- TEMPORARILY HIDDEN until Render deploys curriculum_v1 -->
-        <a class="md-sb-link mx-staff-only" href="/admin/curriculum" style="display:none;">
+        <a class="md-sb-link mx-staff-only" href="/admin/curriculum">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span class="md-sb-link-text">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</span>
         </a>
@@ -9716,8 +9715,7 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
       <div class="dh-action-title">&#x627;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;</div>
       <div class="dh-action-desc">&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x634;&#x647;&#x631;&#x64A; &#x644;&#x644;&#x637;&#x627;&#x644;&#x628;&#x627;&#x62A;</div>
     </a>
-    <!-- TEMPORARILY HIDDEN until Render deploys curriculum_v1 -->
-    <a class="dh-action-card mx-staff-only" href="/teacher/curriculum" style="display:none;background:linear-gradient(135deg,#E65100,#FB8C00);">
+    <a class="dh-action-card mx-staff-only" href="/teacher/curriculum" style="background:linear-gradient(135deg,#E65100,#FB8C00);">
       <div class="dh-action-icon">&#x1F4D6;</div>
       <div class="dh-action-title">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</div>
       <div class="dh-action-desc">&#x643;&#x62A;&#x628; &#x627;&#x644;&#x645;&#x646;&#x647;&#x62C; &#x627;&#x644;&#x645;&#x62A;&#x627;&#x62D;&#x629; &#x644;&#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;</div>
