@@ -69047,6 +69047,18 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
   .evdf-toast.is-show{opacity:1;}
   .evdf-toast.is-success{background:#1D9E75;}
   .evdf-toast.is-error  {background:#c62828;}
+  /* Celebration banner (9.4) */
+  @keyframes evdfPopIn{0%{opacity:0;transform:scale(0.85);}60%{transform:scale(1.05);}100%{opacity:1;transform:scale(1);}}
+  .evdf-celebrate{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border-radius:14px;padding:18px;margin-bottom:14px;text-align:center;animation:evdfPopIn .5s ease;}
+  .evdf-celebrate .em{font-size:2.2rem;display:block;margin-bottom:6px;}
+  .evdf-celebrate .ttl{font-weight:900;font-size:1.05rem;margin-bottom:4px;}
+  .evdf-celebrate .sub{font-size:.86rem;opacity:.95;margin-bottom:12px;}
+  .evdf-celebrate button{background:#fff;color:#1D9E75;border:none;padding:11px 22px;border-radius:10px;font-weight:900;font-size:.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+  .evdf-celebrate button:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,0.20);}
+  /* Bottom report button */
+  .evdf-report{display:flex;justify-content:center;margin:14px 0 24px;}
+  .evdf-report a{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#25D366,#1D9E75);color:#fff;border:none;padding:13px 26px;border-radius:12px;font-weight:900;font-size:.96rem;cursor:pointer;text-decoration:none;box-shadow:0 4px 14px rgba(29,158,117,0.25);}
+  .evdf-report a:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(29,158,117,0.35);}
   /* Skeleton */
   @keyframes evdfShim{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
   .evdf-skel{display:block;border-radius:8px;background:linear-gradient(90deg,#eef0f3 0%,#f6f7f9 50%,#eef0f3 100%);background-size:200px 100%;background-repeat:no-repeat;animation:evdfShim 1.4s linear infinite;height:48px;margin-bottom:8px;}
@@ -69188,7 +69200,28 @@ function evdfRender(){
   var attHTML = evdfRenderSection('att', '👥 الحضور',
     attDone + '/' + (aP.total || 0), attInner);
 
-  root.innerHTML = headerHTML + progressHTML + schedHTML + itemsHTML + tasksHTML + attHTML;
+  // 9.4 — celebration banner when everything is done
+  var hasAnyContent = (sP.total || 0) + (iP.total || 0) + (tP.total || 0) + (aP.total || 0) > 0;
+  var canFinish = (ev.status === 'open' || ev.status === 'closed');
+  var celebrateHTML = '';
+  if (DATA.all_done && hasAnyContent && canFinish){
+    celebrateHTML = '<div class="evdf-celebrate" id="evdf-celebrate">'
+                  + '  <span class="em">🎊</span>'
+                  + '  <div class="ttl">الرحلة مكتملة!</div>'
+                  + '  <div class="sub">يمكنك الآن إنهاء الرحلة وتغيير حالتها لـ «منتهية».</div>'
+                  + '  <button type="button" id="evdf-finish-btn">✅ إنهاء الرحلة</button>'
+                  + '</div>';
+  }
+
+  // 9.4 — bottom WhatsApp report button (always available once data loads)
+  var reportHTML = '<div class="evdf-report">'
+                 + '  <a id="evdf-report-btn" href="#" target="_blank" rel="noopener">'
+                 + '    📱 إرسال تقرير الرحلة (واتساب)'
+                 + '  </a>'
+                 + '</div>';
+
+  root.innerHTML = celebrateHTML + headerHTML + progressHTML
+                 + schedHTML + itemsHTML + tasksHTML + attHTML + reportHTML;
 
   // Wire up checkbox rows + attendance buttons
   root.querySelectorAll('.evdf-row[data-toggle]').forEach(function(row){
@@ -69206,6 +69239,70 @@ function evdfRender(){
       evdfSetAttendance(rid, st, btn);
     });
   });
+  // 9.4 wires
+  var fb = document.getElementById('evdf-finish-btn');
+  if (fb) fb.addEventListener('click', evdfFinishTrip);
+  var rb = document.getElementById('evdf-report-btn');
+  if (rb) rb.href = evdfBuildReportUrl();
+}
+
+/* ── 9.4 — finish trip + WhatsApp report ─────────────────────── */
+function evdfFinishTrip(){
+  if (!DATA || !DATA.event) return;
+  var msg = 'هل تريدين إنهاء الرحلة وتغيير حالتها لـ «منتهية»؟\n\n'
+          + 'سيتم نقل البيانات للأرشيف ولا يمكن التراجع.';
+  if (!confirm(msg)) return;
+  var btn = document.getElementById('evdf-finish-btn');
+  if (btn){ btn.disabled = true; btn.textContent = '… جار الإنهاء'; }
+  fetch('/api/admin/events/' + EID + '/status', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status: 'completed'}),
+    credentials: 'same-origin'
+  })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        if (btn){ btn.disabled = false; btn.textContent = '✅ إنهاء الرحلة'; }
+        evdfToast(o.j.error || 'تعذّر الإنهاء', 'error');
+        return;
+      }
+      evdfToast('✅ تم إنهاء الرحلة بنجاح', 'success');
+      setTimeout(function(){
+        window.location.href = '/admin/events/' + EID;
+      }, 800);
+    })
+    .catch(function(){
+      if (btn){ btn.disabled = false; btn.textContent = '✅ إنهاء الرحلة'; }
+      evdfToast('خطأ في الاتصال', 'error');
+    });
+}
+
+function evdfBuildReportUrl(){
+  if (!DATA) return '#';
+  var ev = DATA.event || {};
+  var pr = DATA.progress || {};
+  var sP = pr.schedule || {}, iP = pr.items || {}, tP = pr.tasks || {}, aP = pr.attendance || {};
+  var attDone = (aP.present || 0) + (aP.late || 0);
+  var lines = [
+    '📋 تقرير رحلة: ' + (ev.name || 'رحلة'),
+    '📅 ' + evdfFmtDate(ev.event_date),
+    '',
+    '📊 ملخص التقدم:',
+    '👥 الحضور: ' + attDone + '/' + (aP.total || 0)
+                  + ' (حاضرات ' + (aP.present || 0)
+                  + '، متأخرات ' + (aP.late || 0)
+                  + '، غائبات ' + (aP.absent || 0) + ')',
+    '⏰ الخطة الزمنية: ' + (sP.done || 0) + '/' + (sP.total || 0)
+                          + ' (' + Math.round(sP.pct || 0) + '%)',
+    '🛠️ الأدوات: ' + (iP.ready || 0) + '/' + (iP.total || 0)
+                    + ' (' + Math.round(iP.pct || 0) + '%)',
+    '✅ المهام: ' + (tP.completed || 0) + '/' + (tP.total || 0)
+                  + ' (' + Math.round(tP.pct || 0) + '%)',
+    '',
+    '📄 التقرير الكامل: ' + window.location.origin + '/admin/events/' + EID + '/print/full'
+  ];
+  return 'https://wa.me/?text=' + encodeURIComponent(lines.join('\n'));
 }
 
 function evdfRenderSection(k, title, ratio, inner){
