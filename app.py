@@ -68178,6 +68178,8 @@ def api_admin_events_alerts():
     out = []
     for r in rows:
         rd = dict(r)
+        eid = int(rd.get("id") or 0)
+        ename = rd.get("name") or ""
         # Days-until calculation done in Python for portability.
         try:
             y, m, d = [int(x) for x in str(rd.get("event_date"))[:10].split("-")]
@@ -68185,25 +68187,83 @@ def api_admin_events_alerts():
         except Exception:
             delta = None
         if delta is None: continue
-        if delta <= 1:
-            sev = "critical" if delta == 0 else "warning"
+        if delta == 0:
             out.append({
-                "type":        "imminent_event",
-                "severity":    sev,
-                "event_id":    rd.get("id"),
-                "event_name":  rd.get("name") or "",
-                "message":     ("اليوم: " if delta == 0 else "غداً: ") + (rd.get("name") or ""),
-                "action_link": "/admin/events/" + str(rd.get("id")),
+                "type": "trip_today", "severity": "critical",
+                "event_id": eid, "event_name": ename,
+                "title":   "🚌 اليوم!",
+                "message": "رحلة «" + ename + "» اليوم — تأكدي من الجاهزية",
+                "action_link": "/admin/events/" + str(eid),
+            })
+        elif delta == 1:
+            out.append({
+                "type": "trip_tomorrow", "severity": "warning",
+                "event_id": eid, "event_name": ename,
+                "title":   "⏰ غداً",
+                "message": "رحلة «" + ename + "» غداً — راجعي الخطة الزمنية والقائمة",
+                "action_link": "/admin/events/" + str(eid),
             })
         elif delta <= 3:
             out.append({
                 "type":        "upcoming_event",
                 "severity":    "info",
-                "event_id":    rd.get("id"),
-                "event_name":  rd.get("name") or "",
-                "message":     (rd.get("name") or "") + " بعد " + str(delta) + " أيام",
-                "action_link": "/admin/events/" + str(rd.get("id")),
+                "event_id":    eid,
+                "event_name":  ename,
+                "title":       "📅 قريباً",
+                "message":     ename + " بعد " + str(delta) + " أيام",
+                "action_link": "/admin/events/" + str(eid),
             })
+        # 8.3 — low payment alert (<50% collected, 3 days out)
+        if delta is not None and 0 <= delta <= 3:
+            try:
+                cap = int(rd.get("max_students") or 0)
+                ev_full = db.execute(
+                    "SELECT max_students, price_per_student FROM ev_events "
+                    "WHERE id = ?", (eid,)).fetchone()
+                ev_full_d = dict(ev_full) if ev_full else {}
+                cap = int(ev_full_d.get("max_students") or 0)
+                price = float(ev_full_d.get("price_per_student") or 0)
+                rr = db.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(payment_amount), 0) "
+                    "FROM ev_registrations "
+                    "WHERE event_id = ? AND is_deleted = 0", (eid,)).fetchone()
+                rr_d = list(rr) if rr else [0, 0]
+                n_reg = int(rr_d[0] or 0)
+                collected = float(rr_d[1] or 0)
+                expected = price * max(n_reg, cap)
+                if expected > 0 and collected / expected < 0.5 and n_reg > 0:
+                    pct = int(round(collected / expected * 100))
+                    out.append({
+                        "type": "low_payment", "severity": "warning",
+                        "event_id": eid, "event_name": ename,
+                        "title":   "💰 تحصيل منخفض",
+                        "message": "«" + ename + "» — تم تحصيل " + str(pct) + "% فقط من الإيراد المتوقع",
+                        "action_link": "/admin/events/" + str(eid) + "#students",
+                    })
+            except Exception:
+                pass
+        # 8.3 — incomplete tasks alert (<80% completed, day before)
+        if delta == 1:
+            try:
+                tt = db.execute(
+                    "SELECT COUNT(*), "
+                    "       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) "
+                    "FROM ev_tasks WHERE event_id = ? AND is_deleted = 0",
+                    (eid,)).fetchone()
+                tt_d = list(tt) if tt else [0, 0]
+                t_total = int(tt_d[0] or 0)
+                t_done = int(tt_d[1] or 0)
+                if t_total > 0 and t_done / t_total < 0.8:
+                    pct = int(round(t_done / t_total * 100))
+                    out.append({
+                        "type": "incomplete_tasks", "severity": "warning",
+                        "event_id": eid, "event_name": ename,
+                        "title":   "✅ مهام ناقصة",
+                        "message": "«" + ename + "» — أُنجزت " + str(pct) + "% فقط من المهام (" + str(t_done) + "/" + str(t_total) + ")",
+                        "action_link": "/admin/events/" + str(eid) + "#tasks",
+                    })
+            except Exception:
+                pass
     # Newly-completed events that don't have post-trip notes yet.
     try:
         nrows = db.execute(
