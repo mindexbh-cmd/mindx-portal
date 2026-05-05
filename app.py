@@ -66977,6 +66977,32 @@ PUBLIC_EVENT_REG_HTML = r"""<!DOCTYPE html>
   .pubreg-banner .meta{font-size:.92rem;opacity:.95;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 16px;font-weight:700;}
   .pubreg-banner .meta span{display:inline-flex;align-items:center;gap:4px;}
   .pubreg-banner .price{display:inline-block;background:rgba(255,255,255,0.22);padding:6px 18px;border-radius:99px;margin-top:10px;font-weight:800;font-size:.95rem;}
+  /* Payment info card (payment-2) */
+  .pubreg-pay-card{background:linear-gradient(135deg,#e6f7ee 0%,#fff 100%);border:2.5px solid #1D9E75;border-radius:16px;padding:20px 22px;margin-bottom:24px;box-shadow:0 4px 14px rgba(29,158,117,0.12);}
+  .pay-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:2px dashed #c6ecd6;flex-wrap:wrap;}
+  .pay-header h2{margin:0;color:#1D9E75;font-size:1.15rem;font-weight:900;}
+  .pay-amount{font-size:1rem;color:#444;}
+  .pay-amount strong{color:#c62828;font-size:1.4rem;margin-inline-start:6px;}
+  .pay-methods{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+  .pay-method{background:#fff;border-radius:10px;padding:12px 14px;border:1.5px solid #d3d8de;}
+  .pay-method .lbl{font-weight:800;color:#444;font-size:.88rem;margin-bottom:6px;}
+  .pay-method .val{font-family:'Courier New',monospace;font-weight:900;color:#0d47a1;font-size:1.05rem;letter-spacing:0.8px;word-break:break-all;direction:ltr;text-align:left;display:block;}
+  .copy-row{display:flex;align-items:center;gap:10px;}
+  .copy-row .val{flex:1;background:#f6faff;padding:8px 12px;border-radius:8px;border:1px solid #e3f2fd;}
+  .copy-btn{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;font-size:.85rem;flex-shrink:0;transition:.15s;}
+  .copy-btn:hover{transform:translateY(-1px);}
+  .copy-btn:active{transform:scale(0.95);}
+  .copy-btn.is-copied{background:#43a047;}
+  .pay-instructions{background:#fff8e1;border-right:4px solid #FFA726;padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:.92rem;color:#7a4a00;line-height:1.5;}
+  .pay-steps{background:#f6faff;border-radius:10px;padding:14px 18px;}
+  .pay-steps .title{font-weight:900;color:#0d47a1;margin-bottom:8px;font-size:.95rem;}
+  .pay-steps ol{margin:0;padding-inline-start:20px;line-height:1.9;}
+  .pay-steps li{font-size:.9rem;color:#444;}
+  /* Receipt upload preview */
+  .receipt-preview{margin-top:12px;padding:12px;background:#fafbfc;border-radius:10px;border:2px solid #1D9E75;display:flex;align-items:center;gap:14px;}
+  .receipt-preview img{max-width:140px;max-height:180px;border-radius:8px;border:1px solid #d3d8de;}
+  .receipt-preview button{background:#c62828;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:.88rem;}
+  .receipt-preview button:hover{background:#b71c1c;}
   .pubreg-row{margin-bottom:12px;}
   .pubreg-row label{display:block;font-weight:800;color:#444;font-size:.9rem;margin-bottom:5px;}
   .pubreg-row input,.pubreg-row textarea{width:100%;padding:12px 14px;border:1.5px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:1rem;}
@@ -67040,8 +67066,67 @@ def _events_public_render_form(ev):
               + '</div>'
               '<div class="price">💰 ' + _html.escape(price_lbl) + '</div>'
               '</div>')
+    # Payment info card — only renders the methods the admin actually
+    # filled in; falls back to a "contact the centre" message if none.
+    iban        = str(ev.get("payment_iban")         or "").strip()
+    benefit     = str(ev.get("payment_benefit")      or "").strip()
+    beneficiary = str(ev.get("payment_beneficiary")  or "").strip()
+    instr       = str(ev.get("payment_instructions") or "").strip()
+    has_any = any([iban, benefit, beneficiary])
+    pay_card_parts = []
+    pay_card_parts.append('<div class="pubreg-pay-card">')
+    pay_card_parts.append('<div class="pay-header">'
+                          '<h2>💳 معلومات الدفع</h2>'
+                          '<div class="pay-amount">المبلغ المطلوب: '
+                          '<strong>' + _html.escape(price_lbl) + '</strong></div>'
+                          '</div>')
+    if has_any:
+        pay_card_parts.append('<div class="pay-methods">')
+        if iban:
+            pay_card_parts.append(
+                '<div class="pay-method">'
+                '<div class="lbl">🏦 رقم الحساب البنكي (IBAN):</div>'
+                '<div class="copy-row">'
+                '<code class="val" id="pay-iban-val">' + _html.escape(iban) + '</code>'
+                '<button type="button" class="copy-btn" data-copy-target="pay-iban-val">📋 نسخ</button>'
+                '</div></div>')
+        if benefit:
+            pay_card_parts.append(
+                '<div class="pay-method">'
+                '<div class="lbl">📱 BenefitPay:</div>'
+                '<div class="copy-row">'
+                '<code class="val" id="pay-benefit-val">' + _html.escape(benefit) + '</code>'
+                '<button type="button" class="copy-btn" data-copy-target="pay-benefit-val">📋 نسخ</button>'
+                '</div></div>')
+        if beneficiary:
+            pay_card_parts.append(
+                '<div class="pay-method">'
+                '<div class="lbl">👤 اسم المستفيد:</div>'
+                '<div class="val" style="background:#f6faff;padding:8px 12px;border-radius:8px;">'
+                + _html.escape(beneficiary) + '</div></div>')
+        pay_card_parts.append('</div>')
+    else:
+        pay_card_parts.append(
+            '<div class="pay-instructions" style="border-right-color:#1565C0;'
+            'background:#e3f2fd;color:#0d47a1;">'
+            '📞 يرجى التواصل مع المركز للحصول على تفاصيل الدفع قبل التسجيل.'
+            '</div>')
+    if instr:
+        pay_card_parts.append(
+            '<div class="pay-instructions">💡 ' + _html.escape(instr) + '</div>')
+    pay_card_parts.append(
+        '<div class="pay-steps">'
+        '<div class="title">📋 خطوات الدفع والتسجيل:</div>'
+        '<ol>'
+        '<li>قومي بالتحويل عبر تطبيق البنك أو BenefitPay</li>'
+        '<li>احفظي صورة (Screenshot) للإيصال</li>'
+        '<li>عبّئي بيانات الطالبة أدناه</li>'
+        '<li>ارفقي صورة الإيصال وأرسلي التسجيل</li>'
+        '</ol></div>')
+    pay_card_parts.append('</div>')
+    pay_card = "".join(pay_card_parts)
     form = ('<div id="pubreg-msg"></div>'
-            '<form id="pubreg-form">'
+            '<form id="pubreg-form" enctype="multipart/form-data">'
             '<div class="pubreg-row">'
             '  <label for="pr-name">اسم الطالبة *</label>'
             '  <input id="pr-name" type="text" required maxlength="120" placeholder="الاسم الكامل"/>'
@@ -67058,9 +67143,21 @@ def _events_public_render_form(ev):
             '  <label for="pr-notes">ملاحظات (اختياري)</label>'
             '  <textarea id="pr-notes" maxlength="400" placeholder="أي ملاحظات تودّون إخبارنا بها"></textarea>'
             '</div>'
+            '<div class="pubreg-row">'
+            '  <label for="pr-receipt">📎 إيصال الدفع <span style="color:#c62828;">*</span></label>'
+            '  <input id="pr-receipt" name="receipt" type="file" required '
+            '         accept="image/png,image/jpeg,image/jpg,image/webp"/>'
+            '  <small style="color:#666;font-size:.78rem;display:block;margin-top:4px;">'
+            '    ارفقي صورة (Screenshot) لإيصال التحويل. الحد الأقصى: 5 MB'
+            '  </small>'
+            '  <div class="receipt-preview" id="receipt-preview" hidden>'
+            '    <img id="receipt-preview-img" src="" alt="معاينة الإيصال"/>'
+            '    <button type="button" id="receipt-clear">❌ إزالة</button>'
+            '  </div>'
+            '</div>'
             '<button type="submit" class="pubreg-submit" id="pr-submit">✨ تأكيد التسجيل</button>'
             '</form>')
-    return banner + form
+    return banner + pay_card + form
 
 
 _PUBLIC_CLOSED_VARIANTS = {
@@ -67153,34 +67250,90 @@ _PUBLIC_REG_SCRIPT = r"""<script>
     var m = document.getElementById('pubreg-msg');
     if (m) m.innerHTML = '<div class="pubreg-' + (kind || 'err') + '">' + html + '</div>';
   }
+
+  /* Copy buttons (IBAN / BenefitPay) */
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var targetId = btn.getAttribute('data-copy-target');
+      var el = targetId ? document.getElementById(targetId) : null;
+      if (!el) return;
+      var text = (el.textContent || '').trim();
+      var ok = function(){
+        btn.classList.add('is-copied');
+        btn.textContent = '✓ تم النسخ';
+        setTimeout(function(){
+          btn.classList.remove('is-copied');
+          btn.textContent = '📋 نسخ';
+        }, 2000);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(ok, function(){ ok(); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(_){}
+        document.body.removeChild(ta);
+        ok();
+      }
+    });
+  });
+
+  /* Receipt file preview + size guard */
+  var receiptInput = document.getElementById('pr-receipt');
+  var receiptPreview = document.getElementById('receipt-preview');
+  var receiptPreviewImg = document.getElementById('receipt-preview-img');
+  var receiptClear = document.getElementById('receipt-clear');
+  if (receiptInput){
+    receiptInput.addEventListener('change', function(){
+      var fl = receiptInput.files && receiptInput.files[0];
+      if (!fl){ if (receiptPreview) receiptPreview.hidden = true; return; }
+      if (fl.size > 5 * 1024 * 1024){
+        msg('حجم الصورة كبير جداً (الحد الأقصى 5 MB)', 'err');
+        receiptInput.value = '';
+        if (receiptPreview) receiptPreview.hidden = true;
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e){
+        if (receiptPreviewImg) receiptPreviewImg.src = e.target.result;
+        if (receiptPreview) receiptPreview.hidden = false;
+      };
+      reader.readAsDataURL(fl);
+    });
+  }
+  if (receiptClear){
+    receiptClear.addEventListener('click', function(){
+      if (receiptInput) receiptInput.value = '';
+      if (receiptPreview) receiptPreview.hidden = true;
+    });
+  }
+
+  /* Submit — multipart so the receipt file rides along */
   f.addEventListener('submit', function(e){
     e.preventDefault();
     var btn = document.getElementById('pr-submit');
     btn.disabled = true; btn.textContent = '… جار الإرسال';
-    var body = {
-      student_name: (document.getElementById('pr-name').value || '').trim(),
-      parent_name:  (document.getElementById('pr-parent').value || '').trim(),
-      parent_phone: (document.getElementById('pr-phone').value || '').trim(),
-      notes:        (document.getElementById('pr-notes').value || '').trim()
-    };
-    fetch('/events/register/' + token, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    })
-    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
-    .then(function(o){
-      if (!o.ok || !o.j.ok){
+    var fd = new FormData();
+    fd.append('student_name', (document.getElementById('pr-name').value   || '').trim());
+    fd.append('parent_name',  (document.getElementById('pr-parent').value || '').trim());
+    fd.append('parent_phone', (document.getElementById('pr-phone').value  || '').trim());
+    fd.append('notes',        (document.getElementById('pr-notes').value  || '').trim());
+    var fl = receiptInput && receiptInput.files && receiptInput.files[0];
+    if (fl) fd.append('receipt', fl);
+    fetch('/events/register/' + token, {method:'POST', body: fd})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+      .then(function(o){
+        if (!o.ok || !o.j.ok){
+          btn.disabled = false; btn.textContent = '✨ تأكيد التسجيل';
+          msg(o.j.error || 'تعذّر التسجيل، حاول لاحقاً', 'err');
+          return;
+        }
+        document.getElementById('pubreg-root').innerHTML = o.j.html || '<div class="pubreg-ok">تم التسجيل بنجاح ✅</div>';
+      })
+      .catch(function(){
         btn.disabled = false; btn.textContent = '✨ تأكيد التسجيل';
-        msg(o.j.error || 'تعذّر التسجيل، حاول لاحقاً', 'err');
-        return;
-      }
-      document.getElementById('pubreg-root').innerHTML = o.j.html || '<div class="pubreg-ok">تم التسجيل بنجاح ✅</div>';
-    })
-    .catch(function(){
-      btn.disabled = false; btn.textContent = '✨ تأكيد التسجيل';
-      msg('خطأ في الاتصال بالخادم', 'err');
-    });
+        msg('خطأ في الاتصال بالخادم', 'err');
+      });
   });
 })();
 </script>"""
@@ -67230,6 +67383,36 @@ def events_public_register_get(token):
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
+_RECEIPT_ALLOWED_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+_RECEIPT_ALLOWED_EXTS  = {".png", ".jpg", ".jpeg", ".webp"}
+_RECEIPT_MAX_BYTES = 5 * 1024 * 1024
+
+
+def _events_receipts_storage_dir():
+    """Mirror the curriculum storage convention: persistent disk on
+    Render (/var/data/uploads/receipts), local fallback under
+    ./data/uploads/receipts. Returns the resolved abspath, ensures
+    it exists. Falls through to a tmp path on misconfiguration so
+    a bad host doesn't 500 every public registration."""
+    candidates = []
+    if os.path.isdir("/var/data"):
+        candidates.append("/var/data/uploads/receipts")
+    candidates.append(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "data", "uploads", "receipts"))
+    for c in candidates:
+        try:
+            os.makedirs(c, exist_ok=True)
+            return c
+        except Exception:
+            continue
+    fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "uploads", "receipts")
+    try: os.makedirs(fallback, exist_ok=True)
+    except Exception: pass
+    return fallback
+
+
 @app.route('/events/register/<token>', methods=['POST'])
 def events_public_register_post(token):
     db = get_db()
@@ -67238,7 +67421,14 @@ def events_public_register_post(token):
         return jsonify({"ok": False, "error": "الرابط غير صالح"}), 404
     if (ev.get("status") or "").lower() != "open":
         return jsonify({"ok": False, "error": "التسجيل غير مفتوح حالياً"}), 400
-    d = request.get_json(silent=True) or {}
+    # The form is multipart now (receipt file rides along) — fall back
+    # to JSON for older clients that may still POST application/json.
+    if request.content_type and "multipart/form-data" in request.content_type:
+        d = request.form
+        receipt_file = request.files.get("receipt")
+    else:
+        d = request.get_json(silent=True) or {}
+        receipt_file = None
     student_name = (d.get("student_name") or "").strip()
     parent_name  = (d.get("parent_name") or "").strip() or None
     parent_phone = (d.get("parent_phone") or "").strip()
@@ -67247,6 +67437,23 @@ def events_public_register_post(token):
         return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
     if not parent_phone:
         return jsonify({"ok": False, "error": "رقم هاتف ولي الأمر مطلوب"}), 400
+    if not receipt_file or not getattr(receipt_file, "filename", ""):
+        return jsonify({"ok": False, "error": "إيصال الدفع مطلوب — يرجى إرفاق صورة الإيصال"}), 400
+    # Validate mime + extension
+    fname = receipt_file.filename or ""
+    ext = (os.path.splitext(fname)[1] or "").lower()
+    mime = (receipt_file.mimetype or "").lower()
+    if mime not in _RECEIPT_ALLOWED_MIMES and ext not in _RECEIPT_ALLOWED_EXTS:
+        return jsonify({"ok": False, "error": "نوع الملف غير مدعوم — استخدمي صورة (PNG / JPG / WEBP)"}), 400
+    # Validate size (read once via stream tell/seek)
+    try:
+        receipt_file.stream.seek(0, 2)  # SEEK_END
+        size = receipt_file.stream.tell()
+        receipt_file.stream.seek(0)
+    except Exception:
+        size = 0
+    if size > _RECEIPT_MAX_BYTES:
+        return jsonify({"ok": False, "error": "حجم الصورة كبير جداً (الحد الأقصى 5 MB)"}), 400
     eid = int(ev.get("id"))
     cap = int(ev.get("max_students") or 0)
     if cap > 0:
@@ -67260,6 +67467,9 @@ def events_public_register_post(token):
             cur = 0
         if cur >= cap:
             return jsonify({"ok": False, "error": "اكتمل العدد"}), 400
+    # Insert the registration first so we have a row id to anchor the
+    # receipt filename against. payment_status stays 'pending' until
+    # the admin verifies the receipt in the lightbox.
     try:
         db.execute(
             "INSERT INTO ev_registrations(event_id, student_id, student_name, "
@@ -67275,10 +67485,80 @@ def events_public_register_post(token):
         import sys as _sys
         print("[events] public reg insert failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر الحفظ، حاول لاحقاً"}), 500
+    try:
+        rid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        rid = None
+    # Save the file under <storage>/<eid>_<rid>_<ts>_<safe>.<ext>
+    saved_url = None
+    if rid:
+        from werkzeug.utils import secure_filename as _secure
+        from datetime import datetime as _dt
+        try:
+            safe_base = _secure(os.path.splitext(fname)[0]) or "receipt"
+            safe_base = safe_base[:40]  # cap length
+            ts = _dt.utcnow().strftime("%Y%m%d%H%M%S")
+            saved_ext = ext if ext in _RECEIPT_ALLOWED_EXTS else ".jpg"
+            disk_name = "%d_%d_%s_%s%s" % (eid, rid, ts, safe_base, saved_ext)
+            storage = _events_receipts_storage_dir()
+            disk_path = os.path.join(storage, disk_name)
+            receipt_file.save(disk_path)
+            # Public URL is served via the auth-gated route below.
+            saved_url = "/admin/events/" + str(eid) + "/receipts/" + disk_name
+            db.execute(
+                "UPDATE ev_registrations SET receipt_image_url = ?, "
+                "  receipt_uploaded_at = CURRENT_TIMESTAMP, "
+                "  updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?", (saved_url, rid))
+            db.commit()
+        except Exception as ex:
+            try: db.rollback()
+            except Exception: pass
+            import sys as _sys
+            print("[events] receipt save failed for rid=" + str(rid)
+                  + ": " + str(ex), file=_sys.stderr)
+            # Don't fail the registration just because the receipt save
+            # blew up — admin will see no thumbnail and can ask parent
+            # to re-upload via WhatsApp.
     return jsonify({
-        "ok":   True,
-        "html": _events_public_render_thanks(ev.get("name") or "رحلة"),
+        "ok":           True,
+        "html":         _events_public_render_thanks(ev.get("name") or "رحلة"),
+        "receipt_saved": bool(saved_url),
     })
+
+
+@app.route('/admin/events/<int:eid>/receipts/<path:filename>', methods=['GET'])
+@login_required
+def admin_events_receipt_serve(eid, filename):
+    """Serve a saved receipt image. Auth-gated (login_required); only
+    admins/managers can view. Validates the filename starts with the
+    event id prefix to prevent ../ traversal and cross-event lookup."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return Response("غير مصرح", status=403)
+    # Reject anything that looks suspicious before hitting the FS.
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return Response("not found", status=404)
+    if not filename.startswith(str(int(eid)) + "_"):
+        return Response("not found", status=404)
+    storage = _events_receipts_storage_dir()
+    full = os.path.join(storage, filename)
+    if not os.path.isfile(full):
+        return Response("not found", status=404)
+    # Pick a sensible MIME from extension.
+    ext = os.path.splitext(filename)[1].lower()
+    mt = {
+        ".png":  "image/png",
+        ".jpg":  "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }.get(ext, "application/octet-stream")
+    try:
+        with open(full, "rb") as f:
+            data = f.read()
+    except Exception:
+        return Response("read error", status=500)
+    return Response(data, mimetype=mt)
 
 
 # ── Message templates + WA-link rendering (7.3) ────────────────
