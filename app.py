@@ -70322,10 +70322,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
    so they read as historical record without hiding. */
 .ev-cal-day .evnames{display:flex;flex-direction:column;gap:2px;
                      margin-top:3px;width:100%;overflow:hidden;}
-.evchip{font-size:.68rem;font-weight:800;color:#fff;
-        padding:2px 6px;border-radius:5px;line-height:1.3;
+.evchip{display:block;font-size:.74rem;font-weight:800;color:#fff;
+        padding:3px 7px;border-radius:5px;line-height:1.3;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-        background:#9e9e9e;transition:opacity .12s;}
+        background:#9e9e9e;transition:opacity .12s,transform .12s;
+        text-decoration:none;cursor:pointer;}
+.evchip:hover{transform:translateX(2px);text-decoration:none;
+              box-shadow:0 2px 6px rgba(0,0,0,0.15);}
 .evchip[data-status="planning"] {background:#9e9e9e;}
 .evchip[data-status="ready"]    {background:#FFA726;color:#3a2400;}
 .evchip[data-status="open"]     {background:#1D9E75;}
@@ -70872,6 +70875,11 @@ function evRenderCalendar(){
     // Per-event chips with status colors. Completed/cancelled get
     // muted opacity / strikethrough via CSS so they read as past
     // record entries without disappearing entirely.
+    // Per-event chips. Each chip is a real <a> so clicking the
+    // event name navigates to its detail page instead of falling
+    // through to the day-cell filter handler. We also stop click
+    // propagation in the wiring step below so the parent .ev-cal-day
+    // click (which filters the list view by date) doesn't double-fire.
     var chips = '';
     if (evs.length){
       var titleAttr = evEsc(evs.map(function(x){
@@ -70879,8 +70887,14 @@ function evRenderCalendar(){
       }).join('، '));
       chips = '<div class="evnames" title="' + titleAttr + '">'
             + evs.map(function(x){
-                return '<span class="evchip" data-status="' + evEsc(x.status || '') + '">'
-                     + evEsc(x.name || '') + '</span>';
+                var href = '/admin/events/' + (x.id|0);
+                var attrTitle = evEsc((x.name || '') + ' — '
+                                       + (x.status_label || x.status || ''));
+                return '<a class="evchip" href="' + href + '" '
+                     + 'data-status="' + evEsc(x.status || '') + '" '
+                     + 'data-evchip="1" '
+                     + 'title="' + attrTitle + '">'
+                     + evEsc(x.name || '') + '</a>';
               }).join('')
             + '</div>';
     }
@@ -70914,9 +70928,17 @@ function evRenderCalendar(){
       evRenderCalendar();
     });
   });
-  // Day click → filter list view to that day
+  // Each chip is a real <a> — let the navigation happen but stop
+  // bubbling so the parent day-cell click (which filters the list
+  // view by date) doesn't also fire.
+  calEl.querySelectorAll('a[data-evchip]').forEach(function(a){
+    a.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  // Day click → filter list view to that day. Skip if the click
+  // landed on a chip (its own anchor handles navigation).
   calEl.querySelectorAll('.ev-cal-day.has-events').forEach(function(c){
-    c.addEventListener('click', function(){
+    c.addEventListener('click', function(e){
+      if (e.target && e.target.closest && e.target.closest('a[data-evchip]')) return;
       var iso = c.getAttribute('data-iso');
       _EV_DAY_FILTER = iso;
       evSetView('list');
