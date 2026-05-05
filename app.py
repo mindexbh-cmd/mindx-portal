@@ -68581,6 +68581,13 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-mode{display:flex;gap:6px;margin-bottom:12px;background:#eef0f3;padding:4px;border-radius:10px;}
   .evd-reg-mode button{flex:1;background:transparent;border:none;padding:8px 12px;border-radius:8px;font-weight:800;cursor:pointer;color:#666;font-size:.88rem;}
   .evd-reg-mode button.is-on{background:#fff;color:#1D9E75;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+  /* Edit modal sections (6.3) */
+  .evd-reg-section{margin-bottom:14px;padding:12px 14px;background:#fafbfc;border-radius:10px;border-right:3px solid var(--rsec,#1D9E75);}
+  .evd-reg-section[data-sec="identity"]{--rsec:#1D9E75;}
+  .evd-reg-section[data-sec="pay"]     {--rsec:#E65100;}
+  .evd-reg-section[data-sec="att"]     {--rsec:#1565C0;}
+  .evd-reg-section .sec-h{font-weight:900;color:var(--rsec);font-size:.92rem;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .evd-reg-section .row:last-child{margin-bottom:0;}
   /* Quick-toggle popover (6.3) */
   .evd-reg-pop{position:absolute;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.18);padding:8px;display:none;z-index:90;animation:evdItemIn .15s ease both;min-width:140px;}
   .evd-reg-pop.is-open{display:block;}
@@ -68972,33 +68979,37 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
         <button type="button" data-mode="list">📋 اختيار من القائمة</button>
         <button type="button" data-mode="manual">✍️ إضافة يدوية</button>
       </div>
-      <div class="row" id="rf-list-row">
-        <label for="rf-pick">اختاري الطالبة</label>
-        <select id="rf-pick">
-          <option value="">— اختاري —</option>
-        </select>
-        <div style="font-size:.78rem;color:#888;margin-top:4px;" id="rf-list-hint">سيتم تعبئة البيانات تلقائياً.</div>
-      </div>
-      <div class="row">
-        <label for="rf-name">اسم الطالبة *</label>
-        <input id="rf-name" type="text" required maxlength="120"/>
-      </div>
-      <div class="grid2">
-        <div class="row">
-          <label for="rf-parent">اسم الأم</label>
-          <input id="rf-parent" type="text" maxlength="120"/>
+      <div class="evd-reg-section" data-sec="identity">
+        <div class="sec-h">👤 الهوية</div>
+        <div class="row" id="rf-list-row">
+          <label for="rf-pick">اختاري الطالبة</label>
+          <select id="rf-pick">
+            <option value="">— اختاري —</option>
+          </select>
+          <div style="font-size:.78rem;color:#888;margin-top:4px;" id="rf-list-hint">سيتم تعبئة البيانات تلقائياً.</div>
         </div>
         <div class="row">
-          <label for="rf-phone">هاتف الأم</label>
-          <input id="rf-phone" type="tel" maxlength="32" inputmode="tel"/>
+          <label for="rf-name">اسم الطالبة *</label>
+          <input id="rf-name" type="text" required maxlength="120"/>
+        </div>
+        <div class="grid2">
+          <div class="row">
+            <label for="rf-parent">اسم الأم</label>
+            <input id="rf-parent" type="text" maxlength="120"/>
+          </div>
+          <div class="row">
+            <label for="rf-phone">هاتف الأم</label>
+            <input id="rf-phone" type="tel" maxlength="32" inputmode="tel"/>
+          </div>
+        </div>
+        <div class="row">
+          <label for="rf-group">الفصل</label>
+          <input id="rf-group" type="text" maxlength="80" placeholder="اختياري"/>
         </div>
       </div>
-      <div class="row">
-        <label for="rf-group">الفصل</label>
-        <input id="rf-group" type="text" maxlength="80" placeholder="اختياري"/>
-      </div>
-      <hr style="border:0;border-top:1px dashed #d3d8de;margin:14px 0;"/>
-      <div class="grid2">
+      <div class="evd-reg-section" data-sec="pay">
+        <div class="sec-h">💰 الدفع</div>
+        <div class="grid2">
         <div class="row">
           <label for="rf-pay">حالة الدفع</label>
           <select id="rf-pay">
@@ -69014,25 +69025,29 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
           <input id="rf-amt" type="number" min="0" step="0.001" placeholder="0.000"/>
         </div>
       </div>
-      <div class="row">
-        <label for="rf-paynote">ملاحظة الدفع</label>
-        <input id="rf-paynote" type="text" maxlength="200"/>
-      </div>
-      <div class="grid2">
         <div class="row">
-          <label for="rf-att">حالة الحضور</label>
-          <select id="rf-att">
-            <option value="pending">⏳ بانتظار</option>
-            <option value="present">✅ حاضرة</option>
-            <option value="late">🟡 متأخرة</option>
-            <option value="absent">❌ غائبة</option>
-            <option value="cancelled">🚫 ملغاة</option>
-            <option value="medical_emergency">🚑 طارئ صحي</option>
-          </select>
+          <label for="rf-paynote">ملاحظة الدفع</label>
+          <input id="rf-paynote" type="text" maxlength="200"/>
         </div>
-        <div class="row">
-          <label for="rf-attnote">ملاحظة الحضور</label>
-          <input id="rf-attnote" type="text" maxlength="200"/>
+      </div>
+      <div class="evd-reg-section" data-sec="att">
+        <div class="sec-h">📋 الحضور</div>
+        <div class="grid2">
+          <div class="row">
+            <label for="rf-att">حالة الحضور</label>
+            <select id="rf-att">
+              <option value="pending">⏳ بانتظار</option>
+              <option value="present">✅ حاضرة</option>
+              <option value="late">🟡 متأخرة</option>
+              <option value="absent">❌ غائبة</option>
+              <option value="cancelled">🚫 ملغاة</option>
+              <option value="medical_emergency">🚑 طارئ صحي</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="rf-attnote">ملاحظة الحضور</label>
+            <input id="rf-attnote" type="text" maxlength="200"/>
+          </div>
         </div>
       </div>
       <div class="footer">
@@ -70978,12 +70993,24 @@ function evdRegOpenPopover(anchor, rid, kind){
       evdRegQuickSet(rid, kind, st);
     });
   });
-  // Position the popover under the anchor.
+  // Position the popover under the anchor, then nudge it back into
+  // the viewport if it would overflow the right or bottom edges.
   var rect = anchor.getBoundingClientRect();
   pop.style.position = 'fixed';
   pop.style.top  = (rect.bottom + 8) + 'px';
   pop.style.left = (rect.left + rect.width / 2 - 90) + 'px';
   pop.classList.add('is-open');
+  // After it's rendered we know the actual size — clamp to viewport.
+  setTimeout(function(){
+    var pr = pop.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var nl = pr.left, nt = pr.top;
+    if (pr.right > vw - 8) nl = Math.max(8, vw - pr.width - 8);
+    if (pr.left < 8)       nl = 8;
+    if (pr.bottom > vh - 8) nt = Math.max(8, rect.top - pr.height - 8);
+    pop.style.left = nl + 'px';
+    pop.style.top  = nt + 'px';
+  }, 0);
 }
 
 function evdRegQuickSet(rid, kind, status){
@@ -71220,6 +71247,8 @@ document.addEventListener('DOMContentLoaded', function(){
     if (e.key === 'Escape'){
       document.querySelectorAll('.evd-mb.is-open').forEach(function(m){ m.classList.remove('is-open'); });
       document.getElementById('evd-status-menu').classList.remove('is-open');
+      var pop = document.getElementById('evd-reg-pop');
+      if (pop) pop.classList.remove('is-open');
     }
   });
 });
