@@ -986,6 +986,8 @@ def init_db():
         title TEXT NOT NULL,
         description TEXT,
         order_index INTEGER DEFAULT 0,
+        is_completed INTEGER DEFAULT 0,
+        completed_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0,
@@ -6495,6 +6497,30 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_schedule_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_schedule_completion_v1 (stage 9.1): track which schedule
+    # items were completed during the field follow-up. Adds is_completed
+    # + completed_at as nullable extras so existing rows are unchanged.
+    if "ev_schedule_completion_v1" not in applied:
+        try:
+            _sched_cols = {r[1] for r in db2.execute(
+                "PRAGMA table_info(ev_schedule)").fetchall()}
+        except Exception:
+            _sched_cols = set()
+        for _col, _decl in [
+            ("is_completed", "INTEGER DEFAULT 0"),
+            ("completed_at", "DATETIME"),
+        ]:
+            if _col not in _sched_cols:
+                try:
+                    db2.execute("ALTER TABLE ev_schedule ADD COLUMN "
+                                + _col + " " + _decl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_schedule_completion_v1",))
             db2.commit()
         except Exception: pass
 
@@ -68152,6 +68178,8 @@ def _events_schedule_row(rd):
         "title":            rd.get("title") or "",
         "description":      rd.get("description") or "",
         "order_index":      int(rd.get("order_index") or 0),
+        "is_completed":     int(rd.get("is_completed") or 0),
+        "completed_at":     rd.get("completed_at") or "",
         "created_at":       rd.get("created_at") or "",
         "updated_at":       rd.get("updated_at") or "",
     }
@@ -68377,6 +68405,71 @@ def api_admin_events_schedule_delete(eid, sid):
     except Exception:
         pass
     return jsonify({"ok": True, "id": sid})
+
+
+@app.route('/api/admin/events/<int:eid>/schedule/<int:sid>/toggle-complete',
+           methods=['PATCH'])
+@login_required
+def api_admin_events_schedule_toggle_complete(eid, sid):
+    """Field follow-up (stage 9.1): flip the is_completed flag and
+    stamp completed_at. Designed for the mobile follow-up screen
+    where the only edit op is tapping a checkbox."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_schedule_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_schedule WHERE id = ? AND event_id = ? AND is_deleted = 0",
+            (sid, eid)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "البند غير موجود"}), 404
+    cur = dict(row)
+    # Allow client to force a value via {is_completed: 0/1}; otherwise toggle.
+    d = request.get_json(silent=True) or {}
+    if "is_completed" in d:
+        try:
+            new_val = 1 if int(d.get("is_completed") or 0) else 0
+        except Exception:
+            new_val = 0
+    else:
+        new_val = 0 if int(cur.get("is_completed") or 0) else 1
+    try:
+        if new_val:
+            db.execute(
+                "UPDATE ev_schedule SET is_completed = 1, "
+                "completed_at = CURRENT_TIMESTAMP, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?", (sid,))
+        else:
+            db.execute(
+                "UPDATE ev_schedule SET is_completed = 0, "
+                "completed_at = NULL, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?", (sid,))
+        db.commit()
+    except Exception as ex:
+        try: db.rollback()
+        except Exception: pass
+        import sys as _sys
+        print("[events] schedule toggle-complete failed: " + str(ex), file=_sys.stderr)
+        return jsonify({"ok": False, "error": "تعذّر التحديث"}), 500
+    try:
+        new_row = db.execute(
+            "SELECT * FROM ev_schedule WHERE id = ?", (sid,)).fetchone()
+        item = _events_schedule_row(dict(new_row)) if new_row else None
+    except Exception:
+        item = None
+    try:
+        _audit("event.schedule.toggle_complete",
+               target_type="ev_schedule", target_id=sid,
+               old_value={"is_completed": int(cur.get("is_completed") or 0)},
+               new_value={"is_completed": new_val})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "id": sid, "item": item})
 
 
 @app.route('/api/admin/events/<int:eid>/schedule/reorder', methods=['POST'])
@@ -68736,6 +68829,163 @@ def admin_events_detail_page(eid):
         uid = 0
     html = html.replace("{{UID}}", str(uid))
     return Response(html, mimetype="text/html; charset=utf-8")
+
+
+# ── Field follow-up screen (stage 9) ───────────────────────────
+@app.route('/admin/events/<int:eid>/followup', methods=['GET'])
+@login_required
+def admin_events_followup_page(eid):
+    """Read-only mobile-first follow-up screen. Single scrollable
+    page with checkboxes for schedule / items / tasks / attendance."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='padding:40px;text-align:center;color:#c62828;font-family:sans-serif;'>"
+            "<h1>غير مصرح</h1></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return redirect("/admin/events#not-found")
+    html = ADMIN_EVENT_FOLLOWUP_HTML.replace("{{EID}}", str(eid))
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+@app.route('/api/admin/events/<int:eid>/followup', methods=['GET'])
+@login_required
+def api_admin_events_followup(eid):
+    """One-shot aggregator for the follow-up screen — bundles event
+    meta + schedule + items + tasks + registrations + per-section
+    progress so the screen renders in a single round-trip."""
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        ev_row = db.execute(
+            "SELECT * FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        ev_row = None
+    if not ev_row:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    ev = _events_detail_dict(dict(ev_row), db)
+    # Schedule
+    try:
+        sched_rows = db.execute(
+            "SELECT * FROM ev_schedule WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY time_slot, order_index, id", (eid,)).fetchall()
+        schedule = [_events_schedule_row(dict(r)) for r in sched_rows]
+    except Exception:
+        schedule = []
+    # Items
+    try:
+        item_rows = db.execute(
+            "SELECT * FROM ev_items WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY order_index, id", (eid,)).fetchall()
+        items = [_events_items_row(dict(r)) for r in item_rows]
+    except Exception:
+        items = []
+    # Tasks (grouped by category)
+    try:
+        task_rows = db.execute(
+            "SELECT * FROM ev_tasks WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY category, order_index, id", (eid,)).fetchall()
+        tasks_flat = [_events_tasks_row(dict(r)) for r in task_rows]
+    except Exception:
+        tasks_flat = []
+    tasks_by_cat = {"before": [], "during": [], "after": []}
+    for t in tasks_flat:
+        c = (t.get("category") or "before").lower()
+        tasks_by_cat.setdefault(c, []).append(t)
+    # Registrations
+    try:
+        reg_rows = db.execute(
+            "SELECT * FROM ev_registrations "
+            "WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY student_name", (eid,)).fetchall()
+        regs = [_events_reg_row(dict(r)) for r in reg_rows]
+    except Exception:
+        regs = []
+    # Progress
+    sched_total = len(schedule)
+    sched_done  = sum(1 for s in schedule if int(s.get("is_completed") or 0))
+    items_total = len(items)
+    items_ready = sum(1 for it in items if int(it.get("is_ready") or 0))
+    tasks_total = len(tasks_flat)
+    tasks_done  = sum(1 for t in tasks_flat
+                      if (t.get("status") or "") in ("completed", "cancelled"))
+    att_total   = len(regs)
+    att_present = sum(1 for r in regs if (r.get("attendance_status") or "") == "present")
+    att_late    = sum(1 for r in regs if (r.get("attendance_status") or "") == "late")
+    att_absent  = sum(1 for r in regs if (r.get("attendance_status") or "") == "absent")
+    att_pending = sum(1 for r in regs
+                      if (r.get("attendance_status") or "pending") == "pending")
+    progress = {
+        "schedule": {
+            "total": sched_total, "done": sched_done,
+            "pct": round(sched_done / sched_total * 100, 1) if sched_total else 0.0,
+        },
+        "items": {
+            "total": items_total, "ready": items_ready,
+            "pct": round(items_ready / items_total * 100, 1) if items_total else 0.0,
+        },
+        "tasks": {
+            "total": tasks_total, "completed": tasks_done,
+            "pct": round(tasks_done / tasks_total * 100, 1) if tasks_total else 0.0,
+        },
+        "attendance": {
+            "total": att_total, "present": att_present, "late": att_late,
+            "absent": att_absent, "pending": att_pending,
+            "pct": round((att_present + att_late) / att_total * 100, 1) if att_total else 0.0,
+        },
+    }
+    # All-done flag = every section either has zero items or is 100%.
+    all_done = (
+        (sched_total == 0 or sched_done == sched_total) and
+        (items_total == 0 or items_ready == items_total) and
+        (tasks_total == 0 or tasks_done == tasks_total) and
+        (att_total   == 0 or att_pending == 0)
+    )
+    return jsonify({
+        "ok":            True,
+        "event":         ev,
+        "schedule":      schedule,
+        "items":         items,
+        "tasks":         tasks_by_cat,
+        "registrations": regs,
+        "progress":      progress,
+        "all_done":      bool(all_done),
+    })
+
+
+# Stage 9.2 ships the actual follow-up HTML; commit 9.1 keeps a
+# short stub here so the route doesn't 500 if someone hits it
+# between deploys. The 9.2 commit replaces this constant in place.
+ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>متابعة الرحلة</title>
+<style>
+  body{margin:0;padding:40px;font-family:'Tahoma','Segoe UI',sans-serif;background:#f4f5f7;text-align:center;}
+  .stub{max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:40px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .em{font-size:3rem;}
+  a{color:#1D9E75;font-weight:800;text-decoration:none;}
+</style>
+</head><body>
+<div class="stub">
+  <div class="em">📍</div>
+  <h2>متابعة الرحلة قيد التطوير (9.2)</h2>
+  <p style="color:#666;">واجهة الميدان ستُتاح في التحديث القادم.</p>
+  <p><a href="/admin/events/{{EID}}">← العودة لتفاصيل الرحلة</a></p>
+</div>
+</body></html>"""
 
 
 @app.route('/api/admin/events/<int:eid>', methods=['GET'])
