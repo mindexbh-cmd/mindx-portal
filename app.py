@@ -69033,15 +69033,28 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
   .evdf-attrow:last-child{border-bottom:0;}
   .evdf-attrow .nm{font-weight:800;color:#222;font-size:.94rem;display:flex;align-items:center;gap:6px;}
   .evdf-attrow .grp{font-size:.7rem;color:#0d47a1;background:#e3f2fd;padding:1px 7px;border-radius:99px;font-weight:700;}
-  .evdf-attbtns{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
-  .evdf-attbtn{background:#fff;border:2px solid #d3d8de;border-radius:9px;padding:9px 4px;font-size:1.25rem;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
-  .evdf-attbtn:active{transform:scale(0.92);}
-  .evdf-attbtn.is-on[data-st="pending"]          {background:#eef0f3;border-color:#9e9e9e;}
-  .evdf-attbtn.is-on[data-st="present"]          {background:#1D9E75;border-color:#1D9E75;color:#fff;}
-  .evdf-attbtn.is-on[data-st="late"]             {background:#E65100;border-color:#E65100;color:#fff;}
-  .evdf-attbtn.is-on[data-st="absent"]           {background:#c62828;border-color:#c62828;color:#fff;}
-  .evdf-attbtn.is-on[data-st="cancelled"]        {background:#37474F;border-color:#37474F;color:#fff;}
-  .evdf-attbtn.is-on[data-st="medical_emergency"]{background:#6B3FA0;border-color:#6B3FA0;color:#fff;}
+  .evdf-attbtns{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+  .evdf-attbtn{background:#fff;border:1.5px solid #d3d8de;border-radius:10px;padding:8px 4px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:62px;-webkit-tap-highlight-color:transparent;}
+  .evdf-attbtn:active{transform:scale(0.95);}
+  .evdf-attbtn .em{font-size:1.2rem;line-height:1;}
+  .evdf-attbtn .lbl{font-size:.7rem;font-weight:700;color:#555;line-height:1;}
+  /* Subtle pre-tinted background so each option is recognizable
+     even when it's not the selected one. */
+  .evdf-attbtn[data-st="pending"]          {background:#fafbfc;}
+  .evdf-attbtn[data-st="present"]          {background:#f0f9f5;}
+  .evdf-attbtn[data-st="late"]             {background:#fff8e1;}
+  .evdf-attbtn[data-st="absent"]           {background:#ffebee;}
+  .evdf-attbtn[data-st="cancelled"]        {background:#eef0f3;}
+  .evdf-attbtn[data-st="medical_emergency"]{background:#f3e5f5;}
+  /* Selected state — strong color + white label */
+  .evdf-attbtn.is-on{border-width:2.5px;font-weight:900;}
+  .evdf-attbtn.is-on[data-st="pending"]          {background:#9e9e9e;border-color:#757575;}
+  .evdf-attbtn.is-on[data-st="present"]          {background:#1D9E75;border-color:#1D9E75;}
+  .evdf-attbtn.is-on[data-st="late"]             {background:#E65100;border-color:#E65100;}
+  .evdf-attbtn.is-on[data-st="absent"]           {background:#c62828;border-color:#c62828;}
+  .evdf-attbtn.is-on[data-st="cancelled"]        {background:#37474F;border-color:#37474F;}
+  .evdf-attbtn.is-on[data-st="medical_emergency"]{background:#6B3FA0;border-color:#6B3FA0;}
+  .evdf-attbtn.is-on .lbl,.evdf-attbtn.is-on .em{color:#fff;}
   /* Toast */
   .evdf-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:24px;font-weight:800;font-size:.9rem;box-shadow:0 4px 18px rgba(0,0,0,0.20);opacity:0;transition:opacity .25s;z-index:200;pointer-events:none;}
   .evdf-toast.is-show{opacity:1;}
@@ -69070,6 +69083,7 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
     .evdf-header h1{font-size:1.1rem;}
     .evdf-header .meta{font-size:.8rem;}
     .evdf-attbtns{grid-template-columns:repeat(3,1fr);}
+    .evdf-attbtn{min-height:58px;}
   }
 </style></head><body>
 <div class="evdf-shell">
@@ -69373,19 +69387,24 @@ function evdfTaskRowHTML(t){
 }
 
 var ATT_STATES = [
-  {st:'pending',           em:'⏳'},
-  {st:'present',           em:'✅'},
-  {st:'late',              em:'🟡'},
-  {st:'absent',            em:'❌'},
-  {st:'cancelled',         em:'🚫'},
-  {st:'medical_emergency', em:'🚑'}
+  {st:'pending',           em:'⏳', lbl:'بانتظار',   short:'بانتظار'},
+  {st:'present',           em:'✅', lbl:'حاضرة',    short:'حاضرة'},
+  {st:'late',              em:'⏰', lbl:'متأخرة',   short:'متأخرة'},
+  {st:'absent',            em:'❌', lbl:'غائبة',    short:'غائبة'},
+  {st:'cancelled',         em:'🚫', lbl:'ملغاة',    short:'ملغاة'},
+  {st:'medical_emergency', em:'🚑', lbl:'طارئ صحي', short:'طارئ'}
 ];
 function evdfAttRowHTML(r){
   var cur = r.attendance_status || 'pending';
   var grp = r.group_name ? '<span class="grp">' + evdfEsc(r.group_name) + '</span>' : '';
   var btns = ATT_STATES.map(function(s){
     var on = (s.st === cur) ? ' is-on' : '';
-    return '<button type="button" class="evdf-attbtn' + on + '" data-rid="' + (r.id|0) + '" data-st="' + s.st + '" aria-label="' + s.st + '">' + s.em + '</button>';
+    return '<button type="button" class="evdf-attbtn' + on + '" '
+         + 'data-rid="' + (r.id|0) + '" data-st="' + s.st + '" '
+         + 'aria-label="' + evdfEsc(s.lbl) + '">'
+         + '<span class="em">' + s.em + '</span>'
+         + '<span class="lbl">' + evdfEsc(s.short) + '</span>'
+         + '</button>';
   }).join('');
   return '<div class="evdf-attrow" data-rid="' + (r.id|0) + '">'
        + '  <div class="nm">' + evdfEsc(r.student_name || '—') + grp + '</div>'
@@ -73053,9 +73072,11 @@ var REG_PAY_META = {
   waived:   {label:'معفاة',   emoji:'🆓'}
 };
 var REG_ATT_META = {
+  // Clock emoji for "late" reads more clearly than the yellow ball
+  // when the badge is small. Same set is used in the followup screen.
   pending:           {label:'بانتظار',     emoji:'⏳'},
   present:           {label:'حاضرة',      emoji:'✅'},
-  late:              {label:'متأخرة',     emoji:'🟡'},
+  late:              {label:'متأخرة',     emoji:'⏰'},
   absent:            {label:'غائبة',      emoji:'❌'},
   cancelled:         {label:'ملغاة',      emoji:'🚫'},
   medical_emergency: {label:'طارئ صحي',  emoji:'🚑'}
