@@ -70511,8 +70511,6 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-btn-back{background:#fff;color:#1D9E75;border-color:#1D9E75;}
   .evd-btn-edit{background:#fff;color:#0d47a1;border-color:#0d47a1;}
   .evd-btn-del {background:#fff;color:#c62828;border-color:#c62828;}
-  .evd-btn-followup{background:linear-gradient(135deg,#6B3FA0,#4a148c);color:#fff;border-color:#6B3FA0;}
-  .evd-btn-followup:hover{background:linear-gradient(135deg,#5e35b1,#311b92);box-shadow:0 4px 12px rgba(107,63,160,0.30);}
   /* Header card with status-keyed gradient. */
   .evd-header{position:relative;border-radius:18px;padding:24px;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.10);background:linear-gradient(135deg,#9e9e9e,#757575);overflow:hidden;}
   .evd-header[data-status="planning"] {background:linear-gradient(135deg,#bdbdbd,#616161);}
@@ -70972,10 +70970,16 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-prn-h{font-size:1.1rem;font-weight:900;color:#0d47a1;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
   .evd-prn-grid{display:grid;grid-template-columns:1fr;gap:10px;}
   .evd-prn-card{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:16px 18px;background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--pc,#1D9E75);text-decoration:none;color:inherit;transition:.15s;cursor:pointer;}
+  .evd-prn-card[data-k="followup"] {--pc:#6B3FA0;}
   .evd-prn-card[data-k="list"]     {--pc:#1D9E75;}
   .evd-prn-card[data-k="schedule"] {--pc:#1565C0;}
   .evd-prn-card[data-k="financial"]{--pc:#E65100;}
   .evd-prn-card[data-k="full"]     {--pc:#6B3FA0;}
+  /* Followup card stands out — purple gradient + bold border so it
+     reads as the "interactive tool" entry rather than a print view. */
+  .evd-prn-card-followup{background:linear-gradient(135deg,#f3e5f5 0%,#fff 100%);border:2px solid #6B3FA0;}
+  .evd-prn-card-followup .ttl{color:#4a148c !important;}
+  .evd-prn-card-followup button{background:#6B3FA0 !important;}
   .evd-prn-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.10);}
   .evd-prn-card .em{font-size:2.1rem;}
   .evd-prn-card .body .ttl{font-weight:900;color:#0d47a1;font-size:1rem;}
@@ -71028,7 +71032,6 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <a href="/admin/events" class="evd-btn evd-btn-back">← العودة</a>
     </div>
     <div class="left">
-      <a class="evd-btn evd-btn-followup" id="evd-followup-btn" href="#" hidden>📍 متابعة الرحلة</a>
       <button class="evd-btn evd-btn-edit" id="evd-edit-btn" type="button">⚙️ تعديل</button>
       <button class="evd-btn evd-btn-del"  id="evd-del-btn"  type="button">🗑️ حذف</button>
     </div>
@@ -71134,6 +71137,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     <div class="evd-prn" id="evd-prn-root">
       <div class="evd-prn-h">🖨️ خيارات الطباعة</div>
       <div class="evd-prn-grid">
+        <!-- Followup card (always visible — admin can use it any time) -->
+        <a class="evd-prn-card evd-prn-card-followup" data-k="followup" id="evd-prn-followup-card">
+          <div class="em">📍</div>
+          <div class="body"><div class="ttl">متابعة الرحلة</div><div class="sub">متابعة ميدانية — علّمي البنود المنجزة أثناء الرحلة</div></div>
+          <button type="button">🔓 فتح</button>
+        </a>
         <a class="evd-prn-card" data-k="list" target="_blank" rel="noopener">
           <div class="em">📋</div>
           <div class="body"><div class="ttl">قائمة الطالبات الكاملة</div><div class="sub">مع أرقام الأهل لتسجيل الحضور</div></div>
@@ -71556,10 +71565,18 @@ function evdActivateTab(name){
 }
 
 function evdRefreshPrintLinks(){
-  document.querySelectorAll('.evd-prn-card').forEach(function(a){
+  // Stamp the EID into every card's href on tab activation. The
+  // followup card is the only non-print entry — opens in the same
+  // tab (interactive tool) rather than _blank like the print views.
+  // It's ALWAYS visible regardless of event status.
+  document.querySelectorAll('.evd-prn-card[data-k]').forEach(function(a){
     var k = a.getAttribute('data-k');
     if (!k) return;
-    a.setAttribute('href', '/admin/events/' + EID + '/print/' + k);
+    if (k === 'followup'){
+      a.setAttribute('href', '/admin/events/' + EID + '/followup');
+    } else {
+      a.setAttribute('href', '/admin/events/' + EID + '/print/' + k);
+    }
   });
 }
 function evdSyncTabFromHash(){
@@ -71586,18 +71603,6 @@ function evdRenderHeader(ev){
     ? ((ev.registered_count || 0) + '/' + ev.max_students + ' مسجلة')
     : ((ev.registered_count || 0) + ' مسجلة');
   document.getElementById('evd-meta-cap').textContent = '👥 ' + cap;
-  // 9.3 — show "📍 متابعة الرحلة" button only for open / closed.
-  // (planning has nothing to track yet; completed/cancelled is past.)
-  var fb = document.getElementById('evd-followup-btn');
-  if (fb){
-    var st = (ev.status || '').toLowerCase();
-    if (st === 'open' || st === 'closed'){
-      fb.href = '/admin/events/' + EID + '/followup';
-      fb.hidden = false;
-    } else {
-      fb.hidden = true;
-    }
-  }
   // Header chips with task/item/registration progress (5.6 + 6.5).
   var chips = document.getElementById('evd-h-chips');
   if (chips){
