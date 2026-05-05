@@ -69093,28 +69093,33 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
   .evdf-attrow:last-child{border-bottom:0;}
   .evdf-attrow .nm{font-weight:800;color:#222;font-size:.94rem;display:flex;align-items:center;gap:6px;}
   .evdf-attrow .grp{font-size:.7rem;color:#0d47a1;background:#e3f2fd;padding:1px 7px;border-radius:99px;font-weight:700;}
-  .evdf-attbtns{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
-  .evdf-attbtn{background:#fff;border:1.5px solid #d3d8de;border-radius:10px;padding:8px 4px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:62px;-webkit-tap-highlight-color:transparent;}
-  .evdf-attbtn:active{transform:scale(0.95);}
-  .evdf-attbtn .em{font-size:1.2rem;line-height:1;}
-  .evdf-attbtn .lbl{font-size:.7rem;font-weight:700;color:#555;line-height:1;}
-  /* Subtle pre-tinted background so each option is recognizable
-     even when it's not the selected one. */
-  .evdf-attbtn[data-st="pending"]          {background:#fafbfc;}
-  .evdf-attbtn[data-st="present"]          {background:#f0f9f5;}
-  .evdf-attbtn[data-st="late"]             {background:#fff8e1;}
-  .evdf-attbtn[data-st="absent"]           {background:#ffebee;}
-  .evdf-attbtn[data-st="cancelled"]        {background:#eef0f3;}
-  .evdf-attbtn[data-st="medical_emergency"]{background:#f3e5f5;}
-  /* Selected state — strong color + white label */
-  .evdf-attbtn.is-on{border-width:2.5px;font-weight:900;}
-  .evdf-attbtn.is-on[data-st="pending"]          {background:#9e9e9e;border-color:#757575;}
-  .evdf-attbtn.is-on[data-st="present"]          {background:#1D9E75;border-color:#1D9E75;}
-  .evdf-attbtn.is-on[data-st="late"]             {background:#E65100;border-color:#E65100;}
-  .evdf-attbtn.is-on[data-st="absent"]           {background:#c62828;border-color:#c62828;}
-  .evdf-attbtn.is-on[data-st="cancelled"]        {background:#37474F;border-color:#37474F;}
-  .evdf-attbtn.is-on[data-st="medical_emergency"]{background:#6B3FA0;border-color:#6B3FA0;}
-  .evdf-attbtn.is-on .lbl,.evdf-attbtn.is-on .em{color:#fff;}
+  /* Attendance dropdown picker (replaces 6-button row). One trigger
+     per student; tap to expand the menu, tap option to save+close. */
+  .evdf-dd{position:relative;}
+  .evdf-ddtrigger{width:100%;background:#fff;border:2px solid #d3d8de;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:inherit;font-size:.96rem;font-weight:700;transition:.15s;-webkit-tap-highlight-color:transparent;}
+  .evdf-ddtrigger:hover{border-color:#1D9E75;}
+  .evdf-ddtrigger:active{transform:scale(0.98);}
+  .evdf-ddtrigger .em{font-size:1.2rem;}
+  .evdf-ddtrigger .lbl{flex:1;text-align:start;color:#222;}
+  .evdf-ddtrigger .arrow{font-size:.72rem;color:#888;}
+  /* Color the trigger by the currently-selected status. */
+  .evdf-ddtrigger[data-status="pending"]          {border-color:#9e9e9e;background:#fafbfc;}
+  .evdf-ddtrigger[data-status="present"]          {border-color:#1D9E75;background:#f0f9f5;}
+  .evdf-ddtrigger[data-status="late"]             {border-color:#E65100;background:#fff8e1;}
+  .evdf-ddtrigger[data-status="absent"]           {border-color:#c62828;background:#ffebee;}
+  .evdf-ddtrigger[data-status="cancelled"]        {border-color:#37474F;background:#eef0f3;}
+  .evdf-ddtrigger[data-status="medical_emergency"]{border-color:#6B3FA0;background:#f3e5f5;}
+  /* Expanded menu */
+  .evdf-ddmenu{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:2px solid #d3d8de;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:50;overflow:hidden;animation:evdfDdSlide .15s ease;}
+  @keyframes evdfDdSlide{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  .evdf-ddopt{width:100%;background:#fff;border:none;border-bottom:1px solid #f0f3f7;padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:inherit;font-size:.94rem;font-weight:700;text-align:start;color:#444;transition:background .12s;-webkit-tap-highlight-color:transparent;}
+  .evdf-ddopt:last-child{border-bottom:0;}
+  .evdf-ddopt:hover{background:#f6faff;}
+  .evdf-ddopt:active{background:#e3f2fd;}
+  .evdf-ddopt .em{font-size:1.15rem;}
+  .evdf-ddopt .lbl{flex:1;}
+  .evdf-ddopt .check{color:#1D9E75;font-weight:900;font-size:1.05rem;}
+  .evdf-ddopt.is-on{background:#e6f7ee;color:#1D9E75;}
   /* Toast */
   .evdf-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:24px;font-weight:800;font-size:.9rem;box-shadow:0 4px 18px rgba(0,0,0,0.20);opacity:0;transition:opacity .25s;z-index:200;pointer-events:none;}
   .evdf-toast.is-show{opacity:1;}
@@ -69142,8 +69147,6 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
     .evdf-pcard .val{font-size:.95rem;}
     .evdf-header h1{font-size:1.1rem;}
     .evdf-header .meta{font-size:.8rem;}
-    .evdf-attbtns{grid-template-columns:repeat(3,1fr);}
-    .evdf-attbtn{min-height:58px;}
   }
 </style></head><body>
 <div class="evdf-shell">
@@ -69227,6 +69230,10 @@ function evdfRenderTimestamp(){
 function evdfRender(){
   var root = document.getElementById('evdf-root');
   if (!root || !DATA) return;
+  // Snapshot scroll position so a re-render doesn't yank the page
+  // back to the top after a toggle (especially noticeable when the
+  // user has scrolled deep into the attendance list).
+  var savedScroll = window.scrollY;
   var ev = DATA.event || {};
   var pr = DATA.progress || {};
   // Header
@@ -69325,18 +69332,49 @@ function evdfRender(){
       evdfToggle(kind, id, !cur, row);
     });
   });
-  root.querySelectorAll('.evdf-attbtn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var rid = parseInt(btn.getAttribute('data-rid'), 10);
-      var st  = btn.getAttribute('data-st');
-      evdfSetAttendance(rid, st, btn);
+  // Attendance dropdown — toggle open/close on trigger click
+  root.querySelectorAll('.evdf-ddtrigger').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      // Close every other open dropdown so only one is open at a time.
+      document.querySelectorAll('.evdf-ddmenu:not([hidden])').forEach(function(m){
+        if (m !== btn.nextElementSibling) m.hidden = true;
+      });
+      var menu = btn.nextElementSibling;
+      if (menu) menu.hidden = !menu.hidden;
     });
   });
+  // Click an option → save + close
+  root.querySelectorAll('.evdf-ddopt').forEach(function(opt){
+    opt.addEventListener('click', function(e){
+      e.stopPropagation();
+      var rid = parseInt(opt.getAttribute('data-rid'), 10);
+      var st  = opt.getAttribute('data-st');
+      var menu = opt.closest('.evdf-ddmenu');
+      if (menu) menu.hidden = true;
+      evdfSetAttendance(rid, st, opt);
+    });
+  });
+  // Click outside → close any open dropdown. Wire only ONCE so we
+  // don't accumulate listeners across re-renders.
+  if (!window._evdfDdClickWired){
+    window._evdfDdClickWired = true;
+    document.addEventListener('click', function(e){
+      if (!e.target.closest('.evdf-dd')){
+        document.querySelectorAll('.evdf-ddmenu:not([hidden])').forEach(function(m){
+          m.hidden = true;
+        });
+      }
+    });
+  }
   // 9.4 wires
   var fb = document.getElementById('evdf-finish-btn');
   if (fb) fb.addEventListener('click', evdfFinishTrip);
   var rb = document.getElementById('evdf-report-btn');
   if (rb) rb.href = evdfBuildReportUrl();
+  // Restore scroll position captured at the top of evdfRender so the
+  // page doesn't snap to the top after every toggle.
+  window.scrollTo(0, savedScroll);
 }
 
 /* ── 9.4 — finish trip + WhatsApp report ─────────────────────── */
@@ -69456,19 +69494,28 @@ var ATT_STATES = [
 ];
 function evdfAttRowHTML(r){
   var cur = r.attendance_status || 'pending';
+  var st = ATT_STATES.find(function(s){ return s.st === cur; }) || ATT_STATES[0];
   var grp = r.group_name ? '<span class="grp">' + evdfEsc(r.group_name) + '</span>' : '';
-  var btns = ATT_STATES.map(function(s){
+  var opts = ATT_STATES.map(function(s){
     var on = (s.st === cur) ? ' is-on' : '';
-    return '<button type="button" class="evdf-attbtn' + on + '" '
+    return '<button type="button" class="evdf-ddopt' + on + '" '
          + 'data-rid="' + (r.id|0) + '" data-st="' + s.st + '" '
          + 'aria-label="' + evdfEsc(s.lbl) + '">'
          + '<span class="em">' + s.em + '</span>'
-         + '<span class="lbl">' + evdfEsc(s.short) + '</span>'
+         + '<span class="lbl">' + evdfEsc(s.lbl) + '</span>'
+         + (s.st === cur ? '<span class="check">✓</span>' : '')
          + '</button>';
   }).join('');
   return '<div class="evdf-attrow" data-rid="' + (r.id|0) + '">'
        + '  <div class="nm">' + evdfEsc(r.student_name || '—') + grp + '</div>'
-       + '  <div class="evdf-attbtns">' + btns + '</div>'
+       + '  <div class="evdf-dd" data-rid="' + (r.id|0) + '">'
+       + '    <button type="button" class="evdf-ddtrigger" data-status="' + cur + '" aria-haspopup="listbox">'
+       + '      <span class="em">' + st.em + '</span>'
+       + '      <span class="lbl">' + evdfEsc(st.lbl) + '</span>'
+       + '      <span class="arrow">▼</span>'
+       + '    </button>'
+       + '    <div class="evdf-ddmenu" role="listbox" hidden>' + opts + '</div>'
+       + '  </div>'
        + '</div>';
 }
 
