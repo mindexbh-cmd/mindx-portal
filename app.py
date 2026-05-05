@@ -65177,18 +65177,22 @@ def _mx_strip_response_surrogates(response):
 # auto-status, daily alerts, calendar view. Per-event detail page
 # with the 8 organised tabs lands in stage 2.
 
-_EV_VALID_STATUSES = ("planning", "open", "closed", "completed")
+_EV_VALID_STATUSES = ("planning", "ready", "open", "closed", "completed", "cancelled")
 _EV_STATUS_LABELS = {
     "planning":  "📝 قيد التخطيط",
+    "ready":     "🎯 جاهزة",
     "open":      "📢 مفتوحة",
-    "closed":    "🎯 جاهزة",
+    "closed":    "🔒 مغلقة",
     "completed": "✅ منتهية",
+    "cancelled": "❌ ملغاة",
 }
 _EV_STATUS_COLORS = {
     "planning":  "#9e9e9e",
+    "ready":     "#FFA726",
     "open":      "#1D9E75",
-    "closed":    "#BA7517",
-    "completed": "#1565C0",
+    "closed":    "#1565C0",
+    "completed": "#6B3FA0",
+    "cancelled": "#c62828",
 }
 
 # Default cost categories seeded on every new event (4.1). Order
@@ -65658,12 +65662,17 @@ def api_admin_events_set_status(eid):
         return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
     cur = (dict(row).get("status") or "").strip()
     role = ((user.get("role") or "")).strip().lower()
-    # Forward allowed transitions:
+    # Forward allowed transitions. The state machine now includes
+    # `ready` (event finalised but registration not yet opened) and
+    # `cancelled` (terminal, distinct from `completed`). Admins can
+    # always roll back to `planning` from any state.
     forward = {
-        "planning": {"open"},
-        "open":     {"closed", "planning"},
-        "closed":   {"completed", "open"},
-        "completed": {"closed"},  # rollback edge for admin only
+        "planning":  {"ready", "open"},
+        "ready":     {"open", "planning"},
+        "open":      {"ready", "closed", "planning", "cancelled"},
+        "closed":    {"completed", "open", "cancelled"},
+        "completed": {"closed"},
+        "cancelled": {"planning"},
     }
     rollback_to_planning = (new_status == "planning" and role == "admin")
     if cur == new_status:
@@ -66999,6 +67008,11 @@ _PUBLIC_CLOSED_VARIANTS = {
         "h":    "التسجيل لم يُفتح بعد",
         "sub":  "هذه الرحلة قيد التخطيط ولم يُفتح التسجيل بعد. يرجى المحاولة لاحقاً، أو تواصلي مع المركز للاستفسار عن موعد الفتح.",
     },
+    "ready": {
+        "em":   "🎯",
+        "h":    "التسجيل لم يُفتح بعد",
+        "sub":  "هذه الرحلة جاهزة للنشر. سيُفتح التسجيل قريباً — تابعينا للحصول على رابط التسجيل الفعّال.",
+    },
     "closed": {
         "em":   "🎯",
         "h":    "التسجيل أُغلق",
@@ -67120,7 +67134,7 @@ def events_public_register_get(token):
         body = _events_public_render_closed("not_found")
     else:
         st = (ev.get("status") or "planning").lower()
-        if st in ("planning", "closed", "completed", "cancelled"):
+        if st in ("planning", "ready", "closed", "completed", "cancelled"):
             body = _events_public_render_closed(st, ev=ev)
         elif st != "open":
             body = _events_public_render_closed("default", ev=ev)
@@ -69045,9 +69059,11 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
   .evdf-bar .ts{font-size:.78rem;color:#888;font-weight:600;font-variant-numeric:tabular-nums;}
   /* Header card with status-keyed gradient */
   .evdf-header{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(29,158,117,0.18);}
-  .evdf-header[data-status="open"]    {background:linear-gradient(135deg,#43a047,#1D9E75);}
-  .evdf-header[data-status="closed"]  {background:linear-gradient(135deg,#fb8c00,#BA7517);}
-  .evdf-header[data-status="completed"]{background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evdf-header[data-status="ready"]    {background:linear-gradient(135deg,#FFA726,#BA7517);}
+  .evdf-header[data-status="open"]     {background:linear-gradient(135deg,#43a047,#1D9E75);}
+  .evdf-header[data-status="closed"]   {background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evdf-header[data-status="completed"]{background:linear-gradient(135deg,#7e57c2,#4a148c);}
+  .evdf-header[data-status="cancelled"]{background:linear-gradient(135deg,#e57373,#c62828);}
   .evdf-header h1{margin:0 0 6px;font-size:1.25rem;font-weight:900;display:flex;align-items:center;gap:8px;}
   .evdf-header .meta{font-size:.88rem;opacity:.95;display:flex;flex-wrap:wrap;gap:6px 14px;font-weight:700;}
   /* Progress strip */
@@ -69786,9 +69802,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                        to  {opacity:1;transform:translateY(0);}}
 .ev-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.12);}
 .ev-card[data-status="planning"]  {--c:#9e9e9e;}
+.ev-card[data-status="ready"]     {--c:#FFA726;}
 .ev-card[data-status="open"]      {--c:#1D9E75;}
-.ev-card[data-status="closed"]    {--c:#BA7517;}
-.ev-card[data-status="completed"] {--c:#1565C0;background:linear-gradient(180deg,#fff,#fff 60%,#f6faff);}
+.ev-card[data-status="closed"]    {--c:#1565C0;}
+.ev-card[data-status="completed"] {--c:#6B3FA0;background:linear-gradient(180deg,#fff,#fff 60%,#faf5ff);}
+.ev-card[data-status="cancelled"] {--c:#c62828;}
 
 .ev-card .head{display:flex;justify-content:space-between;align-items:flex-start;
                gap:10px;}
@@ -70514,9 +70532,52 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   /* Header card with status-keyed gradient. */
   .evd-header{position:relative;border-radius:18px;padding:24px;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.10);background:linear-gradient(135deg,#9e9e9e,#757575);overflow:hidden;}
   .evd-header[data-status="planning"] {background:linear-gradient(135deg,#bdbdbd,#616161);}
+  .evd-header[data-status="ready"]    {background:linear-gradient(135deg,#FFA726,#BA7517);}
   .evd-header[data-status="open"]     {background:linear-gradient(135deg,#43a047,#1D9E75);}
-  .evd-header[data-status="closed"]   {background:linear-gradient(135deg,#fb8c00,#BA7517);}
-  .evd-header[data-status="completed"]{background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evd-header[data-status="closed"]   {background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evd-header[data-status="completed"]{background:linear-gradient(135deg,#7e57c2,#4a148c);}
+  .evd-header[data-status="cancelled"]{background:linear-gradient(135deg,#e57373,#c62828);}
+  /* Status bar — prominent strip under header, makes the current
+     state (and what it implies for parents) impossible to miss. */
+  .evd-statusbar{position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;border-radius:14px;margin:0 0 18px;box-shadow:0 4px 14px rgba(0,0,0,0.06);border:2px solid;transition:.2s;}
+  .evd-statusbar-main{display:flex;align-items:center;gap:14px;flex:1;min-width:0;}
+  .evd-statusbar .em{font-size:2rem;flex-shrink:0;}
+  .evd-statusbar .body{flex:1;min-width:0;}
+  .evd-statusbar .ttl{font-weight:900;font-size:1.05rem;line-height:1.2;margin-bottom:3px;}
+  .evd-statusbar .sub{font-size:.85rem;line-height:1.4;opacity:.92;}
+  .evd-statusbar[data-status="planning"]{background:linear-gradient(135deg,#eef0f3 0%,#fff 100%);border-color:#9e9e9e;color:#555;}
+  .evd-statusbar[data-status="planning"] .ttl{color:#444;}
+  .evd-statusbar[data-status="ready"]{background:linear-gradient(135deg,#fff8e1 0%,#fff 100%);border-color:#FFA726;color:#7a4a00;}
+  .evd-statusbar[data-status="ready"] .ttl{color:#bf360c;}
+  .evd-statusbar[data-status="open"]{background:linear-gradient(135deg,#e6f7ee 0%,#fff 100%);border-color:#1D9E75;color:#0e5a3e;}
+  .evd-statusbar[data-status="open"] .ttl{color:#1D9E75;}
+  .evd-statusbar[data-status="closed"]{background:linear-gradient(135deg,#e3f2fd 0%,#fff 100%);border-color:#1565C0;color:#0d47a1;}
+  .evd-statusbar[data-status="closed"] .ttl{color:#0d47a1;}
+  .evd-statusbar[data-status="completed"]{background:linear-gradient(135deg,#f3e5f5 0%,#fff 100%);border-color:#6B3FA0;color:#4a148c;}
+  .evd-statusbar[data-status="completed"] .ttl{color:#4a148c;}
+  .evd-statusbar[data-status="cancelled"]{background:linear-gradient(135deg,#ffebee 0%,#fff 100%);border-color:#c62828;color:#b71c1c;}
+  .evd-statusbar[data-status="cancelled"] .ttl{color:#c62828;}
+  .evd-sb-change{background:#fff;border:1.5px solid #d3d8de;border-radius:10px;padding:10px 16px;cursor:pointer;font-weight:800;font-size:.9rem;color:#444;white-space:nowrap;flex-shrink:0;transition:.15s;-webkit-tap-highlight-color:transparent;}
+  .evd-sb-change:hover{border-color:#1D9E75;color:#1D9E75;}
+  .evd-sb-change:active{transform:scale(0.97);}
+  .evd-sb-menu{background:#fff;border:2px solid #d3d8de;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.12);margin-bottom:18px;overflow:hidden;animation:evdSbSlide .2s ease;}
+  @keyframes evdSbSlide{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+  .evd-sb-opt{width:100%;background:#fff;border:none;border-bottom:1px solid #f0f3f7;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;text-align:start;font-family:inherit;transition:background .12s;-webkit-tap-highlight-color:transparent;}
+  .evd-sb-opt:last-child{border-bottom:0;}
+  .evd-sb-opt:hover{background:#f6faff;}
+  .evd-sb-opt:active{background:#e3f2fd;}
+  .evd-sb-opt .em{font-size:1.6rem;flex-shrink:0;}
+  .evd-sb-opt .body{flex:1;}
+  .evd-sb-opt .ttl{font-weight:900;font-size:.96rem;color:#222;margin-bottom:2px;}
+  .evd-sb-opt .sub{font-size:.82rem;color:#666;line-height:1.4;}
+  .evd-sb-opt.is-current{background:#e6f7ee;}
+  .evd-sb-opt.is-current::after{content:'✓';color:#1D9E75;font-weight:900;font-size:1.2rem;margin-inline-start:auto;}
+  @media (max-width: 640px){
+    .evd-statusbar{flex-direction:column;align-items:stretch;gap:12px;padding:14px 16px;}
+    .evd-sb-change{width:100%;}
+    .evd-statusbar .ttl{font-size:1rem;}
+    .evd-statusbar .sub{font-size:.82rem;}
+  }
   .evd-h-title{display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:900;margin:0 0 8px;flex-wrap:wrap;}
   .evd-h-title .name{flex:1;min-width:200px;}
   .evd-h-meta{display:flex;flex-wrap:wrap;gap:14px 22px;color:#fff;opacity:.95;font-size:.95rem;font-weight:600;}
@@ -71073,6 +71134,63 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     <div class="evd-h-chips" id="evd-h-chips" hidden></div>
   </div>
 
+  <!-- Status bar — prominent indicator of current event status -->
+  <div class="evd-statusbar" id="evd-statusbar" data-status="planning">
+    <div class="evd-statusbar-main">
+      <span class="em" id="evd-sb-em">📝</span>
+      <div class="body">
+        <div class="ttl" id="evd-sb-ttl">قيد التخطيط</div>
+        <div class="sub" id="evd-sb-sub">جاري إعداد الرحلة - الرابط العام لا يعمل بعد</div>
+      </div>
+    </div>
+    <button type="button" class="evd-sb-change" id="evd-sb-change">⚙️ تغيير الحالة</button>
+  </div>
+  <!-- Status options menu (hidden by default, opens via change button) -->
+  <div class="evd-sb-menu" id="evd-sb-menu" hidden role="listbox">
+    <button type="button" class="evd-sb-opt" data-st="planning">
+      <span class="em">📝</span>
+      <div class="body">
+        <div class="ttl">قيد التخطيط</div>
+        <div class="sub">جاري الإعداد — الرابط لا يعمل</div>
+      </div>
+    </button>
+    <button type="button" class="evd-sb-opt" data-st="ready">
+      <span class="em">🎯</span>
+      <div class="body">
+        <div class="ttl">جاهزة</div>
+        <div class="sub">جاهزة للنشر — الرابط لا يعمل بعد</div>
+      </div>
+    </button>
+    <button type="button" class="evd-sb-opt" data-st="open">
+      <span class="em">📢</span>
+      <div class="body">
+        <div class="ttl">مفتوحة للتسجيل</div>
+        <div class="sub">✅ الرابط العام نشط — الأهل يقدرون يسجلون أطفالهم الآن</div>
+      </div>
+    </button>
+    <button type="button" class="evd-sb-opt" data-st="closed">
+      <span class="em">🔒</span>
+      <div class="body">
+        <div class="ttl">مغلقة (انتهى التسجيل)</div>
+        <div class="sub">التسجيل أُغلق — في انتظار تنفيذ الرحلة</div>
+      </div>
+    </button>
+    <button type="button" class="evd-sb-opt" data-st="completed">
+      <span class="em">✅</span>
+      <div class="body">
+        <div class="ttl">منتهية</div>
+        <div class="sub">تم تنفيذ الرحلة بنجاح</div>
+      </div>
+    </button>
+    <button type="button" class="evd-sb-opt" data-st="cancelled">
+      <span class="em">❌</span>
+      <div class="body">
+        <div class="ttl">ملغاة</div>
+        <div class="sub">تم إلغاء الرحلة</div>
+      </div>
+    </button>
+  </div>
+
   <!-- Tab bar -->
   <div class="evd-tabs" id="evd-tabs" role="tablist">
     <button class="evd-tab" data-tab="info"     role="tab">📋 المعلومات</button>
@@ -71538,16 +71656,20 @@ window._EV_USER = {id: parseInt('{{UID}}', 10) || null};
 var EVENT_DATA = null;
 var STATUS_LABELS = {
   planning:  '\u{1F4DD} قيد التخطيط',
+  ready:     '\u{1F3AF} جاهزة',
   open:      '\u{1F4E2} مفتوحة',
-  closed:    '\u{1F3AF} جاهزة',
-  completed: '✅ منتهية'
+  closed:    '\u{1F512} مغلقة',
+  completed: '✅ منتهية',
+  cancelled: '❌ ملغاة'
 };
 // Forward transitions mirror the server-side `forward` table.
 var STATUS_FORWARD = {
-  planning:  ['open'],
-  open:      ['closed', 'planning'],
-  closed:    ['completed', 'open'],
-  completed: ['closed']
+  planning:  ['ready', 'open'],
+  ready:     ['open', 'planning'],
+  open:      ['ready', 'closed', 'planning', 'cancelled'],
+  closed:    ['completed', 'open', 'cancelled'],
+  completed: ['closed'],
+  cancelled: ['planning']
 };
 var TABS = ['info','schedule','costs','items','tasks','students','messages','print','followup'];
 
@@ -71667,7 +71789,35 @@ function evdRenderHeader(ev){
       evdSetStatus(b.getAttribute('data-set'));
     });
   });
+  // Status bar (under header) — distinct prominent indicator with
+  // explanation text per status. Always reflects EVENT_DATA.status.
+  evdRenderStatusBar();
 }
+
+var STATUS_META = {
+  planning:  {em:'\u{1F4DD}', ttl:'قيد التخطيط',          sub:'جاري إعداد الرحلة — الرابط العام لا يعمل بعد'},
+  ready:     {em:'\u{1F3AF}', ttl:'جاهزة',                sub:'جاهزة للنشر — الرابط لا يعمل بعد. غيّري الحالة لـ «مفتوحة» لتفعيل التسجيل'},
+  open:      {em:'\u{1F4E2}', ttl:'مفتوحة للتسجيل',        sub:'✅ الرابط العام نشط — الأهل يقدرون يسجلون أطفالهم الآن'},
+  closed:    {em:'\u{1F512}', ttl:'مغلقة (انتهى التسجيل)', sub:'التسجيل أُغلق — في انتظار تنفيذ الرحلة'},
+  completed: {em:'✅',         ttl:'منتهية',               sub:'تم تنفيذ الرحلة بنجاح'},
+  cancelled: {em:'❌',         ttl:'ملغاة',                sub:'تم إلغاء الرحلة'}
+};
+
+function evdRenderStatusBar(){
+  if (!EVENT_DATA) return;
+  var st = EVENT_DATA.status || 'planning';
+  var meta = STATUS_META[st] || STATUS_META.planning;
+  var bar = document.getElementById('evd-statusbar');
+  if (!bar) return;
+  bar.setAttribute('data-status', st);
+  document.getElementById('evd-sb-em').textContent  = meta.em;
+  document.getElementById('evd-sb-ttl').textContent = meta.ttl;
+  document.getElementById('evd-sb-sub').textContent = meta.sub;
+  document.querySelectorAll('.evd-sb-opt').forEach(function(opt){
+    opt.classList.toggle('is-current', opt.getAttribute('data-st') === st);
+  });
+}
+
 function evdToggleStatusMenu(){
   document.getElementById('evd-status-menu').classList.toggle('is-open');
 }
@@ -74155,6 +74305,51 @@ document.addEventListener('DOMContentLoaded', function(){
       window.location.href = '/admin/events/' + EID + '/followup';
     });
   }
+  // Status bar — change button toggles the menu, options PATCH the
+  // status via the same /status endpoint the small header dropdown
+  // uses. Backend rejects illegal transitions; we surface that as a
+  // toast so the admin learns the rules without leaving the page.
+  var sbChangeBtn = document.getElementById('evd-sb-change');
+  var sbMenu      = document.getElementById('evd-sb-menu');
+  if (sbChangeBtn && sbMenu){
+    sbChangeBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      sbMenu.hidden = !sbMenu.hidden;
+    });
+    document.addEventListener('click', function(e){
+      if (sbMenu.hidden) return;
+      if (e.target.closest && (e.target.closest('#evd-statusbar')
+                              || e.target.closest('#evd-sb-menu'))) return;
+      sbMenu.hidden = true;
+    });
+  }
+  document.querySelectorAll('.evd-sb-opt').forEach(function(opt){
+    opt.addEventListener('click', function(){
+      var newSt = opt.getAttribute('data-st');
+      if (!newSt || !EVENT_DATA){ return; }
+      if (newSt === EVENT_DATA.status){
+        if (sbMenu) sbMenu.hidden = true;
+        return;
+      }
+      fetch('/api/admin/events/' + EID + '/status', {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({status: newSt}),
+        credentials: 'same-origin'
+      })
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(o){
+          if (!o.ok || !o.j.ok){
+            evdToast(o.j.error || 'تعذّر التحديث', 'error');
+            return;
+          }
+          if (sbMenu) sbMenu.hidden = true;
+          evdToast('✅ تم تحديث الحالة', 'success');
+          evdLoadEvent();   // refetch so EVENT_DATA + header + bar all sync
+        })
+        .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+    });
+  });
   // Edit modal wires
   document.getElementById('evd-edit-btn').addEventListener('click', evdOpenEdit);
   document.getElementById('evd-edit-cancel').addEventListener('click', evdCloseEdit);
