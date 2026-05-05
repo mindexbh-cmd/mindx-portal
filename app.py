@@ -961,6 +961,10 @@ def init_db():
         status TEXT DEFAULT 'planning',
         registration_token TEXT,
         post_trip_notes TEXT,
+        payment_iban TEXT,
+        payment_benefit TEXT,
+        payment_beneficiary TEXT,
+        payment_instructions TEXT,
         created_by_user_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1075,6 +1079,8 @@ def init_db():
         payment_status TEXT DEFAULT 'pending',
         payment_amount REAL DEFAULT 0,
         payment_notes TEXT,
+        receipt_image_url TEXT,
+        receipt_uploaded_at DATETIME,
         attendance_status TEXT DEFAULT 'pending',
         attendance_notes TEXT,
         registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -6425,6 +6431,10 @@ if True:
         status TEXT DEFAULT 'planning',
         registration_token TEXT,
         post_trip_notes TEXT,
+        payment_iban TEXT,
+        payment_benefit TEXT,
+        payment_beneficiary TEXT,
+        payment_instructions TEXT,
         created_by_user_id INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -6690,6 +6700,8 @@ if True:
         payment_status TEXT DEFAULT 'pending',
         payment_amount REAL DEFAULT 0,
         payment_notes TEXT,
+        receipt_image_url TEXT,
+        receipt_uploaded_at DATETIME,
         attendance_status TEXT DEFAULT 'pending',
         attendance_notes TEXT,
         registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -6726,6 +6738,47 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_registrations_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_payment_info_v1: payment method fields on ev_events
+    # (IBAN / BenefitPay / beneficiary / instructions) plus receipt
+    # upload tracking on ev_registrations (image URL + timestamp).
+    # Idempotent ALTER TABLE ADD COLUMN; existing rows get NULL.
+    if "ev_payment_info_v1" not in applied:
+        try:
+            _ev_event_cols = {r[1] for r in db2.execute(
+                "PRAGMA table_info(ev_events)").fetchall()}
+        except Exception:
+            _ev_event_cols = set()
+        for _col, _decl in [
+            ("payment_iban",         "TEXT"),
+            ("payment_benefit",      "TEXT"),
+            ("payment_beneficiary",  "TEXT"),
+            ("payment_instructions", "TEXT"),
+        ]:
+            if _col not in _ev_event_cols:
+                try:
+                    db2.execute("ALTER TABLE ev_events ADD COLUMN "
+                                + _col + " " + _decl)
+                except Exception: pass
+        try:
+            _ev_reg_cols = {r[1] for r in db2.execute(
+                "PRAGMA table_info(ev_registrations)").fetchall()}
+        except Exception:
+            _ev_reg_cols = set()
+        for _col, _decl in [
+            ("receipt_image_url",   "TEXT"),
+            ("receipt_uploaded_at", "DATETIME"),
+        ]:
+            if _col not in _ev_reg_cols:
+                try:
+                    db2.execute("ALTER TABLE ev_registrations ADD COLUMN "
+                                + _col + " " + _decl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_payment_info_v1",))
             db2.commit()
         except Exception: pass
 
@@ -65767,6 +65820,19 @@ def api_admin_events_update(eid):
             ensure_ascii=False)
     if "post_trip_notes" in d:
         upd["post_trip_notes"] = (d.get("post_trip_notes") or "").strip() or None
+    # Payment info — all optional, empty string stored as NULL.
+    if "payment_iban" in d:
+        v = (d.get("payment_iban") or "").strip()
+        upd["payment_iban"] = v[:40] if v else None
+    if "payment_benefit" in d:
+        v = (d.get("payment_benefit") or "").strip()
+        upd["payment_benefit"] = v[:20] if v else None
+    if "payment_beneficiary" in d:
+        v = (d.get("payment_beneficiary") or "").strip()
+        upd["payment_beneficiary"] = v[:80] if v else None
+    if "payment_instructions" in d:
+        v = (d.get("payment_instructions") or "").strip()
+        upd["payment_instructions"] = v[:400] if v else None
     if not upd:
         return jsonify({"ok": True, "id": eid, "noop": True,
                         "event": _events_detail_dict(cur, db)})
@@ -68855,20 +68921,24 @@ def _events_detail_dict(rd, db=None):
     cap   = int(rd.get("max_students") or 0)
     pay_expected = round(price * max(reg_total, cap), 3)
     base.update({
-        "description":         rd.get("description") or "",
-        "target_group_ids":    rd.get("target_group_ids") or "[]",
-        "registration_token":  rd.get("registration_token") or "",
-        "post_trip_notes":     rd.get("post_trip_notes") or "",
-        "created_at":          rd.get("created_at") or "",
-        "updated_at":          rd.get("updated_at") or "",
-        "task_total":          task_total,
-        "task_completed":      task_done,
-        "task_pct":            round(task_done / task_total * 100, 1) if task_total else 0.0,
-        "item_total":          item_total,
-        "item_ready":          item_ready,
-        "item_pct":            round(item_ready / item_total * 100, 1) if item_total else 0.0,
-        "payment_collected":   round(pay_collected, 3),
-        "payment_expected":    pay_expected,
+        "description":          rd.get("description") or "",
+        "target_group_ids":     rd.get("target_group_ids") or "[]",
+        "registration_token":   rd.get("registration_token") or "",
+        "post_trip_notes":      rd.get("post_trip_notes") or "",
+        "payment_iban":         rd.get("payment_iban") or "",
+        "payment_benefit":      rd.get("payment_benefit") or "",
+        "payment_beneficiary":  rd.get("payment_beneficiary") or "",
+        "payment_instructions": rd.get("payment_instructions") or "",
+        "created_at":           rd.get("created_at") or "",
+        "updated_at":           rd.get("updated_at") or "",
+        "task_total":           task_total,
+        "task_completed":       task_done,
+        "task_pct":             round(task_done / task_total * 100, 1) if task_total else 0.0,
+        "item_total":           item_total,
+        "item_ready":           item_ready,
+        "item_pct":             round(item_ready / item_total * 100, 1) if item_total else 0.0,
+        "payment_collected":    round(pay_collected, 3),
+        "payment_expected":     pay_expected,
     })
     return base
 
@@ -70637,6 +70707,14 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-modal textarea{min-height:84px;resize:vertical;}
   .evd-modal .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
   .evd-modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  /* Section grouping inside the edit modal — used by the payment
+     info block to visually separate it from the basic event fields. */
+  .evd-edit-section{margin:18px 0 8px;padding:14px 16px;background:#fafbfc;border-radius:10px;border-right:3px solid #1D9E75;}
+  .evd-edit-section h3{margin:0 0 4px;font-size:1rem;color:#1D9E75;font-weight:900;}
+  .evd-edit-section .hint{margin:0 0 12px;font-size:.78rem;color:#666;line-height:1.5;}
+  .evd-edit-section .row:last-child{margin-bottom:0;}
+  .evd-edit-section-pay{border-right-color:#1D9E75;}
+  .evd-edit-section-pay h3{color:#1D9E75;}
   /* Info panel (3.1) */
   .evd-info-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
   .evd-info-card{background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:4px solid var(--ic,#1D9E75);}
@@ -71365,6 +71443,33 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
         <label for="ef-groups">الفئة المستهدفة (الفصول)</label>
         <select id="ef-groups" multiple size="5" style="min-height:96px;"></select>
         <div style="font-size:.78rem;color:#888;margin-top:4px;">اضغطي Ctrl/⌘ لاختيار أكثر من فصل</div>
+      </div>
+      <!-- Payment info section -->
+      <div class="evd-edit-section evd-edit-section-pay">
+        <h3>💳 معلومات الدفع</h3>
+        <p class="hint">سيظهر للأهل في صفحة التسجيل العامة لإتمام عملية الدفع</p>
+        <div class="row">
+          <label for="ef-iban">🏦 رقم الحساب (IBAN)</label>
+          <input id="ef-iban" type="text" maxlength="40" dir="ltr"
+                 style="text-align:left;font-family:monospace;letter-spacing:1px;"
+                 placeholder="BH00 NBOB 0000 0000 0000 00"/>
+        </div>
+        <div class="row">
+          <label for="ef-benefit">📱 رقم BenefitPay</label>
+          <input id="ef-benefit" type="text" maxlength="20" dir="ltr"
+                 style="text-align:left;font-family:monospace;"
+                 placeholder="33XXXXXX"/>
+        </div>
+        <div class="row">
+          <label for="ef-beneficiary">👤 اسم المستفيد</label>
+          <input id="ef-beneficiary" type="text" maxlength="80"
+                 placeholder="مايندكس للتدريب"/>
+        </div>
+        <div class="row">
+          <label for="ef-pay-instr">💡 تعليمات إضافية للأهل (اختياري)</label>
+          <textarea id="ef-pay-instr" maxlength="400" rows="2"
+                    placeholder="مثال: يرجى ذكر اسم الطالبة في خانة الملاحظات عند التحويل"></textarea>
+        </div>
       </div>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-edit-cancel">إلغاء</button>
@@ -73265,6 +73370,11 @@ function evdOpenEdit(){
   document.getElementById('ef-ret'  ).value = ev.return_time || '';
   document.getElementById('ef-cap'  ).value = ev.max_students || '';
   document.getElementById('ef-price').value = ev.price_per_student || '';
+  // Payment info (added in payment-1)
+  document.getElementById('ef-iban'      ).value = ev.payment_iban         || '';
+  document.getElementById('ef-benefit'   ).value = ev.payment_benefit      || '';
+  document.getElementById('ef-beneficiary').value = ev.payment_beneficiary || '';
+  document.getElementById('ef-pay-instr' ).value = ev.payment_instructions || '';
   // Load groups, pre-select what's already on the event.
   var sel = document.getElementById('ef-groups');
   sel.innerHTML = '<option disabled>جارٍ التحميل…</option>';
@@ -73299,16 +73409,20 @@ function evdSubmitEdit(e){
   var groupIds = Array.prototype.filter.call(sel.options, function(o){ return o.selected; })
                                        .map(function(o){ return o.value; });
   var body = {
-    name:              document.getElementById('ef-name').value.trim(),
-    destination:       document.getElementById('ef-dest').value.trim(),
-    description:       document.getElementById('ef-desc').value.trim(),
-    event_date:        document.getElementById('ef-date').value.trim(),
-    meeting_point:     document.getElementById('ef-meet').value.trim(),
-    departure_time:    document.getElementById('ef-dep' ).value.trim(),
-    return_time:       document.getElementById('ef-ret' ).value.trim(),
-    max_students:      document.getElementById('ef-cap' ).value || 0,
-    price_per_student: document.getElementById('ef-price').value || 0,
-    target_group_ids:  groupIds
+    name:                 document.getElementById('ef-name').value.trim(),
+    destination:          document.getElementById('ef-dest').value.trim(),
+    description:          document.getElementById('ef-desc').value.trim(),
+    event_date:           document.getElementById('ef-date').value.trim(),
+    meeting_point:        document.getElementById('ef-meet').value.trim(),
+    departure_time:       document.getElementById('ef-dep' ).value.trim(),
+    return_time:          document.getElementById('ef-ret' ).value.trim(),
+    max_students:         document.getElementById('ef-cap' ).value || 0,
+    price_per_student:    document.getElementById('ef-price').value || 0,
+    target_group_ids:     groupIds,
+    payment_iban:         document.getElementById('ef-iban'      ).value.trim(),
+    payment_benefit:      document.getElementById('ef-benefit'   ).value.trim(),
+    payment_beneficiary:  document.getElementById('ef-beneficiary').value.trim(),
+    payment_instructions: document.getElementById('ef-pay-instr' ).value.trim()
   };
   fetch('/api/admin/events/' + EID, {
     method: 'PATCH',
