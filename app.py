@@ -6727,6 +6727,47 @@ if True:
             db2.commit()
         except Exception: pass
 
+    # ── ev_registration_tokens_backfill_v1 (hotfix-1): older events
+    # may have been created before the registration_token column was
+    # added (or before _events_generate_token was wired into the
+    # create flow). Public /events/register/<token> can't find them
+    # because their token is NULL/empty — backfill with unique 16-char
+    # tokens once. Idempotent: only updates rows where token is missing.
+    if "ev_registration_tokens_backfill_v1" not in applied:
+        import secrets as _bf_secrets, string as _bf_string
+        _bf_alphabet = _bf_string.ascii_letters + _bf_string.digits
+        try:
+            _bf_rows = db2.execute(
+                "SELECT id FROM ev_events "
+                "WHERE registration_token IS NULL OR TRIM(registration_token) = ''"
+            ).fetchall()
+            for _bf_r in _bf_rows:
+                _bf_eid = (dict(_bf_r).get("id") if hasattr(_bf_r, "keys") else _bf_r[0])
+                # Generate a token unique within the table.
+                for _ in range(8):
+                    _bf_cand = "".join(_bf_secrets.choice(_bf_alphabet) for _ in range(16))
+                    try:
+                        _bf_dup = db2.execute(
+                            "SELECT 1 FROM ev_events WHERE registration_token = ? LIMIT 1",
+                            (_bf_cand,)).fetchone()
+                        if not _bf_dup:
+                            break
+                    except Exception:
+                        break
+                try:
+                    db2.execute(
+                        "UPDATE ev_events SET registration_token = ? WHERE id = ?",
+                        (_bf_cand, _bf_eid))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_registration_tokens_backfill_v1",))
+            db2.commit()
+        except Exception: pass
+
     # ── evaluations_v2: monthly evaluation form (1-10 sliders).
     # The evaluations table predates this feature (see legacy CREATE
     # above with form_fill_date / class_participation / etc. columns).
@@ -66703,12 +66744,69 @@ def _events_public_render_form(ev):
     return banner + form
 
 
-def _events_public_render_closed(reason):
-    return ('<div class="pubreg-status">'
-            '<div class="em">🔒</div>'
-            '<div class="h">التسجيل غير متاح</div>'
-            '<div class="sub">' + reason + '</div>'
-            '</div>')
+_PUBLIC_CLOSED_VARIANTS = {
+    "not_found": {
+        "em":   "🔗",
+        "h":    "الرابط غير صحيح",
+        "sub":  "الرابط الذي فتحتِه غير صالح أو منتهي الصلاحية. تأكدي من نسخه كاملاً، أو تواصلي مع المركز للحصول على رابط جديد.",
+    },
+    "planning": {
+        "em":   "📝",
+        "h":    "التسجيل لم يُفتح بعد",
+        "sub":  "هذه الرحلة قيد التخطيط ولم يُفتح التسجيل بعد. يرجى المحاولة لاحقاً، أو تواصلي مع المركز للاستفسار عن موعد الفتح.",
+    },
+    "closed": {
+        "em":   "🎯",
+        "h":    "التسجيل أُغلق",
+        "sub":  "أُغلق التسجيل في هذه الرحلة استعداداً لتنفيذها. إذا أردتِ الانضمام، تواصلي مع المركز للاستفسار عن إمكانية ذلك.",
+    },
+    "completed": {
+        "em":   "✅",
+        "h":    "هذه الرحلة انتهت",
+        "sub":  "نشكركم على اهتمامكم — هذه الرحلة قد انتهت بالفعل. ترقّبوا رحلاتنا القادمة!",
+    },
+    "cancelled": {
+        "em":   "🚫",
+        "h":    "هذه الرحلة أُلغيت",
+        "sub":  "نأسف، أُلغيت هذه الرحلة. تواصلي مع المركز للاستفسار عن الرحلات البديلة.",
+    },
+    "full": {
+        "em":   "👥",
+        "h":    "اكتمل العدد",
+        "sub":  "تم استلام الحد الأقصى من التسجيلات لهذه الرحلة. تواصلي مع المركز لإضافة اسم الطالبة على قائمة الانتظار.",
+    },
+    "default": {
+        "em":   "🔒",
+        "h":    "التسجيل غير متاح",
+        "sub":  "التسجيل في هذه الرحلة غير متاح حالياً. تواصلي مع المركز للاستفسار.",
+    },
+}
+
+
+def _events_public_render_closed(variant, ev=None, extra=None):
+    """Render the closed-state card. variant is one of the keys in
+    _PUBLIC_CLOSED_VARIANTS; ev (optional) shows the trip name on the
+    page so the parent knows which event the message refers to; extra
+    appends a small note (e.g. capacity counter) under the main copy."""
+    import html as _html
+    v = _PUBLIC_CLOSED_VARIANTS.get(variant) or _PUBLIC_CLOSED_VARIANTS["default"]
+    name_block = ""
+    if ev and (ev.get("name") or "").strip():
+        name_block = ('<div style="background:#f6faff;border-radius:10px;'
+                      'padding:10px 14px;margin-bottom:14px;font-weight:800;'
+                      'color:#0d47a1;text-align:center;font-size:.94rem;">'
+                      '🚌 ' + _html.escape(ev.get("name") or "") + '</div>')
+    extra_block = ""
+    if extra:
+        extra_block = ('<div style="margin-top:14px;color:#888;'
+                       'font-size:.84rem;font-weight:700;">' + extra + '</div>')
+    return (name_block
+            + '<div class="pubreg-status">'
+            '<div class="em">' + v["em"] + '</div>'
+            '<div class="h">' + v["h"] + '</div>'
+            '<div class="sub">' + v["sub"] + '</div>'
+            + extra_block
+            + '</div>')
 
 
 def _events_public_render_thanks(ev_name):
@@ -66767,18 +66865,21 @@ _PUBLIC_REG_SCRIPT = r"""<script>
 @app.route('/events/register/<token>', methods=['GET'])
 def events_public_register_get(token):
     """Public — no login required. Renders the parent-facing
-    registration form for an event identified by its share token."""
+    registration form for an event identified by its share token.
+    The closed/blocked branches each render a status-specific card so
+    the parent knows exactly why the form isn't shown."""
     db = get_db()
     ev = _events_public_event_by_token(db, token)
     title = "تسجيل في رحلة"
+    script = ""
     if not ev:
-        body = _events_public_render_closed("الرابط غير صالح أو انتهت صلاحيته.")
-        script = ""
+        body = _events_public_render_closed("not_found")
     else:
         st = (ev.get("status") or "planning").lower()
-        if st != "open":
-            body = _events_public_render_closed("التسجيل في هذه الرحلة غير مفتوح حالياً.")
-            script = ""
+        if st in ("planning", "closed", "completed", "cancelled"):
+            body = _events_public_render_closed(st, ev=ev)
+        elif st != "open":
+            body = _events_public_render_closed("default", ev=ev)
         else:
             cap = int(ev.get("max_students") or 0)
             cur = 0
@@ -66792,8 +66893,8 @@ def events_public_register_get(token):
                 except Exception:
                     cur = 0
             if cap > 0 and cur >= cap:
-                body = _events_public_render_closed("اكتمل العدد، لم تعد الرحلة تقبل تسجيلات جديدة.")
-                script = ""
+                extra = "العدد الحالي: " + str(cur) + "/" + str(cap)
+                body = _events_public_render_closed("full", ev=ev, extra=extra)
             else:
                 body = _events_public_render_form(ev)
                 script = _PUBLIC_REG_SCRIPT
