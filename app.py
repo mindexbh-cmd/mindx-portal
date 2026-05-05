@@ -66466,7 +66466,8 @@ def api_admin_events_items_delete(eid, iid):
 
 
 # ── Registrations (6.1) ────────────────────────────────────────
-_EV_REG_PAY_STATUSES = ("pending", "paid", "partial", "refunded", "waived")
+_EV_REG_PAY_STATUSES = ("pending", "paid", "cash", "unpaid", "waived",
+                        "partial", "refunded")
 _EV_REG_ATT_STATUSES = ("pending", "present", "late", "absent", "cancelled", "medical_emergency")
 
 
@@ -68030,8 +68031,9 @@ def _print_section_payments(regs, ev):
     if not regs:
         return ('<div class="pp-section"><h2>💵 تفاصيل المدفوعات</h2>'
                 '<div class="pp-empty">لا توجد طالبات مسجلات.</div></div>')
-    pay_lbl = {"pending":"⏳ بانتظار","paid":"✅ دفعت","partial":"🔵 جزئي",
-               "refunded":"↩️ مسترد","waived":"🆓 معفاة"}
+    pay_lbl = {"pending":"💳 لم يُدفع بعد","paid":"✅ مدفوع",
+               "cash":"💵 نقدي","unpaid":"❌ غير مدفوع","waived":"🆓 معفاة",
+               "partial":"🔵 جزئي","refunded":"↩️ مسترد"}
     collected = sum(float(r.get("payment_amount") or 0) for r in regs)
     paid_n = sum(1 for r in regs if r.get("payment_status") == "paid")
     pending_n = sum(1 for r in regs if (r.get("payment_status") or "pending") == "pending")
@@ -69862,12 +69864,15 @@ function evdfTaskRowHTML(t){
 }
 
 var ATT_STATES = [
-  {st:'pending',           em:'⏳', lbl:'بانتظار',   short:'بانتظار'},
-  {st:'present',           em:'✅', lbl:'حاضرة',    short:'حاضرة'},
-  {st:'late',              em:'⏰', lbl:'متأخرة',   short:'متأخرة'},
-  {st:'absent',            em:'❌', lbl:'غائبة',    short:'غائبة'},
-  {st:'cancelled',         em:'🚫', lbl:'ملغاة',    short:'ملغاة'},
-  {st:'medical_emergency', em:'🚑', lbl:'طارئ صحي', short:'طارئ'}
+  // Attendance-pending uses "لم تُسجَّل" + 📋 clipboard so it doesn't
+  // collide with payment-pending in the admin's eye. Followup screen
+  // mirrors the REG_ATT_META labels in the detail page.
+  {st:'pending',           em:'📋', lbl:'لم تُسجَّل', short:'لم تُسجَّل'},
+  {st:'present',           em:'✅', lbl:'حاضرة',     short:'حاضرة'},
+  {st:'late',              em:'⏰', lbl:'متأخرة',    short:'متأخرة'},
+  {st:'absent',            em:'❌', lbl:'غائبة',     short:'غائبة'},
+  {st:'cancelled',         em:'🚫', lbl:'ملغاة',     short:'ملغاة'},
+  {st:'medical_emergency', em:'🚑', lbl:'طارئ صحي',  short:'طارئ'}
 ];
 function evdfAttRowHTML(r){
   var cur = r.attendance_status || 'pending';
@@ -71300,11 +71305,13 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-row .par .ph .none{color:#bbb;font-style:italic;}
   .evd-reg-badge{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-size:.78rem;padding:4px 10px;border-radius:99px;cursor:pointer;border:1.5px solid transparent;transition:.15s;white-space:nowrap;}
   .evd-reg-badge:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-  .evd-reg-badge.pay-pending {background:#eef0f3;color:#666;border-color:#d3d8de;}
+  .evd-reg-badge.pay-pending {background:#fff8e1;color:#bf360c;border-color:#ffcc80;}
   .evd-reg-badge.pay-paid    {background:#e6f7ee;color:#1D9E75;border-color:#c6ecd6;}
+  .evd-reg-badge.pay-cash    {background:#fff3cd;color:#7a4a00;border-color:#ffe082;}
+  .evd-reg-badge.pay-unpaid  {background:#ffebee;color:#c62828;border-color:#ef9a9a;}
+  .evd-reg-badge.pay-waived  {background:#f3e5f5;color:#6B3FA0;border-color:#e1bee7;}
   .evd-reg-badge.pay-partial {background:#e3f2fd;color:#1565C0;border-color:#bbdefb;}
   .evd-reg-badge.pay-refunded{background:#eef0f3;color:#666;border-color:#d3d8de;}
-  .evd-reg-badge.pay-waived  {background:#f3e5f5;color:#6B3FA0;border-color:#e1bee7;}
   .evd-reg-badge.att-pending          {background:#eef0f3;color:#666;border-color:#d3d8de;}
   .evd-reg-badge.att-present          {background:#e6f7ee;color:#1D9E75;border-color:#c6ecd6;}
   .evd-reg-badge.att-late             {background:#fff8e1;color:#E65100;border-color:#ffcc80;}
@@ -72006,10 +72013,10 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
         <div class="row">
           <label for="rf-pay">حالة الدفع</label>
           <select id="rf-pay">
-            <option value="pending">⏳ بانتظار</option>
-            <option value="paid">✅ دفعت</option>
-            <option value="partial">🔵 جزئي</option>
-            <option value="refunded">↩️ مسترد</option>
+            <option value="pending">💳 لم يُدفع بعد</option>
+            <option value="paid">✅ مدفوع</option>
+            <option value="cash">💵 نقدي</option>
+            <option value="unpaid">❌ غير مدفوع</option>
             <option value="waived">🆓 معفاة</option>
           </select>
         </div>
@@ -72029,9 +72036,9 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
           <div class="row">
             <label for="rf-att">حالة الحضور</label>
             <select id="rf-att">
-              <option value="pending">⏳ بانتظار</option>
+              <option value="pending">📋 لم تُسجَّل</option>
               <option value="present">✅ حاضرة</option>
-              <option value="late">🟡 متأخرة</option>
+              <option value="late">⏰ متأخرة</option>
               <option value="absent">❌ غائبة</option>
               <option value="cancelled">🚫 ملغاة</option>
               <option value="medical_emergency">🚑 طارئ صحي</option>
@@ -73780,17 +73787,26 @@ var REG_FILTER = 'all';     // all / paid / unpaid / present / absent
 var REG_BULK_MODE = false;
 var REG_BULK_DRAFT = {};    // {rid: {st, notes}}
 
+// Status-specific labels — both pay+attendance previously used
+// the generic "بانتظار" which made it impossible to tell at a
+// glance which axis a row was waiting on. Pay-pending now reads
+// "لم يُدفع بعد" with a 💳 card emoji; attendance-pending reads
+// "لم تُسجَّل" with a 📋 clipboard.
 var REG_PAY_META = {
-  pending:  {label:'بانتظار',  emoji:'⏳'},
-  paid:     {label:'دفعت',    emoji:'✅'},
-  partial:  {label:'جزئي',    emoji:'🔵'},
-  refunded: {label:'مسترد',   emoji:'↩️'},
-  waived:   {label:'معفاة',   emoji:'🆓'}
+  pending:  {label:'لم يُدفع بعد', emoji:'💳'},
+  paid:     {label:'مدفوع',       emoji:'✅'},
+  cash:     {label:'نقدي',         emoji:'💵'},
+  unpaid:   {label:'غير مدفوع',    emoji:'❌'},
+  waived:   {label:'معفاة',        emoji:'🆓'},
+  // Legacy statuses — kept so any existing rows still display
+  // sensibly. New admin UI doesn't surface these.
+  partial:  {label:'جزئي',         emoji:'🔵'},
+  refunded: {label:'مسترد',        emoji:'↩️'}
 };
 var REG_ATT_META = {
   // Clock emoji for "late" reads more clearly than the yellow ball
   // when the badge is small. Same set is used in the followup screen.
-  pending:           {label:'بانتظار',     emoji:'⏳'},
+  pending:           {label:'لم تُسجَّل',  emoji:'📋'},
   present:           {label:'حاضرة',      emoji:'✅'},
   late:              {label:'متأخرة',     emoji:'⏰'},
   absent:            {label:'غائبة',      emoji:'❌'},
@@ -74061,7 +74077,7 @@ function evdConfirmPaymentInline(rid){
 }
 function evdRejectPaymentInline(rid){
   if (!rid) return;
-  if (!confirm('هل تريدين رفض هذا الإيصال وإعادة الحالة إلى «بانتظار»؟')) return;
+  if (!confirm('هل تريدين رفض هذا الإيصال وإعادة حالة الدفع إلى «لم يُدفع بعد»؟')) return;
   // Map "rejected receipt" to payment_status='pending' since "unpaid"
   // isn't one of the supported statuses (_EV_REG_PAY_STATUSES).
   fetch('/api/admin/events/' + EID + '/registrations/' + rid, {
