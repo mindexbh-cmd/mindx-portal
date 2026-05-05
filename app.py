@@ -70309,19 +70309,54 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .ev-cal-day .num{font-weight:800;font-size:.86rem;color:#444;}
 .ev-cal-day.is-today{background:#fff3e0;border-color:#f1a132;}
 .ev-cal-day.is-today .num{color:#8d4f00;}
-.ev-cal-day.has-events{cursor:pointer;background:#e6f7ee;
-                        border-color:#1D9E75;}
-.ev-cal-day.has-events:hover{background:#c8e6c9;}
+.ev-cal-day.has-events{cursor:pointer;background:#fafbfc;
+                        border-color:#d3d8de;}
+.ev-cal-day.has-events:hover{background:#f0f3f7;border-color:#1D9E75;}
 .ev-cal-day.is-other-month{opacity:.35;}
 .ev-cal-day .count{position:absolute;bottom:6px;right:6px;
-                    font-weight:900;color:#1D9E75;font-size:.78rem;
+                    font-weight:900;color:#0d47a1;font-size:.78rem;
                     background:#fff;border-radius:999px;padding:1px 6px;
-                    line-height:1.4;}
-.ev-cal-day .names{font-size:.7rem;color:#0f6b4a;font-weight:700;
-                    margin-top:2px;line-height:1.2;
-                    overflow:hidden;text-overflow:ellipsis;
-                    display:-webkit-box;-webkit-line-clamp:2;
-                    -webkit-box-orient:vertical;}
+                    line-height:1.4;border:1px solid #d3d8de;}
+/* Per-event chips inside day cells. The chip background colour
+   carries the status info; completed/cancelled get a muted variant
+   so they read as historical record without hiding. */
+.ev-cal-day .evnames{display:flex;flex-direction:column;gap:2px;
+                     margin-top:3px;width:100%;overflow:hidden;}
+.evchip{font-size:.68rem;font-weight:800;color:#fff;
+        padding:2px 6px;border-radius:5px;line-height:1.3;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+        background:#9e9e9e;transition:opacity .12s;}
+.evchip[data-status="planning"] {background:#9e9e9e;}
+.evchip[data-status="ready"]    {background:#FFA726;color:#3a2400;}
+.evchip[data-status="open"]     {background:#1D9E75;}
+.evchip[data-status="closed"]   {background:#1565C0;}
+.evchip[data-status="completed"]{background:#6B3FA0;opacity:0.85;}
+.evchip[data-status="cancelled"]{background:#c62828;opacity:0.78;
+                                  text-decoration:line-through;
+                                  text-decoration-color:rgba(255,255,255,0.7);}
+.ev-cal-day:hover .evchip[data-status="completed"],
+.ev-cal-day:hover .evchip[data-status="cancelled"]{
+  opacity:1;
+  text-decoration:none;
+}
+/* Status legend strip above the grid */
+.evcal-legend{display:flex;flex-wrap:wrap;gap:6px 10px;
+              padding:10px 14px;background:#fafbfc;
+              border:1px solid #eef0f3;border-radius:10px;
+              margin-bottom:14px;align-items:center;font-size:.82rem;}
+.evcal-legend .legend-title{font-weight:900;color:#444;
+                            margin-inline-end:4px;}
+.evcal-legend .legend-item{display:inline-flex;align-items:center;
+                            gap:4px;padding:2px 9px;border-radius:99px;
+                            font-weight:800;color:#fff;font-size:.78rem;}
+.evcal-legend .legend-item[data-st="planning"] {background:#9e9e9e;}
+.evcal-legend .legend-item[data-st="ready"]    {background:#FFA726;color:#3a2400;}
+.evcal-legend .legend-item[data-st="open"]     {background:#1D9E75;}
+.evcal-legend .legend-item[data-st="closed"]   {background:#1565C0;}
+.evcal-legend .legend-item[data-st="completed"]{background:#6B3FA0;}
+.evcal-legend .legend-item[data-st="cancelled"]{background:#c62828;
+                                                 text-decoration:line-through;
+                                                 text-decoration-color:rgba(255,255,255,0.7);}
 .ev-cal-empty{text-align:center;color:#aab;padding:24px;font-style:italic;
               font-size:.9rem;}
 
@@ -70809,6 +70844,15 @@ function evRenderCalendar(){
            + '      <button type="button" data-cal-nav="next" title="التالي">‹</button>'
            + '    </div>'
            + '  </div>'
+           + '  <div class="evcal-legend">'
+           + '    <span class="legend-title">الحالات:</span>'
+           + '    <span class="legend-item" data-st="planning">📝 قيد التخطيط</span>'
+           + '    <span class="legend-item" data-st="ready">🎯 جاهزة</span>'
+           + '    <span class="legend-item" data-st="open">📢 مفتوحة</span>'
+           + '    <span class="legend-item" data-st="closed">🔒 مغلقة</span>'
+           + '    <span class="legend-item" data-st="completed">✅ منتهية</span>'
+           + '    <span class="legend-item" data-st="cancelled">❌ ملغاة</span>'
+           + '  </div>'
            + '  <div class="ev-cal-grid">';
   // Day-of-week headers
   for (var i = 0; i < 7; i++){
@@ -70825,14 +70869,26 @@ function evRenderCalendar(){
     var cls = 'ev-cal-day';
     if (iso === todayIso) cls += ' is-today';
     if (evs.length)       cls += ' has-events';
-    var nameLine = evs.length
-      ? '<div class="names" title="' + evEsc(evs.map(function(x){return x.name;}).join(', ')) + '">'
-        + evs.map(function(x){ return evEsc(x.name); }).join(' • ') + '</div>' : '';
+    // Per-event chips with status colors. Completed/cancelled get
+    // muted opacity / strikethrough via CSS so they read as past
+    // record entries without disappearing entirely.
+    var chips = '';
+    if (evs.length){
+      var titleAttr = evEsc(evs.map(function(x){
+        return (x.name || '') + ' [' + (x.status_label || x.status || '') + ']';
+      }).join('، '));
+      chips = '<div class="evnames" title="' + titleAttr + '">'
+            + evs.map(function(x){
+                return '<span class="evchip" data-status="' + evEsc(x.status || '') + '">'
+                     + evEsc(x.name || '') + '</span>';
+              }).join('')
+            + '</div>';
+    }
     var countBadge = evs.length > 1
       ? '<span class="count">' + evs.length + '</span>' : '';
     html += '<div class="' + cls + '" data-iso="' + iso + '">'
           + '<span class="num">' + d + '</span>'
-          + nameLine
+          + chips
           + countBadge
           + '</div>';
   }
