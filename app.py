@@ -64449,8 +64449,11 @@ def _curriculum_visible_file_ids(db, user):
     from) silently broke visibility before this fix.
 
     Returns a set[int]. Empty set when the user matches nothing."""
-    role = _curriculum_user_role(user)
-    if role in ("admin", "manager"):
+    # Short-circuit: anyone _curriculum_can_manage trusts (admin /
+    # manager / trusted uploaders) sees every non-deleted file. Single
+    # source of truth — extending _curriculum_can_manage propagates here
+    # automatically.
+    if _curriculum_can_manage(user):
         try:
             rows = db.execute(
                 "SELECT id FROM curriculum_files WHERE COALESCE(is_deleted,0)=0"
@@ -64518,14 +64521,14 @@ def _curriculum_visible_file_ids(db, user):
 def _curriculum_resolve_download(db, user, file_id):
     """Returns (can_view: bool, can_download: bool) for this user/file
     pair. can_view is True iff there is at least one matching
-    assignment (or the user is admin/manager). can_download is True
-    iff:
-      - admin/manager (always), OR
+    assignment (or _curriculum_can_manage(user) is True). can_download
+    is True iff:
+      - _curriculum_can_manage(user) (always — admin/manager/trusted
+        uploaders need to preview before assigning), OR
       - any matching assignment row has can_download=1, OR
       - file.download_default='allowed' AND no matching assignment
         has explicitly overridden it to can_download=0.
     """
-    role = _curriculum_user_role(user)
     try:
         f = db.execute(
             "SELECT id, download_default, is_deleted FROM curriculum_files "
@@ -64540,7 +64543,10 @@ def _curriculum_resolve_download(db, user, file_id):
         return False, False
     default_allowed = ((fd.get("download_default") or "allowed") == "allowed")
 
-    if role in ("admin", "manager"):
+    # Short-circuit: anyone _curriculum_can_manage trusts bypasses the
+    # assignment match — they manage the library and need to preview
+    # files before assigning them, including view_only ones.
+    if _curriculum_can_manage(user):
         return True, True
 
     # User must match at least one assignment to view at all.
