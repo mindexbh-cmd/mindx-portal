@@ -70540,6 +70540,20 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-tab:focus-visible{box-shadow:0 0 0 3px rgba(29,158,117,.35);}
   .evd-tab:hover{background:#f6f7f9;color:#1D9E75;}
   .evd-tab.is-active{background:#e6f7ee;color:#1D9E75;border-bottom-color:#1D9E75;}
+  /* 9th tab — purple to mark it as the action / field-tool tab. */
+  .evd-tab[data-tab="followup"]{color:#6B3FA0;}
+  .evd-tab[data-tab="followup"]:hover{background:#f3e5f5;color:#4a148c;}
+  .evd-tab[data-tab="followup"].is-active{background:#6B3FA0;color:#fff;border-bottom-color:#4a148c;}
+  /* Followup panel content — center-aligned launch card. */
+  .evd-followup-embed{padding:30px 20px;text-align:center;}
+  .evd-followup-intro{display:flex;align-items:center;gap:16px;max-width:560px;margin:0 auto 24px;padding:18px 22px;background:linear-gradient(135deg,#f3e5f5 0%,#fff 100%);border:2px solid #6B3FA0;border-radius:14px;text-align:start;}
+  .evd-followup-intro .em{font-size:2.4rem;flex-shrink:0;}
+  .evd-followup-intro .ttl{font-weight:900;color:#4a148c;font-size:1.1rem;margin-bottom:4px;}
+  .evd-followup-intro .sub{font-size:.88rem;color:#666;line-height:1.5;}
+  .evd-followup-launch{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#6B3FA0,#4a148c);color:#fff;padding:16px 36px;border-radius:12px;text-decoration:none;font-weight:900;font-size:1.05rem;box-shadow:0 4px 14px rgba(107,63,160,0.30);transition:.15s;cursor:pointer;}
+  .evd-followup-launch:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(107,63,160,0.40);}
+  .evd-followup-launch:active{transform:translateY(0);}
+  .evd-followup-hint{margin-top:18px;font-size:.84rem;color:#666;max-width:480px;margin-inline:auto;line-height:1.6;}
   .evd-panel{display:none;background:#fff;border-radius:14px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,0.05);min-height:280px;}
   .evd-panel.is-active{display:block;}
   .evd-stub{text-align:center;padding:40px 20px;color:#666;}
@@ -71069,6 +71083,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     <button class="evd-tab" data-tab="students" role="tab">👥 الطالبات</button>
     <button class="evd-tab" data-tab="messages" role="tab">💬 الرسائل</button>
     <button class="evd-tab" data-tab="print"    role="tab">🖨️ الطباعة</button>
+    <button class="evd-tab evd-tab-followup" data-tab="followup" role="tab">📍 المتابعة</button>
   </div>
 
   <!-- Panels -->
@@ -71137,12 +71152,6 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     <div class="evd-prn" id="evd-prn-root">
       <div class="evd-prn-h">🖨️ خيارات الطباعة</div>
       <div class="evd-prn-grid">
-        <!-- Followup card (always visible — admin can use it any time) -->
-        <a class="evd-prn-card evd-prn-card-followup" data-k="followup" id="evd-prn-followup-card">
-          <div class="em">📍</div>
-          <div class="body"><div class="ttl">متابعة الرحلة</div><div class="sub">متابعة ميدانية — علّمي البنود المنجزة أثناء الرحلة</div></div>
-          <button type="button">🔓 فتح</button>
-        </a>
         <a class="evd-prn-card" data-k="list" target="_blank" rel="noopener">
           <div class="em">📋</div>
           <div class="body"><div class="ttl">قائمة الطالبات الكاملة</div><div class="sub">مع أرقام الأهل لتسجيل الحضور</div></div>
@@ -71163,6 +71172,24 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
           <div class="body"><div class="ttl">تقرير الرحلة الشامل</div><div class="sub">كل التفاصيل في صفحة واحدة</div></div>
           <button type="button">🖨️ طباعة</button>
         </a>
+      </div>
+    </div>
+  </section>
+  <!-- Followup panel (9th tab) — links to the field follow-up screen -->
+  <section class="evd-panel" data-panel="followup" role="tabpanel">
+    <div class="evd-followup-embed">
+      <div class="evd-followup-intro">
+        <span class="em">📍</span>
+        <div class="body">
+          <div class="ttl">متابعة الرحلة الميدانية</div>
+          <div class="sub">شاشة مخصصة لمتابعة الرحلة أثناء التنفيذ. علّمي البنود المنجزة، سجّلي الحضور، واحصلي على تقرير فوري.</div>
+        </div>
+      </div>
+      <a href="#" id="evd-followup-launch" class="evd-followup-launch">
+        🔓 فتح شاشة المتابعة
+      </a>
+      <div class="evd-followup-hint">
+        💡 الشاشة تفتح في نفس النافذة. مصممة للموبايل والتابلت لاستخدامها أثناء الرحلة.
       </div>
     </div>
   </section>
@@ -71522,7 +71549,7 @@ var STATUS_FORWARD = {
   closed:    ['completed', 'open'],
   completed: ['closed']
 };
-var TABS = ['info','schedule','costs','items','tasks','students','messages','print'];
+var TABS = ['info','schedule','costs','items','tasks','students','messages','print','followup'];
 
 function evdEsc(s){
   return String(s == null ? '' : s)
@@ -71565,18 +71592,10 @@ function evdActivateTab(name){
 }
 
 function evdRefreshPrintLinks(){
-  // Stamp the EID into every card's href on tab activation. The
-  // followup card is the only non-print entry — opens in the same
-  // tab (interactive tool) rather than _blank like the print views.
-  // It's ALWAYS visible regardless of event status.
-  document.querySelectorAll('.evd-prn-card[data-k]').forEach(function(a){
+  document.querySelectorAll('.evd-prn-card').forEach(function(a){
     var k = a.getAttribute('data-k');
     if (!k) return;
-    if (k === 'followup'){
-      a.setAttribute('href', '/admin/events/' + EID + '/followup');
-    } else {
-      a.setAttribute('href', '/admin/events/' + EID + '/print/' + k);
-    }
+    a.setAttribute('href', '/admin/events/' + EID + '/print/' + k);
   });
 }
 function evdSyncTabFromHash(){
@@ -74127,6 +74146,15 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   evdSyncTabFromHash();
   evdLoadEvent();
+  // Followup tab launch button — navigates to the field follow-up
+  // screen in the same tab (interactive tool, not a print view).
+  var followupLaunch = document.getElementById('evd-followup-launch');
+  if (followupLaunch){
+    followupLaunch.addEventListener('click', function(e){
+      e.preventDefault();
+      window.location.href = '/admin/events/' + EID + '/followup';
+    });
+  }
   // Edit modal wires
   document.getElementById('evd-edit-btn').addEventListener('click', evdOpenEdit);
   document.getElementById('evd-edit-cancel').addEventListener('click', evdCloseEdit);
