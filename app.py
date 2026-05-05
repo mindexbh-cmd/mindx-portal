@@ -8484,6 +8484,13 @@ body:not([data-role="admin"]) .mx-admin-only{display:none !important;}
 /* Visible to admin AND manager — used by /admin/teacher-deliveries
    which the spec grants to both roles. Server still gates the URL. */
 body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:none !important;}
+/* Events / Violations links — visible to admins AND any manager
+   that's been granted the data-allow-events / data-allow-violations
+   opt-in (see _EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES on the server).
+   Other managers stay blocked by the same hide rule that mx-admin-only
+   uses. */
+body:not([data-role="admin"]):not([data-allow-events="1"]) .mx-events-link{display:none !important;}
+body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-link{display:none !important;}
 /* Events v2 — sidebar/quick-card badge for upcoming events count.
    Hidden when zero so the chrome stays clean. */
 .ev-sb-badge,.ev-qc-badge{display:inline-flex;align-items:center;
@@ -8507,7 +8514,9 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
 <link rel="stylesheet" href="/static/css/dashboard-redesign.css">
 </head>
 <body>
-<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
+document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
 <script>document.body && (document.body.dataset.username = (window._mxUserUsername = "USER_USERNAME_PLACEHOLDER"));</script>
 <div class="dh-topbar">
   <!-- Phase 2 — fixed 64px deep purple header. Settings + logout
@@ -8720,11 +8729,11 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           <span class="md-sb-link-text">&#x625;&#x062F;&#x0627;&#x0631;&#x0629; &#x0627;&#x0644;&#x0635;&#x0644;&#x0627;&#x062D;&#x064A;&#x0627;&#x062A;</span>
         </a>
-        <a class="md-sb-link mx-admin-only" href="/admin/violations">
+        <a class="md-sb-link mx-violations-link" href="/admin/violations" id="md-sb-violations">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span class="md-sb-link-text">&#x1F393; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
         </a>
-        <a class="md-sb-link mx-admin-only" href="/admin/events" id="md-sb-events">
+        <a class="md-sb-link mx-events-link" href="/admin/events" id="md-sb-events">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="11" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>
           <span class="md-sb-link-text">&#x1F68C; &#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;<span class="ev-sb-badge" id="md-sb-events-badge" hidden>0</span></span>
         </a>
@@ -9534,11 +9543,11 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
       <span class="md-quick-emoji" aria-hidden="true">&#x1F4CA;</span>
       <span class="md-quick-label">&#x627;&#x644;&#x62A;&#x642;&#x627;&#x631;&#x64A;&#x631;</span>
     </a>
-    <a class="md-quick-card mx-admin-only" href="/admin/violations">
+    <a class="md-quick-card mx-violations-link" href="/admin/violations" id="md-qc-violations">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F393;</span>
       <span class="md-quick-label">&#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
     </a>
-    <a class="md-quick-card mx-admin-only" href="/admin/events" id="md-qc-events">
+    <a class="md-quick-card mx-events-link" href="/admin/events" id="md-qc-events">
       <span class="md-quick-emoji" aria-hidden="true">&#x1F68C;</span>
       <span class="md-quick-label">&#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;<span class="ev-qc-badge" id="md-qc-events-badge" hidden>0</span></span>
     </a>
@@ -18933,7 +18942,9 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 </style>
 </head>
 <body>
-<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
+document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
 <div class="topbar">
   <h1>&#x627;&#x644;&#x635;&#x641;&#x62D;&#x629; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629; &#x644;&#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</h1>
   <a href="/settings" class="btn-home" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-home">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
@@ -23645,11 +23656,15 @@ def dashboard():
         return redirect("/portal/parent-hub")
     if role == "parent":
         return redirect("/portal/parent")
+    _allow_ev = "1" if _has_events_full_access(user) else "0"
+    _allow_vi = "1" if _has_violations_full_access(user) else "0"
     _html = (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
         .replace("USER_USERNAME_PLACEHOLDER", username)
         .replace("DH_CTRL_DISP_PLACEHOLDER", ("flex" if role == "admin" else "none"))
+        .replace("EVENTS_ACCESS_PLACEHOLDER", _allow_ev)
+        .replace("VIOLATIONS_ACCESS_PLACEHOLDER", _allow_vi)
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
     )
@@ -23678,7 +23693,13 @@ def database():
     # edit pattern) and editable cells appear "stuck" until the user
     # hard-refreshes — visible as "only attendance and taqseet are
     # directly editable" while the rest still look read-only.
-    resp = Response(DATABASE_HTML.replace("USER_ROLE_PLACEHOLDER", "admin"), mimetype='text/html; charset=utf-8')
+    # /database is @admin_required — caller is always admin, so the
+    # events/violations data attrs are always "1" (admin sees both).
+    _db_html = (DATABASE_HTML
+                .replace("USER_ROLE_PLACEHOLDER", "admin")
+                .replace("EVENTS_ACCESS_PLACEHOLDER", "1")
+                .replace("VIOLATIONS_ACCESS_PLACEHOLDER", "1"))
+    resp = Response(_db_html, mimetype='text/html; charset=utf-8')
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
     return resp
@@ -41284,7 +41305,10 @@ def admin_teacher_deliveries_page():
 # which uses _td_can_view). Stats are pure SELECT queries against the
 # violations table created in Step 1 (violations_v1 migration).
 def _vio_can_admin(user):
-    return ((user or {}).get("role") or "").strip().lower() == "admin"
+    # Admin OR allowlist managers (Ahmed Ibrahim 010307885, Raed
+    # 980909805). The helper definition + the allowlist constant
+    # both live near the events code at the top of this module.
+    return _has_violations_full_access(user)
 
 
 ADMIN_VIOLATIONS_HTML = r"""<!DOCTYPE html>
@@ -56155,8 +56179,13 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     if (document.getElementById('mx-admin-only-style')) return;
     var st = document.createElement('style');
     st.id = 'mx-admin-only-style';
+    // Three rules: original mx-admin-only (admin only), plus the
+    // events/violations link rules that also admit the allowlist
+    // managers via body[data-allow-events|data-allow-violations="1"].
     st.textContent =
-      'body:not([data-role="admin"]) .mx-admin-only{display:none !important;}';
+      'body:not([data-role="admin"]) .mx-admin-only{display:none !important;}'
+      + 'body:not([data-role="admin"]):not([data-allow-events="1"]) .mx-events-link{display:none !important;}'
+      + 'body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-link{display:none !important;}';
     document.head.appendChild(st);
   })();
 
@@ -61528,7 +61557,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
   .summary.show,.bal.changed{animation:none;}
 }
 </style></head><body>
-<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
+document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
 <div class="topbar">
   <h1>⚙ إدارة سريعة للنقاط</h1>
   <a href="__BACK_HREF__">← __BACK_LABEL__</a>
@@ -65375,9 +65406,41 @@ def _events_seed_default_tasks(db, event_id, created_by_user_id=None):
         print("[events] default-tasks seed failed: " + str(ex), file=_sys.stderr)
 
 
+# Username-based allowlist for managers who need admin-equivalent
+# access ONLY on the Events + Violations features. Adding to this
+# set grants full CRUD on those two sections without promoting the
+# user to the global "admin" role. Keep the set tiny — every entry
+# is an out-of-band exception to the standard role taxonomy.
+_EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES = {
+    "010307885",   # أحمد إبراهيم — manager
+    "980909805",   # رائد — manager
+}
+
+
+def _has_events_full_access(user):
+    """True if the user is admin OR is in the events/violations
+    allowlist. Use this in any backend gate that should admit
+    allowlist managers in addition to the standard role check."""
+    if not user:
+        return False
+    role = (user.get("role") or "").strip().lower()
+    if role == "admin":
+        return True
+    uname = (user.get("username") or "").strip()
+    return uname in _EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES
+
+
+def _has_violations_full_access(user):
+    """Same allowlist as events — kept as a separate helper so the
+    two surfaces can split later if the policy diverges."""
+    return _has_events_full_access(user)
+
+
 def _events_can_admin(user):
-    """Manager-class — admin/manager. Reuses the existing role
-    taxonomy."""
+    """Manager-class for the Events module — admin/manager. Reuses
+    the existing role taxonomy. Allowlist users are also admitted
+    via _has_events_full_access (only matters for surfaces gated by
+    that helper, e.g. sidebar visibility)."""
     role = ((user or {}).get("role") or "").strip().lower()
     return role in ("admin", "manager")
 
@@ -65732,7 +65795,12 @@ def api_admin_events_set_status(eid):
         "completed": {"closed"},
         "cancelled": {"planning"},
     }
-    rollback_to_planning = (new_status == "planning" and role == "admin")
+    # Rollback-to-planning is an admin-only escape hatch. Allowlist
+    # managers (Ahmed Ibrahim, Raed) are also granted this privilege
+    # via _has_events_full_access — same intent as the events DELETE
+    # gate above.
+    rollback_to_planning = (new_status == "planning"
+                            and _has_events_full_access(user))
     if cur == new_status:
         return jsonify({"ok": True, "id": eid, "status": cur, "noop": True})
     if not rollback_to_planning and new_status not in forward.get(cur, set()):
@@ -68962,10 +69030,11 @@ def api_admin_events_delete(eid):
     """Admin-only soft delete. Sets is_deleted = 1 so dependent
     tables added in later stages can still join historical rows
     without losing their FK target. Manager (non-admin) cannot
-    delete — this is the safety the spec calls for."""
+    delete — except for the explicit allowlist managers in
+    _EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES, who get the same
+    full-CRUD on events as admins."""
     user = session.get("user") or {}
-    role = ((user.get("role") or "")).strip().lower()
-    if role != "admin":
+    if not _has_events_full_access(user):
         return jsonify({"ok": False, "error": "الحذف يتطلب صلاحية المدير"}), 403
     db = get_db()
     try:
