@@ -66979,6 +66979,400 @@ def api_admin_events_msg_render(eid):
     return jsonify({"ok": True, "messages": out, "count": len(out)})
 
 
+# ── Print views (8.1) ──────────────────────────────────────────
+PRINT_PAGE_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{TITLE}}</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Tahoma','Segoe UI',sans-serif;background:#fff;color:#222;padding:0;}
+  .pp-screen{padding:18px;max-width:920px;margin:0 auto;}
+  .pp-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#1D9E75;color:#fff;padding:12px 16px;border-radius:10px;margin-bottom:18px;}
+  .pp-toolbar a{color:#fff;background:rgba(255,255,255,0.2);text-decoration:none;font-weight:800;padding:7px 14px;border-radius:8px;font-size:.86rem;}
+  .pp-toolbar a:hover{background:rgba(255,255,255,0.3);}
+  .pp-toolbar button{background:#fff;color:#1D9E75;border:none;font-weight:800;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:.86rem;}
+  .pp-letterhead{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px solid #1D9E75;padding-bottom:12px;margin-bottom:18px;}
+  .pp-letterhead .brand{font-size:1.6rem;font-weight:900;color:#1D9E75;letter-spacing:1px;}
+  .pp-letterhead .meta{font-size:.78rem;color:#666;text-align:left;}
+  .pp-h1{font-size:1.4rem;font-weight:900;color:#0d47a1;margin:0 0 4px;}
+  .pp-sub{font-size:.92rem;color:#555;font-weight:700;margin-bottom:14px;}
+  .pp-section{margin-bottom:18px;page-break-inside:avoid;}
+  .pp-section h2{font-size:1.05rem;color:#1565C0;border-bottom:2px solid #1565C0;padding-bottom:5px;margin:0 0 10px;font-weight:900;}
+  .pp-table{width:100%;border-collapse:collapse;font-size:.88rem;}
+  .pp-table th,.pp-table td{padding:7px 10px;border:1px solid #d3d8de;text-align:right;}
+  .pp-table th{background:#f6faff;color:#0d47a1;font-weight:800;}
+  .pp-table .num{text-align:center;color:#888;font-variant-numeric:tabular-nums;width:34px;}
+  .pp-table .check{width:24px;text-align:center;}
+  .pp-table .check span{display:inline-block;width:14px;height:14px;border:1.5px solid #555;border-radius:3px;}
+  .pp-table .right{text-align:end;font-variant-numeric:tabular-nums;font-weight:800;color:#0d47a1;}
+  .pp-info-grid{display:grid;grid-template-columns:160px 1fr;gap:6px 14px;font-size:.92rem;}
+  .pp-info-grid .lab{color:#666;font-weight:700;}
+  .pp-info-grid .val{color:#222;font-weight:600;}
+  .pp-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .pp-summary .card{background:#f6faff;border:1px solid #d3d8de;border-radius:8px;padding:10px 12px;text-align:center;}
+  .pp-summary .card .lab{font-size:.78rem;color:#666;font-weight:700;}
+  .pp-summary .card .val{font-size:1.18rem;color:#0d47a1;font-weight:900;font-variant-numeric:tabular-nums;}
+  .pp-empty{text-align:center;color:#888;padding:14px;font-style:italic;}
+  .pp-foot{border-top:1px dashed #d3d8de;padding-top:10px;margin-top:24px;font-size:.74rem;color:#888;display:flex;justify-content:space-between;}
+  @media print{
+    body{padding:0;}
+    .pp-screen{padding:14px;}
+    .pp-toolbar{display:none !important;}
+    .pp-section{break-inside:avoid;}
+    .pp-letterhead{margin-bottom:14px;}
+  }
+</style></head><body>
+<div class="pp-screen">
+  <div class="pp-toolbar no-print">
+    <a href="/admin/events/{{EID}}">← العودة للرحلة</a>
+    <button type="button" onclick="window.print()">🖨️ طباعة</button>
+  </div>
+  <div class="pp-letterhead">
+    <div class="brand">🌿 MINDEX</div>
+    <div class="meta">
+      <div><strong>{{TITLE}}</strong></div>
+      <div>{{PRINTED_ON}}</div>
+    </div>
+  </div>
+  {{BODY}}
+  <div class="pp-foot">
+    <span>Mindex — تقرير محلي</span>
+    <span>{{EVENT_NAME}}</span>
+  </div>
+</div>
+<script>
+  // Auto-trigger print after a small delay so the layout settles.
+  setTimeout(function(){
+    try { window.print(); } catch(_){}
+  }, 500);
+</script>
+</body></html>"""
+
+
+def _events_print_load(eid, db):
+    """Load all event-related rows once for the full report."""
+    try:
+        ev_row = db.execute(
+            "SELECT * FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        ev_row = None
+    if not ev_row:
+        return None
+    ev = _events_detail_dict(dict(ev_row), db)
+    out = {"event": ev, "regs": [], "schedule": [], "costs": [],
+           "items": [], "tasks": []}
+    try:
+        rs = db.execute(
+            "SELECT * FROM ev_registrations WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY student_name", (eid,)).fetchall()
+        out["regs"] = [_events_reg_row(dict(r)) for r in rs]
+    except Exception: pass
+    try:
+        rs = db.execute(
+            "SELECT * FROM ev_schedule WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY start_time, id", (eid,)).fetchall()
+        out["schedule"] = [dict(r) for r in rs]
+    except Exception: pass
+    try:
+        rs = db.execute(
+            "SELECT * FROM ev_costs WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY id", (eid,)).fetchall()
+        out["costs"] = [dict(r) for r in rs]
+    except Exception: pass
+    try:
+        rs = db.execute(
+            "SELECT * FROM ev_items WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY title", (eid,)).fetchall()
+        out["items"] = [dict(r) for r in rs]
+    except Exception: pass
+    try:
+        rs = db.execute(
+            "SELECT * FROM ev_tasks WHERE event_id = ? AND is_deleted = 0 "
+            "ORDER BY category, order_index, id", (eid,)).fetchall()
+        out["tasks"] = [dict(r) for r in rs]
+    except Exception: pass
+    return out
+
+
+def _events_print_event_header(ev):
+    """Common event-header info grid used by every print view."""
+    import html as _html
+    date_lbl = _events_msg_format_date(ev.get("event_date"))
+    dep = (ev.get("departure_time") or "").strip()
+    ret = (ev.get("return_time") or "").strip()
+    time_lbl = (dep + (" - " + ret if ret else "")) if dep else "—"
+    place = (ev.get("meeting_point") or ev.get("destination") or "—").strip()
+    return ('<div class="pp-h1">🚌 ' + _html.escape(ev.get("name") or "—") + '</div>'
+            '<div class="pp-sub">'
+            + (('📅 ' + _html.escape(date_lbl)) if date_lbl else '')
+            + ' &nbsp; • &nbsp; ⏰ ' + _html.escape(time_lbl)
+            + ' &nbsp; • &nbsp; 📍 ' + _html.escape(place)
+            + '</div>')
+
+
+def _events_print_render(eid, ev, body, title):
+    """Wrap a body string in the PRINT_PAGE_HTML template."""
+    import html as _html
+    from datetime import datetime as _dt
+    ts = _dt.now().strftime("%Y-%m-%d %H:%M")
+    html = (PRINT_PAGE_HTML
+            .replace("{{TITLE}}", _html.escape(title))
+            .replace("{{EVENT_NAME}}", _html.escape(ev.get("name") or ""))
+            .replace("{{PRINTED_ON}}", "طُبع: " + ts)
+            .replace("{{EID}}", str(eid))
+            .replace("{{BODY}}", body))
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+def _print_section_list(regs):
+    """Body for /print/list — students + parents + phones."""
+    import html as _html
+    if not regs:
+        return ('<div class="pp-section"><h2>👥 قائمة الطالبات</h2>'
+                '<div class="pp-empty">لا توجد طالبات مسجلات بعد.</div>'
+                '</div>')
+    rows = ""
+    for i, r in enumerate(regs):
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td>' + _html.escape(r.get("student_name") or "") + '</td>'
+                 '<td>' + _html.escape(r.get("group_name") or "—") + '</td>'
+                 '<td>' + _html.escape(r.get("parent_name") or "—") + '</td>'
+                 '<td>' + _html.escape(r.get("parent_phone") or "—") + '</td>'
+                 '<td class="check"><span></span></td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>👥 قائمة الطالبات (' + str(len(regs)) + ')</h2>'
+            '<table class="pp-table">'
+            '<thead><tr>'
+            '<th>#</th><th>الطالبة</th><th>الفصل</th>'
+            '<th>الأم</th><th>الهاتف</th><th>✓</th>'
+            '</tr></thead><tbody>' + rows + '</tbody></table></div>')
+
+
+_SCHED_CAT_LABELS = {
+    "departure": "🚌 الانطلاق", "activity": "🎯 النشاط الرئيسي",
+    "break":     "☕ الاستراحة", "meal":     "🍽️ الوجبات",
+    "return":    "🏠 العودة",   "other":    "📌 أخرى",
+}
+
+
+def _print_section_schedule(schedule):
+    import html as _html
+    if not schedule:
+        return ('<div class="pp-section"><h2>⏰ الخطة الزمنية</h2>'
+                '<div class="pp-empty">لا توجد بنود في الخطة الزمنية بعد.</div>'
+                '</div>')
+    rows = ""
+    for i, s in enumerate(schedule):
+        cat = (s.get("category") or "other").lower()
+        cat_lbl = _SCHED_CAT_LABELS.get(cat, cat)
+        time_lbl = (s.get("start_time") or "—")
+        dur = s.get("duration_min")
+        dur_lbl = (str(int(dur)) + " د") if dur else "—"
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td>' + _html.escape(time_lbl) + '</td>'
+                 '<td>' + _html.escape(cat_lbl) + '</td>'
+                 '<td><strong>' + _html.escape(s.get("title") or "") + '</strong>'
+                 + (('<br/><span style="font-size:.82rem;color:#666;">' + _html.escape(s.get("description") or "") + '</span>') if s.get("description") else '')
+                 + '</td>'
+                 '<td>' + _html.escape(dur_lbl) + '</td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>⏰ الخطة الزمنية (' + str(len(schedule)) + ' بند)</h2>'
+            '<table class="pp-table">'
+            '<thead><tr><th>#</th><th>الوقت</th><th>القسم</th>'
+            '<th>التفاصيل</th><th>المدة</th></tr></thead>'
+            '<tbody>' + rows + '</tbody></table></div>')
+
+
+def _print_section_costs(costs):
+    import html as _html
+    if not costs:
+        return ('<div class="pp-section"><h2>💰 تفاصيل التكاليف</h2>'
+                '<div class="pp-empty">لا توجد تكاليف مسجلة.</div></div>')
+    total = 0.0
+    rows = ""
+    for i, c in enumerate(costs):
+        amt = float(c.get("amount") or 0)
+        total += amt
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td>' + _html.escape(c.get("label") or "—") + '</td>'
+                 '<td class="right">' + ("%.3f" % amt) + ' د.ب</td>'
+                 '<td>' + _html.escape(c.get("notes") or "—") + '</td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>💰 تفاصيل التكاليف (' + str(len(costs)) + ' صنف)</h2>'
+            '<table class="pp-table">'
+            '<thead><tr><th>#</th><th>التسمية</th><th>المبلغ</th>'
+            '<th>ملاحظات</th></tr></thead>'
+            '<tbody>' + rows
+            + '<tr><td colspan="2" style="text-align:end;font-weight:900;color:#0d47a1;">الإجمالي</td>'
+            + '<td class="right" style="background:#f6faff;">' + ("%.3f" % total) + ' د.ب</td>'
+            + '<td></td></tr>'
+            + '</tbody></table></div>')
+
+
+def _print_section_payments(regs, ev):
+    import html as _html
+    if not regs:
+        return ('<div class="pp-section"><h2>💵 تفاصيل المدفوعات</h2>'
+                '<div class="pp-empty">لا توجد طالبات مسجلات.</div></div>')
+    pay_lbl = {"pending":"⏳ بانتظار","paid":"✅ دفعت","partial":"🔵 جزئي",
+               "refunded":"↩️ مسترد","waived":"🆓 معفاة"}
+    collected = sum(float(r.get("payment_amount") or 0) for r in regs)
+    paid_n = sum(1 for r in regs if r.get("payment_status") == "paid")
+    pending_n = sum(1 for r in regs if (r.get("payment_status") or "pending") == "pending")
+    expected = float(ev.get("payment_expected") or 0)
+    summary = ('<div class="pp-summary">'
+               '<div class="card"><div class="lab">المسجلات</div><div class="val">' + str(len(regs)) + '</div></div>'
+               '<div class="card"><div class="lab">دفعن</div><div class="val">' + str(paid_n) + '</div></div>'
+               '<div class="card"><div class="lab">المحصّل</div><div class="val">' + ("%.3f" % collected) + '</div></div>'
+               '<div class="card"><div class="lab">المتوقع</div><div class="val">' + ("%.3f" % expected) + '</div></div>'
+               '</div>')
+    rows = ""
+    for i, r in enumerate(regs):
+        st = r.get("payment_status") or "pending"
+        amt = float(r.get("payment_amount") or 0)
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td>' + _html.escape(r.get("student_name") or "") + '</td>'
+                 '<td>' + _html.escape(pay_lbl.get(st, st)) + '</td>'
+                 '<td class="right">' + ("%.3f" % amt) + ' د.ب</td>'
+                 '<td>' + _html.escape(r.get("payment_notes") or "—") + '</td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>💵 تفاصيل المدفوعات</h2>'
+            + summary
+            + '<table class="pp-table">'
+            '<thead><tr><th>#</th><th>الطالبة</th><th>الحالة</th>'
+            '<th>المبلغ</th><th>ملاحظات</th></tr></thead>'
+            '<tbody>' + rows + '</tbody></table></div>')
+
+
+def _print_section_tasks(tasks):
+    import html as _html
+    if not tasks:
+        return ('<div class="pp-section"><h2>✅ المهام</h2>'
+                '<div class="pp-empty">لا توجد مهام.</div></div>')
+    cat_lbl = {"before":"🟢 قبل","during":"🟡 أثناء","after":"🟣 بعد"}
+    st_lbl = {"pending":"قيد الانتظار","in_progress":"جارية",
+              "completed":"✓ مكتملة","cancelled":"✕ ملغاة"}
+    rows = ""
+    for i, t in enumerate(tasks):
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td>' + _html.escape(cat_lbl.get(t.get("category") or "before", "—")) + '</td>'
+                 '<td>' + _html.escape(t.get("title") or "") + '</td>'
+                 '<td>' + _html.escape(t.get("assigned_to_name") or "—") + '</td>'
+                 '<td>' + _html.escape(st_lbl.get(t.get("status") or "pending", "—")) + '</td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>✅ المهام (' + str(len(tasks)) + ')</h2>'
+            '<table class="pp-table">'
+            '<thead><tr><th>#</th><th>القسم</th><th>المهمة</th>'
+            '<th>المسؤولة</th><th>الحالة</th></tr></thead>'
+            '<tbody>' + rows + '</tbody></table></div>')
+
+
+def _print_section_items(items):
+    import html as _html
+    if not items:
+        return ('<div class="pp-section"><h2>🛠️ الأدوات</h2>'
+                '<div class="pp-empty">لا توجد أدوات.</div></div>')
+    rows = ""
+    for i, it in enumerate(items):
+        ready = '✓' if int(it.get("is_ready") or 0) else ''
+        rows += ('<tr>'
+                 '<td class="num">' + str(i+1) + '</td>'
+                 '<td><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #555;border-radius:3px;text-align:center;line-height:12px;font-weight:900;color:#1D9E75;">' + ready + '</span></td>'
+                 '<td>' + _html.escape(it.get("title") or "") + '</td>'
+                 '<td>' + str(int(it.get("quantity") or 1)) + '</td>'
+                 '<td>' + _html.escape(it.get("assigned_to_name") or "—") + '</td>'
+                 '</tr>')
+    return ('<div class="pp-section"><h2>🛠️ الأدوات (' + str(len(items)) + ')</h2>'
+            '<table class="pp-table">'
+            '<thead><tr><th>#</th><th>✓</th><th>الأداة</th>'
+            '<th>الكمية</th><th>المسؤولة</th></tr></thead>'
+            '<tbody>' + rows + '</tbody></table></div>')
+
+
+@app.route('/admin/events/<int:eid>/print/list', methods=['GET'])
+@login_required
+def admin_events_print_list(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return "غير مصرح", 403
+    db = get_db()
+    bundle = _events_print_load(eid, db)
+    if not bundle:
+        return "الرحلة غير موجودة", 404
+    body = (_events_print_event_header(bundle["event"])
+            + _print_section_list(bundle["regs"]))
+    return _events_print_render(eid, bundle["event"], body, "قائمة الطالبات")
+
+
+@app.route('/admin/events/<int:eid>/print/schedule', methods=['GET'])
+@login_required
+def admin_events_print_schedule(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return "غير مصرح", 403
+    db = get_db()
+    bundle = _events_print_load(eid, db)
+    if not bundle:
+        return "الرحلة غير موجودة", 404
+    body = (_events_print_event_header(bundle["event"])
+            + _print_section_schedule(bundle["schedule"]))
+    return _events_print_render(eid, bundle["event"], body, "الخطة الزمنية")
+
+
+@app.route('/admin/events/<int:eid>/print/financial', methods=['GET'])
+@login_required
+def admin_events_print_financial(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return "غير مصرح", 403
+    db = get_db()
+    bundle = _events_print_load(eid, db)
+    if not bundle:
+        return "الرحلة غير موجودة", 404
+    body = (_events_print_event_header(bundle["event"])
+            + _print_section_costs(bundle["costs"])
+            + _print_section_payments(bundle["regs"], bundle["event"]))
+    return _events_print_render(eid, bundle["event"], body, "التقرير المالي")
+
+
+@app.route('/admin/events/<int:eid>/print/full', methods=['GET'])
+@login_required
+def admin_events_print_full(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return "غير مصرح", 403
+    db = get_db()
+    bundle = _events_print_load(eid, db)
+    if not bundle:
+        return "الرحلة غير موجودة", 404
+    ev = bundle["event"]
+    # One-page summary at the top, then everything in detail.
+    import html as _html
+    summary = ('<div class="pp-summary">'
+               '<div class="card"><div class="lab">المسجلات</div><div class="val">' + str(len(bundle["regs"])) + '</div></div>'
+               '<div class="card"><div class="lab">المهام</div><div class="val">' + str(int(ev.get("task_completed") or 0)) + '/' + str(int(ev.get("task_total") or 0)) + '</div></div>'
+               '<div class="card"><div class="lab">الأدوات</div><div class="val">' + str(int(ev.get("item_ready") or 0)) + '/' + str(int(ev.get("item_total") or 0)) + '</div></div>'
+               '<div class="card"><div class="lab">المحصّل</div><div class="val">' + ("%.3f" % float(ev.get("payment_collected") or 0)) + '</div></div>'
+               '</div>')
+    body = (_events_print_event_header(ev)
+            + summary
+            + _print_section_schedule(bundle["schedule"])
+            + _print_section_costs(bundle["costs"])
+            + _print_section_payments(bundle["regs"], ev)
+            + _print_section_list(bundle["regs"])
+            + _print_section_tasks(bundle["tasks"])
+            + _print_section_items(bundle["items"]))
+    return _events_print_render(eid, ev, body, "تقرير الرحلة الشامل")
+
+
 # ── Tasks (5.3) ────────────────────────────────────────────────
 def _events_tasks_event_exists(db, eid):
     try:
