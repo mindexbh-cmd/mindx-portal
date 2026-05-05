@@ -69785,6 +69785,9 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-msg-actions button.share-wa{border-color:#25D366;color:#25D366;}
   .evd-msg-actions button.share-wa:hover{background:#25D366;color:#fff;}
   .evd-msg-warn{margin-top:10px;font-size:.82rem;color:#E65100;background:#fff8e1;padding:8px 12px;border-radius:8px;font-weight:700;}
+  .evd-msg-warn strong{color:#bf360c;}
+  .evd-msg-warn .hint{display:block;color:#7a4a00;font-weight:600;margin-top:4px;font-size:.78rem;}
+  .evd-msg-ok{margin-top:10px;font-size:.84rem;color:#1D9E75;background:#e6f7ee;padding:9px 12px;border-radius:8px;font-weight:800;display:flex;align-items:center;gap:6px;}
   .evd-msg-tpl-list{display:flex;flex-direction:column;gap:8px;}
   .evd-msg-tpl{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 14px;border-radius:10px;background:#f6faff;border:1.5px solid transparent;cursor:pointer;transition:.15s;}
   .evd-msg-tpl:hover{border-color:#1565C0;background:#e3f2fd;}
@@ -72523,6 +72526,24 @@ function evdRenderMsg(){
              + '  <div class="evd-msg-warn">⚠️ الرابط غير مولّد لهذه الرحلة بعد. أنشئ رحلة جديدة لتوليد الرابط تلقائياً.</div>'
              + '</div>';
   } else {
+    // Status-aware footer: parents only see the form when status=open.
+    // Anything else gets a status-specific page from /events/register/.
+    var statusFoot;
+    if (statusOk){
+      statusFoot = '<div class="evd-msg-ok">✅ <span>الرابط نشط — الأهل يستطيعون التسجيل الآن</span></div>';
+    } else {
+      var stLabels = {
+        planning:  'قيد التخطيط',
+        closed:    'جاهزة',
+        completed: 'منتهية',
+        cancelled: 'ملغاة'
+      };
+      var stLbl = stLabels[status] || status;
+      statusFoot = '<div class="evd-msg-warn">'
+                 + '⚠️ <strong>الرابط لن يعمل</strong> — حالة الرحلة الحالية: «' + evdEsc(stLbl) + '»'
+                 + '<span class="hint">لتفعيل الرابط: اضغطي على شارة الحالة في الأعلى وغيّريها إلى «مفتوحة».</span>'
+                 + '</div>';
+    }
     linkCard = '<div class="evd-msg-card" data-k="link">'
              + '  <h3>🌐 رابط التسجيل العام</h3>'
              + '  <div style="font-size:.86rem;color:#666;margin-bottom:8px;">شاركيه مع الأهل لتسجيل الطالبات تلقائياً.</div>'
@@ -72535,7 +72556,7 @@ function evdRenderMsg(){
              + '    <button type="button" class="share-wa" id="evd-msg-link-wa">📱 مشاركة عبر واتساب</button>'
              + '    <a class="evd-btn" target="_blank" rel="noopener" href="' + evdEsc(url) + '">👁️ معاينة</a>'
              + '  </div>'
-             + (statusOk ? '' : '<div class="evd-msg-warn">⚠️ الرابط لا يقبل تسجيلات إلا عندما تكون حالة الرحلة «مفتوحة».</div>')
+             + statusFoot
              + '</div>';
   }
 
