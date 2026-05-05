@@ -65200,6 +65200,32 @@ def api_admin_events_list():
         print("[events] list failed: " + str(ex), file=_sys.stderr)
         return jsonify({"ok": False, "error": "تعذّر جلب القائمة"}), 500
     out = [_events_row_dict(dict(r)) for r in rows]
+    # Stage 6.5 — overlay real registered_count + collected revenue
+    # from ev_registrations in a single batch query.
+    try:
+        eids = [int(d.get("id")) for d in out if d.get("id")]
+        if eids:
+            ph = ",".join(["?"] * len(eids))
+            rs = db.execute(
+                "SELECT event_id, COUNT(*) AS n, "
+                "       COALESCE(SUM(payment_amount), 0) AS pay "
+                "FROM ev_registrations "
+                "WHERE event_id IN (" + ph + ") AND is_deleted = 0 "
+                "GROUP BY event_id", tuple(eids)).fetchall()
+            counts = {}
+            for r in rs:
+                rd = dict(r)
+                counts[int(rd.get("event_id") or 0)] = (
+                    int(rd.get("n") or 0), float(rd.get("pay") or 0.0))
+            for d in out:
+                eid = int(d.get("id") or 0)
+                n, pay = counts.get(eid, (0, 0.0))
+                d["registered_count"] = n
+                cap = int(d.get("max_students") or 0)
+                d["registration_pct"] = round(n / cap * 100, 1) if cap > 0 else 0.0
+                d["payment_collected"] = round(pay, 3)
+    except Exception:
+        pass
     return jsonify({
         "ok":     True,
         "events": out,
@@ -69167,10 +69193,24 @@ function evdRenderHeader(ev){
     ? ((ev.registered_count || 0) + '/' + ev.max_students + ' مسجلة')
     : ((ev.registered_count || 0) + ' مسجلة');
   document.getElementById('evd-meta-cap').textContent = '👥 ' + cap;
-  // Header chips with task/item progress (5.6).
+  // Header chips with task/item/registration progress (5.6 + 6.5).
   var chips = document.getElementById('evd-h-chips');
   if (chips){
     var bits = [];
+    var regCount = parseInt(ev.registered_count || 0, 10);
+    if (regCount > 0 || (ev.max_students || 0) > 0){
+      var regCap = (ev.max_students || 0) > 0
+        ? (regCount + '/' + ev.max_students)
+        : ('' + regCount);
+      bits.push('<a href="#students">👥 المسجلات: ' + regCap + '</a>');
+    }
+    var collected = parseFloat(ev.payment_collected || 0) || 0;
+    var expected  = parseFloat(ev.payment_expected  || 0) || 0;
+    if (collected > 0 || expected > 0){
+      var revLab = collected.toFixed(3);
+      if (expected > 0) revLab += '/' + expected.toFixed(3);
+      bits.push('<a href="#students">💰 الإيراد: ' + revLab + ' د.ب</a>');
+    }
     if ((ev.task_total || 0) > 0){
       bits.push('<a href="#tasks">✅ المهام: ' + (ev.task_completed || 0) + '/' + ev.task_total + '</a>');
     }
