@@ -69092,6 +69092,9 @@ ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
 var EID = parseInt('{{EID}}', 10);
 var DATA = null;
 var BUSY = {};   // {kind:id} guard against double-tap
+var LAST_LOAD_AT = null;
+var REFRESH_TIMER = null;
+var TS_TICK_TIMER = null;
 
 function evdfEsc(s){
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -69124,11 +69127,27 @@ function evdfLoad(){
 }
 
 function evdfStampTimestamp(){
-  var d = new Date();
-  var hh = String(d.getHours()).padStart(2,'0');
-  var mm = String(d.getMinutes()).padStart(2,'0');
+  // 9.5 — record absolute time then render a live "Y ago" string
+  // that updates every 5s.
+  LAST_LOAD_AT = Date.now();
+  evdfRenderTimestamp();
+}
+
+function evdfRenderTimestamp(){
   var el = document.getElementById('evdf-ts');
-  if (el) el.textContent = 'تحديث: ' + hh + ':' + mm;
+  if (!el || !LAST_LOAD_AT) return;
+  var sec = Math.floor((Date.now() - LAST_LOAD_AT) / 1000);
+  var label;
+  if (sec < 5)        label = 'آخر تحديث: الآن';
+  else if (sec < 60)  label = 'آخر تحديث: قبل ' + sec + ' ثانية';
+  else if (sec < 3600){
+    var m = Math.floor(sec / 60);
+    label = 'آخر تحديث: قبل ' + m + ' دقيقة';
+  } else {
+    var d = new Date(LAST_LOAD_AT);
+    label = 'آخر تحديث: ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  el.textContent = label;
 }
 
 function evdfRender(){
@@ -69495,7 +69514,36 @@ function evdfRecount(){
   );
 }
 
-document.addEventListener('DOMContentLoaded', evdfLoad);
+/* ── 9.5 — auto-refresh + battery-friendly visibility hooks ──── */
+function evdfStartRefreshLoop(){
+  evdfStopRefreshLoop();
+  // Re-fetch every 30s so multiple admins editing in parallel see
+  // each other's changes within half a minute.
+  REFRESH_TIMER = setInterval(function(){
+    if (document.hidden) return;
+    // Don't yank state from under the user mid-tap.
+    if (Object.keys(BUSY).length > 0) return;
+    evdfLoad();
+  }, 30000);
+  // Tick the "آخر تحديث" label every 5s.
+  TS_TICK_TIMER = setInterval(evdfRenderTimestamp, 5000);
+}
+function evdfStopRefreshLoop(){
+  if (REFRESH_TIMER){ clearInterval(REFRESH_TIMER); REFRESH_TIMER = null; }
+  if (TS_TICK_TIMER){ clearInterval(TS_TICK_TIMER); TS_TICK_TIMER = null; }
+}
+document.addEventListener('visibilitychange', function(){
+  // When the user comes back to the tab after being away, refresh
+  // immediately so the data isn't stale on first glance.
+  if (!document.hidden && LAST_LOAD_AT && (Date.now() - LAST_LOAD_AT) > 15000){
+    evdfLoad();
+  }
+});
+window.addEventListener('beforeunload', evdfStopRefreshLoop);
+
+document.addEventListener('DOMContentLoaded', function(){
+  evdfLoad().then(evdfStartRefreshLoop);
+});
 </script>
 </body></html>"""
 
