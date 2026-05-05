@@ -67073,7 +67073,7 @@ def _events_print_load(eid, db):
     try:
         rs = db.execute(
             "SELECT * FROM ev_schedule WHERE event_id = ? AND is_deleted = 0 "
-            "ORDER BY start_time, id", (eid,)).fetchall()
+            "ORDER BY time_slot, order_index, id", (eid,)).fetchall()
         out["schedule"] = [dict(r) for r in rs]
     except Exception: pass
     try:
@@ -67169,8 +67169,8 @@ def _print_section_schedule(schedule):
     for i, s in enumerate(schedule):
         cat = (s.get("category") or "other").lower()
         cat_lbl = _SCHED_CAT_LABELS.get(cat, cat)
-        time_lbl = (s.get("start_time") or "—")
-        dur = s.get("duration_min")
+        time_lbl = (s.get("time_slot") or "—")
+        dur = s.get("duration_minutes")
         dur_lbl = (str(int(dur)) + " د") if dur else "—"
         rows += ('<tr>'
                  '<td class="num">' + str(i+1) + '</td>'
@@ -71806,7 +71806,13 @@ function evdRegRowHTML(r, idx){
     var dig = phone.replace(/[^0-9]/g, '');
     if (dig && dig.length >= 8){
       var waNum = (dig.length === 8 ? '973' + dig : dig);
-      phLink = '<a href="https://wa.me/' + waNum + '" target="_blank" rel="noopener">' + evdEsc(phone) + '</a>';
+      // Pre-fill the chat with a polite Arabic greeting + child name
+      // so the admin doesn't have to type "السلام عليكم" every time.
+      var ev = EVENT_DATA || {};
+      var greet = 'السلام عليكم، بخصوص ' + (r.student_name || 'الطالبة')
+                + (ev.name ? ' ورحلة «' + ev.name + '»' : '');
+      var waUrl = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(greet);
+      phLink = '<a href="' + waUrl + '" target="_blank" rel="noopener" title="افتحي واتساب">' + evdEsc(phone) + '</a>';
     } else {
       phLink = evdEsc(phone);
     }
@@ -72277,6 +72283,10 @@ var MSG_DEFAULT_TPLS = [
 ];
 
 function evdLoadMsg(){
+  // Make sure we have the event meta first — the messages tab uses
+  // the registration_token + name in its banner / templates.
+  var primer = EVENT_DATA ? Promise.resolve() : evdLoadEvent();
+  return primer.then(function(){
   // Fetch templates first (will fall back to defaults on 404), then
   // ensure we have registration data for audience counts.
   return fetch('/api/admin/events/' + EID + '/messages/templates')
@@ -72297,6 +72307,7 @@ function evdLoadMsg(){
       if (!REG_LOADED) return evdLoadRegs();
     })
     .then(function(){ evdRenderMsg(); });
+  });
 }
 
 function evdMsgPublicUrl(){
