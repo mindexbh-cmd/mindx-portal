@@ -37842,6 +37842,12 @@ table.tbl tr:hover td{background:#faf6ff;}
         <label><input type="radio" name="cu-dl" value="view_only"> للقراءة فقط</label>
       </div>
     </div>
+    <div class="field" id="cu-notify-field">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="cu-notify-wa" style="width:18px;height:18px;">
+        <span>إرسال إشعار واتساب للمستهدفين عند الرفع</span>
+      </label>
+    </div>
 
     <div class="assign-section">
       <h4>📋 المجموعات</h4>
@@ -38136,6 +38142,8 @@ table.tbl tr:hover td{background:#faf6ff;}
     document.getElementById('cu-file').value  = '';
     document.querySelector('input[name="cu-dl"][value="allowed"]').checked = true;
     document.getElementById('cu-file-field').style.display = '';
+    document.getElementById('cu-notify-wa').checked = false;
+    document.getElementById('cu-notify-field').style.display = '';
     TAGS = {group:[], student:[], parent:[], teacher:[]};
     ['group','student','parent','teacher'].forEach(renderTags);
     refreshPreview();
@@ -38143,6 +38151,8 @@ table.tbl tr:hover td{background:#faf6ff;}
   };
   window.cuOpenEdit = function(id){
     EDIT_ID = id;
+    document.getElementById('cu-notify-field').style.display = 'none';
+    document.getElementById('cu-notify-wa').checked = false;
     document.getElementById('cu-mod-title').textContent = '\u270F\uFE0F \u062A\u0639\u062F\u064A\u0644 المنهج';
     document.getElementById('cu-file-field').style.display = 'none';
     fetch('/api/curriculum/'+id, {credentials:'include'})
@@ -38219,12 +38229,14 @@ table.tbl tr:hover td{background:#faf6ff;}
     } else {
       var f = document.getElementById('cu-file').files[0];
       if(!f){ btn.disabled=false; btn.textContent='💾 حفظ'; toast('يجب اختيار ملف PDF', true); return; }
+      var notifyWa = document.getElementById('cu-notify-wa').checked ? '1' : '0';
       var fd = new FormData();
       fd.append('title', title);
       fd.append('description', desc);
       fd.append('subject', subject);
       fd.append('level', level);
       fd.append('download_default', dl);
+      fd.append('notify_whatsapp', notifyWa);
       fd.append('assignments', JSON.stringify(assigns));
       fd.append('pdf_file', f);
       fetch('/api/curriculum/upload', {method:'POST', credentials:'include', body:fd})
@@ -64639,6 +64651,126 @@ def _curriculum_count_assignments(db, file_id):
     return out
 
 
+def _curriculum_resolve_notify_recipients(db, target_type, target_id):
+    """Map a single curriculum assignment target → list of
+    {name, whatsapp} dicts. Best-effort: errors swallowed → []."""
+    out = []
+    try:
+        tt = (target_type or "").strip().lower()
+        ti = str(target_id or "").strip()
+        if not tt or not ti: return out
+        if tt == "group":
+            try:
+                kids = _pm_group_recipients(db, ti)
+            except Exception:
+                kids = []
+            for s in kids or []:
+                if s.get("whatsapp"):
+                    out.append({"name": s.get("student_name") or "",
+                                "whatsapp": s.get("whatsapp") or ""})
+        elif tt == "student":
+            try:
+                row = db.execute(
+                    "SELECT student_name, COALESCE(whatsapp,'') AS whatsapp, "
+                    "COALESCE(mother_phone,'') AS mother_phone, "
+                    "COALESCE(father_phone,'') AS father_phone "
+                    "FROM students WHERE id=?", (int(ti),)
+                ).fetchone()
+            except Exception:
+                row = None
+            if row:
+                rd = dict(row)
+                phone = (rd.get("whatsapp") or "").strip() or \
+                        (rd.get("mother_phone") or "").strip() or \
+                        (rd.get("father_phone") or "").strip()
+                if phone:
+                    out.append({"name": rd.get("student_name") or "",
+                                "whatsapp": _pm_clean_phone(phone)})
+        elif tt == "parent":
+            # Parent users link to a single student via linked_student_id.
+            try:
+                urow = db.execute(
+                    "SELECT name, username, linked_student_id "
+                    "FROM users WHERE id=?", (int(ti),)
+                ).fetchone()
+            except Exception:
+                urow = None
+            if urow:
+                ud = dict(urow)
+                sid = int(ud.get("linked_student_id") or 0)
+                phone = ""
+                if sid:
+                    try:
+                        srow = db.execute(
+                            "SELECT COALESCE(whatsapp,'') AS whatsapp, "
+                            "COALESCE(mother_phone,'') AS mother_phone, "
+                            "COALESCE(father_phone,'') AS father_phone "
+                            "FROM students WHERE id=?", (sid,)
+                        ).fetchone()
+                    except Exception:
+                        srow = None
+                    if srow:
+                        sd = dict(srow)
+                        phone = (sd.get("whatsapp") or "").strip() or \
+                                (sd.get("mother_phone") or "").strip() or \
+                                (sd.get("father_phone") or "").strip()
+                if phone:
+                    out.append({"name": ud.get("name") or ud.get("username") or "",
+                                "whatsapp": _pm_clean_phone(phone)})
+        elif tt == "teacher":
+            # Teachers have no phone column on users — log a placeholder
+            # row keyed by username so it shows up in سجل الرسائل.
+            try:
+                urow = db.execute(
+                    "SELECT name, username FROM users WHERE id=?",
+                    (int(ti),)
+                ).fetchone()
+            except Exception:
+                urow = None
+            if urow:
+                ud = dict(urow)
+                out.append({"name": ud.get("name") or ud.get("username") or "",
+                            "whatsapp": ""})
+    except Exception:
+        pass
+    return out
+
+
+def _curriculum_enqueue_notifications(db, file_id, title, assignments):
+    """For each assignment target, INSERT a message_log row representing
+    the intent to notify (template_name = curriculum-upload/<file_id>).
+    Best-effort: errors swallowed; returns number of rows inserted."""
+    template_name = "curriculum-upload/" + str(int(file_id))
+    notified = 0
+    seen_phones = set()
+    for a in assignments or []:
+        if not isinstance(a, dict): continue
+        tt = (a.get("target_type") or "").strip().lower()
+        ti = str(a.get("target_id") or "").strip()
+        if not tt or not ti: continue
+        try:
+            recipients = _curriculum_resolve_notify_recipients(db, tt, ti)
+        except Exception:
+            recipients = []
+        for r in recipients:
+            phone = (r.get("whatsapp") or "").strip()
+            key = phone or ("name:" + (r.get("name") or ""))
+            if key in seen_phones: continue
+            seen_phones.add(key)
+            try:
+                db.execute(
+                    "INSERT INTO message_log(student_name, "
+                    "student_whatsapp, template_name) VALUES(?,?,?)",
+                    (r.get("name") or "", phone, template_name),
+                )
+                notified += 1
+            except Exception:
+                continue
+    try: db.commit()
+    except Exception: pass
+    return notified
+
+
 def _curriculum_row_to_dict(r, *, current_user_can_download=None,
                              counts=None):
     if r is None: return None
@@ -64787,17 +64919,31 @@ def api_curriculum_upload():
             continue
     db.commit()
 
+    # Optional: enqueue WhatsApp notifications via the existing
+    # message_log pipeline. Non-blocking — failure does NOT fail the
+    # upload. Triggered by the "إرسال إشعار واتساب" checkbox.
+    notify_flag = (request.form.get("notify_whatsapp") or "").strip().lower()
+    notified_count = 0
+    if notify_flag in ("1", "true", "on", "yes"):
+        try:
+            notified_count = _curriculum_enqueue_notifications(
+                db, int(new_id or 0), title, assignments)
+        except Exception:
+            notified_count = 0
+
     try:
         _audit("curriculum.upload", target_type="curriculum_files",
                target_id=new_id,
                new_value={"title": title,
                           "size_bytes": len(raw),
                           "download_default": download_default,
-                          "assignments": inserted_assignments})
+                          "assignments": inserted_assignments,
+                          "notified": notified_count})
     except Exception:
         pass
     return jsonify({"ok": True, "success": True, "id": int(new_id or 0),
                     "assignments": inserted_assignments,
+                    "notified": notified_count,
                     "size_bytes": len(raw)})
 
 
