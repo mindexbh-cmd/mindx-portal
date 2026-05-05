@@ -870,6 +870,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
+        subject TEXT,
+        level TEXT,
         file_path TEXT NOT NULL,
         file_size_bytes INTEGER DEFAULT 0,
         download_default TEXT DEFAULT 'allowed',
@@ -6307,6 +6309,8 @@ if True:
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
+        subject TEXT,
+        level TEXT,
         file_path TEXT NOT NULL,
         file_size_bytes INTEGER DEFAULT 0,
         download_default TEXT DEFAULT 'allowed',
@@ -6352,6 +6356,28 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("curriculum_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── curriculum_subject_level_v1: optional subject + level metadata
+    # on curriculum_files. Idempotent ALTER TABLE ADD COLUMN; existing
+    # rows get NULL and the UI hides badges when those columns are NULL,
+    # so no backfill is needed.
+    if "curriculum_subject_level_v1" not in applied:
+        try:
+            _curr_cols = {r[1] for r in db2.execute(
+                "PRAGMA table_info(curriculum_files)").fetchall()}
+        except Exception:
+            _curr_cols = set()
+        for _col, _decl in [("subject", "TEXT"), ("level", "TEXT")]:
+            if _col not in _curr_cols:
+                try:
+                    db2.execute("ALTER TABLE curriculum_files ADD COLUMN "
+                                + _col + " " + _decl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("curriculum_subject_level_v1",))
             db2.commit()
         except Exception: pass
 
@@ -37764,6 +37790,13 @@ table.tbl tr:hover td{background:#faf6ff;}
   <div class="panel">
     <div class="row-tools">
       <input type="text" id="cu-search" placeholder="ابحث عن كتاب..." />
+      <select id="cu-flt-subject" style="padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+        <option value="">جميع المواد</option>
+        <option value="English">English</option>
+        <option value="Math">Math</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="text" id="cu-flt-level" placeholder="فلترة حسب المستوى..." style="padding:6px 10px;border:1.4px solid #d8c8ec;border-radius:7px;max-width:160px;">
       <button class="btn" onclick="cuOpenUpload()">📤 رفع منهج جديد</button>
     </div>
     <div id="cu-list-box"><div class="empty">جاري التحميل...</div></div>
@@ -37782,6 +37815,21 @@ table.tbl tr:hover td{background:#faf6ff;}
     <div class="field">
       <label>الوصف (اختياري)</label>
       <textarea id="cu-desc" maxlength="2000"></textarea>
+    </div>
+    <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label>المادة (اختياري)</label>
+        <select id="cu-subject" style="width:100%;padding:8px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+          <option value="">— اختياري —</option>
+          <option value="English">English</option>
+          <option value="Math">Math</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>المستوى (اختياري)</label>
+        <input type="text" id="cu-level" maxlength="80" placeholder="مثلاً: Level 3" style="width:100%;padding:8px 10px;border:1.4px solid #d8c8ec;border-radius:7px;">
+      </div>
     </div>
     <div class="field" id="cu-file-field">
       <label>ملف PDF (حد أقصى 50 ميجا)</label>
@@ -37895,6 +37943,10 @@ table.tbl tr:hover td{background:#faf6ff;}
         var box = document.getElementById('cu-list-box');
         if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
         var arr = j.files || [];
+        var fltSubj = (document.getElementById('cu-flt-subject').value || '').trim();
+        var fltLvl  = (document.getElementById('cu-flt-level').value || '').trim().toLowerCase();
+        if(fltSubj){ arr = arr.filter(function(e){ return (e.subject||'') === fltSubj; }); }
+        if(fltLvl){  arr = arr.filter(function(e){ return ((e.level||'').toLowerCase().indexOf(fltLvl) === 0); }); }
         if(!arr.length){ box.innerHTML = '<div class="empty">لا توجد ملفات حتى الآن. اضغط "رفع منهج جديد" للبدء.</div>'; return; }
         var html = '<table class="tbl"><thead><tr>'+
           '<th>العنوان</th><th>الوصف</th><th>الحجم</th><th>المُستفيدون</th>'+
@@ -37908,8 +37960,11 @@ table.tbl tr:hover td{background:#faf6ff;}
           if(s.teacher)  pills += '<span class="targets-pill">'+s.teacher+' معلمة</span>';
           if(!pills)     pills = '<span class="targets-pill empty">— غير مخصص —</span>';
           var lock = (e.download_default === 'view_only') ? ' 🔒' : '';
+          var meta = '';
+          if(e.subject) meta += ' <span class="size-pill" style="background:#e3f2fd;color:#0d47a1;border-color:#bbdefb;">'+escapeHtml(e.subject)+'</span>';
+          if(e.level)   meta += ' <span class="size-pill" style="background:#fff8e1;color:#7c5e00;border-color:#ffe082;">'+escapeHtml(e.level)+'</span>';
           html += '<tr>'+
-            '<td data-label="العنوان"><b>'+escapeHtml(e.title)+'</b>'+lock+'</td>'+
+            '<td data-label="العنوان"><b>'+escapeHtml(e.title)+'</b>'+lock+meta+'</td>'+
             '<td data-label="الوصف">'+escapeHtml((e.description||'').slice(0,80))+((e.description||'').length>80?'...':'')+'</td>'+
             '<td data-label="الحجم"><span class="size-pill">'+fmtSize(e.file_size_bytes)+'</span></td>'+
             '<td data-label="المُستفيدون">'+pills+'</td>'+
@@ -37931,6 +37986,11 @@ table.tbl tr:hover td{background:#faf6ff;}
   document.getElementById('cu-search').addEventListener('input', function(){
     clearTimeout(SEARCH_TIMER);
     SEARCH_TIMER = setTimeout(loadList, 300);
+  });
+  document.getElementById('cu-flt-subject').addEventListener('change', loadList);
+  document.getElementById('cu-flt-level').addEventListener('input', function(){
+    clearTimeout(SEARCH_TIMER);
+    SEARCH_TIMER = setTimeout(loadList, 250);
   });
 
   // ── Target dropdowns ────────────────────────────────────────────
@@ -38059,6 +38119,8 @@ table.tbl tr:hover td{background:#faf6ff;}
     document.getElementById('cu-mod-title').textContent = '📤 رفع منهج جديد';
     document.getElementById('cu-title').value = '';
     document.getElementById('cu-desc').value  = '';
+    document.getElementById('cu-subject').value = '';
+    document.getElementById('cu-level').value = '';
     document.getElementById('cu-file').value  = '';
     document.querySelector('input[name="cu-dl"][value="allowed"]').checked = true;
     document.getElementById('cu-file-field').style.display = '';
@@ -38077,6 +38139,8 @@ table.tbl tr:hover td{background:#faf6ff;}
         var e = j.entry || {};
         document.getElementById('cu-title').value = e.title || '';
         document.getElementById('cu-desc').value  = e.description || '';
+        document.getElementById('cu-subject').value = e.subject || '';
+        document.getElementById('cu-level').value = e.level || '';
         var dlVal = e.download_default || 'allowed';
         document.querySelector('input[name="cu-dl"][value="'+dlVal+'"]').checked = true;
         TAGS = {group:[], student:[], parent:[], teacher:[]};
@@ -38118,6 +38182,8 @@ table.tbl tr:hover td{background:#faf6ff;}
   window.cuSave = function(){
     var title = document.getElementById('cu-title').value.trim();
     var desc  = document.getElementById('cu-desc').value.trim();
+    var subject = (document.getElementById('cu-subject').value || '').trim();
+    var level = (document.getElementById('cu-level').value || '').trim();
     var dl    = (document.querySelector('input[name="cu-dl"]:checked')||{}).value || 'allowed';
     if(!title){ toast('العنوان مطلوب', true); return; }
     var assigns = buildAssignmentsArray();
@@ -38128,7 +38194,7 @@ table.tbl tr:hover td{background:#faf6ff;}
         method:'PATCH',
         headers:{'Content-Type':'application/json'},
         credentials:'include',
-        body: JSON.stringify({title:title, description:desc, download_default:dl, assignments:assigns})
+        body: JSON.stringify({title:title, description:desc, subject:subject, level:level, download_default:dl, assignments:assigns})
       }).then(function(r){return r.json();}).then(function(j){
         btn.disabled = false; btn.textContent = '💾 حفظ';
         if(!j || !j.ok){ toast(j&&j.error||'تعذر الحفظ', true); return; }
@@ -38144,6 +38210,8 @@ table.tbl tr:hover td{background:#faf6ff;}
       var fd = new FormData();
       fd.append('title', title);
       fd.append('description', desc);
+      fd.append('subject', subject);
+      fd.append('level', level);
       fd.append('download_default', dl);
       fd.append('assignments', JSON.stringify(assigns));
       fd.append('pdf_file', f);
@@ -64567,6 +64635,8 @@ def _curriculum_row_to_dict(r, *, current_user_can_download=None,
         "id":                int(d.get("id") or 0),
         "title":             d.get("title") or "",
         "description":       d.get("description") or "",
+        "subject":           d.get("subject") or "",
+        "level":             d.get("level") or "",
         "file_size_bytes":   int(d.get("file_size_bytes") or 0),
         "download_default":  d.get("download_default") or "allowed",
         "uploaded_by":       int(d.get("uploaded_by") or 0),
@@ -64592,6 +64662,12 @@ def api_curriculum_upload():
         return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
     title = (request.form.get("title") or "").strip()
     description = (request.form.get("description") or "").strip()
+    subject = (request.form.get("subject") or "").strip() or None
+    level = (request.form.get("level") or "").strip() or None
+    if subject and subject not in ("English", "Math", "Other"):
+        subject = "Other"
+    if level and len(level) > 80:
+        level = level[:80]
     download_default = (request.form.get("download_default") or "allowed").strip()
     if download_default not in ("allowed", "view_only"):
         download_default = "allowed"
@@ -64642,11 +64718,11 @@ def api_curriculum_upload():
     except Exception: uploader_id = None
     try:
         cur = db.execute(
-            "INSERT INTO curriculum_files(title, description, file_path, "
-            "file_size_bytes, download_default, uploaded_by, uploaded_at, "
-            "is_deleted, updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,0,"
-            "CURRENT_TIMESTAMP)",
-            (title, description, file_path, len(raw),
+            "INSERT INTO curriculum_files(title, description, subject, level, "
+            "file_path, file_size_bytes, download_default, uploaded_by, "
+            "uploaded_at, is_deleted, updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0,CURRENT_TIMESTAMP)",
+            (title, description, subject, level, file_path, len(raw),
              download_default, uploader_id),
         )
         db.commit()
@@ -64871,7 +64947,7 @@ def api_curriculum_update(file_id):
     rd = dict(row)
     sets = []; params = []
     audit_old = {}; audit_new = {}
-    for k in ("title", "description", "download_default"):
+    for k in ("title", "description", "subject", "level", "download_default"):
         if k in body:
             v = (body.get(k) or "").strip()
             if k == "title" and not v:
@@ -64879,10 +64955,14 @@ def api_curriculum_update(file_id):
                     "العنوان مطلوب"}), 400
             if k == "download_default" and v not in ("allowed", "view_only"):
                 v = "allowed"
+            if k == "subject" and v and v not in ("English", "Math", "Other"):
+                v = "Other"
+            if k == "level" and v and len(v) > 80:
+                v = v[:80]
             if v != (rd.get(k) or ""):
                 audit_old[k] = rd.get(k) or ""
                 audit_new[k] = v
-                sets.append(k + "=?"); params.append(v)
+                sets.append(k + "=?"); params.append(v if v else None)
     if sets:
         sets.append("updated_at=CURRENT_TIMESTAMP")
         params.append(int(file_id))
