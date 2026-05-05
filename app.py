@@ -71899,20 +71899,9 @@ function evdRenderMsg(){
   var lcp = document.getElementById('evd-msg-link-copy');
   if (lcp){
     lcp.addEventListener('click', function(){
-      var u = url;
-      if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(u).then(function(){
-          var ok = document.getElementById('evd-msg-link-ok');
-          if (ok){ ok.classList.add('is-show'); setTimeout(function(){ ok.classList.remove('is-show'); }, 1400); }
-          evdToast('تم نسخ الرابط', 'success');
-        });
-      } else {
-        var ta = document.createElement('textarea');
-        ta.value = u; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch(_){}
-        document.body.removeChild(ta);
-        evdToast('تم نسخ الرابط', 'success');
-      }
+      evdMsgCopyText(url, lcp);
+      var ok = document.getElementById('evd-msg-link-ok');
+      if (ok){ ok.classList.add('is-show'); setTimeout(function(){ ok.classList.remove('is-show'); }, 1400); }
     });
   }
   var lwa = document.getElementById('evd-msg-link-wa');
@@ -71979,11 +71968,42 @@ function evdMsgGenerate(){
   });
 }
 
+function evdMsgCopyText(txt, btnEl){
+  function done(){
+    evdToast('تم النسخ', 'success');
+    if (btnEl){
+      var orig = btnEl.textContent;
+      btnEl.textContent = '✓ نُسخ';
+      btnEl.style.background = '#1D9E75';
+      btnEl.style.color = '#fff';
+      btnEl.style.borderColor = '#1D9E75';
+      setTimeout(function(){
+        btnEl.textContent = orig;
+        btnEl.style.background = '';
+        btnEl.style.color = '';
+        btnEl.style.borderColor = '';
+      }, 1200);
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, function(){ done(); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(_){}
+    document.body.removeChild(ta);
+    done();
+  }
+}
+
 function evdMsgRenderList(rows){
   var wrap = document.getElementById('evd-msg-list-wrap');
   if (!wrap) return;
   if (!rows.length){
-    wrap.innerHTML = '<div class="evd-msg-card"><div style="text-align:center;color:#888;padding:14px;">— لا توجد مستلمات في هذه الفئة —</div></div>';
+    var cause = (REG_DATA && REG_DATA.length === 0)
+      ? 'لا توجد طالبات مسجلات في هذه الرحلة بعد. أضيفي طالبات من تبويب «الطالبات» أولاً.'
+      : 'لا توجد مستلمات في هذه الفئة. جربي تغيير المستلمات أعلاه.';
+    wrap.innerHTML = '<div class="evd-msg-card" data-k="send"><div style="text-align:center;color:#888;padding:24px 14px;"><div style="font-size:2.6rem;margin-bottom:6px;">📭</div><div style="font-weight:800;color:#444;">' + evdEsc(cause) + '</div></div></div>';
     return;
   }
   var rowsHTML = rows.map(function(m, i){
@@ -71995,25 +72015,33 @@ function evdMsgRenderList(rows){
          + '  <button type="button" class="cp" data-cp="' + i + '">📋 نسخ النص</button>'
          + '</div>';
   }).join('');
+  // Top toolbar — copy all phones (comma-joined) for bulk paste.
+  var phones = rows.map(function(m){ return m.parent_phone || ''; }).filter(function(p){ return !!p; });
+  var bulkBar = ''
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:8px 10px;background:#f6faff;border-radius:10px;">'
+    + '  <span style="font-weight:800;color:#0d47a1;font-size:.86rem;">' + rows.length + ' مستلمة • ' + phones.length + ' هاتف صالح</span>'
+    + '  <button type="button" class="cp" id="evd-msg-copy-phones">📋 نسخ كل الأرقام</button>'
+    + '</div>';
   wrap.innerHTML = '<div class="evd-msg-card" data-k="send">'
-                 + '  <h3>📋 الرسائل المُولّدة (' + rows.length + ')</h3>'
+                 + '  <h3>📋 الرسائل المُولّدة</h3>'
+                 + bulkBar
                  + '  <div class="evd-msg-list">' + rowsHTML + '</div>'
                  + '</div>';
+  // Smooth scroll into view so the user sees the result immediately.
+  try { wrap.scrollIntoView({behavior: 'smooth', block: 'start'}); } catch(_){}
   wrap.querySelectorAll('button[data-cp]').forEach(function(b){
     b.addEventListener('click', function(){
       var idx = parseInt(b.getAttribute('data-cp'), 10);
       var txt = (rows[idx] && rows[idx].rendered_text) || '';
-      if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(txt).then(function(){ evdToast('تم نسخ النص', 'success'); });
-      } else {
-        var ta = document.createElement('textarea');
-        ta.value = txt; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch(_){}
-        document.body.removeChild(ta);
-        evdToast('تم نسخ النص', 'success');
-      }
+      evdMsgCopyText(txt, b);
     });
   });
+  var cpAll = document.getElementById('evd-msg-copy-phones');
+  if (cpAll){
+    cpAll.addEventListener('click', function(){
+      evdMsgCopyText(phones.join(', '), cpAll);
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function(){
