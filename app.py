@@ -1090,6 +1090,16 @@ def init_db():
                "ON ev_registrations(event_id, payment_status)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_reg_attendance "
                "ON ev_registrations(event_id, attendance_status)")
+    # Per-org WhatsApp message templates for events (7.3).
+    db.execute("""CREATE TABLE IF NOT EXISTS ev_msg_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT,
+        message TEXT NOT NULL,
+        audience TEXT DEFAULT 'all',
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     db.commit()
     db.close()
 
@@ -6660,6 +6670,60 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("ev_registrations_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── ev_msg_templates_v1: per-org WhatsApp message templates (7.3).
+    db2.execute("""CREATE TABLE IF NOT EXISTS ev_msg_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT,
+        message TEXT NOT NULL,
+        audience TEXT DEFAULT 'all',
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    if "ev_msg_templates_v1" not in applied:
+        # Seed the four canonical defaults idempotently.
+        _seed_tpls = [
+            ("📢", "إعلان الرحلة",
+             "السلام عليكم، نعلنكم عن رحلة {اسم_الرحلة} يوم {التاريخ} للسعر {السعر} د.ب. للتسجيل: {رابط_التسجيل}"),
+            ("💰", "تذكير بالدفع",
+             "السلام عليكم، نذكركم بدفع رسوم رحلة {اسم_الرحلة} ({السعر} د.ب) قبل {التاريخ}. شكراً"),
+            ("⏰", "تذكير قبل يوم",
+             "السلام عليكم، تذكير بأن رحلة {اسم_الرحلة} غداً {التاريخ} الساعة {وقت_الانطلاق}. التجمع في {نقطة_التجمع}. شكراً"),
+            ("🙏", "رسالة شكر بعد الرحلة",
+             "السلام عليكم، شكراً جزيلاً لمشاركة {اسم_الطالبة} في رحلة {اسم_الرحلة}. كانت رحلة ممتعة!"),
+        ]
+        for _icon, _nm, _msg in _seed_tpls:
+            try:
+                # Skip if a template with this name already exists.
+                _ex = db2.execute(
+                    "SELECT id FROM ev_msg_templates WHERE name = ? LIMIT 1",
+                    (_nm,)).fetchone()
+                if _ex:
+                    continue
+                db2.execute(
+                    "INSERT INTO ev_msg_templates(name, icon, message, "
+                    "                             audience, is_default) "
+                    "VALUES(?,?,?,?,1)",
+                    (_nm, _icon, _msg, "all"))
+            except Exception:
+                pass
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("ev_msg_templates", "قوالب رسائل الرحلات"),
+            )
+        except Exception:
+            try:
+                db2.execute("INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                            ("ev_msg_templates", "قوالب رسائل الرحلات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("ev_msg_templates_v1",))
             db2.commit()
         except Exception: pass
 
@@ -30128,6 +30192,7 @@ BUILT_IN_TABLE_LABELS = {
     "ev_items":          "أدوات الرحلات",
     "ev_tasks":          "مهام الرحلات",
     "ev_registrations":  "تسجيل الرحلات",
+    "ev_msg_templates":  "قوالب رسائل الرحلات",
 }
 
 # Common column identifier → Arabic label. Used for tables that have no
@@ -32549,6 +32614,7 @@ _TBL_AUDIT_FEATURE = {
     "ev_items":             ("أدوات الرحلات",                   "نظام الفعاليات والرحلات v2"),
     "ev_tasks":             ("مهام الرحلات",                    "نظام الفعاليات والرحلات v2"),
     "ev_registrations":     ("تسجيل الرحلات",                   "نظام الفعاليات والرحلات v2"),
+    "ev_msg_templates":     ("قوالب رسائل الرحلات",             "نظام الفعاليات والرحلات v2"),
 }
 _TBL_AUDIT_SYSTEM = {
     "users":               "حسابات المستخدمين والصلاحيات",
@@ -66756,6 +66822,161 @@ def events_public_register_post(token):
         "ok":   True,
         "html": _events_public_render_thanks(ev.get("name") or "رحلة"),
     })
+
+
+# ── Message templates + WA-link rendering (7.3) ────────────────
+def _events_msg_event_exists(db, eid):
+    try:
+        row = db.execute(
+            "SELECT * FROM ev_events WHERE id = ? AND is_deleted = 0",
+            (eid,)).fetchone()
+    except Exception:
+        return None
+    return dict(row) if row else None
+
+
+def _events_msg_format_date(iso):
+    s = (iso or "").strip()
+    if not s or len(s) < 10:
+        return ""
+    try:
+        months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو",
+                  "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+        y, m, d = s[:10].split("-")
+        return "%d %s %s" % (int(d), months[int(m)-1], y)
+    except Exception:
+        return s
+
+
+def _events_msg_render_text(template_text, ev, reg):
+    """Replace {variable} placeholders with event + per-recipient
+    values. Variables are Arabic-named to match what the template
+    seeds use."""
+    if not template_text:
+        return ""
+    # Build the public registration URL only once per event.
+    base = (request.url_root or "").rstrip("/")
+    tok = (ev.get("registration_token") or "").strip()
+    reg_url = (base + "/events/register/" + tok) if tok else ""
+    price = float(ev.get("price_per_student") or 0)
+    price_lbl = ("%.3f" % price) if price > 0 else "مجاناً"
+    repls = {
+        "{اسم_الطالبة}":   (reg.get("student_name") or "").strip(),
+        "{اسم_الأم}":      (reg.get("parent_name")  or "").strip(),
+        "{اسم_الرحلة}":    (ev.get("name") or "").strip(),
+        "{التاريخ}":        _events_msg_format_date(ev.get("event_date")),
+        "{السعر}":          price_lbl,
+        "{وقت_الانطلاق}":  (ev.get("departure_time") or "").strip(),
+        "{نقطة_التجمع}":   (ev.get("meeting_point") or ev.get("destination") or "").strip(),
+        "{رابط_التسجيل}":   reg_url,
+    }
+    out = template_text
+    for k, v in repls.items():
+        out = out.replace(k, v or "")
+    return out
+
+
+def _events_msg_wa_link(phone, text):
+    """Build a wa.me link. Bahrain-default the country code if the
+    digits look like a local 8-digit number."""
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    if not digits:
+        return ""
+    if len(digits) == 8:
+        digits = "973" + digits
+    if len(digits) < 8:
+        return ""
+    from urllib.parse import quote as _q
+    return "https://wa.me/" + digits + "?text=" + _q(text or "")
+
+
+@app.route('/api/admin/events/<int:eid>/messages/templates', methods=['GET'])
+@login_required
+def api_admin_events_msg_templates(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    if not _events_msg_event_exists(db, eid):
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    try:
+        rows = db.execute(
+            "SELECT id, name, icon, message, audience, is_default "
+            "FROM ev_msg_templates ORDER BY is_default DESC, id ASC"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        rd = dict(r)
+        out.append({
+            "id":         rd.get("id"),
+            "name":       rd.get("name") or "",
+            "icon":       rd.get("icon") or "💬",
+            "message":    rd.get("message") or "",
+            "audience":   rd.get("audience") or "all",
+            "is_default": bool(rd.get("is_default")),
+        })
+    return jsonify({"ok": True, "templates": out})
+
+
+@app.route('/api/admin/events/<int:eid>/messages/render', methods=['POST'])
+@login_required
+def api_admin_events_msg_render(eid):
+    user = session.get("user") or {}
+    if not _events_can_admin(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    ev = _events_msg_event_exists(db, eid)
+    if not ev:
+        return jsonify({"ok": False, "error": "الرحلة غير موجودة"}), 404
+    d = request.get_json(silent=True) or {}
+    custom = (d.get("custom_text") or "").strip()
+    template_id = d.get("template_id")
+    audience = (d.get("audience") or "all").strip().lower()
+    template_text = custom
+    # If no custom text but a template_id was sent, look it up.
+    if not template_text and template_id:
+        try:
+            r = db.execute(
+                "SELECT message FROM ev_msg_templates WHERE id = ?",
+                (int(template_id),)).fetchone()
+            if r:
+                template_text = (dict(r).get("message") or "").strip()
+        except Exception:
+            pass
+    if not template_text:
+        return jsonify({"ok": False, "error": "نص الرسالة مطلوب"}), 400
+    # Filter the audience.
+    try:
+        regs = db.execute(
+            "SELECT * FROM ev_registrations "
+            "WHERE event_id = ? AND is_deleted = 0",
+            (eid,)).fetchall()
+    except Exception:
+        regs = []
+    audience_filter = {
+        "all":     lambda r: True,
+        "unpaid":  lambda r: (r.get("payment_status") or "pending") in ("pending", "partial"),
+        "paid":    lambda r: (r.get("payment_status") or "") == "paid",
+        "present": lambda r: (r.get("attendance_status") or "") in ("present", "late"),
+        "absent":  lambda r: (r.get("attendance_status") or "") == "absent",
+    }.get(audience, lambda r: True)
+    out = []
+    for row in regs:
+        rd = dict(row)
+        if not audience_filter(rd):
+            continue
+        text = _events_msg_render_text(template_text, ev, rd)
+        out.append({
+            "rid":          rd.get("id"),
+            "student_name": (rd.get("student_name") or "").strip(),
+            "parent_name":  (rd.get("parent_name")  or "").strip(),
+            "parent_phone": (rd.get("parent_phone") or "").strip(),
+            "rendered_text": text,
+            "wa_link":       _events_msg_wa_link(rd.get("parent_phone"), text),
+        })
+    return jsonify({"ok": True, "messages": out, "count": len(out)})
 
 
 # ── Tasks (5.3) ────────────────────────────────────────────────
