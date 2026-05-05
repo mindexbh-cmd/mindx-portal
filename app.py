@@ -864,6 +864,41 @@ def init_db():
         read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, student_id)
     )""")
+    # ── curriculum_v2: مكتبة المناهج (rebuild). Admin/manager/allowlist
+    # uploaders attach PDFs to specific groups + audience flags
+    # (teachers / parents) with per-audience download permission.
+    # File binary is stored under ./uploads/curriculum/<uuid>.pdf;
+    # the UUID is also the curriculum_files.file_uuid value so the
+    # disk filename and DB row are 1-to-1. curriculum_file_groups is
+    # the many-to-many join to student_groups.group_name (string,
+    # not FK — group_name is the human-readable identifier the rest
+    # of the codebase already keys on).
+    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_uuid TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_size_bytes INTEGER DEFAULT 0,
+        audience_teachers INTEGER DEFAULT 0,
+        audience_parents INTEGER DEFAULT 0,
+        teacher_can_download INTEGER DEFAULT 1,
+        parent_can_download INTEGER DEFAULT 1,
+        uploaded_by INTEGER,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_file_groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        group_name TEXT NOT NULL,
+        UNIQUE(file_id, group_name)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_fg_file "
+               "ON curriculum_file_groups(file_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_fg_group "
+               "ON curriculum_file_groups(group_name)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
+               "ON curriculum_files(is_deleted)")
     # ── violations_v1: نظام المخالفات — admin-only registration of student
     # behaviour incidents. 12 violation types auto-classified into
     # light/medium/severe in `severity`, place ∈ {classroom/break/center},
@@ -6314,6 +6349,45 @@ if True:
                 print("[curriculum-cleanup] curriculum_uploads_cleanup_v1 DONE",
                       file=_sys.stderr)
             except Exception: pass
+
+    # ── curriculum_v2: rebuilt مكتبة المناهج. See init_db() above for
+    # the canonical CREATE. CREATE TABLE IF NOT EXISTS + indices are
+    # naturally idempotent so they run unconditionally; the tag insert
+    # is gated.
+    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_uuid TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_size_bytes INTEGER DEFAULT 0,
+        audience_teachers INTEGER DEFAULT 0,
+        audience_parents INTEGER DEFAULT 0,
+        teacher_can_download INTEGER DEFAULT 1,
+        parent_can_download INTEGER DEFAULT 1,
+        uploaded_by INTEGER,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_file_groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        group_name TEXT NOT NULL,
+        UNIQUE(file_id, group_name)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_fg_file "
+                    "ON curriculum_file_groups(file_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_fg_group "
+                    "ON curriculum_file_groups(group_name)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
+                    "ON curriculum_files(is_deleted)")
+    except Exception: pass
+    if "curriculum_v2" not in applied:
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("curriculum_v2",))
+            db2.commit()
+        except Exception: pass
 
     # ── violations_v1: نظام المخالفات — admin-only behaviour-incident
     # registry. See init_db() above for the canonical CREATE. Mirror
@@ -28880,6 +28954,7 @@ _TRUNCATE_ALLOWED = {
 _TRUNCATE_PROTECTED = {
     "users", "students", "taqseet", "parent_receipts",
     "audit_log", "backup_log",
+    "curriculum_files", "curriculum_file_groups",
     "docs_pages", "docs_screenshots",
     "settings", "schema_migrations", "table_labels",
 }
@@ -32831,6 +32906,8 @@ _TBL_AUDIT_FEATURE = {
     "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
     "parent_messages":     ("رسائل المعلمة لأولياء الأمور",  "ماذا تريد أن يعرف ولي الأمر"),
     "parent_message_reads": ("اطّلاع أولياء الأمور على الرسائل", "ماذا تريد أن يعرف ولي الأمر"),
+    "curriculum_files":     ("ملفات المنهج",                  "مكتبة المناهج"),
+    "curriculum_file_groups": ("مجموعات المنهج",              "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
