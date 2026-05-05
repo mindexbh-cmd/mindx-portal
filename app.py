@@ -25994,9 +25994,18 @@ def _grp_norm(s):
     out = "".join(" " if (c.isspace() or ord(c) == 0x00A0) else c for c in out)
     out = " ".join(out.split())
     # Arabic fold: alef variants → ا, ى → ي, ة → ه, strip diacritics.
+    # Also fold digit scripts to ASCII so "مجموعة 01" matches
+    # "مجموعة ٠١" (Arabic-Indic) and "مجموعة ۰۱" (Persian-Indic) —
+    # real-world Excel imports mix these. The dropdown still shows
+    # whatever the user typed; comparison treats them as equal.
     # Use translate for speed.
     _AR_FOLD = {ord("أ"): "ا", ord("إ"): "ا", ord("آ"): "ا",
                 ord("ى"): "ي", ord("ة"): "ه"}
+    # Arabic-Indic digits U+0660..U+0669 → 0..9
+    for _i in range(10):
+        _AR_FOLD[0x0660 + _i] = chr(0x30 + _i)
+        # Eastern-Arabic-Indic (Persian) digits U+06F0..U+06F9 → 0..9
+        _AR_FOLD[0x06F0 + _i] = chr(0x30 + _i)
     out = out.translate(_AR_FOLD)
     out = "".join(c for c in out if not (0x064B <= ord(c) <= 0x0652))
     return out.casefold()
@@ -64407,10 +64416,27 @@ def _curriculum_user_targets(db, user):
     elif role in ("student", "parent"):
         if my_id:
             targets.append(("parent", str(my_id)))
-        sid = 0
-        try: sid = int(user.get("linked_student_id") or 0)
-        except Exception: sid = 0
-        if sid:
+        # Collect every linked-student id. role='student' uses
+        # linked_student_id (single int). role='parent' uses
+        # linked_parent_for (JSON array of student ids) — without this
+        # branch, real parent accounts saw zero group targets and
+        # group-assigned books never appeared in the parent portal.
+        sids = set()
+        try:
+            sid_one = int(user.get("linked_student_id") or 0)
+            if sid_one: sids.add(sid_one)
+        except Exception: pass
+        try:
+            raw_parent_for = user.get("linked_parent_for") or ""
+            if raw_parent_for:
+                parsed = json.loads(raw_parent_for) if isinstance(raw_parent_for, str) else raw_parent_for
+                if isinstance(parsed, list):
+                    for x in parsed:
+                        try: sids.add(int(x))
+                        except Exception: pass
+        except Exception: pass
+        for sid in sids:
+            if not sid: continue
             targets.append(("student", str(sid)))
             try:
                 srow = db.execute(
