@@ -37936,10 +37936,14 @@ table.tbl tr:hover td{background:#faf6ff;}
   var SEARCH_TIMER = null;
   function loadList(){
     var q = document.getElementById('cu-search').value || '';
-    fetch('/api/curriculum/list' + (q ? ('?search=' + encodeURIComponent(q)) : ''),
-          {credentials:'include'})
-      .then(function(r){return r.json();})
-      .then(function(j){
+    var listP = fetch('/api/curriculum/list' + (q ? ('?search=' + encodeURIComponent(q)) : ''),
+                      {credentials:'include'}).then(function(r){return r.json();});
+    var statsP = fetch('/api/curriculum/stats', {credentials:'include'})
+      .then(function(r){return r.json();}).catch(function(){return {ok:false};});
+    Promise.all([listP, statsP])
+      .then(function(res){
+        var j = res[0]; var sj = res[1] || {};
+        var stats = (sj && sj.ok && sj.stats) ? sj.stats : {};
         var box = document.getElementById('cu-list-box');
         if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
         var arr = j.files || [];
@@ -37950,7 +37954,7 @@ table.tbl tr:hover td{background:#faf6ff;}
         if(!arr.length){ box.innerHTML = '<div class="empty">لا توجد ملفات حتى الآن. اضغط "رفع منهج جديد" للبدء.</div>'; return; }
         var html = '<table class="tbl"><thead><tr>'+
           '<th>العنوان</th><th>الوصف</th><th>الحجم</th><th>المُستفيدون</th>'+
-          '<th>تاريخ الرفع</th><th>إجراءات</th></tr></thead><tbody>';
+          '<th>الاستخدام</th><th>تاريخ الرفع</th><th>إجراءات</th></tr></thead><tbody>';
         arr.forEach(function(e){
           var s = e.assignment_summary || {};
           var pills = '';
@@ -37963,11 +37967,19 @@ table.tbl tr:hover td{background:#faf6ff;}
           var meta = '';
           if(e.subject) meta += ' <span class="size-pill" style="background:#e3f2fd;color:#0d47a1;border-color:#bbdefb;">'+escapeHtml(e.subject)+'</span>';
           if(e.level)   meta += ' <span class="size-pill" style="background:#fff8e1;color:#7c5e00;border-color:#ffe082;">'+escapeHtml(e.level)+'</span>';
+          var st = stats[String(e.id)] || {views:0, downloads:0, last_accessed_at:''};
+          var usage = '';
+          usage += '<span class="size-pill" style="background:#e8f5e9;color:#1b5e20;border-color:#c8e6c9;">👁️ '+(st.views||0)+'</span> ';
+          usage += '<span class="size-pill" style="background:#fff3e0;color:#bf360c;border-color:#ffccbc;">⬇️ '+(st.downloads||0)+'</span>';
+          if(st.last_accessed_at){
+            usage += '<div style="font-size:11px;color:#777;margin-top:3px;">آخر اطّلاع: '+escapeHtml(String(st.last_accessed_at).slice(0,16))+'</div>';
+          }
           html += '<tr>'+
             '<td data-label="العنوان"><b>'+escapeHtml(e.title)+'</b>'+lock+meta+'</td>'+
             '<td data-label="الوصف">'+escapeHtml((e.description||'').slice(0,80))+((e.description||'').length>80?'...':'')+'</td>'+
             '<td data-label="الحجم"><span class="size-pill">'+fmtSize(e.file_size_bytes)+'</span></td>'+
             '<td data-label="المُستفيدون">'+pills+'</td>'+
+            '<td data-label="الاستخدام">'+usage+'</td>'+
             '<td data-label="تاريخ الرفع">'+escapeHtml((e.uploaded_at||'').slice(0,16))+'</td>'+
             '<td data-label="إجراءات">'+
               '<button class="act-btn edit" onclick="cuOpenEdit('+e.id+')">تعديل</button>'+
@@ -64824,6 +64836,47 @@ def api_curriculum_list():
         out.append(_curriculum_row_to_dict(
             r, current_user_can_download=can_download, counts=counts))
     return jsonify({"ok": True, "files": out, "count": len(out)})
+
+
+@app.route('/api/curriculum/stats', methods=['GET'])
+@login_required
+def api_curriculum_stats():
+    """Aggregate view/download counts + last-accessed timestamp per file
+    from curriculum_access_log. Admin/manager only — same gate as the
+    upload/manage UI. Returns {ok, stats: {<file_id>: {views, downloads,
+    last_accessed_at}}}."""
+    user = session.get("user") or {}
+    if not _curriculum_can_manage(user):
+        return jsonify({"ok": False, "error": "للأدمن أو المدير فقط"}), 403
+    db = get_db()
+    out = {}
+    try:
+        rows = db.execute(
+            "SELECT file_id, "
+            "SUM(CASE WHEN action='view' THEN 1 ELSE 0 END) AS views, "
+            "SUM(CASE WHEN action='download' THEN 1 ELSE 0 END) AS downloads, "
+            "MAX(accessed_at) AS last_accessed_at "
+            "FROM curriculum_access_log GROUP BY file_id"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    for r in rows:
+        rd = dict(r)
+        try: fid = int(rd.get("file_id") or 0)
+        except Exception: continue
+        if not fid: continue
+        try: v = int(rd.get("views") or 0)
+        except Exception: v = 0
+        try: d = int(rd.get("downloads") or 0)
+        except Exception: d = 0
+        last_raw = rd.get("last_accessed_at")
+        last = ""
+        if last_raw is not None:
+            try: last = str(last_raw)[:19]
+            except Exception: last = ""
+        out[str(fid)] = {"views": v, "downloads": d,
+                         "last_accessed_at": last}
+    return jsonify({"ok": True, "stats": out})
 
 
 def _curriculum_send(file_id, *, as_attachment, action_label):
