@@ -66381,10 +66381,24 @@ def _events_reg_target_groups(ev_row):
 
 
 def _events_reg_available_students(db, eid, ev_row):
-    """List of students from the event's target groups who aren't
-    already registered (or whose registration is soft-deleted).
-    Falls back to ALL students when the event has no target groups
-    yet, so an admin starting from scratch can still pick names."""
+    """Build the student picker payload for the registration modal.
+
+    Returns:
+      {
+        "students":                list[{id,name,group_name,parent_name,parent_phone}],
+        "target_groups_set":       bool — were target groups configured?
+        "target_group_names":      list[str] — for the UI's "X, Y" label
+        "already_registered_count": int — context for empty-state copy
+      }
+
+    Behavior:
+      - If target_group_ids is set → only return students from those
+        groups (excluding already-registered).
+      - If no target groups set → return EMPTY list with target_groups_set
+        =false so the UI can prompt the admin to set them. (This is the
+        hotfix-2 change — the old behavior returned ALL students which
+        was confusing.)
+    """
     target_ids = _events_reg_target_groups(ev_row)
     # Resolve target_group_ids to group_name strings (legacy table
     # design uses group_name as the joinable token from the
@@ -66412,21 +66426,26 @@ def _events_reg_available_students(db, eid, ev_row):
         already_ids = {int(dict(r).get("student_id") or 0) for r in already}
     except Exception:
         already_ids = set()
+    # No target groups → return empty list so the UI nags the admin.
+    if not group_names:
+        return {
+            "students":                 [],
+            "target_groups_set":        False,
+            "target_group_names":       [],
+            "already_registered_count": len(already_ids),
+        }
     # The students table has: student_name, group_name_student,
     # mother_phone, father_phone, other_phone — no `parent_name`
     # column. Surface the best-available phone (mother → father →
     # other) and leave parent_name blank for the admin to fill in.
+    ph = ",".join(["?"] * len(group_names))
     sql = ("SELECT id, student_name, group_name_student, "
            "       mother_phone, father_phone, other_phone "
-           "FROM students")
-    params = []
-    if group_names:
-        ph = ",".join(["?"] * len(group_names))
-        sql += " WHERE TRIM(group_name_student) IN (" + ph + ")"
-        params = list(group_names)
-    sql += " ORDER BY student_name"
+           "FROM students "
+           "WHERE TRIM(group_name_student) IN (" + ph + ") "
+           "ORDER BY student_name")
     try:
-        rows = db.execute(sql, tuple(params)).fetchall()
+        rows = db.execute(sql, tuple(group_names)).fetchall()
     except Exception:
         rows = []
     out = []
@@ -66445,7 +66464,12 @@ def _events_reg_available_students(db, eid, ev_row):
             "parent_name":  "",
             "parent_phone": phone,
         })
-    return out
+    return {
+        "students":                 out,
+        "target_groups_set":        True,
+        "target_group_names":       group_names,
+        "already_registered_count": len(already_ids),
+    }
 
 
 @app.route('/api/admin/events/<int:eid>/registrations', methods=['GET'])
@@ -66473,12 +66497,15 @@ def api_admin_events_reg_list(eid):
         out,
         expected_price=ev.get("price_per_student") or 0,
         capacity=ev.get("max_students") or 0)
-    available = _events_reg_available_students(db, eid, ev)
+    avail = _events_reg_available_students(db, eid, ev)
     return jsonify({
-        "ok":                 True,
-        "registrations":      out,
-        "summary":            summary,
-        "available_students": available,
+        "ok":                       True,
+        "registrations":            out,
+        "summary":                  summary,
+        "available_students":       avail.get("students") or [],
+        "target_groups_set":        bool(avail.get("target_groups_set")),
+        "target_group_names":       avail.get("target_group_names") or [],
+        "already_registered_count": int(avail.get("already_registered_count") or 0),
     })
 
 
@@ -69871,6 +69898,15 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-mode{display:flex;gap:6px;margin-bottom:12px;background:#eef0f3;padding:4px;border-radius:10px;}
   .evd-reg-mode button{flex:1;background:transparent;border:none;padding:8px 12px;border-radius:8px;font-weight:800;cursor:pointer;color:#666;font-size:.88rem;}
   .evd-reg-mode button.is-on{background:#fff;color:#1D9E75;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+  /* Hint card inside the registration modal (hotfix-2) */
+  .evd-reg-hint{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:14px;border-radius:12px;background:#fafbfc;border:1.5px dashed #d3d8de;}
+  .evd-reg-hint.warn{background:#fff8e1;border-color:#ffcc80;}
+  .evd-reg-hint.ok  {background:#e6f7ee;border-color:#c6ecd6;}
+  .evd-reg-hint .em{font-size:2rem;align-self:start;}
+  .evd-reg-hint .body .ttl{font-weight:900;color:#444;font-size:.94rem;margin-bottom:4px;}
+  .evd-reg-hint .body .sub{font-size:.84rem;color:#666;line-height:1.5;}
+  .evd-reg-hint.warn .body .ttl{color:#bf360c;}
+  .evd-reg-hint.ok   .body .ttl{color:#1D9E75;}
   /* Edit modal sections (6.3) */
   .evd-reg-section{margin-bottom:14px;padding:12px 14px;background:#fafbfc;border-radius:10px;border-right:3px solid var(--rsec,#1D9E75);}
   .evd-reg-section[data-sec="identity"]{--rsec:#1D9E75;}
@@ -72155,6 +72191,8 @@ function evdSubmitEdit(e){
 var REG_DATA = [];
 var REG_SUMMARY = null;
 var REG_AVAILABLE = [];
+var REG_TARGET_SET = false;          // hotfix-2: target_groups_set flag
+var REG_TARGET_GROUP_NAMES = [];     // hotfix-2: list of target group names
 var REG_LOADED = false;
 var REG_SEARCH = '';
 var REG_FILTER = 'all';     // all / paid / unpaid / present / absent
@@ -72182,10 +72220,12 @@ function evdLoadRegs(){
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
-      REG_DATA      = j.registrations || [];
-      REG_SUMMARY   = j.summary || {};
-      REG_AVAILABLE = j.available_students || [];
-      REG_LOADED    = true;
+      REG_DATA              = j.registrations || [];
+      REG_SUMMARY           = j.summary || {};
+      REG_AVAILABLE         = j.available_students || [];
+      REG_TARGET_SET        = !!j.target_groups_set;
+      REG_TARGET_GROUP_NAMES = j.target_group_names || [];
+      REG_LOADED            = true;
       evdRenderRegs();
       evdRefreshHeaderChips();
       // Per-unit costs depend on registration / attendee counts, so
@@ -72382,14 +72422,77 @@ function evdOpenRegAdd(){
   document.getElementById('rf-paynote').value = '';
   document.getElementById('rf-att').value = 'pending';
   document.getElementById('rf-attnote').value = '';
-  evdRegSetMode('list');
-  // Populate the picker dropdown.
-  var pick = document.getElementById('rf-pick');
-  pick.innerHTML = '<option value="">— اختاري —</option>';
+  // Pick the right initial mode based on what's available:
+  // - target groups not set → manual only, with a hint
+  // - target groups set but no available students → manual with hint
+  // - target groups set + students available → list mode (default)
+  var initialMode = (REG_TARGET_SET && REG_AVAILABLE.length > 0) ? 'list' : 'manual';
+  evdRegSetMode(initialMode);
+  evdRegRenderListHint();
+  document.getElementById('evd-reg-mb').classList.add('is-open');
+  setTimeout(function(){
+    var f = (initialMode === 'list')
+      ? document.getElementById('rf-pick')
+      : document.getElementById('rf-name');
+    if (f) f.focus();
+  }, 50);
+}
+
+function evdRegRenderListHint(){
+  // Re-renders the contents of #rf-list-row based on the current
+  // REG_TARGET_SET / REG_AVAILABLE state.
+  var row = document.getElementById('rf-list-row');
+  if (!row) return;
+  if (!REG_TARGET_SET){
+    row.innerHTML = '<div class="evd-reg-hint warn">'
+                  + '<div class="em">⚠️</div>'
+                  + '<div class="body">'
+                  + '  <div class="ttl">لم يتم تحديد المجموعات المستهدفة لهذه الرحلة</div>'
+                  + '  <div class="sub">لاستخدام قائمة الاختيار، حددي المجموعات أولاً من تبويب «المعلومات» → ⚙️ تعديل.</div>'
+                  + '  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'
+                  + '    <button type="button" class="evd-btn" id="rf-goto-edit">⚙️ الانتقال للتعديل</button>'
+                  + '    <button type="button" class="evd-btn" id="rf-stay-manual">✍️ متابعة يدوياً</button>'
+                  + '  </div>'
+                  + '</div>'
+                  + '</div>';
+    var ge = document.getElementById('rf-goto-edit');
+    if (ge) ge.addEventListener('click', function(){ evdCloseReg(); evdOpenEdit(); });
+    var sm = document.getElementById('rf-stay-manual');
+    if (sm) sm.addEventListener('click', function(){ evdRegSetMode('manual'); });
+    return;
+  }
+  if (!REG_AVAILABLE.length){
+    var groupChips = (REG_TARGET_GROUP_NAMES || []).map(function(n){
+      return '<span class="evd-info-chip">' + evdEsc(n) + '</span>';
+    }).join(' ');
+    row.innerHTML = '<div class="evd-reg-hint ok">'
+                  + '<div class="em">✅</div>'
+                  + '<div class="body">'
+                  + '  <div class="ttl">المجموعات المحددة:</div>'
+                  + '  <div class="evd-info-chips" style="margin:4px 0 8px;">' + groupChips + '</div>'
+                  + '  <div class="sub">📭 جميع طالبات هذه المجموعات مسجلات بالفعل في هذه الرحلة.</div>'
+                  + '  <div style="margin-top:8px;">'
+                  + '    <button type="button" class="evd-btn evd-btn-edit" id="rf-go-manual">➕ التبديل للإضافة اليدوية</button>'
+                  + '  </div>'
+                  + '</div>'
+                  + '</div>';
+    var gm = document.getElementById('rf-go-manual');
+    if (gm) gm.addEventListener('click', function(){ evdRegSetMode('manual'); });
+    return;
+  }
+  // Happy path: populate the dropdown.
+  var groupLbl = (REG_TARGET_GROUP_NAMES || []).join('، ');
+  var optsHTML = '<option value="">— اختاري —</option>';
   REG_AVAILABLE.forEach(function(s){
     var lbl = s.name + (s.group_name ? ' — ' + s.group_name : '');
-    pick.innerHTML += '<option value="' + (s.id|0) + '">' + evdEsc(lbl) + '</option>';
+    optsHTML += '<option value="' + (s.id|0) + '">' + evdEsc(lbl) + '</option>';
   });
+  row.innerHTML = '<label for="rf-pick">اختاري الطالبة</label>'
+                + '<select id="rf-pick">' + optsHTML + '</select>'
+                + '<div style="font-size:.78rem;color:#1D9E75;margin-top:4px;font-weight:700;">'
+                + '✅ ' + REG_AVAILABLE.length + ' طالبة متاحة من المجموعات: ' + evdEsc(groupLbl)
+                + '</div>';
+  var pick = document.getElementById('rf-pick');
   pick.onchange = function(){
     var sid = parseInt(pick.value || '0', 10);
     if (!sid) return;
@@ -72400,8 +72503,6 @@ function evdOpenRegAdd(){
     document.getElementById('rf-phone').value  = s.parent_phone || '';
     document.getElementById('rf-group').value  = s.group_name || '';
   };
-  document.getElementById('evd-reg-mb').classList.add('is-open');
-  setTimeout(function(){ document.getElementById('rf-pick').focus(); }, 50);
 }
 
 function evdOpenRegEdit(r){
