@@ -12418,7 +12418,12 @@ function dhLoadEventsNav(){
     }
     if (warning > 0)  tipBits.push('⚠️ ' + warning + ' تنبيهات تحتاج متابعة');
     if (critical > 0) tipBits.push('🚨 ' + critical + ' عاجل');
-    var tip = tipBits.join('\n');
+    // \\n must be doubly escaped here because HOME_HTML is a non-raw
+    // Python triple-quoted string — a single backslash-n would be
+    // interpreted by Python as a real newline and break the JS string
+    // literal at parse time, killing every function defined in the
+    // same <script> block (including srOpen/sdOpen/ssOpen).
+    var tip = tipBits.join('\\n');
     ['md-sb-events-badge','md-qc-events-badge'].forEach(function(id){
       var el = document.getElementById(id);
       if (!el) return;
