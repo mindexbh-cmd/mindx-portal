@@ -63195,6 +63195,176 @@ def api_mev_export():
                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ──────────────────────────────────────────────────────────────────
+# Curriculum library v2 (مكتبة المناهج) — helpers
+# ──────────────────────────────────────────────────────────────────
+# Storage: ./uploads/curriculum/<uuid>.pdf next to app.py. UUIDs are
+# generated server-side and stored in curriculum_files.file_uuid so
+# the disk filename and DB row stay in lock-step. PDFs are streamed
+# through /api/curriculum/file/<uuid>, NOT served as static — the
+# permission gate (audience flag + group intersection) runs on every
+# request. The 3 trusted-uploader usernames mirror the manager
+# allowlist used elsewhere; admin role bypasses the username check.
+
+# Allowlist of usernames who can upload curriculum files in addition
+# to the admin role. These are real employee logins (see
+# employee_logins_v1 migration). Keep in sync with the spec — adding
+# a username here is the single change required to grant upload
+# rights without touching SQL.
+_CURRICULUM_UPLOADER_USERNAMES = {
+    "021005931",   # أحمد يونس
+    "010307885",   # أحمد إبراهيم
+    "980909805",   # رائد
+}
+
+_CURRICULUM_MAX_BYTES = 25 * 1024 * 1024   # 25 MB hard cap per file
+_CURRICULUM_PDF_MAGIC = b"%PDF-"
+
+
+def _curriculum_can_upload(user):
+    """True iff this user may upload / delete curriculum files.
+    admin role passes unconditionally; otherwise the username must
+    be in _CURRICULUM_UPLOADER_USERNAMES."""
+    if not user: return False
+    role = (user.get("role") or "").strip().lower()
+    if role == "admin": return True
+    uname = (user.get("username") or "").strip()
+    return uname in _CURRICULUM_UPLOADER_USERNAMES
+
+
+def _curriculum_storage_dir():
+    """Resolve and ensure ./uploads/curriculum exists. Path is
+    relative to app.py so it works the same locally and on Render
+    (note: on Render this path is EPHEMERAL — files are lost on
+    every deploy. If persistence is needed later, point this at
+    /var/data/curriculum instead)."""
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "uploads", "curriculum")
+    try: os.makedirs(base, exist_ok=True)
+    except Exception: pass
+    return base
+
+
+def _curriculum_user_audience(user):
+    """Map session user to the audience flag used to filter file
+    visibility. 'teacher' → audience_teachers; 'student'/'parent' →
+    audience_parents; admin/manager → None (sees everything).
+    Returns one of: 'teacher', 'parent', or None for staff bypass."""
+    if not user: return None
+    role = (user.get("role") or "").strip().lower()
+    if role == "teacher": return "teacher"
+    if role in ("student", "parent"): return "parent"
+    return None  # admin / manager / reception → unrestricted
+
+
+def _curriculum_user_groups(db, user):
+    """List of group_name strings this user is associated with, used
+    to filter curriculum_files via curriculum_file_groups intersect.
+    - teacher: their owned groups (via _teacher_groups_for).
+    - student / parent: their child's group_name_student + group_online,
+      walking linked_student_id (single int) AND linked_parent_for
+      (JSON array of student ids).
+    - admin / manager: empty list (callers should bypass via
+      _curriculum_user_audience returning None).
+    Returns list — caller should fold via _grp_norm for matching."""
+    if not user: return []
+    role = (user.get("role") or "").strip().lower()
+    out = []
+    if role == "teacher":
+        try:
+            for g in _teacher_groups_for(db, user):
+                if g: out.append(g)
+        except Exception: pass
+        return out
+    if role in ("student", "parent"):
+        sids = set()
+        try:
+            sid_one = int(user.get("linked_student_id") or 0)
+            if sid_one: sids.add(sid_one)
+        except Exception: pass
+        try:
+            raw = user.get("linked_parent_for") or ""
+            if raw:
+                parsed = json.loads(raw) if isinstance(raw, str) else raw
+                if isinstance(parsed, list):
+                    for x in parsed:
+                        try: sids.add(int(x))
+                        except Exception: pass
+        except Exception: pass
+        for sid in sids:
+            if not sid: continue
+            try:
+                srow = db.execute(
+                    "SELECT group_name_student, group_online "
+                    "FROM students WHERE id=?", (sid,)
+                ).fetchone()
+            except Exception: srow = None
+            if srow:
+                sd = dict(srow)
+                for k in ("group_name_student", "group_online"):
+                    v = (sd.get(k) or "").strip()
+                    if v: out.append(v)
+    return out
+
+
+def _curriculum_file_row_to_dict(row, *, group_names=None,
+                                  can_download=None):
+    """Shape the JSON the list / detail endpoints return. Keeps the
+    internal column names out of the wire format where they'd be
+    confusing (audience_teachers becomes audience.teachers, etc.)."""
+    if row is None: return None
+    d = dict(row)
+    return {
+        "id":               int(d.get("id") or 0),
+        "file_uuid":        d.get("file_uuid") or "",
+        "title":            d.get("title") or "",
+        "description":      d.get("description") or "",
+        "file_size_bytes":  int(d.get("file_size_bytes") or 0),
+        "audience": {
+            "teachers": bool(int(d.get("audience_teachers") or 0)),
+            "parents":  bool(int(d.get("audience_parents") or 0)),
+        },
+        "download": {
+            "teachers": bool(int(d.get("teacher_can_download") or 0)),
+            "parents":  bool(int(d.get("parent_can_download") or 0)),
+        },
+        "uploaded_by":      int(d.get("uploaded_by") or 0),
+        "uploaded_at":      d.get("uploaded_at") or "",
+        "groups":           list(group_names) if group_names is not None else [],
+        "can_download":     bool(can_download) if can_download is not None else None,
+    }
+
+
+def _curriculum_file_visible_for(db, user, file_row, file_groups):
+    """Return (can_view, can_download) for this user/file pair.
+    - admin / manager / allowlist-uploader → (True, True) bypass.
+    - teacher → audience.teachers must be set AND at least one of
+      file_groups must fold-match one of the teacher's groups.
+      can_download = file.teacher_can_download.
+    - student / parent → same with audience.parents and child's
+      groups. can_download = file.parent_can_download.
+    - everyone else → (False, False)."""
+    if file_row is None: return (False, False)
+    if int(dict(file_row).get("is_deleted") or 0):
+        return (False, False)
+    if _curriculum_can_upload(user):
+        return (True, True)
+    aud = _curriculum_user_audience(user)
+    if aud not in ("teacher", "parent"):
+        return (False, False)
+    fr = dict(file_row)
+    aud_flag = int(fr.get("audience_teachers" if aud == "teacher"
+                          else "audience_parents") or 0)
+    if not aud_flag: return (False, False)
+    my_groups_norm = {_grp_norm(g) for g in _curriculum_user_groups(db, user)}
+    if not my_groups_norm: return (False, False)
+    file_groups_norm = {_grp_norm(g) for g in (file_groups or [])}
+    if not (my_groups_norm & file_groups_norm): return (False, False)
+    can_dl = bool(int(fr.get("teacher_can_download" if aud == "teacher"
+                              else "parent_can_download") or 0))
+    return (True, can_dl)
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
