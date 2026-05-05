@@ -12234,24 +12234,56 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else dhLoadStats();
 /* Events v2 badge — count of trips with status open/closed for the
    sidebar + quick-card chips. Self-gates on data-role admin/manager
-   so non-admin sessions never hit the API. */
+   so non-admin sessions never hit the API. Stage 8.5 also queries
+   /alerts to surface a warning tint + tooltip with the closest trip
+   and any critical alerts. */
 function dhLoadEventsNav(){
   var role = (document.body.dataset.role || '').toLowerCase();
   if (role !== 'admin' && role !== 'manager') return;
-  fetch('/api/admin/events', {credentials:'same-origin'})
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){
-      if (!j || !j.ok) return;
-      var s = j.stats || {};
-      var n = (s.open || 0) + (s.closed || 0);
-      ['md-sb-events-badge','md-qc-events-badge'].forEach(function(id){
-        var el = document.getElementById(id);
-        if (!el) return;
-        if (n > 0){ el.textContent = String(n); el.hidden = false; }
-        else      { el.hidden = true; }
-      });
-    })
-    .catch(function(){});
+  Promise.all([
+    fetch('/api/admin/events', {credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; }),
+    fetch('/api/admin/events/alerts', {credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+  ]).then(function(both){
+    var ev = both[0]; var al = both[1];
+    if (!ev || !ev.ok) return;
+    var s = ev.stats || {};
+    var n = (s.open || 0) + (s.closed || 0);
+    var alerts = (al && al.ok && Array.isArray(al.alerts)) ? al.alerts : [];
+    var critical = alerts.filter(function(a){ return a.severity === 'critical'; }).length;
+    var warning  = alerts.filter(function(a){ return a.severity === 'warning'; }).length;
+    // Pick the closest upcoming trip for the tooltip.
+    var upcoming = (ev.events || []).filter(function(e){
+      return e.status === 'open' || e.status === 'closed';
+    }).sort(function(a, b){
+      return (a.event_date || '').localeCompare(b.event_date || '');
+    });
+    var closest = upcoming[0];
+    var tipBits = [n + ' رحلات قادمة'];
+    if (closest && closest.event_date){
+      tipBits.push('أقرب رحلة: ' + closest.event_date + ' — ' + (closest.name || ''));
+    }
+    if (warning > 0)  tipBits.push('⚠️ ' + warning + ' تنبيهات تحتاج متابعة');
+    if (critical > 0) tipBits.push('🚨 ' + critical + ' عاجل');
+    var tip = tipBits.join('\n');
+    ['md-sb-events-badge','md-qc-events-badge'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (n > 0){ el.textContent = String(n); el.hidden = false; }
+      else      { el.hidden = true; }
+      // Tint red on critical, amber on warning. Falls back to teal.
+      if (critical > 0)      el.style.background = '#c62828';
+      else if (warning > 0)  el.style.background = '#E65100';
+      else                   el.style.background = '';
+    });
+    var sbA = document.getElementById('md-sb-events');
+    var qcA = document.getElementById('md-qc-events');
+    if (sbA) sbA.title = tip;
+    if (qcA) qcA.title = tip;
+  });
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dhLoadEventsNav);
 else dhLoadEventsNav();
