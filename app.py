@@ -69494,6 +69494,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
 .ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
          gap:14px;}
+/* 9.3 — wraps the card so the followup chip can float above it */
+.ev-card-wrap{position:relative;}
+.ev-followup-chip{position:absolute;top:10px;left:10px;z-index:5;
+                  width:34px;height:34px;border-radius:10px;
+                  background:linear-gradient(135deg,#6B3FA0,#4a148c);color:#fff;
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:1.05rem;text-decoration:none;
+                  box-shadow:0 3px 10px rgba(107,63,160,0.30);
+                  transition:transform .12s,box-shadow .12s;}
+.ev-followup-chip:hover{transform:scale(1.08);
+                        box-shadow:0 4px 14px rgba(107,63,160,0.40);}
 .ev-card{background:#fff;border-radius:14px;padding:16px 18px;
          box-shadow:0 4px 14px rgba(0,0,0,.06);
          border-right:5px solid var(--c,#9e9e9e);
@@ -69875,7 +69886,16 @@ function evCardHTML(e){
   var cap = e.max_students || 0;
   var reg = e.registered_count || 0;
   var pct = (cap > 0) ? Math.round(reg / cap * 100) : 0;
+  // Stage 9.3 — show "📍 متابعة" chip only on open/closed events.
+  var st = (e.status || '').toLowerCase();
+  var followupChip = (st === 'open' || st === 'closed')
+    ? '<a class=\"ev-followup-chip\" href=\"/admin/events/' + (e.id|0) + '/followup\" '
+      + 'title=\"متابعة الرحلة\" aria-label=\"متابعة الرحلة\" '
+      + 'onclick=\"event.stopPropagation();\">📍</a>'
+    : '';
   return ''
+    + '<div class=\"ev-card-wrap\">'
+    + followupChip
     + '<a class=\"ev-card\" data-status=\"' + evEsc(e.status) + '\" '
     + '   href=\"/admin/events/' + (e.id|0) + '\">'
     + '  <div class=\"head\">'
@@ -69894,7 +69914,8 @@ function evCardHTML(e){
         + '  <div class=\"bar\"><div class=\"fill\" style=\"width:' + pct + '%\"></div></div>'
         + '</div>' : '')
     + '  <div class=\"open-cta\">اضغطي للفتح →</div>'
-    + '</a>';
+    + '</a>'
+    + '</div>';
 }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -70219,6 +70240,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-btn-back{background:#fff;color:#1D9E75;border-color:#1D9E75;}
   .evd-btn-edit{background:#fff;color:#0d47a1;border-color:#0d47a1;}
   .evd-btn-del {background:#fff;color:#c62828;border-color:#c62828;}
+  .evd-btn-followup{background:linear-gradient(135deg,#6B3FA0,#4a148c);color:#fff;border-color:#6B3FA0;}
+  .evd-btn-followup:hover{background:linear-gradient(135deg,#5e35b1,#311b92);box-shadow:0 4px 12px rgba(107,63,160,0.30);}
   /* Header card with status-keyed gradient. */
   .evd-header{position:relative;border-radius:18px;padding:24px;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.10);background:linear-gradient(135deg,#9e9e9e,#757575);overflow:hidden;}
   .evd-header[data-status="planning"] {background:linear-gradient(135deg,#bdbdbd,#616161);}
@@ -70734,6 +70757,7 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <a href="/admin/events" class="evd-btn evd-btn-back">← العودة</a>
     </div>
     <div class="left">
+      <a class="evd-btn evd-btn-followup" id="evd-followup-btn" href="#" hidden>📍 متابعة الرحلة</a>
       <button class="evd-btn evd-btn-edit" id="evd-edit-btn" type="button">⚙️ تعديل</button>
       <button class="evd-btn evd-btn-del"  id="evd-del-btn"  type="button">🗑️ حذف</button>
     </div>
@@ -71291,6 +71315,18 @@ function evdRenderHeader(ev){
     ? ((ev.registered_count || 0) + '/' + ev.max_students + ' مسجلة')
     : ((ev.registered_count || 0) + ' مسجلة');
   document.getElementById('evd-meta-cap').textContent = '👥 ' + cap;
+  // 9.3 — show "📍 متابعة الرحلة" button only for open / closed.
+  // (planning has nothing to track yet; completed/cancelled is past.)
+  var fb = document.getElementById('evd-followup-btn');
+  if (fb){
+    var st = (ev.status || '').toLowerCase();
+    if (st === 'open' || st === 'closed'){
+      fb.href = '/admin/events/' + EID + '/followup';
+      fb.hidden = false;
+    } else {
+      fb.hidden = true;
+    }
+  }
   // Header chips with task/item/registration progress (5.6 + 6.5).
   var chips = document.getElementById('evd-h-chips');
   if (chips){
