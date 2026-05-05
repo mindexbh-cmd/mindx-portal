@@ -71198,52 +71198,51 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   @keyframes evdCountFlash{0%{color:inherit;}50%{color:#1D9E75;text-shadow:0 0 6px rgba(29,158,117,0.4);}100%{color:inherit;}}
   .evd-cost-calc .val.is-flash{animation:evdCountFlash .55s ease;}
   .evd-cost-total span:last-child.is-flash{animation:evdCountFlash .55s ease;}
-  /* Schedule panel (3.4) */
-  .evd-sched-loading{text-align:center;color:#888;padding:30px 0;font-weight:700;}
-  /* Item enter/leave (3.5) */
+  /* Item enter/leave keyframe is shared by other panels — keep here. */
   @keyframes evdItemIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
-  .evd-sched-item{animation:evdItemIn .22s ease both;}
-  .evd-sched-item.is-leaving{animation:evdItemIn .18s ease reverse both;}
-  .evd-sched-summary{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;background:#fff;border-radius:12px;padding:13px 16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);font-weight:700;color:#444;font-size:.9rem;}
-  .evd-sched-summary .icon{font-size:1.3rem;}
-  .evd-sched-summary strong{color:#0d47a1;font-variant-numeric:tabular-nums;}
-  .evd-sched-cat{background:#fff;border-radius:14px;padding:14px 16px 10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--cc,#9e9e9e);}
-  .evd-sched-cat[data-cat="departure"]{--cc:#1D9E75;}
-  .evd-sched-cat[data-cat="activity"] {--cc:#1565C0;}
-  .evd-sched-cat[data-cat="break"]    {--cc:#E65100;}
-  .evd-sched-cat[data-cat="meal"]     {--cc:#6B3FA0;}
-  .evd-sched-cat[data-cat="return"]   {--cc:#37474F;}
-  .evd-sched-cat[data-cat="other"]    {--cc:#757575;}
-  .evd-sched-cat-h{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;}
-  .evd-sched-cat-h h4{margin:0;color:var(--cc);font-size:.98rem;font-weight:900;display:flex;align-items:center;gap:6px;}
-  .evd-sched-cat-h .count{font-size:.78rem;color:#888;font-weight:700;}
-  .evd-sched-item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;}
-  .evd-sched-item:last-child{border-bottom:0;}
-  .evd-sched-item .time{font-weight:800;color:#0d47a1;font-variant-numeric:tabular-nums;min-width:64px;}
-  .evd-sched-item .body{display:flex;flex-direction:column;gap:2px;}
-  .evd-sched-item .body .title{font-weight:700;color:#222;}
-  .evd-sched-item .body .desc{font-size:.82rem;color:#666;}
-  .evd-sched-item .dur{font-size:.74rem;color:var(--cc);background:rgba(0,0,0,0.05);padding:2px 8px;border-radius:99px;font-weight:700;margin-inline-start:6px;}
-  .evd-sched-item .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
-  .evd-sched-item:hover .acts,
-  .evd-sched-item:focus-within .acts{opacity:1;}
-  .evd-sched-item .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
-  .evd-sched-item .acts button:hover{background:#f0f3f7;color:#0d47a1;}
-  .evd-sched-item .acts button.del:hover{color:#c62828;background:#ffebee;}
-  .evd-sched-add{margin-top:6px;}
-  .evd-sched-add button{background:transparent;border:1.5px dashed var(--cc,#9e9e9e);color:var(--cc,#9e9e9e);border-radius:10px;padding:7px 14px;font-weight:800;font-size:.85rem;cursor:pointer;width:100%;transition:.15s;}
-  .evd-sched-add button:hover{background:rgba(0,0,0,0.03);transform:translateY(-1px);}
-  .evd-sched-cat-empty{font-size:.84rem;color:#999;font-style:italic;padding:6px 0;}
-  .evd-sched-empty{text-align:center;padding:50px 20px;color:#888;background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);}
-  .evd-sched-empty .em{font-size:3.2rem;margin-bottom:6px;}
-  .evd-sched-empty .h{font-weight:800;color:#444;margin-bottom:14px;}
-  .evd-sched-empty button{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;}
-  /* Inline edit row */
-  .evd-sched-edit{display:grid;grid-template-columns:1fr;gap:8px;padding:10px;background:#f6faff;border-radius:10px;margin:6px 0;}
-  .evd-sched-edit .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-  .evd-sched-edit input,.evd-sched-edit textarea,.evd-sched-edit select{width:100%;padding:7px 9px;border:1px solid #d3d8de;border-radius:8px;font-family:inherit;font-size:.9rem;}
-  .evd-sched-edit textarea{min-height:54px;}
-  .evd-sched-edit .footer{display:flex;justify-content:flex-end;gap:6px;}
+  /* Schedule panel — simplified linear list */
+  .evd-sched{padding:6px 0;}
+  .evd-sched-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .evd-sched-head .title{font-weight:900;color:#0d47a1;font-size:1.1rem;}
+  .evd-sched-tmpl{background:linear-gradient(135deg,#FFA726,#E65100);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:800;cursor:pointer;font-size:.88rem;transition:.15s;}
+  .evd-sched-tmpl:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(230,81,0,0.30);}
+  /* Quick-add row */
+  .evd-sched-quickadd{display:grid;grid-template-columns:90px 1fr auto;gap:8px;padding:14px;background:linear-gradient(135deg,#e3f2fd 0%,#fff 100%);border:2px solid #1565C0;border-radius:12px;margin-bottom:14px;align-items:center;}
+  .evd-sched-quickadd .qtime{padding:10px;border:1.5px solid #d3d8de;border-radius:8px;font-family:inherit;font-size:1rem;font-weight:800;text-align:center;direction:ltr;}
+  .evd-sched-quickadd .qtitle{padding:10px 14px;border:1.5px solid #d3d8de;border-radius:8px;font-family:inherit;font-size:.95rem;}
+  .evd-sched-quickadd .qtime:focus,.evd-sched-quickadd .qtitle:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 3px rgba(29,158,117,0.15);}
+  .evd-sched-qadd{background:#1D9E75;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:.92rem;white-space:nowrap;transition:.15s;}
+  .evd-sched-qadd:hover{background:#16805e;transform:translateY(-1px);}
+  .evd-sched-qadd:active{transform:scale(0.96);}
+  .evd-sched-qadd:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  /* Linear time-sorted list */
+  .evd-sched-list{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:4px solid #1565C0;overflow:hidden;}
+  .evd-sched-row{display:grid;grid-template-columns:auto auto 1fr auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px dashed #eef0f3;transition:background .12s;cursor:pointer;animation:evdItemIn .22s ease both;}
+  .evd-sched-row:last-child{border-bottom:0;}
+  .evd-sched-row:hover{background:#fafbfc;}
+  .evd-sched-row.is-editing{background:#fff8e1;}
+  .evd-sched-row .time{font-family:monospace;font-weight:900;color:#0d47a1;font-size:1rem;font-variant-numeric:tabular-nums;min-width:55px;text-align:center;background:#e3f2fd;padding:4px 10px;border-radius:8px;direction:ltr;}
+  .evd-sched-row .icon{font-size:1.4rem;line-height:1;}
+  .evd-sched-row .desc{font-weight:700;color:#222;font-size:.95rem;line-height:1.4;}
+  .evd-sched-row .desc .dur{display:block;font-size:.78rem;color:#888;font-weight:600;margin-top:2px;}
+  .evd-sched-row .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-sched-row:hover .acts,
+  .evd-sched-row.is-editing .acts{opacity:1;}
+  .evd-sched-row .acts button{background:#fff;border:1px solid #d3d8de;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:.95rem;transition:.12s;display:flex;align-items:center;justify-content:center;}
+  .evd-sched-row .acts button:hover{transform:scale(1.1);}
+  .evd-sched-row .acts .del:hover{background:#ffebee;border-color:#c62828;}
+  /* Inline edit form — appears when row gets .is-editing */
+  .evd-sched-row.is-editing .time,
+  .evd-sched-row.is-editing .desc,
+  .evd-sched-row.is-editing .icon{display:none;}
+  .evd-sched-row .edit-form{display:none;grid-column:1 / -1;grid-template-columns:90px 1fr auto auto;gap:8px;}
+  .evd-sched-row.is-editing .edit-form{display:grid;align-items:center;}
+  .evd-sched-row .edit-form input{padding:8px 10px;border:1.5px solid #d3d8de;border-radius:6px;font-family:inherit;font-size:.92rem;}
+  .evd-sched-row .edit-form input[type="time"]{text-align:center;font-weight:800;direction:ltr;}
+  .evd-sched-row .edit-form button{background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:800;cursor:pointer;font-size:.85rem;}
+  .evd-sched-row .edit-form .cancel{background:#9e9e9e;}
+  /* Empty state */
+  .evd-sched-empty{text-align:center;padding:40px 20px;color:#aaa;font-style:italic;}
   /* Registrations panel (6.2) */
   .evd-reg-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
   .evd-reg-stat{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--rsc,#1D9E75);}
@@ -71478,9 +71477,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-modal .grid2{grid-template-columns:1fr;}
     .evd-info-row{grid-template-columns:1fr;gap:2px;}
     .evd-info-row .lab{font-size:.78rem;}
-    .evd-sched-item{grid-template-columns:auto 1fr;}
-    .evd-sched-item .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
-    .evd-sched-edit .grid3{grid-template-columns:1fr;}
+    .evd-sched-quickadd{grid-template-columns:1fr 1fr;}
+    .evd-sched-quickadd .qtitle{grid-column:1 / -1;}
+    .evd-sched-quickadd .evd-sched-qadd{grid-column:1 / -1;}
+    .evd-sched-row{grid-template-columns:auto 1fr;gap:8px;padding:10px 12px;}
+    .evd-sched-row .icon{display:none;}
+    .evd-sched-row .acts{grid-column:1 / -1;opacity:1;justify-content:flex-end;}
     .evd-cost-calc .row{grid-template-columns:1fr;gap:2px;}
     .evd-cost-calc .lab{font-size:.78rem;}
     .evd-cost-row{grid-template-columns:1fr auto;}
@@ -71619,13 +71621,30 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-card"></div>
     </div>
   </section>
-  <!-- Schedule panel (3.4) -->
+  <!-- Schedule panel (simplified) -->
   <section class="evd-panel" data-panel="schedule" role="tabpanel">
-    <div class="evd-sched" id="evd-sched-root">
-      <div class="evd-skel h-card" style="height:54px;"></div>
-      <div class="evd-skel h-card"></div>
-      <div class="evd-skel h-row"></div>
-      <div class="evd-skel h-row"></div>
+    <div class="evd-sched">
+      <div class="evd-sched-head">
+        <div class="title">⏰ الخطة الزمنية</div>
+        <button type="button" class="evd-sched-tmpl" id="evd-sched-tmpl-btn"
+                title="إضافة 8 بنود نموذجية للرحلة دفعة واحدة">
+          📋 استخدمي نموذج جاهز
+        </button>
+      </div>
+      <div class="evd-sched-quickadd">
+        <input type="time" id="evd-sched-qtime" class="qtime"
+               placeholder="08:00" aria-label="الوقت"/>
+        <input type="text" id="evd-sched-qtitle" class="qtitle"
+               maxlength="120" placeholder="ماذا يحدث في هذا الوقت؟"
+               aria-label="الوصف"/>
+        <button type="button" class="evd-sched-qadd" id="evd-sched-qadd-btn"
+                title="إضافة (Enter)">
+          ➕ إضافة
+        </button>
+      </div>
+      <div class="evd-sched-list" id="evd-sched-list">
+        <div class="evd-sched-empty">جاري التحميل…</div>
+      </div>
     </div>
   </section>
   <!-- Costs panel (4.3) -->
@@ -71920,49 +71939,6 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="footer">
         <button type="button" class="evd-btn" id="evd-cost-cancel">إلغاء</button>
         <button type="submit" class="evd-btn evd-btn-edit" id="evd-cost-save">✨ حفظ</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Schedule add/edit modal (3.4) -->
-<div class="evd-mb" id="evd-sched-mb" role="dialog" aria-modal="true" aria-labelledby="evd-sched-title">
-  <div class="evd-modal" style="max-width:480px;">
-    <h2 id="evd-sched-title">➕ بند جديد</h2>
-    <form id="evd-sched-form">
-      <input type="hidden" id="sf-id"/>
-      <div class="row">
-        <label for="sf-cat">القسم *</label>
-        <select id="sf-cat" required>
-          <option value="departure">🚌 الانطلاق</option>
-          <option value="activity">🎯 النشاط الرئيسي</option>
-          <option value="break">☕ الاستراحة</option>
-          <option value="meal">🍽️ الوجبات</option>
-          <option value="return">🏠 العودة</option>
-          <option value="other">📌 أخرى</option>
-        </select>
-      </div>
-      <div class="grid2">
-        <div class="row">
-          <label for="sf-time">الوقت</label>
-          <input id="sf-time" type="time"/>
-        </div>
-        <div class="row">
-          <label for="sf-dur">المدة (دقائق)</label>
-          <input id="sf-dur" type="number" min="0" max="600" placeholder="اختياري"/>
-        </div>
-      </div>
-      <div class="row">
-        <label for="sf-title">العنوان *</label>
-        <input id="sf-title" type="text" required maxlength="120"/>
-      </div>
-      <div class="row">
-        <label for="sf-desc">التفاصيل</label>
-        <textarea id="sf-desc" maxlength="400"></textarea>
-      </div>
-      <div class="footer">
-        <button type="button" class="evd-btn" id="evd-sched-cancel">إلغاء</button>
-        <button type="submit" class="evd-btn evd-btn-edit" id="evd-sched-save">✨ حفظ</button>
       </div>
     </form>
   </div>
@@ -72428,16 +72404,45 @@ function evdRenderInfo(ev){
   });
 }
 
-/* ── Schedule panel (3.4) ────────────────────────────────────── */
-var SCHED_DATA = {departure:[], activity:[], break:[], meal:[], return:[], other:[]};
+/* ── Schedule panel — simplified linear time-sorted list ─────── */
+var SCHED_DATA = [];
 var SCHED_LOADED = false;
-var SCHED_CATS = [
-  {key:'departure', label:'🚌 الانطلاق'},
-  {key:'activity',  label:'🎯 النشاط الرئيسي'},
-  {key:'break',     label:'☕ الاستراحة'},
-  {key:'meal',      label:'🍽️ الوجبات'},
-  {key:'return',    label:'🏠 العودة'},
-  {key:'other',     label:'📌 أخرى'}
+
+// Auto-icon selection by Arabic keywords in the title — first match wins.
+var SCHED_ICON_RULES = [
+  {kw: ['وصول','حضور','استقبال','نداء'],                       icon: '🚌'},
+  {kw: ['انطلاق','مغادرة','ركوب','تحرك'],                      icon: '🚌'},
+  {kw: ['عودة','رجوع','انصراف','استلام'],                       icon: '🔄'},
+  {kw: ['وجبة','إفطار','غداء','استراحة','شراب','أكل','عصير'],  icon: '🍽️'},
+  {kw: ['صلاة','أذان'],                                          icon: '🕌'},
+  {kw: ['جولة','زيارة','استكشاف','عرض'],                        icon: '🎯'},
+  {kw: ['نشاط','ورشة','تعليم','شرح','محاضرة'],                  icon: '📚'},
+  {kw: ['لعب','ترفيه','مسابقة','تسلية'],                         icon: '🎮'},
+  {kw: ['تصوير','صور','فوتو'],                                   icon: '📸'},
+  {kw: ['ختام','نهاية','توديع','شكر'],                           icon: '🎊'}
+];
+
+function evdSchedAutoIcon(title){
+  var t = (title || '').toLowerCase();
+  for (var i = 0; i < SCHED_ICON_RULES.length; i++){
+    var rule = SCHED_ICON_RULES[i];
+    for (var j = 0; j < rule.kw.length; j++){
+      if (t.indexOf(rule.kw[j]) >= 0) return rule.icon;
+    }
+  }
+  return '⏰';
+}
+
+// 8-item template — common Bahrain field-trip flow.
+var SCHED_TEMPLATE = [
+  {time: '08:00', title: 'وصول الطالبات للمركز'},
+  {time: '08:15', title: 'النداء والاستعداد'},
+  {time: '08:30', title: 'الانطلاق إلى الموقع'},
+  {time: '09:30', title: 'الوصول للموقع'},
+  {time: '10:00', title: 'الجولة والأنشطة'},
+  {time: '11:30', title: 'استراحة ووجبة خفيفة'},
+  {time: '12:00', title: 'العودة للمركز'},
+  {time: '13:00', title: 'استلام الطالبات من قبل الأهل'}
 ];
 
 function evdLoadSchedule(){
@@ -72445,206 +72450,203 @@ function evdLoadSchedule(){
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
-      SCHED_DATA = j.schedule || SCHED_DATA;
+      // Backend returns {category: [items, ...]} — flatten into one
+      // chronological list since we no longer surface categories.
+      var flat = [];
+      var grouped = j.schedule || {};
+      Object.keys(grouped).forEach(function(cat){
+        (grouped[cat] || []).forEach(function(s){ flat.push(s); });
+      });
+      flat.sort(function(a, b){
+        var ta = (a.time_slot || '99:99');
+        var tb = (b.time_slot || '99:99');
+        if (ta < tb) return -1;
+        if (ta > tb) return 1;
+        return (a.order_index || 0) - (b.order_index || 0);
+      });
+      // Auto-derive duration from gap to next item if not stored.
+      flat.forEach(function(s, i){
+        if (!s.duration_minutes && i < flat.length - 1){
+          var next = flat[i + 1];
+          if (s.time_slot && next.time_slot){
+            try {
+              var p1 = s.time_slot.split(':');
+              var p2 = next.time_slot.split(':');
+              var m1 = parseInt(p1[0],10)*60 + parseInt(p1[1],10);
+              var m2 = parseInt(p2[0],10)*60 + parseInt(p2[1],10);
+              if (m2 > m1) s._auto_duration = m2 - m1;
+            } catch(_){}
+          }
+        }
+      });
+      SCHED_DATA = flat;
       SCHED_LOADED = true;
-      evdRenderSchedule(j.summary || {});
+      evdRenderSchedule();
     })
     .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
-function evdFmtDuration(min){
-  min = parseInt(min || 0, 10);
-  if (!min) return '';
-  if (min < 60) return min + ' د';
-  var h = Math.floor(min / 60), m = min % 60;
-  return m ? (h + ' س ' + m + ' د') : (h + ' س');
-}
-
-function evdRenderSchedule(summary){
-  var root = document.getElementById('evd-sched-root');
-  if (!root) return;
-  summary = summary || {};
-  var total = parseInt(summary.total_items || 0, 10);
-  if (!total){
-    root.innerHTML = ''
-      + '<div class="evd-sched-empty">'
-      + '  <div class="em">📋</div>'
-      + '  <div class="h">لم يتم إضافة خطة زمنية بعد</div>'
-      + '  <button type="button" id="evd-sched-empty-add">✨ ابدئي بإضافة أول بند</button>'
-      + '</div>';
-    var ea = document.getElementById('evd-sched-empty-add');
-    if (ea) ea.addEventListener('click', function(){ evdOpenSchedAdd(''); });
+function evdRenderSchedule(){
+  var list = document.getElementById('evd-sched-list');
+  if (!list) return;
+  if (!SCHED_DATA.length){
+    list.innerHTML = '<div class="evd-sched-empty">لا توجد بنود — استخدمي الإضافة السريعة أو النموذج الجاهز</div>';
     return;
   }
-  var sumDur = parseInt(summary.total_duration_minutes || 0, 10);
-  var first = summary.first_time || '';
-  var last  = summary.last_time  || '';
-  var html = ''
-    + '<div class="evd-sched-summary">'
-    + '  <span><span class="icon">📊</span> <strong>' + total + '</strong> بند</span>'
-    + (sumDur ? '  <span>المدة: <strong>' + evdEsc(evdFmtDuration(sumDur)) + '</strong></span>' : '')
-    + (first ? '  <span>من <strong>' + evdEsc(first) + '</strong>' + (last && last !== first ? ' إلى <strong>' + evdEsc(last) + '</strong>' : '') + '</span>' : '')
-    + '</div>';
-
-  SCHED_CATS.forEach(function(c){
-    var items = SCHED_DATA[c.key] || [];
-    html += '<div class="evd-sched-cat" data-cat="' + c.key + '">'
-          + '  <div class="evd-sched-cat-h">'
-          + '    <h4>' + evdEsc(c.label) + '</h4>'
-          + '    <span class="count">' + items.length + ' بند</span>'
-          + '  </div>'
-          + '  <div class="evd-sched-cat-body">';
-    if (!items.length){
-      html += '<div class="evd-sched-cat-empty">لا توجد بنود في هذا القسم</div>';
-    } else {
-      items.forEach(function(it){
-        html += evdSchedItemHTML(it);
-      });
-    }
-    html += '  </div>'
-          + '  <div class="evd-sched-add">'
-          + '    <button type="button" data-add="' + c.key + '">+ إضافة بند</button>'
-          + '  </div>'
-          + '</div>';
-  });
-  root.innerHTML = html;
-
-  // Wire add buttons
-  root.querySelectorAll('button[data-add]').forEach(function(b){
-    b.addEventListener('click', function(){ evdOpenSchedAdd(b.getAttribute('data-add')); });
-  });
-  // Wire edit/delete
-  root.querySelectorAll('button[data-edit]').forEach(function(b){
-    b.addEventListener('click', function(){
-      var sid = parseInt(b.getAttribute('data-edit'), 10);
-      var it = evdSchedFindItem(sid);
-      if (it) evdOpenSchedEdit(it);
+  list.innerHTML = SCHED_DATA.map(evdSchedRowHTML).join('');
+  // Click row → enter edit mode (ignore action buttons + form clicks)
+  list.querySelectorAll('.evd-sched-row').forEach(function(row){
+    row.addEventListener('click', function(e){
+      if (e.target.closest('.acts')) return;
+      if (e.target.closest('.edit-form')) return;
+      var id = parseInt(row.getAttribute('data-id'), 10);
+      evdSchedToggleEdit(id);
     });
   });
-  root.querySelectorAll('button[data-del]').forEach(function(b){
-    b.addEventListener('click', function(){
-      var sid = parseInt(b.getAttribute('data-del'), 10);
-      evdSchedDelete(sid);
+  list.querySelectorAll('button[data-sched-del]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      evdSchedDelete(parseInt(btn.getAttribute('data-sched-del'), 10));
+    });
+  });
+  list.querySelectorAll('button[data-sched-save]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      evdSchedSaveEdit(parseInt(btn.getAttribute('data-sched-save'), 10));
+    });
+  });
+  list.querySelectorAll('button[data-sched-cancel]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      evdSchedCancelEdit(parseInt(btn.getAttribute('data-sched-cancel'), 10));
     });
   });
 }
 
-function evdSchedItemHTML(it){
-  var dur = evdFmtDuration(it.duration_minutes);
-  var time = it.time_slot || '—';
+function evdSchedRowHTML(s){
+  var icon = evdSchedAutoIcon(s.title);
+  var time = s.time_slot || '—:—';
+  var dur  = s.duration_minutes || s._auto_duration;
+  var durStr = dur ? ('<span class="dur">⏱️ ' + dur + ' دقيقة</span>') : '';
   return ''
-    + '<div class="evd-sched-item" data-sid="' + (it.id|0) + '">'
-    + '  <div class="time">⏰ ' + evdEsc(time) + '</div>'
-    + '  <div class="body">'
-    + '    <div class="title">' + evdEsc(it.title) + (dur ? '<span class="dur">' + evdEsc(dur) + '</span>' : '') + '</div>'
-    + (it.description ? '<div class="desc">' + evdEsc(it.description) + '</div>' : '')
-    + '  </div>'
+    + '<div class="evd-sched-row" data-id="' + (s.id|0) + '">'
+    + '  <div class="time">' + evdEsc(time) + '</div>'
+    + '  <div class="icon">' + icon + '</div>'
+    + '  <div class="desc">' + evdEsc(s.title || '—') + durStr + '</div>'
     + '  <div class="acts">'
-    + '    <button type="button" data-edit="' + (it.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
-    + '    <button type="button" class="del" data-del="' + (it.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+    + '    <button type="button" title="حذف" class="del" data-sched-del="' + (s.id|0) + '">🗑️</button>'
+    + '  </div>'
+    + '  <div class="edit-form">'
+    + '    <input type="time" data-edit-time="' + (s.id|0) + '" value="' + evdEsc(time === '—:—' ? '' : time) + '"/>'
+    + '    <input type="text" data-edit-title="' + (s.id|0) + '" value="' + evdEsc(s.title || '') + '" maxlength="120"/>'
+    + '    <button type="button" data-sched-save="' + (s.id|0) + '">💾 حفظ</button>'
+    + '    <button type="button" class="cancel" data-sched-cancel="' + (s.id|0) + '">إلغاء</button>'
     + '  </div>'
     + '</div>';
 }
 
-function evdSchedFindItem(sid){
-  for (var i = 0; i < SCHED_CATS.length; i++){
-    var arr = SCHED_DATA[SCHED_CATS[i].key] || [];
-    for (var j = 0; j < arr.length; j++){
-      if (parseInt(arr[j].id, 10) === sid) return arr[j];
+function evdSchedToggleEdit(id){
+  // Close any other open edit row first — only one editable at a time.
+  document.querySelectorAll('.evd-sched-row.is-editing').forEach(function(r){
+    if (parseInt(r.getAttribute('data-id'), 10) !== id){
+      r.classList.remove('is-editing');
     }
-  }
-  return null;
-}
-
-function evdOpenSchedAdd(category){
-  document.getElementById('evd-sched-title').textContent = '➕ بند جديد';
-  document.getElementById('sf-id').value    = '';
-  document.getElementById('sf-cat').value   = category || 'departure';
-  document.getElementById('sf-time').value  = '';
-  document.getElementById('sf-dur').value   = '';
-  document.getElementById('sf-title').value = '';
-  document.getElementById('sf-desc').value  = '';
-  document.getElementById('evd-sched-mb').classList.add('is-open');
-  setTimeout(function(){ document.getElementById('sf-title').focus(); }, 50);
-}
-
-function evdOpenSchedEdit(it){
-  document.getElementById('evd-sched-title').textContent = '✏️ تعديل البند';
-  document.getElementById('sf-id').value    = it.id;
-  document.getElementById('sf-cat').value   = it.category || 'departure';
-  document.getElementById('sf-time').value  = it.time_slot || '';
-  document.getElementById('sf-dur').value   = it.duration_minutes || '';
-  document.getElementById('sf-title').value = it.title || '';
-  document.getElementById('sf-desc').value  = it.description || '';
-  document.getElementById('evd-sched-mb').classList.add('is-open');
-  setTimeout(function(){ document.getElementById('sf-title').focus(); }, 50);
-}
-
-function evdCloseSched(){
-  document.getElementById('evd-sched-mb').classList.remove('is-open');
-}
-
-function evdSubmitSched(e){
-  e.preventDefault();
-  var btn = document.getElementById('evd-sched-save');
-  btn.disabled = true; btn.style.opacity = '.6';
-  var sid = parseInt(document.getElementById('sf-id').value || '0', 10);
-  var body = {
-    category:         document.getElementById('sf-cat').value,
-    time_slot:        document.getElementById('sf-time').value || '',
-    duration_minutes: document.getElementById('sf-dur').value || '',
-    title:            document.getElementById('sf-title').value.trim(),
-    description:      document.getElementById('sf-desc').value.trim()
-  };
-  var url, method;
-  if (sid){
-    url = '/api/admin/events/' + EID + '/schedule/' + sid;
-    method = 'PATCH';
-  } else {
-    url = '/api/admin/events/' + EID + '/schedule';
-    method = 'POST';
-  }
-  fetch(url, {
-    method: method,
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  })
-  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
-  .then(function(o){
-    btn.disabled = false; btn.style.opacity = '1';
-    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
-    evdCloseSched();
-    evdToast(sid ? 'تم تحديث البند' : 'تم إضافة البند', 'success');
-    evdLoadSchedule();
-  })
-  .catch(function(){
-    btn.disabled = false; btn.style.opacity = '1';
-    evdToast('خطأ في الاتصال', 'error');
   });
+  var row = document.querySelector('.evd-sched-row[data-id="' + id + '"]');
+  if (row) row.classList.toggle('is-editing');
+}
+
+function evdSchedCancelEdit(id){
+  var row = document.querySelector('.evd-sched-row[data-id="' + id + '"]');
+  if (row) row.classList.remove('is-editing');
+}
+
+function evdSchedSaveEdit(id){
+  var time  = (document.querySelector('input[data-edit-time="'  + id + '"]') || {}).value || '';
+  var title = (document.querySelector('input[data-edit-title="' + id + '"]') || {}).value || '';
+  time = time.trim(); title = title.trim();
+  if (!title){ evdToast('العنوان مطلوب', 'error'); return; }
+  fetch('/api/admin/events/' + EID + '/schedule/' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({time_slot: time || '', title: title})
+  })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+      evdToast('✅ تم التحديث', 'success');
+      evdLoadSchedule();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
 }
 
 function evdSchedDelete(sid){
   if (!sid) return;
-  if (!confirm('هل تريدين حذف هذا البند؟')) return;
-  // Animate the row out before the refetch lands.
-  var row = document.querySelector('.evd-sched-item[data-sid="' + sid + '"]');
-  if (row) row.classList.add('is-leaving');
+  if (!confirm('حذف هذا البند؟')) return;
   fetch('/api/admin/events/' + EID + '/schedule/' + sid, {method: 'DELETE'})
     .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
     .then(function(o){
-      if (!o.ok || !o.j.ok){
-        if (row) row.classList.remove('is-leaving');
-        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
-      }
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحذف', 'error'); return; }
       evdToast('تم الحذف', 'success');
-      // Wait for the leave animation to finish before re-render so
-      // the user sees the row slide out instead of vanishing.
-      setTimeout(evdLoadSchedule, 180);
+      evdLoadSchedule();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdSchedQuickAdd(){
+  var time  = (document.getElementById('evd-sched-qtime').value  || '').trim();
+  var title = (document.getElementById('evd-sched-qtitle').value || '').trim();
+  if (!title){ evdToast('اكتبي وصف البند', 'error'); return; }
+  // The simplified UI doesn't surface categories — default to 'activity'
+  // (the closest match to "main activity"). Existing rows keep their
+  // original category since we only flatten on read.
+  var btn = document.getElementById('evd-sched-qadd-btn');
+  if (btn){ btn.disabled = true; }
+  fetch('/api/admin/events/' + EID + '/schedule', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({category: 'activity', time_slot: time || '', title: title})
+  })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (btn){ btn.disabled = false; }
+      if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الإضافة', 'error'); return; }
+      // Clear the title field but keep the time so admin can keep
+      // adding sequential items quickly.
+      document.getElementById('evd-sched-qtitle').value = '';
+      evdLoadSchedule();
+      evdToast('✅ تمت الإضافة', 'success');
+      document.getElementById('evd-sched-qtitle').focus();
     })
     .catch(function(){
-      if (row) row.classList.remove('is-leaving');
+      if (btn){ btn.disabled = false; }
       evdToast('خطأ في الاتصال', 'error');
     });
+}
+
+function evdSchedApplyTemplate(){
+  if (SCHED_DATA.length > 0){
+    if (!confirm('سيتم إضافة 8 بنود نموذجية للخطة الحالية. هل تريدين المتابعة؟')) return;
+  }
+  var btn = document.getElementById('evd-sched-tmpl-btn');
+  if (btn){ btn.disabled = true; btn.textContent = '… جاري الإضافة'; }
+  Promise.all(SCHED_TEMPLATE.map(function(item){
+    return fetch('/api/admin/events/' + EID + '/schedule', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({category: 'activity', time_slot: item.time, title: item.title})
+    });
+  }))
+  .then(function(){
+    if (btn){ btn.disabled = false; btn.textContent = '📋 استخدمي نموذج جاهز'; }
+    evdLoadSchedule();
+    evdToast('✅ تم إضافة 8 بنود نموذجية', 'success');
+  })
+  .catch(function(){
+    if (btn){ btn.disabled = false; btn.textContent = '📋 استخدمي نموذج جاهز'; }
+    evdToast('بعض البنود لم تُضف', 'error');
+    evdLoadSchedule();
+  });
 }
 
 /* ── Tasks panel (5.4) ───────────────────────────────────────── */
@@ -74894,12 +74896,23 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-edit-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseEdit();
   });
-  // Schedule modal wires (3.4)
-  document.getElementById('evd-sched-cancel').addEventListener('click', evdCloseSched);
-  document.getElementById('evd-sched-form').addEventListener('submit', evdSubmitSched);
-  document.getElementById('evd-sched-mb').addEventListener('click', function(e){
-    if (e.target === this) evdCloseSched();
-  });
+  // Schedule quick-add wires (simplified)
+  var schedQAdd = document.getElementById('evd-sched-qadd-btn');
+  if (schedQAdd) schedQAdd.addEventListener('click', evdSchedQuickAdd);
+  var schedQTitle = document.getElementById('evd-sched-qtitle');
+  if (schedQTitle){
+    schedQTitle.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){ e.preventDefault(); evdSchedQuickAdd(); }
+    });
+  }
+  var schedQTime = document.getElementById('evd-sched-qtime');
+  if (schedQTime){
+    schedQTime.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){ e.preventDefault(); evdSchedQuickAdd(); }
+    });
+  }
+  var schedTmpl = document.getElementById('evd-sched-tmpl-btn');
+  if (schedTmpl) schedTmpl.addEventListener('click', evdSchedApplyTemplate);
   // Cost modal wires (4.3)
   document.getElementById('evd-cost-cancel').addEventListener('click', evdCloseCost);
   document.getElementById('evd-cost-form').addEventListener('submit', evdSubmitCost);
