@@ -8,8 +8,11 @@ qrcode[pil]>=7.4.2
 # binaries), the docs UI gracefully exposes a manual-upload fallback.
 playwright>=1.40
 Pillow>=10.0
-# HEIC / HEIF support for parent-uploaded receipts (iPhone default).
-# Optional — if install fails on the host the receipt-upload path
-# silently falls back to "store original" with a conversion-failed
-# flag, so the deploy never breaks.
-pillow-heif>=0.13
+# NOTE: pillow-heif is intentionally NOT pinned here. The package
+# needs the system libheif/libde265 libraries which Render's stock
+# Python image doesn't always provide — when the wheel falls back to
+# source compilation it dies and takes the entire build with it.
+# render.yaml's buildCommand installs it best-effort with a `|| echo`
+# fallback. The runtime import in app.py is already wrapped in
+# try/except so a missing pillow-heif silently falls through to the
+# pass-through receipt path; nothing else needs to change.

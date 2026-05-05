@@ -14,6 +14,7 @@ services:
     #      system falls back to manual upload.
     buildCommand: |
       pip install -r requirements.txt &&
+      (pip install 'pillow-heif>=0.13' || echo "[deploy] pillow-heif install failed — HEIC parent uploads will fall back to passthrough") &&
       python -m playwright install chromium &&
       (python -m playwright install-deps chromium || echo "[deploy] install-deps non-fatal failure")
     # --timeout 120: the Drive-import endpoint does pre-import backup +
