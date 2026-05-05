@@ -65517,13 +65517,28 @@ def _events_row_dict(rd):
     """Slim outbound shape for the list-page card render."""
     cap = int(rd.get("max_students") or 0)
     pct = 0.0
+    # event_date normalisation — Postgres returns the DATE column as
+    # a datetime.date object; Flask's jsonify then serialises it as
+    # an HTTP-style string ("Wed, 14 Jun 2026 00:00:00 GMT"), which
+    # the calendar's frontend can't bucket. SQLite returns strings
+    # already, so this only matters on prod. Coerce to ISO YYYY-MM-DD
+    # so both backends ship the same shape.
+    _ed_raw = rd.get("event_date")
+    try:
+        import datetime as _dt
+        if isinstance(_ed_raw, (_dt.date, _dt.datetime)):
+            _ed_iso = _ed_raw.strftime("%Y-%m-%d")
+        else:
+            _ed_iso = (str(_ed_raw)[:10]) if _ed_raw else ""
+    except Exception:
+        _ed_iso = (str(_ed_raw)[:10]) if _ed_raw else ""
     # registered_count + task/payment pcts arrive in stage 2 once the
     # registration / task / payment tables exist — kept as 0 for now.
     return {
         "id":                  rd.get("id"),
         "name":                rd.get("name") or "",
         "destination":         rd.get("destination") or "",
-        "event_date":          rd.get("event_date") or "",
+        "event_date":          _ed_iso,
         "departure_time":      rd.get("departure_time") or "",
         "return_time":         rd.get("return_time") or "",
         "meeting_point":       rd.get("meeting_point") or "",
