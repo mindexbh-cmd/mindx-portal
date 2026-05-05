@@ -69583,6 +69583,20 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-msg-list-row .wa.disabled{background:#bbb;cursor:not-allowed;pointer-events:none;}
   .evd-msg-list-row .cp{background:#fff;border:1.5px solid #d3d8de;color:#666;padding:6px 10px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.82rem;}
   .evd-msg-list-row .cp:hover{border-color:#1565C0;color:#1565C0;}
+  /* Print panel (8.2) */
+  .evd-prn-h{font-size:1.1rem;font-weight:900;color:#0d47a1;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .evd-prn-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+  .evd-prn-card{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:16px 18px;background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--pc,#1D9E75);text-decoration:none;color:inherit;transition:.15s;cursor:pointer;}
+  .evd-prn-card[data-k="list"]     {--pc:#1D9E75;}
+  .evd-prn-card[data-k="schedule"] {--pc:#1565C0;}
+  .evd-prn-card[data-k="financial"]{--pc:#E65100;}
+  .evd-prn-card[data-k="full"]     {--pc:#6B3FA0;}
+  .evd-prn-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.10);}
+  .evd-prn-card .em{font-size:2.1rem;}
+  .evd-prn-card .body .ttl{font-weight:900;color:#0d47a1;font-size:1rem;}
+  .evd-prn-card .body .sub{font-size:.84rem;color:#666;margin-top:2px;}
+  .evd-prn-card button{background:var(--pc);color:#fff;border:none;padding:8px 18px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.88rem;display:inline-flex;align-items:center;gap:5px;}
+  .evd-prn-card:hover button{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.12);}
   /* Mobile */
   @media (max-width: 720px){
     .evd-shell{padding:10px;}
@@ -69617,6 +69631,8 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-reg-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
     .evd-reg-row .pay-cell,.evd-reg-row .att-cell{grid-column:1 / -1;justify-content:flex-end;display:flex;gap:6px;}
     .evd-reg-bulk-btns{grid-template-columns:repeat(3,1fr);}
+    .evd-prn-card{grid-template-columns:auto 1fr;}
+    .evd-prn-card button{grid-column:1 / -1;justify-self:end;}
   }
 </style></head><body>
 
@@ -69727,7 +69743,34 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="print"    role="tabpanel"><div class="evd-stub"><div class="em">🖨️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Print panel (8.2) -->
+  <section class="evd-panel" data-panel="print" role="tabpanel">
+    <div class="evd-prn" id="evd-prn-root">
+      <div class="evd-prn-h">🖨️ خيارات الطباعة</div>
+      <div class="evd-prn-grid">
+        <a class="evd-prn-card" data-k="list" target="_blank" rel="noopener">
+          <div class="em">📋</div>
+          <div class="body"><div class="ttl">قائمة الطالبات الكاملة</div><div class="sub">مع أرقام الأهل لتسجيل الحضور</div></div>
+          <button type="button">🖨️ طباعة</button>
+        </a>
+        <a class="evd-prn-card" data-k="schedule" target="_blank" rel="noopener">
+          <div class="em">⏰</div>
+          <div class="body"><div class="ttl">الخطة الزمنية</div><div class="sub">جدول الأنشطة بالتفاصيل</div></div>
+          <button type="button">🖨️ طباعة</button>
+        </a>
+        <a class="evd-prn-card" data-k="financial" target="_blank" rel="noopener">
+          <div class="em">💰</div>
+          <div class="body"><div class="ttl">التقرير المالي</div><div class="sub">تكاليف ومدفوعات</div></div>
+          <button type="button">🖨️ طباعة</button>
+        </a>
+        <a class="evd-prn-card" data-k="full" target="_blank" rel="noopener">
+          <div class="em">📊</div>
+          <div class="body"><div class="ttl">تقرير الرحلة الشامل</div><div class="sub">كل التفاصيل في صفحة واحدة</div></div>
+          <button type="button">🖨️ طباعة</button>
+        </a>
+      </div>
+    </div>
+  </section>
 
 </div>
 
@@ -70107,6 +70150,15 @@ function evdActivateTab(name){
   if (name === 'tasks'    && !TASK_LOADED)  evdLoadTasks();
   if (name === 'students' && !REG_LOADED)   evdLoadRegs();
   if (name === 'messages' && !MSG_LOADED)   evdLoadMsg();
+  if (name === 'print')                     evdRefreshPrintLinks();
+}
+
+function evdRefreshPrintLinks(){
+  document.querySelectorAll('.evd-prn-card').forEach(function(a){
+    var k = a.getAttribute('data-k');
+    if (!k) return;
+    a.setAttribute('href', '/admin/events/' + EID + '/print/' + k);
+  });
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
