@@ -63365,6 +63365,491 @@ def _curriculum_file_visible_for(db, user, file_row, file_groups):
     return (True, can_dl)
 
 
+# ──────────────────────────────────────────────────────────────────
+# /admin/curriculum — upload, manage, delete curriculum PDFs
+# ──────────────────────────────────────────────────────────────────
+ADMIN_CURRICULUM_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>المناهج — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px;}
+.panel{background:#fff;border-radius:18px;padding:22px;margin-bottom:22px;
+       box-shadow:0 8px 24px rgba(107,63,160,.14);}
+.panel h2{margin:0 0 16px;font-size:1.15rem;color:#4a148c;font-weight:900;}
+.field{margin-bottom:14px;}
+.field label{display:block;margin-bottom:6px;font-weight:700;color:#4a148c;font-size:.92rem;}
+.field input[type=text], .field textarea{width:100%;padding:9px 12px;
+       border:1.5px solid #d8c8ec;border-radius:8px;font-family:inherit;font-size:.95rem;}
+.field textarea{resize:vertical;min-height:60px;}
+.field input[type=file]{font-family:inherit;font-size:.9rem;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media (max-width:680px){.row2{grid-template-columns:1fr;}}
+.cb-row{display:flex;align-items:center;gap:8px;padding:8px 12px;
+        background:#f8f4ff;border-radius:8px;margin-bottom:6px;}
+.cb-row input{width:18px;height:18px;cursor:pointer;}
+.cb-row label{font-weight:600;color:#333;cursor:pointer;margin:0;font-size:.9rem;}
+.groups-box{border:1.5px solid #d8c8ec;border-radius:8px;padding:10px;
+            max-height:200px;overflow-y:auto;background:#fafafa;}
+.groups-box .gr{display:flex;align-items:center;gap:8px;padding:5px 4px;
+                border-radius:5px;cursor:pointer;}
+.groups-box .gr:hover{background:#f3e5f5;}
+.groups-box .gr input{width:16px;height:16px;}
+.groups-box .gr label{margin:0;font-weight:500;cursor:pointer;font-size:.88rem;color:#333;}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;
+     padding:11px 22px;border-radius:9px;font-weight:800;font-size:.95rem;
+     cursor:pointer;font-family:inherit;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.6;cursor:not-allowed;}
+.tbl{width:100%;border-collapse:collapse;font-size:.9rem;}
+.tbl th{background:#f3e5f5;color:#4a148c;font-weight:800;padding:10px 8px;
+        text-align:right;border-bottom:2px solid #d8c8ec;}
+.tbl td{padding:10px 8px;border-bottom:1px solid #eee;vertical-align:top;}
+.tbl tr:hover td{background:#fafafa;}
+.tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.78rem;
+     font-weight:700;background:#e3f2fd;color:#0d47a1;margin:2px;}
+.tag.t{background:#e8f5e9;color:#1b5e20;}
+.tag.p{background:#fff3e0;color:#bf360c;}
+.tag.lock{background:#fff8e1;color:#7c5e00;}
+.act-del{background:#c62828;color:#fff;border:none;padding:5px 10px;
+         border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;}
+.act-view{background:#1976d2;color:#fff;border:none;padding:5px 10px;
+          border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;
+          text-decoration:none;display:inline-block;margin-left:6px;}
+.empty{text-align:center;color:#888;padding:40px 20px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+       background:#333;color:#fff;padding:12px 20px;border-radius:9px;
+       font-weight:700;z-index:9999;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3);}
+.toast.show{display:block;}
+.toast.err{background:#c62828;}
+@media (max-width:760px){
+  .tbl thead{display:none;}
+  .tbl tbody tr{display:block;background:#fff;border:1px solid #eee;
+                border-radius:10px;margin-bottom:10px;padding:10px;}
+  .tbl tbody td{display:block;padding:4px 0;border:none;}
+  .tbl tbody td::before{content:attr(data-label) ': ';font-weight:800;color:#4a148c;}
+}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 المناهج — إدارة المكتبة</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h2>📤 رفع منهج جديد</h2>
+    <div class="field">
+      <label>عنوان الملف <span style="color:#c62828">*</span></label>
+      <input type="text" id="cu-title" maxlength="200">
+    </div>
+    <div class="field">
+      <label>الوصف (اختياري)</label>
+      <textarea id="cu-desc" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label>ملف PDF (حد أقصى 25 ميجا) <span style="color:#c62828">*</span></label>
+      <input type="file" id="cu-file" accept="application/pdf">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>الجمهور المستهدف</label>
+        <div class="cb-row">
+          <input type="checkbox" id="cu-aud-t">
+          <label for="cu-aud-t">المعلمات</label>
+        </div>
+        <div class="cb-row">
+          <input type="checkbox" id="cu-aud-p">
+          <label for="cu-aud-p">أولياء الأمور</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>إذن التحميل</label>
+        <div class="cb-row">
+          <input type="checkbox" id="cu-dl-t" checked>
+          <label for="cu-dl-t">المعلمات يمكنها التحميل</label>
+        </div>
+        <div class="cb-row">
+          <input type="checkbox" id="cu-dl-p" checked>
+          <label for="cu-dl-p">أولياء الأمور يمكنهم التحميل</label>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>المجموعات المستفيدة <span style="color:#c62828">*</span></label>
+      <div class="groups-box" id="cu-groups">
+        <div style="color:#888;font-size:.85rem;padding:8px;">جاري تحميل المجموعات...</div>
+      </div>
+    </div>
+    <button class="btn" id="cu-save" onclick="cuUpload()">💾 رفع الملف</button>
+  </div>
+
+  <div class="panel">
+    <h2>📋 الملفات المرفوعة</h2>
+    <div id="cu-list"><div class="empty">جاري التحميل...</div></div>
+  </div>
+
+</div>
+<div class="toast" id="cu-toast"></div>
+<script>
+(function(){
+  function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function toast(msg, err){
+    var t = document.getElementById('cu-toast');
+    t.textContent = msg; t.className = 'toast show' + (err?' err':'');
+    setTimeout(function(){ t.className='toast'; }, 3500);
+  }
+  function fmtSize(n){
+    if(!n) return '0';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  // ── Load groups for checkbox list
+  function loadGroups(){
+    fetch('/api/curriculum/admin/groups',{credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('cu-groups');
+        if(!j || !j.ok || !(j.groups||[]).length){
+          box.innerHTML = '<div style="color:#888;padding:8px;">لا توجد مجموعات في النظام.</div>';
+          return;
+        }
+        box.innerHTML = j.groups.map(function(g, i){
+          var safe = _esc(g);
+          return '<div class="gr"><input type="checkbox" class="cu-gr" id="g'+i+'" value="'+safe+'"><label for="g'+i+'">'+safe+'</label></div>';
+        }).join('');
+      })
+      .catch(function(){
+        document.getElementById('cu-groups').innerHTML = '<div style="color:#c62828;padding:8px;">تعذر تحميل المجموعات</div>';
+      });
+  }
+  // ── Upload
+  window.cuUpload = function(){
+    var title = document.getElementById('cu-title').value.trim();
+    var desc  = document.getElementById('cu-desc').value.trim();
+    var file  = document.getElementById('cu-file').files[0];
+    var audT  = document.getElementById('cu-aud-t').checked;
+    var audP  = document.getElementById('cu-aud-p').checked;
+    var dlT   = document.getElementById('cu-dl-t').checked;
+    var dlP   = document.getElementById('cu-dl-p').checked;
+    var groups = Array.prototype.map.call(
+      document.querySelectorAll('.cu-gr:checked'),
+      function(el){return el.value;}
+    );
+    if(!title){ toast('العنوان مطلوب', true); return; }
+    if(!file){ toast('يجب اختيار ملف PDF', true); return; }
+    if(!audT && !audP){ toast('اختر جمهور واحد على الأقل', true); return; }
+    if(!groups.length){ toast('اختر مجموعة واحدة على الأقل', true); return; }
+    if(file.size > 25*1024*1024){ toast('حجم الملف يتجاوز 25 ميجا', true); return; }
+    var fd = new FormData();
+    fd.append('title', title);
+    fd.append('description', desc);
+    fd.append('audience_teachers', audT ? '1' : '0');
+    fd.append('audience_parents',  audP ? '1' : '0');
+    fd.append('teacher_can_download', dlT ? '1' : '0');
+    fd.append('parent_can_download',  dlP ? '1' : '0');
+    fd.append('groups', JSON.stringify(groups));
+    fd.append('pdf_file', file);
+    var btn = document.getElementById('cu-save');
+    btn.disabled = true; btn.textContent = '⏳ جاري الرفع...';
+    fetch('/api/curriculum/upload', {method:'POST', credentials:'include', body:fd})
+      .then(function(r){return r.json().then(function(j){return {status:r.status, j:j};});})
+      .then(function(res){
+        btn.disabled = false; btn.textContent = '💾 رفع الملف';
+        if(!res.j || !res.j.ok){
+          toast(res.j && res.j.error || ('فشل الرفع — ' + res.status), true);
+          return;
+        }
+        toast('تم الرفع ✓');
+        // Reset form
+        document.getElementById('cu-title').value = '';
+        document.getElementById('cu-desc').value  = '';
+        document.getElementById('cu-file').value  = '';
+        document.getElementById('cu-aud-t').checked = false;
+        document.getElementById('cu-aud-p').checked = false;
+        document.getElementById('cu-dl-t').checked = true;
+        document.getElementById('cu-dl-p').checked = true;
+        Array.prototype.forEach.call(document.querySelectorAll('.cu-gr'),
+                                      function(el){el.checked=false;});
+        loadList();
+      })
+      .catch(function(){
+        btn.disabled = false; btn.textContent = '💾 رفع الملف';
+        toast('خطأ في الاتصال', true);
+      });
+  };
+  // ── List
+  function loadList(){
+    fetch('/api/curriculum/admin/list',{credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('cu-list');
+        if(!j || !j.ok){ box.innerHTML = '<div class="empty">تعذر التحميل</div>'; return; }
+        var arr = j.files || [];
+        if(!arr.length){ box.innerHTML = '<div class="empty">لا توجد ملفات بعد.</div>'; return; }
+        var html = '<table class="tbl"><thead><tr>'+
+          '<th>العنوان</th><th>الحجم</th><th>الجمهور</th>'+
+          '<th>المجموعات</th><th>التاريخ</th><th>إجراءات</th></tr></thead><tbody>';
+        arr.forEach(function(e){
+          var aud = '';
+          if(e.audience.teachers){
+            aud += '<span class="tag t">معلمات' + (e.download.teachers?'':' 🔒') + '</span>';
+          }
+          if(e.audience.parents){
+            aud += '<span class="tag p">أولياء' + (e.download.parents?'':' 🔒') + '</span>';
+          }
+          var grps = (e.groups||[]).map(function(g){return '<span class="tag">'+_esc(g)+'</span>';}).join('');
+          html += '<tr>'+
+            '<td data-label="العنوان"><b>'+_esc(e.title)+'</b>'+
+              (e.description?'<div style="color:#666;font-size:.82rem;margin-top:3px;">'+_esc((e.description||'').slice(0,100))+'</div>':'')+'</td>'+
+            '<td data-label="الحجم">'+fmtSize(e.file_size_bytes)+'</td>'+
+            '<td data-label="الجمهور">'+aud+'</td>'+
+            '<td data-label="المجموعات">'+grps+'</td>'+
+            '<td data-label="التاريخ">'+_esc((e.uploaded_at||'').slice(0,16))+'</td>'+
+            '<td data-label="إجراءات">'+
+              '<a class="act-view" href="/portal/curriculum/view/'+_esc(e.file_uuid)+'" target="_blank" rel="noopener">عرض</a>'+
+              '<button class="act-del" onclick="cuDelete('+e.id+', this)">حذف</button>'+
+            '</td></tr>';
+        });
+        html += '</tbody></table>';
+        box.innerHTML = html;
+      })
+      .catch(function(){
+        document.getElementById('cu-list').innerHTML = '<div class="empty">تعذر التحميل</div>';
+      });
+  }
+  // ── Delete
+  window.cuDelete = function(id, btn){
+    if(!confirm('حذف هذا الملف نهائياً؟')) return;
+    btn.disabled = true; btn.textContent = '⏳';
+    fetch('/api/curriculum/'+id, {method:'DELETE', credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ btn.disabled=false; btn.textContent='حذف'; toast(j&&j.error||'فشل الحذف', true); return; }
+        toast('تم الحذف ✓');
+        loadList();
+      })
+      .catch(function(){ btn.disabled=false; btn.textContent='حذف'; toast('خطأ', true); });
+  };
+  loadGroups();
+  loadList();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/curriculum')
+@login_required
+def admin_curriculum_page():
+    user = session.get("user") or {}
+    if not _curriculum_can_upload(user):
+        return redirect("/dashboard")
+    return ADMIN_CURRICULUM_HTML
+
+
+@app.route('/api/curriculum/admin/groups', methods=['GET'])
+@login_required
+def api_curriculum_admin_groups():
+    """Distinct group_name list from student_groups, for the upload
+    form's checkbox grid. Restricted to uploaders only."""
+    user = session.get("user") or {}
+    if not _curriculum_can_upload(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT group_name FROM student_groups "
+            "WHERE COALESCE(group_name,'')<>'' ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True,
+                    "groups": [(dict(r).get("group_name") or "").strip()
+                               for r in rows]})
+
+
+@app.route('/api/curriculum/admin/list', methods=['GET'])
+@login_required
+def api_curriculum_admin_list():
+    """Every non-deleted file (admin-side, unfiltered)."""
+    user = session.get("user") or {}
+    if not _curriculum_can_upload(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM curriculum_files "
+            "WHERE COALESCE(is_deleted,0)=0 "
+            "ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        fid = int(dict(r).get("id") or 0)
+        try:
+            grps = [(dict(g).get("group_name") or "").strip()
+                    for g in db.execute(
+                        "SELECT group_name FROM curriculum_file_groups "
+                        "WHERE file_id=?", (fid,)).fetchall()]
+        except Exception: grps = []
+        out.append(_curriculum_file_row_to_dict(r, group_names=grps))
+    return jsonify({"ok": True, "files": out, "count": len(out)})
+
+
+@app.route('/api/curriculum/upload', methods=['POST'])
+@login_required
+def api_curriculum_upload():
+    user = session.get("user") or {}
+    if not _curriculum_can_upload(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+    aud_t = 1 if (request.form.get("audience_teachers") or "0") in ("1","true","on") else 0
+    aud_p = 1 if (request.form.get("audience_parents")  or "0") in ("1","true","on") else 0
+    if not (aud_t or aud_p):
+        return jsonify({"ok": False, "error":
+                        "اختر جمهور واحد على الأقل"}), 400
+    dl_t = 1 if (request.form.get("teacher_can_download") or "1") in ("1","true","on") else 0
+    dl_p = 1 if (request.form.get("parent_can_download")  or "1") in ("1","true","on") else 0
+    raw_groups = request.form.get("groups") or "[]"
+    try:
+        groups = json.loads(raw_groups) or []
+        if not isinstance(groups, list): groups = []
+    except Exception:
+        groups = []
+    groups = [str(g).strip() for g in groups if str(g).strip()]
+    if not groups:
+        return jsonify({"ok": False, "error":
+                        "اختر مجموعة واحدة على الأقل"}), 400
+
+    if "pdf_file" not in request.files:
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    upload = request.files["pdf_file"]
+    if not upload or not (upload.filename or "").strip():
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    raw = upload.read()
+    if not raw:
+        return jsonify({"ok": False, "error": "الملف فارغ"}), 400
+    if len(raw) > _CURRICULUM_MAX_BYTES:
+        return jsonify({"ok": False, "error":
+                        "حجم الملف يتجاوز 25 ميجا"}), 413
+    if not raw.startswith(_CURRICULUM_PDF_MAGIC):
+        return jsonify({"ok": False, "error":
+                        "الملف ليس PDF صالحاً"}), 400
+
+    import uuid as _uuid_mod
+    file_uuid = _uuid_mod.uuid4().hex
+    storage_dir = _curriculum_storage_dir()
+    file_path = os.path.join(storage_dir, file_uuid + ".pdf")
+    try:
+        with open(file_path, "wb") as fh: fh.write(raw)
+    except Exception as ex:
+        return jsonify({"ok": False, "error":
+                        "فشل حفظ الملف على القرص: " + str(ex)}), 500
+
+    db = get_db()
+    try: uid = int(user.get("id") or 0) or None
+    except Exception: uid = None
+    try:
+        cur = db.execute(
+            "INSERT INTO curriculum_files(file_uuid, title, description, "
+            "file_size_bytes, audience_teachers, audience_parents, "
+            "teacher_can_download, parent_can_download, uploaded_by, "
+            "uploaded_at, is_deleted) VALUES(?,?,?,?,?,?,?,?,?,"
+            "CURRENT_TIMESTAMP,0)",
+            (file_uuid, title, description, len(raw),
+             aud_t, aud_p, dl_t, dl_p, uid),
+        )
+        db.commit()
+        try: new_id = cur.lastrowid
+        except Exception: new_id = None
+        if not new_id:
+            try:
+                new_id = int(db.execute(
+                    "SELECT id FROM curriculum_files WHERE file_uuid=?",
+                    (file_uuid,)).fetchone()[0])
+            except Exception: new_id = 0
+    except Exception as ex:
+        try: os.remove(file_path)
+        except Exception: pass
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    inserted = 0
+    for g in groups:
+        try:
+            db.execute(
+                "INSERT INTO curriculum_file_groups(file_id, group_name) "
+                "VALUES(?,?)", (int(new_id), g))
+            inserted += 1
+        except Exception: continue
+    db.commit()
+
+    try:
+        _audit("curriculum.upload", target_type="curriculum_files",
+               target_id=int(new_id),
+               new_value={"title": title, "groups": groups,
+                          "size": len(raw),
+                          "audience_teachers": aud_t,
+                          "audience_parents": aud_p})
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(new_id),
+                    "file_uuid": file_uuid,
+                    "groups_attached": inserted,
+                    "size_bytes": len(raw)})
+
+
+@app.route('/api/curriculum/<int:file_id>', methods=['DELETE'])
+@login_required
+def api_curriculum_delete(file_id):
+    user = session.get("user") or {}
+    if not _curriculum_can_upload(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, file_uuid FROM curriculum_files WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(file_id),)
+        ).fetchone()
+    except Exception: row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    file_uuid = rd.get("file_uuid") or ""
+    try:
+        db.execute("UPDATE curriculum_files SET is_deleted=1 WHERE id=?",
+                   (int(file_id),))
+        db.execute("DELETE FROM curriculum_file_groups WHERE file_id=?",
+                   (int(file_id),))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if file_uuid:
+        try:
+            path = os.path.join(_curriculum_storage_dir(), file_uuid + ".pdf")
+            if os.path.isfile(path): os.remove(path)
+        except Exception: pass
+    try:
+        _audit("curriculum.delete", target_type="curriculum_files",
+               target_id=int(file_id),
+               new_value={"file_uuid": file_uuid})
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(file_id)})
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
