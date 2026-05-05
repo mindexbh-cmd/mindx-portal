@@ -68596,6 +68596,10 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-reg-pop .opt:hover{background:#f0f7f3;}
   .evd-reg-pop .opt.is-cur{background:#e6f7ee;color:#1D9E75;}
   /* Bulk attendance mode (6.4) */
+  .evd-reg-bulk-search{background:#fff;border-radius:12px;padding:10px 14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:sticky;top:64px;z-index:10;}
+  .evd-reg-bulk-search input{width:100%;padding:8px 12px;border:1.5px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.94rem;}
+  @keyframes evdBulkPress{0%{transform:scale(1);}40%{transform:scale(0.92);}100%{transform:scale(1);}}
+  .evd-reg-bulk-btn:active{animation:evdBulkPress .18s ease;}
   .evd-reg-bulk-bar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1565C0,#0d47a1);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;font-weight:800;}
   .evd-reg-bulk-bar .ttl{display:flex;align-items:center;gap:8px;font-size:1.05rem;}
   .evd-reg-bulk-bar button{background:#fff;color:#0d47a1;border:none;padding:6px 14px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.86rem;}
@@ -71047,15 +71051,27 @@ document.addEventListener('click', function(e){
 });
 
 /* Bulk attendance mode (6.4) */
+var REG_BULK_SEARCH = '';
+
 function evdRenderRegsBulk(root){
   var statuses = ['pending','present','late','absent','cancelled','medical_emergency'];
   var touched = Object.keys(REG_BULK_DRAFT).length;
   var headerHTML = ''
     + '<div class="evd-reg-bulk-bar">'
-    + '  <div class="ttl">📋 تسجيل الحضور</div>'
+    + '  <div class="ttl">📋 تسجيل الحضور (' + REG_DATA.length + ' طالبة)</div>'
     + '  <button type="button" id="evd-reg-bulk-exit">إلغاء وخروج</button>'
     + '</div>';
-  var rowsHTML = REG_DATA.map(function(r){
+  var searchHTML = ''
+    + '<div class="evd-reg-bulk-search">'
+    + '  <input type="text" id="evd-reg-bulk-search-in" placeholder="🔍 ابحثي بالاسم…" value="' + evdEsc(REG_BULK_SEARCH) + '"/>'
+    + '</div>';
+  var q = REG_BULK_SEARCH.toLowerCase();
+  var visibleRows = REG_DATA.filter(function(r){
+    if (!q) return true;
+    var hay = (r.student_name + ' ' + (r.group_name || '')).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  });
+  var rowsHTML = visibleRows.map(function(r){
     var draft = REG_BULK_DRAFT[r.id];
     var cur = draft ? draft.st : (r.attendance_status || 'pending');
     var grpChip = r.group_name ? '<span class="grp">' + evdEsc(r.group_name) + '</span>' : '';
@@ -71078,9 +71094,23 @@ function evdRenderRegsBulk(root){
     + '    <button type="button" class="save" id="evd-reg-bulk-save"' + (touched ? '' : ' disabled style="opacity:.5;cursor:not-allowed;"') + '>💾 حفظ الكل (' + touched + ')</button>'
     + '  </div>'
     + '</div>';
-  root.innerHTML = headerHTML
-                 + '<div class="evd-reg-table">' + rowsHTML + '</div>'
-                 + stickyHTML;
+  var listHTML = visibleRows.length
+    ? ('<div class="evd-reg-table">' + rowsHTML + '</div>')
+    : '<div class="evd-reg-table"><div class="evd-reg-empty"><div class="em">🔍</div><div class="h">لا توجد نتائج</div></div></div>';
+  root.innerHTML = headerHTML + searchHTML + listHTML + stickyHTML;
+  var bs = document.getElementById('evd-reg-bulk-search-in');
+  if (bs){
+    var bt = null;
+    bs.addEventListener('input', function(){
+      clearTimeout(bt);
+      bt = setTimeout(function(){
+        REG_BULK_SEARCH = bs.value || '';
+        evdRenderRegs();
+        var bs2 = document.getElementById('evd-reg-bulk-search-in');
+        if (bs2){ bs2.focus(); var v = bs2.value; bs2.value = ''; bs2.value = v; }
+      }, 200);
+    });
+  }
   root.querySelectorAll('.evd-reg-bulk-btn').forEach(function(b){
     b.addEventListener('click', function(){
       var rid = parseInt(b.getAttribute('data-rid'), 10);
@@ -71103,6 +71133,7 @@ function evdRegBulkExit(reload){
   }
   REG_BULK_MODE = false;
   REG_BULK_DRAFT = {};
+  REG_BULK_SEARCH = '';
   if (reload) evdLoadRegs();
   else        evdRenderRegs();
 }
@@ -71125,6 +71156,7 @@ function evdRegBulkSave(){
     evdToast('تم حفظ ' + (o.j.updated_count || 0) + ' تحديث', 'success');
     REG_BULK_MODE = false;
     REG_BULK_DRAFT = {};
+    REG_BULK_SEARCH = '';
     evdLoadRegs();
   })
   .catch(function(){
