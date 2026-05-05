@@ -66694,21 +66694,15 @@ def _events_public_event_by_token(db, token):
 
 
 def _events_public_render_form(ev):
-    """Render the registration form with event banner."""
-    name = (ev.get("name") or "رحلة").strip()
-    dest = (ev.get("destination") or "").strip()
-    date_iso = (ev.get("event_date") or "").strip()
-    date_lbl = ""
-    if date_iso and len(date_iso) >= 10:
-        try:
-            months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو",
-                      "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
-            y, m, d = date_iso[:10].split("-")
-            date_lbl = "%d %s %s" % (int(d), months[int(m)-1], y)
-        except Exception:
-            date_lbl = date_iso
-    dep = (ev.get("departure_time") or "").strip()
-    place = (ev.get("meeting_point") or dest or "").strip()
+    """Render the registration form with event banner. All string
+    fields go through str() first so a Postgres date object (from the
+    DATE column) doesn't crash .strip()."""
+    name = str(ev.get("name") or "رحلة").strip()
+    dest = str(ev.get("destination") or "").strip()
+    # Use the shared helper so the same Postgres-vs-SQLite rules apply.
+    date_lbl = _events_msg_format_date(ev.get("event_date"))
+    dep = str(ev.get("departure_time") or "").strip()
+    place = str(ev.get("meeting_point") or dest or "").strip()
     price = float(ev.get("price_per_student") or 0)
     price_lbl = ("%.3f د.ب" % price) if price > 0 else "مجاناً"
     import html as _html
@@ -66969,9 +66963,25 @@ def _events_msg_event_exists(db, eid):
 
 
 def _events_msg_format_date(iso):
-    s = (iso or "").strip()
-    if not s or len(s) < 10:
+    """Render an event_date in Arabic. Tolerant of: str ISO,
+    datetime.date (which is what Postgres returns for DATE columns —
+    SQLite would return a string), datetime.datetime, or None.
+    Returning '' on bad input is safer than raising in print views."""
+    if iso is None:
         return ""
+    # If it's already a date-like, format directly.
+    try:
+        import datetime as _dt
+        if isinstance(iso, (_dt.date, _dt.datetime)):
+            d = iso if isinstance(iso, _dt.date) and not isinstance(iso, _dt.datetime) else iso.date()
+            months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو",
+                      "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+            return "%d %s %d" % (d.day, months[d.month - 1], d.year)
+    except Exception:
+        pass
+    s = str(iso).strip()
+    if not s or len(s) < 10:
+        return s
     try:
         months = ["يناير","فبراير","مارس","أبريل","مايو","يونيو",
                   "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
@@ -67231,14 +67241,16 @@ def _events_print_load(eid, db):
 
 
 def _events_print_event_header(ev):
-    """Common event-header info grid used by every print view."""
+    """Common event-header info grid used by every print view. All
+    string fields go through str() so Postgres date/time objects
+    don't crash .strip()."""
     import html as _html
     date_lbl = _events_msg_format_date(ev.get("event_date"))
-    dep = (ev.get("departure_time") or "").strip()
-    ret = (ev.get("return_time") or "").strip()
+    dep = str(ev.get("departure_time") or "").strip()
+    ret = str(ev.get("return_time") or "").strip()
     time_lbl = (dep + (" - " + ret if ret else "")) if dep else "—"
-    place = (ev.get("meeting_point") or ev.get("destination") or "—").strip()
-    return ('<div class="pp-h1">🚌 ' + _html.escape(ev.get("name") or "—") + '</div>'
+    place = str(ev.get("meeting_point") or ev.get("destination") or "—").strip()
+    return ('<div class="pp-h1">🚌 ' + _html.escape(str(ev.get("name") or "—")) + '</div>'
             '<div class="pp-sub">'
             + (('📅 ' + _html.escape(date_lbl)) if date_lbl else '')
             + ' &nbsp; • &nbsp; ⏰ ' + _html.escape(time_lbl)
@@ -67253,11 +67265,55 @@ def _events_print_render(eid, ev, body, title):
     ts = _dt.now().strftime("%Y-%m-%d %H:%M")
     html = (PRINT_PAGE_HTML
             .replace("{{TITLE}}", _html.escape(title))
-            .replace("{{EVENT_NAME}}", _html.escape(ev.get("name") or ""))
+            .replace("{{EVENT_NAME}}", _html.escape(str(ev.get("name") or "")))
             .replace("{{PRINTED_ON}}", "طُبع: " + ts)
             .replace("{{EID}}", str(eid))
             .replace("{{BODY}}", body))
     return Response(html, mimetype="text/html; charset=utf-8")
+
+
+def _events_print_safe(eid, kind, build_fn):
+    """Wrap a print-route body builder in defensive logging so an
+    exception never leaks a 500 with no diagnostic. ?debug=1 (admins
+    only) shows the traceback inline so future bugs can be debugged
+    from a phone without tailing Render logs."""
+    import sys as _sys, traceback as _tb
+    db = get_db()
+    bundle = _events_print_load(eid, db)
+    if not bundle:
+        return Response("الرحلة غير موجودة", status=404)
+    try:
+        return build_fn(bundle)
+    except Exception as ex:
+        tb = _tb.format_exc()
+        print("[events] print/" + kind + " FAILED for eid=" + str(eid)
+              + ": " + str(ex), file=_sys.stderr)
+        print(tb, file=_sys.stderr)
+        # Show traceback inline for admins when ?debug=1.
+        user = session.get("user") or {}
+        is_admin = bool(user) and (user.get("role") in ("admin", "manager")
+                                   or _events_can_admin(user))
+        debug = (request.args.get("debug") == "1")
+        if is_admin and debug:
+            import html as _html
+            body = ('<div class="pp-section"><h2 style="color:#c62828;">'
+                    '⚠️ خطأ في توليد الطباعة</h2>'
+                    '<pre style="background:#fff8e1;padding:14px;border-radius:8px;'
+                    'overflow-x:auto;direction:ltr;text-align:left;font-size:.82rem;">'
+                    + _html.escape(tb) + '</pre></div>')
+            return _events_print_render(eid, bundle["event"], body,
+                                        "خطأ — تشخيص المسؤولين")
+        # Otherwise show a friendly error.
+        body = ('<div class="pp-section" style="text-align:center;padding:30px;">'
+                '<div style="font-size:2.6rem;">⚠️</div>'
+                '<div style="font-weight:900;color:#c62828;font-size:1.1rem;'
+                'margin:8px 0;">تعذّر توليد التقرير</div>'
+                '<div style="color:#666;">حصل خطأ غير متوقع. أعيدي المحاولة، '
+                'وإذا استمر المشكلة تواصلي مع المسؤول.</div>'
+                '<div style="font-size:.78rem;color:#888;margin-top:14px;">'
+                'للمسؤولين: أضيفي <code>?debug=1</code> لرؤية تفاصيل الخطأ.</div>'
+                '</div>')
+        return _events_print_render(eid, bundle["event"], body, "خطأ في الطباعة")
 
 
 def _print_section_list(regs):
@@ -67436,13 +67492,11 @@ def admin_events_print_list(eid):
     user = session.get("user") or {}
     if not _events_can_admin(user):
         return "غير مصرح", 403
-    db = get_db()
-    bundle = _events_print_load(eid, db)
-    if not bundle:
-        return "الرحلة غير موجودة", 404
-    body = (_events_print_event_header(bundle["event"])
-            + _print_section_list(bundle["regs"]))
-    return _events_print_render(eid, bundle["event"], body, "قائمة الطالبات")
+    def _build(bundle):
+        body = (_events_print_event_header(bundle["event"])
+                + _print_section_list(bundle["regs"]))
+        return _events_print_render(eid, bundle["event"], body, "قائمة الطالبات")
+    return _events_print_safe(eid, "list", _build)
 
 
 @app.route('/admin/events/<int:eid>/print/schedule', methods=['GET'])
@@ -67451,13 +67505,11 @@ def admin_events_print_schedule(eid):
     user = session.get("user") or {}
     if not _events_can_admin(user):
         return "غير مصرح", 403
-    db = get_db()
-    bundle = _events_print_load(eid, db)
-    if not bundle:
-        return "الرحلة غير موجودة", 404
-    body = (_events_print_event_header(bundle["event"])
-            + _print_section_schedule(bundle["schedule"]))
-    return _events_print_render(eid, bundle["event"], body, "الخطة الزمنية")
+    def _build(bundle):
+        body = (_events_print_event_header(bundle["event"])
+                + _print_section_schedule(bundle["schedule"]))
+        return _events_print_render(eid, bundle["event"], body, "الخطة الزمنية")
+    return _events_print_safe(eid, "schedule", _build)
 
 
 @app.route('/admin/events/<int:eid>/print/financial', methods=['GET'])
@@ -67466,14 +67518,12 @@ def admin_events_print_financial(eid):
     user = session.get("user") or {}
     if not _events_can_admin(user):
         return "غير مصرح", 403
-    db = get_db()
-    bundle = _events_print_load(eid, db)
-    if not bundle:
-        return "الرحلة غير موجودة", 404
-    body = (_events_print_event_header(bundle["event"])
-            + _print_section_costs(bundle["costs"])
-            + _print_section_payments(bundle["regs"], bundle["event"]))
-    return _events_print_render(eid, bundle["event"], body, "التقرير المالي")
+    def _build(bundle):
+        body = (_events_print_event_header(bundle["event"])
+                + _print_section_costs(bundle["costs"])
+                + _print_section_payments(bundle["regs"], bundle["event"]))
+        return _events_print_render(eid, bundle["event"], body, "التقرير المالي")
+    return _events_print_safe(eid, "financial", _build)
 
 
 @app.route('/admin/events/<int:eid>/print/full', methods=['GET'])
@@ -67482,28 +67532,24 @@ def admin_events_print_full(eid):
     user = session.get("user") or {}
     if not _events_can_admin(user):
         return "غير مصرح", 403
-    db = get_db()
-    bundle = _events_print_load(eid, db)
-    if not bundle:
-        return "الرحلة غير موجودة", 404
-    ev = bundle["event"]
-    # One-page summary at the top, then everything in detail.
-    import html as _html
-    summary = ('<div class="pp-summary">'
-               '<div class="card"><div class="lab">المسجلات</div><div class="val">' + str(len(bundle["regs"])) + '</div></div>'
-               '<div class="card"><div class="lab">المهام</div><div class="val">' + str(int(ev.get("task_completed") or 0)) + '/' + str(int(ev.get("task_total") or 0)) + '</div></div>'
-               '<div class="card"><div class="lab">الأدوات</div><div class="val">' + str(int(ev.get("item_ready") or 0)) + '/' + str(int(ev.get("item_total") or 0)) + '</div></div>'
-               '<div class="card"><div class="lab">المحصّل</div><div class="val">' + ("%.3f" % float(ev.get("payment_collected") or 0)) + '</div></div>'
-               '</div>')
-    body = (_events_print_event_header(ev)
-            + summary
-            + _print_section_schedule(bundle["schedule"])
-            + _print_section_costs(bundle["costs"])
-            + _print_section_payments(bundle["regs"], ev)
-            + _print_section_list(bundle["regs"])
-            + _print_section_tasks(bundle["tasks"])
-            + _print_section_items(bundle["items"]))
-    return _events_print_render(eid, ev, body, "تقرير الرحلة الشامل")
+    def _build(bundle):
+        ev = bundle["event"]
+        summary = ('<div class="pp-summary">'
+                   '<div class="card"><div class="lab">المسجلات</div><div class="val">' + str(len(bundle["regs"])) + '</div></div>'
+                   '<div class="card"><div class="lab">المهام</div><div class="val">' + str(int(ev.get("task_completed") or 0)) + '/' + str(int(ev.get("task_total") or 0)) + '</div></div>'
+                   '<div class="card"><div class="lab">الأدوات</div><div class="val">' + str(int(ev.get("item_ready") or 0)) + '/' + str(int(ev.get("item_total") or 0)) + '</div></div>'
+                   '<div class="card"><div class="lab">المحصّل</div><div class="val">' + ("%.3f" % float(ev.get("payment_collected") or 0)) + '</div></div>'
+                   '</div>')
+        body = (_events_print_event_header(ev)
+                + summary
+                + _print_section_schedule(bundle["schedule"])
+                + _print_section_costs(bundle["costs"])
+                + _print_section_payments(bundle["regs"], ev)
+                + _print_section_list(bundle["regs"])
+                + _print_section_tasks(bundle["tasks"])
+                + _print_section_items(bundle["items"]))
+        return _events_print_render(eid, ev, body, "تقرير الرحلة الشامل")
+    return _events_print_safe(eid, "full", _build)
 
 
 # ── Tasks (5.3) ────────────────────────────────────────────────
