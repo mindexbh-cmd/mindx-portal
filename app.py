@@ -864,46 +864,6 @@ def init_db():
         read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, student_id)
     )""")
-    # ── curriculum_v1: PDF library (admin/manager uploads, assigned per
-    # group/student/parent/teacher with optional download permission).
-    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        description TEXT,
-        subject TEXT,
-        level TEXT,
-        file_path TEXT NOT NULL,
-        file_size_bytes INTEGER DEFAULT 0,
-        download_default TEXT DEFAULT 'allowed',
-        uploaded_by INTEGER,
-        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_assignments(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_id INTEGER NOT NULL,
-        target_type TEXT NOT NULL,
-        target_id TEXT NOT NULL,
-        can_download INTEGER,
-        assigned_by INTEGER,
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0
-    )""")
-    db.execute("""CREATE TABLE IF NOT EXISTS curriculum_access_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_id INTEGER NOT NULL,
-        user_id INTEGER,
-        action TEXT,
-        accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ip_address TEXT
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_lookup "
-               "ON curriculum_assignments(file_id, target_type, target_id)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_target "
-               "ON curriculum_assignments(target_type, target_id, is_deleted)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
-               "ON curriculum_files(is_deleted)")
     # ── violations_v1: نظام المخالفات — admin-only registration of student
     # behaviour incidents. 12 violation types auto-classified into
     # light/medium/severe in `severity`, place ∈ {classroom/break/center},
@@ -6294,91 +6254,32 @@ if True:
             db2.commit()
         except Exception: pass
 
-    # ── curriculum_v1: المناهج — central PDF library. Admin/manager
-    # uploads PDFs and assigns each to specific groups, students,
-    # parents, or teachers with configurable view-only or download
-    # permission. PDFs are stored on the persistent disk (Render
-    # /var/data/curriculum, local fallback ./data/curriculum) — the
-    # file_path column holds the absolute path so the binary is
-    # NEVER served from /static. curriculum_assignments is the
-    # join table; target_type ∈ {group, student, parent, teacher}.
-    # Idempotent: CREATE TABLE IF NOT EXISTS unconditionally; no
-    # ALTER block yet (this is a brand-new table set so there are
-    # no legacy columns to backfill).
-    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_files(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        description TEXT,
-        subject TEXT,
-        level TEXT,
-        file_path TEXT NOT NULL,
-        file_size_bytes INTEGER DEFAULT 0,
-        download_default TEXT DEFAULT 'allowed',
-        uploaded_by INTEGER,
-        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_assignments(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_id INTEGER NOT NULL,
-        target_type TEXT NOT NULL,
-        target_id TEXT NOT NULL,
-        can_download INTEGER,
-        assigned_by INTEGER,
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0
-    )""")
-    db2.execute("""CREATE TABLE IF NOT EXISTS curriculum_access_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_id INTEGER NOT NULL,
-        user_id INTEGER,
-        action TEXT,
-        accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ip_address TEXT
-    )""")
-    try:
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_lookup "
-                    "ON curriculum_assignments(file_id, target_type, target_id)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_assign_target "
-                    "ON curriculum_assignments(target_type, target_id, is_deleted)")
-        db2.execute("CREATE INDEX IF NOT EXISTS idx_curriculum_files_deleted "
-                    "ON curriculum_files(is_deleted)")
-    except Exception: pass
-    try:
-        _cv1 = db2.execute(
-            "SELECT 1 FROM schema_migrations WHERE tag=?",
-            ("curriculum_v1",)
-        ).fetchone()
-    except Exception:
-        _cv1 = None
-    if not _cv1:
+    # ── curriculum_removed_v1: drops every curriculum_* table after the
+    # feature was retired. User explicitly requested removal of the
+    # curriculum/books library to start fresh. DROP TABLE IF EXISTS is
+    # safe-by-construction; each statement is wrapped so a missing
+    # table doesn't crash boot. The tag is stamped so this runs once
+    # per DB and stays inert on subsequent boots.
+    if "curriculum_removed_v1" not in applied:
+        for _tbl in ("curriculum_access_log",
+                     "curriculum_assignments",
+                     "curriculum_files"):
+            try:
+                db2.execute("DROP TABLE IF EXISTS " + _tbl)
+                import sys as _sys
+                print("[curriculum-removal] dropped " + _tbl,
+                      file=_sys.stderr)
+            except Exception as _e:
+                import sys as _sys
+                print("[curriculum-removal] drop " + _tbl + " failed: "
+                      + str(_e), file=_sys.stderr)
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("curriculum_v1",))
+                        ("curriculum_removed_v1",))
             db2.commit()
-        except Exception: pass
-
-    # ── curriculum_subject_level_v1: optional subject + level metadata
-    # on curriculum_files. Idempotent ALTER TABLE ADD COLUMN; existing
-    # rows get NULL and the UI hides badges when those columns are NULL,
-    # so no backfill is needed.
-    if "curriculum_subject_level_v1" not in applied:
-        try:
-            _curr_cols = {r[1] for r in db2.execute(
-                "PRAGMA table_info(curriculum_files)").fetchall()}
-        except Exception:
-            _curr_cols = set()
-        for _col, _decl in [("subject", "TEXT"), ("level", "TEXT")]:
-            if _col not in _curr_cols:
-                try:
-                    db2.execute("ALTER TABLE curriculum_files ADD COLUMN "
-                                + _col + " " + _decl)
-                except Exception: pass
-        try:
-            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
-                        ("curriculum_subject_level_v1",))
-            db2.commit()
+            import sys as _sys
+            print("[curriculum-removal] curriculum_removed_v1 DONE",
+                  file=_sys.stderr)
         except Exception: pass
 
     # ── violations_v1: نظام المخالفات — admin-only behaviour-incident
