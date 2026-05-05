@@ -68521,6 +68521,100 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   .evd-sched-edit input,.evd-sched-edit textarea,.evd-sched-edit select{width:100%;padding:7px 9px;border:1px solid #d3d8de;border-radius:8px;font-family:inherit;font-size:.9rem;}
   .evd-sched-edit textarea{min-height:54px;}
   .evd-sched-edit .footer{display:flex;justify-content:flex-end;gap:6px;}
+  /* Registrations panel (6.2) */
+  .evd-reg-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .evd-reg-stat{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid var(--rsc,#1D9E75);}
+  .evd-reg-stat[data-k="reg"]  {--rsc:#1D9E75;}
+  .evd-reg-stat[data-k="paid"] {--rsc:#43a047;}
+  .evd-reg-stat[data-k="cash"] {--rsc:#E65100;}
+  .evd-reg-stat[data-k="att"]  {--rsc:#1565C0;}
+  .evd-reg-stat .lab{font-size:.78rem;color:#666;font-weight:700;display:flex;align-items:center;gap:5px;margin-bottom:5px;}
+  .evd-reg-stat .val{font-size:1.18rem;color:#222;font-weight:900;font-variant-numeric:tabular-nums;}
+  .evd-reg-stat .val .sub{font-size:.78rem;color:#888;font-weight:700;}
+  .evd-reg-stat .bar{height:6px;background:#eef0f3;border-radius:6px;overflow:hidden;margin-top:6px;}
+  .evd-reg-stat .bar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--rsc),#43a047);transition:width .8s cubic-bezier(.2,.8,.2,1);}
+  .evd-reg-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+  .evd-reg-toolbar input.search{flex:1;min-width:160px;padding:8px 12px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.92rem;}
+  .evd-reg-toolbar select.filter{padding:8px 10px;border:1px solid #d3d8de;border-radius:10px;font-family:inherit;font-size:.9rem;background:#fff;}
+  .evd-reg-table{background:#fff;border-radius:14px;padding:6px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-right:5px solid #1565C0;}
+  .evd-reg-row{display:grid;grid-template-columns:34px 1fr 1fr auto auto auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px dashed #eef0f3;font-size:.92rem;animation:evdItemIn .22s ease both;}
+  .evd-reg-row:last-child{border-bottom:0;}
+  .evd-reg-row.is-leaving{animation:evdItemIn .18s ease reverse both;}
+  .evd-reg-row.is-stripe{background:rgba(29,158,117,0.025);}
+  .evd-reg-row .num{color:#888;font-weight:700;font-variant-numeric:tabular-nums;}
+  .evd-reg-row .who{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .evd-reg-row .who .nm{color:#222;font-weight:800;}
+  .evd-reg-row .who .grp{font-size:.74rem;color:#0d47a1;background:#e3f2fd;padding:1px 8px;border-radius:99px;font-weight:700;align-self:flex-start;}
+  .evd-reg-row .par{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:.86rem;}
+  .evd-reg-row .par .pn{color:#444;font-weight:700;}
+  .evd-reg-row .par .ph a{color:#1D9E75;text-decoration:none;font-weight:700;font-variant-numeric:tabular-nums;}
+  .evd-reg-row .par .ph a:hover{text-decoration:underline;}
+  .evd-reg-row .par .ph .none{color:#bbb;font-style:italic;}
+  .evd-reg-badge{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-size:.78rem;padding:4px 10px;border-radius:99px;cursor:pointer;border:1.5px solid transparent;transition:.15s;white-space:nowrap;}
+  .evd-reg-badge:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+  .evd-reg-badge.pay-pending {background:#eef0f3;color:#666;border-color:#d3d8de;}
+  .evd-reg-badge.pay-paid    {background:#e6f7ee;color:#1D9E75;border-color:#c6ecd6;}
+  .evd-reg-badge.pay-partial {background:#e3f2fd;color:#1565C0;border-color:#bbdefb;}
+  .evd-reg-badge.pay-refunded{background:#eef0f3;color:#666;border-color:#d3d8de;}
+  .evd-reg-badge.pay-waived  {background:#f3e5f5;color:#6B3FA0;border-color:#e1bee7;}
+  .evd-reg-badge.att-pending          {background:#eef0f3;color:#666;border-color:#d3d8de;}
+  .evd-reg-badge.att-present          {background:#e6f7ee;color:#1D9E75;border-color:#c6ecd6;}
+  .evd-reg-badge.att-late             {background:#fff8e1;color:#E65100;border-color:#ffcc80;}
+  .evd-reg-badge.att-absent           {background:#ffebee;color:#c62828;border-color:#ef9a9a;}
+  .evd-reg-badge.att-cancelled        {background:#eef0f3;color:#37474F;border-color:#cfd8dc;}
+  .evd-reg-badge.att-medical_emergency{background:#f3e5f5;color:#6B3FA0;border-color:#e1bee7;}
+  .evd-reg-row .acts{display:flex;gap:4px;opacity:0;transition:opacity .15s;}
+  .evd-reg-row:hover .acts,
+  .evd-reg-row:focus-within .acts{opacity:1;}
+  .evd-reg-row .acts button{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:5px 7px;border-radius:6px;color:#666;}
+  .evd-reg-row .acts button:hover{background:#f0f3f7;color:#0d47a1;}
+  .evd-reg-row .acts button.del:hover{color:#c62828;background:#ffebee;}
+  .evd-reg-empty{text-align:center;padding:40px 18px;color:#888;}
+  .evd-reg-empty .em{font-size:3rem;margin-bottom:8px;}
+  .evd-reg-empty .h{font-weight:800;color:#444;margin-bottom:6px;}
+  .evd-reg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;}
+  .evd-reg-actions button{background:#fff;border:1.5px solid #1D9E75;color:#1D9E75;padding:9px 18px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;}
+  .evd-reg-actions button:hover{background:#1D9E75;color:#fff;}
+  .evd-reg-actions button.warn{border-color:#E65100;color:#E65100;}
+  .evd-reg-actions button.warn:hover{background:#E65100;color:#fff;}
+  /* Add modal mode toggle */
+  .evd-reg-mode{display:flex;gap:6px;margin-bottom:12px;background:#eef0f3;padding:4px;border-radius:10px;}
+  .evd-reg-mode button{flex:1;background:transparent;border:none;padding:8px 12px;border-radius:8px;font-weight:800;cursor:pointer;color:#666;font-size:.88rem;}
+  .evd-reg-mode button.is-on{background:#fff;color:#1D9E75;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+  /* Quick-toggle popover (6.3) */
+  .evd-reg-pop{position:absolute;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.18);padding:8px;display:none;z-index:90;animation:evdItemIn .15s ease both;min-width:140px;}
+  .evd-reg-pop.is-open{display:block;}
+  .evd-reg-pop .pop-arrow{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:12px;height:12px;background:#fff;rotate:45deg;border-radius:2px;box-shadow:-2px -2px 4px rgba(0,0,0,0.04);}
+  .evd-reg-pop .opt{display:block;width:100%;text-align:right;background:none;border:none;padding:7px 11px;border-radius:8px;font-weight:700;cursor:pointer;color:#333;font-size:.88rem;}
+  .evd-reg-pop .opt:hover{background:#f0f7f3;}
+  .evd-reg-pop .opt.is-cur{background:#e6f7ee;color:#1D9E75;}
+  /* Bulk attendance mode (6.4) */
+  .evd-reg-bulk-bar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1565C0,#0d47a1);color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;font-weight:800;}
+  .evd-reg-bulk-bar .ttl{display:flex;align-items:center;gap:8px;font-size:1.05rem;}
+  .evd-reg-bulk-bar button{background:#fff;color:#0d47a1;border:none;padding:6px 14px;border-radius:8px;font-weight:800;cursor:pointer;font-size:.86rem;}
+  .evd-reg-bulk-bar button:hover{background:#e3f2fd;}
+  .evd-reg-bulk-row{display:grid;grid-template-columns:1fr;gap:10px;padding:12px 0;border-bottom:1px dashed #eef0f3;animation:evdItemIn .2s ease both;}
+  .evd-reg-bulk-row:last-child{border-bottom:0;}
+  .evd-reg-bulk-row.is-touched{background:linear-gradient(90deg,rgba(255,193,7,0.10),transparent 90%);border-radius:10px;padding-inline:8px;}
+  .evd-reg-bulk-row .head{font-weight:800;color:#222;font-size:.96rem;display:flex;align-items:center;gap:8px;}
+  .evd-reg-bulk-row .head .grp{font-size:.74rem;color:#0d47a1;background:#e3f2fd;padding:1px 8px;border-radius:99px;font-weight:700;}
+  .evd-reg-bulk-btns{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .evd-reg-bulk-btn{background:#fff;border:2px solid #d3d8de;border-radius:10px;padding:10px 4px;font-size:1.4rem;cursor:pointer;transition:.12s;display:flex;align-items:center;justify-content:center;}
+  .evd-reg-bulk-btn:hover{transform:translateY(-1px);}
+  .evd-reg-bulk-btn.is-on[data-st="pending"]          {background:#eef0f3;border-color:#9e9e9e;}
+  .evd-reg-bulk-btn.is-on[data-st="present"]          {background:#1D9E75;border-color:#1D9E75;color:#fff;}
+  .evd-reg-bulk-btn.is-on[data-st="late"]             {background:#E65100;border-color:#E65100;color:#fff;}
+  .evd-reg-bulk-btn.is-on[data-st="absent"]           {background:#c62828;border-color:#c62828;color:#fff;}
+  .evd-reg-bulk-btn.is-on[data-st="cancelled"]        {background:#37474F;border-color:#37474F;color:#fff;}
+  .evd-reg-bulk-btn.is-on[data-st="medical_emergency"]{background:#6B3FA0;border-color:#6B3FA0;color:#fff;}
+  .evd-reg-bulk-sticky{position:sticky;bottom:0;background:#fff;border-radius:14px;padding:12px 18px;margin-top:14px;box-shadow:0 -4px 14px rgba(0,0,0,0.10);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-top:3px solid #1565C0;}
+  .evd-reg-bulk-sticky .info{font-weight:800;color:#0d47a1;font-size:.94rem;}
+  .evd-reg-bulk-sticky .actions{display:flex;gap:8px;}
+  .evd-reg-bulk-sticky button{padding:8px 18px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.92rem;border:1.5px solid transparent;}
+  .evd-reg-bulk-sticky button.save{background:#1D9E75;color:#fff;border-color:#1D9E75;}
+  .evd-reg-bulk-sticky button.save:hover{background:#178a64;}
+  .evd-reg-bulk-sticky button.cancel{background:#fff;color:#c62828;border-color:#c62828;}
+  .evd-reg-bulk-sticky button.cancel:hover{background:#ffebee;}
   /* Mobile */
   @media (max-width: 720px){
     .evd-shell{padding:10px;}
@@ -68549,6 +68643,12 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
     .evd-task-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
     .evd-task-toolbar{flex-direction:column;align-items:stretch;}
     .evd-task-filters{margin-inline-start:0;justify-content:flex-start;}
+    .evd-reg-stats{grid-template-columns:repeat(2,1fr);}
+    .evd-reg-row{grid-template-columns:30px 1fr auto;gap:6px;}
+    .evd-reg-row .par{display:none;}
+    .evd-reg-row .acts{grid-column:1 / -1;justify-content:flex-end;opacity:1;}
+    .evd-reg-row .pay-cell,.evd-reg-row .att-cell{grid-column:1 / -1;justify-content:flex-end;display:flex;gap:6px;}
+    .evd-reg-bulk-btns{grid-template-columns:repeat(3,1fr);}
   }
 </style></head><body>
 
@@ -68642,7 +68742,15 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
       <div class="evd-skel h-row"></div>
     </div>
   </section>
-  <section class="evd-panel" data-panel="students" role="tabpanel"><div class="evd-stub"><div class="em">👥</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
+  <!-- Students panel (6.2) -->
+  <section class="evd-panel" data-panel="students" role="tabpanel">
+    <div class="evd-reg" id="evd-reg-root">
+      <div class="evd-skel h-card" style="height:90px;"></div>
+      <div class="evd-skel h-card"></div>
+      <div class="evd-skel h-row"></div>
+      <div class="evd-skel h-row"></div>
+    </div>
+  </section>
   <section class="evd-panel" data-panel="messages" role="tabpanel"><div class="evd-stub"><div class="em">💬</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
   <section class="evd-panel" data-panel="print"    role="tabpanel"><div class="evd-stub"><div class="em">🖨️</div><div class="h">⏳ هذا التبويب قيد التطوير</div><div class="sub">سيكون جاهز قريباً</div></div></section>
 
@@ -68853,6 +68961,94 @@ ADMIN_EVENT_DETAIL_HTML = r"""<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Registration add/edit modal (6.2 / 6.3) -->
+<div class="evd-mb" id="evd-reg-mb" role="dialog" aria-modal="true" aria-labelledby="evd-reg-title">
+  <div class="evd-modal" style="max-width:560px;">
+    <h2 id="evd-reg-title">+ تسجيل طالبة</h2>
+    <form id="evd-reg-form">
+      <input type="hidden" id="rf-id"/>
+      <input type="hidden" id="rf-mode" value="list"/>
+      <div class="evd-reg-mode" id="rf-mode-tabs">
+        <button type="button" data-mode="list">📋 اختيار من القائمة</button>
+        <button type="button" data-mode="manual">✍️ إضافة يدوية</button>
+      </div>
+      <div class="row" id="rf-list-row">
+        <label for="rf-pick">اختاري الطالبة</label>
+        <select id="rf-pick">
+          <option value="">— اختاري —</option>
+        </select>
+        <div style="font-size:.78rem;color:#888;margin-top:4px;" id="rf-list-hint">سيتم تعبئة البيانات تلقائياً.</div>
+      </div>
+      <div class="row">
+        <label for="rf-name">اسم الطالبة *</label>
+        <input id="rf-name" type="text" required maxlength="120"/>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="rf-parent">اسم الأم</label>
+          <input id="rf-parent" type="text" maxlength="120"/>
+        </div>
+        <div class="row">
+          <label for="rf-phone">هاتف الأم</label>
+          <input id="rf-phone" type="tel" maxlength="32" inputmode="tel"/>
+        </div>
+      </div>
+      <div class="row">
+        <label for="rf-group">الفصل</label>
+        <input id="rf-group" type="text" maxlength="80" placeholder="اختياري"/>
+      </div>
+      <hr style="border:0;border-top:1px dashed #d3d8de;margin:14px 0;"/>
+      <div class="grid2">
+        <div class="row">
+          <label for="rf-pay">حالة الدفع</label>
+          <select id="rf-pay">
+            <option value="pending">⏳ بانتظار</option>
+            <option value="paid">✅ دفعت</option>
+            <option value="partial">🔵 جزئي</option>
+            <option value="refunded">↩️ مسترد</option>
+            <option value="waived">🆓 معفاة</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="rf-amt">المبلغ (د.ب)</label>
+          <input id="rf-amt" type="number" min="0" step="0.001" placeholder="0.000"/>
+        </div>
+      </div>
+      <div class="row">
+        <label for="rf-paynote">ملاحظة الدفع</label>
+        <input id="rf-paynote" type="text" maxlength="200"/>
+      </div>
+      <div class="grid2">
+        <div class="row">
+          <label for="rf-att">حالة الحضور</label>
+          <select id="rf-att">
+            <option value="pending">⏳ بانتظار</option>
+            <option value="present">✅ حاضرة</option>
+            <option value="late">🟡 متأخرة</option>
+            <option value="absent">❌ غائبة</option>
+            <option value="cancelled">🚫 ملغاة</option>
+            <option value="medical_emergency">🚑 طارئ صحي</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="rf-attnote">ملاحظة الحضور</label>
+          <input id="rf-attnote" type="text" maxlength="200"/>
+        </div>
+      </div>
+      <div class="footer">
+        <button type="button" class="evd-btn" id="evd-reg-cancel">إلغاء</button>
+        <button type="submit" class="evd-btn evd-btn-edit" id="evd-reg-save">✨ حفظ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Quick-toggle popover (6.3) -->
+<div class="evd-reg-pop" id="evd-reg-pop" role="menu">
+  <div class="pop-arrow"></div>
+  <div id="evd-reg-pop-body"></div>
+</div>
+
 <!-- Delete confirmation modal (2.4) -->
 <div class="evd-mb" id="evd-del-mb" role="dialog" aria-modal="true" aria-labelledby="evd-del-title">
   <div class="evd-modal" style="max-width:440px;">
@@ -68926,6 +69122,7 @@ function evdActivateTab(name){
   if (name === 'costs'    && !COST_LOADED)  evdLoadCosts();
   if (name === 'items'    && !ITEM_LOADED)  evdLoadItems();
   if (name === 'tasks'    && !TASK_LOADED)  evdLoadTasks();
+  if (name === 'students' && !REG_LOADED)   evdLoadRegs();
 }
 function evdSyncTabFromHash(){
   var h = (location.hash || '').replace('#','');
@@ -70429,6 +70626,486 @@ function evdSubmitEdit(e){
   });
 }
 
+/* ── Registrations panel (6.2 / 6.3 / 6.4) ───────────────────── */
+var REG_DATA = [];
+var REG_SUMMARY = null;
+var REG_AVAILABLE = [];
+var REG_LOADED = false;
+var REG_SEARCH = '';
+var REG_FILTER = 'all';     // all / paid / unpaid / present / absent
+var REG_BULK_MODE = false;
+var REG_BULK_DRAFT = {};    // {rid: {st, notes}}
+
+var REG_PAY_META = {
+  pending:  {label:'بانتظار',  emoji:'⏳'},
+  paid:     {label:'دفعت',    emoji:'✅'},
+  partial:  {label:'جزئي',    emoji:'🔵'},
+  refunded: {label:'مسترد',   emoji:'↩️'},
+  waived:   {label:'معفاة',   emoji:'🆓'}
+};
+var REG_ATT_META = {
+  pending:           {label:'بانتظار',     emoji:'⏳'},
+  present:           {label:'حاضرة',      emoji:'✅'},
+  late:              {label:'متأخرة',     emoji:'🟡'},
+  absent:            {label:'غائبة',      emoji:'❌'},
+  cancelled:         {label:'ملغاة',      emoji:'🚫'},
+  medical_emergency: {label:'طارئ صحي',  emoji:'🚑'}
+};
+
+function evdLoadRegs(){
+  return fetch('/api/admin/events/' + EID + '/registrations')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok){ evdToast(j.error || 'تعذّر التحميل', 'error'); return; }
+      REG_DATA      = j.registrations || [];
+      REG_SUMMARY   = j.summary || {};
+      REG_AVAILABLE = j.available_students || [];
+      REG_LOADED    = true;
+      evdRenderRegs();
+      evdRefreshHeaderChips();
+    })
+    .catch(function(){ evdToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdRegMatchesFilter(r){
+  if (REG_SEARCH){
+    var q = REG_SEARCH.toLowerCase();
+    var hay = (r.student_name + ' ' + (r.parent_name || '') + ' ' + (r.parent_phone || '') + ' ' + (r.group_name || '')).toLowerCase();
+    if (hay.indexOf(q) < 0) return false;
+  }
+  if (REG_FILTER === 'all') return true;
+  if (REG_FILTER === 'paid')    return r.payment_status === 'paid';
+  if (REG_FILTER === 'unpaid')  return r.payment_status === 'pending' || r.payment_status === 'partial';
+  if (REG_FILTER === 'present') return r.attendance_status === 'present' || r.attendance_status === 'late';
+  if (REG_FILTER === 'absent')  return r.attendance_status === 'absent';
+  return true;
+}
+
+function evdRegBadgeHTML(kind, status){
+  var meta = (kind === 'pay' ? REG_PAY_META : REG_ATT_META)[status] || {label:status, emoji:'•'};
+  return '<span class="evd-reg-badge ' + kind + '-' + status + '" '
+       + 'data-pop="' + kind + '" tabindex="0" role="button" '
+       + 'aria-label="' + evdEsc(meta.label) + '">'
+       + meta.emoji + ' ' + evdEsc(meta.label) + '</span>';
+}
+
+function evdRegRowHTML(r, idx){
+  var phone = (r.parent_phone || '').trim();
+  var phLink = '';
+  if (phone){
+    var dig = phone.replace(/[^0-9]/g, '');
+    if (dig && dig.length >= 8){
+      var waNum = (dig.length === 8 ? '973' + dig : dig);
+      phLink = '<a href="https://wa.me/' + waNum + '" target="_blank" rel="noopener">' + evdEsc(phone) + '</a>';
+    } else {
+      phLink = evdEsc(phone);
+    }
+  } else {
+    phLink = '<span class="none">— لا يوجد —</span>';
+  }
+  var grpChip = r.group_name ? '<span class="grp">' + evdEsc(r.group_name) + '</span>' : '';
+  var stripe = (idx % 2 === 1) ? ' is-stripe' : '';
+  return '<div class="evd-reg-row' + stripe + '" data-rid="' + (r.id|0) + '">'
+       + '  <div class="num">' + (idx + 1) + '</div>'
+       + '  <div class="who"><span class="nm">' + evdEsc(r.student_name) + '</span>' + grpChip + '</div>'
+       + '  <div class="par"><span class="pn">' + (r.parent_name ? evdEsc(r.parent_name) : '<span class="none">— لم يُحدد —</span>') + '</span><span class="ph">' + phLink + '</span></div>'
+       + '  <div class="pay-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('pay', r.payment_status) + '</div>'
+       + '  <div class="att-cell" data-rid="' + (r.id|0) + '">' + evdRegBadgeHTML('att', r.attendance_status) + '</div>'
+       + '  <div class="acts">'
+       + '    <button type="button" data-reg-edit="' + (r.id|0) + '" title="تعديل" aria-label="تعديل">✏️</button>'
+       + '    <button type="button" class="del" data-reg-del="' + (r.id|0) + '" title="حذف" aria-label="حذف">🗑️</button>'
+       + '  </div>'
+       + '</div>';
+}
+
+function evdRenderRegs(){
+  var root = document.getElementById('evd-reg-root');
+  if (!root) return;
+  if (REG_BULK_MODE){ evdRenderRegsBulk(root); return; }
+
+  var s = REG_SUMMARY || {payment:{}, attendance:{}, total:0, total_collected:0, total_expected:0, collection_pct:0};
+  var pay = s.payment || {};
+  var att = s.attendance || {};
+  var total = parseInt(s.total || 0, 10);
+  var paid = (pay.paid || 0) + (pay.partial || 0);
+  var present = (att.present || 0) + (att.late || 0);
+  var collected = parseFloat(s.total_collected || 0);
+  var expected  = parseFloat(s.total_expected  || 0);
+  var pct = parseFloat(s.collection_pct || 0);
+
+  var statsHTML = ''
+    + '<div class="evd-reg-stats">'
+    + '  <div class="evd-reg-stat" data-k="reg"><div class="lab">👥 المسجلات</div><div class="val">' + total + '</div></div>'
+    + '  <div class="evd-reg-stat" data-k="paid"><div class="lab">✅ دفعت</div><div class="val">' + paid + '<span class="sub">/' + total + '</span></div></div>'
+    + '  <div class="evd-reg-stat" data-k="cash"><div class="lab">💰 المحصّل</div><div class="val">' + collected.toFixed(3) + ' <span class="sub">/' + expected.toFixed(3) + ' د.ب</span></div><div class="bar"><div class="fill" style="width:' + Math.min(pct, 100) + '%;"></div></div></div>'
+    + '  <div class="evd-reg-stat" data-k="att"><div class="lab">📋 حضرن</div><div class="val">' + present + '<span class="sub">/' + total + '</span></div></div>'
+    + '</div>';
+
+  var filterOpts = [
+    {k:'all',     l:'كل المسجلات'},
+    {k:'unpaid',  l:'لم تدفعن'},
+    {k:'paid',    l:'دفعن'},
+    {k:'present', l:'حاضرات'},
+    {k:'absent',  l:'غائبات'}
+  ];
+  var filterHTML = filterOpts.map(function(o){
+    var sel = REG_FILTER === o.k ? ' selected' : '';
+    return '<option value="' + o.k + '"' + sel + '>' + evdEsc(o.l) + '</option>';
+  }).join('');
+
+  var toolbarHTML = ''
+    + '<div class="evd-reg-toolbar">'
+    + '  <input type="text" class="search" id="evd-reg-search" placeholder="🔍 ابحثي عن طالبة/أم/هاتف…" value="' + evdEsc(REG_SEARCH) + '"/>'
+    + '  <select class="filter" id="evd-reg-filter">' + filterHTML + '</select>'
+    + '  <button type="button" class="evd-btn evd-btn-edit" id="evd-reg-add">+ إضافة طالبة</button>'
+    + '</div>';
+
+  var visible = REG_DATA.filter(evdRegMatchesFilter);
+  var listHTML;
+  if (!REG_DATA.length){
+    listHTML = '<div class="evd-reg-table"><div class="evd-reg-empty"><div class="em">📋</div><div class="h">لا توجد طالبات مسجلات بعد</div><div>اضغطي «إضافة طالبة» للبدء</div></div></div>';
+  } else if (!visible.length){
+    listHTML = '<div class="evd-reg-table"><div class="evd-reg-empty"><div class="em">🔍</div><div class="h">لا توجد نتائج مطابقة</div></div></div>';
+  } else {
+    listHTML = '<div class="evd-reg-table">'
+             + visible.map(function(r, i){ return evdRegRowHTML(r, i); }).join('')
+             + '</div>';
+  }
+
+  var actionsHTML = ''
+    + '<div class="evd-reg-actions">'
+    + '  <button type="button" id="evd-reg-bulk">📋 وضع الحضور</button>'
+    + '  <button type="button" class="warn" id="evd-reg-focus-pay">💰 تسجيل دفعات</button>'
+    + '</div>';
+
+  root.innerHTML = statsHTML + toolbarHTML + listHTML + actionsHTML;
+
+  document.getElementById('evd-reg-add').addEventListener('click', function(){ evdOpenRegAdd(); });
+  document.getElementById('evd-reg-bulk').addEventListener('click', function(){
+    if (!REG_DATA.length){ evdToast('لا توجد طالبات مسجلات', 'error'); return; }
+    REG_BULK_MODE = true;
+    REG_BULK_DRAFT = {};
+    evdRenderRegs();
+  });
+  document.getElementById('evd-reg-focus-pay').addEventListener('click', function(){
+    REG_FILTER = 'unpaid';
+    var sel = document.getElementById('evd-reg-filter');
+    if (sel) sel.value = REG_FILTER;
+    evdRenderRegs();
+  });
+  var sb = document.getElementById('evd-reg-search');
+  if (sb){
+    var t = null;
+    sb.addEventListener('input', function(){
+      clearTimeout(t);
+      t = setTimeout(function(){ REG_SEARCH = sb.value || ''; evdRenderRegs(); var sb2 = document.getElementById('evd-reg-search'); if (sb2){ sb2.focus(); var v = sb2.value; sb2.value = ''; sb2.value = v; } }, 200);
+    });
+  }
+  var fl = document.getElementById('evd-reg-filter');
+  if (fl) fl.addEventListener('change', function(){ REG_FILTER = fl.value; evdRenderRegs(); });
+
+  root.querySelectorAll('button[data-reg-edit]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var rid = parseInt(b.getAttribute('data-reg-edit'), 10);
+      var r = REG_DATA.find(function(x){ return x.id === rid; });
+      if (r) evdOpenRegEdit(r);
+    });
+  });
+  root.querySelectorAll('button[data-reg-del]').forEach(function(b){
+    b.addEventListener('click', function(){
+      evdRegDelete(parseInt(b.getAttribute('data-reg-del'), 10));
+    });
+  });
+  root.querySelectorAll('.evd-reg-badge').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.stopPropagation();
+      var cell = el.closest('.pay-cell, .att-cell');
+      if (!cell) return;
+      var rid = parseInt(cell.getAttribute('data-rid'), 10);
+      var kind = el.getAttribute('data-pop');
+      evdRegOpenPopover(el, rid, kind);
+    });
+  });
+}
+
+function evdOpenRegAdd(){
+  document.getElementById('evd-reg-title').textContent = '+ تسجيل طالبة';
+  document.getElementById('rf-id').value = '';
+  document.getElementById('rf-name').value = '';
+  document.getElementById('rf-parent').value = '';
+  document.getElementById('rf-phone').value = '';
+  document.getElementById('rf-group').value = '';
+  document.getElementById('rf-pay').value = 'pending';
+  document.getElementById('rf-amt').value = '';
+  document.getElementById('rf-paynote').value = '';
+  document.getElementById('rf-att').value = 'pending';
+  document.getElementById('rf-attnote').value = '';
+  evdRegSetMode('list');
+  // Populate the picker dropdown.
+  var pick = document.getElementById('rf-pick');
+  pick.innerHTML = '<option value="">— اختاري —</option>';
+  REG_AVAILABLE.forEach(function(s){
+    var lbl = s.name + (s.group_name ? ' — ' + s.group_name : '');
+    pick.innerHTML += '<option value="' + (s.id|0) + '">' + evdEsc(lbl) + '</option>';
+  });
+  pick.onchange = function(){
+    var sid = parseInt(pick.value || '0', 10);
+    if (!sid) return;
+    var s = REG_AVAILABLE.find(function(x){ return x.id === sid; });
+    if (!s) return;
+    document.getElementById('rf-name').value   = s.name || '';
+    document.getElementById('rf-parent').value = s.parent_name || '';
+    document.getElementById('rf-phone').value  = s.parent_phone || '';
+    document.getElementById('rf-group').value  = s.group_name || '';
+  };
+  document.getElementById('evd-reg-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('rf-pick').focus(); }, 50);
+}
+
+function evdOpenRegEdit(r){
+  document.getElementById('evd-reg-title').textContent = '✏️ تعديل التسجيل';
+  document.getElementById('rf-id').value = r.id;
+  document.getElementById('rf-name').value = r.student_name || '';
+  document.getElementById('rf-parent').value = r.parent_name || '';
+  document.getElementById('rf-phone').value = r.parent_phone || '';
+  document.getElementById('rf-group').value = r.group_name || '';
+  document.getElementById('rf-pay').value = r.payment_status || 'pending';
+  document.getElementById('rf-amt').value = (r.payment_amount && r.payment_amount > 0) ? r.payment_amount : '';
+  document.getElementById('rf-paynote').value = r.payment_notes || '';
+  document.getElementById('rf-att').value = r.attendance_status || 'pending';
+  document.getElementById('rf-attnote').value = r.attendance_notes || '';
+  // Force manual mode (no picker) for edits.
+  evdRegSetMode('manual');
+  document.getElementById('evd-reg-mb').classList.add('is-open');
+  setTimeout(function(){ document.getElementById('rf-name').focus(); }, 50);
+}
+
+function evdRegSetMode(mode){
+  document.getElementById('rf-mode').value = mode;
+  document.querySelectorAll('#rf-mode-tabs button').forEach(function(b){
+    b.classList.toggle('is-on', b.getAttribute('data-mode') === mode);
+  });
+  document.getElementById('rf-list-row').style.display = (mode === 'list') ? '' : 'none';
+}
+
+function evdCloseReg(){
+  document.getElementById('evd-reg-mb').classList.remove('is-open');
+}
+
+function evdSubmitReg(e){
+  e.preventDefault();
+  var btn = document.getElementById('evd-reg-save');
+  btn.disabled = true; btn.style.opacity = '.6';
+  var rid = parseInt(document.getElementById('rf-id').value || '0', 10);
+  var sid = null;
+  if (!rid && document.getElementById('rf-mode').value === 'list'){
+    var v = document.getElementById('rf-pick').value;
+    sid = v ? parseInt(v, 10) : null;
+  }
+  var amt = document.getElementById('rf-amt').value;
+  var body = {
+    student_name:      (document.getElementById('rf-name').value || '').trim(),
+    parent_name:       (document.getElementById('rf-parent').value || '').trim(),
+    parent_phone:      (document.getElementById('rf-phone').value || '').trim(),
+    group_name:        (document.getElementById('rf-group').value || '').trim(),
+    payment_status:    document.getElementById('rf-pay').value || 'pending',
+    payment_amount:    amt === '' ? 0 : parseFloat(amt),
+    payment_notes:     (document.getElementById('rf-paynote').value || '').trim(),
+    attendance_status: document.getElementById('rf-att').value || 'pending',
+    attendance_notes:  (document.getElementById('rf-attnote').value || '').trim()
+  };
+  if (sid) body.student_id = sid;
+  var url, method;
+  if (rid){ url = '/api/admin/events/' + EID + '/registrations/' + rid; method = 'PATCH'; }
+  else    { url = '/api/admin/events/' + EID + '/registrations';        method = 'POST';  }
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    btn.disabled = false; btn.style.opacity = '1';
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+    evdCloseReg();
+    evdToast(rid ? 'تم تحديث التسجيل' : 'تم إضافة الطالبة', 'success');
+    evdLoadRegs();
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '1';
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
+function evdRegDelete(rid){
+  if (!rid) return;
+  if (!confirm('هل تريدين حذف هذا التسجيل؟')) return;
+  var row = document.querySelector('.evd-reg-row[data-rid="' + rid + '"]');
+  if (row) row.classList.add('is-leaving');
+  fetch('/api/admin/events/' + EID + '/registrations/' + rid, {method:'DELETE'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      if (!o.ok || !o.j.ok){
+        if (row) row.classList.remove('is-leaving');
+        evdToast(o.j.error || 'تعذّر الحذف', 'error'); return;
+      }
+      evdToast('تم الحذف', 'success');
+      setTimeout(evdLoadRegs, 180);
+    })
+    .catch(function(){
+      if (row) row.classList.remove('is-leaving');
+      evdToast('خطأ في الاتصال', 'error');
+    });
+}
+
+/* Quick-toggle popover (6.3) */
+function evdRegOpenPopover(anchor, rid, kind){
+  var pop = document.getElementById('evd-reg-pop');
+  var body = document.getElementById('evd-reg-pop-body');
+  var meta = (kind === 'pay' ? REG_PAY_META : REG_ATT_META);
+  var r = REG_DATA.find(function(x){ return x.id === rid; });
+  var cur = r ? (kind === 'pay' ? r.payment_status : r.attendance_status) : 'pending';
+  body.innerHTML = '';
+  Object.keys(meta).forEach(function(k){
+    var m = meta[k];
+    var on = (k === cur) ? ' is-cur' : '';
+    body.innerHTML += '<button type="button" class="opt' + on + '" data-set="' + k + '">' + m.emoji + ' ' + evdEsc(m.label) + '</button>';
+  });
+  body.querySelectorAll('button[data-set]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var st = b.getAttribute('data-set');
+      pop.classList.remove('is-open');
+      evdRegQuickSet(rid, kind, st);
+    });
+  });
+  // Position the popover under the anchor.
+  var rect = anchor.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top  = (rect.bottom + 8) + 'px';
+  pop.style.left = (rect.left + rect.width / 2 - 90) + 'px';
+  pop.classList.add('is-open');
+}
+
+function evdRegQuickSet(rid, kind, status){
+  var body = (kind === 'pay')
+    ? {payment_status: status}
+    : {attendance_status: status};
+  // Optimistic update.
+  var r = REG_DATA.find(function(x){ return x.id === rid; });
+  if (r){
+    if (kind === 'pay') r.payment_status = status;
+    else                r.attendance_status = status;
+    evdRenderRegs();
+  }
+  fetch('/api/admin/events/' + EID + '/registrations/' + rid, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر التحديث', 'error'); evdLoadRegs(); return; }
+    // Re-fetch to get updated summary + auto-amount on paid.
+    evdLoadRegs();
+  })
+  .catch(function(){ evdToast('خطأ في الاتصال', 'error'); evdLoadRegs(); });
+}
+
+document.addEventListener('click', function(e){
+  var pop = document.getElementById('evd-reg-pop');
+  if (!pop) return;
+  if (e.target.closest && e.target.closest('.evd-reg-pop')) return;
+  if (e.target.closest && e.target.closest('.evd-reg-badge')) return;
+  pop.classList.remove('is-open');
+});
+
+/* Bulk attendance mode (6.4) */
+function evdRenderRegsBulk(root){
+  var statuses = ['pending','present','late','absent','cancelled','medical_emergency'];
+  var touched = Object.keys(REG_BULK_DRAFT).length;
+  var headerHTML = ''
+    + '<div class="evd-reg-bulk-bar">'
+    + '  <div class="ttl">📋 تسجيل الحضور</div>'
+    + '  <button type="button" id="evd-reg-bulk-exit">إلغاء وخروج</button>'
+    + '</div>';
+  var rowsHTML = REG_DATA.map(function(r){
+    var draft = REG_BULK_DRAFT[r.id];
+    var cur = draft ? draft.st : (r.attendance_status || 'pending');
+    var grpChip = r.group_name ? '<span class="grp">' + evdEsc(r.group_name) + '</span>' : '';
+    var btnsHTML = statuses.map(function(st){
+      var meta = REG_ATT_META[st];
+      var on = (st === cur) ? ' is-on' : '';
+      return '<button type="button" class="evd-reg-bulk-btn' + on + '" data-rid="' + (r.id|0) + '" data-st="' + st + '" title="' + evdEsc(meta.label) + '" aria-label="' + evdEsc(meta.label) + '">' + meta.emoji + '</button>';
+    }).join('');
+    var ts = draft ? ' is-touched' : '';
+    return '<div class="evd-reg-bulk-row' + ts + '" data-rid="' + (r.id|0) + '">'
+         + '  <div class="head"><span>' + evdEsc(r.student_name) + '</span>' + grpChip + '</div>'
+         + '  <div class="evd-reg-bulk-btns">' + btnsHTML + '</div>'
+         + '</div>';
+  }).join('');
+  var stickyHTML = ''
+    + '<div class="evd-reg-bulk-sticky">'
+    + '  <div class="info">تم تعديل ' + touched + ' طالبة</div>'
+    + '  <div class="actions">'
+    + '    <button type="button" class="cancel" id="evd-reg-bulk-cancel">❌ إلغاء وخروج</button>'
+    + '    <button type="button" class="save" id="evd-reg-bulk-save"' + (touched ? '' : ' disabled style="opacity:.5;cursor:not-allowed;"') + '>💾 حفظ الكل (' + touched + ')</button>'
+    + '  </div>'
+    + '</div>';
+  root.innerHTML = headerHTML
+                 + '<div class="evd-reg-table">' + rowsHTML + '</div>'
+                 + stickyHTML;
+  root.querySelectorAll('.evd-reg-bulk-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      var rid = parseInt(b.getAttribute('data-rid'), 10);
+      var st = b.getAttribute('data-st');
+      var orig = (REG_DATA.find(function(x){ return x.id === rid; }) || {}).attendance_status || 'pending';
+      if (st === orig){ delete REG_BULK_DRAFT[rid]; }
+      else            { REG_BULK_DRAFT[rid] = {st: st}; }
+      evdRenderRegs();
+    });
+  });
+  document.getElementById('evd-reg-bulk-exit').addEventListener('click', function(){ evdRegBulkExit(false); });
+  document.getElementById('evd-reg-bulk-cancel').addEventListener('click', function(){ evdRegBulkExit(false); });
+  var sv = document.getElementById('evd-reg-bulk-save');
+  if (sv && touched) sv.addEventListener('click', evdRegBulkSave);
+}
+
+function evdRegBulkExit(reload){
+  if (Object.keys(REG_BULK_DRAFT).length){
+    if (!confirm('سيتم تجاهل التغييرات غير المحفوظة. متابعة؟')) return;
+  }
+  REG_BULK_MODE = false;
+  REG_BULK_DRAFT = {};
+  if (reload) evdLoadRegs();
+  else        evdRenderRegs();
+}
+
+function evdRegBulkSave(){
+  var updates = Object.keys(REG_BULK_DRAFT).map(function(rid){
+    return {rid: parseInt(rid, 10), attendance_status: REG_BULK_DRAFT[rid].st};
+  });
+  if (!updates.length){ evdRegBulkExit(false); return; }
+  var btn = document.getElementById('evd-reg-bulk-save');
+  if (btn){ btn.disabled = true; btn.style.opacity = '.6'; }
+  fetch('/api/admin/events/' + EID + '/registrations/bulk-attendance', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({updates: updates})
+  })
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+  .then(function(o){
+    if (!o.ok || !o.j.ok){ evdToast(o.j.error || 'تعذّر الحفظ', 'error'); if (btn){ btn.disabled = false; btn.style.opacity = '1'; } return; }
+    evdToast('تم حفظ ' + (o.j.updated_count || 0) + ' تحديث', 'success');
+    REG_BULK_MODE = false;
+    REG_BULK_DRAFT = {};
+    evdLoadRegs();
+  })
+  .catch(function(){
+    if (btn){ btn.disabled = false; btn.style.opacity = '1'; }
+    evdToast('خطأ في الاتصال', 'error');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function(){
   // Tab clicks update hash; the hashchange listener does the work.
   document.querySelectorAll('.evd-tab').forEach(function(t, i){
@@ -70501,6 +71178,15 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('evd-task-form').addEventListener('submit', evdSubmitTask);
   document.getElementById('evd-task-mb').addEventListener('click', function(e){
     if (e.target === this) evdCloseTask();
+  });
+  // Registration modal wires (6.2)
+  document.getElementById('evd-reg-cancel').addEventListener('click', evdCloseReg);
+  document.getElementById('evd-reg-form').addEventListener('submit', evdSubmitReg);
+  document.getElementById('evd-reg-mb').addEventListener('click', function(e){
+    if (e.target === this) evdCloseReg();
+  });
+  document.querySelectorAll('#rf-mode-tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ evdRegSetMode(b.getAttribute('data-mode')); });
   });
   // Delete modal wires (2.4)
   document.getElementById('evd-del-btn').addEventListener('click', function(){
