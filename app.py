@@ -8723,6 +8723,10 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <span class="md-sb-link-text">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x627;&#x62A;</span>
         </a>
+        <a class="md-sb-link mx-staff-only" href="/admin/curriculum">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</span>
+        </a>
       </div>
     </div>
     <!-- 🌟 نظام النقاط -->
@@ -9718,6 +9722,11 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
       <div class="dh-action-icon">&#x1F4CA;</div>
       <div class="dh-action-title">&#x627;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;</div>
       <div class="dh-action-desc">&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x634;&#x647;&#x631;&#x64A; &#x644;&#x644;&#x637;&#x627;&#x644;&#x628;&#x627;&#x62A;</div>
+    </a>
+    <a class="dh-action-card mx-staff-only" href="/teacher/curriculum" style="background:linear-gradient(135deg,#E65100,#FB8C00);">
+      <div class="dh-action-icon">&#x1F4D6;</div>
+      <div class="dh-action-title">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</div>
+      <div class="dh-action-desc">&#x643;&#x62A;&#x628; &#x627;&#x644;&#x645;&#x646;&#x647;&#x62C; &#x627;&#x644;&#x645;&#x62A;&#x627;&#x62D;&#x629; &#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A;&#x643;</div>
     </a>
   </div>
 </div>
@@ -58310,6 +58319,7 @@ noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
       <li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>
       <li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>
       <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
+      <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
     </ul>
   </noscript>
 </div>
@@ -58330,6 +58340,7 @@ function _renderFallbackNav(reason){
       '<li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>'+
       '<li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>'+
       '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
+      '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
     '</ul>';
 }
 fetch('/api/portal/student/meta',{credentials:'include'})
@@ -58370,6 +58381,10 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +   '<a class="card evals" href="/portal/parent-hub/evaluations">'
       +     '<span class="ic">📊</span><h3>التقييمات</h3>'
       +     '<p>تقييمات ' + _esc(s.student_name||firstName) + ' الشهرية</p>'
+      +   '</a>'
+      +   '<a class="card crc" href="/portal/parent-hub/curriculum">'
+      +     '<span class="ic">📚</span><h3>كتب المنهج</h3>'
+      +     '<p>الكتب المتاحة لـ ' + _esc(firstName) + '</p>'
       +   '</a>'
       + '</div>';
     root.innerHTML = html;
@@ -64066,6 +64081,109 @@ def api_curriculum_file(file_uuid):
     try:
         resp.headers["Cache-Control"] = "private, no-store"
         resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception: pass
+    return resp
+
+
+# Iframe viewer page. Loads the PDF in an <iframe> and overlays a
+# repeating diagonal watermark of "<username> · <today>" on top.
+# The overlay is best-effort visual deterrence — the user can still
+# screenshot or open the iframe URL directly. The download button
+# is conditionally rendered based on can_download; even when
+# hidden, /api/curriculum/file/<uuid>?download=1 still 403s for
+# users whose audience permission is view-only.
+@app.route('/portal/curriculum/view/<file_uuid>')
+@login_required
+def portal_curriculum_view_page(file_uuid):
+    user = session.get("user") or {}
+    db = get_db()
+    safe_uuid = "".join(c for c in (file_uuid or "")
+                        if c in "0123456789abcdef")[:64]
+    if not safe_uuid:
+        return Response("uuid غير صالح", status=400)
+    try:
+        row = db.execute(
+            "SELECT * FROM curriculum_files WHERE file_uuid=?",
+            (safe_uuid,)).fetchone()
+    except Exception: row = None
+    if not row:
+        return Response("غير موجود", status=404)
+    fid = int(dict(row).get("id") or 0)
+    try:
+        grps = [(dict(g).get("group_name") or "").strip()
+                for g in db.execute(
+                    "SELECT group_name FROM curriculum_file_groups "
+                    "WHERE file_id=?", (fid,)).fetchall()]
+    except Exception: grps = []
+    can_view, can_dl = _curriculum_file_visible_for(db, user, row, grps)
+    if not can_view:
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+            "<title>403</title><style>body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;"
+            "background:#1a1a1a;color:#eee;min-height:100vh;display:flex;"
+            "align-items:center;justify-content:center;margin:0;direction:rtl;}"
+            ".card{background:#2a2a2a;padding:40px;border-radius:14px;text-align:center;}"
+            ".card a{color:#FF80AB;}</style></head><body>"
+            "<div class='card'><h1>🚫 غير مصرح</h1>"
+            "<p>هذا الملف غير متاح لك.</p>"
+            "<p><a href='/dashboard'>← العودة</a></p></div></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    title = (dict(row).get("title") or "ملف")
+    uname = (user.get("username") or user.get("name") or "").strip()
+    from datetime import datetime as _dt
+    today = _dt.now().strftime("%Y-%m-%d")
+    # Build watermark text safely (no raw user input straight into HTML).
+    import html as _html_e
+    watermark_text = _html_e.escape(uname + " · " + today)
+    title_safe = _html_e.escape(title)
+    dl_btn = ("<a class='hdr-btn dl' href='/api/curriculum/file/"
+              + safe_uuid + "?download=1'>⬇ تحميل</a>") if can_dl else ""
+    page = ("<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+            "<title>" + title_safe + " — مايندكس</title>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<style>"
+            "*{box-sizing:border-box;}"
+            "html,body{margin:0;padding:0;height:100%;background:#1a1a1a;"
+            "font-family:'Segoe UI',Tahoma,Arial,sans-serif;}"
+            ".hdr{background:#2a2a2a;color:#fff;padding:10px 16px;display:flex;"
+            "align-items:center;justify-content:space-between;gap:12px;"
+            "box-shadow:0 2px 8px rgba(0,0,0,.4);}"
+            ".hdr h1{margin:0;font-size:1rem;font-weight:800;color:#FF80AB;"
+            "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"
+            ".hdr .right{display:flex;gap:8px;align-items:center;}"
+            ".hdr-btn{background:#6B3FA0;color:#fff;text-decoration:none;"
+            "padding:7px 14px;border-radius:7px;font-weight:700;font-size:.85rem;}"
+            ".hdr-btn.dl{background:#43A047;}"
+            ".hdr-btn:hover{filter:brightness(1.15);}"
+            ".stage{position:relative;width:100%;height:calc(100vh - 50px);"
+            "overflow:hidden;}"
+            ".stage iframe{width:100%;height:100%;border:0;background:#fff;}"
+            ".wm-layer{position:absolute;inset:0;pointer-events:none;"
+            "overflow:hidden;display:grid;"
+            "grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(5,1fr);}"
+            ".wm-layer .wm{display:flex;align-items:center;justify-content:center;"
+            "color:rgba(255,80,140,.18);font-weight:900;font-size:1.1rem;"
+            "transform:rotate(-28deg);user-select:none;white-space:nowrap;}"
+            "</style></head><body>"
+            "<div class='hdr'>"
+              "<h1>📄 " + title_safe + "</h1>"
+              "<div class='right'>" + dl_btn +
+                "<a class='hdr-btn' href='javascript:history.back()'>← رجوع</a>"
+              "</div>"
+            "</div>"
+            "<div class='stage'>"
+              "<iframe src='/api/curriculum/file/" + safe_uuid +
+                "#toolbar=" + ("1" if can_dl else "0") +
+                "&navpanes=0' title='" + title_safe + "'></iframe>"
+              "<div class='wm-layer'>"
+                + ("<div class='wm'>" + watermark_text + "</div>") * 15 +
+              "</div>"
+            "</div>"
+            "</body></html>")
+    resp = Response(page, mimetype="text/html; charset=utf-8")
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
         resp.headers["X-Frame-Options"] = "SAMEORIGIN"
     except Exception: pass
     return resp
