@@ -68964,27 +68964,442 @@ def api_admin_events_followup(eid):
     })
 
 
-# Stage 9.2 ships the actual follow-up HTML; commit 9.1 keeps a
-# short stub here so the route doesn't 500 if someone hits it
-# between deploys. The 9.2 commit replaces this constant in place.
+# Stage 9.2: read-only field follow-up screen. Mobile-first single
+# scrollable page with checkboxes for schedule / items / tasks /
+# attendance. Only edit op is toggling done/not-done — no add/edit/
+# delete from this screen.
 ADMIN_EVENT_FOLLOWUP_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#1D9E75"/>
 <title>متابعة الرحلة</title>
 <style>
-  body{margin:0;padding:40px;font-family:'Tahoma','Segoe UI',sans-serif;background:#f4f5f7;text-align:center;}
-  .stub{max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:40px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
-  .em{font-size:3rem;}
-  a{color:#1D9E75;font-weight:800;text-decoration:none;}
-</style>
-</head><body>
-<div class="stub">
-  <div class="em">📍</div>
-  <h2>متابعة الرحلة قيد التطوير (9.2)</h2>
-  <p style="color:#666;">واجهة الميدان ستُتاح في التحديث القادم.</p>
-  <p><a href="/admin/events/{{EID}}">← العودة لتفاصيل الرحلة</a></p>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Tahoma','Segoe UI',sans-serif;background:#f4f5f7;color:#222;-webkit-tap-highlight-color:transparent;padding-bottom:env(safe-area-inset-bottom);}
+  .evdf-shell{max-width:780px;margin:0 auto;padding:12px;}
+  /* Sticky header */
+  .evdf-stickytop{position:sticky;top:0;z-index:40;background:#f4f5f7;padding:6px 0 8px;}
+  .evdf-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border-radius:12px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .evdf-bar a.back{display:inline-flex;align-items:center;gap:5px;color:#1D9E75;background:#e6f7ee;border-radius:8px;padding:7px 13px;font-weight:800;text-decoration:none;font-size:.92rem;}
+  .evdf-bar .ts{font-size:.78rem;color:#888;font-weight:600;font-variant-numeric:tabular-nums;}
+  /* Header card with status-keyed gradient */
+  .evdf-header{background:linear-gradient(135deg,#1D9E75,#43a047);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(29,158,117,0.18);}
+  .evdf-header[data-status="open"]    {background:linear-gradient(135deg,#43a047,#1D9E75);}
+  .evdf-header[data-status="closed"]  {background:linear-gradient(135deg,#fb8c00,#BA7517);}
+  .evdf-header[data-status="completed"]{background:linear-gradient(135deg,#1976d2,#0d47a1);}
+  .evdf-header h1{margin:0 0 6px;font-size:1.25rem;font-weight:900;display:flex;align-items:center;gap:8px;}
+  .evdf-header .meta{font-size:.88rem;opacity:.95;display:flex;flex-wrap:wrap;gap:6px 14px;font-weight:700;}
+  /* Progress strip */
+  .evdf-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+  .evdf-pcard{background:#fff;border-radius:12px;padding:10px 8px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-top:4px solid var(--pcc,#1D9E75);}
+  .evdf-pcard[data-k="schedule"]{--pcc:#1565C0;}
+  .evdf-pcard[data-k="items"]   {--pcc:#1D9E75;}
+  .evdf-pcard[data-k="tasks"]   {--pcc:#E65100;}
+  .evdf-pcard[data-k="att"]     {--pcc:#6B3FA0;}
+  .evdf-pcard .lab{font-size:.72rem;color:#666;font-weight:700;}
+  .evdf-pcard .val{font-size:1.05rem;color:#222;font-weight:900;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .evdf-pcard .pct{font-size:.74rem;color:var(--pcc);font-weight:800;}
+  /* Section card */
+  .evdf-sec{background:#fff;border-radius:14px;padding:14px 14px 8px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.05);border-right:5px solid var(--sc,#1D9E75);}
+  .evdf-sec[data-k="schedule"]{--sc:#1565C0;}
+  .evdf-sec[data-k="items"]   {--sc:#1D9E75;}
+  .evdf-sec[data-k="tasks"]   {--sc:#E65100;}
+  .evdf-sec[data-k="att"]     {--sc:#6B3FA0;}
+  .evdf-sec h2{margin:0 0 10px;font-size:1rem;font-weight:900;color:var(--sc);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .evdf-sec h2 .ratio{font-size:.82rem;font-weight:800;color:#666;background:#f0f3f7;padding:3px 10px;border-radius:99px;}
+  .evdf-cathd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 4px;}
+  .evdf-cathd .h{font-size:.92rem;font-weight:800;color:#444;display:flex;align-items:center;gap:6px;}
+  .evdf-cathd .ratio{font-size:.78rem;color:#888;font-weight:700;}
+  /* Checkable row — big tap target for fingers */
+  .evdf-row{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;padding:11px 4px;border-bottom:1px dashed #eef0f3;cursor:pointer;transition:background .12s;border-radius:8px;-webkit-tap-highlight-color:rgba(29,158,117,0.10);}
+  .evdf-row:last-child{border-bottom:0;}
+  .evdf-row:hover{background:#fafbfc;}
+  .evdf-row:active{background:#f0f7f3;}
+  .evdf-row.is-done{background:linear-gradient(90deg,rgba(29,158,117,0.08),transparent 90%);}
+  .evdf-row.is-done .title{color:#1D9E75;text-decoration:line-through;}
+  .evdf-row.is-done .meta {color:#888;}
+  .evdf-row.is-saving{opacity:.6;pointer-events:none;}
+  .evdf-cb{width:34px;height:34px;border:2.5px solid #c4cdd5;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:transparent;transition:all .18s;background:#fff;flex-shrink:0;font-weight:900;}
+  .evdf-row.is-done .evdf-cb{background:#1D9E75;border-color:#1D9E75;color:#fff;animation:evdfPop .25s ease;}
+  @keyframes evdfPop{0%{transform:scale(1);}40%{transform:scale(1.18);}100%{transform:scale(1);}}
+  .evdf-body .title{font-size:.95rem;font-weight:700;color:#222;line-height:1.4;}
+  .evdf-body .meta {font-size:.78rem;color:#666;margin-top:2px;}
+  .evdf-body .qty  {display:inline-block;font-size:.74rem;color:#0d47a1;background:#e3f2fd;padding:1px 8px;border-radius:99px;font-weight:800;margin-inline-start:6px;}
+  .evdf-time{font-weight:900;color:#0d47a1;font-variant-numeric:tabular-nums;font-size:.96rem;}
+  .evdf-empty{text-align:center;color:#aaa;font-style:italic;padding:14px 0;font-size:.88rem;}
+  /* Attendance row — name + status pills */
+  .evdf-attrow{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 4px;border-bottom:1px dashed #eef0f3;}
+  .evdf-attrow:last-child{border-bottom:0;}
+  .evdf-attrow .nm{font-weight:800;color:#222;font-size:.94rem;display:flex;align-items:center;gap:6px;}
+  .evdf-attrow .grp{font-size:.7rem;color:#0d47a1;background:#e3f2fd;padding:1px 7px;border-radius:99px;font-weight:700;}
+  .evdf-attbtns{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
+  .evdf-attbtn{background:#fff;border:2px solid #d3d8de;border-radius:9px;padding:9px 4px;font-size:1.25rem;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+  .evdf-attbtn:active{transform:scale(0.92);}
+  .evdf-attbtn.is-on[data-st="pending"]          {background:#eef0f3;border-color:#9e9e9e;}
+  .evdf-attbtn.is-on[data-st="present"]          {background:#1D9E75;border-color:#1D9E75;color:#fff;}
+  .evdf-attbtn.is-on[data-st="late"]             {background:#E65100;border-color:#E65100;color:#fff;}
+  .evdf-attbtn.is-on[data-st="absent"]           {background:#c62828;border-color:#c62828;color:#fff;}
+  .evdf-attbtn.is-on[data-st="cancelled"]        {background:#37474F;border-color:#37474F;color:#fff;}
+  .evdf-attbtn.is-on[data-st="medical_emergency"]{background:#6B3FA0;border-color:#6B3FA0;color:#fff;}
+  /* Toast */
+  .evdf-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:24px;font-weight:800;font-size:.9rem;box-shadow:0 4px 18px rgba(0,0,0,0.20);opacity:0;transition:opacity .25s;z-index:200;pointer-events:none;}
+  .evdf-toast.is-show{opacity:1;}
+  .evdf-toast.is-success{background:#1D9E75;}
+  .evdf-toast.is-error  {background:#c62828;}
+  /* Skeleton */
+  @keyframes evdfShim{0%{background-position:-200px 0;}100%{background-position:calc(200px + 100%) 0;}}
+  .evdf-skel{display:block;border-radius:8px;background:linear-gradient(90deg,#eef0f3 0%,#f6f7f9 50%,#eef0f3 100%);background-size:200px 100%;background-repeat:no-repeat;animation:evdfShim 1.4s linear infinite;height:48px;margin-bottom:8px;}
+  /* Mobile tweaks */
+  @media (max-width: 520px){
+    .evdf-shell{padding:8px;}
+    .evdf-progress{grid-template-columns:repeat(2,1fr);gap:6px;}
+    .evdf-pcard .val{font-size:.95rem;}
+    .evdf-header h1{font-size:1.1rem;}
+    .evdf-header .meta{font-size:.8rem;}
+    .evdf-attbtns{grid-template-columns:repeat(3,1fr);}
+  }
+</style></head><body>
+<div class="evdf-shell">
+  <div class="evdf-stickytop">
+    <div class="evdf-bar">
+      <a class="back" href="/admin/events/{{EID}}">← العودة</a>
+      <span class="ts" id="evdf-ts">…</span>
+    </div>
+  </div>
+  <div id="evdf-root">
+    <div class="evdf-skel" style="height:90px;"></div>
+    <div class="evdf-skel" style="height:64px;"></div>
+    <div class="evdf-skel"></div>
+    <div class="evdf-skel"></div>
+    <div class="evdf-skel"></div>
+  </div>
 </div>
+<div class="evdf-toast" id="evdf-toast"></div>
+<script>
+var EID = parseInt('{{EID}}', 10);
+var DATA = null;
+var BUSY = {};   // {kind:id} guard against double-tap
+
+function evdfEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function evdfToast(msg, kind){
+  var t = document.getElementById('evdf-toast');
+  t.textContent = msg;
+  t.className = 'evdf-toast is-show ' + (kind ? 'is-' + kind : '');
+  clearTimeout(t._h);
+  t._h = setTimeout(function(){ t.classList.remove('is-show'); }, 1800);
+}
+function evdfFmtDate(iso){
+  if (!iso) return '—';
+  var s = String(iso).substring(0, 10), p = s.split('-');
+  if (p.length !== 3) return s;
+  var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return parseInt(p[2], 10) + ' ' + (months[parseInt(p[1], 10) - 1] || p[1]) + ' ' + p[0];
+}
+
+function evdfLoad(){
+  return fetch('/api/admin/events/' + EID + '/followup', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){ evdfToast(j.error || 'تعذّر التحميل', 'error'); return; }
+      DATA = j;
+      evdfRender();
+      evdfStampTimestamp();
+    })
+    .catch(function(){ evdfToast('خطأ في الاتصال', 'error'); });
+}
+
+function evdfStampTimestamp(){
+  var d = new Date();
+  var hh = String(d.getHours()).padStart(2,'0');
+  var mm = String(d.getMinutes()).padStart(2,'0');
+  var el = document.getElementById('evdf-ts');
+  if (el) el.textContent = 'تحديث: ' + hh + ':' + mm;
+}
+
+function evdfRender(){
+  var root = document.getElementById('evdf-root');
+  if (!root || !DATA) return;
+  var ev = DATA.event || {};
+  var pr = DATA.progress || {};
+  // Header
+  var dateLbl = evdfFmtDate(ev.event_date);
+  var dep = (ev.departure_time || '').trim(), ret = (ev.return_time || '').trim();
+  var time = dep ? (dep + (ret ? (' - ' + ret) : '')) : '';
+  var place = (ev.meeting_point || ev.destination || '').trim();
+  var headerHTML = '<div class="evdf-header" data-status="' + evdfEsc(ev.status || 'planning') + '">'
+                 + '  <h1>🚌 ' + evdfEsc(ev.name || 'رحلة') + '</h1>'
+                 + '  <div class="meta">'
+                 + (dateLbl ? '<span>📅 ' + evdfEsc(dateLbl) + '</span>' : '')
+                 + (time    ? '<span>⏰ ' + evdfEsc(time)    + '</span>' : '')
+                 + (place   ? '<span>📍 ' + evdfEsc(place)   + '</span>' : '')
+                 + '  </div>'
+                 + '</div>';
+
+  // Progress strip
+  function pcard(k, lab, num, denom, pct){
+    return '<div class="evdf-pcard" data-k="' + k + '">'
+         + '  <div class="lab">' + evdfEsc(lab) + '</div>'
+         + '  <div class="val">' + num + '/' + denom + '</div>'
+         + '  <div class="pct">' + (pct || 0) + '%</div>'
+         + '</div>';
+  }
+  var sP = pr.schedule || {}, iP = pr.items || {}, tP = pr.tasks || {}, aP = pr.attendance || {};
+  var attDone = (aP.present || 0) + (aP.late || 0);
+  var progressHTML = '<div class="evdf-progress">'
+                   + pcard('schedule', '⏰ الخطة', sP.done || 0,      sP.total || 0, Math.round(sP.pct || 0))
+                   + pcard('items',    '🛠️ الأدوات', iP.ready || 0,   iP.total || 0, Math.round(iP.pct || 0))
+                   + pcard('tasks',    '✅ المهام', tP.completed || 0, tP.total || 0, Math.round(tP.pct || 0))
+                   + pcard('att',      '👥 الحضور', attDone,           aP.total || 0, Math.round(aP.pct || 0))
+                   + '</div>';
+
+  // Schedule section
+  var schedHTML = evdfRenderSection('schedule', '⏰ الخطة الزمنية',
+    sP.done + '/' + sP.total,
+    (DATA.schedule || []).map(evdfScheduleRowHTML).join('')
+    || '<div class="evdf-empty">لا توجد بنود في الخطة</div>');
+
+  // Items section
+  var itemsHTML = evdfRenderSection('items', '🛠️ الأدوات',
+    iP.ready + '/' + iP.total,
+    (DATA.items || []).map(evdfItemRowHTML).join('')
+    || '<div class="evdf-empty">لا توجد أدوات</div>');
+
+  // Tasks section (3 categories)
+  var tasksByCat = DATA.tasks || {before:[], during:[], after:[]};
+  var catLabels = {before:'🟢 قبل', during:'🟡 أثناء', after:'🟣 بعد'};
+  var tasksInner = '';
+  ['before','during','after'].forEach(function(cat){
+    var arr = tasksByCat[cat] || [];
+    var done = arr.filter(function(t){ return t.status === 'completed' || t.status === 'cancelled'; }).length;
+    if (!arr.length){ return; }
+    tasksInner += '<div class="evdf-cathd"><span class="h">' + catLabels[cat] + '</span><span class="ratio">' + done + '/' + arr.length + '</span></div>';
+    tasksInner += arr.map(evdfTaskRowHTML).join('');
+  });
+  if (!tasksInner) tasksInner = '<div class="evdf-empty">لا توجد مهام</div>';
+  var tasksHTML = evdfRenderSection('tasks', '✅ المهام',
+    tP.completed + '/' + tP.total, tasksInner);
+
+  // Attendance section
+  var attInner = (DATA.registrations || []).map(evdfAttRowHTML).join('')
+              || '<div class="evdf-empty">لا توجد طالبات مسجلات</div>';
+  var attHTML = evdfRenderSection('att', '👥 الحضور',
+    attDone + '/' + (aP.total || 0), attInner);
+
+  root.innerHTML = headerHTML + progressHTML + schedHTML + itemsHTML + tasksHTML + attHTML;
+
+  // Wire up checkbox rows + attendance buttons
+  root.querySelectorAll('.evdf-row[data-toggle]').forEach(function(row){
+    row.addEventListener('click', function(){
+      var kind = row.getAttribute('data-toggle');
+      var id = parseInt(row.getAttribute('data-id'), 10);
+      var cur = row.getAttribute('data-cur') === '1';
+      evdfToggle(kind, id, !cur, row);
+    });
+  });
+  root.querySelectorAll('.evdf-attbtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var rid = parseInt(btn.getAttribute('data-rid'), 10);
+      var st  = btn.getAttribute('data-st');
+      evdfSetAttendance(rid, st, btn);
+    });
+  });
+}
+
+function evdfRenderSection(k, title, ratio, inner){
+  return '<div class="evdf-sec" data-k="' + k + '">'
+       + '  <h2><span>' + title + '</span><span class="ratio">' + ratio + '</span></h2>'
+       + inner
+       + '</div>';
+}
+
+function evdfScheduleRowHTML(s){
+  var done = !!s.is_completed;
+  var time = s.time_slot ? '<span class="evdf-time">' + evdfEsc(s.time_slot) + '</span>' : '';
+  var dur  = s.duration_minutes ? ' · ' + s.duration_minutes + ' د' : '';
+  return '<div class="evdf-row' + (done ? ' is-done' : '') + '" data-toggle="schedule" data-id="' + (s.id|0) + '" data-cur="' + (done ? 1 : 0) + '">'
+       + '  <div class="evdf-cb">' + (done ? '✓' : '') + '</div>'
+       + '  <div class="evdf-body">'
+       + '    <div class="title">' + evdfEsc(s.title || '—') + '</div>'
+       + '    <div class="meta">' + time + (s.description ? ' — ' + evdfEsc(s.description) : '') + dur + '</div>'
+       + '  </div>'
+       + '  <div></div>'
+       + '</div>';
+}
+
+function evdfItemRowHTML(it){
+  var done = !!it.is_ready;
+  var qty = (it.quantity > 1) ? '<span class="qty">×' + it.quantity + '</span>' : '';
+  var asg = it.assigned_to_name ? ('<div class="meta">👤 ' + evdfEsc(it.assigned_to_name) + '</div>') : '';
+  return '<div class="evdf-row' + (done ? ' is-done' : '') + '" data-toggle="item" data-id="' + (it.id|0) + '" data-cur="' + (done ? 1 : 0) + '">'
+       + '  <div class="evdf-cb">' + (done ? '✓' : '') + '</div>'
+       + '  <div class="evdf-body">'
+       + '    <div class="title">' + evdfEsc(it.title || '—') + qty + '</div>'
+       + '    ' + asg
+       + '  </div>'
+       + '  <div></div>'
+       + '</div>';
+}
+
+function evdfTaskRowHTML(t){
+  var done = (t.status === 'completed' || t.status === 'cancelled');
+  var asg = t.assigned_to_name ? ('<div class="meta">👤 ' + evdfEsc(t.assigned_to_name) + '</div>') : '';
+  return '<div class="evdf-row' + (done ? ' is-done' : '') + '" data-toggle="task" data-id="' + (t.id|0) + '" data-cur="' + (done ? 1 : 0) + '">'
+       + '  <div class="evdf-cb">' + (done ? '✓' : '') + '</div>'
+       + '  <div class="evdf-body">'
+       + '    <div class="title">' + evdfEsc(t.title || '—') + '</div>'
+       + '    ' + asg
+       + '  </div>'
+       + '  <div></div>'
+       + '</div>';
+}
+
+var ATT_STATES = [
+  {st:'pending',           em:'⏳'},
+  {st:'present',           em:'✅'},
+  {st:'late',              em:'🟡'},
+  {st:'absent',            em:'❌'},
+  {st:'cancelled',         em:'🚫'},
+  {st:'medical_emergency', em:'🚑'}
+];
+function evdfAttRowHTML(r){
+  var cur = r.attendance_status || 'pending';
+  var grp = r.group_name ? '<span class="grp">' + evdfEsc(r.group_name) + '</span>' : '';
+  var btns = ATT_STATES.map(function(s){
+    var on = (s.st === cur) ? ' is-on' : '';
+    return '<button type="button" class="evdf-attbtn' + on + '" data-rid="' + (r.id|0) + '" data-st="' + s.st + '" aria-label="' + s.st + '">' + s.em + '</button>';
+  }).join('');
+  return '<div class="evdf-attrow" data-rid="' + (r.id|0) + '">'
+       + '  <div class="nm">' + evdfEsc(r.student_name || '—') + grp + '</div>'
+       + '  <div class="evdf-attbtns">' + btns + '</div>'
+       + '</div>';
+}
+
+/* ── Toggle handlers — optimistic UI + auto-save ─────────────── */
+function evdfToggle(kind, id, newVal, rowEl){
+  var key = kind + ':' + id;
+  if (BUSY[key]) return;
+  BUSY[key] = true;
+  if (rowEl) rowEl.classList.add('is-saving');
+  var url, body;
+  if (kind === 'schedule'){
+    url  = '/api/admin/events/' + EID + '/schedule/' + id + '/toggle-complete';
+    body = {is_completed: newVal ? 1 : 0};
+  } else if (kind === 'item'){
+    url  = '/api/admin/events/' + EID + '/items/' + id;
+    body = {is_ready: newVal ? 1 : 0};
+  } else if (kind === 'task'){
+    url  = '/api/admin/events/' + EID + '/tasks/' + id;
+    body = {status: newVal ? 'completed' : 'pending'};
+  } else { delete BUSY[key]; return; }
+  fetch(url, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), credentials:'same-origin'})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      delete BUSY[key];
+      if (rowEl) rowEl.classList.remove('is-saving');
+      if (!o.ok || !o.j.ok){ evdfToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+      // Patch the in-memory record + recount, then re-render so the
+      // top progress strip + section ratios update without a refetch.
+      evdfPatchLocal(kind, id, newVal);
+      evdfRecount();
+      evdfRender();
+      evdfStampTimestamp();
+      evdfToast('✓ تم الحفظ', 'success');
+      if (navigator.vibrate) try { navigator.vibrate(15); } catch(_){}
+    })
+    .catch(function(){
+      delete BUSY[key];
+      if (rowEl) rowEl.classList.remove('is-saving');
+      evdfToast('خطأ في الاتصال', 'error');
+    });
+}
+
+function evdfSetAttendance(rid, st, btnEl){
+  var key = 'att:' + rid;
+  if (BUSY[key]) return;
+  BUSY[key] = true;
+  if (btnEl) btnEl.style.opacity = '0.5';
+  fetch('/api/admin/events/' + EID + '/registrations/' + rid, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({attendance_status: st}), credentials:'same-origin'
+  })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(o){
+      delete BUSY[key];
+      if (btnEl) btnEl.style.opacity = '1';
+      if (!o.ok || !o.j.ok){ evdfToast(o.j.error || 'تعذّر الحفظ', 'error'); return; }
+      // Patch local + re-render so the count + the per-row buttons
+      // reflect the new selection immediately.
+      (DATA.registrations || []).forEach(function(r){
+        if (r.id === rid) r.attendance_status = st;
+      });
+      evdfRecount();
+      evdfRender();
+      evdfStampTimestamp();
+      evdfToast('✓ تم الحفظ', 'success');
+      if (navigator.vibrate) try { navigator.vibrate(15); } catch(_){}
+    })
+    .catch(function(){
+      delete BUSY[key];
+      if (btnEl) btnEl.style.opacity = '1';
+      evdfToast('خطأ في الاتصال', 'error');
+    });
+}
+
+function evdfPatchLocal(kind, id, newVal){
+  if (kind === 'schedule'){
+    (DATA.schedule || []).forEach(function(s){
+      if (s.id === id) s.is_completed = newVal ? 1 : 0;
+    });
+  } else if (kind === 'item'){
+    (DATA.items || []).forEach(function(it){
+      if (it.id === id) it.is_ready = newVal ? 1 : 0;
+    });
+  } else if (kind === 'task'){
+    var cats = DATA.tasks || {};
+    Object.keys(cats).forEach(function(c){
+      (cats[c] || []).forEach(function(t){
+        if (t.id === id) t.status = newVal ? 'completed' : 'pending';
+      });
+    });
+  }
+}
+
+function evdfRecount(){
+  // Recompute progress totals from the in-memory data so the strip
+  // updates without a server round-trip.
+  if (!DATA) return;
+  var pr = DATA.progress = DATA.progress || {};
+  var sched = DATA.schedule || [];
+  var sDone = sched.filter(function(s){ return !!s.is_completed; }).length;
+  pr.schedule = {total:sched.length, done:sDone, pct: sched.length ? Math.round(sDone / sched.length * 1000) / 10 : 0};
+  var items = DATA.items || [];
+  var iReady = items.filter(function(it){ return !!it.is_ready; }).length;
+  pr.items = {total:items.length, ready:iReady, pct: items.length ? Math.round(iReady / items.length * 1000) / 10 : 0};
+  var tasksFlat = [];
+  Object.keys(DATA.tasks || {}).forEach(function(c){ tasksFlat = tasksFlat.concat(DATA.tasks[c] || []); });
+  var tDone = tasksFlat.filter(function(t){ return t.status === 'completed' || t.status === 'cancelled'; }).length;
+  pr.tasks = {total:tasksFlat.length, completed:tDone, pct: tasksFlat.length ? Math.round(tDone / tasksFlat.length * 1000) / 10 : 0};
+  var regs = DATA.registrations || [];
+  var present = regs.filter(function(r){ return r.attendance_status === 'present'; }).length;
+  var late    = regs.filter(function(r){ return r.attendance_status === 'late'; }).length;
+  var absent  = regs.filter(function(r){ return r.attendance_status === 'absent'; }).length;
+  var pending = regs.filter(function(r){ return (r.attendance_status || 'pending') === 'pending'; }).length;
+  pr.attendance = {total:regs.length, present:present, late:late, absent:absent, pending:pending,
+                   pct: regs.length ? Math.round((present + late) / regs.length * 1000) / 10 : 0};
+  // Recompute all_done locally as well.
+  DATA.all_done = (
+    (sched.length === 0 || sDone === sched.length) &&
+    (items.length === 0 || iReady === items.length) &&
+    (tasksFlat.length === 0 || tDone === tasksFlat.length) &&
+    (regs.length === 0 || pending === 0)
+  );
+}
+
+document.addEventListener('DOMContentLoaded', evdfLoad);
+</script>
 </body></html>"""
 
 
