@@ -41603,6 +41603,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-cat-mini-badge.severe{background:#FFEBEE;color:#C62828;}
 .vio-cat-autofill{background:#f6f0fc;border:2px solid #c8a8e8;
   border-radius:12px;padding:14px;margin-top:14px;}
+.vio-cat-af-empty{padding:18px 14px;text-align:center;color:#6B3FA0;
+  background:#fff;border:1.5px dashed #c8a8e8;border-radius:9px;
+  font-size:.92rem;font-weight:700;line-height:1.6;margin-bottom:10px;}
+.vio-cat-af-action-ta{width:100%;min-height:90px;padding:10px 12px;
+  border:1.5px solid #d8c8ec;border-radius:9px;font-family:inherit;
+  font-size:.94rem;background:#fff;line-height:1.6;resize:vertical;}
+.vio-cat-af-action-ta:focus{outline:none;border-color:#8B5CC8;
+  background:#fafaff;}
 .vio-cat-af-head{display:flex;align-items:center;gap:6px;margin-bottom:12px;
   font-weight:800;color:#4a148c;flex-wrap:wrap;}
 .vio-cat-af-mark{font-size:1.1rem;}
@@ -41907,56 +41915,71 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             </div>
           </details>
 
-          <!-- Auto-fill panel -->
-          <div id="vio-cat-autofill" class="vio-cat-autofill" hidden>
-            <div class="vio-cat-af-head">
-              <span class="vio-cat-af-mark">✅</span>
-              <span class="vio-cat-af-key">المخالفة:</span>
-              <span id="vio-cat-af-text" class="vio-cat-af-text"></span>
+          <!-- Auto-fill panel — ALWAYS visible so users can discover
+               the action editor + templates picker even before they've
+               selected a violation. Picking a violation populates
+               severity / location / suggested action in-place. -->
+          <div id="vio-cat-autofill" class="vio-cat-autofill">
+            <!-- Empty-state hint shown when no violation is picked -->
+            <div id="vio-cat-af-empty" class="vio-cat-af-empty">
+              👆 اختاري المخالفة من القائمة أعلاه لتعبئة التصنيف والإجراء المقترح تلقائياً
             </div>
 
-            <!-- Escalation banner (only shown when was_escalated=true) -->
-            <div id="vio-cat-af-escbar" class="vio-cat-af-escbar" hidden>
-              <div class="vio-cat-af-escbar-head">
-                ⚠️ <span id="vio-cat-af-escbar-title"></span>
+            <div id="vio-cat-af-filled" hidden>
+              <div class="vio-cat-af-head">
+                <span class="vio-cat-af-mark">✅</span>
+                <span class="vio-cat-af-key">المخالفة:</span>
+                <span id="vio-cat-af-text" class="vio-cat-af-text"></span>
               </div>
-              <div id="vio-cat-af-escbar-body" class="vio-cat-af-escbar-body"></div>
+
+              <!-- Escalation banner (only shown when was_escalated=true) -->
+              <div id="vio-cat-af-escbar" class="vio-cat-af-escbar" hidden>
+                <div class="vio-cat-af-escbar-head">
+                  ⚠️ <span id="vio-cat-af-escbar-title"></span>
+                </div>
+                <div id="vio-cat-af-escbar-body" class="vio-cat-af-escbar-body"></div>
+              </div>
+
+              <div class="vio-cat-af-row">
+                <span class="vio-cat-af-key">التصنيف:</span>
+                <span id="vio-cat-af-sev" class="vio-cat-af-val" data-field="severity"></span>
+                <button type="button" class="vio-cat-af-edit" data-edit="severity" title="تعديل">✏️</button>
+              </div>
+              <div class="vio-cat-af-row">
+                <span class="vio-cat-af-key">المكان:</span>
+                <span id="vio-cat-af-loc" class="vio-cat-af-val" data-field="location"></span>
+                <button type="button" class="vio-cat-af-edit" data-edit="location" title="تعديل">✏️</button>
+              </div>
+
+              <!-- Compact history badge (click to expand) -->
+              <div id="vio-cat-af-histbadge" class="vio-cat-af-histbadge" hidden>
+                <button type="button" id="vio-cat-af-histtoggle" class="vio-cat-af-histtoggle">
+                  📊 <span id="vio-cat-af-histshort"></span>
+                  <span class="vio-cat-af-histarrow">▼</span>
+                </button>
+              </div>
+              <div id="vio-cat-af-history" class="vio-cat-af-history" hidden>
+                <div class="vio-cat-af-history-title" id="vio-cat-af-history-title"></div>
+                <div id="vio-cat-af-history-body" class="vio-cat-af-history-body"></div>
+              </div>
             </div>
 
-            <div class="vio-cat-af-row">
-              <span class="vio-cat-af-key">التصنيف:</span>
-              <span id="vio-cat-af-sev" class="vio-cat-af-val" data-field="severity"></span>
-              <button type="button" class="vio-cat-af-edit" data-edit="severity" title="تعديل">✏️</button>
-            </div>
-            <div class="vio-cat-af-row">
-              <span class="vio-cat-af-key">المكان:</span>
-              <span id="vio-cat-af-loc" class="vio-cat-af-val" data-field="location"></span>
-              <button type="button" class="vio-cat-af-edit" data-edit="location" title="تعديل">✏️</button>
-            </div>
-
-            <!-- Compact history badge (click to expand) -->
-            <div id="vio-cat-af-histbadge" class="vio-cat-af-histbadge" hidden>
-              <button type="button" id="vio-cat-af-histtoggle" class="vio-cat-af-histtoggle">
-                📊 <span id="vio-cat-af-histshort"></span>
-                <span class="vio-cat-af-histarrow">▼</span>
-              </button>
-            </div>
-            <div id="vio-cat-af-history" class="vio-cat-af-history" hidden>
-              <div class="vio-cat-af-history-title" id="vio-cat-af-history-title"></div>
-              <div id="vio-cat-af-history-body" class="vio-cat-af-history-body"></div>
-            </div>
-
+            <!-- Action block — ALWAYS visible (even before a violation
+                 is picked) so users can manually type the action if
+                 they want, AND so the "📋 من القوالب" button is
+                 always discoverable. The textarea is permanently
+                 editable; clicking a template REPLACES its contents. -->
             <div class="vio-cat-af-action-block">
               <div class="vio-cat-af-action-head">
-                <span id="vio-cat-af-action-label">المعالجة المقترحة:</span>
+                <span id="vio-cat-af-action-label">✅ الإجراء المتخذ:</span>
                 <span class="vio-cat-af-action-tools">
                   <button type="button" id="vio-cat-af-tpl-trigger" class="vio-cat-af-tpl-trigger" title="اختاري من القوالب الجاهزة (42 قالب)">
-                    📋 من القوالب
+                    📋 اختيار من القوالب الجاهزة (42)
                   </button>
-                  <button type="button" class="vio-cat-af-edit" data-edit="action" title="تعديل يدوي">✏️</button>
                 </span>
               </div>
-              <div id="vio-cat-af-action" class="vio-cat-af-action"></div>
+              <textarea id="vio-cat-af-action-ta" class="vio-cat-af-action-ta"
+                        rows="3" placeholder="الإجراء المتخذ — يُعبّأ تلقائياً عند اختيار المخالفة، ويمكنك تعديله أو اختيار قالب جاهز..."></textarea>
             </div>
 
             <!-- Alternative action (catalog row's own action — shown only
@@ -41986,18 +42009,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         </div>
       </div>
 
-      <!-- Section 3: Actions taken -->
-      <div class="vio-section">
-        <h4>✅ الإجراءات المتخذة</h4>
-        <div class="vio-checks">
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-oral-teacher"><span>تنبيه شفهي من المعلمة</span></label>
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-oral-supervisor"><span>تنبيه شفهي من المشرفة</span></label>
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-written"><span>تنبيه كتابي</span></label>
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-message-parent"><span>إرسال رسالة لولي الأمر</span></label>
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-call-parent"><span>اتصال بولي الأمر</span></label>
-          <label class="vio-check-row"><input type="checkbox" id="vio-act-meeting-parent"><span>اجتماع مع ولي الأمر</span></label>
-        </div>
-      </div>
+      <!-- Legacy Section 3 (6-checkbox "الإجراءات المتخذة") removed
+           in favour of the auto-fill panel's editable action textarea
+           inside Section 2. The 6 boolean columns on the violations
+           table (action_oral_teacher / _supervisor / _written /
+           _message_parent / _call_parent / _meeting_parent) are kept
+           in the schema and historical rows are untouched — new rows
+           just save the action as TEXT in `action_taken` instead. -->
 
       <!-- Section 4: Additional notes -->
       <div class="vio-section" style="margin-bottom:0;">
@@ -43116,10 +43134,39 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   }
 
   function _catRenderAutofill(){
+    // The panel itself is ALWAYS visible now (so users can discover
+    // the templates picker + action textarea before picking a
+    // violation). What changes is whether the "filled" subtree
+    // showing severity/location/escalation/history is visible vs.
+    // the "empty" hint.
     var panel = document.getElementById('vio-cat-autofill');
     if (!panel) return;
-    if (!_catState.catalogId){ panel.hidden = true; return; }
-    panel.hidden = false;
+    var emptyHint = document.getElementById('vio-cat-af-empty');
+    var filled    = document.getElementById('vio-cat-af-filled');
+    var hasPick   = !!_catState.catalogId;
+    if (emptyHint) emptyHint.hidden = hasPick;
+    if (filled)    filled.hidden    = !hasPick;
+
+    // Action textarea is bound regardless — keep it in sync with
+    // _catState.action so manual typing pre-pick still saves.
+    var actTa = document.getElementById('vio-cat-af-action-ta');
+    if (actTa && actTa.value !== (_catState.action || '')){
+      actTa.value = _catState.action || '';
+    }
+    _catSetHidden();
+    if (!hasPick){
+      // Reset the dependent surfaces that only make sense post-pick.
+      var altBox = document.getElementById('vio-cat-af-alt');
+      if (altBox) altBox.hidden = true;
+      var escBarPre = document.getElementById('vio-cat-af-escbar');
+      if (escBarPre) escBarPre.hidden = true;
+      var histBadge = document.getElementById('vio-cat-af-histbadge');
+      if (histBadge) histBadge.hidden = true;
+      var hist = document.getElementById('vio-cat-af-history');
+      if (hist) hist.hidden = true;
+      return;
+    }
+
     var setText = function(id, v){
       var el = document.getElementById(id);
       if (el) el.textContent = v == null ? '' : String(v);
@@ -43127,7 +43174,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     setText('vio-cat-af-text', _catState.text || '');
     setText('vio-cat-af-sev', _catSevLabel[_catState.severity] || _catState.severity || '');
     setText('vio-cat-af-loc', _catState.location || '');
-    setText('vio-cat-af-action', _catState.action || '');
 
     // ── Escalation banner ───────────────────────────────────────
     // Shown only when the suggestion endpoint flagged was_escalated.
@@ -43357,28 +43403,26 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         }
       });
     } else if (field === 'action'){
-      var actEl = document.getElementById('vio-cat-af-action');
-      if (!actEl) return;
-      actEl.setAttribute('contenteditable', 'true');
-      actEl.focus();
-      var commit = function(){
-        actEl.removeAttribute('contenteditable');
-        _catState.action = (actEl.textContent || '').trim();
-        _catSetHidden();
-      };
-      actEl.addEventListener('blur', commit, { once: true });
-      actEl.addEventListener('keydown', function onKey(e){
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
-          e.preventDefault();
-          actEl.removeEventListener('keydown', onKey);
-          commit();
-          actEl.blur();
-        }
-      });
+      // The action is now a permanently-editable textarea; this
+      // branch is kept for backwards compat with any caller that
+      // still passes 'action'. Just focus the textarea.
+      var actTa = document.getElementById('vio-cat-af-action-ta');
+      if (actTa) actTa.focus();
     }
   }
 
   function _catBindAll(){
+    // Action textarea — permanently editable; mirrors to _catState.action
+    // on input so saveViolation() reads the latest text. Replaces the
+    // old click-✏️-to-edit contenteditable div pattern.
+    var actTa = document.getElementById('vio-cat-af-action-ta');
+    if (actTa && !actTa._catBound){
+      actTa._catBound = true;
+      actTa.addEventListener('input', function(){
+        _catState.action = (actTa.value || '');
+        _catSetHidden();
+      });
+    }
     // Search input — debounced. Updates BOTH the small dropdown
     // AND the main results list so typing narrows everything.
     // Empty query restores the full grouped-by-severity view.
