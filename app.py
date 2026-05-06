@@ -9169,6 +9169,10 @@ document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER")
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span class="md-sb-link-text">&#x1F393; &#x646;&#x638;&#x627;&#x645; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
         </a>
+        <a class="md-sb-link mx-violations-link" href="/admin/violations-catalog" id="md-sb-violations-catalog">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span class="md-sb-link-text">&#x1F4CB; &#x644;&#x627;&#x626;&#x62D;&#x629; &#x627;&#x644;&#x645;&#x62E;&#x627;&#x644;&#x641;&#x627;&#x62A;</span>
+        </a>
         <a class="md-sb-link mx-events-link" href="/admin/events" id="md-sb-events">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="11" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="7" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>
           <span class="md-sb-link-text">&#x1F68C; &#x627;&#x644;&#x641;&#x639;&#x627;&#x644;&#x64A;&#x627;&#x62A; &#x648;&#x627;&#x644;&#x631;&#x62D;&#x644;&#x627;&#x62A;<span class="ev-sb-badge" id="md-sb-events-badge" hidden>0</span></span>
@@ -43177,6 +43181,1007 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 """
 
 
+# ── /admin/violations-catalog — admin catalog editor (Commit 4) ─────
+# Manage the editable catalog that drives the smart selection form.
+# Allowlist gate (admin + Ahmed Ibrahim + Raed). Mutations go through
+# /api/violations-catalog/* (defined in Commit 2). Soft-delete only;
+# existing violations rows referencing a deleted catalog_id are
+# untouched and keep their snapshot action_taken text.
+ADMIN_VIOLATIONS_CATALOG_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<title>لائحة المخالفات — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.vcc-topbar{background:rgba(255,255,255,.95);padding:14px 22px;display:flex;
+            justify-content:space-between;align-items:center;flex-wrap:wrap;
+            gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);
+            position:sticky;top:0;z-index:50;}
+.vcc-topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.vcc-topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+              padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.vcc-wrap{max-width:1200px;margin:18px auto;padding:0 16px;}
+.vcc-hero{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+          padding:22px 26px;border-radius:16px;margin-bottom:14px;
+          box-shadow:0 6px 20px rgba(107,63,160,.25);
+          display:flex;justify-content:space-between;align-items:center;
+          flex-wrap:wrap;gap:12px;}
+.vcc-hero h2{margin:0;font-size:1.35rem;font-weight:900;line-height:1.3;}
+.vcc-hero p{margin:6px 0 0;font-size:.92rem;opacity:.92;}
+.vcc-btn{border:none;border-radius:9px;padding:10px 18px;font-weight:800;
+         font-size:.92rem;font-family:inherit;cursor:pointer;
+         display:inline-flex;align-items:center;gap:6px;
+         transition:box-shadow .15s ease,background .15s ease;}
+.vcc-btn-primary{background:#fff;color:#4a148c;
+                 box-shadow:0 3px 10px rgba(0,0,0,.15);}
+.vcc-btn-primary:hover{box-shadow:0 5px 16px rgba(0,0,0,.25);}
+.vcc-btn-ghost{background:#f3e5f5;color:#4a148c;}
+.vcc-btn-ghost:hover{background:#e1bee7;}
+.vcc-btn-secondary{background:#fff;color:#4a148c;border:1.5px solid #d8c8ec;}
+.vcc-btn-secondary:hover{background:#faf5ff;}
+.vcc-btn-save{background:linear-gradient(135deg,#1D9E75,#2BB585);color:#fff;
+              box-shadow:0 3px 10px rgba(29,158,117,.25);}
+.vcc-btn-save:hover{box-shadow:0 5px 16px rgba(29,158,117,.4);}
+.vcc-btn-pause{background:#FFF3E0;color:#E65100;}
+.vcc-btn-pause:hover{background:#FFE0B2;}
+.vcc-btn-del{background:#FFEBEE;color:#C62828;}
+.vcc-btn-del:hover{background:#FFCDD2;}
+
+.vcc-filters{background:#fff;border-radius:12px;padding:14px 16px;
+             box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:14px;
+             display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:10px;}
+@media (max-width:880px){.vcc-filters{grid-template-columns:1fr 1fr;}}
+@media (max-width:540px){.vcc-filters{grid-template-columns:1fr;}}
+.vcc-field label{display:block;font-size:.78rem;color:#4a148c;font-weight:800;
+                 margin-bottom:4px;}
+.vcc-field input,.vcc-field select,.vcc-field textarea{
+  width:100%;padding:8px 11px;border:1.5px solid #d8c8ec;border-radius:8px;
+  font-family:inherit;font-size:.9rem;background:#fafafe;}
+.vcc-field input:focus,.vcc-field select:focus,.vcc-field textarea:focus{
+  outline:none;border-color:#8B5CC8;background:#fff;}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.vcc-list{display:flex;flex-direction:column;gap:10px;}
+.vcc-card{background:#fff;border-radius:12px;padding:14px 16px;
+          box-shadow:0 2px 8px rgba(0,0,0,.05);
+          border-right:5px solid #6B3FA0;
+          transition:box-shadow .15s ease;}
+.vcc-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08);}
+.vcc-card.sev-light{border-right-color:#1D9E75;}
+.vcc-card.sev-medium{border-right-color:#BA7517;}
+.vcc-card.sev-severe{border-right-color:#A32D2D;}
+.vcc-card.is-inactive{opacity:.62;background:#f8f8fa;}
+.vcc-card-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+.vcc-sev-badge{font-size:.76rem;padding:3px 11px;border-radius:999px;
+               font-weight:800;}
+.vcc-sev-badge.light{background:#E8F5E9;color:#2E7D32;}
+.vcc-sev-badge.medium{background:#FFF8E1;color:#E65100;}
+.vcc-sev-badge.severe{background:#FFEBEE;color:#C62828;}
+.vcc-loc-badge{font-size:.78rem;padding:3px 11px;border-radius:999px;
+               background:#f3e5f5;color:#4a148c;font-weight:800;}
+.vcc-card-text{flex:1 1 100%;color:#212121;font-size:1.02rem;font-weight:800;
+               margin-top:4px;display:flex;align-items:center;gap:8px;}
+.vcc-card-emoji{font-size:1.4rem;}
+.vcc-meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;
+              font-size:.8rem;color:#666;}
+.vcc-meta-pill{display:inline-flex;align-items:center;gap:4px;
+               background:#f4f4f8;padding:3px 10px;border-radius:999px;
+               font-weight:700;}
+.vcc-meta-pill.qp{background:#FFF8E1;color:#E65100;}
+.vcc-meta-pill.usage{background:#E3F2FD;color:#1565C0;}
+.vcc-meta-pill.muted{background:#FCE4EC;color:#C62828;}
+.vcc-card-foot{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;
+               border-top:1px dashed #ece4f8;padding-top:10px;}
+.vcc-card-foot .vcc-btn{padding:6px 12px;font-size:.82rem;border-radius:7px;}
+.vcc-update-stamp{font-size:.74rem;color:#888;font-weight:600;
+                  margin-right:auto;align-self:center;}
+
+/* Expanded body */
+.vcc-card-body{display:none;margin-top:12px;border-top:1.5px dashed #ece4f8;
+               padding-top:12px;}
+.vcc-card.expanded .vcc-card-body{display:block;}
+.vcc-section-h{font-size:.86rem;font-weight:900;color:#4a148c;
+               margin:8px 0 6px;border-bottom:1px dashed #d8c8ec;
+               padding-bottom:4px;}
+.vcc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media (max-width:580px){.vcc-grid-2{grid-template-columns:1fr;}}
+.vcc-grid-3{display:grid;grid-template-columns:80px 1fr 1fr;gap:10px;}
+@media (max-width:580px){.vcc-grid-3{grid-template-columns:1fr;}}
+.vcc-action-block{background:#faf8fd;border:1px solid #ece4f8;border-radius:10px;
+                  padding:10px 12px;margin-bottom:10px;position:relative;}
+.vcc-action-head{display:flex;align-items:center;justify-content:space-between;
+                 gap:8px;margin-bottom:6px;}
+.vcc-action-title{font-weight:800;color:#4a148c;font-size:.92rem;}
+.vcc-action-thr{display:flex;align-items:center;gap:6px;font-size:.82rem;
+                color:#666;}
+.vcc-action-thr input{width:54px;padding:4px 6px;text-align:center;
+                      font-weight:800;}
+.vcc-action-text{width:100%;min-height:54px;padding:9px 11px;
+                 border:1.5px solid #d8c8ec;border-radius:8px;
+                 font-family:inherit;font-size:.92rem;background:#fff;
+                 resize:vertical;line-height:1.5;}
+.vcc-action-text:focus{outline:none;border-color:#8B5CC8;}
+.vcc-tpl-trigger{margin-top:6px;background:#f3e5f5;color:#4a148c;
+                 border:1px dashed #c8a8e8;border-radius:8px;
+                 padding:5px 12px;font-family:inherit;font-size:.82rem;
+                 font-weight:700;cursor:pointer;}
+.vcc-tpl-trigger:hover{background:#e1bee7;}
+
+/* Template popover */
+.vcc-tpl-pop{position:absolute;top:100%;right:0;z-index:5;
+             background:#fff;border:1px solid #d8c8ec;border-radius:10px;
+             box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:280px;
+             overflow:auto;min-width:260px;margin-top:4px;}
+.vcc-tpl-item{padding:8px 12px;cursor:pointer;font-size:.88rem;
+              border-bottom:1px solid #f0e6f8;color:#333;
+              display:flex;align-items:center;gap:6px;}
+.vcc-tpl-item:last-child{border-bottom:none;}
+.vcc-tpl-item:hover{background:#faf5ff;color:#4a148c;font-weight:700;}
+.vcc-tpl-empty{padding:14px;color:#888;font-style:italic;font-size:.86rem;
+               text-align:center;}
+
+.vcc-qp-row{display:flex;align-items:center;gap:8px;margin:8px 0 6px;
+            background:#FFF8E1;padding:7px 10px;border-radius:8px;
+            border:1px solid #FFD876;font-size:.86rem;font-weight:700;
+            color:#7C5A00;cursor:pointer;}
+.vcc-qp-row input{margin:0;width:18px;height:18px;cursor:pointer;
+                  accent-color:#E65100;flex-shrink:0;}
+
+.vcc-empty{background:#fff;border-radius:14px;padding:40px 20px;
+           box-shadow:0 4px 14px rgba(0,0,0,.06);
+           text-align:center;color:#888;font-style:italic;}
+
+.vcc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+           margin-top:14px;}
+@media (max-width:760px){.vcc-stats{grid-template-columns:repeat(2,1fr);}}
+.vcc-stat{background:#fff;border-radius:12px;padding:14px;
+          box-shadow:0 2px 8px rgba(0,0,0,.05);text-align:center;
+          border-bottom:3px solid #6B3FA0;}
+.vcc-stat-num{font-size:1.6rem;font-weight:900;color:#4a148c;}
+.vcc-stat-lbl{color:#666;font-size:.82rem;font-weight:700;}
+
+/* Toast */
+.vcc-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+           background:#2E7D32;color:#fff;padding:12px 22px;border-radius:10px;
+           font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);
+           opacity:0;pointer-events:none;transition:opacity .25s ease;
+           z-index:9999;max-width:90vw;text-align:center;font-size:.95rem;}
+.vcc-toast.show{opacity:1;}
+.vcc-toast.err{background:#C62828;}
+.vcc-toast.warn{background:#E65100;}
+
+/* Add new modal */
+.vcc-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
+                   display:none;align-items:flex-start;justify-content:center;
+                   z-index:9990;padding:24px 14px;overflow-y:auto;}
+.vcc-modal-overlay.show{display:flex;}
+.vcc-modal{background:#fff;border-radius:14px;padding:0;max-width:780px;
+           width:100%;box-shadow:0 14px 48px rgba(0,0,0,.25);}
+.vcc-modal-head{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+                padding:14px 20px;display:flex;justify-content:space-between;
+                align-items:center;border-radius:14px 14px 0 0;}
+.vcc-modal-head h3{margin:0;font-size:1.1rem;font-weight:900;}
+.vcc-modal-close{background:transparent;border:none;color:#fff;
+                 font-size:1.6rem;cursor:pointer;padding:0 4px;
+                 line-height:1;font-family:inherit;}
+.vcc-modal-body{padding:18px 20px;}
+.vcc-modal-foot{display:flex;gap:10px;padding:14px 20px;
+                border-top:1px solid #f0e6f8;background:#faf8fd;
+                border-radius:0 0 14px 14px;flex-wrap:wrap;}
+.vcc-form-error{display:none;background:#FCE6E6;color:#A32D2D;
+                border:1px solid #f5b9b9;border-radius:8px;
+                padding:10px 14px;margin-top:8px;font-weight:700;
+                font-size:.9rem;}
+.vcc-form-error.show{display:block;}
+
+/* Templates manager */
+.vcc-tpl-manage{background:#fff;border-radius:12px;padding:14px 16px;
+                box-shadow:0 2px 8px rgba(0,0,0,.05);margin-top:14px;}
+.vcc-tpl-manage details{margin:0;}
+.vcc-tpl-manage summary{cursor:pointer;font-weight:900;color:#4a148c;
+                        list-style:none;padding:6px 4px;}
+.vcc-tpl-manage summary::-webkit-details-marker{display:none;}
+.vcc-tpl-manage-body{margin-top:10px;}
+.vcc-tpl-list-item{display:flex;align-items:center;gap:10px;
+                   padding:6px 8px;border-bottom:1px solid #f0e6f8;
+                   font-size:.9rem;}
+.vcc-tpl-list-item:last-child{border-bottom:none;}
+.vcc-tpl-list-item button{background:#FFEBEE;color:#C62828;border:none;
+                          padding:3px 8px;border-radius:6px;font-weight:700;
+                          font-family:inherit;cursor:pointer;font-size:.8rem;}
+.vcc-tpl-add-row{display:flex;gap:8px;margin-top:10px;}
+.vcc-tpl-add-row input{flex:1;}
+</style></head>
+<body>
+<div class="vcc-topbar">
+  <h1>📋 لائحة المخالفات</h1>
+  <a href="/admin/violations">→ سجل المخالفات</a>
+</div>
+<div class="vcc-wrap">
+  <div class="vcc-hero">
+    <div>
+      <h2>📋 إدارة لائحة المخالفات</h2>
+      <p>تعديل المخالفات والإجراءات المقترحة لكل تكرار</p>
+    </div>
+    <button type="button" class="vcc-btn vcc-btn-primary" id="vcc-btn-add">
+      ➕ إضافة مخالفة جديدة
+    </button>
+  </div>
+
+  <div class="vcc-filters">
+    <div class="vcc-field">
+      <label>🔍 بحث في النص</label>
+      <input type="text" id="vcc-flt-q" placeholder="اكتب أي كلمة...">
+    </div>
+    <div class="vcc-field">
+      <label>🎯 التصنيف</label>
+      <select id="vcc-flt-sev">
+        <option value="">— الكل —</option>
+        <option value="light">🟢 خفيفة</option>
+        <option value="medium">🟡 متوسطة</option>
+        <option value="severe">🔴 خطيرة</option>
+      </select>
+    </div>
+    <div class="vcc-field">
+      <label>📍 المكان</label>
+      <select id="vcc-flt-loc">
+        <option value="">— الكل —</option>
+        <option>داخل الصف</option>
+        <option>خارج الصف (ممرات)</option>
+        <option>دورات المياه</option>
+        <option>خارج المعهد (الباب)</option>
+      </select>
+    </div>
+    <div class="vcc-field">
+      <label>الحالة</label>
+      <select id="vcc-flt-state">
+        <option value="active">مفعّلة فقط</option>
+        <option value="all">الكل</option>
+        <option value="inactive">المتوقفة فقط</option>
+      </select>
+    </div>
+    <div class="vcc-field">
+      <label>الترتيب</label>
+      <select id="vcc-flt-sort">
+        <option value="order">حسب الرقم</option>
+        <option value="usage">الأكثر استخداماً</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="vcc-list" id="vcc-list">
+    <div class="vcc-empty">جارٍ التحميل...</div>
+  </div>
+
+  <div class="vcc-stats">
+    <div class="vcc-stat">
+      <div class="vcc-stat-num" id="vcc-stat-total">…</div>
+      <div class="vcc-stat-lbl">إجمالي المخالفات في القائمة</div>
+    </div>
+    <div class="vcc-stat">
+      <div class="vcc-stat-num" id="vcc-stat-active">…</div>
+      <div class="vcc-stat-lbl">المفعّلة</div>
+    </div>
+    <div class="vcc-stat">
+      <div class="vcc-stat-num" id="vcc-stat-inactive">…</div>
+      <div class="vcc-stat-lbl">المتوقفة</div>
+    </div>
+    <div class="vcc-stat">
+      <div class="vcc-stat-num" id="vcc-stat-recorded">…</div>
+      <div class="vcc-stat-lbl">إجمالي المخالفات المسجلة</div>
+    </div>
+  </div>
+
+  <div class="vcc-tpl-manage">
+    <details>
+      <summary>⚙️ قوالب الإجراءات (إدارة القائمة)</summary>
+      <div class="vcc-tpl-manage-body" id="vcc-tpl-manage-body">
+        <div class="vcc-empty" style="padding:14px;">جارٍ التحميل...</div>
+      </div>
+      <div class="vcc-tpl-add-row">
+        <input type="text" id="vcc-tpl-add-input" placeholder="أضف قالب جديد...">
+        <button type="button" class="vcc-btn vcc-btn-ghost" id="vcc-tpl-add-btn">➕ إضافة</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- Add new modal -->
+<div class="vcc-modal-overlay" id="vcc-add-overlay" hidden>
+  <div class="vcc-modal" role="dialog" aria-modal="true">
+    <div class="vcc-modal-head">
+      <h3>➕ إضافة مخالفة جديدة</h3>
+      <button type="button" class="vcc-modal-close" id="vcc-add-close" aria-label="إغلاق">×</button>
+    </div>
+    <div class="vcc-modal-body" id="vcc-add-body"></div>
+    <div class="vcc-modal-foot">
+      <button type="button" class="vcc-btn vcc-btn-save" id="vcc-add-save">💾 حفظ</button>
+      <button type="button" class="vcc-btn vcc-btn-secondary" id="vcc-add-cancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var SEV_DEFAULTS = {
+    light: {
+      a1: 'تنبيه الطالب وتوجيهه + رسالة لولي الأمر',
+      a2: 'أخذ تعهد كتابي + إبلاغ ولي الأمر بالاتصال',
+      a3: 'تحويل للمرشد الاجتماعي + إبلاغ الإدارة',
+      t2: 3, t3: 5
+    },
+    medium: {
+      a1: 'تنبيه + رسالة نصية لولي الأمر + رصد المخالفة',
+      a2: 'أخذ تعهد كتابي + استدعاء ولي الأمر',
+      a3: 'تحويل للمرشد + استدعاء الإدارة + اتخاذ إجراء',
+      t2: 2, t3: 3
+    },
+    severe: {
+      a1: 'إنذار + استدعاء ولي الأمر + تعهد كتابي',
+      a2: 'إيقاف يوم/يومين + تحويل للمرشد + الإدارة',
+      a3: 'إيقاف فصل دراسي + قرار من الإدارة',
+      t2: 2, t3: 3
+    }
+  };
+
+  var SEV_LABEL = {
+    light: '🟢 خفيفة',
+    medium: '🟡 متوسطة',
+    severe: '🔴 خطيرة'
+  };
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+  function showToast(msg, level){
+    var t = document.getElementById('vcc-toast');
+    if (!t){
+      t = document.createElement('div');
+      t.id = 'vcc-toast';
+      t.className = 'vcc-toast';
+      document.body.appendChild(t);
+    }
+    t.classList.remove('err','warn');
+    if (level === 'err' || level === 'warn') t.classList.add(level);
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+
+  // ── State ─────────────────────────────────────────────────────
+  var _items = [];
+  var _templates = [];
+  var _expanded = {};   // catalogId → bool
+  var _origEdits = {};  // catalogId → original payload snapshot
+  var _editsDirty = {}; // catalogId → bool
+  var _filters = { q: '', sev: '', loc: '', state: 'active', sort: 'order' };
+
+  // ── Data load ─────────────────────────────────────────────────
+  function loadCatalog(){
+    // For "all" or "inactive" we ignore active_only; otherwise default
+    // (active_only=1) is server-side.
+    var qs = [];
+    if (_filters.state === 'all' || _filters.state === 'inactive'){
+      qs.push('active_only=0');
+    }
+    if (_filters.sev) qs.push('severity=' + encodeURIComponent(_filters.sev));
+    if (_filters.loc) qs.push('location=' + encodeURIComponent(_filters.loc));
+    if (_filters.q)   qs.push('q='        + encodeURIComponent(_filters.q));
+    var url = '/api/violations-catalog' + (qs.length ? '?' + qs.join('&') : '');
+    var listC = document.getElementById('vcc-list');
+    fetch(url, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok){
+          listC.innerHTML = '<div class="vcc-empty">تعذر جلب القائمة</div>';
+          _items = [];
+          renderStats();
+          return;
+        }
+        _items = d.items || [];
+        // Apply state-only filter on the client when needed.
+        if (_filters.state === 'inactive'){
+          _items = _items.filter(function(x){ return !x.is_active; });
+        }
+        // Sort (server returns by sort_order ASC)
+        if (_filters.sort === 'usage'){
+          _items.sort(function(a,b){
+            return (b.use_count||0) - (a.use_count||0);
+          });
+        }
+        renderList();
+        renderStats();
+      })
+      .catch(function(){
+        listC.innerHTML = '<div class="vcc-empty">تعذر الاتصال بالخادم</div>';
+      });
+  }
+
+  function loadTemplates(){
+    fetch('/api/violations-action-templates', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        _templates = (d && d.items) || [];
+        renderTemplatesManager();
+      })
+      .catch(function(){});
+  }
+
+  function loadRecordedTotal(){
+    fetch('/api/admin/violations/stats', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var n = (d && d.ok) ? (d.total || 0) : 0;
+        var el = document.getElementById('vcc-stat-recorded');
+        if (el) el.textContent = String(n);
+      })
+      .catch(function(){
+        var el = document.getElementById('vcc-stat-recorded');
+        if (el) el.textContent = '—';
+      });
+  }
+
+  // ── Render: list ──────────────────────────────────────────────
+  function renderList(){
+    var c = document.getElementById('vcc-list');
+    if (!_items.length){
+      c.innerHTML = '<div class="vcc-empty">لا توجد نتائج بهذه التصفية</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < _items.length; i++){
+      html += renderCard(_items[i]);
+    }
+    c.innerHTML = html;
+  }
+
+  function renderCard(it){
+    var sev = (it.severity || '').toLowerCase();
+    var sevCls = (sev === 'light' || sev === 'medium' || sev === 'severe') ? sev : '';
+    var sevLbl = (sev === 'light' ? 'خفيفة' : sev === 'medium' ? 'متوسطة' :
+                  sev === 'severe' ? 'خطيرة' : '');
+    var expanded = !!_expanded[it.id];
+    var inactiveCls = it.is_active ? '' : ' is-inactive';
+    var qpRow = it.is_quick_pick
+      ? '<span class="vcc-meta-pill qp">⭐ زر سريع</span>' : '';
+    var inactiveBadge = it.is_active ? '' :
+      '<span class="vcc-meta-pill muted">⏸️ متوقفة</span>';
+    var stamp = it.updated_at ? ('آخر تحديث: ' + escapeHtml(String(it.updated_at).slice(0, 16).replace('T',' '))) : '';
+    return (
+      '<div class="vcc-card sev-' + sevCls + (expanded ? ' expanded' : '') + inactiveCls +
+        '" data-cat-id="' + escapeHtml(it.id) + '">' +
+        '<div class="vcc-card-head">' +
+          '<span class="vcc-sev-badge ' + sevCls + '">' + escapeHtml(sevLbl) + '</span>' +
+          '<span class="vcc-loc-badge">' + escapeHtml(it.location || '') + '</span>' +
+          inactiveBadge +
+          qpRow +
+          '<span class="vcc-meta-pill usage">📊 ' +
+            escapeHtml(it.use_count || 0) + ' مرة</span>' +
+        '</div>' +
+        '<div class="vcc-card-text">' +
+          '<span class="vcc-card-emoji">' + escapeHtml(it.emoji_icon || '📋') + '</span>' +
+          '<span>' + escapeHtml(it.violation_text || '') + '</span>' +
+        '</div>' +
+        renderCardBody(it) +
+        '<div class="vcc-card-foot">' +
+          (stamp ? '<span class="vcc-update-stamp">' + stamp + '</span>' : '') +
+          '<button type="button" class="vcc-btn vcc-btn-ghost vcc-act-toggle">' +
+            (expanded ? '🔼 طيّ' : '🔽 توسيع') +
+          '</button>' +
+          (expanded ?
+            '<button type="button" class="vcc-btn vcc-btn-save vcc-act-save">💾 حفظ التغييرات</button>' +
+            '<button type="button" class="vcc-btn vcc-btn-pause vcc-act-toggle-active">' +
+              (it.is_active ? '⏸️ إيقاف' : '✅ تفعيل') +
+            '</button>' +
+            '<button type="button" class="vcc-btn vcc-btn-del vcc-act-delete">🗑️ حذف</button>'
+          : '<button type="button" class="vcc-btn vcc-btn-secondary vcc-act-toggle">✏️ تعديل</button>') +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderCardBody(it){
+    var sev = (it.severity || 'light').toLowerCase();
+    var qpAttrs = it.is_quick_pick ? ' checked' : '';
+    return (
+      '<div class="vcc-card-body">' +
+        '<div class="vcc-section-h">━━━ المعلومات الأساسية ━━━</div>' +
+        '<div class="vcc-field" style="margin-bottom:10px;">' +
+          '<label>النص الكامل</label>' +
+          '<input type="text" data-fld="violation_text" value="' +
+            escapeHtml(it.violation_text || '') + '">' +
+        '</div>' +
+        '<div class="vcc-grid-2">' +
+          '<div class="vcc-field">' +
+            '<label>التصنيف</label>' +
+            '<select data-fld="severity">' +
+              ['light','medium','severe'].map(function(s){
+                return '<option value="' + s + '"' +
+                  (s === sev ? ' selected' : '') + '>' +
+                  SEV_LABEL[s] + '</option>';
+              }).join('') +
+            '</select>' +
+          '</div>' +
+          '<div class="vcc-field">' +
+            '<label>المكان</label>' +
+            '<select data-fld="location">' +
+              ['داخل الصف','خارج الصف (ممرات)','دورات المياه','خارج المعهد (الباب)']
+                .map(function(loc){
+                  return '<option' +
+                    (loc === (it.location || '') ? ' selected' : '') + '>' +
+                    escapeHtml(loc) + '</option>';
+                }).join('') +
+            '</select>' +
+          '</div>' +
+        '</div>' +
+        '<div class="vcc-grid-2" style="margin-top:8px;">' +
+          '<div class="vcc-field">' +
+            '<label>الإيموجي</label>' +
+            '<input type="text" data-fld="emoji_icon" maxlength="6" value="' +
+              escapeHtml(it.emoji_icon || '') + '">' +
+          '</div>' +
+          '<div class="vcc-field">' +
+            '<label>التسمية القصيرة</label>' +
+            '<input type="text" data-fld="short_label" maxlength="40" value="' +
+              escapeHtml(it.short_label || '') + '">' +
+          '</div>' +
+        '</div>' +
+        '<label class="vcc-qp-row">' +
+          '<input type="checkbox" data-fld="is_quick_pick"' + qpAttrs + '>' +
+          '<span>⭐ زر سريع (يظهر في أعلى نموذج التسجيل)</span>' +
+        '</label>' +
+
+        '<div class="vcc-section-h">━━━ الإجراءات حسب التكرار ━━━</div>' +
+
+        '<div class="vcc-action-block">' +
+          '<div class="vcc-action-head">' +
+            '<span class="vcc-action-title">📍 المرة الأولى</span>' +
+          '</div>' +
+          '<textarea class="vcc-action-text" data-fld="action_first_time" rows="2">' +
+            escapeHtml(it.action_first_time || '') +
+          '</textarea>' +
+          '<button type="button" class="vcc-tpl-trigger" data-tpl-target="action_first_time">' +
+            '📋 إضافة من القوالب الجاهزة' +
+          '</button>' +
+        '</div>' +
+
+        '<div class="vcc-action-block">' +
+          '<div class="vcc-action-head">' +
+            '<span class="vcc-action-title">📍 المرة الثانية</span>' +
+            '<span class="vcc-action-thr">تطبق بعد ' +
+              '<input type="number" min="1" data-fld="repeat_threshold_2nd" value="' +
+                escapeHtml(it.repeat_threshold_2nd || 2) + '"> مرات' +
+            '</span>' +
+          '</div>' +
+          '<textarea class="vcc-action-text" data-fld="action_second_time" rows="2">' +
+            escapeHtml(it.action_second_time || '') +
+          '</textarea>' +
+          '<button type="button" class="vcc-tpl-trigger" data-tpl-target="action_second_time">' +
+            '📋 إضافة من القوالب الجاهزة' +
+          '</button>' +
+        '</div>' +
+
+        '<div class="vcc-action-block">' +
+          '<div class="vcc-action-head">' +
+            '<span class="vcc-action-title">📍 المرة الثالثة</span>' +
+            '<span class="vcc-action-thr">تطبق بعد ' +
+              '<input type="number" min="1" data-fld="repeat_threshold_3rd" value="' +
+                escapeHtml(it.repeat_threshold_3rd || 3) + '"> مرات' +
+            '</span>' +
+          '</div>' +
+          '<textarea class="vcc-action-text" data-fld="action_third_time" rows="2">' +
+            escapeHtml(it.action_third_time || '') +
+          '</textarea>' +
+          '<button type="button" class="vcc-tpl-trigger" data-tpl-target="action_third_time">' +
+            '📋 إضافة من القوالب الجاهزة' +
+          '</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderStats(){
+    var total    = _items.length;
+    var active   = _items.filter(function(x){ return x.is_active; }).length;
+    var inactive = total - active;
+    var t = document.getElementById('vcc-stat-total');
+    var a = document.getElementById('vcc-stat-active');
+    var i = document.getElementById('vcc-stat-inactive');
+    if (t) t.textContent = String(total);
+    if (a) a.textContent = String(active);
+    if (i) i.textContent = String(inactive);
+  }
+
+  function renderTemplatesManager(){
+    var c = document.getElementById('vcc-tpl-manage-body');
+    if (!c) return;
+    if (!_templates.length){
+      c.innerHTML = '<div class="vcc-empty" style="padding:14px;">لا توجد قوالب بعد</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < _templates.length; i++){
+      var t = _templates[i];
+      html += '<div class="vcc-tpl-list-item" data-tpl-id="' + escapeHtml(t.id) + '">' +
+              '<span style="flex:1;">' + escapeHtml(t.template_text) + '</span>' +
+              '<button type="button" class="vcc-act-tpl-del">🗑️</button>' +
+              '</div>';
+    }
+    c.innerHTML = html;
+  }
+
+  // ── Card mutations ────────────────────────────────────────────
+  function _toggleExpand(id){
+    _expanded[id] = !_expanded[id];
+    renderList();
+  }
+
+  function _readCardPayload(card){
+    var out = {};
+    var inputs = card.querySelectorAll('[data-fld]');
+    for (var i = 0; i < inputs.length; i++){
+      var el = inputs[i];
+      var f = el.getAttribute('data-fld');
+      if (el.type === 'checkbox'){
+        out[f] = el.checked ? 1 : 0;
+      } else if (el.type === 'number'){
+        out[f] = parseInt(el.value, 10);
+      } else {
+        out[f] = (el.value || '').trim();
+      }
+    }
+    return out;
+  }
+
+  function _saveCard(id, btn){
+    var card = document.querySelector('.vcc-card[data-cat-id="' + id + '"]');
+    if (!card) return;
+    var payload = _readCardPayload(card);
+    var oldText = btn ? btn.textContent : '';
+    if (btn){ btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+    fetch('/api/violations-catalog/' + encodeURIComponent(id), {
+      method: 'PATCH', credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+    .then(function(res){
+      if (btn){ btn.disabled = false; btn.textContent = oldText; }
+      if (res.status === 200 && res.data && res.data.ok){
+        showToast('✓ تم حفظ التغييرات');
+        loadCatalog();
+      } else {
+        var msg = (res.data && res.data.error) || 'تعذر الحفظ';
+        showToast(msg, 'err');
+      }
+    })
+    .catch(function(){
+      if (btn){ btn.disabled = false; btn.textContent = oldText; }
+      showToast('تعذر الاتصال بالخادم', 'err');
+    });
+  }
+
+  function _toggleActive(id){
+    var it = _items.filter(function(x){ return parseInt(x.id,10) === parseInt(id,10); })[0];
+    if (!it) return;
+    if (it.is_active){
+      // Soft delete confirmation, then DELETE.
+      var ok = window.confirm(
+        'سيتم إيقاف هذه المخالفة وعدم ظهورها للموظفات في نموذج التسجيل. ' +
+        'السجلات السابقة لن تتأثر. هل تريدين المتابعة؟'
+      );
+      if (!ok) return;
+      fetch('/api/violations-catalog/' + encodeURIComponent(id), {
+        method: 'DELETE', credentials: 'same-origin',
+      })
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+      .then(function(res){
+        if (res.status === 200 && res.data && res.data.ok){
+          showToast('✓ تم إيقاف المخالفة');
+          loadCatalog();
+        } else {
+          showToast((res.data && res.data.error) || 'تعذر الإيقاف', 'err');
+        }
+      });
+    } else {
+      // Re-activate via PATCH.
+      fetch('/api/violations-catalog/' + encodeURIComponent(id), {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ is_active: 1 }),
+      })
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+      .then(function(res){
+        if (res.status === 200 && res.data && res.data.ok){
+          showToast('✓ تم التفعيل');
+          loadCatalog();
+        } else {
+          showToast((res.data && res.data.error) || 'تعذر التفعيل', 'err');
+        }
+      });
+    }
+  }
+
+  function _deleteCard(id){
+    var ok = window.confirm(
+      'هذه المخالفة لن تظهر للموظفات في نموذج التسجيل. ' +
+      'السجلات السابقة لن تتأثر. هل تريدين المتابعة؟'
+    );
+    if (!ok) return;
+    fetch('/api/violations-catalog/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'same-origin',
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+    .then(function(res){
+      if (res.status === 200 && res.data && res.data.ok){
+        showToast('✓ تم الحذف');
+        loadCatalog();
+      } else {
+        showToast((res.data && res.data.error) || 'تعذر الحذف', 'err');
+      }
+    });
+  }
+
+  // ── Template popovers ────────────────────────────────────────
+  function _openTplPopover(triggerBtn){
+    // Close any open popover first
+    var existing = document.querySelector('.vcc-tpl-pop');
+    if (existing && existing._opener === triggerBtn){
+      existing.parentNode.removeChild(existing);
+      return;
+    }
+    if (existing) existing.parentNode.removeChild(existing);
+    var pop = document.createElement('div');
+    pop.className = 'vcc-tpl-pop';
+    pop._opener = triggerBtn;
+    pop._target = triggerBtn.getAttribute('data-tpl-target');
+    if (!_templates.length){
+      pop.innerHTML = '<div class="vcc-tpl-empty">لا توجد قوالب — أضيفي من قسم "قوالب الإجراءات"</div>';
+    } else {
+      pop.innerHTML = _templates.map(function(t){
+        return '<div class="vcc-tpl-item" data-tpl-text="' +
+               escapeHtml(t.template_text) + '">' +
+               '➕ <span>' + escapeHtml(t.template_text) + '</span></div>';
+      }).join('');
+    }
+    triggerBtn.parentNode.style.position = 'relative';
+    triggerBtn.parentNode.appendChild(pop);
+  }
+
+  function _appendToActionField(card, fld, addText){
+    var ta = card.querySelector('textarea[data-fld="' + fld + '"]');
+    if (!ta) return;
+    var cur = (ta.value || '').trim();
+    ta.value = cur ? (cur + ' + ' + addText) : addText;
+    ta.focus();
+  }
+
+  // ── Add new modal ────────────────────────────────────────────
+  function _openAddModal(){
+    var blank = {
+      id: 'new', violation_text: '', severity: 'light', location: 'داخل الصف',
+      emoji_icon: '📋', short_label: '', is_quick_pick: 0,
+      action_first_time: SEV_DEFAULTS.light.a1,
+      action_second_time: SEV_DEFAULTS.light.a2,
+      action_third_time: SEV_DEFAULTS.light.a3,
+      repeat_threshold_2nd: SEV_DEFAULTS.light.t2,
+      repeat_threshold_3rd: SEV_DEFAULTS.light.t3,
+      is_active: 1, use_count: 0,
+    };
+    var body = document.getElementById('vcc-add-body');
+    body.innerHTML = renderCardBody(blank) +
+      '<div class="vcc-form-error" id="vcc-add-error" role="alert"></div>';
+    body.setAttribute('data-cat-id', 'new');
+    var ov = document.getElementById('vcc-add-overlay');
+    ov.removeAttribute('hidden');
+    ov.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    // When severity changes inside the add modal, refill action defaults.
+    var sevSel = body.querySelector('[data-fld="severity"]');
+    if (sevSel){
+      sevSel.addEventListener('change', function(){
+        var d = SEV_DEFAULTS[sevSel.value] || SEV_DEFAULTS.light;
+        body.querySelector('[data-fld="action_first_time"]').value = d.a1;
+        body.querySelector('[data-fld="action_second_time"]').value = d.a2;
+        body.querySelector('[data-fld="action_third_time"]').value = d.a3;
+        body.querySelector('[data-fld="repeat_threshold_2nd"]').value = d.t2;
+        body.querySelector('[data-fld="repeat_threshold_3rd"]').value = d.t3;
+      });
+    }
+  }
+
+  function _closeAddModal(){
+    var ov = document.getElementById('vcc-add-overlay');
+    if (!ov) return;
+    ov.classList.remove('show');
+    ov.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  function _saveAddModal(){
+    var body = document.getElementById('vcc-add-body');
+    var errBox = document.getElementById('vcc-add-error');
+    var payload = _readCardPayload(body);
+    if (errBox){ errBox.classList.remove('show'); errBox.textContent = ''; }
+    if (!payload.violation_text){
+      if (errBox){ errBox.textContent = 'النص مطلوب'; errBox.classList.add('show'); }
+      return;
+    }
+    fetch('/api/violations-catalog', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+    .then(function(res){
+      if (res.status === 200 && res.data && res.data.ok){
+        showToast('✓ تم إضافة المخالفة');
+        _closeAddModal();
+        loadCatalog();
+      } else {
+        var msg = (res.data && res.data.error) || 'تعذر الحفظ';
+        if (errBox){ errBox.textContent = msg; errBox.classList.add('show'); }
+      }
+    })
+    .catch(function(){
+      if (errBox){ errBox.textContent = 'تعذر الاتصال بالخادم'; errBox.classList.add('show'); }
+    });
+  }
+
+  // ── Wiring ───────────────────────────────────────────────────
+  function bindAll(){
+    document.getElementById('vcc-flt-q').addEventListener('input', function(e){
+      _filters.q = (e.target.value || '').trim();
+      clearTimeout(window._vccQTimer);
+      window._vccQTimer = setTimeout(loadCatalog, 200);
+    });
+    document.getElementById('vcc-flt-sev').addEventListener('change', function(e){
+      _filters.sev = e.target.value || ''; loadCatalog();
+    });
+    document.getElementById('vcc-flt-loc').addEventListener('change', function(e){
+      _filters.loc = e.target.value || ''; loadCatalog();
+    });
+    document.getElementById('vcc-flt-state').addEventListener('change', function(e){
+      _filters.state = e.target.value || 'active'; loadCatalog();
+    });
+    document.getElementById('vcc-flt-sort').addEventListener('change', function(e){
+      _filters.sort = e.target.value || 'order'; loadCatalog();
+    });
+
+    var listEl = document.getElementById('vcc-list');
+    listEl.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var card = t.closest('.vcc-card');
+      if (!card) return;
+      var id = card.getAttribute('data-cat-id');
+      if (!id) return;
+      if (t.closest('.vcc-act-toggle')){
+        _toggleExpand(id);
+      } else if (t.closest('.vcc-act-save')){
+        _saveCard(id, t.closest('.vcc-act-save'));
+      } else if (t.closest('.vcc-act-toggle-active')){
+        _toggleActive(id);
+      } else if (t.closest('.vcc-act-delete')){
+        _deleteCard(id);
+      } else if (t.closest('.vcc-tpl-trigger')){
+        _openTplPopover(t.closest('.vcc-tpl-trigger'));
+      } else if (t.closest('.vcc-tpl-item')){
+        var item = t.closest('.vcc-tpl-item');
+        var pop  = t.closest('.vcc-tpl-pop');
+        if (pop && item){
+          var fld = pop._target;
+          var addText = item.getAttribute('data-tpl-text') || '';
+          if (fld && addText) _appendToActionField(card, fld, addText);
+          pop.parentNode.removeChild(pop);
+        }
+      }
+    });
+
+    // Close template popovers on outside click
+    document.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (t.closest && (t.closest('.vcc-tpl-pop') || t.closest('.vcc-tpl-trigger'))) return;
+      var pops = document.querySelectorAll('.vcc-tpl-pop');
+      for (var i = 0; i < pops.length; i++){
+        if (pops[i].parentNode) pops[i].parentNode.removeChild(pops[i]);
+      }
+    });
+
+    document.getElementById('vcc-btn-add').addEventListener('click', _openAddModal);
+    document.getElementById('vcc-add-close').addEventListener('click', _closeAddModal);
+    document.getElementById('vcc-add-cancel').addEventListener('click', _closeAddModal);
+    document.getElementById('vcc-add-save').addEventListener('click', _saveAddModal);
+
+    // Add-modal: template popover delegation (uses same _openTplPopover etc.)
+    var addBody = document.getElementById('vcc-add-body');
+    addBody.addEventListener('click', function(ev){
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      if (t.closest('.vcc-tpl-trigger')){
+        _openTplPopover(t.closest('.vcc-tpl-trigger'));
+      } else if (t.closest('.vcc-tpl-item')){
+        var item = t.closest('.vcc-tpl-item');
+        var pop  = t.closest('.vcc-tpl-pop');
+        if (pop && item){
+          var fld = pop._target;
+          var addText = item.getAttribute('data-tpl-text') || '';
+          if (fld && addText) _appendToActionField(addBody, fld, addText);
+          pop.parentNode.removeChild(pop);
+        }
+      }
+    });
+
+    // Templates manager
+    document.getElementById('vcc-tpl-add-btn').addEventListener('click', function(){
+      var inp = document.getElementById('vcc-tpl-add-input');
+      var v = (inp.value || '').trim();
+      if (!v){ showToast('اكتبي نص القالب', 'err'); return; }
+      fetch('/api/violations-action-templates', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ template_text: v }),
+      })
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+      .then(function(res){
+        if (res.status === 200 && res.data && res.data.ok){
+          inp.value = '';
+          showToast('✓ تم إضافة القالب');
+          loadTemplates();
+        } else {
+          showToast((res.data && res.data.error) || 'تعذر الإضافة', 'err');
+        }
+      })
+      .catch(function(){ showToast('تعذر الاتصال بالخادم', 'err'); });
+    });
+
+    document.getElementById('vcc-tpl-manage-body').addEventListener('click', function(ev){
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var btn = t.closest('.vcc-act-tpl-del');
+      if (!btn) return;
+      var item = btn.closest('.vcc-tpl-list-item');
+      var id = item ? item.getAttribute('data-tpl-id') : '';
+      if (!id) return;
+      if (!window.confirm('حذف هذا القالب؟')) return;
+      fetch('/api/violations-action-templates/' + encodeURIComponent(id), {
+        method: 'DELETE', credentials: 'same-origin',
+      })
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+      .then(function(res){
+        if (res.status === 200 && res.data && res.data.ok){
+          showToast('✓ تم الحذف');
+          loadTemplates();
+        } else {
+          showToast((res.data && res.data.error) || 'تعذر الحذف', 'err');
+        }
+      });
+    });
+  }
+
+  function init(){
+    bindAll();
+    loadCatalog();
+    loadTemplates();
+    loadRecordedTotal();
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body></html>
+"""
+
+
 @app.route('/admin/violations')
 @login_required
 def admin_violations_page():
@@ -43188,6 +44193,19 @@ def admin_violations_page():
             "<h1>غير مصرح</h1><p>هذه الصفحة للأدمن فقط.</p></body></html>",
             status=403, mimetype="text/html; charset=utf-8")
     return ADMIN_VIOLATIONS_HTML
+
+
+@app.route('/admin/violations-catalog')
+@login_required
+def admin_violations_catalog_page():
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return Response(
+            "<!doctype html><html lang='ar' dir='rtl'><body style='font-family:Segoe UI,Tahoma,Arial,sans-serif;"
+            "padding:40px;text-align:center;color:#c62828;'>"
+            "<h1>غير مصرح</h1><p>هذه الصفحة للأدمن فقط.</p></body></html>",
+            status=403, mimetype="text/html; charset=utf-8")
+    return ADMIN_VIOLATIONS_CATALOG_HTML
 
 
 @app.route('/api/admin/violations/stats', methods=['GET'])
