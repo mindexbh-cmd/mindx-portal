@@ -864,6 +864,48 @@ def init_db():
         read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, student_id)
     )""")
+    # ── books_v2_schema: مكتبة الكتب — fresh rebuild after the
+    # curriculum-* feature was retired. Three tables, FK-based
+    # assignments (book ↔ group_id, book ↔ teacher_user_id) so the
+    # Arabic/digit-script string-matching bug class is impossible by
+    # construction. group_id references student_groups.id (numeric),
+    # teacher_user_id references users.id (numeric). Storage path
+    # /var/data/books_v2 with local fallback ./data/books_v2;
+    # filename pattern <bid>_<safe_title>.pdf.
+    db.execute("""CREATE TABLE IF NOT EXISTS books_v2(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_path TEXT NOT NULL,
+        file_size_bytes INTEGER DEFAULT 0,
+        can_download INTEGER DEFAULT 1,
+        uploaded_by_username TEXT,
+        uploaded_by_name TEXT,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        group_id INTEGER NOT NULL,
+        UNIQUE(book_id, group_id)
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS books_v2_teachers(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        teacher_user_id INTEGER NOT NULL,
+        UNIQUE(book_id, teacher_user_id)
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_deleted "
+               "ON books_v2(is_deleted)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_groups_book "
+               "ON books_v2_groups(book_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_groups_group "
+               "ON books_v2_groups(group_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_teachers_book "
+               "ON books_v2_teachers(book_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_teachers_user "
+               "ON books_v2_teachers(teacher_user_id)")
     # ── violations_v1: نظام المخالفات — admin-only registration of student
     # behaviour incidents. 12 violation types auto-classified into
     # light/medium/severe in `severity`, place ∈ {classroom/break/center},
@@ -6337,6 +6379,53 @@ if True:
             db2.commit()
             print("[curriculum-v2-cleanup] curriculum_v2_cleanup DONE",
                   file=_sys.stderr)
+        except Exception: pass
+
+    # ── books_v2_schema: مكتبة الكتب — see init_db() above for the
+    # canonical CREATE. CREATE TABLE IF NOT EXISTS + indices are
+    # naturally idempotent so they run unconditionally; the tag
+    # insert is gated.
+    db2.execute("""CREATE TABLE IF NOT EXISTS books_v2(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        file_path TEXT NOT NULL,
+        file_size_bytes INTEGER DEFAULT 0,
+        can_download INTEGER DEFAULT 1,
+        uploaded_by_username TEXT,
+        uploaded_by_name TEXT,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_deleted INTEGER DEFAULT 0
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        group_id INTEGER NOT NULL,
+        UNIQUE(book_id, group_id)
+    )""")
+    db2.execute("""CREATE TABLE IF NOT EXISTS books_v2_teachers(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        teacher_user_id INTEGER NOT NULL,
+        UNIQUE(book_id, teacher_user_id)
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_deleted "
+                    "ON books_v2(is_deleted)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_groups_book "
+                    "ON books_v2_groups(book_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_groups_group "
+                    "ON books_v2_groups(group_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_teachers_book "
+                    "ON books_v2_teachers(book_id)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_books_v2_teachers_user "
+                    "ON books_v2_teachers(teacher_user_id)")
+    except Exception: pass
+    if "books_v2_schema" not in applied:
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("books_v2_schema",))
+            db2.commit()
         except Exception: pass
 
     # ── violations_v1: نظام المخالفات — admin-only behaviour-incident
@@ -28904,6 +28993,7 @@ _TRUNCATE_ALLOWED = {
 _TRUNCATE_PROTECTED = {
     "users", "students", "taqseet", "parent_receipts",
     "audit_log", "backup_log",
+    "books_v2", "books_v2_groups", "books_v2_teachers",
     "docs_pages", "docs_screenshots",
     "settings", "schema_migrations", "table_labels",
 }
@@ -32855,6 +32945,9 @@ _TBL_AUDIT_FEATURE = {
     "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
     "parent_messages":     ("رسائل المعلمة لأولياء الأمور",  "ماذا تريد أن يعرف ولي الأمر"),
     "parent_message_reads": ("اطّلاع أولياء الأمور على الرسائل", "ماذا تريد أن يعرف ولي الأمر"),
+    "books_v2":             ("الكتب",                           "مكتبة الكتب"),
+    "books_v2_groups":      ("الكتب — مجموعات",                 "مكتبة الكتب"),
+    "books_v2_teachers":    ("الكتب — معلمات",                  "مكتبة الكتب"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
