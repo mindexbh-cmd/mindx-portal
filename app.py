@@ -924,7 +924,9 @@ def init_db():
         uploaded_by_username TEXT,
         uploaded_by_name TEXT,
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0
+        is_deleted INTEGER DEFAULT 0,
+        cloudinary_url TEXT,
+        cloudinary_public_id TEXT
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6437,7 +6439,9 @@ if True:
         uploaded_by_username TEXT,
         uploaded_by_name TEXT,
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0
+        is_deleted INTEGER DEFAULT 0,
+        cloudinary_url TEXT,
+        cloudinary_public_id TEXT
     )""")
     db2.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6467,6 +6471,33 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("books_v2_schema",))
+            db2.commit()
+        except Exception: pass
+
+    # ── books_v2_cloudinary_v1: add cloudinary_url + cloudinary_public_id
+    # for the file-storage migration off the ephemeral local disk.
+    # TEXT nullable in both SQLite and Postgres. Legacy file_path is
+    # left untouched so existing rows keep working through view/
+    # download fallback. PRAGMA table_info is auto-translated to
+    # information_schema.columns by the Postgres wrapper.
+    if "books_v2_cloudinary_v1" not in applied:
+        try:
+            _bk_cols = [r[1] for r in db2.execute(
+                "PRAGMA table_info(books_v2)").fetchall()]
+        except Exception:
+            _bk_cols = []
+        for _c, _ddl in [
+            ("cloudinary_url",
+             "ALTER TABLE books_v2 ADD COLUMN cloudinary_url TEXT"),
+            ("cloudinary_public_id",
+             "ALTER TABLE books_v2 ADD COLUMN cloudinary_public_id TEXT"),
+        ]:
+            if _c not in _bk_cols:
+                try: db2.execute(_ddl)
+                except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("books_v2_cloudinary_v1",))
             db2.commit()
         except Exception: pass
 
