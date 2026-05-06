@@ -41622,10 +41622,42 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-cat-af-history.first-time .vio-cat-af-history-title{color:#1B5E20;}
 .vio-cat-af-history-body{color:#7C5A00;line-height:1.6;}
 .vio-cat-af-history.first-time .vio-cat-af-history-body{color:#1B5E20;}
-.vio-cat-af-action-block{margin-top:10px;}
+.vio-cat-af-action-block{margin-top:10px;position:relative;}
 .vio-cat-af-action-head{display:flex;align-items:center;
   justify-content:space-between;margin-bottom:6px;font-weight:800;
-  color:#4a148c;font-size:.92rem;}
+  color:#4a148c;font-size:.92rem;flex-wrap:wrap;gap:6px;}
+.vio-cat-af-action-tools{display:inline-flex;gap:4px;align-items:center;}
+.vio-cat-af-tpl-trigger{background:#fff;border:1.5px solid #8B5CC8;
+  color:#4a148c;border-radius:7px;padding:4px 10px;font-family:inherit;
+  font-size:.82rem;font-weight:800;cursor:pointer;}
+.vio-cat-af-tpl-trigger:hover{background:#f3e5f5;}
+.vio-cat-af-tpl-pop{position:absolute;top:32px;left:0;right:0;z-index:6;
+  background:#fff;border:1px solid #d8c8ec;border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.16);max-height:320px;
+  overflow:auto;}
+.vio-cat-af-tpl-pop-search{padding:8px;background:#faf8fd;
+  border-bottom:1px solid #ece4f8;position:sticky;top:0;z-index:1;}
+.vio-cat-af-tpl-pop-search input{width:100%;padding:7px 10px;
+  border:1.5px solid #d8c8ec;border-radius:7px;font-family:inherit;
+  font-size:.88rem;background:#fff;}
+.vio-cat-af-tpl-pop-search input:focus{outline:none;border-color:#8B5CC8;}
+.vio-cat-af-tpl-cat-head{padding:6px 12px;background:#f3e5f5;
+  border-top:1px solid #ece4f8;border-bottom:1px solid #ece4f8;
+  font-weight:900;color:#4a148c;font-size:.78rem;
+  display:flex;align-items:center;gap:6px;}
+.vio-cat-af-tpl-cat-head:first-child{border-top:none;}
+.vio-cat-af-tpl-cat-pill{background:#fff;color:#4a148c;
+  border:1px solid #c8a8e8;padding:2px 8px;border-radius:999px;
+  font-size:.74rem;font-weight:800;}
+.vio-cat-af-tpl-cat-count{margin-right:auto;color:#888;
+  font-size:.74rem;font-weight:700;}
+.vio-cat-af-tpl-item{padding:8px 12px;cursor:pointer;
+  border-bottom:1px solid #f0e6f8;font-size:.88rem;color:#333;
+  display:flex;align-items:center;gap:6px;}
+.vio-cat-af-tpl-item:last-child{border-bottom:none;}
+.vio-cat-af-tpl-item:hover{background:#faf5ff;color:#4a148c;font-weight:700;}
+.vio-cat-af-tpl-empty{padding:14px;text-align:center;color:#888;
+  font-style:italic;font-size:.86rem;}
 .vio-cat-af-action{background:#fff;border:1px solid #d8c8ec;border-radius:8px;
   padding:10px 12px;font-size:.92rem;color:#212121;line-height:1.6;
   white-space:pre-wrap;min-height:48px;}
@@ -41917,7 +41949,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             <div class="vio-cat-af-action-block">
               <div class="vio-cat-af-action-head">
                 <span id="vio-cat-af-action-label">المعالجة المقترحة:</span>
-                <button type="button" class="vio-cat-af-edit" data-edit="action" title="تعديل">✏️</button>
+                <span class="vio-cat-af-action-tools">
+                  <button type="button" id="vio-cat-af-tpl-trigger" class="vio-cat-af-tpl-trigger" title="اختاري من القوالب الجاهزة (42 قالب)">
+                    📋 من القوالب
+                  </button>
+                  <button type="button" class="vio-cat-af-edit" data-edit="action" title="تعديل يدوي">✏️</button>
+                </span>
               </div>
               <div id="vio-cat-af-action" class="vio-cat-af-action"></div>
             </div>
@@ -42828,6 +42865,120 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       .catch(function(){});
   }
 
+  // ── Action templates popover (recording form) ─────────────────
+  // Lives next to the ✏️ on the action block. The catalog editor
+  // had this from day one; the recording form was missing it, so
+  // staff could only see the 1 auto-filled action and edit it as
+  // plain text. Picking a template REPLACES action_taken (not
+  // appends — it's the actual action being taken, not a building
+  // block).
+  var _catTemplates = [];
+  var _catTemplatesByCatList = [];
+  var _catTemplatesLoaded = false;
+
+  function _catLoadTemplates(){
+    if (_catTemplatesLoaded) return;
+    fetch('/api/violations-action-templates', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        _catTemplates = (d && d.items) || [];
+        _catTemplatesByCatList = (d && d.by_category_list) || [];
+        _catTemplatesLoaded = true;
+      })
+      .catch(function(){});
+  }
+
+  function _catRenderTplPopBody(filter){
+    var f = (filter || '').toLowerCase().trim();
+    var groups = _catTemplatesByCatList || [];
+    if (!groups.length){
+      var flat = _catTemplates;
+      if (f) flat = flat.filter(function(t){
+        return (t.template_text || '').toLowerCase().indexOf(f) >= 0;
+      });
+      if (!flat.length) return '<div class="vio-cat-af-tpl-empty">' +
+                                (f ? 'لا نتائج' : 'لا توجد قوالب') + '</div>';
+      return flat.map(function(t){
+        return '<div class="vio-cat-af-tpl-item" data-tpl-text="' +
+               escapeHtml(t.template_text) + '">' +
+               '✓ <span>' + escapeHtml(t.template_text) + '</span></div>';
+      }).join('');
+    }
+    var html = '';
+    var anyShown = false;
+    for (var i = 0; i < groups.length; i++){
+      var cat = groups[i].name || 'general';
+      var rows = groups[i].items || [];
+      if (f) rows = rows.filter(function(t){
+        return (t.template_text || '').toLowerCase().indexOf(f) >= 0
+            || (cat || '').toLowerCase().indexOf(f) >= 0;
+      });
+      if (!rows.length) continue;
+      anyShown = true;
+      html += '<div class="vio-cat-af-tpl-cat-head">' +
+              '<span class="vio-cat-af-tpl-cat-pill">' + escapeHtml(cat) + '</span>' +
+              '<span class="vio-cat-af-tpl-cat-count">' + rows.length + '</span>' +
+              '</div>';
+      for (var j = 0; j < rows.length; j++){
+        var t = rows[j];
+        html += '<div class="vio-cat-af-tpl-item" data-tpl-text="' +
+                escapeHtml(t.template_text) + '">' +
+                '✓ <span>' + escapeHtml(t.template_text) + '</span></div>';
+      }
+    }
+    if (!anyShown){
+      html = '<div class="vio-cat-af-tpl-empty">' +
+             (f ? 'لا نتائج' : 'لا توجد قوالب') + '</div>';
+    }
+    return html;
+  }
+
+  function _catCloseTplPopover(){
+    var existing = document.querySelector('.vio-cat-af-tpl-pop');
+    if (existing && existing.parentNode){
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function _catOpenTplPopover(triggerBtn){
+    if (!triggerBtn) return;
+    var existing = document.querySelector('.vio-cat-af-tpl-pop');
+    if (existing){
+      // Toggle off if already open from same trigger.
+      _catCloseTplPopover();
+      if (existing._opener === triggerBtn) return;
+    }
+    var pop = document.createElement('div');
+    pop.className = 'vio-cat-af-tpl-pop';
+    pop._opener = triggerBtn;
+    var bodyHtml = _catRenderTplPopBody('');
+    pop.innerHTML =
+      '<div class="vio-cat-af-tpl-pop-search">' +
+        '<input type="text" placeholder="🔍 ابحثي في القوالب..." autocomplete="off">' +
+      '</div>' +
+      '<div class="vio-cat-af-tpl-pop-body">' + bodyHtml + '</div>';
+    var srch = pop.querySelector('input');
+    var body = pop.querySelector('.vio-cat-af-tpl-pop-body');
+    if (srch && body){
+      srch.addEventListener('input', function(){
+        body.innerHTML = _catRenderTplPopBody(srch.value || '');
+      });
+      setTimeout(function(){ try { srch.focus(); } catch(_){} }, 0);
+    }
+    var block = triggerBtn.closest('.vio-cat-af-action-block');
+    if (block){
+      block.appendChild(pop);
+    } else {
+      triggerBtn.parentNode.appendChild(pop);
+    }
+  }
+
+  function _catApplyTemplate(text){
+    if (!text) return;
+    _catState.action = text;
+    _catRenderAutofill();
+  }
+
   function _catRenderResultRow(it){
     var sev = (it.severity || '').toLowerCase();
     var sevLbl = (sev === 'light' ? 'خفيفة' : sev === 'medium' ? 'متوسطة' :
@@ -43341,13 +43492,30 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       });
     }
     // Override edit buttons + history badge toggle + alternative-
-    // action apply button — all delegated through the autofill panel.
+    // action apply button + templates popover — all delegated
+    // through the autofill panel.
     var af = document.getElementById('vio-cat-autofill');
     if (af && !af._catBound){
       af._catBound = true;
       af.addEventListener('click', function(ev){
         var t = ev.target;
         if (!t || !t.closest) return;
+        // Templates popover trigger
+        var tplBtn = t.closest('#vio-cat-af-tpl-trigger');
+        if (tplBtn){
+          ev.stopPropagation();
+          _catOpenTplPopover(tplBtn);
+          return;
+        }
+        // Template item clicked inside the popover → REPLACE action
+        var tplItem = t.closest('.vio-cat-af-tpl-item');
+        if (tplItem){
+          ev.stopPropagation();
+          var txt = tplItem.getAttribute('data-tpl-text') || '';
+          if (txt) _catApplyTemplate(txt);
+          _catCloseTplPopover();
+          return;
+        }
         // Override edit (✏️ pencils)
         var editBtn = t.closest('.vio-cat-af-edit');
         if (editBtn){
@@ -43370,12 +43538,22 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
           if (_catState.alternativeAction){
             _catState.action = _catState.alternativeAction;
             _catRenderAutofill();
-            // Hide the alt box since we just applied it.
             var altBox = document.getElementById('vio-cat-af-alt');
             if (altBox) altBox.hidden = true;
           }
           return;
         }
+      });
+    }
+    // Outside-click closes the templates popover.
+    if (!document._catTplOutsideBound){
+      document._catTplOutsideBound = true;
+      document.addEventListener('click', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        if (t.closest('.vio-cat-af-tpl-pop') ||
+            t.closest('#vio-cat-af-tpl-trigger')) return;
+        _catCloseTplPopover();
       });
     }
     // Re-fetch suggestion when student changes (so the count updates).
@@ -43409,6 +43587,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     _catBindAll();
     _catLoadQuickPicks();
     _catLoadResults();
+    _catLoadTemplates();
   }
 
   // Edit-mode prefill: given a saved violations row, recover catalog
@@ -44060,12 +44239,16 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   padding:2px 8px;border-radius:999px;font-weight:700;flex-shrink:0;}
 
 /* ── Escalation rules card (Commit 2 of escalation) ──────────── */
-.vcc-esc-card{background:#fff;border-radius:14px;padding:18px 20px;
-              box-shadow:0 4px 16px rgba(107,63,160,.08);
-              border:2px solid #c8a8e8;margin-bottom:14px;}
-.vcc-esc-card h3{margin:0 0 4px;font-size:1.05rem;font-weight:900;
-                 color:#4a148c;display:flex;align-items:center;gap:6px;}
-.vcc-esc-card .vcc-esc-sub{margin:0 0 14px;color:#666;font-size:.86rem;}
+/* Light-yellow background + bold gold border so the card stands
+   out from the otherwise pastel page palette. Users had been
+   missing it because the old white-on-pastel styling blended in. */
+.vcc-esc-card{background:#FFF8E1;border-radius:14px;padding:18px 20px;
+              box-shadow:0 6px 18px rgba(255,167,38,.18);
+              border:3px solid #FFA726;margin-bottom:14px;}
+.vcc-esc-card h3{margin:0 0 4px;font-size:1.15rem;font-weight:900;
+                 color:#7C5A00;display:flex;align-items:center;gap:6px;}
+.vcc-esc-card .vcc-esc-sub{margin:0 0 14px;color:#7C5A00;font-size:.88rem;
+                           opacity:.85;}
 .vcc-esc-rule{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
               background:#faf8fd;border:1px solid #ece4f8;border-radius:10px;
               padding:10px 14px;margin-bottom:10px;font-size:.92rem;
