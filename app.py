@@ -1114,47 +1114,64 @@ def init_db():
                "ON violations(violation_date)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
                "ON violations(is_deleted)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_violations_catalog_id "
-               "ON violations(catalog_id)")
     # ── violations_catalog_v1: editable catalog of standard violations.
     # Each row stores its own three actions + two thresholds so admins
     # can tweak any single violation independently. Past `violations`
     # rows hold their own `action_taken` snapshot at record time, so
     # edits here never retroactively change historical records.
-    db.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        violation_text TEXT NOT NULL,
-        severity TEXT NOT NULL,
-        location TEXT NOT NULL,
-        emoji_icon TEXT,
-        short_label TEXT,
-        is_quick_pick INTEGER DEFAULT 0,
-        action_first_time TEXT NOT NULL,
-        action_second_time TEXT NOT NULL,
-        action_third_time TEXT NOT NULL,
-        repeat_threshold_2nd INTEGER NOT NULL,
-        repeat_threshold_3rd INTEGER NOT NULL,
-        use_count INTEGER DEFAULT 0,
-        sort_order INTEGER DEFAULT 0,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_severity "
-               "ON violations_catalog(severity)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_location "
-               "ON violations_catalog(location)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_quick "
-               "ON violations_catalog(is_quick_pick)")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_active "
-               "ON violations_catalog(is_active)")
-    db.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        template_text TEXT NOT NULL UNIQUE,
-        sort_order INTEGER DEFAULT 0,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
+    #
+    # NOTE on the catalog_id index: on existing Postgres DBs the
+    # `violations` table already exists from violations_v1 and
+    # `CREATE TABLE IF NOT EXISTS` is a no-op here, so the new
+    # catalog_id column is only added by the ALTER TABLE in the
+    # else-branch migration further down. That means we CANNOT
+    # create the catalog_id index inside init_db — Postgres would
+    # raise "column does not exist" before the ALTER runs. The
+    # else-branch creates the same index in a wrapped try/except
+    # AFTER the ALTER, which is the correct order. The other
+    # CREATE TABLE / CREATE INDEX statements below are defensively
+    # wrapped too so any future Postgres quirk on these new tables
+    # cannot crash the gunicorn worker at boot.
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            violation_text TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            location TEXT NOT NULL,
+            emoji_icon TEXT,
+            short_label TEXT,
+            is_quick_pick INTEGER DEFAULT 0,
+            action_first_time TEXT NOT NULL,
+            action_second_time TEXT NOT NULL,
+            action_third_time TEXT NOT NULL,
+            repeat_threshold_2nd INTEGER NOT NULL,
+            repeat_threshold_3rd INTEGER NOT NULL,
+            use_count INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
+    try:
+        db.execute("CREATE INDEX IF NOT EXISTS idx_vc_severity "
+                   "ON violations_catalog(severity)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_vc_location "
+                   "ON violations_catalog(location)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_vc_quick "
+                   "ON violations_catalog(is_quick_pick)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_vc_active "
+                   "ON violations_catalog(is_active)")
+    except Exception: pass
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            template_text TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
     try:
         _seed_violations_catalog(db)
     except Exception: pass
@@ -6723,25 +6740,27 @@ if True:
     if "occurrence_number" not in v_cols:
         try: db2.execute("ALTER TABLE violations ADD COLUMN occurrence_number INTEGER")
         except Exception: pass
-    db2.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        violation_text TEXT NOT NULL,
-        severity TEXT NOT NULL,
-        location TEXT NOT NULL,
-        emoji_icon TEXT,
-        short_label TEXT,
-        is_quick_pick INTEGER DEFAULT 0,
-        action_first_time TEXT NOT NULL,
-        action_second_time TEXT NOT NULL,
-        action_third_time TEXT NOT NULL,
-        repeat_threshold_2nd INTEGER NOT NULL,
-        repeat_threshold_3rd INTEGER NOT NULL,
-        use_count INTEGER DEFAULT 0,
-        sort_order INTEGER DEFAULT 0,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
+    try:
+        db2.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            violation_text TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            location TEXT NOT NULL,
+            emoji_icon TEXT,
+            short_label TEXT,
+            is_quick_pick INTEGER DEFAULT 0,
+            action_first_time TEXT NOT NULL,
+            action_second_time TEXT NOT NULL,
+            action_third_time TEXT NOT NULL,
+            repeat_threshold_2nd INTEGER NOT NULL,
+            repeat_threshold_3rd INTEGER NOT NULL,
+            use_count INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
     try:
         db2.execute("CREATE INDEX IF NOT EXISTS idx_vc_severity "
                     "ON violations_catalog(severity)")
@@ -6754,13 +6773,15 @@ if True:
         db2.execute("CREATE INDEX IF NOT EXISTS idx_violations_catalog_id "
                     "ON violations(catalog_id)")
     except Exception: pass
-    db2.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        template_text TEXT NOT NULL UNIQUE,
-        sort_order INTEGER DEFAULT 0,
-        is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )""")
+    try:
+        db2.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            template_text TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
     if "violations_catalog_v1" not in applied:
         try:
             _seed_violations_catalog(db2)
