@@ -41142,6 +41142,111 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-monthly-foot{display:flex;gap:10px;justify-content:flex-start;
                   padding:14px 20px;border-top:1px solid #f0e6f8;
                   background:#faf8fd;flex-wrap:wrap;}
+
+/* ── Smart catalog selection (Commit 3) ───────────────────────── */
+.vio-cat-pick{display:block;}
+.vio-cat-search-wrap{position:relative;margin-bottom:10px;}
+.vio-cat-search-wrap input{width:100%;padding:10px 14px;
+  border:1.5px solid #d8c8ec;border-radius:9px;font-family:inherit;
+  font-size:.95rem;background:#fafafe;}
+.vio-cat-search-wrap input:focus{outline:none;border-color:#8B5CC8;background:#fff;}
+.vio-cat-search-results{position:absolute;top:100%;left:0;right:0;z-index:10;
+  background:#fff;border:1px solid #d8c8ec;border-radius:9px;
+  box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:280px;overflow:auto;
+  margin-top:4px;}
+.vio-cat-search-results-item{padding:9px 12px;cursor:pointer;display:flex;
+  align-items:center;gap:8px;border-bottom:1px solid #f0e6f8;font-size:.92rem;}
+.vio-cat-search-results-item:last-child{border-bottom:none;}
+.vio-cat-search-results-item:hover{background:#faf5ff;}
+.vio-cat-search-results-emoji{font-size:1.2rem;flex-shrink:0;}
+.vio-cat-search-results-text{flex:1;color:#333;}
+.vio-cat-divider{text-align:center;color:#888;font-size:.82rem;
+  margin:14px 0 8px;font-weight:700;}
+.vio-cat-qp-label{font-size:.92rem;color:#4a148c;font-weight:800;margin-bottom:8px;}
+.vio-cat-qp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  margin-bottom:14px;}
+@media(max-width:560px){.vio-cat-qp-grid{grid-template-columns:repeat(2,1fr);}}
+.vio-cat-qp-btn{background:#fff;border:2px solid #d8c8ec;border-radius:10px;
+  padding:10px 8px;font-family:inherit;cursor:pointer;font-size:.85rem;
+  font-weight:700;color:#4a148c;display:flex;flex-direction:column;
+  align-items:center;gap:4px;transition:all .15s ease;}
+.vio-cat-qp-btn:hover{background:#faf5ff;border-color:#8B5CC8;
+  box-shadow:0 3px 10px rgba(107,63,160,.15);}
+.vio-cat-qp-btn.vio-cat-sev-light{border-color:#1D9E75;}
+.vio-cat-qp-btn.vio-cat-sev-medium{border-color:#BA7517;}
+.vio-cat-qp-btn.vio-cat-sev-severe{border-color:#A32D2D;}
+.vio-cat-qp-btn .vio-cat-qp-emoji{font-size:1.5rem;line-height:1;}
+.vio-cat-qp-empty{grid-column:1/-1;text-align:center;color:#888;font-size:.86rem;
+  font-style:italic;padding:8px;}
+.vio-cat-filter-block{margin-bottom:8px;}
+.vio-cat-filter-label{font-size:.86rem;color:#4a148c;font-weight:800;
+  margin-bottom:6px;}
+.vio-cat-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.vio-cat-chip{background:#fff;border:1.5px solid #d8c8ec;border-radius:999px;
+  padding:5px 12px;font-family:inherit;font-size:.82rem;font-weight:700;
+  color:#4a148c;cursor:pointer;transition:all .12s ease;}
+.vio-cat-chip:hover{background:#f3e5f5;}
+.vio-cat-chip.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.vio-cat-results-head{margin:12px 0 6px;font-weight:800;font-size:.88rem;
+  color:#4a148c;}
+.vio-cat-results{background:#fff;border:1px solid #ece4f8;border-radius:10px;
+  max-height:220px;overflow:auto;}
+.vio-cat-result-item{padding:9px 12px;cursor:pointer;display:flex;
+  align-items:center;gap:10px;border-bottom:1px solid #f0e6f8;font-size:.9rem;}
+.vio-cat-result-item:last-child{border-bottom:none;}
+.vio-cat-result-item:hover{background:#faf5ff;}
+.vio-cat-result-item.selected{background:#f3e5f5;border-right:3px solid #6B3FA0;}
+.vio-cat-result-emoji{font-size:1.2rem;flex-shrink:0;}
+.vio-cat-result-text{flex:1;color:#333;}
+.vio-cat-empty{padding:20px;text-align:center;color:#888;font-style:italic;
+  font-size:.9rem;}
+.vio-cat-mini-badge{font-size:.7rem;padding:2px 7px;border-radius:999px;
+  font-weight:800;flex-shrink:0;}
+.vio-cat-mini-badge.light{background:#E8F5E9;color:#2E7D32;}
+.vio-cat-mini-badge.medium{background:#FFF8E1;color:#E65100;}
+.vio-cat-mini-badge.severe{background:#FFEBEE;color:#C62828;}
+.vio-cat-autofill{background:#f6f0fc;border:2px solid #c8a8e8;
+  border-radius:12px;padding:14px;margin-top:14px;}
+.vio-cat-af-head{display:flex;align-items:center;gap:6px;margin-bottom:12px;
+  font-weight:800;color:#4a148c;flex-wrap:wrap;}
+.vio-cat-af-mark{font-size:1.1rem;}
+.vio-cat-af-text{flex:1;color:#212121;min-width:160px;}
+.vio-cat-af-row{display:flex;align-items:center;gap:6px;font-size:.92rem;
+  margin-bottom:8px;}
+.vio-cat-af-key{color:#666;font-weight:700;min-width:62px;}
+.vio-cat-af-val{flex:1;color:#212121;font-weight:700;}
+.vio-cat-af-edit{background:transparent;border:none;cursor:pointer;
+  font-size:1rem;padding:2px 4px;color:#6B3FA0;font-family:inherit;
+  border-radius:4px;}
+.vio-cat-af-edit:hover{background:#e1bee7;}
+.vio-cat-af-history{background:#fff7e1;border:1px solid #f5d97a;
+  border-radius:8px;padding:9px 12px;font-size:.85rem;margin:8px 0;}
+.vio-cat-af-history.first-time{background:#E8F5E9;border-color:#A5D6A7;color:#1B5E20;}
+.vio-cat-af-history-title{font-weight:800;color:#7C5A00;margin-bottom:4px;}
+.vio-cat-af-history.first-time .vio-cat-af-history-title{color:#1B5E20;}
+.vio-cat-af-history-body{color:#7C5A00;line-height:1.6;}
+.vio-cat-af-history.first-time .vio-cat-af-history-body{color:#1B5E20;}
+.vio-cat-af-action-block{margin-top:10px;}
+.vio-cat-af-action-head{display:flex;align-items:center;
+  justify-content:space-between;margin-bottom:6px;font-weight:800;
+  color:#4a148c;font-size:.92rem;}
+.vio-cat-af-action{background:#fff;border:1px solid #d8c8ec;border-radius:8px;
+  padding:10px 12px;font-size:.92rem;color:#212121;line-height:1.6;
+  white-space:pre-wrap;min-height:48px;}
+.vio-cat-af-action[contenteditable="true"]{outline:2px solid #8B5CC8;background:#fafaff;}
+.vio-cat-af-val[contenteditable="true"]{outline:2px solid #8B5CC8;background:#fafaff;
+  padding:3px 6px;border-radius:5px;}
+.vio-cat-af-edit-actions{display:inline-flex;gap:4px;align-items:center;}
+.vio-cat-af-mini{background:#fff;border:1px solid #d8c8ec;color:#4a148c;
+  padding:2px 8px;font-size:.8rem;font-weight:700;border-radius:5px;
+  cursor:pointer;font-family:inherit;}
+.vio-cat-af-mini:hover{background:#f3e5f5;}
+.vio-cat-af-sev-select{padding:4px 8px;border:1.5px solid #8B5CC8;
+  border-radius:6px;background:#fff;font-family:inherit;font-size:.92rem;
+  font-weight:700;color:#212121;}
+.vio-cat-af-loc-select{padding:4px 8px;border:1.5px solid #8B5CC8;
+  border-radius:6px;background:#fff;font-family:inherit;font-size:.92rem;
+  font-weight:700;color:#212121;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -41271,51 +41376,103 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         </div>
       </div>
 
-      <!-- Section 2: Violation details -->
+      <!-- Section 2: Violation details (smart catalog selection) -->
       <div class="vio-section">
         <h4>📋 تفاصيل المخالفة</h4>
-        <div class="vio-grid-2" style="margin-bottom:12px;">
-          <div class="vio-field">
-            <label for="vio-form-date">تاريخ المخالفة</label>
-            <input type="date" id="vio-form-date">
-          </div>
-          <div class="vio-field">
-            <label for="vio-form-place">مكان المخالفة</label>
-            <select id="vio-form-place">
-              <option value="">— اختر... —</option>
-              <option>الصف</option>
-              <option>مقر المعهد</option>
-              <option>بالقرب من مقر المعهد في الخارج</option>
-            </select>
-          </div>
-        </div>
         <div class="vio-field" style="margin-bottom:12px;">
-          <label for="vio-form-type">نوع المخالفة</label>
-          <select id="vio-form-type">
-            <option value="">— اختر... —</option>
-            <optgroup label="🟢 خفيفة">
-              <option>النوم في الدرس</option>
-              <option>إصدار أصوات</option>
-              <option>التحدث مع الطلاب بدون إذن</option>
-            </optgroup>
-            <optgroup label="🟡 متوسطة">
-              <option>الحركة والتنقل بدون إذن</option>
-              <option>الخروج من دون إذن</option>
-              <option>استخدام الهاتف من دون إذن</option>
-              <option>الدخول إلى بعض الصفوف أو الغُرف من دون إذن</option>
-            </optgroup>
-            <optgroup label="🔴 خطيرة">
-              <option>ضرب طالب/طالبة</option>
-              <option>التكلم بكلمات بذيئة أو غير لائقة</option>
-              <option>إصدار أفعال تشوش على الطلاب الدرس</option>
-              <option>التصوير من دون إذن</option>
-              <option>إصدار أفعال غير لائقة أو غير أخلاقية</option>
-            </optgroup>
-          </select>
+          <label for="vio-form-date">تاريخ المخالفة</label>
+          <input type="date" id="vio-form-date">
         </div>
-        <div class="vio-field" style="margin-bottom:0;">
-          <label for="vio-form-desc">وصف مختصر</label>
-          <textarea id="vio-form-desc" rows="3" maxlength="200"
+
+        <div class="vio-cat-pick">
+          <!-- Search -->
+          <div class="vio-cat-search-wrap">
+            <input type="text" id="vio-cat-search"
+                   placeholder="🔍 ابحث عن المخالفة..." autocomplete="off">
+            <div id="vio-cat-search-results" class="vio-cat-search-results" hidden></div>
+          </div>
+
+          <div class="vio-cat-divider">━━━ أو اختر بسرعة ━━━</div>
+
+          <!-- Quick picks -->
+          <div class="vio-cat-qp-label">⭐ الأكثر استخداماً</div>
+          <div id="vio-cat-quick-picks" class="vio-cat-qp-grid">
+            <div class="vio-cat-qp-empty">…</div>
+          </div>
+
+          <div class="vio-cat-divider">━━━ تصفية متقدمة ━━━</div>
+
+          <!-- Filter chips -->
+          <div class="vio-cat-filter-block">
+            <div class="vio-cat-filter-label">🎯 التصنيف:</div>
+            <div class="vio-cat-chips" data-cat-chip-group="severity">
+              <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
+              <button type="button" class="vio-cat-chip" data-value="light">🟢 خفيفة</button>
+              <button type="button" class="vio-cat-chip" data-value="medium">🟡 متوسطة</button>
+              <button type="button" class="vio-cat-chip" data-value="severe">🔴 خطيرة</button>
+            </div>
+          </div>
+          <div class="vio-cat-filter-block">
+            <div class="vio-cat-filter-label">📍 المكان:</div>
+            <div class="vio-cat-chips" data-cat-chip-group="location">
+              <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
+              <button type="button" class="vio-cat-chip" data-value="داخل الصف">داخل الصف</button>
+              <button type="button" class="vio-cat-chip" data-value="خارج الصف (ممرات)">الممرات</button>
+              <button type="button" class="vio-cat-chip" data-value="دورات المياه">دورات المياه</button>
+              <button type="button" class="vio-cat-chip" data-value="خارج المعهد (الباب)">خارج المعهد</button>
+            </div>
+          </div>
+
+          <!-- Results list -->
+          <div class="vio-cat-results-head">
+            📋 النتائج (<span id="vio-cat-results-count">0</span> مخالفة)
+          </div>
+          <div id="vio-cat-results" class="vio-cat-results">
+            <div class="vio-cat-empty">…</div>
+          </div>
+
+          <!-- Auto-fill panel -->
+          <div id="vio-cat-autofill" class="vio-cat-autofill" hidden>
+            <div class="vio-cat-af-head">
+              <span class="vio-cat-af-mark">✅</span>
+              <span class="vio-cat-af-key">المخالفة:</span>
+              <span id="vio-cat-af-text" class="vio-cat-af-text"></span>
+            </div>
+            <div class="vio-cat-af-row">
+              <span class="vio-cat-af-key">التصنيف:</span>
+              <span id="vio-cat-af-sev" class="vio-cat-af-val" data-field="severity"></span>
+              <button type="button" class="vio-cat-af-edit" data-edit="severity" title="تعديل">✏️</button>
+            </div>
+            <div class="vio-cat-af-row">
+              <span class="vio-cat-af-key">المكان:</span>
+              <span id="vio-cat-af-loc" class="vio-cat-af-val" data-field="location"></span>
+              <button type="button" class="vio-cat-af-edit" data-edit="location" title="تعديل">✏️</button>
+            </div>
+            <div id="vio-cat-af-history" class="vio-cat-af-history" hidden>
+              <div class="vio-cat-af-history-title" id="vio-cat-af-history-title"></div>
+              <div id="vio-cat-af-history-body" class="vio-cat-af-history-body"></div>
+            </div>
+            <div class="vio-cat-af-action-block">
+              <div class="vio-cat-af-action-head">
+                <span>المعالجة المقترحة:</span>
+                <button type="button" class="vio-cat-af-edit" data-edit="action" title="تعديل">✏️</button>
+              </div>
+              <div id="vio-cat-af-action" class="vio-cat-af-action"></div>
+            </div>
+          </div>
+
+          <!-- Hidden form fields populated by selection state -->
+          <input type="hidden" id="vio-form-place" value="">
+          <input type="hidden" id="vio-form-type" value="">
+          <input type="hidden" id="vio-form-catalog-id" value="">
+          <input type="hidden" id="vio-form-severity" value="">
+          <input type="hidden" id="vio-form-action-taken" value="">
+          <input type="hidden" id="vio-form-occurrence" value="">
+        </div>
+
+        <div class="vio-field" style="margin-top:12px;margin-bottom:0;">
+          <label for="vio-form-desc">وصف مختصر (اختياري)</label>
+          <textarea id="vio-form-desc" rows="2" maxlength="200"
             placeholder="وصف مختصر للحادثة (حتى 200 حرف)..."></textarea>
         </div>
       </div>
@@ -41612,6 +41769,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
     clearFormError();
 
+    // Catalog prefill (Commit 3): if the saved row references a
+    // catalog entry, recover its severity/location/action context;
+    // otherwise synthesize a free-text autofill so the admin can
+    // still see what's stored.
+    if (typeof _catPrefillFromRow === 'function') _catPrefillFromRow(row);
+
     // Edit mode: surface the history alert for the linked student.
     // Manual entries (student_id is null) skip the fetch — same rule
     // as the picker's change handler.
@@ -41635,6 +41798,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     overlay.removeAttribute('hidden');
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    if (typeof _catEnsureLoaded === 'function') _catEnsureLoaded();
     ensurePickerData(function(){
       populateGroupDropdown();
       populateStudentDropdown();
@@ -42133,10 +42297,522 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     t.classList.add('show');
     setTimeout(function(){ t.classList.remove('show'); }, 3200);
   }
+  // ── Smart catalog picker (Commit 3) ───────────────────────────
+  // The picker maintains _catState which is the SOURCE OF TRUTH for
+  // the selected violation. The hidden inputs (vio-form-place,
+  // vio-form-type, vio-form-severity, vio-form-action-taken,
+  // vio-form-catalog-id, vio-form-occurrence) are mirrors that
+  // saveViolation reads. Any user edit (override ✏️) updates the
+  // hidden mirror immediately so save always sees the latest value.
+  var _catState = {
+    catalogId: null, text: '', severity: '', location: '',
+    action: '', occurrence: 0, prevCount: 0, prevDates: [],
+    threshold2: 0, threshold3: 0,
+  };
+  var _catFilters = { severity: '', location: '' };
+  var _catSearchDebounce = null;
+  var _catSevLabel = { light: '🟢 خفيفة', medium: '🟡 متوسطة', severe: '🔴 خطيرة' };
+  var _catLocationOptions = [
+    'داخل الصف', 'خارج الصف (ممرات)', 'دورات المياه', 'خارج المعهد (الباب)'
+  ];
+
+  function _catSetHidden(){
+    var setVal = function(id, v){
+      var el = document.getElementById(id);
+      if (el) el.value = (v == null ? '' : String(v));
+    };
+    setVal('vio-form-catalog-id', _catState.catalogId || '');
+    setVal('vio-form-type',       _catState.text || '');
+    setVal('vio-form-severity',   _catState.severity || '');
+    setVal('vio-form-place',      _catState.location || '');
+    setVal('vio-form-action-taken', _catState.action || '');
+    setVal('vio-form-occurrence', _catState.occurrence || '');
+  }
+
+  function _catRenderQuickPicks(items){
+    var c = document.getElementById('vio-cat-quick-picks');
+    if (!c) return;
+    if (!items || !items.length){
+      c.innerHTML = '<div class="vio-cat-qp-empty">لا توجد أزرار سريعة</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < items.length; i++){
+      var it = items[i];
+      var sev = (it.severity || '').toLowerCase();
+      html += '<button type="button" class="vio-cat-qp-btn vio-cat-sev-' + escapeHtml(sev) +
+              '" data-cat-id="' + escapeHtml(it.id) + '">' +
+              '<span class="vio-cat-qp-emoji">' + escapeHtml(it.emoji_icon || '📋') + '</span>' +
+              '<span>' + escapeHtml(it.short_label || it.violation_text || '') + '</span>' +
+              '</button>';
+    }
+    c.innerHTML = html;
+  }
+
+  function _catLoadQuickPicks(){
+    fetch('/api/violations-catalog/quick-picks', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d && d.ok) _catRenderQuickPicks(d.items || []); })
+      .catch(function(){});
+  }
+
+  function _catRenderResultRow(it){
+    var sev = (it.severity || '').toLowerCase();
+    var sevLbl = (sev === 'light' ? 'خفيفة' : sev === 'medium' ? 'متوسطة' :
+                  sev === 'severe' ? 'خطيرة' : '');
+    var sevCls = (sev === 'light' || sev === 'medium' || sev === 'severe') ? sev : '';
+    var sel = (_catState.catalogId && parseInt(_catState.catalogId,10) === parseInt(it.id,10))
+              ? ' selected' : '';
+    return '<div class="vio-cat-result-item' + sel + '" data-cat-id="' + escapeHtml(it.id) + '">' +
+           '<span class="vio-cat-result-emoji">' + escapeHtml(it.emoji_icon || '📋') + '</span>' +
+           '<span class="vio-cat-result-text">' + escapeHtml(it.violation_text || '') + '</span>' +
+           (sevLbl ? '<span class="vio-cat-mini-badge ' + sevCls + '">' +
+                     escapeHtml(sevLbl) + '</span>' : '') +
+           '</div>';
+  }
+
+  function _catLoadResults(){
+    var c = document.getElementById('vio-cat-results');
+    var ct = document.getElementById('vio-cat-results-count');
+    if (!c) return;
+    var qs = ['active_only=1'];
+    if (_catFilters.severity) qs.push('severity=' + encodeURIComponent(_catFilters.severity));
+    if (_catFilters.location) qs.push('location=' + encodeURIComponent(_catFilters.location));
+    fetch('/api/violations-catalog?' + qs.join('&'), {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var items = (d && d.items) || [];
+        if (ct) ct.textContent = items.length;
+        if (!items.length){
+          c.innerHTML = '<div class="vio-cat-empty">لا توجد نتائج بهذه التصفية</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < items.length; i++){ html += _catRenderResultRow(items[i]); }
+        c.innerHTML = html;
+      })
+      .catch(function(){
+        c.innerHTML = '<div class="vio-cat-empty">تعذر جلب النتائج</div>';
+      });
+  }
+
+  function _catSearch(q){
+    var box = document.getElementById('vio-cat-search-results');
+    if (!box) return;
+    if (!q){ box.hidden = true; box.innerHTML = ''; return; }
+    fetch('/api/violations-catalog?active_only=1&q=' + encodeURIComponent(q),
+          {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var items = ((d && d.items) || []).slice(0, 8);
+        if (!items.length){
+          box.innerHTML = '<div class="vio-cat-search-results-item" style="cursor:default;">' +
+                          '<span class="vio-cat-search-results-text" style="color:#888;font-style:italic;">' +
+                          'لا توجد نتائج</span></div>';
+          box.hidden = false;
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < items.length; i++){
+          var it = items[i];
+          var sev = (it.severity || '').toLowerCase();
+          var sevLbl = (sev === 'light' ? 'خفيفة' : sev === 'medium' ? 'متوسطة' :
+                        sev === 'severe' ? 'خطيرة' : '');
+          var sevCls = (sev === 'light' || sev === 'medium' || sev === 'severe') ? sev : '';
+          html += '<div class="vio-cat-search-results-item" data-cat-id="' + escapeHtml(it.id) + '">' +
+                  '<span class="vio-cat-search-results-emoji">' + escapeHtml(it.emoji_icon || '📋') + '</span>' +
+                  '<span class="vio-cat-search-results-text">' + escapeHtml(it.violation_text || '') + '</span>' +
+                  (sevLbl ? '<span class="vio-cat-mini-badge ' + sevCls + '">' +
+                            escapeHtml(sevLbl) + '</span>' : '') +
+                  '</div>';
+        }
+        box.innerHTML = html;
+        box.hidden = false;
+      })
+      .catch(function(){ box.hidden = true; });
+  }
+
+  function _catCurrentStudentId(){
+    var sel = document.getElementById('vio-form-student');
+    var v = sel ? (sel.value || '').trim() : '';
+    if (!v || v === '__MANUAL__') return null;
+    var n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  function _catCurrentStudentName(){
+    var sel = document.getElementById('vio-form-student');
+    var manualInp = document.getElementById('vio-form-manual-name');
+    var v = sel ? (sel.value || '').trim() : '';
+    if (v === '__MANUAL__') return ((manualInp && manualInp.value) || '').trim();
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return '';
+    var rec = (pickerCache.students || []).filter(function(s){
+      return parseInt(s.id, 10) === n;
+    })[0];
+    return rec ? ((rec.student_name || '').trim()) : '';
+  }
+
+  function _catRenderAutofill(){
+    var panel = document.getElementById('vio-cat-autofill');
+    if (!panel) return;
+    if (!_catState.catalogId){ panel.hidden = true; return; }
+    panel.hidden = false;
+    var setText = function(id, v){
+      var el = document.getElementById(id);
+      if (el) el.textContent = v == null ? '' : String(v);
+    };
+    setText('vio-cat-af-text', _catState.text || '');
+    setText('vio-cat-af-sev', _catSevLabel[_catState.severity] || _catState.severity || '');
+    setText('vio-cat-af-loc', _catState.location || '');
+    setText('vio-cat-af-action', _catState.action || '');
+
+    // History block
+    var hist     = document.getElementById('vio-cat-af-history');
+    var histTtl  = document.getElementById('vio-cat-af-history-title');
+    var histBody = document.getElementById('vio-cat-af-history-body');
+    var stuName  = _catCurrentStudentName();
+    if (!_catCurrentStudentId()){
+      if (hist) hist.hidden = true;
+    } else {
+      if (hist) hist.hidden = false;
+      var prev = _catState.prevCount || 0;
+      var occ  = _catState.occurrence || (prev + 1);
+      if (hist) {
+        hist.classList.toggle('first-time', prev === 0);
+      }
+      if (histTtl){
+        histTtl.textContent = '📊 سجل ' + (stuName || 'الطالبة') + ':';
+      }
+      var occWord = '';
+      if (prev === 0) occWord = 'هذه أول مرة لهذه المخالفة';
+      else if (occ === 2) occWord = 'هذه المرة الثانية لهذه المخالفة';
+      else if (occ === 3) occWord = 'هذه المرة الثالثة لهذه المخالفة';
+      else occWord = 'هذه المرة رقم ' + occ + ' لهذه المخالفة';
+      var dates = (_catState.prevDates || []).slice(-5);
+      var datesHtml = '';
+      if (dates.length){
+        datesHtml = '<br>' + dates.map(function(d){
+          return '• ' + escapeHtml(d);
+        }).join('<br>');
+      }
+      if (histBody) histBody.innerHTML = escapeHtml(occWord) + datesHtml;
+    }
+    _catSetHidden();
+    // Visually mark the matching row in the result list, if open.
+    var resBox = document.getElementById('vio-cat-results');
+    if (resBox){
+      var items = resBox.querySelectorAll('.vio-cat-result-item');
+      for (var i = 0; i < items.length; i++){
+        items[i].classList.toggle('selected',
+          parseInt(items[i].getAttribute('data-cat-id'), 10) === parseInt(_catState.catalogId, 10));
+      }
+    }
+  }
+
+  function _catApplySuggestion(d){
+    if (!d || !d.ok) return;
+    var c = d.catalog || {};
+    _catState.catalogId  = c.id;
+    _catState.text       = c.violation_text || '';
+    _catState.severity   = (c.severity || '').toLowerCase();
+    _catState.location   = c.location || '';
+    _catState.action     = d.suggested_action || c.action_first_time || '';
+    _catState.occurrence = d.occurrence_number || 1;
+    _catState.prevCount  = d.previous_count || 0;
+    _catState.prevDates  = d.previous_dates || [];
+    _catState.threshold2 = d.threshold_2nd || 0;
+    _catState.threshold3 = d.threshold_3rd || 0;
+    _catRenderAutofill();
+  }
+
+  function _catSelectId(catalogId){
+    if (!catalogId) return;
+    var sid = _catCurrentStudentId();
+    var url = '/api/violations-catalog/' + encodeURIComponent(catalogId) + '/suggestion' +
+              (sid ? ('?student_id=' + encodeURIComponent(sid)) : '');
+    fetch(url, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(_catApplySuggestion)
+      .catch(function(){});
+    var box = document.getElementById('vio-cat-search-results');
+    if (box) box.hidden = true;
+    var sb = document.getElementById('vio-cat-search');
+    if (sb) sb.value = '';
+  }
+
+  function _catClearSelection(){
+    _catState = { catalogId: null, text: '', severity: '', location: '',
+                  action: '', occurrence: 0, prevCount: 0, prevDates: [],
+                  threshold2: 0, threshold3: 0 };
+    var panel = document.getElementById('vio-cat-autofill');
+    if (panel) panel.hidden = true;
+    _catSetHidden();
+  }
+
+  function _catRefreshSuggestionForCurrentStudent(){
+    if (!_catState.catalogId) return;
+    _catSelectId(_catState.catalogId);
+  }
+
+  // Override editor: clicking ✏️ inside the autofill panel makes the
+  // value editable. For severity/location we swap to a <select>; for
+  // action it's contenteditable. Save writes back to _catState only.
+  function _catEditField(field){
+    if (!_catState.catalogId) return;
+    if (field === 'severity'){
+      var sevEl = document.getElementById('vio-cat-af-sev');
+      if (!sevEl) return;
+      var cur = _catState.severity || 'light';
+      var sel = document.createElement('select');
+      sel.className = 'vio-cat-af-sev-select';
+      ['light','medium','severe'].forEach(function(s){
+        var o = document.createElement('option');
+        o.value = s; o.textContent = _catSevLabel[s];
+        if (s === cur) o.selected = true;
+        sel.appendChild(o);
+      });
+      sevEl.parentNode.insertBefore(sel, sevEl);
+      sevEl.style.display = 'none';
+      sel.focus();
+      sel.addEventListener('change', function(){
+        _catState.severity = sel.value;
+        sevEl.textContent = _catSevLabel[sel.value] || sel.value;
+        sevEl.style.display = '';
+        sel.parentNode.removeChild(sel);
+        _catSetHidden();
+      });
+      sel.addEventListener('blur', function(){
+        if (sel.parentNode){
+          sevEl.style.display = '';
+          sel.parentNode.removeChild(sel);
+        }
+      });
+    } else if (field === 'location'){
+      var locEl = document.getElementById('vio-cat-af-loc');
+      if (!locEl) return;
+      var cur2 = _catState.location || _catLocationOptions[0];
+      var sel2 = document.createElement('select');
+      sel2.className = 'vio-cat-af-loc-select';
+      _catLocationOptions.forEach(function(loc){
+        var o = document.createElement('option');
+        o.value = loc; o.textContent = loc;
+        if (loc === cur2) o.selected = true;
+        sel2.appendChild(o);
+      });
+      locEl.parentNode.insertBefore(sel2, locEl);
+      locEl.style.display = 'none';
+      sel2.focus();
+      sel2.addEventListener('change', function(){
+        _catState.location = sel2.value;
+        locEl.textContent = sel2.value;
+        locEl.style.display = '';
+        sel2.parentNode.removeChild(sel2);
+        _catSetHidden();
+      });
+      sel2.addEventListener('blur', function(){
+        if (sel2.parentNode){
+          locEl.style.display = '';
+          sel2.parentNode.removeChild(sel2);
+        }
+      });
+    } else if (field === 'action'){
+      var actEl = document.getElementById('vio-cat-af-action');
+      if (!actEl) return;
+      actEl.setAttribute('contenteditable', 'true');
+      actEl.focus();
+      var commit = function(){
+        actEl.removeAttribute('contenteditable');
+        _catState.action = (actEl.textContent || '').trim();
+        _catSetHidden();
+      };
+      actEl.addEventListener('blur', commit, { once: true });
+      actEl.addEventListener('keydown', function onKey(e){
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+          e.preventDefault();
+          actEl.removeEventListener('keydown', onKey);
+          commit();
+          actEl.blur();
+        }
+      });
+    }
+  }
+
+  function _catBindAll(){
+    // Search input — debounced
+    var sb = document.getElementById('vio-cat-search');
+    if (sb && !sb._catBound){
+      sb._catBound = true;
+      sb.addEventListener('input', function(){
+        if (_catSearchDebounce) clearTimeout(_catSearchDebounce);
+        var q = (sb.value || '').trim();
+        _catSearchDebounce = setTimeout(function(){ _catSearch(q); }, 200);
+      });
+      sb.addEventListener('blur', function(){
+        // Delay so click handlers fire first.
+        setTimeout(function(){
+          var box = document.getElementById('vio-cat-search-results');
+          if (box) box.hidden = true;
+        }, 180);
+      });
+      sb.addEventListener('focus', function(){
+        if ((sb.value || '').trim()) _catSearch((sb.value || '').trim());
+      });
+    }
+    // Search dropdown — click to select
+    var sbResults = document.getElementById('vio-cat-search-results');
+    if (sbResults && !sbResults._catBound){
+      sbResults._catBound = true;
+      sbResults.addEventListener('mousedown', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var item = t.closest('.vio-cat-search-results-item');
+        if (!item) return;
+        var cid = item.getAttribute('data-cat-id');
+        if (cid) _catSelectId(cid);
+      });
+    }
+    // Quick picks
+    var qp = document.getElementById('vio-cat-quick-picks');
+    if (qp && !qp._catBound){
+      qp._catBound = true;
+      qp.addEventListener('click', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var btn = t.closest('.vio-cat-qp-btn');
+        if (!btn) return;
+        var cid = btn.getAttribute('data-cat-id');
+        if (cid) _catSelectId(cid);
+      });
+    }
+    // Filter chips
+    var chipGroups = document.querySelectorAll('[data-cat-chip-group]');
+    for (var i = 0; i < chipGroups.length; i++){
+      var grp = chipGroups[i];
+      if (grp._catBound) continue;
+      grp._catBound = true;
+      (function(group){
+        group.addEventListener('click', function(ev){
+          var t = ev.target;
+          if (!t || !t.closest) return;
+          var chip = t.closest('.vio-cat-chip');
+          if (!chip) return;
+          var siblings = group.querySelectorAll('.vio-cat-chip');
+          for (var j = 0; j < siblings.length; j++){
+            siblings[j].classList.remove('active');
+          }
+          chip.classList.add('active');
+          var key = group.getAttribute('data-cat-chip-group');
+          _catFilters[key] = chip.getAttribute('data-value') || '';
+          _catLoadResults();
+        });
+      })(grp);
+    }
+    // Result list — click to select
+    var rb = document.getElementById('vio-cat-results');
+    if (rb && !rb._catBound){
+      rb._catBound = true;
+      rb.addEventListener('click', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var item = t.closest('.vio-cat-result-item');
+        if (!item) return;
+        var cid = item.getAttribute('data-cat-id');
+        if (cid) _catSelectId(cid);
+      });
+    }
+    // Override edit buttons
+    var af = document.getElementById('vio-cat-autofill');
+    if (af && !af._catBound){
+      af._catBound = true;
+      af.addEventListener('click', function(ev){
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var btn = t.closest('.vio-cat-af-edit');
+        if (!btn) return;
+        var fld = btn.getAttribute('data-edit');
+        if (fld) _catEditField(fld);
+      });
+    }
+    // Re-fetch suggestion when student changes (so the count updates).
+    var stuSel = document.getElementById('vio-form-student');
+    if (stuSel && !stuSel._catSugBound){
+      stuSel._catSugBound = true;
+      stuSel.addEventListener('change', function(){
+        _catRefreshSuggestionForCurrentStudent();
+      });
+    }
+  }
+
+  function _catResetPicker(){
+    _catClearSelection();
+    var sb = document.getElementById('vio-cat-search');
+    if (sb) sb.value = '';
+    var srBox = document.getElementById('vio-cat-search-results');
+    if (srBox){ srBox.hidden = true; srBox.innerHTML = ''; }
+    _catFilters = { severity: '', location: '' };
+    var chipGroups = document.querySelectorAll('[data-cat-chip-group]');
+    for (var i = 0; i < chipGroups.length; i++){
+      var siblings = chipGroups[i].querySelectorAll('.vio-cat-chip');
+      for (var j = 0; j < siblings.length; j++){
+        siblings[j].classList.toggle('active',
+          (siblings[j].getAttribute('data-value') || '') === '');
+      }
+    }
+  }
+
+  function _catEnsureLoaded(){
+    _catBindAll();
+    _catLoadQuickPicks();
+    _catLoadResults();
+  }
+
+  // Edit-mode prefill: given a saved violations row, recover catalog
+  // selection state. If catalog_id exists, fetch the entry. Otherwise
+  // fall back to the legacy free-text mode by stuffing the row's
+  // values into the autofill panel as-is.
+  function _catPrefillFromRow(row){
+    if (!row) return;
+    if (row.catalog_id){
+      fetch('/api/violations-catalog/' + encodeURIComponent(row.catalog_id),
+            {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d || !d.ok || !d.item) return;
+          var c = d.item;
+          _catState.catalogId  = c.id;
+          _catState.text       = row.violation_type || c.violation_text || '';
+          _catState.severity   = (row.severity || c.severity || '').toLowerCase();
+          _catState.location   = row.violation_place || c.location || '';
+          _catState.action     = row.action_taken || c.action_first_time || '';
+          _catState.occurrence = row.occurrence_number || 0;
+          _catState.prevCount  = Math.max(0, (row.occurrence_number || 1) - 1);
+          _catState.prevDates  = [];
+          _catRenderAutofill();
+        })
+        .catch(function(){});
+    } else if (row.violation_type) {
+      // Pure legacy row — synthesize a minimal autofill view so the
+      // admin can still review/edit before saving.
+      _catState.catalogId  = -1;  // sentinel: don't post catalog_id
+      _catState.text       = row.violation_type || '';
+      _catState.severity   = (row.severity || '').toLowerCase();
+      _catState.location   = row.violation_place || '';
+      _catState.action     = row.action_taken || '';
+      _catState.occurrence = 0;
+      _catRenderAutofill();
+      // catalog_id mirror should stay empty for legacy.
+      var hid = document.getElementById('vio-form-catalog-id');
+      if (hid) hid.value = '';
+    }
+  }
+
   function resetForm(){
     var ids = ['vio-form-search','vio-form-group','vio-form-student',
                'vio-form-manual-name','vio-form-date','vio-form-place',
-               'vio-form-type','vio-form-desc','vio-form-notes'];
+               'vio-form-type','vio-form-desc','vio-form-notes',
+               'vio-form-catalog-id','vio-form-severity',
+               'vio-form-action-taken','vio-form-occurrence'];
     ids.forEach(function(id){
       var el = document.getElementById(id);
       if (el) el.value = '';
@@ -42150,6 +42826,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     clearFormError();
     if (typeof _hideHistoryAlert === 'function') _hideHistoryAlert();
     _histLastKey = null;
+    _catResetPicker();
   }
 
   function saveViolation(){
@@ -42192,8 +42869,19 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     }
     if (!student_name){ showFormError('اسم الطالبة فارغ'); return; }
     if (!dateInp.value){ showFormError('اختاري التاريخ'); return; }
-    if (!placeSel.value){ showFormError('اختاري المكان'); return; }
-    if (!typeSel.value){ showFormError('اختاري نوع المخالفة'); return; }
+    if (!placeSel.value){ showFormError('اختاري مكان المخالفة من القائمة'); return; }
+    if (!typeSel.value){ showFormError('اختاري المخالفة من القائمة'); return; }
+
+    // Catalog fields (Commit 3): pulled from hidden inputs that the
+    // smart picker keeps in sync with _catState.
+    var catIdEl    = document.getElementById('vio-form-catalog-id');
+    var sevEl      = document.getElementById('vio-form-severity');
+    var actTakenEl = document.getElementById('vio-form-action-taken');
+    var occEl      = document.getElementById('vio-form-occurrence');
+    var catalog_id = ((catIdEl    && catIdEl.value)    || '').trim();
+    var sev_val    = ((sevEl      && sevEl.value)      || '').trim();
+    var actTaken   = ((actTakenEl && actTakenEl.value) || '').trim();
+    var occVal     = ((occEl      && occEl.value)      || '').trim();
 
     var body = {
       student_id:      student_id,
@@ -42205,6 +42893,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       description:     ((descInp && descInp.value) || '').trim(),
       additional_notes:((notesInp && notesInp.value) || '').trim(),
     };
+    if (catalog_id) body.catalog_id = parseInt(catalog_id, 10);
+    if (sev_val)    body.severity = sev_val;
+    if (actTaken)   body.action_taken = actTaken;
+    if (occVal)     body.occurrence_number = parseInt(occVal, 10);
     ACTION_KEYS.forEach(function(k){
       var el = document.getElementById(ACTION_CHECKBOX_IDS[k]);
       body[k] = (el && el.checked) ? 1 : 0;
@@ -42249,6 +42941,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       btn.textContent = origText;
       if (res.status === 200 && res.data && res.data.ok){
         var savedVid = editingVid || res.data.id;
+        // Increment catalog use_count for new records (not edits).
+        if (!editingVid && body.catalog_id){
+          fetch('/api/violations-catalog/' + encodeURIComponent(body.catalog_id) +
+                '/increment-use',
+                { method: 'POST', credentials: 'same-origin' }).catch(function(){});
+        }
         closeModal();
         resetForm();
         loadStats();
