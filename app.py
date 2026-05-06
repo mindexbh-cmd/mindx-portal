@@ -63914,6 +63914,158 @@ def api_books_v2_download(bid):
     return _books_v2_send_file(bid, as_attachment=True)
 
 
+@app.route('/api/books/diag', methods=['GET'])
+@login_required
+def api_books_v2_diag():
+    """Admin/uploader-only diagnostic. Trace exactly why a given
+    student (by personal_id) does or doesn't see books in the parent
+    portal. Walks every step:
+      1. Find the student row.
+      2. Find any user accounts linked to that student.
+      3. Resolve the student's group_name_student / group_online to
+         student_groups.id values via _grp_norm fold-match — and
+         report each candidate match individually.
+      4. List every books_v2 row + its books_v2_groups assignments.
+      5. Compute the visible book set under the parent's session.
+    Pass ?personal_id=… to pick the student.
+
+    Use this when a parent reports they don't see a book they
+    should — the diagnostics tell you whether it's a data issue
+    (student not in any group, group_name typo) or a code issue
+    (resolver bug)."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    pid = (request.args.get("personal_id") or "").strip()
+    if not pid:
+        return jsonify({"ok": False,
+                        "error": "personal_id query param required"}), 400
+    try:
+        srow = db.execute(
+            "SELECT * FROM students WHERE personal_id=?", (pid,)
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "student not found",
+                        "personal_id": pid}), 404
+    s = dict(srow)
+    sid = int(s.get("id") or 0)
+
+    # 2. Linked user accounts.
+    try:
+        linked = [dict(r) for r in db.execute(
+            "SELECT id, username, role, "
+            "linked_student_id, linked_parent_for, "
+            "COALESCE(is_active,1) AS is_active "
+            "FROM users WHERE linked_student_id=? "
+            "OR (linked_parent_for IS NOT NULL "
+            "AND linked_parent_for LIKE ?) ORDER BY id",
+            (sid, "%" + str(sid) + "%")).fetchall()]
+    except Exception:
+        linked = []
+
+    # 3. Group resolution. Fold each student-side name + each
+    #    student_groups.group_name and compare individually so the
+    #    diagnostic shows exactly where the match succeeds (or not).
+    student_names_raw = []
+    for k in ("group_name_student", "group_online"):
+        v = (s.get(k) or "").strip()
+        if v: student_names_raw.append({"col": k, "value": v,
+                                        "folded": _grp_norm(v),
+                                        "bytes": v.encode("utf-8").hex()})
+    try:
+        all_groups = [dict(r) for r in db.execute(
+            "SELECT id, group_name FROM student_groups "
+            "WHERE COALESCE(group_name,'')<>'' ORDER BY id").fetchall()]
+    except Exception:
+        all_groups = []
+    student_folds = {x["folded"] for x in student_names_raw}
+    group_match_diag = []
+    matched_group_ids = []
+    for g in all_groups:
+        gname = (g.get("group_name") or "").strip()
+        gfold = _grp_norm(gname)
+        is_match = gfold in student_folds
+        group_match_diag.append({
+            "group_id": int(g.get("id") or 0),
+            "group_name": gname,
+            "folded": gfold,
+            "matches_student": is_match,
+        })
+        if is_match: matched_group_ids.append(int(g.get("id") or 0))
+
+    # 4. All books + their assignments.
+    try:
+        books = [dict(r) for r in db.execute(
+            "SELECT id, title, COALESCE(is_deleted,0) AS d, "
+            "can_download FROM books_v2 ORDER BY id").fetchall()]
+    except Exception:
+        books = []
+    book_groups = {}
+    for b in books:
+        bid = int(b.get("id") or 0)
+        try:
+            grows = db.execute(
+                "SELECT bg.group_id, g.group_name "
+                "FROM books_v2_groups bg "
+                "LEFT JOIN student_groups g ON g.id=bg.group_id "
+                "WHERE bg.book_id=?", (bid,)).fetchall()
+        except Exception:
+            grows = []
+        book_groups[bid] = [{"group_id": int(dict(r).get("group_id") or 0),
+                             "group_name": dict(r).get("group_name") or ""}
+                            for r in grows]
+
+    # 5. What the parent would see, simulating their session by
+    #    resolving via the same resolver the for-student API uses.
+    sim_user = linked[0] if linked else {"role": "student",
+                                          "linked_student_id": sid}
+    resolved_gids = sorted(_books_v2_resolve_group_ids_for_students(
+        db, _books_v2_user_student_ids({**sim_user,
+                                         "linked_student_id": sid})))
+    visible_book_ids = []
+    for b in books:
+        if int(b.get("d") or 0): continue
+        bid = int(b.get("id") or 0)
+        bg_ids = {bg["group_id"] for bg in book_groups.get(bid, [])}
+        if bg_ids & set(resolved_gids):
+            visible_book_ids.append(bid)
+
+    return jsonify({
+        "ok": True,
+        "student": {
+            "id":                 s.get("id"),
+            "personal_id":        s.get("personal_id"),
+            "student_name":       s.get("student_name"),
+            "group_name_student": s.get("group_name_student"),
+            "group_online":       s.get("group_online"),
+        },
+        "linked_user_accounts": linked,
+        "student_group_names":  student_names_raw,
+        "all_groups_match":     group_match_diag,
+        "matched_group_ids":    matched_group_ids,
+        "books":                books,
+        "book_assignments":     book_groups,
+        "resolved_group_ids_for_session": resolved_gids,
+        "visible_book_ids":     visible_book_ids,
+        "visible_count":        len(visible_book_ids),
+        "diagnosis": (
+            "Student not in any group — group_name_student is empty"
+            if not student_names_raw else
+            "Student's group name doesn't fold-match any student_groups row"
+            if not matched_group_ids else
+            "No books assigned to the student's group(s)"
+            if not visible_book_ids else
+            "Student should see " + str(len(visible_book_ids)) +
+            " book(s). If the parent reports they don't, check "
+            "session.user.role == 'student' and "
+            "linked_student_id == " + str(sid) + " on their account."
+        ),
+    })
+
+
 # ──────────────────────────────────────────────────────────────────
 # books_v2 — admin UI (/admin/books)
 # ──────────────────────────────────────────────────────────────────
