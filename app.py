@@ -63235,6 +63235,649 @@ def api_mev_export():
                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ──────────────────────────────────────────────────────────────────
+# books_v2 (مكتبة الكتب) — backend APIs
+# ──────────────────────────────────────────────────────────────────
+# Architecture:
+#  - 3 tables: books_v2 (file metadata), books_v2_groups (FK
+#    book_id ↔ student_groups.id), books_v2_teachers (FK book_id ↔
+#    users.id where role='teacher').
+#  - Admin endpoints (/api/books/*) gated by _has_books_full_access.
+#  - Viewer endpoints filter by role + assignment join (parents
+#    via their student's group_id; teachers via their user.id).
+#  - Storage at /var/data/books_v2 (Render persistent disk) with
+#    local fallback ./data/books_v2. Filename: <bid>_<safe_title>.pdf.
+
+_BOOKS_V2_PDF_MAGIC = b"%PDF-"
+_BOOKS_V2_MAX_BYTES = 50 * 1024 * 1024   # 50 MB hard cap
+
+
+def _books_v2_storage_dir():
+    """Resolve and ensure the books_v2 storage directory exists.
+    Render: /var/data/books_v2 (persistent); local: ./data/books_v2."""
+    candidates = ["/var/data/books_v2",
+                  os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "data", "books_v2")]
+    for path in candidates:
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            continue
+    return candidates[-1]
+
+
+def _books_v2_safe_title_slug(title):
+    """Strip the title to characters safe for a filename. Preserves
+    Arabic letters; drops slashes, dots, control chars; collapses
+    whitespace; clamps length to 80 to keep paths short."""
+    import re as _re
+    s = (title or "").strip()
+    # Drop path separators + special filesystem chars
+    s = _re.sub(r"[\\/:*?\"<>|\x00-\x1f]+", "", s)
+    s = _re.sub(r"\s+", "_", s)
+    s = s.strip("._-") or "book"
+    return s[:80]
+
+
+def _books_v2_row_to_dict(row, *, group_ids=None, group_names=None,
+                           teacher_ids=None, teacher_names=None):
+    if row is None: return None
+    d = dict(row)
+    return {
+        "id":               int(d.get("id") or 0),
+        "title":            d.get("title") or "",
+        "description":      d.get("description") or "",
+        "file_size_bytes":  int(d.get("file_size_bytes") or 0),
+        "can_download":     bool(int(d.get("can_download") or 0)),
+        "uploaded_by_username": d.get("uploaded_by_username") or "",
+        "uploaded_by_name":     d.get("uploaded_by_name") or "",
+        "uploaded_at":      d.get("uploaded_at") or "",
+        "groups":           [{"id": gi, "name": gn} for gi, gn
+                             in zip(group_ids or [], group_names or [])],
+        "teachers":         [{"id": ti, "name": tn} for ti, tn
+                             in zip(teacher_ids or [], teacher_names or [])],
+    }
+
+
+def _books_v2_user_can_view(db, user, book_id):
+    """Per-user gate for /api/books/<bid>/view + /download.
+    - admin / books-allowlist → True (uploaders can preview).
+    - teacher → row in books_v2_teachers with teacher_user_id=user.id.
+    - student → at least one of their student-id's groups (resolved
+      via students.group_name_student → student_groups.id) appears
+      in books_v2_groups for this book.
+    Group resolution uses Arabic-fold via _grp_norm so spelling
+    variants between students.group_name_student and
+    student_groups.group_name still match."""
+    if _has_books_full_access(user):
+        return True
+    role = (user.get("role") or "").strip().lower()
+    if role == "teacher":
+        try:
+            uid = int(user.get("id") or 0)
+        except Exception:
+            return False
+        if not uid: return False
+        try:
+            row = db.execute(
+                "SELECT 1 FROM books_v2_teachers WHERE book_id=? "
+                "AND teacher_user_id=? LIMIT 1",
+                (int(book_id), uid)).fetchone()
+        except Exception:
+            row = None
+        return bool(row)
+    if role in ("student", "parent"):
+        sids = _books_v2_user_student_ids(user)
+        if not sids: return False
+        my_group_ids = _books_v2_resolve_group_ids_for_students(db, sids)
+        if not my_group_ids: return False
+        ph = ",".join("?" for _ in my_group_ids)
+        try:
+            row = db.execute(
+                "SELECT 1 FROM books_v2_groups WHERE book_id=? "
+                "AND group_id IN (" + ph + ") LIMIT 1",
+                tuple([int(book_id)] + list(my_group_ids))).fetchone()
+        except Exception:
+            row = None
+        return bool(row)
+    return False
+
+
+def _books_v2_user_student_ids(user):
+    """All student-row IDs linked to this session user.
+    role='student' → linked_student_id (single int).
+    role='parent'  → linked_parent_for (JSON array of ids)."""
+    out = set()
+    try:
+        sid_one = int(user.get("linked_student_id") or 0)
+        if sid_one: out.add(sid_one)
+    except Exception: pass
+    try:
+        raw = user.get("linked_parent_for") or ""
+        if raw:
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(parsed, list):
+                for x in parsed:
+                    try: out.add(int(x))
+                    except Exception: pass
+    except Exception: pass
+    return out
+
+
+def _books_v2_resolve_group_ids_for_students(db, sids):
+    """For a set of student IDs, look up their group_name_student /
+    group_online and resolve to student_groups.id values via
+    Arabic-fold matching. Returns set of int group ids."""
+    if not sids: return set()
+    sid_list = list(sids)
+    ph = ",".join("?" for _ in sid_list)
+    try:
+        rows = db.execute(
+            "SELECT group_name_student, group_online FROM students "
+            "WHERE id IN (" + ph + ")", tuple(sid_list)).fetchall()
+    except Exception:
+        rows = []
+    my_names_norm = set()
+    for r in rows:
+        rd = dict(r)
+        for k in ("group_name_student", "group_online"):
+            v = (rd.get(k) or "").strip()
+            if v: my_names_norm.add(_grp_norm(v))
+    if not my_names_norm: return set()
+    try:
+        gs = db.execute(
+            "SELECT id, group_name FROM student_groups "
+            "WHERE COALESCE(group_name,'')<>''").fetchall()
+    except Exception:
+        gs = []
+    out = set()
+    for g in gs:
+        gd = dict(g)
+        if _grp_norm(gd.get("group_name") or "") in my_names_norm:
+            try: out.add(int(gd.get("id")))
+            except Exception: continue
+    return out
+
+
+def _books_v2_load_book_with_assignments(db, bid):
+    """Returns dict shape used by /api/books and /api/books/<bid>."""
+    try:
+        row = db.execute(
+            "SELECT * FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        row = None
+    if not row: return None
+    try:
+        grows = db.execute(
+            "SELECT g.id AS group_id, g.group_name "
+            "FROM books_v2_groups bg "
+            "JOIN student_groups g ON g.id=bg.group_id "
+            "WHERE bg.book_id=? ORDER BY g.group_name",
+            (int(bid),)).fetchall()
+    except Exception:
+        grows = []
+    g_ids = [int(dict(r).get("group_id") or 0) for r in grows]
+    g_names = [(dict(r).get("group_name") or "").strip() for r in grows]
+    try:
+        trows = db.execute(
+            "SELECT u.id AS uid, COALESCE(u.name, u.username) AS nm "
+            "FROM books_v2_teachers bt "
+            "JOIN users u ON u.id=bt.teacher_user_id "
+            "WHERE bt.book_id=? ORDER BY nm", (int(bid),)).fetchall()
+    except Exception:
+        trows = []
+    t_ids = [int(dict(r).get("uid") or 0) for r in trows]
+    t_names = [(dict(r).get("nm") or "").strip() for r in trows]
+    return _books_v2_row_to_dict(
+        row, group_ids=g_ids, group_names=g_names,
+        teacher_ids=t_ids, teacher_names=t_names)
+
+
+# ── Admin endpoints (CRUD + assignment + picker lists) ───────────
+
+@app.route('/api/books/groups-list', methods=['GET'])
+@login_required
+def api_books_v2_groups_list():
+    """Picker source: every student_groups row, ordered by name."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, group_name FROM student_groups "
+            "WHERE COALESCE(group_name,'')<>'' ORDER BY group_name"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True, "groups": [
+        {"id": int(dict(r).get("id") or 0),
+         "name": (dict(r).get("group_name") or "").strip()}
+        for r in rows]})
+
+
+@app.route('/api/books/teachers-list', methods=['GET'])
+@login_required
+def api_books_v2_teachers_list():
+    """Picker source: every active teacher account."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, COALESCE(name, username) AS nm, username "
+            "FROM users WHERE role='teacher' "
+            "AND COALESCE(is_active,1)<>0 ORDER BY nm"
+        ).fetchall()
+    except Exception:
+        rows = []
+    return jsonify({"ok": True, "teachers": [
+        {"id": int(dict(r).get("id") or 0),
+         "name": (dict(r).get("nm") or "").strip(),
+         "username": (dict(r).get("username") or "").strip()}
+        for r in rows]})
+
+
+@app.route('/api/books', methods=['GET'])
+@login_required
+def api_books_v2_list_admin():
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id FROM books_v2 WHERE COALESCE(is_deleted,0)=0 "
+            "ORDER BY uploaded_at DESC, id DESC").fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        bid = int(dict(r).get("id") or 0)
+        d = _books_v2_load_book_with_assignments(db, bid)
+        if d: out.append(d)
+    return jsonify({"ok": True, "books": out, "count": len(out)})
+
+
+@app.route('/api/books/<int:bid>', methods=['GET'])
+@login_required
+def api_books_v2_get_one(bid):
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    d = _books_v2_load_book_with_assignments(db, bid)
+    if not d:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    return jsonify({"ok": True, "book": d})
+
+
+@app.route('/api/books/upload', methods=['POST'])
+@login_required
+def api_books_v2_upload():
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    title = (request.form.get("title") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+    can_dl = 1 if (request.form.get("can_download") or "1") in ("1","true","on") else 0
+    if "pdf_file" not in request.files:
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    upload = request.files["pdf_file"]
+    if not upload or not (upload.filename or "").strip():
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    raw = upload.read()
+    if not raw:
+        return jsonify({"ok": False, "error": "الملف فارغ"}), 400
+    if len(raw) > _BOOKS_V2_MAX_BYTES:
+        return jsonify({"ok": False, "error": "حجم الملف يتجاوز 50 ميجا"}), 413
+    if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
+        return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
+
+    db = get_db()
+    uname = (user.get("username") or "").strip()
+    uname_disp = (user.get("name") or uname).strip()
+    try:
+        cur = db.execute(
+            "INSERT INTO books_v2(title, description, file_path, "
+            "file_size_bytes, can_download, uploaded_by_username, "
+            "uploaded_by_name, uploaded_at, is_deleted) "
+            "VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0)",
+            (title, description, "", len(raw), can_dl, uname, uname_disp))
+        db.commit()
+        try: bid = int(cur.lastrowid)
+        except Exception: bid = 0
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    # Filename pattern <bid>_<safe>.pdf — bid prefix guarantees no
+    # collision between two uploads with identical titles.
+    storage = _books_v2_storage_dir()
+    fname = str(bid) + "_" + _books_v2_safe_title_slug(title) + ".pdf"
+    file_path = os.path.join(storage, fname)
+    try:
+        with open(file_path, "wb") as fh: fh.write(raw)
+    except Exception as ex:
+        # Roll back the metadata row so we don't leak orphan rows.
+        try:
+            db.execute("DELETE FROM books_v2 WHERE id=?", (bid,))
+            db.commit()
+        except Exception: pass
+        return jsonify({"ok": False, "error":
+                        "فشل حفظ الملف على القرص: " + str(ex)}), 500
+    try:
+        db.execute("UPDATE books_v2 SET file_path=? WHERE id=?",
+                   (file_path, bid))
+        db.commit()
+    except Exception: pass
+
+    # Optional inline assignment payloads for the all-in-one upload
+    # form; both default to empty so a 2-step upload (POST upload
+    # then POST groups/teachers) also works.
+    raw_groups = request.form.get("group_ids") or "[]"
+    raw_teachers = request.form.get("teacher_ids") or "[]"
+    try:
+        gids = json.loads(raw_groups) or []
+        if not isinstance(gids, list): gids = []
+    except Exception: gids = []
+    try:
+        tids = json.loads(raw_teachers) or []
+        if not isinstance(tids, list): tids = []
+    except Exception: tids = []
+    g_inserted = t_inserted = 0
+    for g in gids:
+        try:
+            db.execute("INSERT OR IGNORE INTO books_v2_groups(book_id, group_id) "
+                       "VALUES(?,?)", (bid, int(g)))
+            g_inserted += 1
+        except Exception: continue
+    for t in tids:
+        try:
+            db.execute("INSERT OR IGNORE INTO books_v2_teachers(book_id, teacher_user_id) "
+                       "VALUES(?,?)", (bid, int(t)))
+            t_inserted += 1
+        except Exception: continue
+    db.commit()
+
+    try:
+        _audit("books_v2.upload", target_type="books_v2",
+               target_id=bid,
+               new_value={"title": title, "size": len(raw),
+                          "can_download": can_dl,
+                          "groups": gids, "teachers": tids})
+    except Exception: pass
+    return jsonify({"ok": True, "id": bid, "size_bytes": len(raw),
+                    "groups_attached": g_inserted,
+                    "teachers_attached": t_inserted})
+
+
+@app.route('/api/books/<int:bid>', methods=['PATCH'])
+@login_required
+def api_books_v2_update(bid):
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception: row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    sets, params = [], []
+    if "title" in body:
+        v = (body.get("title") or "").strip()
+        if not v:
+            return jsonify({"ok": False, "error": "العنوان مطلوب"}), 400
+        if v != (rd.get("title") or ""):
+            sets.append("title=?"); params.append(v)
+    if "description" in body:
+        v = (body.get("description") or "").strip()
+        if v != (rd.get("description") or ""):
+            sets.append("description=?"); params.append(v)
+    if "can_download" in body:
+        v = 1 if bool(body.get("can_download")) else 0
+        if v != int(rd.get("can_download") or 0):
+            sets.append("can_download=?"); params.append(v)
+    if sets:
+        params.append(int(bid))
+        try:
+            db.execute("UPDATE books_v2 SET " + ", ".join(sets) +
+                       " WHERE id=?", tuple(params))
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+    try:
+        _audit("books_v2.update", target_type="books_v2",
+               target_id=int(bid), new_value=body)
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(bid)})
+
+
+@app.route('/api/books/<int:bid>', methods=['DELETE'])
+@login_required
+def api_books_v2_delete(bid):
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, file_path FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception: row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    fp = (dict(row).get("file_path") or "")
+    try:
+        db.execute("UPDATE books_v2 SET is_deleted=1 WHERE id=?", (int(bid),))
+        db.execute("DELETE FROM books_v2_groups WHERE book_id=?", (int(bid),))
+        db.execute("DELETE FROM books_v2_teachers WHERE book_id=?", (int(bid),))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if fp:
+        try:
+            # Path traversal guard: only delete files inside our storage dir.
+            sd = os.path.realpath(_books_v2_storage_dir())
+            rp = os.path.realpath(fp)
+            if rp.startswith(sd + os.sep) and os.path.isfile(rp):
+                os.remove(rp)
+        except Exception: pass
+    try:
+        _audit("books_v2.delete", target_type="books_v2", target_id=int(bid))
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(bid)})
+
+
+@app.route('/api/books/<int:bid>/groups', methods=['POST'])
+@login_required
+def api_books_v2_set_groups(bid):
+    """Replace all group assignments for a book in one call."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    raw = body.get("group_ids")
+    if not isinstance(raw, list):
+        return jsonify({"ok": False, "error": "group_ids list required"}), 400
+    db = get_db()
+    try:
+        if not db.execute(
+            "SELECT 1 FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(bid),)).fetchone():
+            return jsonify({"ok": False, "error": "غير موجود"}), 404
+        db.execute("DELETE FROM books_v2_groups WHERE book_id=?", (int(bid),))
+        n = 0
+        for g in raw:
+            try:
+                db.execute("INSERT OR IGNORE INTO books_v2_groups(book_id, group_id) "
+                           "VALUES(?,?)", (int(bid), int(g)))
+                n += 1
+            except Exception: continue
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": int(bid), "groups_attached": n})
+
+
+@app.route('/api/books/<int:bid>/teachers', methods=['POST'])
+@login_required
+def api_books_v2_set_teachers(bid):
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+    raw = body.get("teacher_ids")
+    if not isinstance(raw, list):
+        return jsonify({"ok": False, "error": "teacher_ids list required"}), 400
+    db = get_db()
+    try:
+        if not db.execute(
+            "SELECT 1 FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(bid),)).fetchone():
+            return jsonify({"ok": False, "error": "غير موجود"}), 404
+        db.execute("DELETE FROM books_v2_teachers WHERE book_id=?", (int(bid),))
+        n = 0
+        for t in raw:
+            try:
+                db.execute("INSERT OR IGNORE INTO books_v2_teachers(book_id, teacher_user_id) "
+                           "VALUES(?,?)", (int(bid), int(t)))
+                n += 1
+            except Exception: continue
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": int(bid), "teachers_attached": n})
+
+
+# ── Viewer endpoints (role-gated, assignment-filtered) ──────────
+
+@app.route('/api/books/for-teacher', methods=['GET'])
+@login_required
+def api_books_v2_for_teacher():
+    """Books assigned to the currently-logged-in teacher."""
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role != "teacher" and not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try: uid = int(user.get("id") or 0)
+    except Exception: uid = 0
+    if not uid:
+        return jsonify({"ok": True, "books": [], "count": 0})
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT b.id FROM books_v2 b "
+            "JOIN books_v2_teachers bt ON bt.book_id=b.id "
+            "WHERE bt.teacher_user_id=? AND COALESCE(b.is_deleted,0)=0 "
+            "ORDER BY b.uploaded_at DESC, b.id DESC", (uid,)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        bid = int(dict(r).get("id") or 0)
+        d = _books_v2_load_book_with_assignments(db, bid)
+        if d: out.append(d)
+    return jsonify({"ok": True, "books": out, "count": len(out)})
+
+
+@app.route('/api/books/for-student/<int:sid>', methods=['GET'])
+@login_required
+def api_books_v2_for_student(sid):
+    """Books assigned to any of the student's groups. Student-role
+    callers can only fetch for student IDs they're linked to;
+    admin/manager bypasses the ownership check."""
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    if role in ("student", "parent"):
+        owned = _books_v2_user_student_ids(user)
+        if int(sid) not in owned:
+            return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    elif not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    gids = _books_v2_resolve_group_ids_for_students(db, {int(sid)})
+    if not gids:
+        return jsonify({"ok": True, "books": [], "count": 0})
+    ph = ",".join("?" for _ in gids)
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT b.id FROM books_v2 b "
+            "JOIN books_v2_groups bg ON bg.book_id=b.id "
+            "WHERE bg.group_id IN (" + ph + ") "
+            "AND COALESCE(b.is_deleted,0)=0 "
+            "ORDER BY b.uploaded_at DESC, b.id DESC",
+            tuple(gids)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        bid = int(dict(r).get("id") or 0)
+        d = _books_v2_load_book_with_assignments(db, bid)
+        if d: out.append(d)
+    return jsonify({"ok": True, "books": out, "count": len(out)})
+
+
+def _books_v2_send_file(bid, *, as_attachment):
+    from flask import send_file as _send_b
+    user = session.get("user") or {}
+    db = get_db()
+    if not _books_v2_user_can_view(db, user, int(bid)):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try:
+        row = db.execute(
+            "SELECT title, file_path, can_download FROM books_v2 "
+            "WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(bid),)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    fp = rd.get("file_path") or ""
+    # Path-traversal guard: realpath must live under storage dir.
+    sd = os.path.realpath(_books_v2_storage_dir())
+    rp = os.path.realpath(fp) if fp else ""
+    if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
+        return jsonify({"ok": False, "error":
+                        "الملف غير موجود على القرص"}), 410
+    if as_attachment and not int(rd.get("can_download") or 0) \
+            and not _has_books_full_access(user):
+        return jsonify({"ok": False, "error":
+                        "هذا الكتاب للقراءة فقط"}), 403
+    safe_title = (rd.get("title") or "book") + ".pdf"
+    resp = _send_b(rp, mimetype="application/pdf",
+                   as_attachment=as_attachment,
+                   download_name=safe_title, conditional=False)
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception: pass
+    return resp
+
+
+@app.route('/api/books/<int:bid>/view', methods=['GET'])
+@login_required
+def api_books_v2_view(bid):
+    return _books_v2_send_file(bid, as_attachment=False)
+
+
+@app.route('/api/books/<int:bid>/download', methods=['GET'])
+@login_required
+def api_books_v2_download(bid):
+    return _books_v2_send_file(bid, as_attachment=True)
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
