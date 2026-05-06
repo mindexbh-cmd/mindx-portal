@@ -63482,6 +63482,83 @@ def _has_violations_full_access(user):
     return _has_events_full_access(user)
 
 
+# ──────────────────────────────────────────────────────────────────
+# books_v2 (مكتبة الكتب) — full-access allowlist + helpers
+# ──────────────────────────────────────────────────────────────────
+# Same pattern as _EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES: admin
+# role passes implicitly; non-admin users must be in the allowlist
+# to upload / edit / delete books. Read access is gated separately
+# (by role + group/teacher assignment).
+#
+# Ahmed Younes's username starts with "02"; rather than hard-coding
+# it (and risking it being wrong), we discover it from the users
+# table at boot time with a name-fragment scan that tolerates Arabic
+# and English spellings. If discovery finds exactly one match, the
+# username is added to the allowlist; otherwise a warning is logged
+# and the operator can hard-code it later.
+_BOOKS_V2_FULL_ACCESS_USERNAMES = {
+    "010307885",   # أحمد إبراهيم
+    "980909805",   # رائد
+}
+
+
+def _discover_ahmed_younes_username():
+    """One-shot best-effort lookup. Adds the discovered username
+    (if exactly one match) to _BOOKS_V2_FULL_ACCESS_USERNAMES.
+    Logs a warning if zero / multiple matches so the operator
+    knows to hard-code it. Never raises."""
+    import sys as _sys
+    try:
+        with app.app_context():
+            db = get_db()
+            try:
+                rows = db.execute(
+                    "SELECT username, name FROM users "
+                    "WHERE username LIKE '02%' "
+                    "AND role IN ('admin','manager')"
+                ).fetchall()
+            except Exception:
+                rows = []
+    except Exception:
+        rows = []
+    candidates = []
+    for r in rows:
+        rd = dict(r) if hasattr(r, "keys") else {"username": r[0], "name": r[1]}
+        nm = (rd.get("name") or "").lower()
+        ahmed_kw  = any(k in nm for k in ["ahmed", "احمد", "أحمد"])
+        younes_kw = any(k in nm for k in ["younes", "younis", "يونس", "يونيس"])
+        if ahmed_kw and younes_kw:
+            candidates.append(rd.get("username") or "")
+    if len(candidates) == 1:
+        _BOOKS_V2_FULL_ACCESS_USERNAMES.add(candidates[0])
+        print("[books-v2] Ahmed Younes auto-discovered: " + candidates[0],
+              file=_sys.stderr)
+    elif len(candidates) == 0:
+        print("[books-v2] WARNING: Ahmed Younes not found in users table. "
+              "Add his username manually to _BOOKS_V2_FULL_ACCESS_USERNAMES.",
+              file=_sys.stderr)
+    else:
+        print("[books-v2] WARNING: Multiple Ahmed Younes candidates: "
+              + str(candidates) + ". Add the correct one manually.",
+              file=_sys.stderr)
+
+
+def _has_books_full_access(user):
+    """True if user is admin OR in the books_v2 allowlist."""
+    if not user: return False
+    role = (user.get("role") or "").strip().lower()
+    if role == "admin": return True
+    uname = (user.get("username") or "").strip()
+    return uname in _BOOKS_V2_FULL_ACCESS_USERNAMES
+
+
+# Run discovery at import time. Wrapped in try/except so a malformed
+# users table never aborts boot — books simply falls back to the
+# hard-coded allowlist.
+try: _discover_ahmed_younes_username()
+except Exception: pass
+
+
 def _events_can_admin(user):
     """Manager-class for the Events module — admin/manager. Reuses
     the existing role taxonomy. Allowlist users are also admitted
