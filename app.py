@@ -43331,9 +43331,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     _catState = { catalogId: null, text: '', severity: '', location: '',
                   action: '', occurrence: 0, prevCount: 0, prevDates: [],
                   threshold2: 0, threshold3: 0 };
+    // The outer panel must STAY VISIBLE — discoverability of the
+    // action textarea + templates button depends on it. Calling
+    // _catRenderAutofill now surfaces the empty-state hint and
+    // hides only the filled subtree (because hasPick=false).
     var panel = document.getElementById('vio-cat-autofill');
-    if (panel) panel.hidden = true;
-    _catSetHidden();
+    if (panel){
+      panel.hidden = false;
+      panel.removeAttribute('hidden');
+      panel.style.display = '';
+    }
+    _catRenderAutofill();
   }
 
   function _catRefreshSuggestionForCurrentStudent(){
@@ -43632,6 +43640,18 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     _catLoadQuickPicks();
     _catLoadResults();
     _catLoadTemplates();
+    // Hard guarantee: surface the auto-fill panel + render the
+    // empty-state hint. resetForm() runs _catClearSelection()
+    // earlier in the open flow; if anything else (legacy code,
+    // browser autofill, hot-reload) toggled the panel hidden,
+    // this last call wins.
+    var panel = document.getElementById('vio-cat-autofill');
+    if (panel){
+      panel.hidden = false;
+      panel.removeAttribute('hidden');
+      panel.style.display = '';
+    }
+    _catRenderAutofill();
   }
 
   // Edit-mode prefill: given a saved violations row, recover catalog
