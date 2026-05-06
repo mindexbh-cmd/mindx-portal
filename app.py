@@ -8564,6 +8564,11 @@ body:not([data-role="admin"]):not([data-role="manager"]) .mx-staff-only{display:
    uses. */
 body:not([data-role="admin"]):not([data-allow-events="1"]) .mx-events-link{display:none !important;}
 body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-link{display:none !important;}
+/* Books library — visible to admins AND any manager / employee
+   that _has_books_full_access on the server (data-allow-books="1"
+   is injected per request — see HOME_HTML / DATABASE_HTML /
+   ATTENDANCE_HTML body data attribute). */
+body:not([data-role="admin"]):not([data-allow-books="1"]) .mx-books-link{display:none !important;}
 /* Events v2 — sidebar/quick-card badge for upcoming events count.
    Hidden when zero so the chrome stays clean. */
 .ev-sb-badge,.ev-qc-badge{display:inline-flex;align-items:center;
@@ -8589,7 +8594,8 @@ body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-li
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
 document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
-document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER");</script>
 <script>document.body && (document.body.dataset.username = (window._mxUserUsername = "USER_USERNAME_PLACEHOLDER"));</script>
 <div class="dh-topbar">
   <!-- Phase 2 — fixed 64px deep purple header. Settings + logout
@@ -8761,6 +8767,10 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
         <a class="md-sb-link mx-staff-only" href="/admin/parent-messages">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           <span class="md-sb-link-text">&#x631;&#x633;&#x627;&#x626;&#x644; &#x627;&#x644;&#x645;&#x639;&#x644;&#x645;&#x627;&#x62A;</span>
+        </a>
+        <a class="md-sb-link mx-books-link" href="/admin/books">
+          <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x643;&#x62A;&#x628;</span>
         </a>
       </div>
     </div>
@@ -9757,6 +9767,11 @@ document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLA
       <div class="dh-action-icon">&#x1F4CA;</div>
       <div class="dh-action-title">&#x627;&#x633;&#x62A;&#x645;&#x627;&#x631;&#x629; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;</div>
       <div class="dh-action-desc">&#x62A;&#x642;&#x64A;&#x64A;&#x645; &#x634;&#x647;&#x631;&#x64A; &#x644;&#x644;&#x637;&#x627;&#x644;&#x628;&#x627;&#x62A;</div>
+    </a>
+    <a class="dh-action-card mx-books-link" href="/admin/books" style="background:linear-gradient(135deg,#1565C0,#1E88E5);">
+      <div class="dh-action-icon">&#x1F4D6;</div>
+      <div class="dh-action-title">&#x627;&#x644;&#x643;&#x62A;&#x628;</div>
+      <div class="dh-action-desc">&#x631;&#x641;&#x639; &#x648;&#x625;&#x62F;&#x627;&#x631;&#x629; &#x643;&#x62A;&#x628; &#x627;&#x644;&#x645;&#x646;&#x647;&#x62C;</div>
     </a>
   </div>
 </div>
@@ -19008,7 +19023,8 @@ tbody tr:hover .frozen-col{background:#faf7ff;}
 <body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
 document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
-document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER");</script>
 <div class="topbar">
   <h1>&#x627;&#x644;&#x635;&#x641;&#x62D;&#x629; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629; &#x644;&#x645;&#x639;&#x644;&#x648;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x637;&#x644;&#x628;&#x629;</h1>
   <a href="/settings" class="btn-home" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);margin-left:8px;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-home">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
@@ -23722,6 +23738,7 @@ def dashboard():
         return redirect("/portal/parent")
     _allow_ev = "1" if _has_events_full_access(user) else "0"
     _allow_vi = "1" if _has_violations_full_access(user) else "0"
+    _allow_bk = "1" if _has_books_full_access(user) else "0"
     _html = (
         HOME_HTML
         .replace("USER_ROLE_PLACEHOLDER", role)
@@ -23729,6 +23746,7 @@ def dashboard():
         .replace("DH_CTRL_DISP_PLACEHOLDER", ("flex" if role == "admin" else "none"))
         .replace("EVENTS_ACCESS_PLACEHOLDER", _allow_ev)
         .replace("VIOLATIONS_ACCESS_PLACEHOLDER", _allow_vi)
+        .replace("BOOKS_ACCESS_PLACEHOLDER", _allow_bk)
         .replace("USER_PLACEHOLDER", username)
         .replace("__STUDENT_FORM_MODAL__", STUDENT_FORM_MODAL_HTML)
     )
@@ -23746,7 +23764,16 @@ def dashboard():
 @app.route("/attendance")
 @login_required
 def attendance():
-    return ATTENDANCE_HTML
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    _allow_ev = "1" if _has_events_full_access(user) else "0"
+    _allow_vi = "1" if _has_violations_full_access(user) else "0"
+    _allow_bk = "1" if _has_books_full_access(user) else "0"
+    return (ATTENDANCE_HTML
+            .replace("USER_ROLE_PLACEHOLDER", role)
+            .replace("EVENTS_ACCESS_PLACEHOLDER", _allow_ev)
+            .replace("VIOLATIONS_ACCESS_PLACEHOLDER", _allow_vi)
+            .replace("BOOKS_ACCESS_PLACEHOLDER", _allow_bk))
 
 @app.route("/database")
 @admin_required
@@ -23762,7 +23789,8 @@ def database():
     _db_html = (DATABASE_HTML
                 .replace("USER_ROLE_PLACEHOLDER", "admin")
                 .replace("EVENTS_ACCESS_PLACEHOLDER", "1")
-                .replace("VIOLATIONS_ACCESS_PLACEHOLDER", "1"))
+                .replace("VIOLATIONS_ACCESS_PLACEHOLDER", "1")
+                .replace("BOOKS_ACCESS_PLACEHOLDER", "1"))
     resp = Response(_db_html, mimetype='text/html; charset=utf-8')
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -55281,7 +55309,8 @@ MX_HELPERS_JS = r'''/* mx-helpers.js - Mindex shared UI helpers */
     st.textContent =
       'body:not([data-role="admin"]) .mx-admin-only{display:none !important;}'
       + 'body:not([data-role="admin"]):not([data-allow-events="1"]) .mx-events-link{display:none !important;}'
-      + 'body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-link{display:none !important;}';
+      + 'body:not([data-role="admin"]):not([data-allow-violations="1"]) .mx-violations-link{display:none !important;}'
+      + 'body:not([data-role="admin"]):not([data-allow-books="1"]) .mx-books-link{display:none !important;}';
     document.head.appendChild(st);
   })();
 
@@ -60542,7 +60571,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(1
 </style></head><body>
 <script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));
 document.body && (document.body.dataset.allowEvents = "EVENTS_ACCESS_PLACEHOLDER");
-document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");</script>
+document.body && (document.body.dataset.allowViolations = "VIOLATIONS_ACCESS_PLACEHOLDER");
+document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER");</script>
 <div class="topbar">
   <h1>⚙ إدارة سريعة للنقاط</h1>
   <a href="__BACK_HREF__">← __BACK_LABEL__</a>
@@ -63876,6 +63906,402 @@ def api_books_v2_view(bid):
 @login_required
 def api_books_v2_download(bid):
     return _books_v2_send_file(bid, as_attachment=True)
+
+
+# ──────────────────────────────────────────────────────────────────
+# books_v2 — admin UI (/admin/books)
+# ──────────────────────────────────────────────────────────────────
+ADMIN_BOOKS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الكتب — مايندكس</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px;}
+.panel{background:#fff;border-radius:18px;padding:22px;margin-bottom:22px;
+       box-shadow:0 8px 24px rgba(107,63,160,.14);}
+.panel h2{margin:0 0 16px;font-size:1.15rem;color:#4a148c;font-weight:900;}
+.field{margin-bottom:14px;}
+.field label{display:block;margin-bottom:6px;font-weight:700;color:#4a148c;font-size:.92rem;}
+.field input[type=text], .field textarea{width:100%;padding:9px 12px;
+       border:1.5px solid #d8c8ec;border-radius:8px;font-family:inherit;font-size:.95rem;}
+.field textarea{resize:vertical;min-height:60px;}
+.field input[type=file]{font-family:inherit;font-size:.9rem;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media (max-width:680px){.row2{grid-template-columns:1fr;}}
+.picker{border:1.5px solid #d8c8ec;border-radius:8px;padding:10px;
+        max-height:220px;overflow-y:auto;background:#fafafa;}
+.picker .row{display:flex;align-items:center;gap:8px;padding:5px 4px;
+             border-radius:5px;cursor:pointer;}
+.picker .row:hover{background:#f3e5f5;}
+.picker input{width:16px;height:16px;}
+.picker label{margin:0;font-weight:500;cursor:pointer;font-size:.88rem;color:#333;}
+.picker-tools{display:flex;gap:8px;margin-bottom:6px;}
+.tool-btn{background:#f3e5f5;color:#4a148c;border:1px solid #d8c8ec;
+          padding:5px 10px;border-radius:6px;font-size:.78rem;cursor:pointer;font-weight:700;}
+.tool-btn:hover{background:#e1bee7;}
+.radio-row{display:flex;gap:14px;align-items:center;padding:6px 0;}
+.radio-row label{font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.92rem;color:#333;}
+.btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border:none;
+     padding:11px 22px;border-radius:9px;font-weight:800;font-size:.95rem;
+     cursor:pointer;font-family:inherit;}
+.btn:hover{box-shadow:0 4px 14px rgba(107,63,160,.3);}
+.btn:disabled{opacity:.6;cursor:not-allowed;}
+.book-card{border:1.5px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px;
+           background:#fff;}
+.book-card h3{margin:0 0 6px;color:#4a148c;font-size:1.05rem;}
+.book-card .meta{color:#666;font-size:.84rem;line-height:1.7;}
+.book-card .meta .lock{color:#FB8C00;font-weight:700;}
+.book-card .meta .free{color:#43A047;font-weight:700;}
+.book-card .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.act-edit{background:#1976d2;color:#fff;border:none;padding:6px 12px;border-radius:6px;
+          font-weight:700;font-size:.82rem;cursor:pointer;}
+.act-del{background:#c62828;color:#fff;border:none;padding:6px 12px;border-radius:6px;
+         font-weight:700;font-size:.82rem;cursor:pointer;}
+.act-view{background:#43A047;color:#fff;text-decoration:none;padding:6px 12px;
+          border-radius:6px;font-weight:700;font-size:.82rem;display:inline-block;}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.78rem;
+     font-weight:700;background:#e3f2fd;color:#0d47a1;margin:2px 2px 0 0;}
+.empty{text-align:center;color:#888;padding:40px 20px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+       background:#333;color:#fff;padding:12px 20px;border-radius:9px;
+       font-weight:700;z-index:9999;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3);}
+.toast.show{display:block;}
+.toast.err{background:#c62828;}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;
+            align-items:center;justify-content:center;z-index:1000;padding:20px;}
+.modal-back.show{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:24px;max-width:520px;width:100%;
+       max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+.modal h3{margin:0 0 16px;color:#4a148c;}
+.modal .modal-acts{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+.btn-secondary{background:#f3e5f5;color:#4a148c;border:1px solid #d8c8ec;}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 إدارة الكتب</h1>
+  <div><a href="/dashboard">رجوع للداشبورد</a></div>
+</div>
+<div class="wrap">
+
+  <div class="panel">
+    <h2>➕ إضافة كتاب جديد</h2>
+    <div class="field">
+      <label>📤 ملف PDF (حد أقصى 50 ميجا) <span style="color:#c62828">*</span></label>
+      <input type="file" id="bk-file" accept="application/pdf">
+    </div>
+    <div class="field">
+      <label>📝 العنوان <span style="color:#c62828">*</span></label>
+      <input type="text" id="bk-title" maxlength="200">
+    </div>
+    <div class="field">
+      <label>📄 الوصف (اختياري)</label>
+      <textarea id="bk-desc" maxlength="2000"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>🎯 المجموعات اللي تشوف الكتاب</label>
+        <div class="picker-tools">
+          <button class="tool-btn" type="button" onclick="bkPickAll('groups',true)">☑️ اختيار الكل</button>
+          <button class="tool-btn" type="button" onclick="bkPickAll('groups',false)">☐ إلغاء الكل</button>
+        </div>
+        <div class="picker" id="bk-groups"><div style="padding:8px;color:#888;font-size:.85rem;">جاري التحميل...</div></div>
+      </div>
+      <div class="field">
+        <label>👩‍🏫 المعلمات اللي تشوفه</label>
+        <div class="picker-tools">
+          <button class="tool-btn" type="button" onclick="bkPickAll('teachers',true)">☑️ اختيار الكل</button>
+          <button class="tool-btn" type="button" onclick="bkPickAll('teachers',false)">☐ إلغاء الكل</button>
+        </div>
+        <div class="picker" id="bk-teachers"><div style="padding:8px;color:#888;font-size:.85rem;">جاري التحميل...</div></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>💾 الصلاحية</label>
+      <div class="radio-row">
+        <label><input type="radio" name="bk-dl" value="0" checked> 👁️ عرض فقط</label>
+        <label><input type="radio" name="bk-dl" value="1"> ⬇️ عرض + تحميل</label>
+      </div>
+    </div>
+    <button class="btn" id="bk-save-btn" onclick="bkSave()">💾 حفظ الكتاب</button>
+  </div>
+
+  <div class="panel">
+    <h2>📚 الكتب الحالية (<span id="bk-count">0</span>)</h2>
+    <div id="bk-list"><div class="empty">جاري التحميل...</div></div>
+  </div>
+
+</div>
+
+<!-- Edit modal -->
+<div class="modal-back" id="bk-edit-back" onclick="if(event.target===this)bkCloseEdit()">
+  <div class="modal">
+    <h3>✏️ تعديل الكتاب</h3>
+    <input type="hidden" id="be-id">
+    <div class="field">
+      <label>العنوان</label>
+      <input type="text" id="be-title" maxlength="200">
+    </div>
+    <div class="field">
+      <label>الوصف</label>
+      <textarea id="be-desc" maxlength="2000"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>المجموعات</label>
+        <div class="picker-tools">
+          <button class="tool-btn" type="button" onclick="bkPickAll('be-groups',true)">☑️ الكل</button>
+          <button class="tool-btn" type="button" onclick="bkPickAll('be-groups',false)">☐ لا شيء</button>
+        </div>
+        <div class="picker" id="be-groups"></div>
+      </div>
+      <div class="field">
+        <label>المعلمات</label>
+        <div class="picker-tools">
+          <button class="tool-btn" type="button" onclick="bkPickAll('be-teachers',true)">☑️ الكل</button>
+          <button class="tool-btn" type="button" onclick="bkPickAll('be-teachers',false)">☐ لا شيء</button>
+        </div>
+        <div class="picker" id="be-teachers"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>الصلاحية</label>
+      <div class="radio-row">
+        <label><input type="radio" name="be-dl" value="0"> 👁️ عرض فقط</label>
+        <label><input type="radio" name="be-dl" value="1"> ⬇️ عرض + تحميل</label>
+      </div>
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-secondary" onclick="bkCloseEdit()">إلغاء</button>
+      <button class="btn" id="be-save-btn" onclick="bkSaveEdit()">💾 حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="bk-toast"></div>
+<script>
+(function(){
+  function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function toast(msg, err){
+    var t = document.getElementById('bk-toast');
+    t.textContent = msg; t.className = 'toast show' + (err?' err':'');
+    setTimeout(function(){ t.className='toast'; }, 3500);
+  }
+  function fmtSize(n){
+    if(!n) return '';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  var ALL_GROUPS = [], ALL_TEACHERS = [];
+
+  // ── Load groups + teachers into both pickers (upload + edit)
+  function loadPickers(){
+    fetch('/api/books/groups-list',{credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        ALL_GROUPS = j.groups || [];
+        renderPicker('bk-groups', ALL_GROUPS, 'g');
+      });
+    fetch('/api/books/teachers-list',{credentials:'include'})
+      .then(function(r){return r.json();}).then(function(j){
+        ALL_TEACHERS = j.teachers || [];
+        renderPicker('bk-teachers', ALL_TEACHERS, 't');
+      });
+  }
+  function renderPicker(elId, items, prefix, selectedSet){
+    var box = document.getElementById(elId);
+    if(!items.length){
+      box.innerHTML = '<div style="padding:8px;color:#888;font-size:.85rem;">لا توجد عناصر.</div>';
+      return;
+    }
+    box.innerHTML = items.map(function(o, i){
+      var checked = (selectedSet && selectedSet.has(o.id)) ? 'checked' : '';
+      var safeName = _esc(o.name);
+      return '<div class="row"><input type="checkbox" class="'+prefix+'-cb" id="'+elId+'-'+i+'" value="'+o.id+'" '+checked+'>'+
+             '<label for="'+elId+'-'+i+'">'+safeName+'</label></div>';
+    }).join('');
+  }
+  window.bkPickAll = function(kind, val){
+    var elId = (kind === 'groups' || kind === 'teachers') ? ('bk-'+kind) : kind;
+    document.querySelectorAll('#'+elId+' input[type=checkbox]').forEach(function(cb){ cb.checked = val; });
+  };
+  function getPicked(elId){
+    return Array.prototype.map.call(
+      document.querySelectorAll('#'+elId+' input[type=checkbox]:checked'),
+      function(el){ return parseInt(el.value, 10); }
+    ).filter(function(x){return !isNaN(x);});
+  }
+
+  // ── Upload
+  window.bkSave = function(){
+    var title = document.getElementById('bk-title').value.trim();
+    var desc  = document.getElementById('bk-desc').value.trim();
+    var file  = document.getElementById('bk-file').files[0];
+    var dl    = (document.querySelector('input[name="bk-dl"]:checked')||{}).value || '0';
+    var gids  = getPicked('bk-groups');
+    var tids  = getPicked('bk-teachers');
+    if(!title){ toast('العنوان مطلوب', true); return; }
+    if(!file){ toast('يجب اختيار ملف PDF', true); return; }
+    if(!gids.length && !tids.length){
+      toast('اختر على الأقل مجموعة أو معلمة', true); return;
+    }
+    if(file.size > 50*1024*1024){ toast('حجم الملف يتجاوز 50 ميجا', true); return; }
+    var fd = new FormData();
+    fd.append('title', title);
+    fd.append('description', desc);
+    fd.append('can_download', dl);
+    fd.append('group_ids', JSON.stringify(gids));
+    fd.append('teacher_ids', JSON.stringify(tids));
+    fd.append('pdf_file', file);
+    var btn = document.getElementById('bk-save-btn');
+    btn.disabled = true; btn.textContent = '⏳ جاري الرفع...';
+    fetch('/api/books/upload', {method:'POST', credentials:'include', body:fd})
+      .then(function(r){return r.json().then(function(j){return {status:r.status, j:j};});})
+      .then(function(res){
+        btn.disabled = false; btn.textContent = '💾 حفظ الكتاب';
+        if(!res.j || !res.j.ok){
+          toast(res.j && res.j.error || ('فشل الرفع — ' + res.status), true);
+          return;
+        }
+        toast('تم الرفع ✓');
+        document.getElementById('bk-title').value = '';
+        document.getElementById('bk-desc').value = '';
+        document.getElementById('bk-file').value = '';
+        document.querySelector('input[name="bk-dl"][value="0"]').checked = true;
+        bkPickAll('groups', false); bkPickAll('teachers', false);
+        loadList();
+      })
+      .catch(function(){
+        btn.disabled = false; btn.textContent = '💾 حفظ الكتاب';
+        toast('خطأ في الاتصال', true);
+      });
+  };
+
+  // ── List
+  function loadList(){
+    fetch('/api/books',{credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        var box = document.getElementById('bk-list');
+        document.getElementById('bk-count').textContent = (j.count||0);
+        if(!j || !j.ok){ box.innerHTML='<div class="empty">تعذر التحميل</div>'; return; }
+        var arr = j.books || [];
+        if(!arr.length){ box.innerHTML='<div class="empty">لا توجد كتب بعد.</div>'; return; }
+        box.innerHTML = arr.map(function(b){
+          var grpTags = (b.groups||[]).map(function(g){return '<span class="tag">'+_esc(g.name)+'</span>';}).join('');
+          var tchTags = (b.teachers||[]).map(function(t){return '<span class="tag" style="background:#fff3e0;color:#bf360c;">'+_esc(t.name)+'</span>';}).join('');
+          var dlTag = b.can_download
+            ? '<span class="free">⬇ تحميل مسموح</span>'
+            : '<span class="lock">🔒 عرض فقط</span>';
+          return '<div class="book-card">'+
+            '<h3>📕 '+_esc(b.title)+'</h3>'+
+            '<div class="meta">'+
+              (b.description?'<div>'+_esc((b.description||'').slice(0,150))+'</div>':'')+
+              '<div>🎯 '+(grpTags||'—')+' | '+dlTag+'</div>'+
+              (tchTags?'<div>👩‍🏫 '+tchTags+'</div>':'')+
+              '<div>📅 '+_esc((b.uploaded_at||'').slice(0,16))+
+                ' | بواسطة: '+_esc(b.uploaded_by_name||b.uploaded_by_username)+
+                ' | '+fmtSize(b.file_size_bytes)+'</div>'+
+            '</div>'+
+            '<div class="acts">'+
+              '<a class="act-view" href="/api/books/'+b.id+'/view" target="_blank" rel="noopener">👁 عرض</a>'+
+              '<button class="act-edit" onclick="bkOpenEdit('+b.id+')">✏️ تعديل</button>'+
+              '<button class="act-del" onclick="bkDelete('+b.id+', this)">🗑 حذف</button>'+
+            '</div>'+
+          '</div>';
+        }).join('');
+      })
+      .catch(function(){
+        document.getElementById('bk-list').innerHTML='<div class="empty">تعذر التحميل</div>';
+      });
+  }
+
+  // ── Edit
+  window.bkOpenEdit = function(id){
+    fetch('/api/books/'+id,{credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ toast('تعذر تحميل التفاصيل', true); return; }
+        var b = j.book;
+        document.getElementById('be-id').value = b.id;
+        document.getElementById('be-title').value = b.title || '';
+        document.getElementById('be-desc').value = b.description || '';
+        document.querySelector('input[name="be-dl"][value="' + (b.can_download?'1':'0') + '"]').checked = true;
+        var gSel = new Set((b.groups||[]).map(function(g){return g.id;}));
+        var tSel = new Set((b.teachers||[]).map(function(t){return t.id;}));
+        renderPicker('be-groups', ALL_GROUPS, 'beg', gSel);
+        renderPicker('be-teachers', ALL_TEACHERS, 'bet', tSel);
+        document.getElementById('bk-edit-back').classList.add('show');
+      });
+  };
+  window.bkCloseEdit = function(){
+    document.getElementById('bk-edit-back').classList.remove('show');
+  };
+  window.bkSaveEdit = function(){
+    var id = parseInt(document.getElementById('be-id').value, 10);
+    var title = document.getElementById('be-title').value.trim();
+    var desc  = document.getElementById('be-desc').value.trim();
+    var dl    = (document.querySelector('input[name="be-dl"]:checked')||{}).value || '0';
+    var gids  = getPicked('be-groups');
+    var tids  = getPicked('be-teachers');
+    if(!title){ toast('العنوان مطلوب', true); return; }
+    var btn = document.getElementById('be-save-btn');
+    btn.disabled = true; btn.textContent = '⏳';
+    Promise.all([
+      fetch('/api/books/'+id, {method:'PATCH', headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify({title:title, description:desc, can_download: dl==='1'})}),
+      fetch('/api/books/'+id+'/groups', {method:'POST',
+        headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({group_ids: gids})}),
+      fetch('/api/books/'+id+'/teachers', {method:'POST',
+        headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({teacher_ids: tids})})
+    ]).then(function(){
+      btn.disabled = false; btn.textContent = '💾 حفظ التعديلات';
+      toast('تم الحفظ ✓'); bkCloseEdit(); loadList();
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = '💾 حفظ التعديلات';
+      toast('خطأ في الحفظ', true);
+    });
+  };
+
+  // ── Delete
+  window.bkDelete = function(id, btn){
+    if(!confirm('حذف هذا الكتاب نهائياً؟')) return;
+    btn.disabled = true; btn.textContent = '⏳';
+    fetch('/api/books/'+id, {method:'DELETE', credentials:'include'})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j || !j.ok){ btn.disabled=false; btn.textContent='🗑 حذف'; toast(j&&j.error||'فشل الحذف', true); return; }
+        toast('تم الحذف ✓'); loadList();
+      })
+      .catch(function(){ btn.disabled=false; btn.textContent='🗑 حذف'; toast('خطأ', true); });
+  };
+
+  loadPickers();
+  loadList();
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/admin/books')
+@login_required
+def admin_books_v2_page():
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return redirect("/dashboard")
+    return ADMIN_BOOKS_HTML
 
 
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
