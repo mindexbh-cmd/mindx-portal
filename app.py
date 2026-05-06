@@ -64110,7 +64110,9 @@ def _books_v2_send_file(bid, *, as_attachment):
     # admins/uploaders bypass for re-upload preview convenience.
     if as_attachment and not can_dl and not _has_books_full_access(user):
         return jsonify({"ok": False, "error":
-                        "هذا المنهج للقراءة فقط"}), 403
+                        "هذا المنهج للقراءة فقط",
+                        "view_only": True,
+                        "book_id": int(bid)}), 403
     # Priority 1: Cloudinary URL (new path). Redirect the browser
     # straight to the CDN — view-only books still serve over the
     # raw URL (no fl_attachment), so the PDF renders inline.
@@ -64253,7 +64255,9 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
     can_dl = int(rd.get("can_download") or 0)
     if as_attachment and not can_dl:
         return jsonify({"ok": False, "error":
-                        "هذا المنهج للقراءة فقط"}), 403
+                        "هذا المنهج للقراءة فقط",
+                        "view_only": True,
+                        "book_id": int(bid)}), 403
     # Cloudinary first (new path).
     cl_url = (rd.get("cloudinary_url") or "").strip()
     if cl_url:
