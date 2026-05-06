@@ -28,6 +28,48 @@ if USE_PG:
     import psycopg2
     import psycopg2.extras
 
+# ── Cloudinary configuration (curriculum file storage) ────────────
+# Configured once at import time from CLOUDINARY_CLOUD_NAME /
+# CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET. If any of the three
+# is missing we log a single warning to stderr and leave
+# CLOUDINARY_ENABLED = False — the books_v2 view/download routes
+# fall back to the legacy file_path column in that case so the
+# rest of the app keeps working during the rollout window. Add
+# the three vars in Render → Environment to enable uploads.
+import sys as _sys_cl
+try:
+    import cloudinary as _cloudinary
+    _CL_NAME = (os.environ.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+    _CL_KEY  = (os.environ.get("CLOUDINARY_API_KEY")    or "").strip()
+    _CL_SEC  = (os.environ.get("CLOUDINARY_API_SECRET") or "").strip()
+    if _CL_NAME and _CL_KEY and _CL_SEC:
+        _cloudinary.config(cloud_name=_CL_NAME, api_key=_CL_KEY,
+                           api_secret=_CL_SEC, secure=True)
+        CLOUDINARY_ENABLED = True
+        _sys_cl.stderr.write("[cloudinary] ✅ configured for cloud_name=" +
+                             _CL_NAME + "\n")
+    else:
+        CLOUDINARY_ENABLED = False
+        _missing = [k for k, v in [
+            ("CLOUDINARY_CLOUD_NAME", _CL_NAME),
+            ("CLOUDINARY_API_KEY",    _CL_KEY),
+            ("CLOUDINARY_API_SECRET", _CL_SEC),
+        ] if not v]
+        _sys_cl.stderr.write(
+            "[cloudinary] ⚠ disabled — missing env var(s): " +
+            ", ".join(_missing) +
+            ". Curriculum uploads will return an error and "
+            "view/download will fall back to the legacy file_path. "
+            "Add the three vars in Render → Environment to enable.\n")
+    _sys_cl.stderr.flush()
+except Exception as _ex_cl:
+    CLOUDINARY_ENABLED = False
+    try:
+        _sys_cl.stderr.write("[cloudinary] ⚠ init failed: " +
+                             str(_ex_cl) + "\n")
+        _sys_cl.stderr.flush()
+    except Exception: pass
+
 
 class _Row(dict):
     """Row type that supports r[int], r['name'], dict(r), and r.keys() — compatible with sqlite3.Row usage throughout the app."""
