@@ -8,6 +8,7 @@ qrcode[pil]>=7.4.2
 # binaries), the docs UI gracefully exposes a manual-upload fallback.
 playwright>=1.40
 Pillow>=10.0
+cloudinary>=1.40
 # NOTE: pillow-heif is intentionally NOT pinned here. The package
 # needs the system libheif/libde265 libraries which Render's stock
 # Python image doesn't always provide — when the wheel falls back to
