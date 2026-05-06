@@ -41483,6 +41483,47 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-cat-af-loc-select{padding:4px 8px;border:1.5px solid #8B5CC8;
   border-radius:6px;background:#fff;font-family:inherit;font-size:.92rem;
   font-weight:700;color:#212121;}
+
+/* ── Simplification + escalation surfaces (Commit 3) ───────────── */
+.vio-cat-more{margin:14px 0 0;background:#fff;border:1px solid #ece4f8;
+  border-radius:10px;overflow:hidden;}
+.vio-cat-more-summary{cursor:pointer;list-style:none;padding:10px 14px;
+  font-weight:800;color:#4a148c;background:#faf8fd;font-size:.92rem;
+  display:flex;align-items:center;gap:6px;}
+.vio-cat-more-summary::-webkit-details-marker{display:none;}
+.vio-cat-more-summary:hover{background:#f3e5f5;}
+.vio-cat-more[open] > .vio-cat-more-summary{
+  border-bottom:1px solid #ece4f8;background:#f3e5f5;}
+.vio-cat-more > :not(summary){padding:10px 14px;}
+
+.vio-cat-af-escbar{background:#FCE6E6;border:1.5px solid #f5b9b9;
+  border-radius:9px;padding:10px 12px;margin:8px 0 10px;color:#7A1F1F;
+  font-size:.9rem;line-height:1.5;}
+.vio-cat-af-escbar.medium-tier{background:#FFF8E1;border-color:#FFD876;
+  color:#7C5A00;}
+.vio-cat-af-escbar-head{font-weight:900;margin-bottom:4px;
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.vio-cat-af-escbar-body{}
+
+.vio-cat-af-histbadge{margin:6px 0 8px;}
+.vio-cat-af-histtoggle{background:#fff;border:1px solid #d8c8ec;
+  color:#4a148c;border-radius:8px;padding:6px 12px;font-family:inherit;
+  font-size:.86rem;font-weight:700;cursor:pointer;display:inline-flex;
+  align-items:center;gap:6px;}
+.vio-cat-af-histtoggle:hover{background:#f3e5f5;}
+.vio-cat-af-histarrow{font-size:.7rem;transition:transform .15s ease;}
+.vio-cat-af-histtoggle.expanded .vio-cat-af-histarrow{transform:rotate(180deg);}
+
+.vio-cat-af-alt{margin-top:10px;background:#fff;border:1.5px dashed #8B5CC8;
+  border-radius:9px;padding:10px 12px;}
+.vio-cat-af-alt-head{font-weight:800;color:#4a148c;margin-bottom:4px;
+  font-size:.86rem;}
+.vio-cat-af-alt-text{color:#212121;font-size:.9rem;line-height:1.5;
+  margin-bottom:8px;white-space:pre-wrap;}
+.vio-cat-af-alt-apply{background:#fff;border:1.5px solid #8B5CC8;
+  color:#4a148c;border-radius:7px;padding:5px 12px;font-family:inherit;
+  font-size:.84rem;font-weight:800;cursor:pointer;}
+.vio-cat-af-alt-apply:hover{background:#f3e5f5;}
 </style></head>
 <body>
 <div class="vio-topbar">
@@ -41636,36 +41677,38 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             <div class="vio-cat-qp-empty">…</div>
           </div>
 
-          <div class="vio-cat-divider">━━━ تصفية متقدمة ━━━</div>
+          <!-- Advanced filters + results — collapsed by default to keep the
+               default form light. Most users select via search/quick-picks. -->
+          <details class="vio-cat-more">
+            <summary class="vio-cat-more-summary">📂 المزيد من المخالفات (تصفية متقدمة)</summary>
 
-          <!-- Filter chips -->
-          <div class="vio-cat-filter-block">
-            <div class="vio-cat-filter-label">🎯 التصنيف:</div>
-            <div class="vio-cat-chips" data-cat-chip-group="severity">
-              <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
-              <button type="button" class="vio-cat-chip" data-value="light">🟢 خفيفة</button>
-              <button type="button" class="vio-cat-chip" data-value="medium">🟡 متوسطة</button>
-              <button type="button" class="vio-cat-chip" data-value="severe">🔴 خطيرة</button>
+            <div class="vio-cat-filter-block" style="margin-top:10px;">
+              <div class="vio-cat-filter-label">🎯 التصنيف:</div>
+              <div class="vio-cat-chips" data-cat-chip-group="severity">
+                <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
+                <button type="button" class="vio-cat-chip" data-value="light">🟢 خفيفة</button>
+                <button type="button" class="vio-cat-chip" data-value="medium">🟡 متوسطة</button>
+                <button type="button" class="vio-cat-chip" data-value="severe">🔴 خطيرة</button>
+              </div>
             </div>
-          </div>
-          <div class="vio-cat-filter-block">
-            <div class="vio-cat-filter-label">📍 المكان:</div>
-            <div class="vio-cat-chips" data-cat-chip-group="location">
-              <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
-              <button type="button" class="vio-cat-chip" data-value="داخل الصف">داخل الصف</button>
-              <button type="button" class="vio-cat-chip" data-value="خارج الصف (ممرات)">الممرات</button>
-              <button type="button" class="vio-cat-chip" data-value="دورات المياه">دورات المياه</button>
-              <button type="button" class="vio-cat-chip" data-value="خارج المعهد (الباب)">خارج المعهد</button>
+            <div class="vio-cat-filter-block">
+              <div class="vio-cat-filter-label">📍 المكان:</div>
+              <div class="vio-cat-chips" data-cat-chip-group="location">
+                <button type="button" class="vio-cat-chip active" data-value="">⚪ الكل</button>
+                <button type="button" class="vio-cat-chip" data-value="داخل الصف">داخل الصف</button>
+                <button type="button" class="vio-cat-chip" data-value="خارج الصف (ممرات)">الممرات</button>
+                <button type="button" class="vio-cat-chip" data-value="دورات المياه">دورات المياه</button>
+                <button type="button" class="vio-cat-chip" data-value="خارج المعهد (الباب)">خارج المعهد</button>
+              </div>
             </div>
-          </div>
 
-          <!-- Results list -->
-          <div class="vio-cat-results-head">
-            📋 النتائج (<span id="vio-cat-results-count">0</span> مخالفة)
-          </div>
-          <div id="vio-cat-results" class="vio-cat-results">
-            <div class="vio-cat-empty">…</div>
-          </div>
+            <div class="vio-cat-results-head">
+              📋 النتائج (<span id="vio-cat-results-count">0</span> مخالفة)
+            </div>
+            <div id="vio-cat-results" class="vio-cat-results">
+              <div class="vio-cat-empty">…</div>
+            </div>
+          </details>
 
           <!-- Auto-fill panel -->
           <div id="vio-cat-autofill" class="vio-cat-autofill" hidden>
@@ -41674,6 +41717,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
               <span class="vio-cat-af-key">المخالفة:</span>
               <span id="vio-cat-af-text" class="vio-cat-af-text"></span>
             </div>
+
+            <!-- Escalation banner (only shown when was_escalated=true) -->
+            <div id="vio-cat-af-escbar" class="vio-cat-af-escbar" hidden>
+              <div class="vio-cat-af-escbar-head">
+                ⚠️ <span id="vio-cat-af-escbar-title"></span>
+              </div>
+              <div id="vio-cat-af-escbar-body" class="vio-cat-af-escbar-body"></div>
+            </div>
+
             <div class="vio-cat-af-row">
               <span class="vio-cat-af-key">التصنيف:</span>
               <span id="vio-cat-af-sev" class="vio-cat-af-val" data-field="severity"></span>
@@ -41684,16 +41736,35 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
               <span id="vio-cat-af-loc" class="vio-cat-af-val" data-field="location"></span>
               <button type="button" class="vio-cat-af-edit" data-edit="location" title="تعديل">✏️</button>
             </div>
+
+            <!-- Compact history badge (click to expand) -->
+            <div id="vio-cat-af-histbadge" class="vio-cat-af-histbadge" hidden>
+              <button type="button" id="vio-cat-af-histtoggle" class="vio-cat-af-histtoggle">
+                📊 <span id="vio-cat-af-histshort"></span>
+                <span class="vio-cat-af-histarrow">▼</span>
+              </button>
+            </div>
             <div id="vio-cat-af-history" class="vio-cat-af-history" hidden>
               <div class="vio-cat-af-history-title" id="vio-cat-af-history-title"></div>
               <div id="vio-cat-af-history-body" class="vio-cat-af-history-body"></div>
             </div>
+
             <div class="vio-cat-af-action-block">
               <div class="vio-cat-af-action-head">
-                <span>المعالجة المقترحة:</span>
+                <span id="vio-cat-af-action-label">المعالجة المقترحة:</span>
                 <button type="button" class="vio-cat-af-edit" data-edit="action" title="تعديل">✏️</button>
               </div>
               <div id="vio-cat-af-action" class="vio-cat-af-action"></div>
+            </div>
+
+            <!-- Alternative action (catalog row's own action — shown only
+                 when escalated, so the user can opt out of the escalation). -->
+            <div id="vio-cat-af-alt" class="vio-cat-af-alt" hidden>
+              <div class="vio-cat-af-alt-head">📌 خيار بديل (إجراء التصنيف الأصلي):</div>
+              <div id="vio-cat-af-alt-text" class="vio-cat-af-alt-text"></div>
+              <button type="button" id="vio-cat-af-alt-apply" class="vio-cat-af-alt-apply">
+                تطبيق هذا الإجراء بدلاً منه
+              </button>
             </div>
           </div>
 
@@ -42703,37 +42774,102 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     setText('vio-cat-af-loc', _catState.location || '');
     setText('vio-cat-af-action', _catState.action || '');
 
-    // History block
-    var hist     = document.getElementById('vio-cat-af-history');
-    var histTtl  = document.getElementById('vio-cat-af-history-title');
-    var histBody = document.getElementById('vio-cat-af-history-body');
-    var stuName  = _catCurrentStudentName();
+    // ── Escalation banner ───────────────────────────────────────
+    // Shown only when the suggestion endpoint flagged was_escalated.
+    // Banner colour tracks the EFFECTIVE tier (severe = red, medium
+    // = yellow). The body text is the server's pre-rendered Arabic
+    // explanation so the UI stays in sync with the rules.
+    var escBar  = document.getElementById('vio-cat-af-escbar');
+    var escTtl  = document.getElementById('vio-cat-af-escbar-title');
+    var escBody = document.getElementById('vio-cat-af-escbar-body');
+    var actionLabel = document.getElementById('vio-cat-af-action-label');
+    if (escBar){
+      if (_catState.wasEscalated){
+        escBar.hidden = false;
+        var origLbl = _catSevLabel[_catState.originalSeverity] || _catState.originalSeverity || '';
+        var effLbl  = _catSevLabel[_catState.effectiveSeverity] || _catState.effectiveSeverity || '';
+        escBar.classList.toggle('medium-tier', _catState.effectiveSeverity === 'medium');
+        if (escTtl){
+          escTtl.textContent = 'هذه المخالفة من ' + origLbl + ' محوّلة إلى ' + effLbl;
+        }
+        if (escBody){
+          escBody.textContent = _catState.escExplanation || '';
+        }
+        if (actionLabel){
+          actionLabel.textContent = '🎯 الإجراء المقترح (محوّل):';
+        }
+      } else {
+        escBar.hidden = true;
+        if (actionLabel){
+          actionLabel.textContent = 'المعالجة المقترحة:';
+        }
+      }
+    }
+
+    // ── Compact history badge + full panel ──────────────────────
+    // Default: show the badge (one line). Click expands to the
+    // full date list.
+    var histBadge   = document.getElementById('vio-cat-af-histbadge');
+    var histShort   = document.getElementById('vio-cat-af-histshort');
+    var hist        = document.getElementById('vio-cat-af-history');
+    var histTtl     = document.getElementById('vio-cat-af-history-title');
+    var histBody    = document.getElementById('vio-cat-af-history-body');
+    var stuName     = _catCurrentStudentName();
     if (!_catCurrentStudentId()){
-      if (hist) hist.hidden = true;
+      if (histBadge) histBadge.hidden = true;
+      if (hist)      hist.hidden = true;
     } else {
-      if (hist) hist.hidden = false;
       var prev = _catState.prevCount || 0;
       var occ  = _catState.occurrence || (prev + 1);
-      if (hist) {
-        hist.classList.toggle('first-time', prev === 0);
-      }
-      if (histTtl){
-        histTtl.textContent = '📊 سجل ' + (stuName || 'الطالبة') + ':';
-      }
       var occWord = '';
       if (prev === 0) occWord = 'هذه أول مرة لهذه المخالفة';
       else if (occ === 2) occWord = 'هذه المرة الثانية لهذه المخالفة';
       else if (occ === 3) occWord = 'هذه المرة الثالثة لهذه المخالفة';
       else occWord = 'هذه المرة رقم ' + occ + ' لهذه المخالفة';
-      var dates = (_catState.prevDates || []).slice(-5);
-      var datesHtml = '';
-      if (dates.length){
-        datesHtml = '<br>' + dates.map(function(d){
-          return '• ' + escapeHtml(d);
-        }).join('<br>');
+
+      // Add by-severity totals if we have them — useful context
+      // even when no escalation triggered (e.g., 1 light + 1 medium).
+      var bs = _catState.bySeverity || {};
+      var bsBits = [];
+      if (bs.light)  bsBits.push(bs.light + ' خفيفة');
+      if (bs.medium) bsBits.push(bs.medium + ' متوسطة');
+      if (bs.severe) bsBits.push(bs.severe + ' خطيرة');
+      var bsLine = bsBits.length ? ' • سجل الفصل: ' + bsBits.join(' / ') : '';
+
+      if (histBadge) histBadge.hidden = false;
+      if (histShort) histShort.textContent = occWord + bsLine;
+      // The full panel stays hidden until the toggle is clicked.
+      if (hist){
+        hist.classList.toggle('first-time', prev === 0);
+        if (histTtl){
+          histTtl.textContent = '📊 سجل ' + (stuName || 'الطالبة') + ':';
+        }
+        var dates = (_catState.prevDates || []).slice(-5);
+        var datesHtml = dates.length
+          ? '<br>' + dates.map(function(d){ return '• ' + escapeHtml(d); }).join('<br>')
+          : '';
+        if (histBody) histBody.innerHTML = escapeHtml(occWord + bsLine) + datesHtml;
+        // Only show the full panel if the user already opened it.
+        var toggle = document.getElementById('vio-cat-af-histtoggle');
+        var open = toggle && toggle.classList.contains('expanded');
+        hist.hidden = !open;
       }
-      if (histBody) histBody.innerHTML = escapeHtml(occWord) + datesHtml;
     }
+
+    // ── Alternative action box (catalog row's own action) ───────
+    // Shown only when an escalation actually happened, so the user
+    // can opt out of the escalated suggestion.
+    var altBox  = document.getElementById('vio-cat-af-alt');
+    var altText = document.getElementById('vio-cat-af-alt-text');
+    if (altBox){
+      if (_catState.wasEscalated && (_catState.alternativeAction || '').trim()){
+        altBox.hidden = false;
+        if (altText) altText.textContent = _catState.alternativeAction || '';
+      } else {
+        altBox.hidden = true;
+      }
+    }
+
     _catSetHidden();
     // Visually mark the matching row in the result list, if open.
     var resBox = document.getElementById('vio-cat-results');
@@ -42751,6 +42887,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     var c = d.catalog || {};
     _catState.catalogId  = c.id;
     _catState.text       = c.violation_text || '';
+    // Severity comes from the catalog row (the "what is it"); the
+    // EFFECTIVE severity from the escalation overrides this for
+    // display only — _catState.severity stays at the original tier
+    // because that's what saves to the violations row.
     _catState.severity   = (c.severity || '').toLowerCase();
     _catState.location   = c.location || '';
     _catState.action     = d.suggested_action || c.action_first_time || '';
@@ -42759,6 +42899,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     _catState.prevDates  = d.previous_dates || [];
     _catState.threshold2 = d.threshold_2nd || 0;
     _catState.threshold3 = d.threshold_3rd || 0;
+    // New escalation fields
+    _catState.originalSeverity   = (d.original_severity || c.severity || '').toLowerCase();
+    _catState.originalCount      = d.original_count || 0;
+    _catState.effectiveSeverity  = (d.effective_severity || '').toLowerCase();
+    _catState.effectiveOccurrence = d.effective_occurrence || 0;
+    _catState.wasEscalated       = !!d.was_escalated;
+    _catState.escExplanation     = d.escalation_explanation || '';
+    _catState.alternativeAction  = d.alternative_action || '';
+    _catState.bySeverity         = d.by_severity || null;
     _catRenderAutofill();
   }
 
@@ -42957,17 +43106,42 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         if (cid) _catSelectId(cid);
       });
     }
-    // Override edit buttons
+    // Override edit buttons + history badge toggle + alternative-
+    // action apply button — all delegated through the autofill panel.
     var af = document.getElementById('vio-cat-autofill');
     if (af && !af._catBound){
       af._catBound = true;
       af.addEventListener('click', function(ev){
         var t = ev.target;
         if (!t || !t.closest) return;
-        var btn = t.closest('.vio-cat-af-edit');
-        if (!btn) return;
-        var fld = btn.getAttribute('data-edit');
-        if (fld) _catEditField(fld);
+        // Override edit (✏️ pencils)
+        var editBtn = t.closest('.vio-cat-af-edit');
+        if (editBtn){
+          var fld = editBtn.getAttribute('data-edit');
+          if (fld) _catEditField(fld);
+          return;
+        }
+        // History badge expand/collapse
+        var histBtn = t.closest('#vio-cat-af-histtoggle');
+        if (histBtn){
+          var hist = document.getElementById('vio-cat-af-history');
+          var open = histBtn.classList.toggle('expanded');
+          if (hist) hist.hidden = !open;
+          return;
+        }
+        // "تطبيق هذا الإجراء بدلاً منه" — apply the alternative
+        // (catalog row's own action) instead of the escalated default.
+        var altBtn = t.closest('#vio-cat-af-alt-apply');
+        if (altBtn){
+          if (_catState.alternativeAction){
+            _catState.action = _catState.alternativeAction;
+            _catRenderAutofill();
+            // Hide the alt box since we just applied it.
+            var altBox = document.getElementById('vio-cat-af-alt');
+            if (altBox) altBox.hidden = true;
+          }
+          return;
+        }
       });
     }
     // Re-fetch suggestion when student changes (so the count updates).
