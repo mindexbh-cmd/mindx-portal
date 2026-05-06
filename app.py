@@ -64806,8 +64806,46 @@ def _has_violations_full_access(user):
 
 
 # ──────────────────────────────────────────────────────────────────
-# books_v2 (مكتبة الكتب) — full-access allowlist + helpers
-# ──────────────────────────────────────────────────────────────────
+# books_v2 (مكتبة الكتب) — clean rebuild after the curriculum_*
+# feature was retired. Architecture overview:
+#
+#   3 tables (FK-based, NO group_name strings):
+#     books_v2(id, title, description, file_path, can_download, …)
+#     books_v2_groups(book_id → books_v2.id, group_id → student_groups.id)
+#     books_v2_teachers(book_id → books_v2.id, teacher_user_id → users.id)
+#
+#   Permissions:
+#     - Upload/edit/delete: admin role OR allowlist usernames
+#       (_BOOKS_V2_FULL_ACCESS_USERNAMES). Allowlist bootstraps from
+#       a hard-coded set + auto-discovers Ahmed Younes (username
+#       starts with "02", name fragments match in Arabic/English).
+#     - View/download: gated by _books_v2_user_can_view which joins
+#       on books_v2_groups (parents) or books_v2_teachers (teachers).
+#       Admins/uploaders bypass for preview.
+#     - Download specifically: also requires books_v2.can_download=1
+#       (admins bypass even this — they manage the system).
+#
+#   Routes:
+#     /admin/books              admin/manager UI
+#     /teacher/books            teacher viewer
+#     /portal/parent-hub/curriculum   parent viewer
+#     /api/books/*              REST: upload, list, get, patch,
+#                               delete, set-groups, set-teachers,
+#                               for-student/<sid>, for-teacher,
+#                               <bid>/view, <bid>/download
+#
+#   Storage:
+#     /var/data/books_v2/<bid>_<safe_title>.pdf (Render persistent)
+#     ./data/books_v2/...                       (local fallback)
+#     Path-traversal protection on every view/download endpoint.
+#
+#   Bug-class avoidance:
+#     The previous curriculum_* iterations stored group_name strings
+#     in the join table, which led to the Arabic-vs-ASCII digit-script
+#     mismatch bug (مجموعة 01 vs مجموعة ٠١). books_v2 stores group_id
+#     INTs, so spelling drift in student_groups.group_name has zero
+#     effect on visibility — the FK chain is canonical.
+#
 # Same pattern as _EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES: admin
 # role passes implicitly; non-admin users must be in the allowlist
 # to upload / edit / delete books. Read access is gated separately
