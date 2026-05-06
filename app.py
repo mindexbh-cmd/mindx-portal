@@ -7988,6 +7988,15 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
 .pp-status-pill.partial{background:#fff8e1;color:#e65100;}
 .pp-status-pill.unpaid{background:#ffebee;color:#c62828;}
 .pp-status-pill.exempt{background:#e3f2fd;color:#0d47a1;}
+.pp-bk-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+.pp-bk-card{background:#fff;border:1.5px solid #e0d0f8;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+.pp-bk-card h3{margin:0;font-size:1rem;color:#4a148c;font-weight:800;line-height:1.4;}
+.pp-bk-card .desc{font-size:0.85rem;color:#666;line-height:1.5;}
+.pp-bk-card .meta{font-size:0.78rem;color:#888;}
+.pp-bk-card .lock{color:#FB8C00;font-weight:700;}
+.pp-bk-card .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+.pp-bk-btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:9px 12px;border-radius:9px;font-weight:700;font-size:0.88rem;}
+.pp-bk-btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
 @media(max-width:480px){
   .pp-hero h1{font-size:1.2rem;}
   .pp-hero{padding:18px 14px;}
@@ -8044,6 +8053,10 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
     <div style="text-align:center;padding:14px;color:#2E7D32;font-weight:800;font-size:1rem;">
       &#x2705; &#x62A;&#x645; &#x62F;&#x641;&#x639; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;
     </div>
+  </div>
+  <div class="pp-card pp-section" id="pp-books-card">
+    <h2>&#x1F4DA; &#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</h2>
+    <div id="pp-books"></div>
   </div>
 </div>
 
@@ -8146,6 +8159,43 @@ function _ppRender(d){
     p += '</div>';
   }
   document.getElementById('pp-pay').innerHTML = p;
+  /* Books — مكتبة المناهج visible via books_v2_groups assignment.
+     Card grid mirrors the logged-in parent-portal viewer style but
+     uses the pp- token family so it matches the rest of /parent. */
+  var booksBox = document.getElementById('pp-books');
+  if (booksBox){
+    var books = d.books || [];
+    if (!books.length){
+      booksBox.innerHTML = '<div class="pp-empty">لا توجد مناهج متاحة حالياً</div>';
+    } else {
+      var pidEnc = encodeURIComponent(s.personal_id || '');
+      var bh = '<div class="pp-bk-grid">';
+      books.forEach(function(b){
+        var title = b.title || '';
+        var desc  = String(b.description || '');
+        var trunc = desc.length > 140 ? desc.slice(0,140) + '…' : desc;
+        var dlBtn = b.can_download
+          ? '<a class="pp-bk-btn dl" href="/parent/book/' + b.id + '/download?pid=' + pidEnc + '">⬇️ تحميل</a>'
+          : '';
+        var lock = b.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+        var dt = String(b.uploaded_at || '').slice(0,10);
+        bh += '<div class="pp-bk-card">';
+        bh += '<h3>📄 ' + _ppEsc(title) + '</h3>';
+        if (trunc) bh += '<div class="desc">' + _ppEsc(trunc) + '</div>';
+        bh += '<div class="meta">' + (dt ? _ppEsc(dt) : '') +
+              (dt && lock ? ' • ' : '') + lock + '</div>';
+        bh += '<div class="acts">';
+        bh += '<a class="pp-bk-btn" href="/parent/book/' + b.id +
+              '/view?pid=' + pidEnc +
+              '" target="_blank" rel="noopener">👁️ عرض</a>';
+        bh += dlBtn;
+        bh += '</div>';
+        bh += '</div>';
+      });
+      bh += '</div>';
+      booksBox.innerHTML = bh;
+    }
+  }
   /* Installment picker — show every still-owed installment (unpaid or
      partial) so the parent can see the receipt status next to each.
      Approved-but-not-yet-recorded receipts are also surfaced here so
@@ -23948,6 +23998,14 @@ def api_parent_lookup():
         "group_name_student": s.get("group_name_student") or "",
         "group_online":       s.get("group_online") or "",
     }
+    # Books visible to this student via books_v2_groups assignment.
+    # Reuses the same resolver the logged-in parent portal uses, so
+    # spelling variants between students.group_name_student and
+    # student_groups.group_name still match via _grp_norm.
+    try:
+        books_payload = _books_v2_books_for_personal_id(db, pid)
+    except Exception:
+        books_payload = []
     return jsonify({
         "ok": True,
         "student":    safe_student,
@@ -23956,6 +24014,7 @@ def api_parent_lookup():
             "present_rate": pres_rate,
         },
         "payment": pay_payload,
+        "books":   books_payload,
     })
 
 # ─── Admin receipts management ─────────────────────────────────────
@@ -63912,6 +63971,146 @@ def api_books_v2_view(bid):
 @login_required
 def api_books_v2_download(bid):
     return _books_v2_send_file(bid, as_attachment=True)
+
+
+# ── Public parent-portal book access (no login required) ─────────
+# The /parent page validates the visitor by personal_id; the same
+# pid is required here to authorize view/download. Access requires
+# the book to be assigned to one of the student's groups via
+# books_v2_groups, mirroring the logged-in parent flow.
+
+def _books_v2_books_for_personal_id(db, pid):
+    """Public-portal helper: returns the same shape as
+    /api/books/for-student given a personal_id. Returns [] for
+    invalid pid or students without any assigned books."""
+    pid = (pid or "").strip()
+    if not pid: return []
+    try:
+        row = db.execute(
+            "SELECT id FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        row = None
+    if not row: return []
+    try:
+        sid = int(dict(row).get("id") or 0)
+    except Exception:
+        sid = 0
+    if not sid: return []
+    gids = _books_v2_resolve_group_ids_for_students(db, {sid})
+    if not gids: return []
+    ph = ",".join("?" for _ in gids)
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT b.id FROM books_v2 b "
+            "JOIN books_v2_groups bg ON bg.book_id=b.id "
+            "WHERE bg.group_id IN (" + ph + ") "
+            "AND COALESCE(b.is_deleted,0)=0 "
+            "ORDER BY b.uploaded_at DESC, b.id DESC",
+            tuple(gids)).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        try: bid = int(dict(r).get("id") or 0)
+        except Exception: continue
+        if not bid: continue
+        d = _books_v2_load_book_with_assignments(db, bid)
+        if d: out.append(d)
+    return out
+
+
+def _books_v2_pid_can_view(db, pid, book_id):
+    """Verify that the student identified by personal_id has at
+    least one group assigned to this book. Returns False on any
+    miss — no information leakage about whether the book exists."""
+    pid = (pid or "").strip()
+    if not pid: return False
+    try:
+        row = db.execute(
+            "SELECT id FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        row = None
+    if not row: return False
+    try:
+        sid = int(dict(row).get("id") or 0)
+    except Exception:
+        sid = 0
+    if not sid: return False
+    gids = _books_v2_resolve_group_ids_for_students(db, {sid})
+    if not gids: return False
+    ph = ",".join("?" for _ in gids)
+    try:
+        r2 = db.execute(
+            "SELECT 1 FROM books_v2_groups WHERE book_id=? "
+            "AND group_id IN (" + ph + ") "
+            "AND EXISTS(SELECT 1 FROM books_v2 b WHERE b.id=? "
+            "           AND COALESCE(b.is_deleted,0)=0) LIMIT 1",
+            tuple([int(book_id)] + list(gids) + [int(book_id)])
+        ).fetchone()
+    except Exception:
+        r2 = None
+    return bool(r2)
+
+
+def _books_v2_send_file_public(db, bid, *, as_attachment):
+    """Public file server (after pid validation). Mirrors
+    _books_v2_send_file but skips the login-based gate since the
+    caller already verified pid via _books_v2_pid_can_view."""
+    from flask import send_file as _send_b
+    try:
+        row = db.execute(
+            "SELECT title, file_path, can_download FROM books_v2 "
+            "WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(bid),)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    fp = rd.get("file_path") or ""
+    sd = os.path.realpath(_books_v2_storage_dir())
+    rp = os.path.realpath(fp) if fp else ""
+    if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
+        return jsonify({"ok": False, "error":
+                        "الملف غير موجود على القرص"}), 410
+    if as_attachment and not int(rd.get("can_download") or 0):
+        return jsonify({"ok": False, "error":
+                        "هذا المنهج للقراءة فقط"}), 403
+    safe_title = (rd.get("title") or "book") + ".pdf"
+    resp = _send_b(rp, mimetype="application/pdf",
+                   as_attachment=as_attachment,
+                   download_name=safe_title, conditional=False)
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception: pass
+    return resp
+
+
+@app.route('/parent/book/<int:bid>/view', methods=['GET'])
+def parent_book_view(bid):
+    """Public viewer. Requires ?pid=<personal_id>. The pid+bid
+    combo must validate against books_v2_groups for the student's
+    group; otherwise 403 with no information leakage."""
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if not _books_v2_pid_can_view(db, pid, bid):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    return _books_v2_send_file_public(db, int(bid), as_attachment=False)
+
+
+@app.route('/parent/book/<int:bid>/download', methods=['GET'])
+def parent_book_download(bid):
+    """Public download. Same pid validation as /parent/book/<bid>/view
+    plus the can_download=1 gate — view-only books refuse the request."""
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if not _books_v2_pid_can_view(db, pid, bid):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    return _books_v2_send_file_public(db, int(bid), as_attachment=True)
 
 
 @app.route('/api/books/diag', methods=['GET'])
