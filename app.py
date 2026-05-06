@@ -43627,6 +43627,39 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                           font-family:inherit;cursor:pointer;font-size:.8rem;}
 .vcc-tpl-add-row{display:flex;gap:8px;margin-top:10px;}
 .vcc-tpl-add-row input{flex:1;}
+
+/* ── Escalation rules card (Commit 2 of escalation) ──────────── */
+.vcc-esc-card{background:#fff;border-radius:14px;padding:18px 20px;
+              box-shadow:0 4px 16px rgba(107,63,160,.08);
+              border:2px solid #c8a8e8;margin-bottom:14px;}
+.vcc-esc-card h3{margin:0 0 4px;font-size:1.05rem;font-weight:900;
+                 color:#4a148c;display:flex;align-items:center;gap:6px;}
+.vcc-esc-card .vcc-esc-sub{margin:0 0 14px;color:#666;font-size:.86rem;}
+.vcc-esc-rule{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+              background:#faf8fd;border:1px solid #ece4f8;border-radius:10px;
+              padding:10px 14px;margin-bottom:10px;font-size:.92rem;
+              color:#212121;font-weight:700;}
+.vcc-esc-rule input[type=number]{width:64px;padding:5px 8px;text-align:center;
+                                 border:1.5px solid #8B5CC8;border-radius:7px;
+                                 font-family:inherit;font-size:.95rem;
+                                 font-weight:800;background:#fff;}
+.vcc-esc-rule .vcc-esc-arrow{color:#8B5CC8;font-weight:900;}
+.vcc-esc-tier-light{background:#E8F5E9;color:#2E7D32;padding:2px 9px;
+                    border-radius:999px;font-size:.82rem;font-weight:800;}
+.vcc-esc-tier-medium{background:#FFF8E1;color:#E65100;padding:2px 9px;
+                     border-radius:999px;font-size:.82rem;font-weight:800;}
+.vcc-esc-tier-severe{background:#FFEBEE;color:#C62828;padding:2px 9px;
+                     border-radius:999px;font-size:.82rem;font-weight:800;}
+.vcc-esc-extras{display:grid;grid-template-columns:1fr 1fr;gap:10px;
+                margin-top:10px;}
+@media(max-width:680px){.vcc-esc-extras{grid-template-columns:1fr;}}
+.vcc-esc-toggle{display:flex;align-items:center;gap:8px;background:#FFF8E1;
+                border:1px solid #FFD876;border-radius:8px;padding:9px 12px;
+                font-weight:700;color:#7C5A00;font-size:.9rem;cursor:pointer;}
+.vcc-esc-toggle input{width:18px;height:18px;cursor:pointer;
+                      accent-color:#E65100;flex-shrink:0;}
+.vcc-esc-card .vcc-esc-actions{margin-top:12px;display:flex;gap:8px;
+                                flex-wrap:wrap;}
 </style></head>
 <body>
 <div class="vcc-topbar">
@@ -43642,6 +43675,50 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <button type="button" class="vcc-btn vcc-btn-primary" id="vcc-btn-add">
       ➕ إضافة مخالفة جديدة
     </button>
+  </div>
+
+  <!-- Escalation rules card (Commit 2 of escalation) -->
+  <div class="vcc-esc-card" id="vcc-esc-card">
+    <h3>⚙️ قواعد التحويل بين تصنيفات المخالفات</h3>
+    <p class="vcc-esc-sub">
+      كم مخالفة من تصنيف واحد تعادل مخالفة من التصنيف الأعلى. تطبق على عدّ المخالفات منذ بداية الفصل.
+    </p>
+
+    <div class="vcc-esc-rule">
+      <span>كل</span>
+      <input type="number" id="vcc-esc-l2m" min="1" value="3">
+      <span>مخالفات</span>
+      <span class="vcc-esc-tier-light">🟢 خفيفة</span>
+      <span class="vcc-esc-arrow">↓ تعادل ↓</span>
+      <span>1 مخالفة</span>
+      <span class="vcc-esc-tier-medium">🟡 متوسطة</span>
+    </div>
+
+    <div class="vcc-esc-rule">
+      <span>كل</span>
+      <input type="number" id="vcc-esc-m2s" min="1" value="3">
+      <span>مخالفات</span>
+      <span class="vcc-esc-tier-medium">🟡 متوسطة</span>
+      <span class="vcc-esc-arrow">↓ تعادل ↓</span>
+      <span>1 مخالفة</span>
+      <span class="vcc-esc-tier-severe">🔴 خطيرة</span>
+    </div>
+
+    <div class="vcc-esc-extras">
+      <label class="vcc-esc-toggle">
+        <input type="checkbox" id="vcc-esc-auto" checked>
+        <span>☑️ تطبيق التحويل تلقائياً عند تسجيل مخالفة</span>
+      </label>
+      <div class="vcc-field" style="margin:0;">
+        <label>📅 تاريخ بداية الفصل</label>
+        <input type="date" id="vcc-esc-sem">
+      </div>
+    </div>
+
+    <div class="vcc-esc-actions">
+      <button type="button" class="vcc-btn vcc-btn-save" id="vcc-esc-save">💾 حفظ القواعد</button>
+      <span id="vcc-esc-status" style="align-self:center;color:#888;font-size:.86rem;"></span>
+    </div>
   </div>
 
   <div class="vcc-filters">
@@ -44397,11 +44474,79 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     });
   }
 
+  // ── Escalation rules card (Commit 2 of escalation) ───────────
+  // Populated from GET /api/violations-escalation-rules; PUT
+  // persists changes. Auto-apply checkbox + semester start date
+  // share the same Save button.
+  function loadEscalationRules(){
+    fetch('/api/violations-escalation-rules', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok || !d.rules) return;
+        var r = d.rules;
+        var l2m = document.getElementById('vcc-esc-l2m');
+        var m2s = document.getElementById('vcc-esc-m2s');
+        var au  = document.getElementById('vcc-esc-auto');
+        var sem = document.getElementById('vcc-esc-sem');
+        if (l2m) l2m.value = r.escalation_light_to_medium || 3;
+        if (m2s) m2s.value = r.escalation_medium_to_severe || 3;
+        if (au)  au.checked = !!r.escalation_auto_apply;
+        if (sem) sem.value  = (r.semester_start_date || '').slice(0, 10);
+      })
+      .catch(function(){});
+  }
+
+  function saveEscalationRules(){
+    var l2m = document.getElementById('vcc-esc-l2m');
+    var m2s = document.getElementById('vcc-esc-m2s');
+    var au  = document.getElementById('vcc-esc-auto');
+    var sem = document.getElementById('vcc-esc-sem');
+    var status = document.getElementById('vcc-esc-status');
+    var btn = document.getElementById('vcc-esc-save');
+    var body = {
+      escalation_light_to_medium:  parseInt((l2m && l2m.value) || '3', 10),
+      escalation_medium_to_severe: parseInt((m2s && m2s.value) || '3', 10),
+      escalation_auto_apply:       !!(au && au.checked),
+    };
+    var semVal = (sem && sem.value) || '';
+    if (semVal) body.semester_start_date = semVal;
+    if (btn){ btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+    if (status){ status.textContent = ''; }
+    fetch('/api/violations-escalation-rules', {
+      method: 'PUT', credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    })
+    .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+    .then(function(res){
+      if (btn){ btn.disabled = false; btn.textContent = '💾 حفظ القواعد'; }
+      if (res.status === 200 && res.data && res.data.ok){
+        if (status){ status.textContent = '✓ تم الحفظ'; status.style.color = '#2E7D32'; }
+        showToast('✓ تم حفظ قواعد التحويل');
+        loadEscalationRules();
+      } else {
+        var msg = (res.data && res.data.error) || 'تعذر الحفظ';
+        if (status){ status.textContent = msg; status.style.color = '#C62828'; }
+        showToast(msg, 'err');
+      }
+    })
+    .catch(function(){
+      if (btn){ btn.disabled = false; btn.textContent = '💾 حفظ القواعد'; }
+      showToast('تعذر الاتصال بالخادم', 'err');
+    });
+  }
+
   function init(){
     bindAll();
     loadCatalog();
     loadTemplates();
     loadRecordedTotal();
+    loadEscalationRules();
+    var saveBtn = document.getElementById('vcc-esc-save');
+    if (saveBtn && !saveBtn._escBound){
+      saveBtn._escBound = true;
+      saveBtn.addEventListener('click', saveEscalationRules);
+    }
   }
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', init);
