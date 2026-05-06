@@ -64432,6 +64432,132 @@ def portal_books_v2_parent_page():
     return PORTAL_BOOKS_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
 
 
+# ──────────────────────────────────────────────────────────────────
+# books_v2 — teacher viewer (/teacher/books)
+# ──────────────────────────────────────────────────────────────────
+# Card grid against /api/books/for-teacher. If admin/manager opens
+# this page, show a notice with a link to /admin/books — the
+# helper page is for teachers but staff curiosity is harmless.
+
+TEACHER_BOOKS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>الكتب — صفحة المعلمة</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#fce4ec,#e1bee7,#bbdefb);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.topbar{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);
+        padding:14px 22px;display:flex;justify-content:space-between;
+        align-items:center;flex-wrap:wrap;gap:10px;
+        box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.topbar h1{margin:0;font-size:1.1rem;font-weight:900;color:#4a148c;}
+.topbar a{color:#4a148c;text-decoration:none;background:#f3e5f5;
+          padding:8px 16px;border-radius:9px;font-weight:700;font-size:.85rem;}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px;}
+.staff-notice{background:#fff8e1;border:1.5px solid #ffe082;color:#7c5e00;
+              border-radius:12px;padding:14px 18px;margin-bottom:18px;
+              display:flex;align-items:center;gap:10px;}
+.staff-notice a{background:#1565C0;color:#fff;padding:6px 14px;border-radius:7px;
+                text-decoration:none;font-weight:700;font-size:.86rem;margin-right:auto;}
+.bk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media (max-width:980px){.bk-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:620px){.bk-grid{grid-template-columns:1fr;}}
+.bk-card{background:#fff;border-radius:18px;padding:20px;display:flex;
+         flex-direction:column;gap:10px;border:2px solid transparent;
+         transition:all .18s ease;box-shadow:0 8px 24px rgba(107,63,160,.14);}
+.bk-card:hover{border-color:#1565C0;box-shadow:0 14px 32px rgba(107,63,160,.22);}
+.bk-card .ic{font-size:2.4rem;line-height:1;color:#1565C0;}
+.bk-card h3{margin:0;font-size:1.05rem;color:#1565C0;font-weight:900;line-height:1.4;}
+.bk-card .desc{color:#666;font-size:.86rem;line-height:1.5;flex:1;}
+.bk-card .meta{font-size:.78rem;color:#888;}
+.bk-card .lock{display:inline-block;color:#FB8C00;font-weight:800;font-size:.82rem;}
+.bk-card .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.bk-btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#1565C0,#1E88E5);
+        color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.88rem;cursor:pointer;font-family:inherit;}
+.bk-btn:hover{box-shadow:0 4px 14px rgba(21,101,192,.3);}
+.bk-btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.bk-empty{background:#fff;border-radius:18px;padding:60px 24px;text-align:center;color:#666;
+          box-shadow:0 8px 24px rgba(107,63,160,.12);}
+.bk-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 الكتب — صفحة المعلمة</h1>
+  <div><a href="/teacher/hub">← العودة</a></div>
+</div>
+<div class="wrap">
+  __STAFF_NOTICE__
+  <div id="bk-list-box"><div class="bk-empty">جاري التحميل...</div></div>
+</div>
+<script>
+(function(){
+  function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function fmtSize(n){
+    if(!n) return '';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  fetch('/api/books/for-teacher',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      var box = document.getElementById('bk-list-box');
+      if(!j || !j.ok){ box.innerHTML='<div class="bk-empty">تعذر التحميل</div>'; return; }
+      var arr = j.books || [];
+      if(!arr.length){
+        box.innerHTML = '<div class="bk-empty"><span class="em-ic">📚</span>'+
+                        '<div>لا توجد كتب مخصصة لك حالياً.</div></div>';
+        return;
+      }
+      var html = '<div class="bk-grid">';
+      arr.forEach(function(e){
+        var lock = e.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+        var dl = e.can_download
+          ? '<a class="bk-btn dl" href="/api/books/' + e.id + '/download">⬇ تحميل</a>'
+          : '';
+        html += '<div class="bk-card">'+
+          '<span class="ic">📄</span>'+
+          '<h3>'+_esc(e.title)+'</h3>'+
+          '<div class="desc">'+_esc((e.description||'').slice(0,140))+((e.description||'').length>140?'...':'')+'</div>'+
+          '<div class="meta">'+_esc((e.uploaded_at||'').slice(0,10))+(e.file_size_bytes?(' · '+fmtSize(e.file_size_bytes)):'')+(lock?(' · '+lock):'')+'</div>'+
+          '<div class="acts">'+
+            '<a class="bk-btn" href="/api/books/'+e.id+'/view" target="_blank" rel="noopener">👁️ عرض</a>'+
+            dl +
+          '</div>'+
+        '</div>';
+      });
+      html += '</div>';
+      box.innerHTML = html;
+    })
+    .catch(function(){
+      document.getElementById('bk-list-box').innerHTML = '<div class="bk-empty">تعذر التحميل</div>';
+    });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/teacher/books')
+@login_required
+def teacher_books_v2_page():
+    user = session.get("user") or {}
+    role = (user.get("role") or "").strip().lower()
+    # Allow teachers always; admin / manager / books-allowlist can
+    # also peek (with the staff-notice banner) so they can verify
+    # what teachers see.
+    is_staff = _has_books_full_access(user)
+    if role != "teacher" and not is_staff:
+        return redirect("/dashboard")
+    notice = ""
+    if is_staff and role != "teacher":
+        notice = ('<div class="staff-notice">'
+                  '<span>⚠️ هذه الصفحة للمعلمات. اضغطي هنا لإدارة الكتب →</span>'
+                  '<a href="/admin/books">📚 إدارة الكتب</a>'
+                  '</div>')
+    return TEACHER_BOOKS_HTML.replace("__STAFF_NOTICE__", notice)
+
+
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
 # module (after the first injection pass at line ~30239). The shared
 # avatar helpers / picker modal live in mx-helpers.js, so any page that
