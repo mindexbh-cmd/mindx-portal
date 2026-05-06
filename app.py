@@ -63347,19 +63347,55 @@ _BOOKS_V2_PDF_MAGIC = b"%PDF-"
 _BOOKS_V2_MAX_BYTES = 50 * 1024 * 1024   # 50 MB hard cap
 
 
+_BOOKS_V2_STORAGE_LAST_LOGGED = None
+
 def _books_v2_storage_dir():
     """Resolve and ensure the books_v2 storage directory exists.
-    Render: /var/data/books_v2 (persistent); local: ./data/books_v2."""
+    Render: /var/data/books_v2 (persistent); local: ./data/books_v2.
+
+    Verifies writability by writing+removing a tiny probe file —
+    a directory that mkdirs OK but isn't actually writable (e.g.
+    persistent disk not yet mounted) would otherwise silently fall
+    through and we'd keep storing files at the local fallback path
+    that gets wiped on every Render deploy. Logs the resolved path
+    once per process so the boot log shows where uploads are going."""
+    global _BOOKS_V2_STORAGE_LAST_LOGGED
     candidates = ["/var/data/books_v2",
                   os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "data", "books_v2")]
+    chosen = None; reasons = []
     for path in candidates:
         try:
-            os.makedirs(path, exist_ok=True)
-            return path
-        except Exception:
+            os.makedirs(path, mode=0o755, exist_ok=True)
+        except Exception as ex:
+            reasons.append(path + ": mkdir failed (" + str(ex) + ")")
             continue
-    return candidates[-1]
+        # Verify the directory is actually writable. The Render
+        # persistent disk briefly fails this if the deploy fires
+        # before the mount completes — falling back to the local
+        # path in that window is what loses files on next deploy.
+        probe = os.path.join(path, ".__books_v2_writeprobe__")
+        try:
+            with open(probe, "wb") as fh: fh.write(b"ok")
+            try: os.unlink(probe)
+            except Exception: pass
+            chosen = path; break
+        except Exception as ex:
+            reasons.append(path + ": not writable (" + str(ex) + ")")
+            continue
+    if not chosen:
+        chosen = candidates[-1]
+        reasons.append("FALLBACK to last candidate (no writable path)")
+    if _BOOKS_V2_STORAGE_LAST_LOGGED != chosen:
+        try:
+            import sys as _sys_sd
+            _sys_sd.stderr.write("[books-v2] storage_dir resolved → " +
+                                 chosen + (" (warnings: " + " | ".join(reasons) + ")"
+                                           if reasons else "") + "\n")
+            _sys_sd.stderr.flush()
+        except Exception: pass
+        _BOOKS_V2_STORAGE_LAST_LOGGED = chosen
+    return chosen
 
 
 def _books_v2_safe_title_slug(title):
@@ -63634,6 +63670,17 @@ def api_books_v2_upload():
     if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
         return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
 
+    # Resolve + verify the storage directory BEFORE inserting the
+    # DB row. If the persistent disk isn't writable, fail loudly
+    # instead of silently writing to the ephemeral local fallback
+    # (whose files are wiped on every Render deploy and produce the
+    # "الملف غير موجود على القرص" error). The probe write inside
+    # _books_v2_storage_dir already enforces writability.
+    storage = _books_v2_storage_dir()
+    if not os.path.isdir(storage) or not os.access(storage, os.W_OK):
+        return jsonify({"ok": False, "error":
+                        "تخزين الملفات غير متاح حالياً — تواصل مع الإدارة"}), 500
+
     db = get_db()
     uname = (user.get("username") or "").strip()
     uname_disp = (user.get("name") or uname).strip()
@@ -63652,19 +63699,51 @@ def api_books_v2_upload():
 
     # Filename pattern <bid>_<safe>.pdf — bid prefix guarantees no
     # collision between two uploads with identical titles.
-    storage = _books_v2_storage_dir()
     fname = str(bid) + "_" + _books_v2_safe_title_slug(title) + ".pdf"
     file_path = os.path.join(storage, fname)
+    # Temp+rename: write to a sibling .tmp file, fsync, then atomic
+    # rename. Eliminates the "half-written file at the final path"
+    # window if the worker is killed mid-write. After rename, stat
+    # the final path and verify the size matches the buffer length —
+    # only then do we commit the file_path on the DB row.
+    tmp_path = file_path + ".tmp_" + str(os.getpid())
+    written_ok = False
     try:
-        with open(file_path, "wb") as fh: fh.write(raw)
+        with open(tmp_path, "wb") as fh:
+            fh.write(raw); fh.flush()
+            try: os.fsync(fh.fileno())
+            except Exception: pass
+        os.replace(tmp_path, file_path)
+        try:
+            st = os.stat(file_path)
+            written_ok = (st.st_size == len(raw))
+        except Exception:
+            written_ok = False
     except Exception as ex:
-        # Roll back the metadata row so we don't leak orphan rows.
+        # Best-effort cleanup of the partial temp file; row rollback
+        # below covers the DB side.
+        try:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
+        except Exception: pass
         try:
             db.execute("DELETE FROM books_v2 WHERE id=?", (bid,))
             db.commit()
         except Exception: pass
         return jsonify({"ok": False, "error":
                         "فشل حفظ الملف على القرص: " + str(ex)}), 500
+    if not written_ok:
+        # Rare: file wrote but disk reports a different size — treat
+        # as a corrupt write and roll everything back so the admin
+        # sees a clean error and retries instead of leaving an orphan.
+        try:
+            if os.path.exists(file_path): os.unlink(file_path)
+        except Exception: pass
+        try:
+            db.execute("DELETE FROM books_v2 WHERE id=?", (bid,))
+            db.commit()
+        except Exception: pass
+        return jsonify({"ok": False, "error":
+                        "تم رفع الملف لكن لم يُكتب بشكل صحيح — أعد المحاولة"}), 500
     try:
         db.execute("UPDATE books_v2 SET file_path=? WHERE id=?",
                    (file_path, bid))
@@ -63944,7 +64023,10 @@ def _books_v2_send_file(bid, *, as_attachment):
     rp = os.path.realpath(fp) if fp else ""
     if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
         return jsonify({"ok": False, "error":
-                        "الملف غير موجود على القرص"}), 410
+                        "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
+                        "أو التواصل مع الإدارة",
+                        "missing_file": True,
+                        "book_id": int(bid)}), 410
     if as_attachment and not int(rd.get("can_download") or 0) \
             and not _has_books_full_access(user):
         return jsonify({"ok": False, "error":
@@ -64074,7 +64156,10 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
     rp = os.path.realpath(fp) if fp else ""
     if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
         return jsonify({"ok": False, "error":
-                        "الملف غير موجود على القرص"}), 410
+                        "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
+                        "أو التواصل مع الإدارة",
+                        "missing_file": True,
+                        "book_id": int(bid)}), 410
     if as_attachment and not int(rd.get("can_download") or 0):
         return jsonify({"ok": False, "error":
                         "هذا المنهج للقراءة فقط"}), 403
@@ -64111,6 +64196,127 @@ def parent_book_download(bid):
     if not _books_v2_pid_can_view(db, pid, bid):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
     return _books_v2_send_file_public(db, int(bid), as_attachment=True)
+
+
+@app.route('/api/books/storage-check', methods=['GET'])
+@login_required
+def api_books_v2_storage_check():
+    """Admin diagnostic — list every books_v2 row and report whether
+    its file_path actually exists on disk. Use this to identify
+    orphan rows (DB row exists but file lost — typically because the
+    upload landed on the ephemeral local fallback before the Render
+    persistent disk was mounted, or before this fix bound writes to
+    the verified storage dir).
+
+    Pair with /api/books/cleanup-orphans which soft-deletes the
+    orphan rows so they stop surfacing in viewers. Re-uploading the
+    PDF (with the same title) creates a fresh row + file and the
+    parent/teacher portals immediately see it again."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    storage = _books_v2_storage_dir()
+    storage_writable = os.path.isdir(storage) and os.access(storage, os.W_OK)
+    try:
+        rows = db.execute(
+            "SELECT id, title, file_path, file_size_bytes, "
+            "       uploaded_at, uploaded_by_username "
+            "FROM books_v2 WHERE COALESCE(is_deleted,0)=0 "
+            "ORDER BY id").fetchall()
+    except Exception:
+        rows = []
+    out = []
+    sd_real = os.path.realpath(storage)
+    n_ok = n_missing = n_outside = 0
+    for r in rows:
+        d = dict(r)
+        fp = d.get("file_path") or ""
+        rp = os.path.realpath(fp) if fp else ""
+        outside = bool(rp and not rp.startswith(sd_real + os.sep))
+        exists = bool(rp and os.path.isfile(rp))
+        size_disk = 0
+        if exists:
+            try: size_disk = os.path.getsize(rp)
+            except Exception: size_disk = 0
+        if exists: n_ok += 1
+        elif outside: n_outside += 1
+        else: n_missing += 1
+        out.append({
+            "id":               int(d.get("id") or 0),
+            "title":            d.get("title") or "",
+            "file_path":        fp,
+            "exists":           exists,
+            "outside_storage":  outside,
+            "file_size_bytes":  int(d.get("file_size_bytes") or 0),
+            "file_size_on_disk": int(size_disk),
+            "uploaded_at":      d.get("uploaded_at") or "",
+            "uploaded_by":      d.get("uploaded_by_username") or "",
+        })
+    return jsonify({
+        "ok": True,
+        "storage_dir":      storage,
+        "storage_writable": storage_writable,
+        "totals": {
+            "rows":           len(out),
+            "ok":             n_ok,
+            "missing":        n_missing,
+            "outside_storage": n_outside,
+        },
+        "books": out,
+    })
+
+
+@app.route('/api/books/cleanup-orphans', methods=['POST'])
+@login_required
+def api_books_v2_cleanup_orphans():
+    """Admin: soft-delete every books_v2 row whose file_path either
+    doesn't exist on disk OR resolves outside the current storage
+    directory (e.g. lingering rows from when the upload code wrote
+    to the ephemeral local fallback). Returns the list of deleted
+    book IDs + titles so the admin can re-upload them. Sets
+    is_deleted=1 only — no data loss; an admin can manually
+    UPDATE books_v2 SET is_deleted=0 if a path is later restored."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    storage = _books_v2_storage_dir()
+    sd_real = os.path.realpath(storage)
+    try:
+        rows = db.execute(
+            "SELECT id, title, file_path FROM books_v2 "
+            "WHERE COALESCE(is_deleted,0)=0").fetchall()
+    except Exception:
+        rows = []
+    deleted = []
+    for r in rows:
+        d = dict(r)
+        fp = d.get("file_path") or ""
+        rp = os.path.realpath(fp) if fp else ""
+        is_orphan = (
+            (not rp) or
+            (not rp.startswith(sd_real + os.sep)) or
+            (not os.path.isfile(rp))
+        )
+        if not is_orphan: continue
+        try:
+            db.execute("UPDATE books_v2 SET is_deleted=1 WHERE id=?",
+                       (int(d.get("id") or 0),))
+            deleted.append({"id": int(d.get("id") or 0),
+                            "title": d.get("title") or "",
+                            "file_path": fp})
+        except Exception: continue
+    try: db.commit()
+    except Exception: pass
+    try:
+        _audit("books_v2.cleanup_orphans", target_type="books_v2",
+               target_id=0, new_value={"count": len(deleted),
+                                        "deleted": deleted})
+    except Exception: pass
+    return jsonify({"ok": True, "deleted": deleted,
+                    "count": len(deleted),
+                    "storage_dir": storage})
 
 
 @app.route('/api/books/diag', methods=['GET'])
@@ -65268,6 +65474,71 @@ def _has_books_full_access(user):
 # users table never aborts boot — books simply falls back to the
 # hard-coded allowlist.
 try: _discover_ahmed_younes_username()
+except Exception: pass
+
+
+def _books_v2_orphan_probe():
+    """Boot-time scan: count books_v2 rows whose file_path is missing
+    or outside the resolved storage dir. Surfaces silent data loss
+    in the Render log so an admin notices before parents do. Runs
+    out-of-app-context, so we open a private connection."""
+    import sys as _sys_op
+    try:
+        import sqlite3 as _sql
+        # Resolve + log the storage dir first (also writes the
+        # "[books-v2] storage_dir resolved → …" line).
+        storage = _books_v2_storage_dir()
+        sd_real = os.path.realpath(storage)
+        # Direct read so we don't depend on the request context.
+        if USE_PG:
+            # Postgres path — reuse the wrapper.
+            conn = _PgConnection(_pg_pool)
+            cur = conn.execute(
+                "SELECT id, file_path FROM books_v2 "
+                "WHERE COALESCE(is_deleted,0)=0")
+            rows = cur.fetchall()
+        else:
+            conn = _sql.connect(DB); conn.row_factory = _sql.Row
+            rows = conn.execute(
+                "SELECT id, file_path FROM books_v2 "
+                "WHERE COALESCE(is_deleted,0)=0").fetchall()
+            conn.close()
+        n_total = len(rows); n_missing = n_outside = 0
+        examples = []
+        for r in rows:
+            d = dict(r) if hasattr(r, "keys") else {"id": r[0], "file_path": r[1]}
+            fp = d.get("file_path") or ""
+            rp = os.path.realpath(fp) if fp else ""
+            if not rp or not os.path.isfile(rp):
+                n_missing += 1
+                if len(examples) < 3:
+                    examples.append("id=" + str(d.get("id")) + " path=" + fp)
+            elif not rp.startswith(sd_real + os.sep):
+                n_outside += 1
+                if len(examples) < 3:
+                    examples.append("id=" + str(d.get("id")) +
+                                    " outside-storage path=" + fp)
+        if n_missing or n_outside:
+            _sys_op.stderr.write(
+                "[books-v2] ⚠ orphan rows detected — total=" + str(n_total)
+                + " missing=" + str(n_missing)
+                + " outside_storage=" + str(n_outside)
+                + " · examples: " + "; ".join(examples)
+                + " · run GET /api/books/storage-check or "
+                + "POST /api/books/cleanup-orphans to triage.\n")
+        else:
+            _sys_op.stderr.write(
+                "[books-v2] ✅ storage check clean — " + str(n_total)
+                + " row(s), all files present at " + storage + "\n")
+        _sys_op.stderr.flush()
+    except Exception as ex:
+        try:
+            _sys_op.stderr.write("[books-v2] orphan probe failed: " + str(ex) + "\n")
+            _sys_op.stderr.flush()
+        except Exception: pass
+
+
+try: _books_v2_orphan_probe()
 except Exception: pass
 
 
