@@ -399,6 +399,193 @@ def _seed_violations_catalog(db):
         pass
 
 
+# ── violations_settings — escalation rules + semester boundary ─────
+# Stored as key/value rows so admins can change thresholds + the
+# semester start date without a code change. Seeded once per fresh
+# table; never overwritten if the row already exists (so admin
+# edits survive deploys). Keys we use:
+#
+#   semester_start_date         ISO YYYY-MM-DD; counts before this
+#                               date are excluded from escalation.
+#   escalation_light_to_medium  N: every N light violations → 1 medium
+#   escalation_medium_to_severe N: every N medium violations → 1 severe
+#   escalation_auto_apply       "1" / "0" — when 1, the smart picker
+#                               surfaces the escalated severity as
+#                               the suggested action; when 0, it
+#                               surfaces only the original.
+_VIO_SETTINGS_DEFAULTS = {
+    "semester_start_date":          "2026-01-01",
+    "escalation_light_to_medium":   "3",
+    "escalation_medium_to_severe":  "3",
+    "escalation_auto_apply":        "1",
+}
+
+
+def _seed_violations_settings(db):
+    """Insert any missing default settings rows. Never overwrites
+    existing rows so admin edits survive re-runs."""
+    for k, v in _VIO_SETTINGS_DEFAULTS.items():
+        try:
+            row = db.execute(
+                "SELECT 1 FROM violations_settings WHERE key=?", (k,)
+            ).fetchone()
+        except Exception:
+            row = None
+        if not row:
+            try:
+                db.execute(
+                    "INSERT INTO violations_settings(key, value) VALUES(?,?)",
+                    (k, v),
+                )
+            except Exception:
+                pass
+    try:
+        db.commit()
+    except Exception:
+        pass
+
+
+def _vio_get_setting(db, key, default=None):
+    try:
+        row = db.execute(
+            "SELECT value FROM violations_settings WHERE key=?", (key,)
+        ).fetchone()
+        if row is None:
+            return default
+        v = row[0] if not hasattr(row, "keys") else row["value"]
+        return v if v is not None else default
+    except Exception:
+        return default
+
+
+def _vio_set_setting(db, key, value):
+    """Upsert one settings row. Returns True on success."""
+    try:
+        # Upsert via two-step (works on SQLite + Postgres without
+        # relying on dialect-specific ON CONFLICT, which the wrapper
+        # doesn't translate for us here).
+        cur = db.execute(
+            "UPDATE violations_settings SET value=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE key=?",
+            (str(value), key),
+        )
+        rc = getattr(cur, "rowcount", 0) or 0
+        if rc <= 0:
+            db.execute(
+                "INSERT INTO violations_settings(key, value) VALUES(?,?)",
+                (key, str(value)),
+            )
+        try: db.commit()
+        except Exception: pass
+        return True
+    except Exception:
+        return False
+
+
+def _vio_get_escalation_rules(db):
+    """Returns the 4 escalation knobs as a typed dict. Falls back
+    to the seed defaults whenever a row is missing or unparseable."""
+    out = {}
+    out["semester_start_date"] = (
+        _vio_get_setting(db, "semester_start_date",
+                         _VIO_SETTINGS_DEFAULTS["semester_start_date"])
+        or _VIO_SETTINGS_DEFAULTS["semester_start_date"])
+    def _int(k, mn=1):
+        try:
+            v = int(_vio_get_setting(db, k, _VIO_SETTINGS_DEFAULTS[k]))
+            return v if v >= mn else mn
+        except Exception:
+            return int(_VIO_SETTINGS_DEFAULTS[k])
+    out["escalation_light_to_medium"]  = _int("escalation_light_to_medium")
+    out["escalation_medium_to_severe"] = _int("escalation_medium_to_severe")
+    out["escalation_auto_apply"] = (
+        (_vio_get_setting(db, "escalation_auto_apply",
+                          _VIO_SETTINGS_DEFAULTS["escalation_auto_apply"])
+         or "1").strip() in ("1", "true", "True", "yes", "on"))
+    return out
+
+
+def _vio_compute_escalation(prior_light, prior_medium, prior_severe,
+                            original_severity, l_to_m, m_to_s):
+    """Given a student's prior counts at each ORIGINAL severity (within
+    the current semester) plus the new violation's original severity,
+    return a dict describing the escalation:
+
+      original_count       int — count at original tier including this one
+      effective_severity   "light" | "medium" | "severe"
+      effective_occurrence int — Nth time at the effective tier
+      was_escalated        bool
+
+    Algorithm (from the spec): every l_to_m light violations convert to
+    one virtual medium; every m_to_s mediums (real + converted)
+    convert to one virtual severe. The new violation is "effectively"
+    at whichever tier just gained an occurrence."""
+    pl = max(0, int(prior_light or 0))
+    pm = max(0, int(prior_medium or 0))
+    ps = max(0, int(prior_severe or 0))
+    l_to_m = max(1, int(l_to_m or 1))
+    m_to_s = max(1, int(m_to_s or 1))
+
+    cl, cm, cs = pl, pm, ps
+    if   original_severity == "light":  cl += 1
+    elif original_severity == "medium": cm += 1
+    elif original_severity == "severe": cs += 1
+
+    prior_total_medium = pm + (pl // l_to_m)
+    prior_total_severe = ps + (prior_total_medium // m_to_s)
+    cur_total_medium   = cm + (cl // l_to_m)
+    cur_total_severe   = cs + (cur_total_medium // m_to_s)
+
+    if cur_total_severe > prior_total_severe:
+        eff_sev = "severe"; eff_occ = cur_total_severe
+    elif cur_total_medium > prior_total_medium:
+        eff_sev = "medium"; eff_occ = cur_total_medium
+    else:
+        eff_sev = original_severity
+        if   original_severity == "light":  eff_occ = cl
+        elif original_severity == "medium": eff_occ = cm
+        elif original_severity == "severe": eff_occ = cs
+        else: eff_occ = 1
+
+    if   original_severity == "light":  orig_count = cl
+    elif original_severity == "medium": orig_count = cm
+    elif original_severity == "severe": orig_count = cs
+    else: orig_count = 1
+
+    return {
+        "original_count":       orig_count,
+        "effective_severity":   eff_sev,
+        "effective_occurrence": eff_occ,
+        "was_escalated":        eff_sev != original_severity,
+        "cur_light":  cl, "cur_medium": cm, "cur_severe": cs,
+        "prior_light": pl, "prior_medium": pm, "prior_severe": ps,
+    }
+
+
+def _vio_count_prior_by_severity(db, student_id, semester_start_iso):
+    """Returns (light, medium, severe) counts of NON-deleted prior
+    violations for this student since the semester start. Empty
+    student_id → all zeros."""
+    out = {"light": 0, "medium": 0, "severe": 0}
+    if not student_id:
+        return out
+    try:
+        rows = db.execute(
+            "SELECT LOWER(COALESCE(severity,'')) AS sev, COUNT(*) AS c "
+            "FROM violations WHERE student_id=? AND is_deleted=0 "
+            "AND violation_date >= ? GROUP BY LOWER(COALESCE(severity,''))",
+            (int(student_id), semester_start_iso),
+        ).fetchall()
+        for r in rows:
+            sev = (r["sev"] if hasattr(r, "keys") else r[0]) or ""
+            c   = int((r["c"]   if hasattr(r, "keys") else r[1]) or 0)
+            if sev in out:
+                out[sev] = c
+    except Exception:
+        pass
+    return out
+
+
 def init_db():
     # ── CRITICAL DATA SAFETY RULE ────────────────────────────────────
     # This function MUST be idempotent and non-destructive:
@@ -1172,8 +1359,21 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""")
     except Exception: pass
+    # ── violations_escalation_v1: cross-severity escalation rules.
+    # Simple key/value store so admins can change thresholds + the
+    # semester boundary without a code change. Defaults: every 3 light
+    # violations escalate to 1 medium; every 3 medium escalate to 1
+    # severe; counts reset at semester_start_date.
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS violations_settings(
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
     try:
         _seed_violations_catalog(db)
+        _seed_violations_settings(db)
     except Exception: pass
     # ── ev_events: trips & events v2 — single-page-per-event design.
     # Replaces the old multi-table trips system (which was reverted).
@@ -6781,6 +6981,17 @@ if True:
             is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""")
+    except Exception: pass
+    # ── violations_escalation_v1: see init_db() for canonical CREATE.
+    try:
+        db2.execute("""CREATE TABLE IF NOT EXISTS violations_settings(
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+    except Exception: pass
+    try:
+        _seed_violations_settings(db2)
     except Exception: pass
     if "violations_catalog_v1" not in applied:
         try:
@@ -46217,14 +46428,86 @@ def api_violations_catalog_get(cid):
     return jsonify({"ok": True, "item": _vio_catalog_row_to_dict(row)})
 
 
+_VIO_SEV_LABEL_AR = {"light": "خفيفة", "medium": "متوسطة", "severe": "خطيرة"}
+_VIO_SEV_DEFAULTS_BY_KEY = {
+    # Same defaults as the catalog seed; used for the "escalated"
+    # suggestion when a violation jumps tiers and we need a generic
+    # action for the new tier (the catalog row is at the original
+    # tier, so its actions don't apply to the higher tier).
+    "light":  ("تنبيه الطالب وتوجيهه + رسالة لولي الأمر",
+               "أخذ تعهد كتابي + إبلاغ ولي الأمر بالاتصال",
+               "تحويل للمرشد الاجتماعي + إبلاغ الإدارة"),
+    "medium": ("تنبيه + رسالة نصية لولي الأمر + رصد المخالفة",
+               "أخذ تعهد كتابي + استدعاء ولي الأمر",
+               "تحويل للمرشد + استدعاء الإدارة + اتخاذ إجراء"),
+    "severe": ("إنذار + استدعاء ولي الأمر + تعهد كتابي",
+               "إيقاف يوم/يومين + تحويل للمرشد + الإدارة",
+               "إيقاف فصل دراسي + قرار من الإدارة"),
+}
+
+
+def _vio_pick_catalog_action(catalog, occurrence):
+    """Pick one of the three catalog action fields based on occurrence
+    + the catalog's own thresholds. Used for non-escalated suggestions
+    AND for the alternative action shown when escalation flipped."""
+    t2 = int(catalog.get("repeat_threshold_2nd") or 0)
+    t3 = int(catalog.get("repeat_threshold_3rd") or 0)
+    if t3 >= 1 and occurrence >= t3:
+        return catalog.get("action_third_time") or ""
+    if t2 >= 1 and occurrence >= t2:
+        return catalog.get("action_second_time") or ""
+    return catalog.get("action_first_time") or ""
+
+
+def _vio_pick_severity_default(severity, occurrence):
+    """Generic action for a tier when we can't use the catalog row
+    (the catalog is at the original tier, escalation jumped tiers)."""
+    triple = _VIO_SEV_DEFAULTS_BY_KEY.get(severity, _VIO_SEV_DEFAULTS_BY_KEY["light"])
+    if occurrence >= 3: return triple[2]
+    if occurrence >= 2: return triple[1]
+    return triple[0]
+
+
+def _vio_build_escalation_explanation(esc, l_to_m, m_to_s):
+    """One-sentence Arabic explanation of how the escalation collapsed
+    light→medium / medium→severe counts. Returns "" when nothing
+    escalated."""
+    if not esc.get("was_escalated"):
+        return ""
+    cl, cm, cs = esc["cur_light"], esc["cur_medium"], esc["cur_severe"]
+    eff = esc["effective_severity"]
+    eff_lbl = _VIO_SEV_LABEL_AR.get(eff, eff)
+    if eff == "medium":
+        med_from_light = cl // l_to_m
+        return ("كل {n} مخالفات خفيفة تعادل 1 متوسطة. "
+                "{cl} مخالفات خفيفة تم تحويلها إلى {mfl} متوسطة. "
+                "هذه هي المخالفة المتوسطة رقم {occ} ({lbl}).".format(
+                    n=l_to_m, cl=cl, mfl=med_from_light,
+                    occ=esc["effective_occurrence"], lbl=eff_lbl))
+    if eff == "severe":
+        med_from_light = cl // l_to_m
+        total_med = cm + med_from_light
+        sev_from_med = total_med // m_to_s
+        return ("كل {nm} مخالفات متوسطة تعادل 1 خطيرة. "
+                "{tm} مخالفات متوسطة (منها {mfl} محوّلة من خفيفة) "
+                "تم تحويلها إلى {sfm} خطيرة. هذه هي المخالفة الخطيرة "
+                "رقم {occ} ({lbl}).".format(
+                    nm=m_to_s, tm=total_med, mfl=med_from_light,
+                    sfm=sev_from_med, occ=esc["effective_occurrence"],
+                    lbl=eff_lbl))
+    return ""
+
+
 @app.route("/api/violations-catalog/<int:cid>/suggestion", methods=["GET"])
 @login_required
 def api_violations_catalog_suggestion(cid):
-    """Smart-suggestion: how many times has this student already been
-    recorded with THIS catalog entry, and which action to suggest next?
+    """Smart-suggestion: returns BOTH the original-tier counts AND the
+    escalation-effective tier, with explanation + alternative action
+    so the smart picker can show "this light is effectively a medium
+    because the student already has 2 prior lights".
 
-    Counts only same-academic-year non-deleted violations.
-    Falls back to 0 / first-time action if no student_id supplied."""
+    Counts use the configured semester boundary; falls back to the
+    Sep-1 academic year if the setting is missing/invalid."""
     db = get_db()
     try:
         row = db.execute(
@@ -46242,12 +46525,20 @@ def api_violations_catalog_suggestion(cid):
         try: sid = int(sid_raw)
         except Exception: sid = None
 
-    # Academic year window: the school year is roughly Sep→Aug.
-    # Use Sep 1 of the current or prior calendar year as the floor.
-    from datetime import date as _date
-    today = _date.today()
-    year_floor = _date(today.year if today.month >= 9 else today.year - 1, 9, 1).isoformat()
+    rules = _vio_get_escalation_rules(db)
+    sem_start = rules["semester_start_date"]
+    # Defensive — if sem_start somehow isn't ISO, fall back to Sep-1
+    # so the WHERE clause stays valid.
+    try:
+        from datetime import datetime as _dt2
+        _dt2.strptime(sem_start, "%Y-%m-%d")
+    except Exception:
+        from datetime import date as _date
+        today = _date.today()
+        sem_start = _date(today.year if today.month >= 9 else today.year - 1, 9, 1).isoformat()
 
+    # Same-catalog occurrence count + dates (used for non-escalated
+    # suggestions and for surfacing the dates inline).
     previous_count = 0
     previous_dates = []
     if sid is not None:
@@ -46257,7 +46548,7 @@ def api_violations_catalog_suggestion(cid):
                 "WHERE student_id=? AND catalog_id=? AND is_deleted=0 "
                 "AND violation_date >= ? "
                 "ORDER BY violation_date ASC",
-                (sid, cid, year_floor),
+                (sid, cid, sem_start),
             ).fetchall()
             for r in rows:
                 vd = r[0] if not hasattr(r, "keys") else r["violation_date"]
@@ -46268,25 +46559,159 @@ def api_violations_catalog_suggestion(cid):
             previous_count = 0
             previous_dates = []
 
-    occurrence_number = previous_count + 1
+    # Cross-tier counts since semester start.
+    by_sev = _vio_count_prior_by_severity(db, sid, sem_start)
+    original_severity = (catalog.get("severity") or "").lower()
+    esc = _vio_compute_escalation(
+        by_sev["light"], by_sev["medium"], by_sev["severe"],
+        original_severity,
+        rules["escalation_light_to_medium"],
+        rules["escalation_medium_to_severe"],
+    )
+
+    # The catalog's same-row occurrence is independent of the
+    # cross-tier escalation; expose it so the UI can still say
+    # "this is the 3rd time for THIS specific violation".
+    same_catalog_occurrence = previous_count + 1
     threshold_2nd = int(catalog.get("repeat_threshold_2nd") or 0)
     threshold_3rd = int(catalog.get("repeat_threshold_3rd") or 0)
-    if threshold_3rd >= 1 and occurrence_number >= threshold_3rd:
-        suggested = catalog.get("action_third_time") or ""
-    elif threshold_2nd >= 1 and occurrence_number >= threshold_2nd:
-        suggested = catalog.get("action_second_time") or ""
+
+    # Suggested action: use the escalated tier defaults if escalated
+    # AND the auto-apply flag is on. Otherwise stick with the catalog
+    # row's own actions at the same-catalog occurrence.
+    auto_apply = bool(rules.get("escalation_auto_apply"))
+    if esc["was_escalated"] and auto_apply:
+        suggested = _vio_pick_severity_default(
+            esc["effective_severity"], esc["effective_occurrence"])
     else:
-        suggested = catalog.get("action_first_time") or ""
+        suggested = _vio_pick_catalog_action(catalog, same_catalog_occurrence)
+
+    # Alternative = the catalog's own action at the same-catalog
+    # occurrence. Surfaced so the user can override the escalated
+    # suggestion with one click.
+    alternative = _vio_pick_catalog_action(catalog, same_catalog_occurrence)
+
+    explanation = _vio_build_escalation_explanation(
+        esc, rules["escalation_light_to_medium"],
+        rules["escalation_medium_to_severe"])
 
     return jsonify({
         "ok": True,
         "catalog": catalog,
-        "previous_count": previous_count,
-        "occurrence_number": occurrence_number,
-        "suggested_action": suggested,
-        "threshold_2nd": threshold_2nd,
-        "threshold_3rd": threshold_3rd,
-        "previous_dates": previous_dates,
+
+        # Catalog-row occurrence (legacy clients that don't know about
+        # escalation can keep using these fields and behave like before).
+        "previous_count":     previous_count,
+        "occurrence_number":  same_catalog_occurrence,
+        "previous_dates":     previous_dates,
+        "threshold_2nd":      threshold_2nd,
+        "threshold_3rd":      threshold_3rd,
+        "suggested_action":   suggested,
+
+        # New escalation fields
+        "original_severity":     original_severity,
+        "original_count":        esc["original_count"],
+        "effective_severity":    esc["effective_severity"],
+        "effective_occurrence":  esc["effective_occurrence"],
+        "was_escalated":         esc["was_escalated"],
+        "escalation_explanation": explanation,
+        "alternative_action":    alternative,
+        "rules": {
+            "light_to_medium":   rules["escalation_light_to_medium"],
+            "medium_to_severe":  rules["escalation_medium_to_severe"],
+            "auto_apply":        auto_apply,
+            "semester_start":    sem_start,
+        },
+        "by_severity": by_sev,
+    })
+
+
+# ── /api/violations-escalation-rules — admin CRUD on the rules ──────
+# Read endpoint is open to any logged-in user (the smart picker reads
+# rules to render the explanation panel). Update endpoint is gated
+# by the catalog admin allowlist.
+@app.route("/api/violations-escalation-rules", methods=["GET"])
+@login_required
+def api_violations_escalation_rules_get():
+    db = get_db()
+    rules = _vio_get_escalation_rules(db)
+    return jsonify({"ok": True, "rules": rules})
+
+
+@app.route("/api/violations-escalation-rules", methods=["PUT"])
+@login_required
+def api_violations_escalation_rules_put():
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    saved = {}
+    if "semester_start_date" in data:
+        v = ("" if data.get("semester_start_date") is None
+             else str(data.get("semester_start_date"))).strip()
+        try:
+            from datetime import datetime as _dt
+            _dt.strptime(v, "%Y-%m-%d")
+        except Exception:
+            return jsonify({"ok": False,
+                "error": "صيغة تاريخ بداية الفصل غير صحيحة (YYYY-MM-DD)"}), 400
+        _vio_set_setting(db, "semester_start_date", v)
+        saved["semester_start_date"] = v
+    for k in ("escalation_light_to_medium", "escalation_medium_to_severe"):
+        if k in data:
+            try:
+                iv = int(data.get(k))
+            except Exception:
+                return jsonify({"ok": False,
+                    "error": "العتبات يجب أن تكون أرقاماً صحيحة"}), 400
+            if iv < 1:
+                return jsonify({"ok": False,
+                    "error": "العتبات يجب أن تكون 1 أو أكثر"}), 400
+            _vio_set_setting(db, k, str(iv))
+            saved[k] = iv
+    if "escalation_auto_apply" in data:
+        v = data.get("escalation_auto_apply")
+        bv = "1" if (v is True or v in (1, "1", "true", "True", "yes", "on")) else "0"
+        _vio_set_setting(db, "escalation_auto_apply", bv)
+        saved["escalation_auto_apply"] = (bv == "1")
+    return jsonify({"ok": True, "saved": saved,
+                    "rules": _vio_get_escalation_rules(db)})
+
+
+@app.route("/api/violations-escalation-rules/preview", methods=["GET"])
+@login_required
+def api_violations_escalation_rules_preview():
+    """For a given student, return their current per-tier counts +
+    the resulting escalation tally (how many medium-equivalents and
+    severe-equivalents they've accumulated this semester). Does NOT
+    project a hypothetical new violation — that's what /suggestion
+    is for."""
+    db = get_db()
+    sid_raw = request.args.get("student_id") or ""
+    try: sid = int(sid_raw)
+    except Exception: sid = None
+    if not sid:
+        return jsonify({"ok": False, "error": "student_id مطلوب"}), 400
+    rules = _vio_get_escalation_rules(db)
+    by_sev = _vio_count_prior_by_severity(db, sid, rules["semester_start_date"])
+    l_to_m = rules["escalation_light_to_medium"]
+    m_to_s = rules["escalation_medium_to_severe"]
+    medium_from_light = by_sev["light"] // l_to_m
+    total_medium      = by_sev["medium"] + medium_from_light
+    severe_from_med   = total_medium // m_to_s
+    total_severe      = by_sev["severe"] + severe_from_med
+    return jsonify({
+        "ok": True,
+        "student_id":   sid,
+        "by_severity":  by_sev,
+        "rules":        rules,
+        "escalation": {
+            "medium_from_light": medium_from_light,
+            "total_medium":      total_medium,
+            "severe_from_medium": severe_from_med,
+            "total_severe":      total_severe,
+        },
     })
 
 
