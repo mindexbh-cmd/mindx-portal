@@ -340,6 +340,120 @@ _VIOLATIONS_TEMPLATES_SEED = [
     "إخبار الإدارة لاتخاذ القرار المناسب",
 ]
 
+# Categorisation for the original 15 — applied as a one-time UPDATE
+# during the violations_action_templates_categories_v1 migration.
+_VIOLATIONS_TEMPLATES_CATEGORY_MAP = {
+    "تنبيه الطالب وتوجيهه":               "تنبيهية",
+    "إرسال رسالة نصية لولي الأمر":         "تواصل",
+    "أخذ تعهد كتابي":                      "تعهدات",
+    "استدعاء ولي الأمر":                   "تواصل",
+    "تحويل للمرشد الاجتماعي":              "تحويلات",
+    "تحويل لإدارة المعهد":                 "تحويلات",
+    "إيقاف يوم دراسي":                     "إيقاف",
+    "إيقاف 3-5 أيام":                      "إيقاف",
+    "إيقاف فصل دراسي كامل":                "إيقاف",
+    "حرمان من الأنشطة الترفيهية":          "حرمان",
+    "إلزام بدفع قيمة التلفيات":            "مالية",
+    "مصادرة الجهاز":                       "أخرى",
+    "إعادة المسروقات أو دفع قيمتها":       "أخرى",
+    "رصد المخالفة في سجل الطالب":          "تنبيهية",
+    "إخبار الإدارة لاتخاذ القرار المناسب": "تحويلات",
+}
+
+# Additional templates added in the categories expansion. Each tuple
+# is (text, category). 27 entries across 8 categories. Insertion is
+# best-effort per row — duplicates against the UNIQUE template_text
+# are silently skipped so re-runs never fail.
+_VIOLATIONS_TEMPLATES_NEW = [
+    # تنبيهية (4)
+    ("تنبيه شفهي",                                 "تنبيهية"),
+    ("توجيه ونصح",                                 "تنبيهية"),
+    ("تنبيه مع تذكير بالقوانين",                  "تنبيهية"),
+    ("إنذار شديد",                                 "تنبيهية"),
+    # تواصل (2)
+    ("اتصال هاتفي بولي الأمر",                    "تواصل"),
+    ("إرسال تقرير كتابي لولي الأمر",              "تواصل"),
+    # تعهدات (3)
+    ("تعهد شفهي على الطالب",                       "تعهدات"),
+    ("تعهد كتابي مشترك (طالب + ولي الأمر)",        "تعهدات"),
+    ("تعهد رسمي من الإدارة",                       "تعهدات"),
+    # تحويلات (3 — brief mis-counted "(2 new)")
+    ("تحويل الطالب للمشرف",                        "تحويلات"),
+    ("تحويل لمجلس الإدارة",                        "تحويلات"),
+    ("اجتماع طارئ مع ولي الأمر",                   "تحويلات"),
+    # إيقاف (5)
+    ("إيقاف يومين دراسيين",                        "إيقاف"),
+    ("إيقاف أسبوع كامل",                           "إيقاف"),
+    ("إيقاف لمدة شهر",                             "إيقاف"),
+    ("فصل من الدورة",                              "إيقاف"),
+    ("فصل نهائي من المعهد",                        "إيقاف"),
+    # حرمان (4)
+    ("حرمان من الرحلات",                           "حرمان"),
+    ("حرمان من المسابقات",                         "حرمان"),
+    ("حرمان من الحفلات والمناسبات",                "حرمان"),
+    ("حرمان من جوائز التميز",                      "حرمان"),
+    # مالية (2)
+    ("إلزام بتعويض الممتلكات",                     "مالية"),
+    ("غرامة مالية رمزية",                          "مالية"),
+    # أخرى (4 — brief mis-counted "(3 new)")
+    ("حجز الجهاز لنهاية اليوم",                    "أخرى"),
+    ("حجز الجهاز عند الإدارة",                     "أخرى"),
+    ("اعتذار رسمي للمعني",                         "أخرى"),
+    ("خدمة مجتمعية داخل المعهد",                   "أخرى"),
+]
+
+# Display order for the popover sections. Categories not in this
+# list still render, but at the end alphabetically.
+_VIOLATIONS_TEMPLATES_CATEGORY_ORDER = [
+    "تنبيهية", "تواصل", "تعهدات", "تحويلات",
+    "إيقاف", "حرمان", "مالية", "أخرى",
+]
+
+
+def _seed_violations_templates_categories(db):
+    """One-time migration: backfill `category` on the original 15
+    templates and insert the new 27 (categorized). Idempotent —
+    re-running is a no-op because each existing row's category is
+    only updated if currently '' / NULL / 'general', and new rows
+    use try/except over the UNIQUE template_text constraint."""
+    # 1. Update existing rows
+    for txt, cat in _VIOLATIONS_TEMPLATES_CATEGORY_MAP.items():
+        try:
+            db.execute(
+                "UPDATE violations_action_templates SET category=? "
+                "WHERE template_text=? "
+                "AND (category IS NULL OR category='' OR category='general')",
+                (cat, txt),
+            )
+        except Exception:
+            pass
+    # 2. Insert new rows. sort_order picks up where existing rows
+    # left off so the popover stays in seed order.
+    try:
+        row = db.execute(
+            "SELECT MAX(sort_order) FROM violations_action_templates"
+        ).fetchone()
+        next_order = int(((row[0] if row else 0) or 0)) + 1
+    except Exception:
+        next_order = 100
+    for txt, cat in _VIOLATIONS_TEMPLATES_NEW:
+        try:
+            db.execute(
+                "INSERT INTO violations_action_templates("
+                "template_text, category, sort_order) VALUES(?,?,?)",
+                (txt, cat, next_order),
+            )
+            next_order += 1
+        except Exception:
+            # Duplicate template_text or other constraint hit — best-
+            # effort; the existing row's category was already
+            # backfilled (or will be on next run).
+            pass
+    try:
+        db.commit()
+    except Exception:
+        pass
+
 
 def _seed_violations_catalog(db):
     """Insert the 32 default violations + 15 templates if their
@@ -1354,6 +1468,7 @@ def init_db():
         db.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             template_text TEXT NOT NULL UNIQUE,
+            category TEXT DEFAULT 'general',
             sort_order INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -1374,6 +1489,7 @@ def init_db():
     try:
         _seed_violations_catalog(db)
         _seed_violations_settings(db)
+        _seed_violations_templates_categories(db)
     except Exception: pass
     # ── ev_events: trips & events v2 — single-page-per-event design.
     # Replaces the old multi-table trips system (which was reverted).
@@ -6977,11 +7093,24 @@ if True:
         db2.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             template_text TEXT NOT NULL UNIQUE,
+            category TEXT DEFAULT 'general',
             sort_order INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""")
     except Exception: pass
+    # category column was added later — best-effort ALTER for existing DBs.
+    try:
+        t_cols = [r[1] for r in db2.execute(
+            "PRAGMA table_info(violations_action_templates)").fetchall()]
+    except Exception:
+        t_cols = []
+    if "category" not in t_cols:
+        try:
+            db2.execute(
+                "ALTER TABLE violations_action_templates "
+                "ADD COLUMN category TEXT DEFAULT 'general'")
+        except Exception: pass
     # ── violations_escalation_v1: see init_db() for canonical CREATE.
     try:
         db2.execute("""CREATE TABLE IF NOT EXISTS violations_settings(
@@ -7022,6 +7151,22 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("violations_catalog_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── violations_action_templates_categories_v1: backfill the
+    # `category` column on the original 15 templates and insert the
+    # 27 new ones. Idempotent at the row level (UPDATE only fires
+    # when category is unset; INSERT is wrapped in try/except over
+    # the UNIQUE template_text constraint), so the migration tag is
+    # purely an optimisation that skips the work after first run.
+    if "violations_action_templates_categories_v1" not in applied:
+        try:
+            _seed_violations_templates_categories(db2)
+        except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("violations_action_templates_categories_v1",))
             db2.commit()
         except Exception: pass
 
@@ -43799,8 +43944,31 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vcc-tpl-list-item button{background:#FFEBEE;color:#C62828;border:none;
                           padding:3px 8px;border-radius:6px;font-weight:700;
                           font-family:inherit;cursor:pointer;font-size:.8rem;}
-.vcc-tpl-add-row{display:flex;gap:8px;margin-top:10px;}
-.vcc-tpl-add-row input{flex:1;}
+.vcc-tpl-add-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.vcc-tpl-add-row input{flex:1;min-width:140px;}
+.vcc-tpl-add-row select{padding:8px 11px;border:1.5px solid #d8c8ec;
+  border-radius:8px;font-family:inherit;font-size:.9rem;background:#fafafe;
+  font-weight:700;color:#4a148c;}
+
+/* ── Categorised popover + manager (Commit: templates expansion) ── */
+.vcc-tpl-search-wrap{padding:8px;background:#faf8fd;
+  border-bottom:1px solid #ece4f8;position:sticky;top:0;z-index:1;}
+.vcc-tpl-search{width:100%;padding:7px 10px;border:1.5px solid #d8c8ec;
+  border-radius:7px;font-family:inherit;font-size:.88rem;background:#fff;}
+.vcc-tpl-search:focus{outline:none;border-color:#8B5CC8;}
+.vcc-tpl-body{max-height:240px;overflow:auto;}
+.vcc-tpl-cat-head, .vcc-tpl-mgr-cat-head{
+  display:flex;align-items:center;gap:6px;padding:7px 12px;
+  background:#f3e5f5;border-top:1px solid #ece4f8;
+  border-bottom:1px solid #ece4f8;
+  font-weight:900;color:#4a148c;font-size:.82rem;}
+.vcc-tpl-cat-head:first-child, .vcc-tpl-mgr-cat-head:first-child{border-top:none;}
+.vcc-tpl-cat-pill{background:#fff;color:#4a148c;border:1px solid #c8a8e8;
+  padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:800;}
+.vcc-tpl-cat-count{margin-right:auto;color:#888;font-size:.78rem;
+  font-weight:700;}
+.vcc-tpl-row-cat{font-size:.72rem;color:#7E57C2;background:#f3e5f5;
+  padding:2px 8px;border-radius:999px;font-weight:700;flex-shrink:0;}
 
 /* ── Escalation rules card (Commit 2 of escalation) ──────────── */
 .vcc-esc-card{background:#fff;border-radius:14px;padding:18px 20px;
@@ -43967,6 +44135,16 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       </div>
       <div class="vcc-tpl-add-row">
         <input type="text" id="vcc-tpl-add-input" placeholder="أضف قالب جديد...">
+        <select id="vcc-tpl-add-cat" title="التصنيف">
+          <option value="تنبيهية">تنبيهية</option>
+          <option value="تواصل">تواصل</option>
+          <option value="تعهدات">تعهدات</option>
+          <option value="تحويلات">تحويلات</option>
+          <option value="إيقاف">إيقاف</option>
+          <option value="حرمان">حرمان</option>
+          <option value="مالية">مالية</option>
+          <option value="أخرى" selected>أخرى</option>
+        </select>
         <button type="button" class="vcc-btn vcc-btn-ghost" id="vcc-tpl-add-btn">➕ إضافة</button>
       </div>
     </details>
@@ -44086,11 +44264,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       });
   }
 
+  // Templates state — `_templates` is the flat list (legacy);
+  // `_templatesByCatList` is the canonical-ordered list of
+  // {name, items} for display. `_templatesByCat` is kept as a
+  // {name → items} dict for O(1) lookup but is NOT iterated for
+  // display (key order isn't guaranteed across Flask versions).
+  var _templatesByCat = {};
+  var _templatesByCatList = [];
   function loadTemplates(){
     fetch('/api/violations-action-templates', {credentials:'same-origin'})
       .then(function(r){ return r.json(); })
       .then(function(d){
         _templates = (d && d.items) || [];
+        _templatesByCat = (d && d.by_category) || {};
+        _templatesByCatList = (d && d.by_category_list) || [];
         renderTemplatesManager();
       })
       .catch(function(){});
@@ -44284,17 +44471,42 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   function renderTemplatesManager(){
     var c = document.getElementById('vcc-tpl-manage-body');
     if (!c) return;
-    if (!_templates.length){
+    var groups = _templatesByCatList || [];
+    if (!_templates.length && !groups.length){
       c.innerHTML = '<div class="vcc-empty" style="padding:14px;">لا توجد قوالب بعد</div>';
       return;
     }
     var html = '';
-    for (var i = 0; i < _templates.length; i++){
-      var t = _templates[i];
-      html += '<div class="vcc-tpl-list-item" data-tpl-id="' + escapeHtml(t.id) + '">' +
-              '<span style="flex:1;">' + escapeHtml(t.template_text) + '</span>' +
-              '<button type="button" class="vcc-act-tpl-del">🗑️</button>' +
-              '</div>';
+    if (groups.length){
+      // Category-grouped rendering using the API's canonical order.
+      // Each row carries a small category pill so the user knows
+      // which bucket it lives in even after scrolling.
+      for (var i = 0; i < groups.length; i++){
+        var cat  = groups[i].name || 'general';
+        var rows = groups[i].items || [];
+        if (!rows.length) continue;
+        html += '<div class="vcc-tpl-mgr-cat-head">' +
+                '<span class="vcc-tpl-cat-pill">' + escapeHtml(cat) + '</span>' +
+                '<span class="vcc-tpl-cat-count">' + rows.length + '</span>' +
+                '</div>';
+        for (var j = 0; j < rows.length; j++){
+          var t = rows[j];
+          html += '<div class="vcc-tpl-list-item" data-tpl-id="' + escapeHtml(t.id) + '">' +
+                  '<span style="flex:1;">' + escapeHtml(t.template_text) + '</span>' +
+                  '<span class="vcc-tpl-row-cat">' + escapeHtml(cat) + '</span>' +
+                  '<button type="button" class="vcc-act-tpl-del">🗑️</button>' +
+                  '</div>';
+        }
+      }
+    } else {
+      // Legacy fallback (very old API without by_category_list).
+      for (var k = 0; k < _templates.length; k++){
+        var tt = _templates[k];
+        html += '<div class="vcc-tpl-list-item" data-tpl-id="' + escapeHtml(tt.id) + '">' +
+                '<span style="flex:1;">' + escapeHtml(tt.template_text) + '</span>' +
+                '<button type="button" class="vcc-act-tpl-del">🗑️</button>' +
+                '</div>';
+      }
     }
     c.innerHTML = html;
   }
@@ -44412,6 +44624,60 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   }
 
   // ── Template popovers ────────────────────────────────────────
+  function _renderTplPopoverBody(filter){
+    // Returns the HTML for the popover body filtered by `filter`
+    // (lowercase substring). Categories with no remaining matches
+    // are dropped. Iterates the API's canonical-ordered list so
+    // category order is deterministic.
+    var f = (filter || '').toLowerCase().trim();
+    var html = '';
+    var groups = _templatesByCatList || [];
+    if (!groups.length){
+      // Fallback to flat list if by_category_list is empty (very old API).
+      var flat = _templates;
+      if (f) flat = flat.filter(function(t){
+        return (t.template_text || '').toLowerCase().indexOf(f) >= 0;
+      });
+      if (!flat.length){
+        return '<div class="vcc-tpl-empty">' +
+               (f ? 'لا نتائج' : 'لا توجد قوالب') + '</div>';
+      }
+      return flat.map(function(t){
+        return '<div class="vcc-tpl-item" data-tpl-text="' +
+               escapeHtml(t.template_text) + '">' +
+               '➕ <span>' + escapeHtml(t.template_text) + '</span>' +
+               '</div>';
+      }).join('');
+    }
+    var anyShown = false;
+    for (var i = 0; i < groups.length; i++){
+      var cat = groups[i].name || 'general';
+      var rows = groups[i].items || [];
+      if (f) rows = rows.filter(function(t){
+        return (t.template_text || '').toLowerCase().indexOf(f) >= 0
+            || (cat || '').toLowerCase().indexOf(f) >= 0;
+      });
+      if (!rows.length) continue;
+      anyShown = true;
+      html += '<div class="vcc-tpl-cat-head">' +
+              '<span class="vcc-tpl-cat-pill">' + escapeHtml(cat) +
+              '</span><span class="vcc-tpl-cat-count">' + rows.length + '</span>' +
+              '</div>';
+      for (var j = 0; j < rows.length; j++){
+        var t = rows[j];
+        html += '<div class="vcc-tpl-item" data-tpl-text="' +
+                escapeHtml(t.template_text) + '">' +
+                '➕ <span>' + escapeHtml(t.template_text) + '</span>' +
+                '</div>';
+      }
+    }
+    if (!anyShown){
+      html = '<div class="vcc-tpl-empty">' +
+             (f ? 'لا نتائج' : 'لا توجد قوالب') + '</div>';
+    }
+    return html;
+  }
+
   function _openTplPopover(triggerBtn){
     // Close any open popover first
     var existing = document.querySelector('.vcc-tpl-pop');
@@ -44424,14 +44690,31 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     pop.className = 'vcc-tpl-pop';
     pop._opener = triggerBtn;
     pop._target = triggerBtn.getAttribute('data-tpl-target');
-    if (!_templates.length){
-      pop.innerHTML = '<div class="vcc-tpl-empty">لا توجد قوالب — أضيفي من قسم "قوالب الإجراءات"</div>';
+    var hasAny = (_templates && _templates.length) > 0
+              || Object.keys(_templatesByCat || {}).length > 0;
+    if (!hasAny){
+      pop.innerHTML =
+        '<div class="vcc-tpl-empty">لا توجد قوالب — أضيفي من قسم "قوالب الإجراءات"</div>';
     } else {
-      pop.innerHTML = _templates.map(function(t){
-        return '<div class="vcc-tpl-item" data-tpl-text="' +
-               escapeHtml(t.template_text) + '">' +
-               '➕ <span>' + escapeHtml(t.template_text) + '</span></div>';
-      }).join('');
+      // Search input + scrollable body. The search filter runs
+      // against template_text + category name so a single keystroke
+      // can land you on the right row even across all 8 categories.
+      var bodyHtml = _renderTplPopoverBody('');
+      pop.innerHTML =
+        '<div class="vcc-tpl-search-wrap">' +
+          '<input type="text" class="vcc-tpl-search" ' +
+                 'placeholder="🔍 ابحثي في القوالب..." autocomplete="off">' +
+        '</div>' +
+        '<div class="vcc-tpl-body">' + bodyHtml + '</div>';
+      var srch = pop.querySelector('.vcc-tpl-search');
+      var body = pop.querySelector('.vcc-tpl-body');
+      if (srch && body){
+        srch.addEventListener('input', function(){
+          body.innerHTML = _renderTplPopoverBody(srch.value || '');
+        });
+        // Auto-focus so the user can start typing immediately.
+        setTimeout(function(){ try { srch.focus(); } catch(_){} }, 0);
+      }
     }
     triggerBtn.parentNode.style.position = 'relative';
     triggerBtn.parentNode.appendChild(pop);
@@ -44604,12 +44887,14 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     // Templates manager
     document.getElementById('vcc-tpl-add-btn').addEventListener('click', function(){
       var inp = document.getElementById('vcc-tpl-add-input');
+      var catSel = document.getElementById('vcc-tpl-add-cat');
       var v = (inp.value || '').trim();
       if (!v){ showToast('اكتبي نص القالب', 'err'); return; }
+      var cat = (catSel && catSel.value) || 'أخرى';
       fetch('/api/violations-action-templates', {
         method: 'POST', credentials: 'same-origin',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ template_text: v }),
+        body: JSON.stringify({ template_text: v, category: cat }),
       })
       .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
       .then(function(res){
@@ -47282,21 +47567,82 @@ def api_violations_catalog_increment_use(cid):
 @app.route("/api/violations-action-templates", methods=["GET"])
 @login_required
 def api_violations_action_templates_list():
+    """Returns a flat `items` list (backwards-compat) PLUS a
+    `by_category` mapping ordered by _VIOLATIONS_TEMPLATES_CATEGORY_ORDER
+    so the popover can render section headers without re-grouping
+    on the client."""
     db = get_db()
+    # Defensive: SELECT category via COALESCE so a DB that hasn't
+    # yet had the ALTER applied (race window during deploy) still
+    # returns a valid response — the column will be empty strings
+    # which fall under the "general" bucket.
     try:
         rows = db.execute(
-            "SELECT id, template_text, sort_order, is_active "
+            "SELECT id, template_text, "
+            "COALESCE(category,'general') AS category, "
+            "sort_order, is_active "
             "FROM violations_action_templates "
             "WHERE is_active=1 ORDER BY sort_order ASC, id ASC"
         ).fetchall()
     except Exception:
-        rows = []
-    items = [{"id": r["id"] if hasattr(r, "keys") else r[0],
-              "template_text": (r["template_text"] if hasattr(r, "keys") else r[1]) or "",
-              "sort_order": r["sort_order"] if hasattr(r, "keys") else r[2],
-              "is_active": r["is_active"] if hasattr(r, "keys") else r[3]}
-             for r in rows]
-    return jsonify({"ok": True, "items": items})
+        # ALTER missing → fall back to the legacy SELECT so the
+        # endpoint never 500s during a half-applied migration.
+        try:
+            rows = db.execute(
+                "SELECT id, template_text, '' AS category, sort_order, is_active "
+                "FROM violations_action_templates "
+                "WHERE is_active=1 ORDER BY sort_order ASC, id ASC"
+            ).fetchall()
+        except Exception:
+            rows = []
+    items = []
+    for r in rows:
+        if hasattr(r, "keys"):
+            items.append({
+                "id":            r["id"],
+                "template_text": r["template_text"] or "",
+                "category":      (r["category"] or "general") or "general",
+                "sort_order":    r["sort_order"],
+                "is_active":     r["is_active"],
+            })
+        else:
+            items.append({
+                "id":            r[0],
+                "template_text": r[1] or "",
+                "category":      (r[2] or "general") or "general",
+                "sort_order":    r[3],
+                "is_active":     r[4],
+            })
+
+    by_cat_dict = {}
+    for it in items:
+        by_cat_dict.setdefault(it["category"], []).append(it)
+    # Order the groups: known categories first in the canonical
+    # display order, then "general" leftovers, then anything else
+    # alphabetically. Returned as a LIST of {name, items} so client
+    # iteration is unambiguous (dict key order survives Flask's
+    # jsonify only sometimes, depending on JSON_SORT_KEYS).
+    by_category_list = []
+    seen = set()
+    for cat in _VIOLATIONS_TEMPLATES_CATEGORY_ORDER:
+        if cat in by_cat_dict:
+            by_category_list.append({"name": cat, "items": by_cat_dict[cat]})
+            seen.add(cat)
+    if "general" in by_cat_dict and "general" not in seen:
+        by_category_list.append({"name": "general", "items": by_cat_dict["general"]})
+        seen.add("general")
+    for cat in sorted(by_cat_dict.keys()):
+        if cat in seen: continue
+        by_category_list.append({"name": cat, "items": by_cat_dict[cat]})
+    # Also expose a dict shape for clients that want O(1) lookup —
+    # alphabetical ordering doesn't matter here since callers can
+    # walk by_category_list for display.
+    return jsonify({
+        "ok": True,
+        "items": items,
+        "by_category_list": by_category_list,
+        "by_category": by_cat_dict,
+    })
 
 
 @app.route("/api/violations-action-templates", methods=["POST"])
@@ -47311,6 +47657,9 @@ def api_violations_action_templates_create():
     if not txt:
         return jsonify({"ok": False, "error": "النص مطلوب"}), 400
     txt = txt[:500]
+    cat = ("" if data.get("category") is None else
+           str(data.get("category"))).strip() or "general"
+    cat = cat[:60]
     db = get_db()
     try:
         try:
@@ -47322,9 +47671,9 @@ def api_violations_action_templates_create():
             next_order = 1
         try:
             cur = db.execute(
-                "INSERT INTO violations_action_templates(template_text, sort_order) "
-                "VALUES(?,?)",
-                (txt, next_order),
+                "INSERT INTO violations_action_templates("
+                "template_text, category, sort_order) VALUES(?,?,?)",
+                (txt, cat, next_order),
             )
         except Exception:
             existing = db.execute(
@@ -47332,9 +47681,17 @@ def api_violations_action_templates_create():
                 "WHERE template_text=?", (txt,)).fetchone()
             if existing:
                 ex_id = existing["id"] if hasattr(existing, "keys") else existing[0]
-                db.execute(
-                    "UPDATE violations_action_templates SET is_active=1 "
-                    "WHERE id=?", (ex_id,))
+                # Reactivate AND update its category if the caller
+                # supplied a non-default one.
+                try:
+                    db.execute(
+                        "UPDATE violations_action_templates "
+                        "SET is_active=1, category=? WHERE id=?",
+                        (cat, ex_id))
+                except Exception:
+                    db.execute(
+                        "UPDATE violations_action_templates SET is_active=1 "
+                        "WHERE id=?", (ex_id,))
                 db.commit()
                 return jsonify({"ok": True, "id": ex_id, "reactivated": True})
             raise
