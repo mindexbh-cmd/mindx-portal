@@ -41527,10 +41527,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 /* ── Smart catalog selection (Commit 3) ───────────────────────── */
 .vio-cat-pick{display:block;}
 .vio-cat-search-wrap{position:relative;margin-bottom:10px;}
-.vio-cat-search-wrap input{width:100%;padding:10px 14px;
+.vio-cat-search-row{display:flex;gap:6px;align-items:stretch;}
+.vio-cat-search-row input{flex:1;padding:10px 14px;
   border:1.5px solid #d8c8ec;border-radius:9px;font-family:inherit;
   font-size:.95rem;background:#fafafe;}
-.vio-cat-search-wrap input:focus{outline:none;border-color:#8B5CC8;background:#fff;}
+.vio-cat-search-row input:focus{outline:none;border-color:#8B5CC8;background:#fff;}
+.vio-cat-show-all{background:#fff;border:1.5px solid #d8c8ec;
+  color:#4a148c;border-radius:9px;padding:0 14px;font-family:inherit;
+  font-size:.85rem;font-weight:800;cursor:pointer;white-space:nowrap;}
+.vio-cat-show-all:hover{background:#f3e5f5;border-color:#8B5CC8;}
 .vio-cat-search-results{position:absolute;top:100%;left:0;right:0;z-index:10;
   background:#fff;border:1px solid #d8c8ec;border-radius:9px;
   box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:280px;overflow:auto;
@@ -41571,7 +41576,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .vio-cat-results-head{margin:12px 0 6px;font-weight:800;font-size:.88rem;
   color:#4a148c;}
 .vio-cat-results{background:#fff;border:1px solid #ece4f8;border-radius:10px;
-  max-height:220px;overflow:auto;}
+  max-height:280px;overflow:auto;}
+.vio-cat-sev-section{display:flex;align-items:center;gap:8px;padding:7px 12px;
+  background:#faf8fd;border-bottom:1px solid #ece4f8;border-top:1px solid #ece4f8;
+  font-weight:900;font-size:.82rem;color:#4a148c;
+  position:sticky;top:0;z-index:1;}
+.vio-cat-sev-section:first-child{border-top:none;}
+.vio-cat-sev-section.light  {background:#E8F5E9;color:#2E7D32;}
+.vio-cat-sev-section.medium {background:#FFF8E1;color:#7C5A00;}
+.vio-cat-sev-section.severe {background:#FFEBEE;color:#7A1F1F;}
+.vio-cat-sev-section .vio-cat-sev-count{margin-right:auto;color:inherit;
+  opacity:.7;font-size:.78rem;font-weight:700;}
 .vio-cat-result-item{padding:9px 12px;cursor:pointer;display:flex;
   align-items:center;gap:10px;border-bottom:1px solid #f0e6f8;font-size:.9rem;}
 .vio-cat-result-item:last-child{border-bottom:none;}
@@ -41807,10 +41822,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         </div>
 
         <div class="vio-cat-pick">
-          <!-- Search -->
+          <!-- Search + reset -->
           <div class="vio-cat-search-wrap">
-            <input type="text" id="vio-cat-search"
-                   placeholder="🔍 ابحث عن المخالفة..." autocomplete="off">
+            <div class="vio-cat-search-row">
+              <input type="text" id="vio-cat-search"
+                     placeholder="🔍 ابحث عن المخالفة..." autocomplete="off">
+              <button type="button" id="vio-cat-show-all" class="vio-cat-show-all" title="مسح البحث والتصفية">
+                عرض الكل
+              </button>
+            </div>
             <div id="vio-cat-search-results" class="vio-cat-search-results" hidden></div>
           </div>
 
@@ -41822,10 +41842,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
             <div class="vio-cat-qp-empty">…</div>
           </div>
 
-          <!-- Advanced filters + results — collapsed by default to keep the
-               default form light. Most users select via search/quick-picks. -->
-          <details class="vio-cat-more">
-            <summary class="vio-cat-more-summary">📂 المزيد من المخالفات (تصفية متقدمة)</summary>
+          <!-- Browse all violations + filters — open by default so staff
+               can scan the full list without an extra click. -->
+          <details class="vio-cat-more" open>
+            <summary class="vio-cat-more-summary">📂 جميع المخالفات (تصفية متقدمة)</summary>
 
             <div class="vio-cat-filter-block" style="margin-top:10px;">
               <div class="vio-cat-filter-label">🎯 التصنيف:</div>
@@ -42761,7 +42781,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     action: '', occurrence: 0, prevCount: 0, prevDates: [],
     threshold2: 0, threshold3: 0,
   };
-  var _catFilters = { severity: '', location: '' };
+  var _catFilters = { severity: '', location: '', q: '' };
   var _catSearchDebounce = null;
   var _catSevLabel = { light: '🟢 خفيفة', medium: '🟡 متوسطة', severe: '🔴 خطيرة' };
   var _catLocationOptions = [
@@ -42830,6 +42850,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     var qs = ['active_only=1'];
     if (_catFilters.severity) qs.push('severity=' + encodeURIComponent(_catFilters.severity));
     if (_catFilters.location) qs.push('location=' + encodeURIComponent(_catFilters.location));
+    if (_catFilters.q)        qs.push('q='        + encodeURIComponent(_catFilters.q));
     fetch('/api/violations-catalog?' + qs.join('&'), {credentials:'same-origin'})
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -42839,9 +42860,47 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
           c.innerHTML = '<div class="vio-cat-empty">لا توجد نتائج بهذه التصفية</div>';
           return;
         }
-        var html = '';
-        for (var i = 0; i < items.length; i++){ html += _catRenderResultRow(items[i]); }
-        c.innerHTML = html;
+        // Group by severity when the user hasn't picked a specific
+        // tier — so the default "show everything" view has clear
+        // section headers (10 light → 9 medium → 13 severe). When
+        // a tier is selected, render flat since the heading would
+        // be redundant.
+        if (!_catFilters.severity){
+          var buckets = { light: [], medium: [], severe: [], other: [] };
+          for (var i = 0; i < items.length; i++){
+            var sev = ((items[i].severity || '') + '').toLowerCase();
+            (buckets[sev] || buckets.other).push(items[i]);
+          }
+          var html = '';
+          var renderBucket = function(key, label){
+            var rows = buckets[key];
+            if (!rows.length) return;
+            html += '<div class="vio-cat-sev-section ' + key + '">' +
+                    '<span>' + label + '</span>' +
+                    '<span class="vio-cat-sev-count">' + rows.length + ' مخالفة</span>' +
+                    '</div>';
+            for (var k = 0; k < rows.length; k++){
+              html += _catRenderResultRow(rows[k]);
+            }
+          };
+          renderBucket('light',  '🟢 خفيفة');
+          renderBucket('medium', '🟡 متوسطة');
+          renderBucket('severe', '🔴 خطيرة');
+          if (buckets.other.length){
+            html += '<div class="vio-cat-sev-section">' +
+                    '<span>أخرى</span>' +
+                    '<span class="vio-cat-sev-count">' + buckets.other.length + '</span>' +
+                    '</div>';
+            for (var m = 0; m < buckets.other.length; m++){
+              html += _catRenderResultRow(buckets.other[m]);
+            }
+          }
+          c.innerHTML = html;
+        } else {
+          var flat = '';
+          for (var j = 0; j < items.length; j++){ flat += _catRenderResultRow(items[j]); }
+          c.innerHTML = flat;
+        }
       })
       .catch(function(){
         c.innerHTML = '<div class="vio-cat-empty">تعذر جلب النتائج</div>';
@@ -43169,14 +43228,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   }
 
   function _catBindAll(){
-    // Search input — debounced
+    // Search input — debounced. Updates BOTH the small dropdown
+    // AND the main results list so typing narrows everything.
+    // Empty query restores the full grouped-by-severity view.
     var sb = document.getElementById('vio-cat-search');
     if (sb && !sb._catBound){
       sb._catBound = true;
       sb.addEventListener('input', function(){
         if (_catSearchDebounce) clearTimeout(_catSearchDebounce);
         var q = (sb.value || '').trim();
-        _catSearchDebounce = setTimeout(function(){ _catSearch(q); }, 200);
+        _catSearchDebounce = setTimeout(function(){
+          _catFilters.q = q;
+          _catSearch(q);          // dropdown — shows max 8 quick picks
+          _catLoadResults();      // main list — also re-filtered
+        }, 200);
       });
       sb.addEventListener('blur', function(){
         // Delay so click handlers fire first.
@@ -43187,6 +43252,30 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       });
       sb.addEventListener('focus', function(){
         if ((sb.value || '').trim()) _catSearch((sb.value || '').trim());
+      });
+    }
+    // "عرض الكل" button — clear search + chip filters in one click.
+    var showAllBtn = document.getElementById('vio-cat-show-all');
+    if (showAllBtn && !showAllBtn._catBound){
+      showAllBtn._catBound = true;
+      showAllBtn.addEventListener('click', function(){
+        if (sb) sb.value = '';
+        _catFilters = { severity: '', location: '', q: '' };
+        var box = document.getElementById('vio-cat-search-results');
+        if (box){ box.hidden = true; box.innerHTML = ''; }
+        // Reset chip "active" states to "الكل" (data-value="").
+        var chipGroups = document.querySelectorAll('[data-cat-chip-group]');
+        for (var i = 0; i < chipGroups.length; i++){
+          var siblings = chipGroups[i].querySelectorAll('.vio-cat-chip');
+          for (var j = 0; j < siblings.length; j++){
+            siblings[j].classList.toggle('active',
+              (siblings[j].getAttribute('data-value') || '') === '');
+          }
+        }
+        // Make sure the "browse all" details is open.
+        var det = document.querySelector('.vio-cat-more');
+        if (det) det.open = true;
+        _catLoadResults();
       });
     }
     // Search dropdown — click to select
@@ -43305,7 +43394,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     if (sb) sb.value = '';
     var srBox = document.getElementById('vio-cat-search-results');
     if (srBox){ srBox.hidden = true; srBox.innerHTML = ''; }
-    _catFilters = { severity: '', location: '' };
+    _catFilters = { severity: '', location: '', q: '' };
     var chipGroups = document.querySelectorAll('[data-cat-chip-group]');
     for (var i = 0; i < chipGroups.length; i++){
       var siblings = chipGroups[i].querySelectorAll('.vio-cat-chip');
