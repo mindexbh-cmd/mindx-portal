@@ -8770,7 +8770,7 @@ document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER")
         </a>
         <a class="md-sb-link mx-books-link" href="/admin/books">
           <svg class="md-sb-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span class="md-sb-link-text">&#x627;&#x644;&#x643;&#x62A;&#x628;</span>
+          <span class="md-sb-link-text">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</span>
         </a>
       </div>
     </div>
@@ -9770,8 +9770,8 @@ document.body && (document.body.dataset.allowBooks = "BOOKS_ACCESS_PLACEHOLDER")
     </a>
     <a class="dh-action-card mx-books-link" href="/admin/books" style="background:linear-gradient(135deg,#1565C0,#1E88E5);">
       <div class="dh-action-icon">&#x1F4D6;</div>
-      <div class="dh-action-title">&#x627;&#x644;&#x643;&#x62A;&#x628;</div>
-      <div class="dh-action-desc">&#x631;&#x641;&#x639; &#x648;&#x625;&#x62F;&#x627;&#x631;&#x629; &#x643;&#x62A;&#x628; &#x627;&#x644;&#x645;&#x646;&#x647;&#x62C;</div>
+      <div class="dh-action-title">&#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</div>
+      <div class="dh-action-desc">&#x631;&#x641;&#x639; &#x648;&#x625;&#x62F;&#x627;&#x631;&#x629; &#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</div>
     </a>
   </div>
 </div>
@@ -32973,9 +32973,9 @@ _TBL_AUDIT_FEATURE = {
     "lessons_log":         ("سجل الدروس",                    "متابعة التقدم في الدروس"),
     "parent_messages":     ("رسائل المعلمة لأولياء الأمور",  "ماذا تريد أن يعرف ولي الأمر"),
     "parent_message_reads": ("اطّلاع أولياء الأمور على الرسائل", "ماذا تريد أن يعرف ولي الأمر"),
-    "books_v2":             ("الكتب",                           "مكتبة الكتب"),
-    "books_v2_groups":      ("الكتب — مجموعات",                 "مكتبة الكتب"),
-    "books_v2_teachers":    ("الكتب — معلمات",                  "مكتبة الكتب"),
+    "books_v2":             ("المناهج",                         "مكتبة المناهج"),
+    "books_v2_groups":      ("المناهج — مجموعات",               "مكتبة المناهج"),
+    "books_v2_teachers":    ("المناهج — معلمات",                "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
@@ -58379,7 +58379,7 @@ noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
       <li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>
       <li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>
       <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
-      <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
+      <li><a href="/portal/parent-hub/curriculum">📚 المناهج</a></li>
     </ul>
   </noscript>
 </div>
@@ -58400,7 +58400,7 @@ function _renderFallbackNav(reason){
       '<li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>'+
       '<li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>'+
       '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
-      '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
+      '<li><a href="/portal/parent-hub/curriculum">📚 المناهج</a></li>'+
     '</ul>';
 }
 fetch('/api/portal/student/meta',{credentials:'include'})
@@ -58443,8 +58443,8 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +     '<p>تقييمات ' + _esc(s.student_name||firstName) + ' الشهرية</p>'
       +   '</a>'
       +   '<a class="card crc" href="/portal/parent-hub/curriculum">'
-      +     '<span class="ic">📚</span><h3>كتب المنهج</h3>'
-      +     '<p>الكتب المتاحة لـ ' + _esc(firstName) + '</p>'
+      +     '<span class="ic">📚</span><h3>المناهج</h3>'
+      +     '<p>المناهج المتاحة لـ ' + _esc(firstName) + '</p>'
       +   '</a>'
       + '</div>';
     root.innerHTML = html;
@@ -63889,7 +63889,7 @@ def _books_v2_send_file(bid, *, as_attachment):
     if as_attachment and not int(rd.get("can_download") or 0) \
             and not _has_books_full_access(user):
         return jsonify({"ok": False, "error":
-                        "هذا الكتاب للقراءة فقط"}), 403
+                        "هذا المنهج للقراءة فقط"}), 403
     safe_title = (rd.get("title") or "book") + ".pdf"
     resp = _send_b(rp, mimetype="application/pdf",
                    as_attachment=as_attachment,
@@ -63919,7 +63919,7 @@ def api_books_v2_download(bid):
 # ──────────────────────────────────────────────────────────────────
 ADMIN_BOOKS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<title>الكتب — مايندكس</title>
+<title>المناهج — مايندكس</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;}
@@ -63994,13 +63994,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .btn-secondary{background:#f3e5f5;color:#4a148c;border:1px solid #d8c8ec;}
 </style></head><body>
 <div class="topbar">
-  <h1>📚 إدارة الكتب</h1>
+  <h1>📚 إدارة المناهج</h1>
   <div><a href="/dashboard">رجوع للداشبورد</a></div>
 </div>
 <div class="wrap">
 
   <div class="panel">
-    <h2>➕ إضافة كتاب جديد</h2>
+    <h2>➕ إضافة منهج جديد</h2>
     <div class="field">
       <label>📤 ملف PDF (حد أقصى 50 ميجا) <span style="color:#c62828">*</span></label>
       <input type="file" id="bk-file" accept="application/pdf">
@@ -64015,7 +64015,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     </div>
     <div class="row2">
       <div class="field">
-        <label>🎯 المجموعات اللي تشوف الكتاب</label>
+        <label>🎯 المجموعات اللي تشوف المنهج</label>
         <div class="picker-tools">
           <button class="tool-btn" type="button" onclick="bkPickAll('groups',true)">☑️ اختيار الكل</button>
           <button class="tool-btn" type="button" onclick="bkPickAll('groups',false)">☐ إلغاء الكل</button>
@@ -64042,7 +64042,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   </div>
 
   <div class="panel">
-    <h2>📚 الكتب الحالية (<span id="bk-count">0</span>)</h2>
+    <h2>📚 المناهج الحالية (<span id="bk-count">0</span>)</h2>
     <div id="bk-list"><div class="empty">جاري التحميل...</div></div>
   </div>
 
@@ -64051,7 +64051,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 <!-- Edit modal -->
 <div class="modal-back" id="bk-edit-back" onclick="if(event.target===this)bkCloseEdit()">
   <div class="modal">
-    <h3>✏️ تعديل الكتاب</h3>
+    <h3>✏️ تعديل المنهج</h3>
     <input type="hidden" id="be-id">
     <div class="field">
       <label>العنوان</label>
@@ -64173,7 +64173,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     fetch('/api/books/upload', {method:'POST', credentials:'include', body:fd})
       .then(function(r){return r.json().then(function(j){return {status:r.status, j:j};});})
       .then(function(res){
-        btn.disabled = false; btn.textContent = '💾 حفظ الكتاب';
+        btn.disabled = false; btn.textContent = '💾 حفظ المنهج';
         if(!res.j || !res.j.ok){
           toast(res.j && res.j.error || ('فشل الرفع — ' + res.status), true);
           return;
@@ -64187,7 +64187,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         loadList();
       })
       .catch(function(){
-        btn.disabled = false; btn.textContent = '💾 حفظ الكتاب';
+        btn.disabled = false; btn.textContent = '💾 حفظ المنهج';
         toast('خطأ في الاتصال', true);
       });
   };
@@ -64283,7 +64283,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
   // ── Delete
   window.bkDelete = function(id, btn){
-    if(!confirm('حذف هذا الكتاب نهائياً؟')) return;
+    if(!confirm('حذف هذا المنهج نهائياً؟')) return;
     btn.disabled = true; btn.textContent = '⏳';
     fetch('/api/books/'+id, {method:'DELETE', credentials:'include'})
       .then(function(r){return r.json();})
@@ -64321,7 +64321,7 @@ def admin_books_v2_page():
 
 PORTAL_BOOKS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<title>كتب المنهج — بوابة ولي الأمر</title>
+<title>المناهج — بوابة ولي الأمر</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>__PH_CSS__
 .bk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
@@ -64346,7 +64346,7 @@ PORTAL_BOOKS_HTML = r"""<!DOCTYPE html>
 .bk-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
 </style></head><body>
 <div class="topbar">
-  <h1>📚 كتب المنهج</h1>
+  <h1>📚 المناهج</h1>
   <div class="nav">
     <a href="/portal/parent-hub">← العودة للبوابة</a>
     <a class="logout" href="/logout">خروج</a>
@@ -64386,7 +64386,7 @@ PORTAL_BOOKS_HTML = r"""<!DOCTYPE html>
           var arr = j.books || [];
           if(!arr.length){
             box.innerHTML = '<div class="bk-empty"><span class="em-ic">📚</span>'+
-                            '<div>لا توجد كتب متاحة حالياً.</div>'+
+                            '<div>لا توجد مناهج متاحة حالياً.</div>'+
                             '<div style="margin-top:6px;color:#999;font-size:.86rem;">سيتم إضافة المناهج هنا عند جاهزيتها.</div></div>';
             return;
           }
@@ -64441,7 +64441,7 @@ def portal_books_v2_parent_page():
 
 TEACHER_BOOKS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<title>الكتب — صفحة المعلمة</title>
+<title>المناهج — صفحة المعلمة</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;}
@@ -64483,7 +64483,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 .bk-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
 </style></head><body>
 <div class="topbar">
-  <h1>📚 الكتب — صفحة المعلمة</h1>
+  <h1>📚 المناهج — صفحة المعلمة</h1>
   <div><a href="/teacher/hub">← العودة</a></div>
 </div>
 <div class="wrap">
@@ -64507,7 +64507,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       var arr = j.books || [];
       if(!arr.length){
         box.innerHTML = '<div class="bk-empty"><span class="em-ic">📚</span>'+
-                        '<div>لا توجد كتب مخصصة لك حالياً.</div></div>';
+                        '<div>لا توجد مناهج مخصصة لك حالياً.</div></div>';
         return;
       }
       var html = '<div class="bk-grid">';
@@ -64552,8 +64552,8 @@ def teacher_books_v2_page():
     notice = ""
     if is_staff and role != "teacher":
         notice = ('<div class="staff-notice">'
-                  '<span>⚠️ هذه الصفحة للمعلمات. اضغطي هنا لإدارة الكتب →</span>'
-                  '<a href="/admin/books">📚 إدارة الكتب</a>'
+                  '<span>⚠️ هذه الصفحة للمعلمات. اضغطي هنا لإدارة المناهج →</span>'
+                  '<a href="/admin/books">📚 إدارة المناهج</a>'
                   '</div>')
     return TEACHER_BOOKS_HTML.replace("__STAFF_NOTICE__", notice)
 
