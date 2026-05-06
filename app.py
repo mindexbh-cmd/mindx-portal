@@ -63861,6 +63861,102 @@ def api_books_v2_upload():
                     "teachers_attached": t_inserted})
 
 
+@app.route('/api/books/<int:bid>/reupload', methods=['POST'])
+@login_required
+def api_books_v2_reupload(bid):
+    """File-only re-upload for a row whose backing file is gone
+    (legacy file_path on the wiped ephemeral disk, or a Cloudinary
+    asset that was deleted out-of-band). Updates cloudinary_url,
+    cloudinary_public_id, file_size_bytes; clears file_path; leaves
+    title / description / can_download / groups / teachers untouched
+    so the assignment graph survives the swap.
+
+    Best-effort destroys the previous Cloudinary asset (if any) so
+    we don't accumulate paid storage for orphan files."""
+    user = session.get("user") or {}
+    if not _has_books_full_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, title, cloudinary_public_id FROM books_v2 "
+            "WHERE id=? AND COALESCE(is_deleted,0)=0",
+            (int(bid),)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    title = rd.get("title") or "book"
+    old_pub = (rd.get("cloudinary_public_id") or "").strip()
+
+    if "pdf_file" not in request.files:
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    upload = request.files["pdf_file"]
+    if not upload or not (upload.filename or "").strip():
+        return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
+    raw = upload.read()
+    if not raw:
+        return jsonify({"ok": False, "error": "الملف فارغ"}), 400
+    if len(raw) > _BOOKS_V2_MAX_BYTES:
+        return jsonify({"ok": False, "error": "حجم الملف يتجاوز 50 ميجا"}), 413
+    if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
+        return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
+
+    if not CLOUDINARY_ENABLED:
+        return jsonify({"ok": False, "error":
+                        "خدمة تخزين الملفات غير مهيّأة — تواصل مع الإدارة"
+                        }), 503
+
+    import io as _io_ru
+    from cloudinary import uploader as _cl_uploader_ru
+    try:
+        result = _cl_uploader_ru.upload(
+            _io_ru.BytesIO(raw),
+            resource_type="raw",
+            folder="mindex/books",
+            use_filename=True,
+            unique_filename=True,
+            filename_override=_books_v2_safe_title_slug(title) + ".pdf",
+        )
+    except Exception as ex:
+        return jsonify({"ok": False, "error":
+                        "فشل رفع الملف إلى التخزين السحابي — حاول مرة أخرى"
+                        }), 502
+    cl_url = (result or {}).get("secure_url") or (result or {}).get("url") or ""
+    cl_pub = (result or {}).get("public_id") or ""
+    if not cl_url or not cl_pub:
+        return jsonify({"ok": False, "error":
+                        "استجابة التخزين السحابي غير مكتملة — حاول مرة أخرى"
+                        }), 502
+
+    try:
+        db.execute(
+            "UPDATE books_v2 SET cloudinary_url=?, cloudinary_public_id=?, "
+            "file_size_bytes=?, file_path='' WHERE id=?",
+            (cl_url, cl_pub, len(raw), int(bid)))
+        db.commit()
+    except Exception as ex:
+        try: _cl_uploader_ru.destroy(cl_pub, resource_type="raw")
+        except Exception: pass
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    if old_pub and old_pub != cl_pub:
+        try: _cl_uploader_ru.destroy(old_pub, resource_type="raw")
+        except Exception: pass
+
+    try:
+        _audit("books_v2.reupload", target_type="books_v2",
+               target_id=int(bid),
+               new_value={"size": len(raw),
+                          "old_public_id": old_pub,
+                          "new_public_id": cl_pub})
+    except Exception: pass
+    return jsonify({"ok": True, "id": int(bid),
+                    "cloudinary_url": cl_url,
+                    "size_bytes": len(raw)})
+
+
 @app.route('/api/books/<int:bid>', methods=['PATCH'])
 @login_required
 def api_books_v2_update(bid):
@@ -64643,6 +64739,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
          font-weight:700;font-size:.82rem;cursor:pointer;}
 .act-view{background:#43A047;color:#fff;text-decoration:none;padding:6px 12px;
           border-radius:6px;font-weight:700;font-size:.82rem;display:inline-block;}
+.act-reupload{background:#FF8F00;color:#fff;border:none;padding:6px 12px;
+              border-radius:6px;font-weight:700;font-size:.82rem;cursor:pointer;
+              font-family:inherit;}
+.act-reupload:hover{box-shadow:0 4px 12px rgba(255,143,0,.35);}
+.bk-missing-badge{display:inline-block;background:#fff3e0;color:#bf360c;
+                  border:1.5px solid #ffb74d;border-radius:8px;padding:5px 10px;
+                  margin:6px 0;font-weight:800;font-size:.85rem;}
 .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.78rem;
      font-weight:700;background:#e3f2fd;color:#0d47a1;margin:2px 2px 0 0;}
 .empty{text-align:center;color:#888;padding:40px 20px;}
@@ -64756,6 +64859,26 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <div class="modal-acts">
       <button class="btn btn-secondary" onclick="bkCloseEdit()">إلغاء</button>
       <button class="btn" id="be-save-btn" onclick="bkSaveEdit()">💾 حفظ التعديلات</button>
+    </div>
+  </div>
+</div>
+
+<!-- Re-upload modal — file-only swap for orphan rows -->
+<div class="modal-back" id="bk-reupload-back" onclick="if(event.target===this)bkCloseReupload()">
+  <div class="modal">
+    <h3>إعادة رفع ملف المنهج</h3>
+    <input type="hidden" id="bru-id">
+    <div id="bru-title-display" style="margin-bottom:14px;color:#666;font-size:.92rem;"></div>
+    <div class="field">
+      <label>📤 ملف PDF جديد (حد أقصى 50 ميجا)</label>
+      <input type="file" id="bru-file" accept="application/pdf">
+    </div>
+    <div style="background:#f3e5f5;border-radius:8px;padding:10px 12px;color:#4a148c;font-size:.85rem;line-height:1.5;">
+      الملف الجديد سيستبدل الملف المفقود فقط. العنوان والوصف والمجموعات والمعلمات لن تتغير.
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-secondary" onclick="bkCloseReupload()">إلغاء</button>
+      <button class="btn" id="bru-save-btn" onclick="bkDoReupload()">📤 رفع الملف</button>
     </div>
   </div>
 </div>
@@ -64875,8 +64998,18 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
           var dlTag = b.can_download
             ? '<span class="free">⬇ تحميل مسموح</span>'
             : '<span class="lock">🔒 عرض فقط</span>';
+          // Backing-file presence: server returns has_cloudinary +
+          // has_legacy_file; missing if both are false.
+          var hasFile = !!(b.has_cloudinary || b.has_legacy_file);
+          var missingBadge = hasFile ? '' :
+            '<div class="bk-missing-badge">⚠ الملف مفقود</div>';
+          var reuploadBtn = '<button class="act-reupload" onclick="bkOpenReupload('+b.id+', '+JSON.stringify(b.title||'')+')">📤 إعادة رفع الملف</button>';
+          var viewBtn = hasFile
+            ? '<a class="act-view" href="/api/books/'+b.id+'/view" target="_blank" rel="noopener">👁 عرض</a>'
+            : '';
           return '<div class="book-card">'+
             '<h3>📕 '+_esc(b.title)+'</h3>'+
+            missingBadge +
             '<div class="meta">'+
               (b.description?'<div>'+_esc((b.description||'').slice(0,150))+'</div>':'')+
               '<div>🎯 '+(grpTags||'—')+' | '+dlTag+'</div>'+
@@ -64886,7 +65019,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
                 ' | '+fmtSize(b.file_size_bytes)+'</div>'+
             '</div>'+
             '<div class="acts">'+
-              '<a class="act-view" href="/api/books/'+b.id+'/view" target="_blank" rel="noopener">👁 عرض</a>'+
+              viewBtn +
+              reuploadBtn +
               '<button class="act-edit" onclick="bkOpenEdit('+b.id+')">✏️ تعديل</button>'+
               '<button class="act-del" onclick="bkDelete('+b.id+', this)">🗑 حذف</button>'+
             '</div>'+
@@ -64946,6 +65080,42 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       btn.disabled = false; btn.textContent = '💾 حفظ التعديلات';
       toast('خطأ في الحفظ', true);
     });
+  };
+
+  // ── Re-upload (file-only, for orphan rows)
+  window.bkOpenReupload = function(id, title){
+    document.getElementById('bru-id').value = id;
+    document.getElementById('bru-title-display').textContent = title || '';
+    document.getElementById('bru-file').value = '';
+    document.getElementById('bk-reupload-back').classList.add('show');
+  };
+  window.bkCloseReupload = function(){
+    document.getElementById('bk-reupload-back').classList.remove('show');
+  };
+  window.bkDoReupload = function(){
+    var id = parseInt(document.getElementById('bru-id').value, 10);
+    var file = document.getElementById('bru-file').files[0];
+    if(!file){ toast('يجب اختيار ملف PDF', true); return; }
+    if(file.size > 50*1024*1024){ toast('حجم الملف يتجاوز 50 ميجا', true); return; }
+    var fd = new FormData(); fd.append('pdf_file', file);
+    var btn = document.getElementById('bru-save-btn');
+    btn.disabled = true; btn.textContent = '⏳ جاري الرفع...';
+    fetch('/api/books/'+id+'/reupload', {method:'POST', credentials:'include', body:fd})
+      .then(function(r){return r.json().then(function(j){return {status:r.status, j:j};});})
+      .then(function(res){
+        btn.disabled = false; btn.textContent = '📤 رفع الملف';
+        if(!res.j || !res.j.ok){
+          toast(res.j && res.j.error || 'فشل رفع الملف — حاول مرة أخرى', true);
+          return;
+        }
+        toast('تم رفع الملف بنجاح');
+        bkCloseReupload();
+        loadList();
+      })
+      .catch(function(){
+        btn.disabled = false; btn.textContent = '📤 رفع الملف';
+        toast('فشل رفع الملف — حاول مرة أخرى', true);
+      });
   };
 
   // ── Delete
