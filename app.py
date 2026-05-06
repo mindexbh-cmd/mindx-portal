@@ -67584,6 +67584,12 @@ def _books_v2_row_to_dict(row, *, group_ids=None, group_names=None,
                            teacher_ids=None, teacher_names=None):
     if row is None: return None
     d = dict(row)
+    # has_file marks whether this row has any retrievable backing file
+    # — Cloudinary first (the new path), legacy file_path second. The
+    # admin UI uses this to render the "⚠ الملف مفقود" badge and the
+    # re-upload button when both are missing.
+    cl_url = (d.get("cloudinary_url") or "").strip() if d.get("cloudinary_url") is not None else ""
+    fp = (d.get("file_path") or "").strip() if d.get("file_path") is not None else ""
     return {
         "id":               int(d.get("id") or 0),
         "title":            d.get("title") or "",
@@ -67593,6 +67599,9 @@ def _books_v2_row_to_dict(row, *, group_ids=None, group_names=None,
         "uploaded_by_username": d.get("uploaded_by_username") or "",
         "uploaded_by_name":     d.get("uploaded_by_name") or "",
         "uploaded_at":      d.get("uploaded_at") or "",
+        "cloudinary_url":   cl_url,
+        "has_cloudinary":   bool(cl_url),
+        "has_legacy_file":  bool(fp),
         "groups":           [{"id": gi, "name": gn} for gi, gn
                              in zip(group_ids or [], group_names or [])],
         "teachers":         [{"id": ti, "name": tn} for ti, tn
@@ -68159,46 +68168,73 @@ def api_books_v2_for_student(sid):
     return jsonify({"ok": True, "books": out, "count": len(out)})
 
 
+def _books_v2_cloudinary_attachment_url(secure_url):
+    """Insert /fl_attachment/ after /upload/ in a Cloudinary raw URL
+    so the browser receives Content-Disposition: attachment and
+    forces a save dialog instead of inline rendering. The flag is
+    a path-segment transformation supported by Cloudinary on raw
+    resources. Returns the original URL if the pattern doesn't
+    match (defensive — avoids producing a broken URL)."""
+    if not secure_url: return secure_url
+    needle = "/upload/"
+    idx = secure_url.find(needle)
+    if idx < 0: return secure_url
+    if "/fl_attachment/" in secure_url: return secure_url
+    cut = idx + len(needle)
+    return secure_url[:cut] + "fl_attachment/" + secure_url[cut:]
+
+
 def _books_v2_send_file(bid, *, as_attachment):
-    from flask import send_file as _send_b
+    from flask import send_file as _send_b, redirect as _redirect_b
     user = session.get("user") or {}
     db = get_db()
     if not _books_v2_user_can_view(db, user, int(bid)):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
     try:
         row = db.execute(
-            "SELECT title, file_path, can_download FROM books_v2 "
-            "WHERE id=? AND COALESCE(is_deleted,0)=0",
+            "SELECT title, file_path, can_download, "
+            "       cloudinary_url, cloudinary_public_id "
+            "FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
             (int(bid),)).fetchone()
     except Exception:
         row = None
     if not row:
         return jsonify({"ok": False, "error": "غير موجود"}), 404
     rd = dict(row)
-    fp = rd.get("file_path") or ""
-    # Path-traversal guard: realpath must live under storage dir.
-    sd = os.path.realpath(_books_v2_storage_dir())
-    rp = os.path.realpath(fp) if fp else ""
-    if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
-        return jsonify({"ok": False, "error":
-                        "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
-                        "أو التواصل مع الإدارة",
-                        "missing_file": True,
-                        "book_id": int(bid)}), 410
-    if as_attachment and not int(rd.get("can_download") or 0) \
-            and not _has_books_full_access(user):
+    can_dl = int(rd.get("can_download") or 0)
+    # Download-attachment flow honors can_download=0 as view-only;
+    # admins/uploaders bypass for re-upload preview convenience.
+    if as_attachment and not can_dl and not _has_books_full_access(user):
         return jsonify({"ok": False, "error":
                         "هذا المنهج للقراءة فقط"}), 403
-    safe_title = (rd.get("title") or "book") + ".pdf"
-    resp = _send_b(rp, mimetype="application/pdf",
-                   as_attachment=as_attachment,
-                   download_name=safe_title, conditional=False)
-    try:
-        resp.headers["Cache-Control"] = "private, no-store"
-        resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
-    except Exception: pass
-    return resp
+    # Priority 1: Cloudinary URL (new path). Redirect the browser
+    # straight to the CDN — view-only books still serve over the
+    # raw URL (no fl_attachment), so the PDF renders inline.
+    cl_url = (rd.get("cloudinary_url") or "").strip()
+    if cl_url:
+        target = _books_v2_cloudinary_attachment_url(cl_url) if as_attachment else cl_url
+        return _redirect_b(target, code=302)
+    # Priority 2: legacy file_path on the local/persistent disk.
+    fp = rd.get("file_path") or ""
+    sd = os.path.realpath(_books_v2_storage_dir())
+    rp = os.path.realpath(fp) if fp else ""
+    if rp and rp.startswith(sd + os.sep) and os.path.isfile(rp):
+        safe_title = (rd.get("title") or "book") + ".pdf"
+        resp = _send_b(rp, mimetype="application/pdf",
+                       as_attachment=as_attachment,
+                       download_name=safe_title, conditional=False)
+        try:
+            resp.headers["Cache-Control"] = "private, no-store"
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        except Exception: pass
+        return resp
+    # Priority 3: nothing available — clear missing-file error.
+    return jsonify({"ok": False, "error":
+                    "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
+                    "أو التواصل مع الإدارة",
+                    "missing_file": True,
+                    "book_id": int(bid)}), 410
 
 
 @app.route('/api/books/<int:bid>/view', methods=['GET'])
@@ -68298,39 +68334,47 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
     """Public file server (after pid validation). Mirrors
     _books_v2_send_file but skips the login-based gate since the
     caller already verified pid via _books_v2_pid_can_view."""
-    from flask import send_file as _send_b
+    from flask import send_file as _send_b, redirect as _redirect_b
     try:
         row = db.execute(
-            "SELECT title, file_path, can_download FROM books_v2 "
-            "WHERE id=? AND COALESCE(is_deleted,0)=0",
+            "SELECT title, file_path, can_download, "
+            "       cloudinary_url, cloudinary_public_id "
+            "FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
             (int(bid),)).fetchone()
     except Exception:
         row = None
     if not row:
         return jsonify({"ok": False, "error": "غير موجود"}), 404
     rd = dict(row)
+    can_dl = int(rd.get("can_download") or 0)
+    if as_attachment and not can_dl:
+        return jsonify({"ok": False, "error":
+                        "هذا المنهج للقراءة فقط"}), 403
+    # Cloudinary first (new path).
+    cl_url = (rd.get("cloudinary_url") or "").strip()
+    if cl_url:
+        target = _books_v2_cloudinary_attachment_url(cl_url) if as_attachment else cl_url
+        return _redirect_b(target, code=302)
+    # Legacy local-disk fallback for pre-migration rows.
     fp = rd.get("file_path") or ""
     sd = os.path.realpath(_books_v2_storage_dir())
     rp = os.path.realpath(fp) if fp else ""
-    if not rp or not rp.startswith(sd + os.sep) or not os.path.isfile(rp):
-        return jsonify({"ok": False, "error":
-                        "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
-                        "أو التواصل مع الإدارة",
-                        "missing_file": True,
-                        "book_id": int(bid)}), 410
-    if as_attachment and not int(rd.get("can_download") or 0):
-        return jsonify({"ok": False, "error":
-                        "هذا المنهج للقراءة فقط"}), 403
-    safe_title = (rd.get("title") or "book") + ".pdf"
-    resp = _send_b(rp, mimetype="application/pdf",
-                   as_attachment=as_attachment,
-                   download_name=safe_title, conditional=False)
-    try:
-        resp.headers["Cache-Control"] = "private, no-store"
-        resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
-    except Exception: pass
-    return resp
+    if rp and rp.startswith(sd + os.sep) and os.path.isfile(rp):
+        safe_title = (rd.get("title") or "book") + ".pdf"
+        resp = _send_b(rp, mimetype="application/pdf",
+                       as_attachment=as_attachment,
+                       download_name=safe_title, conditional=False)
+        try:
+            resp.headers["Cache-Control"] = "private, no-store"
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        except Exception: pass
+        return resp
+    return jsonify({"ok": False, "error":
+                    "الملف مفقود على القرص — يرجى إعادة رفع المنهج "
+                    "أو التواصل مع الإدارة",
+                    "missing_file": True,
+                    "book_id": int(bid)}), 410
 
 
 @app.route('/parent/book/<int:bid>/view', methods=['GET'])
