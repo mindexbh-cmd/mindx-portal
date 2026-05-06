@@ -63743,17 +63743,52 @@ def api_books_v2_upload():
     if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
         return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
 
-    # Resolve + verify the storage directory BEFORE inserting the
-    # DB row. If the persistent disk isn't writable, fail loudly
-    # instead of silently writing to the ephemeral local fallback
-    # (whose files are wiped on every Render deploy and produce the
-    # "الملف غير موجود على القرص" error). The probe write inside
-    # _books_v2_storage_dir already enforces writability.
-    storage = _books_v2_storage_dir()
-    if not os.path.isdir(storage) or not os.access(storage, os.W_OK):
+    # Cloudinary required: refuse the upload up-front rather than
+    # leak through to a half-finished DB row. The three env vars
+    # (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY /
+    # CLOUDINARY_API_SECRET) must be set in Render → Environment;
+    # the boot log shows whether they're configured.
+    if not CLOUDINARY_ENABLED:
         return jsonify({"ok": False, "error":
-                        "تخزين الملفات غير متاح حالياً — تواصل مع الإدارة"}), 500
+                        "خدمة تخزين الملفات غير مهيّأة — تواصل مع الإدارة"
+                        }), 503
 
+    # Upload to Cloudinary FIRST so the DB row never exists without a
+    # backing file. resource_type='raw' is required for non-image
+    # assets (PDFs); folder='mindex/books' keeps them grouped in the
+    # Cloudinary dashboard. Pass bytes via io.BytesIO since the SDK
+    # accepts either a file path or a file-like object — we already
+    # read the upload into `raw` for size/magic-byte validation.
+    import io as _io_cl
+    from cloudinary import uploader as _cl_uploader
+    try:
+        result = _cl_uploader.upload(
+            _io_cl.BytesIO(raw),
+            resource_type="raw",
+            folder="mindex/books",
+            use_filename=True,
+            unique_filename=True,
+            filename_override=_books_v2_safe_title_slug(title) + ".pdf",
+        )
+    except Exception as ex:
+        try:
+            sys_cl_log = __import__("sys")
+            sys_cl_log.stderr.write("[cloudinary] upload failed: " + str(ex) + "\n")
+            sys_cl_log.stderr.flush()
+        except Exception: pass
+        return jsonify({"ok": False, "error":
+                        "فشل رفع الملف إلى التخزين السحابي — حاول مرة أخرى"
+                        }), 502
+    cl_url = (result or {}).get("secure_url") or (result or {}).get("url") or ""
+    cl_pub = (result or {}).get("public_id") or ""
+    if not cl_url or not cl_pub:
+        return jsonify({"ok": False, "error":
+                        "استجابة التخزين السحابي غير مكتملة — حاول مرة أخرى"
+                        }), 502
+
+    # New rows leave file_path EMPTY — the legacy column stays in
+    # the schema for backward compat with pre-migration rows but is
+    # never written to from this point on.
     db = get_db()
     uname = (user.get("username") or "").strip()
     uname_disp = (user.get("name") or uname).strip()
@@ -63761,67 +63796,21 @@ def api_books_v2_upload():
         cur = db.execute(
             "INSERT INTO books_v2(title, description, file_path, "
             "file_size_bytes, can_download, uploaded_by_username, "
-            "uploaded_by_name, uploaded_at, is_deleted) "
-            "VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0)",
-            (title, description, "", len(raw), can_dl, uname, uname_disp))
+            "uploaded_by_name, uploaded_at, is_deleted, "
+            "cloudinary_url, cloudinary_public_id) "
+            "VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0,?,?)",
+            (title, description, "", len(raw), can_dl, uname, uname_disp,
+             cl_url, cl_pub))
         db.commit()
         try: bid = int(cur.lastrowid)
         except Exception: bid = 0
     except Exception as ex:
+        # DB insert failed AFTER cloud upload — best-effort cleanup
+        # of the orphan asset on Cloudinary so we don't accumulate
+        # paid storage for files no row references.
+        try: _cl_uploader.destroy(cl_pub, resource_type="raw")
+        except Exception: pass
         return jsonify({"ok": False, "error": str(ex)}), 500
-
-    # Filename pattern <bid>_<safe>.pdf — bid prefix guarantees no
-    # collision between two uploads with identical titles.
-    fname = str(bid) + "_" + _books_v2_safe_title_slug(title) + ".pdf"
-    file_path = os.path.join(storage, fname)
-    # Temp+rename: write to a sibling .tmp file, fsync, then atomic
-    # rename. Eliminates the "half-written file at the final path"
-    # window if the worker is killed mid-write. After rename, stat
-    # the final path and verify the size matches the buffer length —
-    # only then do we commit the file_path on the DB row.
-    tmp_path = file_path + ".tmp_" + str(os.getpid())
-    written_ok = False
-    try:
-        with open(tmp_path, "wb") as fh:
-            fh.write(raw); fh.flush()
-            try: os.fsync(fh.fileno())
-            except Exception: pass
-        os.replace(tmp_path, file_path)
-        try:
-            st = os.stat(file_path)
-            written_ok = (st.st_size == len(raw))
-        except Exception:
-            written_ok = False
-    except Exception as ex:
-        # Best-effort cleanup of the partial temp file; row rollback
-        # below covers the DB side.
-        try:
-            if os.path.exists(tmp_path): os.unlink(tmp_path)
-        except Exception: pass
-        try:
-            db.execute("DELETE FROM books_v2 WHERE id=?", (bid,))
-            db.commit()
-        except Exception: pass
-        return jsonify({"ok": False, "error":
-                        "فشل حفظ الملف على القرص: " + str(ex)}), 500
-    if not written_ok:
-        # Rare: file wrote but disk reports a different size — treat
-        # as a corrupt write and roll everything back so the admin
-        # sees a clean error and retries instead of leaving an orphan.
-        try:
-            if os.path.exists(file_path): os.unlink(file_path)
-        except Exception: pass
-        try:
-            db.execute("DELETE FROM books_v2 WHERE id=?", (bid,))
-            db.commit()
-        except Exception: pass
-        return jsonify({"ok": False, "error":
-                        "تم رفع الملف لكن لم يُكتب بشكل صحيح — أعد المحاولة"}), 500
-    try:
-        db.execute("UPDATE books_v2 SET file_path=? WHERE id=?",
-                   (file_path, bid))
-        db.commit()
-    except Exception: pass
 
     # Optional inline assignment payloads for the all-in-one upload
     # form; both default to empty so a 2-step upload (POST upload
