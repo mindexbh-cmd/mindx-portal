@@ -58379,6 +58379,7 @@ noscript .fallback-nav,.fallback-on .fallback-nav{display:block;}
       <li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>
       <li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>
       <li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>
+      <li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>
     </ul>
   </noscript>
 </div>
@@ -58399,6 +58400,7 @@ function _renderFallbackNav(reason){
       '<li><a href="/portal/parent-hub/points">🌟 النقاط</a></li>'+
       '<li><a href="/portal/parent-hub/messages">📨 رسائل المعلمة</a></li>'+
       '<li><a href="/portal/parent-hub/evaluations">📊 التقييمات</a></li>'+
+      '<li><a href="/portal/parent-hub/curriculum">📚 كتب المنهج</a></li>'+
     '</ul>';
 }
 fetch('/api/portal/student/meta',{credentials:'include'})
@@ -58439,6 +58441,10 @@ fetch('/api/portal/student/meta',{credentials:'include'})
       +   '<a class="card evals" href="/portal/parent-hub/evaluations">'
       +     '<span class="ic">📊</span><h3>التقييمات</h3>'
       +     '<p>تقييمات ' + _esc(s.student_name||firstName) + ' الشهرية</p>'
+      +   '</a>'
+      +   '<a class="card crc" href="/portal/parent-hub/curriculum">'
+      +     '<span class="ic">📚</span><h3>كتب المنهج</h3>'
+      +     '<p>الكتب المتاحة لـ ' + _esc(firstName) + '</p>'
       +   '</a>'
       + '</div>';
     root.innerHTML = html;
@@ -64302,6 +64308,128 @@ def admin_books_v2_page():
     if not _has_books_full_access(user):
         return redirect("/dashboard")
     return ADMIN_BOOKS_HTML
+
+
+# ──────────────────────────────────────────────────────────────────
+# books_v2 — parent portal viewer (/portal/parent-hub/curriculum)
+# ──────────────────────────────────────────────────────────────────
+# Card grid against /api/books/for-student/<sid>. The student id is
+# resolved from session.user.linked_student_id (auto-provisioned
+# accounts) — for parents linked to multiple kids via
+# linked_parent_for, the page renders books for ALL of them
+# in one combined list.
+
+PORTAL_BOOKS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>كتب المنهج — بوابة ولي الأمر</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>__PH_CSS__
+.bk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media (max-width:980px){.bk-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:620px){.bk-grid{grid-template-columns:1fr;}}
+.bk-card{background:#fff;border-radius:18px;padding:20px;display:flex;
+         flex-direction:column;gap:10px;border:2px solid transparent;
+         transition:all .18s ease;box-shadow:0 8px 24px rgba(107,63,160,.14);}
+.bk-card:hover{border-color:#1565C0;box-shadow:0 14px 32px rgba(107,63,160,.22);}
+.bk-card .ic{font-size:2.4rem;line-height:1;color:#1565C0;}
+.bk-card h3{margin:0;font-size:1.05rem;color:#1565C0;font-weight:900;line-height:1.4;}
+.bk-card .desc{color:#666;font-size:.86rem;line-height:1.5;flex:1;}
+.bk-card .meta{font-size:.78rem;color:#888;}
+.bk-card .lock{display:inline-block;color:#FB8C00;font-weight:800;font-size:.82rem;}
+.bk-card .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.bk-btn{flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#1565C0,#1E88E5);
+        color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:800;font-size:.88rem;cursor:pointer;font-family:inherit;}
+.bk-btn:hover{box-shadow:0 4px 14px rgba(21,101,192,.3);}
+.bk-btn.dl{background:linear-gradient(135deg,#43A047,#2E7D32);}
+.bk-empty{background:#fff;border-radius:18px;padding:60px 24px;text-align:center;color:#666;
+          box-shadow:0 8px 24px rgba(107,63,160,.12);}
+.bk-empty .em-ic{font-size:3rem;display:block;margin-bottom:14px;}
+</style></head><body>
+<div class="topbar">
+  <h1>📚 كتب المنهج</h1>
+  <div class="nav">
+    <a href="/portal/parent-hub">← العودة للبوابة</a>
+    <a class="logout" href="/logout">خروج</a>
+  </div>
+</div>
+<div class="wrap">
+  <div class="section" style="background:transparent;box-shadow:none;padding:0;">
+    <div id="bk-list-box"><div class="empty">جاري التحميل...</div></div>
+  </div>
+</div>
+<script>
+(function(){
+  function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function fmtSize(n){
+    if(!n) return '';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  // Resolve our student id(s) via the existing meta endpoint.
+  fetch('/api/portal/student/meta',{credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var sid = (d && d.student && d.student.id) ? d.student.id : 0;
+      if(!sid){
+        document.getElementById('bk-list-box').innerHTML =
+          '<div class="bk-empty"><span class="em-ic">📚</span><div>تعذر تحديد الطالبة.</div></div>';
+        return;
+      }
+      return fetch('/api/books/for-student/' + sid, {credentials:'include'})
+        .then(function(r){return r.json();})
+        .then(function(j){
+          var box = document.getElementById('bk-list-box');
+          if(!j || !j.ok){
+            box.innerHTML = '<div class="bk-empty">تعذر التحميل</div>'; return;
+          }
+          var arr = j.books || [];
+          if(!arr.length){
+            box.innerHTML = '<div class="bk-empty"><span class="em-ic">📚</span>'+
+                            '<div>لا توجد كتب متاحة حالياً.</div>'+
+                            '<div style="margin-top:6px;color:#999;font-size:.86rem;">سيتم إضافة المناهج هنا عند جاهزيتها.</div></div>';
+            return;
+          }
+          var html = '<div class="bk-grid">';
+          arr.forEach(function(e){
+            var lock = e.can_download ? '' : '<span class="lock">🔒 للقراءة فقط</span>';
+            var dl = e.can_download
+              ? '<a class="bk-btn dl" href="/api/books/' + e.id + '/download">⬇ تحميل</a>'
+              : '';
+            html += '<div class="bk-card">'+
+              '<span class="ic">📄</span>'+
+              '<h3>'+_esc(e.title)+'</h3>'+
+              '<div class="desc">'+_esc((e.description||'').slice(0,140))+((e.description||'').length>140?'...':'')+'</div>'+
+              '<div class="meta">'+_esc((e.uploaded_at||'').slice(0,10))+(e.file_size_bytes?(' · '+fmtSize(e.file_size_bytes)):'')+(lock?(' · '+lock):'')+'</div>'+
+              '<div class="acts">'+
+                '<a class="bk-btn" href="/api/books/'+e.id+'/view" target="_blank" rel="noopener">👁️ عرض</a>'+
+                dl +
+              '</div>'+
+            '</div>';
+          });
+          html += '</div>';
+          box.innerHTML = html;
+        });
+    })
+    .catch(function(){
+      document.getElementById('bk-list-box').innerHTML = '<div class="bk-empty">تعذر التحميل</div>';
+    });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/portal/parent-hub/curriculum')
+@login_required
+def portal_books_v2_parent_page():
+    """Parent portal book viewer. Reuses the existing parent-hub
+    URL that the noscript fallback / dashboard cards point to."""
+    user = session.get("user") or {}
+    if (user.get("role") or "").strip().lower() != "student":
+        return redirect("/dashboard")
+    if int(user.get("must_change_pw") or 0):
+        return redirect("/portal/change-password")
+    return PORTAL_BOOKS_HTML.replace("__PH_CSS__", _PORTAL_HUB_SHARED_CSS)
 
 
 # Auto-inject mx-helpers.js into HTML blobs that get defined late in the
