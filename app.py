@@ -232,6 +232,173 @@ def _data_integrity_log(db):
               " unexpectedly empty at boot", flush=True)
 
 
+# ── Violations catalog v1 — seed data + helper ─────────────────────
+# 32 violations from the school's official disciplinary policy.
+# Each row carries its OWN three actions + two thresholds so admins
+# can tweak any single violation without affecting siblings; past
+# `violations` rows are not retroactively modified (they hold their
+# original action_taken text). Defaults below are starting points.
+_VIO_LIGHT_DEFAULTS  = ("تنبيه الطالب وتوجيهه + رسالة لولي الأمر",
+                        "أخذ تعهد كتابي + إبلاغ ولي الأمر بالاتصال",
+                        "تحويل للمرشد الاجتماعي + إبلاغ الإدارة",
+                        3, 5)
+_VIO_MEDIUM_DEFAULTS = ("تنبيه + رسالة نصية لولي الأمر + رصد المخالفة",
+                        "أخذ تعهد كتابي + استدعاء ولي الأمر",
+                        "تحويل للمرشد + استدعاء الإدارة + اتخاذ إجراء",
+                        2, 3)
+_VIO_SEVERE_DEFAULTS = ("إنذار + استدعاء ولي الأمر + تعهد كتابي",
+                        "إيقاف يوم/يومين + تحويل للمرشد + الإدارة",
+                        "إيقاف فصل دراسي + قرار من الإدارة",
+                        2, 3)
+
+_VIO_CATALOG_LOCATIONS = (
+    "داخل الصف",
+    "خارج الصف (ممرات)",
+    "دورات المياه",
+    "خارج المعهد (الباب)",
+)
+
+# Each tuple: (text, severity, location, emoji, short_label,
+#              is_quick_pick, override_actions_or_None)
+# override_actions: None → use severity defaults;
+#                   tuple(a1, a2, a3) → replaces the three actions only.
+_VIOLATIONS_CATALOG_SEED = [
+    # ── Light, inside class
+    ("مقاطعة المعلم أثناء الشرح دون إذن",       "light",  "داخل الصف",          "🚫", "مقاطعة",      1, None),
+    ("النوم في الدرس",                            "light",  "داخل الصف",          "😴", "نوم بالصف",   1, None),
+    ("إصدار أصوات مزعجة",                         "light",  "داخل الصف",          "🔊", "ضوضاء",       0, None),
+    ("التحدث مع الطلاب بدون إذن",                 "light",  "داخل الصف",          "💬", "تحدث",        1, None),
+    ("الكتابة على السبورة أو الحائط دون إذن",     "light",  "داخل الصف",          "✏️", "كتابة",       0, None),
+    ("رمي الأوراق أو الفضلات داخل الصف",          "light",  "داخل الصف",          "🗑️", "رمي",         0, None),
+    ("العبث بمفاتيح الأنوار أو المكيفات",         "light",  "داخل الصف",          "💡", "عبث",         0, None),
+    ("مضغ الطعام أو العلكة أثناء الدرس",          "light",  "داخل الصف",          "🍬", "علكة",        0, None),
+    # ── Light, corridors
+    ("إصدار ضوضاء عالية في الممرات (صراخ، صفير)", "light",  "خارج الصف (ممرات)",  "📢", "صراخ",        0, None),
+    ("رمي المخلفات في الممرات",                   "light",  "خارج الصف (ممرات)",  "🚮", "مخلفات",      0, None),
+    # ── Medium, inside class
+    ("الحركة والتنقل بدون إذن",                   "medium", "داخل الصف",          "🏃", "حركة",        0, None),
+    ("الخروج من الصف دون إذن",                    "medium", "داخل الصف",          "🚪", "خروج",        1, None),
+    ("استخدام الهاتف دون إذن",                    "medium", "داخل الصف",          "📱", "هاتف",        1,
+        ("إرشاد الطالب بإغلاق الهاتف أو وضعه على الصامت",
+         "حجز الجهاز لنهاية الدرس + إخبار ولي الأمر",
+         "حجز الهاتف عند الإدارة + استدعاء ولي الأمر للاستلام")),
+    ("الدخول إلى بعض الصفوف أو الغرف دون إذن",    "medium", "داخل الصف",          "🚷", "دخول",        0, None),
+    ("تجاهل توجيهات المعلم عمداً",                "medium", "داخل الصف",          "🙉", "تجاهل",       0, None),
+    ("الغش أو محاولة الغش أثناء الاختبارات",      "medium", "داخل الصف",          "👀", "غش",          0,
+        ("إلغاء الاختبار + إنذار + إبلاغ ولي الأمر",
+         "إيقاف يوم + استدعاء ولي الأمر",
+         "إيقاف فصل + قرار الإدارة")),
+    ("التنمر اللفظي على طالب آخر",                "medium", "داخل الصف",          "😠", "تنمر",        0, None),
+    ("إتلاف ممتلكات المعهد",                      "medium", "داخل الصف",          "💔", "إتلاف",       0, None),
+    # ── Medium, corridors
+    ("الاحتكاك الجسدي مع طلاب آخرين والتعدي عليهم جسدياً", "medium", "خارج الصف (ممرات)", "✊", "تعدي", 1, None),
+    # ── Severe, inside class
+    ("التكلم بكلمات بذيئة أو غير لائقة",          "severe", "داخل الصف",          "🤬", "بذيء",        0, None),
+    ("إصدار أفعال تشوش على الطلاب",               "severe", "داخل الصف",          "⚠️", "تشويش",       0, None),
+    ("إصدار أفعال غير لائقة أو غير أخلاقية",      "severe", "داخل الصف",          "🚷", "غير لائق",    0, None),
+    ("رفع الصوت على المعلم",                      "severe", "داخل الصف",          "📣", "رفع صوت",     0,
+        ("إيقاف 3-5 أيام + استدعاء ولي الأمر + تعهد كتابي",
+         "حرمان من الأنشطة + تحويل للإدارة",
+         "إيقاف فصل دراسي كامل بقرار الإدارة")),
+    ("السخرية من المعلم أو الاستهزاء به",         "severe", "داخل الصف",          "😏", "سخرية",       0,
+        ("إيقاف 3-5 أيام + استدعاء ولي الأمر + تعهد كتابي",
+         "حرمان من الأنشطة + تحويل للإدارة",
+         "إيقاف فصل دراسي كامل بقرار الإدارة")),
+    ("إلقاء أي شيء على طالب آخر",                 "severe", "داخل الصف",          "🎯", "إلقاء",       0, None),
+    ("توجيه تهديد لطالب آخر",                     "severe", "داخل الصف",          "⚡", "تهديد",       0, None),
+    ("كسر الأجهزة (حاسوب، داتا شو)",              "severe", "داخل الصف",          "💻", "كسر أجهزة",   0, None),
+    ("سرقة أي من ممتلكات المعهد أو الطلاب",       "severe", "داخل الصف",          "🦹", "سرقة",        0,
+        ("نصح + إعادة المسروقات + إبلاغ ولي الأمر",
+         "تحويل للمرشد + استدعاء ولي الأمر + استرجاع المسروقات",
+         "تحويل لإدارة المشروع + قرار مناسب")),
+    # ── Severe, corridors
+    ("تصوير طلاب أو معلمين دون إذن",              "severe", "خارج الصف (ممرات)",  "📸", "تصوير",       0, None),
+    # ── Severe, outside institute
+    ("التدخين أو السجائر الإلكترونية",            "severe", "خارج المعهد (الباب)","🚬", "تدخين",       0,
+        ("إنذار شديد + استدعاء ولي الأمر + تعهد",
+         "إيقاف 3-5 أيام + تحويل للإدارة",
+         "إيقاف فصل دراسي + قرار الإدارة")),
+    ("المشاجرات أمام المعهد",                     "severe", "خارج المعهد (الباب)","🥊", "مشاجرات",     0, None),
+    ("تخريب السيارات المركونة أمام المعهد",       "severe", "خارج المعهد (الباب)","🚗", "تخريب",       0, None),
+]
+
+_VIOLATIONS_TEMPLATES_SEED = [
+    "تنبيه الطالب وتوجيهه",
+    "إرسال رسالة نصية لولي الأمر",
+    "أخذ تعهد كتابي",
+    "استدعاء ولي الأمر",
+    "تحويل للمرشد الاجتماعي",
+    "تحويل لإدارة المعهد",
+    "إيقاف يوم دراسي",
+    "إيقاف 3-5 أيام",
+    "إيقاف فصل دراسي كامل",
+    "حرمان من الأنشطة الترفيهية",
+    "إلزام بدفع قيمة التلفيات",
+    "مصادرة الجهاز",
+    "إعادة المسروقات أو دفع قيمتها",
+    "رصد المخالفة في سجل الطالب",
+    "إخبار الإدارة لاتخاذ القرار المناسب",
+]
+
+
+def _seed_violations_catalog(db):
+    """Insert the 32 default violations + 15 templates if their
+    tables are empty. Idempotent: skips when any rows already exist
+    so re-runs (fresh-DB init AND existing-DB migration) never
+    duplicate or overwrite admin edits."""
+    try:
+        row = db.execute("SELECT COUNT(*) FROM violations_catalog").fetchone()
+        existing = int(row[0] if row else 0)
+    except Exception:
+        existing = 0
+    if existing == 0:
+        defaults_by_sev = {
+            "light":  _VIO_LIGHT_DEFAULTS,
+            "medium": _VIO_MEDIUM_DEFAULTS,
+            "severe": _VIO_SEVERE_DEFAULTS,
+        }
+        for i, entry in enumerate(_VIOLATIONS_CATALOG_SEED, start=1):
+            text, sev, loc, emoji, label, qp, override = entry
+            d = defaults_by_sev[sev]
+            a1 = override[0] if override else d[0]
+            a2 = override[1] if override else d[1]
+            a3 = override[2] if override else d[2]
+            t2, t3 = d[3], d[4]
+            try:
+                db.execute(
+                    "INSERT INTO violations_catalog("
+                    "violation_text, severity, location, emoji_icon, "
+                    "short_label, is_quick_pick, action_first_time, "
+                    "action_second_time, action_third_time, "
+                    "repeat_threshold_2nd, repeat_threshold_3rd, "
+                    "sort_order) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (text, sev, loc, emoji, label, int(qp),
+                     a1, a2, a3, int(t2), int(t3), i),
+                )
+            except Exception:
+                pass
+    try:
+        row2 = db.execute(
+            "SELECT COUNT(*) FROM violations_action_templates").fetchone()
+        existing2 = int(row2[0] if row2 else 0)
+    except Exception:
+        existing2 = 0
+    if existing2 == 0:
+        for i, t in enumerate(_VIOLATIONS_TEMPLATES_SEED, start=1):
+            try:
+                db.execute(
+                    "INSERT INTO violations_action_templates("
+                    "template_text, sort_order) VALUES(?,?)",
+                    (t, i),
+                )
+            except Exception:
+                pass
+    try:
+        db.commit()
+    except Exception:
+        pass
+
+
 def init_db():
     # ── CRITICAL DATA SAFETY RULE ────────────────────────────────────
     # This function MUST be idempotent and non-destructive:
@@ -932,6 +1099,9 @@ def init_db():
         severity TEXT,
         whatsapp_sent_at DATETIME,
         whatsapp_sent_by INTEGER,
+        catalog_id INTEGER,
+        action_taken TEXT,
+        occurrence_number INTEGER,
         created_by INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -944,6 +1114,50 @@ def init_db():
                "ON violations(violation_date)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_violations_is_deleted "
                "ON violations(is_deleted)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_violations_catalog_id "
+               "ON violations(catalog_id)")
+    # ── violations_catalog_v1: editable catalog of standard violations.
+    # Each row stores its own three actions + two thresholds so admins
+    # can tweak any single violation independently. Past `violations`
+    # rows hold their own `action_taken` snapshot at record time, so
+    # edits here never retroactively change historical records.
+    db.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        violation_text TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        location TEXT NOT NULL,
+        emoji_icon TEXT,
+        short_label TEXT,
+        is_quick_pick INTEGER DEFAULT 0,
+        action_first_time TEXT NOT NULL,
+        action_second_time TEXT NOT NULL,
+        action_third_time TEXT NOT NULL,
+        repeat_threshold_2nd INTEGER NOT NULL,
+        repeat_threshold_3rd INTEGER NOT NULL,
+        use_count INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_severity "
+               "ON violations_catalog(severity)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_location "
+               "ON violations_catalog(location)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_quick "
+               "ON violations_catalog(is_quick_pick)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vc_active "
+               "ON violations_catalog(is_active)")
+    db.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_text TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    try:
+        _seed_violations_catalog(db)
+    except Exception: pass
     # ── ev_events: trips & events v2 — single-page-per-event design.
     # Replaces the old multi-table trips system (which was reverted).
     # All v2 tables are namespaced with the ev_ prefix to coexist
@@ -6454,6 +6668,9 @@ if True:
         severity TEXT,
         whatsapp_sent_at DATETIME,
         whatsapp_sent_by INTEGER,
+        catalog_id INTEGER,
+        action_taken TEXT,
+        occurrence_number INTEGER,
         created_by INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -6483,6 +6700,96 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("violations_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── violations_catalog_v1: editable catalog of standard violations.
+    # See init_db() for canonical CREATE. The ALTER on `violations`
+    # adds catalog_id / action_taken / occurrence_number to existing
+    # DBs; CREATE TABLE IF NOT EXISTS for the two new tables runs
+    # unconditionally; the seed runs once gated by the migration tag
+    # so admin edits are never overwritten on later boots.
+    try:
+        v_cols = [r[1] for r in db2.execute(
+            "PRAGMA table_info(violations)").fetchall()]
+    except Exception:
+        v_cols = []
+    if "catalog_id" not in v_cols:
+        try: db2.execute("ALTER TABLE violations ADD COLUMN catalog_id INTEGER")
+        except Exception: pass
+    if "action_taken" not in v_cols:
+        try: db2.execute("ALTER TABLE violations ADD COLUMN action_taken TEXT")
+        except Exception: pass
+    if "occurrence_number" not in v_cols:
+        try: db2.execute("ALTER TABLE violations ADD COLUMN occurrence_number INTEGER")
+        except Exception: pass
+    db2.execute("""CREATE TABLE IF NOT EXISTS violations_catalog(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        violation_text TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        location TEXT NOT NULL,
+        emoji_icon TEXT,
+        short_label TEXT,
+        is_quick_pick INTEGER DEFAULT 0,
+        action_first_time TEXT NOT NULL,
+        action_second_time TEXT NOT NULL,
+        action_third_time TEXT NOT NULL,
+        repeat_threshold_2nd INTEGER NOT NULL,
+        repeat_threshold_3rd INTEGER NOT NULL,
+        use_count INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    try:
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_vc_severity "
+                    "ON violations_catalog(severity)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_vc_location "
+                    "ON violations_catalog(location)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_vc_quick "
+                    "ON violations_catalog(is_quick_pick)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_vc_active "
+                    "ON violations_catalog(is_active)")
+        db2.execute("CREATE INDEX IF NOT EXISTS idx_violations_catalog_id "
+                    "ON violations(catalog_id)")
+    except Exception: pass
+    db2.execute("""CREATE TABLE IF NOT EXISTS violations_action_templates(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_text TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    if "violations_catalog_v1" not in applied:
+        try:
+            _seed_violations_catalog(db2)
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("violations_catalog", "لائحة المخالفات"),
+            )
+        except Exception:
+            try:
+                db2.execute(
+                    "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                    ("violations_catalog", "لائحة المخالفات"))
+            except Exception: pass
+        try:
+            db2.execute(
+                "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?) "
+                "ON CONFLICT(tbl_name) DO UPDATE SET tbl_label=EXCLUDED.tbl_label",
+                ("violations_action_templates", "قوالب إجراءات المخالفات"),
+            )
+        except Exception:
+            try:
+                db2.execute(
+                    "INSERT INTO table_labels(tbl_name, tbl_label) VALUES(?,?)",
+                    ("violations_action_templates", "قوالب إجراءات المخالفات"))
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("violations_catalog_v1",))
             db2.commit()
         except Exception: pass
 
@@ -33036,6 +33343,8 @@ _TBL_AUDIT_FEATURE = {
     "books_v2_groups":      ("المناهج — مجموعات",               "مكتبة المناهج"),
     "books_v2_teachers":    ("المناهج — معلمات",                "مكتبة المناهج"),
     "violations":           ("سجل المخالفات",                  "نظام المخالفات"),
+    "violations_catalog":   ("لائحة المخالفات",                "نظام المخالفات"),
+    "violations_action_templates": ("قوالب إجراءات المخالفات", "نظام المخالفات"),
     "ev_events":            ("الفعاليات والرحلات",              "نظام الفعاليات والرحلات v2"),
     "ev_schedule":          ("الخطة الزمنية للرحلات",           "نظام الفعاليات والرحلات v2"),
     "ev_costs":             ("تكاليف الرحلات",                  "نظام الفعاليات والرحلات v2"),
