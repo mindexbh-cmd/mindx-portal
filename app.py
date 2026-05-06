@@ -40803,6 +40803,47 @@ def _vio_can_admin(user):
     return _has_violations_full_access(user)
 
 
+# ── violations_catalog: who can edit the catalog itself? ────────────
+# Same allowlist as the main violations admin surface (admin role +
+# Ahmed Ibrahim + Raed). Kept as a separate helper so policy can
+# diverge later without sweeping changes.
+_VIOLATIONS_CATALOG_VALID_SEVERITIES = ("light", "medium", "severe")
+
+
+def _has_violations_catalog_access(user):
+    return _has_violations_full_access(user)
+
+
+def _vio_catalog_row_to_dict(row):
+    """Normalise a sqlite3.Row / pg row into a JSON-safe dict for
+    catalog responses. Stringifies any non-JSON-friendly value."""
+    if row is None:
+        return None
+    d = dict(row)
+    for k, v in list(d.items()):
+        if v is None or isinstance(v, (str, int, float, bool)):
+            continue
+        try:
+            d[k] = str(v)
+        except Exception:
+            d[k] = None
+    return d
+
+
+def _vio_catalog_count_active_quick_picks(db, exclude_id=None):
+    sql = ("SELECT COUNT(*) FROM violations_catalog "
+           "WHERE is_quick_pick=1 AND is_active=1")
+    args = []
+    if exclude_id is not None:
+        sql += " AND id <> ?"
+        args.append(int(exclude_id))
+    try:
+        row = db.execute(sql, tuple(args)).fetchone()
+        return int(row[0] if row else 0)
+    except Exception:
+        return 0
+
+
 ADMIN_VIOLATIONS_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8">
@@ -42637,8 +42678,11 @@ def api_admin_violations_create():
 
     student_name    = _str(data.get("student_name"))
     violation_date  = _str(data.get("violation_date"))
-    violation_place = _str(data.get("violation_place"))
-    violation_type  = _str(data.get("violation_type"))
+    # New smart-form fields (Commit 3): violation_text + location are
+    # the catalog-backed equivalents of violation_type + violation_place.
+    # Accept either pair so the legacy hard-coded form keeps working.
+    violation_place = _str(data.get("violation_place")) or _str(data.get("location"))
+    violation_type  = _str(data.get("violation_type")) or _str(data.get("violation_text"))
 
     if not student_name:
         return jsonify({"ok": False, "error": "اسم الطالبة مطلوب"}), 400
@@ -42649,12 +42693,49 @@ def api_admin_violations_create():
         _dt.strptime(violation_date, "%Y-%m-%d")
     except Exception:
         return jsonify({"ok": False, "error": "صيغة التاريخ غير صحيحة"}), 400
-    if violation_place not in _VIO_PLACES:
-        return jsonify({"ok": False, "error": "مكان المخالفة غير صحيح"}), 400
-    if violation_type not in _VIO_SEVERITY_BY_TYPE:
-        return jsonify({"ok": False, "error": "نوع المخالفة غير صحيح"}), 400
 
-    severity = _VIO_SEVERITY_BY_TYPE[violation_type]
+    # Resolve catalog row first (if any) — its presence relaxes the
+    # legacy place/type allowlist validation since the catalog has
+    # its own (broader) validation already.
+    cat_id_raw = data.get("catalog_id")
+    catalog_id = None
+    catalog_row = None
+    if cat_id_raw not in (None, "", "null"):
+        try: catalog_id = int(cat_id_raw)
+        except Exception: catalog_id = None
+    if catalog_id is not None:
+        try:
+            db_pre = get_db()
+            catalog_row = db_pre.execute(
+                "SELECT severity, location FROM violations_catalog WHERE id=?",
+                (catalog_id,)).fetchone()
+        except Exception:
+            catalog_row = None
+
+    using_catalog = catalog_row is not None or violation_place in _VIO_CATALOG_LOCATIONS
+    if not using_catalog:
+        if violation_place not in _VIO_PLACES:
+            return jsonify({"ok": False, "error": "مكان المخالفة غير صحيح"}), 400
+        if violation_type not in _VIO_SEVERITY_BY_TYPE:
+            return jsonify({"ok": False, "error": "نوع المخالفة غير صحيح"}), 400
+    else:
+        if not violation_place:
+            return jsonify({"ok": False, "error": "مكان المخالفة مطلوب"}), 400
+        if not violation_type:
+            return jsonify({"ok": False, "error": "نوع المخالفة مطلوب"}), 400
+
+    # Severity precedence: explicit body field → catalog row →
+    # legacy mapping → default 'light'.
+    sev_body = _str(data.get("severity")).lower()
+    if sev_body in _VIOLATIONS_CATALOG_VALID_SEVERITIES:
+        severity = sev_body
+    elif catalog_row is not None:
+        severity = (catalog_row["severity"] if hasattr(catalog_row, "keys")
+                    else catalog_row[0]) or "light"
+    elif violation_type in _VIO_SEVERITY_BY_TYPE:
+        severity = _VIO_SEVERITY_BY_TYPE[violation_type]
+    else:
+        severity = "light"
 
     # student_id may be null (manual entry) or any int that links to students.id
     sid_raw = data.get("student_id")
@@ -42667,9 +42748,17 @@ def api_admin_violations_create():
 
     group_name = _str(data.get("group_name")) or None
     description = _str(data.get("description"))[:500] or None
-    additional_notes = _str(data.get("additional_notes")) or None
+    # `notes` is the smart-form's name for additional_notes; accept both.
+    additional_notes = (_str(data.get("additional_notes"))
+                        or _str(data.get("notes"))) or None
 
     actions = {f: _vio_int01(data.get(f)) for f in _VIO_ACTION_FIELDS}
+    action_taken = _str(data.get("action_taken"))[:1000] or None
+    occ_raw = data.get("occurrence_number")
+    occurrence_number = None
+    if occ_raw not in (None, "", "null"):
+        try: occurrence_number = int(occ_raw)
+        except Exception: occurrence_number = None
 
     db = get_db()
     try:
@@ -42678,8 +42767,9 @@ def api_admin_violations_create():
             "student_id, student_name, group_name, violation_date, "
             "violation_place, violation_type, description, "
             + ", ".join(_VIO_ACTION_FIELDS) + ", "
-            "additional_notes, severity, created_by"
-            ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "additional_notes, severity, catalog_id, action_taken, "
+            "occurrence_number, created_by"
+            ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 student_id, student_name, group_name, violation_date,
                 violation_place, violation_type, description,
@@ -42689,7 +42779,8 @@ def api_admin_violations_create():
                 actions["action_message_parent"],
                 actions["action_call_parent"],
                 actions["action_meeting_parent"],
-                additional_notes, severity, int(user.get("id") or 0),
+                additional_notes, severity, catalog_id, action_taken,
+                occurrence_number, int(user.get("id") or 0),
             ),
         )
         db.commit()
@@ -42908,32 +42999,71 @@ def api_admin_violations_update(vid):
         set_parts.append("violation_date=?"); params.append(v)
         changed["violation_date"] = v
 
-    if "violation_place" in data:
-        v = _str(data["violation_place"])
-        if v not in _VIO_PLACES:
+    # Accept either the legacy field names OR the smart-form aliases
+    # ("location" → violation_place, "violation_text" → violation_type).
+    # Catalog-backed values are accepted without the legacy allowlist
+    # check; legacy values still go through it.
+    if "violation_place" in data or "location" in data:
+        v = _str(data.get("violation_place")) or _str(data.get("location"))
+        if v not in _VIO_PLACES and v not in _VIO_CATALOG_LOCATIONS:
             return jsonify({"ok": False, "error": "مكان المخالفة غير صحيح"}), 400
         set_parts.append("violation_place=?"); params.append(v)
         changed["violation_place"] = v
 
-    if "violation_type" in data:
-        v = _str(data["violation_type"])
-        if v not in _VIO_SEVERITY_BY_TYPE:
-            return jsonify({"ok": False, "error": "نوع المخالفة غير صحيح"}), 400
-        new_sev = _VIO_SEVERITY_BY_TYPE[v]
+    if "violation_type" in data or "violation_text" in data:
+        v = _str(data.get("violation_type")) or _str(data.get("violation_text"))
+        if not v:
+            return jsonify({"ok": False, "error": "نوع المخالفة مطلوب"}), 400
+        # Only re-classify severity automatically when matching the
+        # legacy mapping. For catalog-backed text the caller can pass
+        # `severity` explicitly (validated below).
+        if v in _VIO_SEVERITY_BY_TYPE:
+            new_sev = _VIO_SEVERITY_BY_TYPE[v]
+            set_parts.append("severity=?"); params.append(new_sev)
+            changed["severity"] = new_sev
         set_parts.append("violation_type=?"); params.append(v)
-        set_parts.append("severity=?");       params.append(new_sev)
         changed["violation_type"] = v
-        changed["severity"]       = new_sev
+
+    if "severity" in data:
+        sv = _str(data.get("severity")).lower()
+        if sv not in _VIOLATIONS_CATALOG_VALID_SEVERITIES:
+            return jsonify({"ok": False, "error": "التصنيف غير صحيح"}), 400
+        set_parts.append("severity=?"); params.append(sv)
+        changed["severity"] = sv
 
     if "description" in data:
         v = _str(data["description"])[:500] or None
         set_parts.append("description=?"); params.append(v)
         changed["description"] = v
 
-    if "additional_notes" in data:
-        v = _str(data["additional_notes"]) or None
+    if "additional_notes" in data or "notes" in data:
+        v = (_str(data.get("additional_notes"))
+             or _str(data.get("notes"))) or None
         set_parts.append("additional_notes=?"); params.append(v)
         changed["additional_notes"] = v
+
+    if "action_taken" in data:
+        v = _str(data.get("action_taken"))[:1000] or None
+        set_parts.append("action_taken=?"); params.append(v)
+        changed["action_taken"] = v
+
+    if "catalog_id" in data:
+        cid_raw = data.get("catalog_id")
+        cid_v = None
+        if cid_raw not in (None, "", "null"):
+            try: cid_v = int(cid_raw)
+            except Exception: cid_v = None
+        set_parts.append("catalog_id=?"); params.append(cid_v)
+        changed["catalog_id"] = cid_v
+
+    if "occurrence_number" in data:
+        on_raw = data.get("occurrence_number")
+        on_v = None
+        if on_raw not in (None, "", "null"):
+            try: on_v = int(on_raw)
+            except Exception: on_v = None
+        set_parts.append("occurrence_number=?"); params.append(on_v)
+        changed["occurrence_number"] = on_v
 
     for f in _VIO_ACTION_FIELDS:
         if f in data:
@@ -44268,6 +44398,489 @@ def api_admin_violations_manual_monthly_pdf():
     return _vio_monthly_pdf_response(
         decorated, name, group_name, label, safe_part,
     )
+
+
+# ── /api/violations-catalog/* — catalog CRUD + smart suggestions ────
+# Read endpoints are open to any logged-in user (the smart selection
+# form is used by reception / admin / managers when recording a
+# violation). Mutating endpoints (POST/PATCH/DELETE/toggle) require
+# the catalog admin allowlist. The increment-use endpoint is also
+# any-logged-in because it's called immediately after a violations
+# record is saved by whoever is recording the violation.
+@app.route("/api/violations-catalog", methods=["GET"])
+@login_required
+def api_violations_catalog_list():
+    """List catalog rows with optional filters.
+    Query: severity, location, q (matches violation_text + short_label),
+           active_only (default 1)."""
+    severity = (request.args.get("severity") or "").strip().lower()
+    location = (request.args.get("location") or "").strip()
+    q        = (request.args.get("q") or "").strip()
+    active_only_raw = (request.args.get("active_only") or "1").strip()
+    active_only = active_only_raw not in ("0", "false", "no", "")
+
+    where = []
+    args  = []
+    if active_only:
+        where.append("is_active = 1")
+    if severity in _VIOLATIONS_CATALOG_VALID_SEVERITIES:
+        where.append("severity = ?")
+        args.append(severity)
+    if location:
+        where.append("location = ?")
+        args.append(location)
+    if q:
+        where.append("(violation_text LIKE ? OR COALESCE(short_label,'') LIKE ?)")
+        like = "%" + q + "%"
+        args.extend([like, like])
+    sql = "SELECT * FROM violations_catalog"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY sort_order ASC, id ASC"
+
+    db = get_db()
+    try:
+        rows = db.execute(sql, tuple(args)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر جلب القائمة: " + str(ex)}), 500
+    items = [_vio_catalog_row_to_dict(r) for r in rows]
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/violations-catalog/quick-picks", methods=["GET"])
+@login_required
+def api_violations_catalog_quick_picks():
+    """Top 6 quick-picks, ordered by use_count DESC then sort_order ASC."""
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM violations_catalog "
+            "WHERE is_quick_pick=1 AND is_active=1 "
+            "ORDER BY use_count DESC, sort_order ASC, id ASC LIMIT 6"
+        ).fetchall()
+    except Exception:
+        rows = []
+    items = [_vio_catalog_row_to_dict(r) for r in rows]
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/violations-catalog/<int:cid>", methods=["GET"])
+@login_required
+def api_violations_catalog_get(cid):
+    """Single catalog entry. Any logged-in user."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM violations_catalog WHERE id=?", (cid,)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    return jsonify({"ok": True, "item": _vio_catalog_row_to_dict(row)})
+
+
+@app.route("/api/violations-catalog/<int:cid>/suggestion", methods=["GET"])
+@login_required
+def api_violations_catalog_suggestion(cid):
+    """Smart-suggestion: how many times has this student already been
+    recorded with THIS catalog entry, and which action to suggest next?
+
+    Counts only same-academic-year non-deleted violations.
+    Falls back to 0 / first-time action if no student_id supplied."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM violations_catalog WHERE id=?", (cid,)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "المخالفة غير موجودة"}), 404
+    catalog = _vio_catalog_row_to_dict(row)
+
+    sid_raw = request.args.get("student_id") or ""
+    sid = None
+    if sid_raw not in ("", "null", "None"):
+        try: sid = int(sid_raw)
+        except Exception: sid = None
+
+    # Academic year window: the school year is roughly Sep→Aug.
+    # Use Sep 1 of the current or prior calendar year as the floor.
+    from datetime import date as _date
+    today = _date.today()
+    year_floor = _date(today.year if today.month >= 9 else today.year - 1, 9, 1).isoformat()
+
+    previous_count = 0
+    previous_dates = []
+    if sid is not None:
+        try:
+            rows = db.execute(
+                "SELECT violation_date FROM violations "
+                "WHERE student_id=? AND catalog_id=? AND is_deleted=0 "
+                "AND violation_date >= ? "
+                "ORDER BY violation_date ASC",
+                (sid, cid, year_floor),
+            ).fetchall()
+            for r in rows:
+                vd = r[0] if not hasattr(r, "keys") else r["violation_date"]
+                if vd is None: continue
+                previous_dates.append(str(vd)[:10])
+            previous_count = len(previous_dates)
+        except Exception:
+            previous_count = 0
+            previous_dates = []
+
+    occurrence_number = previous_count + 1
+    threshold_2nd = int(catalog.get("repeat_threshold_2nd") or 0)
+    threshold_3rd = int(catalog.get("repeat_threshold_3rd") or 0)
+    if threshold_3rd >= 1 and occurrence_number >= threshold_3rd:
+        suggested = catalog.get("action_third_time") or ""
+    elif threshold_2nd >= 1 and occurrence_number >= threshold_2nd:
+        suggested = catalog.get("action_second_time") or ""
+    else:
+        suggested = catalog.get("action_first_time") or ""
+
+    return jsonify({
+        "ok": True,
+        "catalog": catalog,
+        "previous_count": previous_count,
+        "occurrence_number": occurrence_number,
+        "suggested_action": suggested,
+        "threshold_2nd": threshold_2nd,
+        "threshold_3rd": threshold_3rd,
+        "previous_dates": previous_dates,
+    })
+
+
+def _vio_catalog_validate_payload(data, partial=False):
+    """Returns (cleaned_dict, error_string_or_None). When partial=True
+    (PATCH), only validates fields that are present in `data`."""
+    cleaned = {}
+
+    def _str(v):
+        return ("" if v is None else str(v)).strip()
+
+    if not partial or "violation_text" in data:
+        v = _str(data.get("violation_text"))
+        if not v: return None, "نص المخالفة مطلوب"
+        cleaned["violation_text"] = v[:500]
+
+    if not partial or "severity" in data:
+        v = _str(data.get("severity")).lower()
+        if v not in _VIOLATIONS_CATALOG_VALID_SEVERITIES:
+            return None, "التصنيف غير صحيح"
+        cleaned["severity"] = v
+
+    if not partial or "location" in data:
+        v = _str(data.get("location"))
+        if v not in _VIO_CATALOG_LOCATIONS:
+            return None, "المكان غير صحيح"
+        cleaned["location"] = v
+
+    if not partial or "emoji_icon" in data:
+        cleaned["emoji_icon"] = _str(data.get("emoji_icon"))[:16] or None
+
+    if not partial or "short_label" in data:
+        cleaned["short_label"] = _str(data.get("short_label"))[:60] or None
+
+    if not partial or "is_quick_pick" in data:
+        v = data.get("is_quick_pick")
+        cleaned["is_quick_pick"] = 1 if (v is True or v in (1, "1", "true", "True") ) else 0
+
+    for fld in ("action_first_time", "action_second_time", "action_third_time"):
+        if not partial or fld in data:
+            v = _str(data.get(fld))
+            if not v: return None, "الإجراءات الثلاثة مطلوبة"
+            cleaned[fld] = v[:500]
+
+    for fld in ("repeat_threshold_2nd", "repeat_threshold_3rd"):
+        if not partial or fld in data:
+            try:
+                iv = int(data.get(fld))
+            except Exception:
+                return None, "العتبات يجب أن تكون أرقاماً صحيحة"
+            if iv < 1:
+                return None, "العتبات يجب أن تكون 1 أو أكثر"
+            cleaned[fld] = iv
+
+    if not partial or "is_active" in data:
+        v = data.get("is_active")
+        if v is not None:
+            cleaned["is_active"] = 1 if (v is True or v in (1, "1", "true", "True")) else 0
+
+    if not partial or "sort_order" in data:
+        if "sort_order" in data and data.get("sort_order") not in (None, ""):
+            try: cleaned["sort_order"] = int(data.get("sort_order"))
+            except Exception: pass
+
+    return cleaned, None
+
+
+@app.route("/api/violations-catalog", methods=["POST"])
+@login_required
+def api_violations_catalog_create():
+    """Admin-only. Creates a new catalog entry. Enforces max 6 active
+    quick-picks (returns 400 if would exceed)."""
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    data = request.get_json(silent=True) or {}
+    cleaned, err = _vio_catalog_validate_payload(data, partial=False)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+
+    db = get_db()
+    if cleaned.get("is_quick_pick") == 1:
+        if _vio_catalog_count_active_quick_picks(db) >= 6:
+            return jsonify({"ok": False,
+                "error": "الحد الأقصى 6 أزرار سريعة. ألغي تفعيل أحدها أولاً"}), 400
+
+    try:
+        cur = db.execute(
+            "INSERT INTO violations_catalog("
+            "violation_text, severity, location, emoji_icon, short_label, "
+            "is_quick_pick, action_first_time, action_second_time, "
+            "action_third_time, repeat_threshold_2nd, repeat_threshold_3rd, "
+            "sort_order, is_active) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                cleaned.get("violation_text"),
+                cleaned.get("severity"),
+                cleaned.get("location"),
+                cleaned.get("emoji_icon"),
+                cleaned.get("short_label"),
+                cleaned.get("is_quick_pick", 0),
+                cleaned.get("action_first_time"),
+                cleaned.get("action_second_time"),
+                cleaned.get("action_third_time"),
+                cleaned.get("repeat_threshold_2nd"),
+                cleaned.get("repeat_threshold_3rd"),
+                cleaned.get("sort_order", 999),
+                cleaned.get("is_active", 1),
+            ),
+        )
+        db.commit()
+        new_id = getattr(cur, "lastrowid", None)
+        if not new_id:
+            row = db.execute(
+                "SELECT id FROM violations_catalog "
+                "ORDER BY id DESC LIMIT 1").fetchone()
+            new_id = row[0] if row else None
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر الحفظ: " + str(ex)}), 500
+    return jsonify({"ok": True, "id": new_id})
+
+
+@app.route("/api/violations-catalog/<int:cid>", methods=["PATCH"])
+@login_required
+def api_violations_catalog_patch(cid):
+    """Admin-only. Updates only the fields present in the body.
+    Past `violations` rows are NEVER modified — only future
+    suggestions use the new values."""
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM violations_catalog WHERE id=?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    data = request.get_json(silent=True) or {}
+    cleaned, err = _vio_catalog_validate_payload(data, partial=True)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    if not cleaned:
+        return jsonify({"ok": True, "id": cid, "noop": True})
+
+    if cleaned.get("is_quick_pick") == 1:
+        if _vio_catalog_count_active_quick_picks(db, exclude_id=cid) >= 6:
+            return jsonify({"ok": False,
+                "error": "الحد الأقصى 6 أزرار سريعة. ألغي تفعيل أحدها أولاً"}), 400
+
+    sets, args = [], []
+    for k, v in cleaned.items():
+        sets.append(k + "=?")
+        args.append(v)
+    sets.append("updated_at=CURRENT_TIMESTAMP")
+    args.append(cid)
+    try:
+        db.execute(
+            "UPDATE violations_catalog SET " + ", ".join(sets) + " WHERE id=?",
+            tuple(args),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر التحديث: " + str(ex)}), 500
+    return jsonify({"ok": True, "id": cid})
+
+
+@app.route("/api/violations-catalog/<int:cid>", methods=["DELETE"])
+@login_required
+def api_violations_catalog_delete(cid):
+    """Admin-only soft-delete. Sets is_active=0. Existing violations
+    rows referencing catalog_id remain intact."""
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    row = db.execute(
+        "SELECT id FROM violations_catalog WHERE id=?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    try:
+        db.execute(
+            "UPDATE violations_catalog SET is_active=0, "
+            "is_quick_pick=0, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (cid,),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر الحذف: " + str(ex)}), 500
+    return jsonify({"ok": True, "id": cid})
+
+
+@app.route("/api/violations-catalog/<int:cid>/toggle-quick-pick",
+           methods=["POST"])
+@login_required
+def api_violations_catalog_toggle_quick_pick(cid):
+    """Admin-only. Flips is_quick_pick. Enforces max 6 active picks."""
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    row = db.execute(
+        "SELECT id, is_quick_pick, is_active FROM violations_catalog "
+        "WHERE id=?", (cid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    cur_qp = int(rd.get("is_quick_pick") or 0)
+    new_qp = 0 if cur_qp == 1 else 1
+    if new_qp == 1 and int(rd.get("is_active") or 0) != 1:
+        return jsonify({"ok": False,
+            "error": "لا يمكن إضافة مخالفة موقوفة كزر سريع"}), 400
+    if new_qp == 1 and _vio_catalog_count_active_quick_picks(db, exclude_id=cid) >= 6:
+        return jsonify({"ok": False,
+            "error": "الحد الأقصى 6 أزرار سريعة. ألغي تفعيل أحدها أولاً"}), 400
+    try:
+        db.execute(
+            "UPDATE violations_catalog SET is_quick_pick=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (new_qp, cid),
+        )
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": cid, "is_quick_pick": new_qp})
+
+
+@app.route("/api/violations-catalog/<int:cid>/increment-use",
+           methods=["POST"])
+@login_required
+def api_violations_catalog_increment_use(cid):
+    """Any logged-in user can call this — fired right after a
+    violations row referencing this catalog entry is saved."""
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE violations_catalog SET use_count = COALESCE(use_count,0) + 1 "
+            "WHERE id=?", (cid,))
+        db.commit()
+        if hasattr(cur, "rowcount") and cur.rowcount == 0:
+            return jsonify({"ok": False, "error": "غير موجود"}), 404
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": cid})
+
+
+# ── /api/violations-action-templates — template library CRUD ────────
+# Used by the catalog editor's "إضافة من القوالب الجاهزة" popover.
+# Read access is open to any logged-in user (also useful from the
+# selection form's auto-fill override editor); mutations require
+# the catalog admin allowlist.
+@app.route("/api/violations-action-templates", methods=["GET"])
+@login_required
+def api_violations_action_templates_list():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, template_text, sort_order, is_active "
+            "FROM violations_action_templates "
+            "WHERE is_active=1 ORDER BY sort_order ASC, id ASC"
+        ).fetchall()
+    except Exception:
+        rows = []
+    items = [{"id": r["id"] if hasattr(r, "keys") else r[0],
+              "template_text": (r["template_text"] if hasattr(r, "keys") else r[1]) or "",
+              "sort_order": r["sort_order"] if hasattr(r, "keys") else r[2],
+              "is_active": r["is_active"] if hasattr(r, "keys") else r[3]}
+             for r in rows]
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/violations-action-templates", methods=["POST"])
+@login_required
+def api_violations_action_templates_create():
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    data = request.get_json(silent=True) or {}
+    txt = ("" if data.get("template_text") is None else
+           str(data.get("template_text"))).strip()
+    if not txt:
+        return jsonify({"ok": False, "error": "النص مطلوب"}), 400
+    txt = txt[:500]
+    db = get_db()
+    try:
+        try:
+            row = db.execute(
+                "SELECT MAX(sort_order) FROM violations_action_templates"
+            ).fetchone()
+            next_order = int(((row[0] if row else 0) or 0)) + 1
+        except Exception:
+            next_order = 1
+        try:
+            cur = db.execute(
+                "INSERT INTO violations_action_templates(template_text, sort_order) "
+                "VALUES(?,?)",
+                (txt, next_order),
+            )
+        except Exception:
+            existing = db.execute(
+                "SELECT id, is_active FROM violations_action_templates "
+                "WHERE template_text=?", (txt,)).fetchone()
+            if existing:
+                ex_id = existing["id"] if hasattr(existing, "keys") else existing[0]
+                db.execute(
+                    "UPDATE violations_action_templates SET is_active=1 "
+                    "WHERE id=?", (ex_id,))
+                db.commit()
+                return jsonify({"ok": True, "id": ex_id, "reactivated": True})
+            raise
+        db.commit()
+        new_id = getattr(cur, "lastrowid", None)
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذر الحفظ: " + str(ex)}), 500
+    return jsonify({"ok": True, "id": new_id})
+
+
+@app.route("/api/violations-action-templates/<int:tid>", methods=["DELETE"])
+@login_required
+def api_violations_action_templates_delete(tid):
+    user = session.get("user") or {}
+    if not _has_violations_catalog_access(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    try:
+        cur = db.execute(
+            "UPDATE violations_action_templates SET is_active=0 WHERE id=?",
+            (tid,))
+        db.commit()
+        if hasattr(cur, "rowcount") and cur.rowcount == 0:
+            return jsonify({"ok": False, "error": "غير موجود"}), 404
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({"ok": True, "id": tid})
 
 
 # ── /api/admin/teacher/<id>/groups ───────────────────────────────────
