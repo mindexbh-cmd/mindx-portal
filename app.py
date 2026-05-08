@@ -39610,6 +39610,46 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   </div>
 </div>
 
+<!-- ── Send-evaluation-to-parent confirmation modal ──────────────
+     Replaces the legacy native confirm() flow on the evaluation
+     cards. Read-only preview of the WhatsApp text; admin clicks
+     إرسال to fire POST /api/monthly-evaluations/<id>/send-to-parent
+     and have wa.me opened in a new tab via the same gesture. ──── -->
+<div class="tm-modal-overlay" id="tm-eval-send-overlay" hidden>
+  <div class="tm-modal" role="dialog" aria-modal="true"
+       aria-labelledby="tm-eval-send-title">
+    <header class="tm-modal-head">
+      <h3 id="tm-eval-send-title">تأكيد إرسال رسالة الواتساب</h3>
+      <button type="button" class="tm-modal-close" id="tm-eval-send-close-x"
+              aria-label="إغلاق">×</button>
+    </header>
+    <div class="tm-modal-body">
+      <div class="tm-evs-row">
+        <span class="tm-evs-key">سيتم إرسال الرسالة التالية إلى ولي أمر:</span>
+        <span class="tm-evs-val" id="tm-evs-student">—</span>
+      </div>
+      <div class="tm-evs-row">
+        <span class="tm-evs-key">رقم الواتساب:</span>
+        <span class="tm-evs-val tm-evs-phone" id="tm-evs-phone">—</span>
+      </div>
+      <div class="tm-evs-preview-wrap">
+        <label class="tm-evs-key" for="tm-evs-preview">نص الرسالة:</label>
+        <textarea id="tm-evs-preview" class="tm-evs-preview" readonly
+                  rows="14" aria-readonly="true"
+                  placeholder="جاري التحميل..."></textarea>
+        <div class="tm-evs-note">لا يمكن تعديل نص الرسالة من هنا</div>
+      </div>
+      <div class="tm-evs-error" id="tm-evs-error" hidden></div>
+    </div>
+    <footer class="tm-modal-foot">
+      <button type="button" class="tm-btn tm-btn-secondary"
+              id="tm-evs-cancel">إلغاء</button>
+      <button type="button" class="tm-btn tm-btn-primary"
+              id="tm-evs-confirm" disabled>إرسال</button>
+    </footer>
+  </div>
+</div>
+
 <style>
 /* ── Step-2 redesign — scoped under tm-* class names so they don't
    collide with the older .panel / .stat-card / .tabs styles still
@@ -39792,6 +39832,25 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
                    min-height:90px;}
 .tm-field textarea:focus{outline:none;border-color:#6B3FA0;
                          box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+
+/* ── Send-evaluation-to-parent confirmation modal ──────────── */
+.tm-evs-row{display:flex;flex-direction:column;gap:4px;}
+.tm-evs-key{color:#4a148c;font-weight:700;font-size:.88rem;}
+.tm-evs-val{color:#212121;font-size:.95rem;font-weight:700;}
+.tm-evs-phone{direction:ltr;text-align:right;font-family:monospace;
+              letter-spacing:.5px;color:#1b5e20;}
+.tm-evs-preview-wrap{display:flex;flex-direction:column;gap:6px;}
+.tm-evs-preview{width:100%;padding:10px 12px;border:0.5px solid #d8c8ec;
+                border-radius:10px;background:#fafafe;color:#212121;
+                font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:.92rem;
+                line-height:1.6;resize:vertical;min-height:220px;
+                direction:rtl;text-align:right;}
+.tm-evs-preview:focus{outline:none;border-color:#6B3FA0;
+                      box-shadow:0 0 0 2px rgba(107,63,160,.15);}
+.tm-evs-note{color:#6a4f8a;font-size:.78rem;font-style:italic;}
+.tm-evs-error{background:#ffebee;color:#b71c1c;border:0.5px solid #ef9a9a;
+              border-radius:8px;padding:9px 12px;font-weight:700;
+              font-size:.88rem;}
 
 /* ── Phase-2: approve-and-send progress modal extras ───────── */
 .tm-send-status{color:#4a148c;font-weight:800;font-size:1rem;
@@ -41173,6 +41232,170 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
            ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
+  // Send-evaluation-to-parent confirmation modal — replaces the
+  // legacy native confirm() flow. Loads the templated text via
+  // GET /api/monthly-evaluations/preview-message/<eid>, then on
+  // إرسال POSTs to /send-to-parent and opens the wa.me tab in the
+  // same gesture chain (the click on tm-evs-confirm).
+  var _evsState = { eid:0, btn:null, sending:false };
+  var evsOverlay = document.getElementById('tm-eval-send-overlay');
+  var evsStudent = document.getElementById('tm-evs-student');
+  var evsPhone   = document.getElementById('tm-evs-phone');
+  var evsPreview = document.getElementById('tm-evs-preview');
+  var evsError   = document.getElementById('tm-evs-error');
+  var evsCancel  = document.getElementById('tm-evs-cancel');
+  var evsClose   = document.getElementById('tm-eval-send-close-x');
+  var evsConfirm = document.getElementById('tm-evs-confirm');
+
+  function tmFmtPhone(raw, clean){
+    var s = String(raw || clean || '').trim();
+    if(!s) return '—';
+    if(clean){
+      var c = String(clean);
+      if(c.length >= 8){
+        return '+' + c.slice(0, c.length-8) + ' ' +
+               c.slice(c.length-8, c.length-4) + ' ' +
+               c.slice(c.length-4);
+      }
+    }
+    return s;
+  }
+  function tmEvsClose(){
+    if(_evsState.sending) return;
+    if(evsOverlay) evsOverlay.setAttribute('hidden','');
+    if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
+    var btn = _evsState.btn;
+    if(btn && btn._origLabel != null){
+      btn.disabled = false;
+      btn.textContent = btn._origLabel;
+      btn._origLabel = null;
+    }
+    _evsState.eid = 0;
+    _evsState.btn = null;
+  }
+  function tmEvsShowError(msg){
+    if(!evsError) return;
+    evsError.textContent = msg || 'تعذّر الإرسال';
+    evsError.removeAttribute('hidden');
+  }
+  function tmEvsOpen(eid, btn){
+    _evsState.eid = eid;
+    _evsState.btn = btn;
+    _evsState.sending = false;
+    if(btn){
+      btn._origLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'جاري التحميل...';
+    }
+    if(evsStudent) evsStudent.textContent = '...';
+    if(evsPhone)   evsPhone.textContent   = '...';
+    if(evsPreview){
+      evsPreview.value = '';
+      evsPreview.placeholder = 'جاري التحميل...';
+    }
+    if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
+    if(evsConfirm){ evsConfirm.disabled = true; evsConfirm.textContent = 'إرسال'; }
+    if(evsCancel) evsCancel.disabled = false;
+    if(evsOverlay) evsOverlay.removeAttribute('hidden');
+    setTimeout(function(){
+      if(evsCancel) try { evsCancel.focus(); } catch(e){}
+    }, 0);
+
+    fetch('/api/monthly-evaluations/preview-message/' +
+          encodeURIComponent(eid),
+          {credentials:'include'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok){
+          tmEvsShowError((j && j.error) || 'تعذّر تحميل المعاينة');
+          return;
+        }
+        var e = j.entry || {};
+        if(evsStudent) evsStudent.textContent = e.student_name || '—';
+        if(evsPhone){
+          var has = !!j.parent_phone_clean;
+          evsPhone.textContent = has
+            ? tmFmtPhone(j.parent_phone_raw, j.parent_phone_clean)
+            : '— غير مسجل —';
+          evsPhone.style.color = has ? '#1b5e20' : '#c62828';
+        }
+        if(evsPreview){
+          evsPreview.value = j.text || '';
+          evsPreview.placeholder = '';
+        }
+        if(evsConfirm){
+          if(!j.parent_phone_clean){
+            evsConfirm.disabled = true;
+            evsConfirm.textContent = 'رقم ولي الأمر غير مسجل';
+          } else {
+            evsConfirm.disabled = false;
+            evsConfirm.textContent = 'إرسال';
+          }
+        }
+      })
+      .catch(function(){
+        tmEvsShowError('تعذّر الاتصال بالخادم');
+      });
+  }
+  function tmEvsSend(){
+    var eid = _evsState.eid;
+    if(!eid || _evsState.sending) return;
+    _evsState.sending = true;
+    if(evsConfirm){ evsConfirm.disabled = true; evsConfirm.textContent = '⏳ جاري الإرسال...'; }
+    if(evsCancel)  evsCancel.disabled = true;
+    if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
+    fetch('/api/monthly-evaluations/' + encodeURIComponent(eid) +
+          '/send-to-parent',
+          {method:'POST',
+           headers:{'Content-Type':'application/json'},
+           credentials:'include',
+           body: JSON.stringify({})})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        _evsState.sending = false;
+        if(!j || !j.ok){
+          if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = 'إرسال'; }
+          if(evsCancel)  evsCancel.disabled = false;
+          tmEvsShowError((j && j.error) || 'تعذّر الإرسال');
+          return;
+        }
+        // Open the WhatsApp tab BEFORE closing — the gesture chain
+        // started with the click on tm-evs-confirm and Chrome/Edge
+        // accept the popup as long as the fetch resolved quickly.
+        try { window.open(j.wa_url, '_blank'); } catch(e){}
+        // Flip the card → "تم الإرسال ✓" badge without re-fetching.
+        var entry = tmFindEvalInCache(eid);
+        if(entry){
+          entry.whatsapp_sent_at = tmNowTimestampStr();
+        }
+        // Clear button state before close so it doesn't get
+        // re-enabled with the old "جاري التحميل..." label.
+        if(_evsState.btn){ _evsState.btn._origLabel = null; }
+        tmEvsClose();
+        tmFilterAndRenderEvals();
+      })
+      .catch(function(){
+        _evsState.sending = false;
+        if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = 'إرسال'; }
+        if(evsCancel)  evsCancel.disabled = false;
+        tmEvsShowError('تعذّر الاتصال بالخادم');
+      });
+  }
+
+  if(evsCancel)  evsCancel.addEventListener('click', tmEvsClose);
+  if(evsClose)   evsClose.addEventListener('click', tmEvsClose);
+  if(evsConfirm) evsConfirm.addEventListener('click', tmEvsSend);
+  if(evsOverlay){
+    evsOverlay.addEventListener('click', function(ev){
+      if(ev.target === evsOverlay) tmEvsClose();
+    });
+  }
+  document.addEventListener('keydown', function(ev){
+    if(ev.key === 'Escape' && evsOverlay && !evsOverlay.hasAttribute('hidden')){
+      tmEvsClose();
+    }
+  });
+
   var evalsPanel = document.getElementById('tm-evals-body');
   if(evalsPanel){
     evalsPanel.addEventListener('click', function(ev){
@@ -41180,48 +41403,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       if(!btn) return;
       var eid = parseInt(btn.getAttribute('data-tm-eval-send'), 10);
       if(!eid) return;
-      var entry = tmFindEvalInCache(eid);
-      var stuName = (entry && entry.student_name) || '';
-      var confirmMsg = stuName
-        ? ('هل تريد إرسال التقييم لولي أمر ' + stuName + '؟')
-        : 'هل تريد إرسال التقييم لولي الأمر؟';
-      if(!confirm(confirmMsg)) return;
-
-      var origLabel = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'جاري الإرسال...';
-
-      fetch('/api/monthly-evaluations/' + encodeURIComponent(eid) +
-            '/send-to-parent',
-            {method:'POST',
-             headers:{'Content-Type':'application/json'},
-             credentials:'include',
-             body: JSON.stringify({})})
-        .then(function(r){ return r.json(); })
-        .then(function(j){
-          if(!j || !j.ok){
-            btn.disabled = false;
-            btn.textContent = origLabel;
-            alert((j && j.error) || 'تعذّر الإرسال');
-            return;
-          }
-          // Open the WhatsApp tab BEFORE any alert/confirm so the
-          // user-gesture is still "fresh" — popup blockers in
-          // Chrome/Edge accept fetches that resolve quickly.
-          try { window.open(j.wa_url, '_blank'); } catch(e){}
-          // Patch the cache so the next render flips the card from
-          // button → "تم الإرسال ✓" badge without a re-fetch.
-          if(entry){
-            entry.whatsapp_sent_at = tmNowTimestampStr();
-          }
-          tmFilterAndRenderEvals();
-          alert('تم فتح واتساب — تأكدي من الإرسال');
-        })
-        .catch(function(){
-          btn.disabled = false;
-          btn.textContent = origLabel;
-          alert('تعذّر الاتصال بالخادم');
-        });
+      tmEvsOpen(eid, btn);
     });
   }
 })();
