@@ -25351,6 +25351,8 @@ def dashboard():
 @app.route("/attendance")
 @login_required
 def attendance():
+    # Deploy bump 2026-05-09 — force Render redeploy to flush stale
+    # cached HTML after the abbf628 frequent-absence push.
     user = session.get("user") or {}
     role = (user.get("role") or "").strip().lower()
     _allow_ev = "1" if _has_events_full_access(user) else "0"
