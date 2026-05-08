@@ -36528,6 +36528,51 @@ h2.head .month{color:#F57C00;}
 .note-box{background:#fff8e1;border:1.5px dashed #FB8C00;border-radius:10px;
           padding:12px 14px;color:#e65100;font-size:.92rem;font-weight:700;
           line-height:1.6;margin-bottom:14px;}
+/* Per-student evaluation-history panel — three states (never /
+   prior-other-months / current-month-already-evaluated). Each state
+   sets a colour-coded left border and matching background. */
+.ev-hist-panel{border-radius:12px;padding:14px 16px;margin-bottom:14px;
+               border:1.5px solid #d8c8ec;background:#faf7ff;
+               border-right:5px solid #6B3FA0;}
+.ev-hist-panel.state-1{border-color:#a5d6a7;background:#f1f8e9;
+                       border-right-color:#2E7D32;}
+.ev-hist-panel.state-2{border-color:#ffe082;background:#fff8e1;
+                       border-right-color:#F57F17;}
+.ev-hist-panel.state-3{border-color:#ef9a9a;background:#ffebee;
+                       border-right-color:#c62828;}
+.ev-hist-panel.state-err{border-color:#ef9a9a;background:#fff5f5;
+                         border-right-color:#c62828;}
+.ev-hist-loading{display:flex;align-items:center;gap:8px;
+                 color:#6a4f8a;font-weight:700;}
+.ev-hist-spinner{display:inline-block;animation:ev-spin 1.4s linear infinite;}
+@keyframes ev-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.ev-hist-title{font-weight:900;color:#4a148c;font-size:1rem;
+               line-height:1.5;margin-bottom:6px;
+               display:flex;gap:8px;align-items:flex-start;}
+.ev-hist-panel.state-1 .ev-hist-title{color:#1b5e20;}
+.ev-hist-panel.state-2 .ev-hist-title{color:#E65100;}
+.ev-hist-panel.state-3 .ev-hist-title{color:#b71c1c;}
+.ev-hist-panel.state-err .ev-hist-title{color:#b71c1c;}
+.ev-hist-sub{color:#5d4037;font-weight:600;font-size:.92rem;
+             line-height:1.55;margin:6px 0;}
+.ev-hist-list{margin:8px 0 6px;padding:0;list-style:none;
+              display:flex;flex-direction:column;gap:4px;}
+.ev-hist-list li{padding:0;font-size:.92rem;color:#4a148c;}
+.ev-hist-list a{color:#6B3FA0;font-weight:700;text-decoration:none;
+                cursor:pointer;}
+.ev-hist-list a:hover{text-decoration:underline;color:#4a148c;}
+.ev-hist-cta{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.ev-hist-btn{background:linear-gradient(135deg,#FB8C00,#EF6C00);
+             color:#fff;border:none;border-radius:8px;padding:9px 16px;
+             font-weight:800;font-size:.92rem;cursor:pointer;
+             font-family:inherit;}
+.ev-hist-btn:hover{box-shadow:0 4px 14px rgba(251,140,0,.3);}
+.ev-hist-btn.retry{background:linear-gradient(135deg,#7B1FA2,#4A148C);}
+@media (max-width:480px){
+  .ev-hist-panel{padding:12px 12px;}
+  .ev-hist-title{font-size:.95rem;}
+  .ev-hist-list li{font-size:.88rem;}
+}
 .section{background:#fffaf2;border:1.5px solid #ffe0b2;border-radius:14px;
          padding:18px;margin-bottom:14px;}
 .section .sect-head{display:flex;justify-content:space-between;align-items:center;
@@ -36670,6 +36715,19 @@ table.tbl tr:hover td{background:#fff8e1;}
         </select>
         <span class="err" id="err-estudent"></span>
       </div>
+    </div>
+
+    <!-- History panel — hidden until a student is picked. Three
+         states: never-evaluated (1), evaluated-other-months (2),
+         current-month-already-evaluated (3). State 3 disables the
+         save button and shows an edit-existing CTA that calls
+         loadIntoForm() in-page. -->
+    <div class="ev-hist-panel" id="evHistPanel" hidden>
+      <div class="ev-hist-loading" id="evHistLoading" hidden>
+        <span class="ev-hist-spinner" aria-hidden="true">⏳</span>
+        <span>جاري تحميل سجل التقييمات...</span>
+      </div>
+      <div class="ev-hist-body" id="evHistBody"></div>
     </div>
 
     <div class="note-box">
@@ -36990,7 +37048,362 @@ table.tbl tr:hover td{background:#fff8e1;}
     var prev = document.getElementById('ev-stu-retry');
     if(prev) prev.parentNode.removeChild(prev);
     loadStudents(this.value);
+    // Group changed → student picker resets, panel must hide.
+    evHistHide();
   });
+
+  // ── per-student history (icons + State 1/2/3 panel) ─────────────
+  // Cache by student_id so revisiting a student doesn't re-fetch.
+  // Cleared on group change (the student dropdown is rebuilt).
+  // Each entry is the JSON body returned by /student-history; we
+  // store either a successful body or an {error: true} sentinel
+  // so retries can re-fetch from a clean state.
+  var _evHistCache = {};
+  function evHistKey(sid, month){ return String(sid) + '|' + (month || ''); }
+  function evHistFetch(sid){
+    if(!sid) return Promise.resolve(null);
+    if(_evHistCache[sid] && !_evHistCache[sid].error){
+      return Promise.resolve(_evHistCache[sid]);
+    }
+    return fetch('/api/teacher/evaluations/student-history/' +
+                 encodeURIComponent(sid),
+                 {credentials:'include'})
+      .then(function(r){ return r.json().then(function(j){
+        return {status:r.status, body:j};
+      });})
+      .then(function(o){
+        if(o.status !== 200 || !o.body || !o.body.ok){
+          _evHistCache[sid] = { error:true,
+            message: (o.body && o.body.error) ||
+                     ('HTTP ' + o.status) };
+          return _evHistCache[sid];
+        }
+        _evHistCache[sid] = o.body;
+        return o.body;
+      })
+      .catch(function(){
+        _evHistCache[sid] = { error:true, message:'network' };
+        return _evHistCache[sid];
+      });
+  }
+
+  function evCountIcon(n){
+    n = parseInt(n, 10) || 0;
+    if(n === 0) return '🟢';   // 🟢
+    if(n <= 2)  return '🟡';   // 🟡
+    return '🔵';                // 🔵
+  }
+  function evCountTooltip(n){
+    n = parseInt(n, 10) || 0;
+    if(n === 0) return '🟢 لم يُقيّم من قبل';
+    if(n === 1) return '🟡 تم تقييمه مرة واحدة من قبل';
+    if(n === 2) return '🟡 تم تقييمه مرتين من قبل';
+    if(n >= 3 && n <= 10) return '🔵 تم تقييمه ' + n + ' مرات من قبل';
+    return '🔵 تم تقييمه ' + n + ' مرة من قبل';
+  }
+  // Decorates each <option> in the student select with an emoji
+  // prefix + title attribute. Called after the picker renders and
+  // after the per-student history fetches resolve. Reads from the
+  // selected month at the time of decoration so the warning icon
+  // (⚠️) reflects the CURRENT auto-filled month — we re-decorate
+  // when the month input changes.
+  function evDecorateStudentOptions(){
+    var sel = document.getElementById('estudent');
+    if(!sel || sel.disabled) return;
+    var monthVal = (document.getElementById('emonth').value || '').trim();
+    for(var i = 0; i < sel.options.length; i++){
+      var opt = sel.options[i];
+      var sid = opt.value;
+      if(!sid) continue;
+      var orig = opt.getAttribute('data-orig-name');
+      if(orig == null){
+        // Strip any prior emoji we placed; first time we see this
+        // option, capture the original name verbatim.
+        orig = opt.textContent;
+        opt.setAttribute('data-orig-name', orig);
+      }
+      var hist = _evHistCache[sid];
+      if(!hist || hist.error){
+        // History not loaded yet (or errored). Render the original
+        // name without an icon — we'll be called again when the
+        // fetch resolves, or the panel will surface the error
+        // when the user actually selects this student.
+        opt.textContent = orig;
+        opt.removeAttribute('title');
+        continue;
+      }
+      var cur = (hist.current_month || '').trim();
+      var alreadyCur = !!(monthVal && monthVal === cur &&
+                          hist.current_month_already_evaluated);
+      var n = (hist.months_evaluated || []).length;
+      if(alreadyCur){
+        opt.textContent = '⚠️ ' + orig;
+        opt.title = '⚠️ تم تقييمه لهذا الشهر مسبقاً — ' +
+                    'اختاريها للتعديل';
+      } else {
+        opt.textContent = evCountIcon(n) + ' ' + orig;
+        opt.title = evCountTooltip(n);
+      }
+    }
+  }
+
+  // After the student picker populates, fire history fetches in
+  // parallel and re-decorate as each resolves. Errors don't block
+  // anything — the panel will surface them when the student is
+  // actually selected.
+  function evPrefetchHistoryFor(sel){
+    if(!sel || sel.disabled) return;
+    var ids = [];
+    for(var i = 0; i < sel.options.length; i++){
+      var v = sel.options[i].value;
+      if(v) ids.push(v);
+    }
+    if(!ids.length) return;
+    ids.forEach(function(sid){
+      evHistFetch(sid).then(function(){ evDecorateStudentOptions(); });
+    });
+  }
+
+  // ── history panel render (State 1/2/3 + error) ─────────────────
+  // Wired up to estudent.change AND emonth.change — re-renders so
+  // moving the month away from a duplicate flips the form back to
+  // save mode without forcing the teacher to reselect the student.
+  function evHistHide(){
+    var p = document.getElementById('evHistPanel');
+    if(p){ p.setAttribute('hidden',''); p.className = 'ev-hist-panel'; }
+    var b = document.getElementById('evHistBody');
+    if(b) b.innerHTML = '';
+    evApplySaveLock(false, null);
+  }
+  function evHistShowLoading(){
+    var p = document.getElementById('evHistPanel');
+    if(p){ p.removeAttribute('hidden'); p.className = 'ev-hist-panel'; }
+    var b = document.getElementById('evHistBody');
+    if(b) b.innerHTML = '';
+    var l = document.getElementById('evHistLoading');
+    if(l) l.removeAttribute('hidden');
+  }
+  function evHistHideLoading(){
+    var l = document.getElementById('evHistLoading');
+    if(l) l.setAttribute('hidden','');
+  }
+  function evHistRenderError(sid, msg){
+    var p = document.getElementById('evHistPanel');
+    var b = document.getElementById('evHistBody');
+    evHistHideLoading();
+    if(!p || !b) return;
+    p.removeAttribute('hidden');
+    p.className = 'ev-hist-panel state-err';
+    b.innerHTML =
+      '<div class="ev-hist-title">⚠️ ' +
+        'تعذّر جلب سجل التقييمات' + '</div>' +
+      '<div class="ev-hist-sub">' +
+        escapeHtml(msg || '') +
+        ' — تم تعطيل زر الحفظ مؤقتاً للحماية من التكرار. ' +
+      '</div>' +
+      '<div class="ev-hist-cta">' +
+        '<button type="button" class="ev-hist-btn retry" ' +
+          'onclick="evHistRetry('+sid+')">' +
+          '↻ إعادة المحاولة' +
+        '</button>' +
+      '</div>';
+    evApplySaveLock(true, 'history-error');
+  }
+  function evHistRenderState(hist, monthVal){
+    var p = document.getElementById('evHistPanel');
+    var b = document.getElementById('evHistBody');
+    evHistHideLoading();
+    if(!p || !b) return;
+    var cur = (hist.current_month || '').trim();
+    var monthLabel = arMonthLabel(monthVal || cur);
+    var alreadyThisMonth = (monthVal === cur &&
+                            !!hist.current_month_already_evaluated);
+    var months = (hist.months_evaluated || []).slice();
+    var existingId = hist.current_month_evaluation_id;
+    p.removeAttribute('hidden');
+
+    // Build the list of "previous months" — every month entry,
+    // EXCLUDING the one matching the currently-selected month
+    // (so the user doesn't see "previous" alongside the duplicate
+    // warning for the same month).
+    function buildList(filterMonth){
+      var items = months.filter(function(x){
+        return !filterMonth || x.month !== filterMonth;
+      });
+      if(!items.length) return '';
+      var lis = items.map(function(m){
+        var url = m.edit_url || ('/teacher/evaluations?edit=' +
+                                 (m.evaluation_id || ''));
+        return '<li>' +
+          '<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener">' +
+            escapeHtml(m.month_label_ar || m.month) +
+          '</a></li>';
+      }).join('');
+      return '<ul class="ev-hist-list">' + lis + '</ul>';
+    }
+
+    if(alreadyThisMonth){
+      // ── State 3: current selected month already has a row.
+      p.className = 'ev-hist-panel state-3';
+      var subList = buildList(cur);
+      var subHtml = subList
+        ? ('<div class="ev-hist-sub" style="margin-top:14px;">' +
+            'التقييمات السابقة:</div>' + subList)
+        : '';
+      b.innerHTML =
+        '<div class="ev-hist-title">⚠️ ' +
+          'تم تقييم هذا الطالب لشهر ' + escapeHtml(monthLabel) +
+          ' مسبقاً</div>' +
+        '<div class="ev-hist-sub">' +
+          'لا يمكن تسجيل تقييم جديد لنفس الشهر.' +
+        '</div>' +
+        '<div class="ev-hist-cta">' +
+          '<button type="button" class="ev-hist-btn" ' +
+            'onclick="evEditExisting('+ (existingId || 0) +')">' +
+            '✎ تعديل التقييم الحالي' +
+          '</button>' +
+        '</div>' +
+        subHtml;
+      evApplySaveLock(true, 'duplicate-month');
+      return;
+    }
+    if(!months.length){
+      // ── State 1: never evaluated by THIS teacher.
+      p.className = 'ev-hist-panel state-1';
+      b.innerHTML =
+        '<div class="ev-hist-title">🟢 ' +
+          'لم يتم تقييم هذا الطالب من قبل' + '</div>' +
+        '<div class="ev-hist-sub">' +
+          'يمكنك المتابعة بإدخال التقييم.' +
+        '</div>';
+      evApplySaveLock(false, null);
+      return;
+    }
+    // ── State 2: prior evaluations exist, but not for the
+    //    currently-selected month.
+    p.className = 'ev-hist-panel state-2';
+    b.innerHTML =
+      '<div class="ev-hist-title">🟡 ' +
+        'تم تقييم هذا الطالب سابقاً في الأشهر التالية:' + '</div>' +
+      buildList(null) +
+      '<div class="ev-hist-sub">' +
+        'يمكنك تسجيل تقييم جديد للشهر الحالي (' +
+        escapeHtml(monthLabel) + ').' +
+      '</div>';
+    evApplySaveLock(false, null);
+  }
+  // Save-button lock state. Reasons: 'duplicate-month' (State 3) or
+  // 'history-error' (fetch failed). Both block the form's submit
+  // button. Only the duplicate-month case swaps the button label;
+  // the error case keeps the original label so the retry button is
+  // the obvious affordance.
+  var _evSaveLockReason = null;
+  var _evSaveOrigLabel = null;
+  function evApplySaveLock(locked, reason){
+    var btn = document.getElementById('saveBtn');
+    if(!btn) return;
+    if(_evSaveOrigLabel == null){
+      _evSaveOrigLabel = btn.textContent;
+    }
+    if(locked){
+      btn.disabled = true;
+      _evSaveLockReason = reason;
+      if(reason === 'duplicate-month'){
+        btn.textContent = '⛔ تم التقييم لهذا الشهر';
+      }
+      // history-error: leave label as-is so the retry CTA is the
+      // visible action.
+    } else {
+      btn.disabled = false;
+      _evSaveLockReason = null;
+      // Restore label only if we previously changed it for State 3.
+      // The edit-mode label ("💾 حفظ التعديلات") should survive a
+      // lock cycle — loadIntoForm sets it after we're done here.
+      if(_evSaveOrigLabel != null){
+        btn.textContent = _evSaveOrigLabel;
+      }
+    }
+  }
+  window.evHistRetry = function(sid){
+    if(!sid) return;
+    delete _evHistCache[sid];
+    evRefreshPanel();
+  };
+  window.evEditExisting = function(eid){
+    if(!eid) return;
+    // Reuse the existing in-page edit pathway — no navigation,
+    // no separate page. loadIntoForm clears State 3 because the
+    // selected student/month will be the one being edited and
+    // _editId switches the submit to PATCH.
+    if(typeof loadIntoForm === 'function'){
+      loadIntoForm(eid);
+    }
+  };
+  function evRefreshPanel(){
+    var sel = document.getElementById('estudent');
+    if(!sel) return;
+    var sid = sel.value;
+    if(!sid){ evHistHide(); return; }
+    var monthVal = (document.getElementById('emonth').value || '').trim();
+    var cached = _evHistCache[sid];
+    if(cached && !cached.error){
+      evHistRenderState(cached, monthVal);
+      return;
+    }
+    evHistShowLoading();
+    evApplySaveLock(true, 'history-loading');
+    evHistFetch(sid).then(function(j){
+      // Only render if THIS student is still selected.
+      if(sel.value !== String(sid)) return;
+      if(!j || j.error){
+        evHistRenderError(sid, j && j.message ? j.message :
+                          'تعذّر الاتصال');
+        return;
+      }
+      evHistRenderState(j, (document.getElementById('emonth').value || '').trim());
+    });
+  }
+  document.getElementById('estudent').addEventListener('change', function(){
+    evRefreshPanel();
+    // Picker decoration depends on which month is currently
+    // selected; refreshing the panel doesn't update the dropdown
+    // icons, so we re-decorate here too in case the cache filled
+    // after the initial decorate pass.
+    evDecorateStudentOptions();
+  });
+  document.getElementById('emonth').addEventListener('change', function(){
+    // Re-render panel: switching the month away from a duplicate
+    // flips the form back to save mode (and vice versa).
+    evRefreshPanel();
+    evDecorateStudentOptions();
+  });
+
+  // Patch loadStudents so we kick off history prefetch + decorate
+  // once the picker is populated. The original loadStudents reference
+  // is captured first so we don't infinite-recurse.
+  var _evOrigLoadStudents = loadStudents;
+  loadStudents = function(group){
+    // Switching group invalidates the per-student cache (different
+    // group → different students → no overlap to keep).
+    _evHistCache = {};
+    evHistHide();
+    _evOrigLoadStudents(group);
+    // The picker populates async. Watch for completion and prefetch
+    // — bounded retry so we don't spin forever on a network error.
+    var sel = document.getElementById('estudent');
+    var attempts = 0;
+    function whenReady(){
+      attempts++;
+      if(attempts > 60){ return; } // ~6s max
+      if(!sel.disabled && sel.options.length > 1){
+        evPrefetchHistoryFor(sel);
+        evDecorateStudentOptions();
+        return;
+      }
+      setTimeout(whenReady, 100);
+    }
+    whenReady();
+  };
 
   // ── recent table ──
   function loadRecent(){
@@ -37141,6 +37554,25 @@ table.tbl tr:hover td{background:#fff8e1;}
 
   loadGroups();
   loadRecent();
+
+  // ?edit=<id> deep-link: history-panel month-links open in a new
+  // tab pointing at this URL form, and admin tooling can share the
+  // same link to land directly in edit mode. Falls through silently
+  // if the param is missing or non-numeric.
+  (function readEditDeepLink(){
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var raw = qs.get('edit');
+      if(!raw) return;
+      var eid = parseInt(raw, 10);
+      if(!eid) return;
+      // loadIntoForm uses /api/monthly-evaluations?limit=200 to find
+      // the row, so it works for any of the teacher's recent entries.
+      // For older entries, the lookup fails silently and the toast
+      // surfaces the error.
+      loadIntoForm(eid);
+    } catch(e){}
+  })();
 })();
 </script>
 </body></html>"""
