@@ -18311,7 +18311,73 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
   <h1>&#128197; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</h1>
   <a href="/settings" style="background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;padding:11px 22px;border-radius:11px;font-size:15px;font-weight:700;text-decoration:none;margin-left:8px;display:inline-block;">&#9881; &#x625;&#x639;&#x62F;&#x627;&#x62F;&#x627;&#x62A;</a><a href="/dashboard" class="btn-back">&larr; &#x627;&#x644;&#x631;&#x626;&#x64A;&#x633;&#x64A;&#x629;</a>
 </div>
+<script>document.body && (document.body.dataset.role = (window._mxUserRole = "USER_ROLE_PLACEHOLDER"));</script>
 <div class="main">
+  <!-- Frequent-absence alerts — admin/manager/reception only.
+       Hidden via inline style; the script block at the bottom of
+       this file flips the [hidden] attribute when window._mxUserRole
+       matches an allowed role. The server-side endpoints all enforce
+       the same role gate independently. -->
+  <div class="atfreq-card" id="atfreqCard" hidden>
+    <div class="atfreq-head">
+      <h2 class="atfreq-title">&#x1F6A8; &#x62A;&#x646;&#x628;&#x64A;&#x647; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628; &#x643;&#x62B;&#x64A;&#x631;&#x64A; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</h2>
+      <button type="button" class="atfreq-toggle" id="atfreqToggleBtn"
+              aria-expanded="false" aria-controls="atfreqBody">
+        <span class="atfreq-toggle-text">&#x639;&#x631;&#x636;</span>
+      </button>
+    </div>
+    <div class="atfreq-body" id="atfreqBody" hidden>
+      <div class="atfreq-row">
+        <div class="atfreq-fld">
+          <label for="atfreqFrom">&#x645;&#x646; &#x62A;&#x627;&#x631;&#x64A;&#x62E;</label>
+          <input type="date" id="atfreqFrom">
+        </div>
+        <div class="atfreq-fld">
+          <label for="atfreqTo">&#x625;&#x644;&#x649; &#x62A;&#x627;&#x631;&#x64A;&#x62E;</label>
+          <input type="date" id="atfreqTo">
+        </div>
+        <div class="atfreq-fld">
+          <label for="atfreqMin">&#x627;&#x644;&#x62D;&#x62F; &#x627;&#x644;&#x623;&#x62F;&#x646;&#x649; &#x644;&#x644;&#x63A;&#x64A;&#x627;&#x628;</label>
+          <input type="number" id="atfreqMin" min="1" value="5">
+        </div>
+        <div class="atfreq-fld">
+          <label for="atfreqGroup">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631;&#x64A;)</label>
+          <select id="atfreqGroup">
+            <option value="">&#8212; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#8212;</option>
+          </select>
+        </div>
+        <div class="atfreq-fld atfreq-search-wrap">
+          <button type="button" class="atfreq-btn atfreq-btn-search"
+                  id="atfreqSearchBtn">&#x1F50D; &#x628;&#x62D;&#x62B;</button>
+        </div>
+      </div>
+      <div class="atfreq-err" id="atfreqInputErr" hidden></div>
+      <div class="atfreq-results" id="atfreqResults" hidden>
+        <div class="atfreq-results-head">
+          <span class="atfreq-summary" id="atfreqSummary">&#8212;</span>
+          <button type="button" class="atfreq-btn atfreq-btn-bulk"
+                  id="atfreqBulkBtn" hidden>&#x1F4E4; &#x625;&#x631;&#x633;&#x627;&#x644; &#x644;&#x644;&#x62C;&#x645;&#x64A;&#x639;</button>
+        </div>
+        <div class="atfreq-table-wrap">
+          <table class="atfreq-tbl">
+            <thead><tr>
+              <th>&#x627;&#x633;&#x645; &#x627;&#x644;&#x637;&#x627;&#x644;&#x628;</th>
+              <th>&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629;</th>
+              <th>&#x639;&#x62F;&#x62F; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</th>
+              <th>&#x62A;&#x648;&#x627;&#x631;&#x64A;&#x62E; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</th>
+              <th>&#x631;&#x642;&#x645; &#x648;&#x644;&#x64A; &#x627;&#x644;&#x623;&#x645;&#x631;</th>
+              <th>&#x625;&#x62C;&#x631;&#x627;&#x621;</th>
+            </tr></thead>
+            <tbody id="atfreqTbody"></tbody>
+          </table>
+        </div>
+        <div class="atfreq-empty" id="atfreqEmpty" hidden>
+          &#x644;&#x627; &#x64A;&#x648;&#x62C;&#x62F; &#x637;&#x644;&#x627;&#x628; &#x64A;&#x637;&#x627;&#x628;&#x642;&#x648;&#x646; &#x627;&#x644;&#x645;&#x639;&#x627;&#x64A;&#x64A;&#x631; &#x641;&#x64A; &#x647;&#x630;&#x647; &#x627;&#x644;&#x641;&#x62A;&#x631;&#x629;.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="attInstrCard">
     <div class="att-intro-title">&#x1F4CB; &#x62E;&#x637;&#x648;&#x627;&#x62A; &#x62A;&#x633;&#x62C;&#x64A;&#x644; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</div>
     <ol>
@@ -19714,7 +19780,678 @@ document.addEventListener('click', function(e){
   if (m && m.style.display === 'flex' && e.target === m) almClose();
 });
 
+/* ── Frequent-absence alerts (admin/manager/reception only) ─────
+   Adds the search card at the top of the page + single/bulk send
+   modals. Reuses the existing wa.me deep-link mechanism — no new
+   send infrastructure. The existing daily attendance flow is NOT
+   touched: this lives in its own scoped IIFE under window.atfreq*
+   helpers. */
+(function atfreqInit(){
+  var ROLE = (window._mxUserRole || '').toLowerCase();
+  var ALLOWED = (ROLE === 'admin' || ROLE === 'manager' || ROLE === 'reception');
+  var card = document.getElementById('atfreqCard');
+  if(!card) return;
+  if(!ALLOWED){
+    /* Card is already [hidden] in markup; leave it that way. The
+       server-side endpoints will 403 anyway, this just avoids the
+       UI noise for users who can't use it. */
+    return;
+  }
+  card.removeAttribute('hidden');
+
+  /* Defaults: from = first of current month, to = today. */
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  var now = new Date();
+  var todayIso = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate());
+  var firstIso = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-01';
+  document.getElementById('atfreqFrom').value = firstIso;
+  document.getElementById('atfreqTo').value   = todayIso;
+
+  /* Group dropdown — fetch once. Reuses /api/groups (admin route).
+     If the fetch fails the dropdown stays at the "all groups" sole
+     option, search still works without group filter. */
+  fetch('/api/groups', {credentials:'include'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if(!j) return;
+      /* /api/groups returns either {groups:[...]} or a list. Be
+         defensive about either shape. */
+      var arr = j.groups || j || [];
+      if(!Array.isArray(arr)) return;
+      var sel = document.getElementById('atfreqGroup');
+      arr.forEach(function(g){
+        var nm = (typeof g === 'string') ? g : (g.name || g.group_name || '');
+        if(!nm) return;
+        var opt = document.createElement('option');
+        opt.value = nm;
+        opt.textContent = nm;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(function(){});
+
+  function escHtml(s){
+    s = (s == null ? '' : String(s));
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* Search-button error banner. */
+  function atfreqShowInputErr(msg){
+    var el = document.getElementById('atfreqInputErr');
+    if(!el) return;
+    if(msg){ el.textContent = msg; el.removeAttribute('hidden'); }
+    else { el.textContent = ''; el.setAttribute('hidden',''); }
+  }
+
+  /* Toggle (collapse) the body — gives admins a way to hide the card
+     when not in use without taking up space on the daily flow. */
+  var toggleBtn = document.getElementById('atfreqToggleBtn');
+  var body = document.getElementById('atfreqBody');
+  toggleBtn.addEventListener('click', function(){
+    var hidden = body.hasAttribute('hidden');
+    if(hidden){
+      body.removeAttribute('hidden');
+      toggleBtn.setAttribute('aria-expanded','true');
+      toggleBtn.querySelector('.atfreq-toggle-text').textContent = 'إخفاء';
+    } else {
+      body.setAttribute('hidden','');
+      toggleBtn.setAttribute('aria-expanded','false');
+      toggleBtn.querySelector('.atfreq-toggle-text').textContent = 'عرض';
+    }
+  });
+
+  /* ── Search ── */
+  var _atfreqSnapshot = { from:'', to:'', min_count:0, students: [] };
+
+  function atfreqDoSearch(){
+    atfreqShowInputErr('');
+    var fromV = (document.getElementById('atfreqFrom').value || '').trim();
+    var toV   = (document.getElementById('atfreqTo').value   || '').trim();
+    var minV  = parseInt(document.getElementById('atfreqMin').value, 10) || 0;
+    var grpV  = (document.getElementById('atfreqGroup').value || '').trim();
+    if(!fromV || !toV){
+      atfreqShowInputErr('الرجاء تحديد نطاق التاريخ.');
+      return;
+    }
+    if(fromV > toV){
+      atfreqShowInputErr('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.');
+      return;
+    }
+    if(minV < 1){
+      atfreqShowInputErr('الحد الأدنى للغياب يجب أن يكون 1 أو أكثر.');
+      return;
+    }
+    var btn = document.getElementById('atfreqSearchBtn');
+    btn.disabled = true;
+    var origLbl = btn.textContent;
+    btn.textContent = '⏳ ...';
+    var qs = '?from=' + encodeURIComponent(fromV) +
+             '&to='   + encodeURIComponent(toV)   +
+             '&min_count=' + encodeURIComponent(minV);
+    if(grpV) qs += '&group_id=' + encodeURIComponent(grpV);
+    fetch('/api/admin/attendance/frequent-absences' + qs,
+          {credentials:'include'})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; }); })
+      .then(function(o){
+        btn.disabled = false;
+        btn.textContent = origLbl;
+        if(o.status !== 200 || !o.body || !o.body.ok){
+          atfreqShowInputErr((o.body && o.body.error) || 'تعذّر البحث.');
+          return;
+        }
+        _atfreqSnapshot = {
+          from: o.body.from, to: o.body.to, min_count: o.body.min_count,
+          students: o.body.students || [],
+        };
+        atfreqRenderResults();
+      })
+      .catch(function(){
+        btn.disabled = false;
+        btn.textContent = origLbl;
+        atfreqShowInputErr('تعذّر الاتصال بالخادم.');
+      });
+  }
+  document.getElementById('atfreqSearchBtn').addEventListener('click', atfreqDoSearch);
+
+  function atfreqDaysAgo(iso){
+    if(!iso) return null;
+    var s = String(iso).slice(0,10);
+    var dt = new Date(s + 'T00:00:00');
+    if(isNaN(dt.getTime())) return null;
+    var diff = (new Date()) - dt;
+    return Math.floor(diff / 86400000);
+  }
+
+  function atfreqRenderResults(){
+    var resultsBox = document.getElementById('atfreqResults');
+    var summary = document.getElementById('atfreqSummary');
+    var tbody = document.getElementById('atfreqTbody');
+    var empty = document.getElementById('atfreqEmpty');
+    var bulkBtn = document.getElementById('atfreqBulkBtn');
+    resultsBox.removeAttribute('hidden');
+    var students = _atfreqSnapshot.students || [];
+    var total = students.length;
+    summary.textContent = 'تم العثور على ' +
+                          total + ' طالب/ة بغياب >= ' +
+                          _atfreqSnapshot.min_count;
+    if(!total){
+      empty.removeAttribute('hidden');
+      tbody.innerHTML = '';
+      bulkBtn.setAttribute('hidden','');
+      return;
+    }
+    empty.setAttribute('hidden','');
+    /* Show bulk button only if at least one row has a phone. */
+    var anyPhone = students.some(function(s){ return !!s.parent_phone_clean; });
+    if(anyPhone){ bulkBtn.removeAttribute('hidden'); }
+    else { bulkBtn.setAttribute('hidden',''); }
+
+    var html = students.map(function(s){
+      var dates = s.absence_dates || [];
+      var datesShort = dates.slice(0,3).join('، ');
+      if(dates.length > 3){
+        datesShort += ' و ' + (dates.length - 3) + ' أخرى';
+      }
+      var phoneCell;
+      if(s.parent_phone_clean){
+        phoneCell = '<span class="atfreq-phone">' + escHtml(s.parent_phone_display) + '</span>';
+      } else {
+        phoneCell = '<span class="atfreq-phone-missing">—</span>';
+      }
+      var actCell;
+      if(!s.parent_phone_clean){
+        actCell = '<button type="button" class="atfreq-row-btn atfreq-row-btn-disabled" disabled>' +
+                  'رقم غير مسجل</button>';
+      } else if(s.last_alert_within_7_days){
+        var days = atfreqDaysAgo(s.last_alert_sent_at);
+        var dlbl = (days == null) ? '?' : String(days);
+        actCell = '<button type="button" class="atfreq-row-btn atfreq-row-btn-warn" ' +
+                  'data-atfreq-sid="' + (parseInt(s.student_id, 10) || 0) + '">' +
+                  '⚠️ تم التنبيه قبل ' + dlbl + ' أيام</button>';
+      } else {
+        actCell = '<button type="button" class="atfreq-row-btn atfreq-row-btn-send" ' +
+                  'data-atfreq-sid="' + (parseInt(s.student_id, 10) || 0) + '">' +
+                  '📲 إرسال تنبيه</button>';
+      }
+      return '<tr data-atfreq-row="' + (parseInt(s.student_id, 10) || 0) + '">' +
+        '<td class="atfreq-name">' + escHtml(s.student_name) + '</td>' +
+        '<td>' + escHtml(s.group_name) + '</td>' +
+        '<td class="atfreq-count">' + s.absence_count + '</td>' +
+        '<td class="atfreq-dates" title="' + escHtml(dates.join(', ')) + '">' + escHtml(datesShort) + '</td>' +
+        '<td>' + phoneCell + '</td>' +
+        '<td>' + actCell + '</td>' +
+      '</tr>';
+    }).join('');
+    tbody.innerHTML = html;
+  }
+
+  /* ── Single-send modal ── */
+  var _atfreqSendState = { sid:0, btn:null, sending:false, force:false };
+
+  function atfreqGetStudent(sid){
+    var arr = _atfreqSnapshot.students || [];
+    for(var i = 0; i < arr.length; i++){
+      if(parseInt(arr[i].student_id, 10) === sid) return arr[i];
+    }
+    return null;
+  }
+
+  function atfreqOpenSend(sid, rowBtn){
+    var s = atfreqGetStudent(sid);
+    if(!s) return;
+    _atfreqSendState.sid = sid;
+    _atfreqSendState.btn = rowBtn;
+    _atfreqSendState.sending = false;
+    _atfreqSendState.force = false;
+    document.getElementById('atfreqSendStudent').textContent = s.student_name || '—';
+    document.getElementById('atfreqSendPhone').textContent = s.parent_phone_display || '—';
+    document.getElementById('atfreqSendPeriod').textContent =
+      _atfreqSnapshot.from + ' → ' + _atfreqSnapshot.to;
+    document.getElementById('atfreqSendCount').textContent = s.absence_count;
+    /* Default-render the message client-side so the textarea is
+       editable from the start. The server applies the same template
+       if custom_message is empty, so re-rendering on the client
+       matches. */
+    var defaultText = atfreqRenderDefault(s.student_name,
+      _atfreqSnapshot.from, _atfreqSnapshot.to, s.absence_count);
+    document.getElementById('atfreqSendText').value = defaultText;
+    var warn = document.getElementById('atfreqSendWarn');
+    var btn  = document.getElementById('atfreqSendBtn');
+    var err  = document.getElementById('atfreqSendErr');
+    err.setAttribute('hidden','');
+    err.textContent = '';
+    if(s.last_alert_within_7_days){
+      var days = atfreqDaysAgo(s.last_alert_sent_at);
+      var dlbl = (days == null) ? '—' : String(days);
+      document.getElementById('atfreqSendWarnText').textContent =
+        '⚠️ تم إرسال تنبيه لهذا الطالب قبل ' +
+        dlbl + ' أيام. هل تريدين المتابعة؟';
+      warn.removeAttribute('hidden');
+      _atfreqSendState.force = true;
+      btn.textContent = 'إرسال على الرغم من ذلك';
+    } else {
+      warn.setAttribute('hidden','');
+      btn.textContent = 'إرسال';
+    }
+    btn.disabled = false;
+    document.getElementById('atfreqSendCancel').disabled = false;
+    document.getElementById('atfreqSendBack').classList.add('show');
+  }
+
+  function atfreqCloseSend(){
+    if(_atfreqSendState.sending) return;
+    document.getElementById('atfreqSendBack').classList.remove('show');
+    _atfreqSendState.sid = 0;
+    _atfreqSendState.btn = null;
+    _atfreqSendState.force = false;
+  }
+
+  function atfreqRenderDefault(name, from_d, to_d, count){
+    var nm = (name || '—').trim() || '—';
+    var fd = from_d || '—';
+    var td = to_d || '—';
+    var cnt = parseInt(count, 10);
+    var cntS = (isNaN(cnt) || cnt <= 0) ? '—' : String(cnt);
+    return 'السلام عليكم ولي أمر الطالب/ة ' + nm + ' 🌸\n\n' +
+      'نود إعلامكم بأن نسبة الغياب لدى الطالب/ة\n' +
+      'ارتفعت خلال الفترة الأخيرة:\n\n' +
+      '📅 الفترة: من ' + fd + ' إلى ' + td + '\n' +
+      '❌ عدد مرات الغياب: ' + cntS + '\n\n' +
+      'نتمنى متابعة حضور الطالب/ة بانتظام لضمان\n' +
+      'استمرارية التحصيل الدراسي.\n\n' +
+      'في حال وجود ظروف خاصة، يرجى التواصل مع الإدارة.\n\n' +
+      'نشكر لكم تعاونكم 💜\n' +
+      'مركز مايندكس للتعليم والتدريب';
+  }
+
+  function atfreqDoSend(){
+    var sid = _atfreqSendState.sid;
+    if(!sid || _atfreqSendState.sending) return;
+    _atfreqSendState.sending = true;
+    var s = atfreqGetStudent(sid);
+    var btn = document.getElementById('atfreqSendBtn');
+    var cancelBtn = document.getElementById('atfreqSendCancel');
+    var origLbl = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري الإرسال...';
+    cancelBtn.disabled = true;
+    var err = document.getElementById('atfreqSendErr');
+    err.setAttribute('hidden',''); err.textContent = '';
+    var customText = document.getElementById('atfreqSendText').value || '';
+    fetch('/api/admin/attendance/send-absence-alert', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({
+        student_id: sid,
+        from: _atfreqSnapshot.from,
+        to:   _atfreqSnapshot.to,
+        absence_count: (s ? s.absence_count : 0),
+        custom_message: customText,
+        force: !!_atfreqSendState.force,
+      }),
+    }).then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; }); })
+      .then(function(o){
+        _atfreqSendState.sending = false;
+        cancelBtn.disabled = false;
+        if(o.status !== 200 || !o.body || !o.body.ok){
+          btn.disabled = false;
+          btn.textContent = origLbl;
+          err.textContent = (o.body && o.body.error) || 'تعذّر الإرسال.';
+          err.removeAttribute('hidden');
+          return;
+        }
+        if(o.body.warning === 'already_alerted_recently' && o.body.proceed_anyway){
+          /* Server-side gate fired even though client thought it was
+             clear (cache vs. server out of sync). Show banner + flip
+             into force mode in the same modal. */
+          var warn = document.getElementById('atfreqSendWarn');
+          var days = atfreqDaysAgo(o.body.last_sent_at);
+          var dlbl = (days == null) ? '—' : String(days);
+          document.getElementById('atfreqSendWarnText').textContent =
+            '⚠️ تم إرسال تنبيه لهذا الطالب قبل ' +
+            dlbl + ' أيام. اضغطي الإرسال للمتابعة.';
+          warn.removeAttribute('hidden');
+          _atfreqSendState.force = true;
+          btn.disabled = false;
+          btn.textContent = 'إرسال على الرغم من ذلك';
+          return;
+        }
+        /* Open wa.me in this gesture chain (same trick the
+           teacher-deliveries modal uses). */
+        try { window.open(o.body.wa_url, '_blank'); } catch(e){}
+        /* Patch the row in the snapshot + DOM so the action button
+           flips to "warn" without re-fetching. */
+        var stu = atfreqGetStudent(sid);
+        if(stu){
+          stu.last_alert_sent_at = (new Date()).toISOString().slice(0,19).replace('T',' ');
+          stu.last_alert_within_7_days = true;
+        }
+        atfreqRenderResults();
+        atfreqCloseSend();
+      })
+      .catch(function(){
+        _atfreqSendState.sending = false;
+        cancelBtn.disabled = false;
+        btn.disabled = false;
+        btn.textContent = origLbl;
+        err.textContent = 'تعذّر الاتصال بالخادم.';
+        err.removeAttribute('hidden');
+      });
+  }
+
+  /* ── Bulk-send modal ── */
+  function atfreqOpenBulk(){
+    var arr = (_atfreqSnapshot.students || []).filter(function(s){ return !!s.parent_phone_clean; });
+    if(!arr.length){ return; }
+    var willSkip = arr.filter(function(s){ return s.last_alert_within_7_days; }).length;
+    var willSend = arr.length - willSkip;
+    document.getElementById('atfreqBulkSummary').textContent =
+      'سيتم إرسال ' + willSend +
+      ' رسالة، وتخطي ' + willSkip +
+      ' طالب تم تنبيههم خلال آخر 7 أيام.';
+    document.getElementById('atfreqBulkText').value = atfreqRenderDefault(
+      '{اسم_الطالب}',
+      _atfreqSnapshot.from, _atfreqSnapshot.to, _atfreqSnapshot.min_count);
+    document.getElementById('atfreqBulkProgress').textContent = '';
+    document.getElementById('atfreqBulkSendBtn').disabled = false;
+    document.getElementById('atfreqBulkSendBtn').textContent =
+      'إرسال للجميع';
+    document.getElementById('atfreqBulkBack').classList.add('show');
+  }
+  function atfreqCloseBulk(){
+    document.getElementById('atfreqBulkBack').classList.remove('show');
+  }
+
+  function atfreqDoBulk(){
+    var arr = (_atfreqSnapshot.students || []).filter(function(s){ return !!s.parent_phone_clean; });
+    if(!arr.length) return;
+    var sids = arr.map(function(s){ return parseInt(s.student_id, 10) || 0; }).filter(function(x){ return !!x; });
+    var customText = document.getElementById('atfreqBulkText').value || '';
+    var btn = document.getElementById('atfreqBulkSendBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري الإرسال...';
+    var progress = document.getElementById('atfreqBulkProgress');
+    progress.textContent = 'جاري الاتصال بالخادم...';
+    fetch('/api/admin/attendance/send-absence-alert-bulk', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({
+        student_ids:    sids,
+        from:           _atfreqSnapshot.from,
+        to:             _atfreqSnapshot.to,
+        min_count:      _atfreqSnapshot.min_count,
+        custom_message: customText,
+      }),
+    }).then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; }); })
+      .then(function(o){
+        if(o.status !== 200 || !o.body || !o.body.ok){
+          btn.disabled = false;
+          btn.textContent = 'إرسال للجميع';
+          progress.textContent = (o.body && o.body.error) || 'تعذّر الإرسال.';
+          return;
+        }
+        var results = (o.body.results || []);
+        var sentList = results.filter(function(x){ return !x.skipped; });
+        var skipped = results.filter(function(x){ return x.skipped; });
+        if(!sentList.length){
+          progress.textContent =
+            'لم يتم الإرسال: تخطي ' + skipped.length +
+            ' طالب.';
+          btn.disabled = false;
+          btn.textContent = 'إغلاق';
+          btn.onclick = atfreqCloseBulk;
+          return;
+        }
+        /* Open wa.me tabs sequentially with 800ms gap. The first
+           open is in the user-gesture chain from the bulk button
+           click; subsequent tabs may be popup-blocked depending on
+           browser settings — we surface that in the progress text
+           if window.open returns null. */
+        var idx = 0;
+        function step(){
+          if(idx >= sentList.length){
+            progress.textContent =
+              'تم فتح ' + sentList.length +
+              ' رسالة، تخطي ' + skipped.length +
+              ' طالب.';
+            btn.disabled = false;
+            btn.textContent = 'إغلاق';
+            btn.onclick = atfreqCloseBulk;
+            /* Re-render so all rows now show "warn" badge. */
+            (sentList).forEach(function(r){
+              var stu = atfreqGetStudent(r.student_id);
+              if(stu){
+                stu.last_alert_sent_at = (new Date()).toISOString().slice(0,19).replace('T',' ');
+                stu.last_alert_within_7_days = true;
+              }
+            });
+            atfreqRenderResults();
+            return;
+          }
+          progress.textContent =
+            'جاري الإرسال... (' +
+            (idx + 1) + ' من ' + sentList.length + ')';
+          var url = sentList[idx].wa_url;
+          try { window.open(url, '_blank'); } catch(e){}
+          idx++;
+          setTimeout(step, 800);
+        }
+        step();
+      })
+      .catch(function(){
+        btn.disabled = false;
+        btn.textContent = 'إرسال للجميع';
+        progress.textContent = 'تعذّر الاتصال بالخادم.';
+      });
+  }
+
+  /* Wire up modal buttons + table delegation. */
+  document.getElementById('atfreqSendCancel').addEventListener('click', atfreqCloseSend);
+  document.getElementById('atfreqSendBtn').addEventListener('click', atfreqDoSend);
+  document.getElementById('atfreqSendBack').addEventListener('click', function(ev){
+    if(ev.target === this) atfreqCloseSend();
+  });
+  document.getElementById('atfreqBulkBtn').addEventListener('click', atfreqOpenBulk);
+  document.getElementById('atfreqBulkCancel').addEventListener('click', atfreqCloseBulk);
+  document.getElementById('atfreqBulkSendBtn').addEventListener('click', atfreqDoBulk);
+  document.getElementById('atfreqBulkBack').addEventListener('click', function(ev){
+    if(ev.target === this) atfreqCloseBulk();
+  });
+  document.getElementById('atfreqTbody').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-atfreq-sid]');
+    if(!b) return;
+    var sid = parseInt(b.getAttribute('data-atfreq-sid'), 10) || 0;
+    if(!sid) return;
+    atfreqOpenSend(sid, b);
+  });
+  document.addEventListener('keydown', function(ev){
+    if(ev.key !== 'Escape') return;
+    var sb = document.getElementById('atfreqSendBack');
+    if(sb && sb.classList.contains('show')){ atfreqCloseSend(); return; }
+    var bb = document.getElementById('atfreqBulkBack');
+    if(bb && bb.classList.contains('show')){ atfreqCloseBulk(); return; }
+  });
+
+  /* TODO(future): add Excel export — out of scope for this commit. */
+})();
+
 </script>
+
+<!-- Frequent-absence alerts: scoped CSS (.atfreq-*) + modals.
+     Sits at the bottom of the page so it doesn't interleave with
+     the existing daily-flow markup. -->
+<style>
+.atfreq-card{background:#fff;border-radius:14px;padding:16px 20px;
+             box-shadow:0 2px 14px rgba(229,57,53,.12);margin-bottom:20px;
+             border:1.5px solid #ffcdd2;border-right:5px solid #c62828;}
+.atfreq-head{display:flex;justify-content:space-between;align-items:center;
+             gap:10px;flex-wrap:wrap;}
+.atfreq-title{margin:0;font-size:18px;font-weight:900;color:#c62828;}
+.atfreq-toggle{background:#fdecea;color:#c62828;border:1.5px solid #ef9a9a;
+               padding:6px 14px;border-radius:9px;font-size:13px;font-weight:700;
+               cursor:pointer;font-family:inherit;}
+.atfreq-toggle:hover{background:#fbcfc9;}
+.atfreq-body{margin-top:16px;}
+.atfreq-row{display:grid;grid-template-columns:repeat(5, 1fr);gap:12px;
+            align-items:end;}
+.atfreq-fld{display:flex;flex-direction:column;gap:5px;}
+.atfreq-fld label{font-size:12px;font-weight:700;color:#c62828;}
+.atfreq-fld input,.atfreq-fld select{padding:9px 12px;border:1.5px solid #ef9a9a;
+                                      border-radius:9px;font-size:14px;
+                                      background:#fff5f5;color:#333;outline:none;
+                                      font-family:inherit;}
+.atfreq-fld input:focus,.atfreq-fld select:focus{border-color:#c62828;background:#fff;}
+.atfreq-search-wrap{justify-content:flex-end;}
+.atfreq-btn{background:linear-gradient(135deg,#c62828,#e53935);color:#fff;
+            border:none;border-radius:10px;padding:10px 18px;font-weight:800;
+            font-size:14px;cursor:pointer;font-family:inherit;
+            display:inline-flex;align-items:center;gap:6px;}
+.atfreq-btn:hover{box-shadow:0 4px 14px rgba(229,57,53,.3);}
+.atfreq-btn:disabled{opacity:.55;cursor:not-allowed;}
+.atfreq-btn-search{width:100%;}
+.atfreq-btn-bulk{background:linear-gradient(135deg,#1565c0,#1976d2);}
+.atfreq-err{margin-top:10px;background:#ffebee;color:#b71c1c;
+            border:1px solid #ef9a9a;border-radius:8px;padding:8px 12px;
+            font-weight:700;font-size:13.5px;}
+.atfreq-results{margin-top:18px;}
+.atfreq-results-head{display:flex;justify-content:space-between;align-items:center;
+                     gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.atfreq-summary{color:#5d4037;font-weight:700;font-size:14px;}
+.atfreq-table-wrap{background:#fff;border-radius:10px;overflow:auto;
+                   border:1px solid #f0e6e6;}
+.atfreq-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}
+.atfreq-tbl thead tr{background:#fdecea;color:#b71c1c;}
+.atfreq-tbl th{padding:10px 12px;text-align:right;font-weight:800;font-size:13px;}
+.atfreq-tbl td{padding:9px 12px;border-bottom:1px solid #f6e6e6;color:#333;}
+.atfreq-tbl tbody tr:hover{background:#fff5f5;}
+.atfreq-name{font-weight:700;color:#1a1a2e;}
+.atfreq-count{font-weight:900;color:#c62828;text-align:center;}
+.atfreq-dates{color:#6d4c41;font-size:12.5px;}
+.atfreq-phone{color:#1b5e20;font-weight:700;direction:ltr;
+              font-family:monospace;}
+.atfreq-phone-missing{color:#c62828;font-weight:800;}
+.atfreq-row-btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;
+                font-weight:700;font-size:12.5px;font-family:inherit;}
+.atfreq-row-btn-send{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;}
+.atfreq-row-btn-send:hover{box-shadow:0 3px 10px rgba(37,211,102,.4);}
+.atfreq-row-btn-warn{background:#fff8e1;color:#e65100;border:1px solid #ffcc80;}
+.atfreq-row-btn-warn:hover{background:#ffecb3;}
+.atfreq-row-btn-disabled{background:#eee;color:#888;cursor:not-allowed;}
+.atfreq-empty{padding:30px 14px;text-align:center;color:#888;font-style:italic;}
+/* Modal styles — scoped under .atfreq-back. Kept fully self-contained
+   (no reuse of .modal-back) so existing daily-flow modals on this
+   page stay untouched. */
+.atfreq-back{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;
+             align-items:center;justify-content:center;z-index:9990;padding:14px;}
+.atfreq-back.show{display:flex;}
+.atfreq-modal{background:#fff;border-radius:14px;padding:0;max-width:640px;
+              width:100%;max-height:92vh;overflow:auto;
+              box-shadow:0 14px 40px rgba(0,0,0,.25);}
+.atfreq-modal h3{margin:0;color:#c62828;font-weight:900;font-size:1.05rem;}
+.atfreq-modal-head{padding:14px 18px;border-bottom:1px solid #f0e6e6;}
+.atfreq-modal-body{padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
+.atfreq-modal-foot{padding:12px 18px;border-top:1px solid #f0e6e6;
+                   display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.atfreq-warn{background:#FEF7E0;color:#7C5800;border:1px solid #F4C430;
+             border-radius:8px;padding:9px 12px;font-weight:700;font-size:13.5px;
+             line-height:1.55;}
+.atfreq-info-row{font-size:13.5px;color:#333;line-height:1.6;}
+.atfreq-info-row b{color:#c62828;}
+.atfreq-info-row .ltr{direction:ltr;display:inline-block;font-family:monospace;
+                       color:#1b5e20;}
+.atfreq-textarea{width:100%;min-height:200px;padding:10px 12px;
+                  border:1.5px solid #ef9a9a;border-radius:8px;
+                  font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13.5px;
+                  line-height:1.6;background:#fafafa;color:#333;
+                  direction:rtl;text-align:right;resize:vertical;}
+.atfreq-textarea:focus{outline:none;border-color:#c62828;background:#fff;}
+.atfreq-note{font-size:12px;color:#888;font-style:italic;}
+.atfreq-bulk-progress{font-weight:700;color:#1565c0;font-size:13.5px;}
+.atfreq-modal-cancel{background:#eee;color:#444;border:none;
+                     padding:9px 16px;border-radius:8px;font-weight:700;
+                     cursor:pointer;font-family:inherit;}
+.atfreq-modal-send{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;
+                   border:none;padding:9px 18px;border-radius:8px;font-weight:800;
+                   cursor:pointer;font-family:inherit;}
+.atfreq-modal-send:disabled{opacity:.55;cursor:not-allowed;}
+@media (max-width:760px){
+  .atfreq-row{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:480px){
+  .atfreq-row{grid-template-columns:1fr;}
+  .atfreq-tbl thead{display:none;}
+  .atfreq-tbl tbody tr{display:block;border-bottom:1px solid #f0e6e6;
+                       padding:8px 10px;}
+  .atfreq-tbl tbody td{display:block;padding:3px 0;border:none;}
+  .atfreq-tbl tbody td::before{content:attr(data-label) ": ";font-weight:700;
+                                color:#c62828;}
+}
+</style>
+
+<!-- Single-send modal -->
+<div class="atfreq-back" id="atfreqSendBack">
+  <div class="atfreq-modal" role="dialog" aria-modal="true"
+       aria-labelledby="atfreqSendTitle">
+    <div class="atfreq-modal-head">
+      <h3 id="atfreqSendTitle">&#x62A;&#x623;&#x643;&#x64A;&#x62F; &#x625;&#x631;&#x633;&#x627;&#x644; &#x62A;&#x646;&#x628;&#x64A;&#x647; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;</h3>
+    </div>
+    <div class="atfreq-modal-body">
+      <div class="atfreq-warn" id="atfreqSendWarn" hidden>
+        <span id="atfreqSendWarnText"></span>
+      </div>
+      <div class="atfreq-info-row">
+        <b>&#x627;&#x644;&#x637;&#x627;&#x644;&#x628;:</b> <span id="atfreqSendStudent">&#8212;</span>
+      </div>
+      <div class="atfreq-info-row">
+        <b>&#x631;&#x642;&#x645; &#x648;&#x644;&#x64A; &#x627;&#x644;&#x623;&#x645;&#x631;:</b>
+        <span class="ltr" id="atfreqSendPhone">&#8212;</span>
+      </div>
+      <div class="atfreq-info-row">
+        <b>&#x627;&#x644;&#x641;&#x62A;&#x631;&#x629;:</b> <span id="atfreqSendPeriod">&#8212;</span>
+      </div>
+      <div class="atfreq-info-row">
+        <b>&#x639;&#x62F;&#x62F; &#x645;&#x631;&#x627;&#x62A; &#x627;&#x644;&#x63A;&#x64A;&#x627;&#x628;:</b>
+        <span id="atfreqSendCount">&#8212;</span>
+      </div>
+      <div>
+        <label for="atfreqSendText" style="display:block;font-weight:700;color:#c62828;font-size:12.5px;margin-bottom:4px;">&#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629;:</label>
+        <textarea id="atfreqSendText" class="atfreq-textarea" rows="11"></textarea>
+        <div class="atfreq-note">&#x64A;&#x645;&#x643;&#x646;&#x643; &#x62A;&#x639;&#x62F;&#x64A;&#x644; &#x627;&#x644;&#x646;&#x635; &#x642;&#x628;&#x644; &#x627;&#x644;&#x625;&#x631;&#x633;&#x627;&#x644;</div>
+      </div>
+      <div class="atfreq-warn" id="atfreqSendErr" hidden style="background:#ffebee;color:#b71c1c;border-color:#ef9a9a;"></div>
+    </div>
+    <div class="atfreq-modal-foot">
+      <button type="button" class="atfreq-modal-cancel" id="atfreqSendCancel">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button type="button" class="atfreq-modal-send" id="atfreqSendBtn">&#x625;&#x631;&#x633;&#x627;&#x644;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk-send modal -->
+<div class="atfreq-back" id="atfreqBulkBack">
+  <div class="atfreq-modal" role="dialog" aria-modal="true"
+       aria-labelledby="atfreqBulkTitle">
+    <div class="atfreq-modal-head">
+      <h3 id="atfreqBulkTitle">&#x625;&#x631;&#x633;&#x627;&#x644; &#x62C;&#x645;&#x627;&#x639;&#x64A; &#x644;&#x644;&#x62A;&#x646;&#x628;&#x64A;&#x647;&#x627;&#x62A;</h3>
+    </div>
+    <div class="atfreq-modal-body">
+      <div class="atfreq-info-row" id="atfreqBulkSummary">&#8212;</div>
+      <div>
+        <label for="atfreqBulkText" style="display:block;font-weight:700;color:#c62828;font-size:12.5px;margin-bottom:4px;">&#x646;&#x635; &#x627;&#x644;&#x631;&#x633;&#x627;&#x644;&#x629; (&#x645;&#x648;&#x62D;&#x62F; &#x644;&#x643;&#x644; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628;):</label>
+        <textarea id="atfreqBulkText" class="atfreq-textarea" rows="11"></textarea>
+        <div class="atfreq-note">&#x646;&#x641;&#x633; &#x627;&#x644;&#x646;&#x635; &#x633;&#x64A;&#x631;&#x633;&#x644; &#x644;&#x643;&#x644; &#x627;&#x644;&#x637;&#x644;&#x627;&#x628; &#x627;&#x644;&#x645;&#x647;&#x644;&#x644;&#x64A;&#x646;.</div>
+      </div>
+      <div class="atfreq-bulk-progress" id="atfreqBulkProgress"></div>
+    </div>
+    <div class="atfreq-modal-foot">
+      <button type="button" class="atfreq-modal-cancel" id="atfreqBulkCancel">&#x625;&#x644;&#x63A;&#x627;&#x621;</button>
+      <button type="button" class="atfreq-modal-send" id="atfreqBulkSendBtn">&#x625;&#x631;&#x633;&#x627;&#x644; &#x644;&#x644;&#x62C;&#x645;&#x64A;&#x639;</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>"""
 
