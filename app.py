@@ -67614,6 +67614,95 @@ def api_mev_send_to_parent(eid):
     })
 
 
+@app.route('/api/teacher/evaluations/student-history/<int:student_id>',
+           methods=['GET'])
+@login_required
+def api_teacher_eval_student_history(student_id):
+    """Returns the current logged-in teacher's evaluation history for
+    a single student, scoped to teacher_id = current user's id. Admins
+    and managers also pass the role gate (matches the form's role
+    gate at /teacher/evaluations) but each sees only their OWN
+    evaluations — by design, cross-teacher visibility is not exposed
+    here. The /admin/teacher-deliveries page is the cross-teacher
+    aggregator. Soft-deleted rows are excluded.
+
+    Response shape: see the spec in
+    pre-feature/teacher-eval-form-history-check.
+    """
+    user = session.get("user") or {}
+    if not _ev_can_use(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try: tid = int(user.get("id") or 0)
+    except Exception: tid = 0
+    if not tid:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    db = get_db()
+    # Confirm the student exists. Returning 404 (not 403) keeps the
+    # surface clean — we don't leak whether this teacher has any
+    # evaluations for the student. The students table has no
+    # is_deleted flag in this codebase (deletes are row-DELETE).
+    try:
+        srow = db.execute(
+            "SELECT id FROM students WHERE id=?", (student_id,)
+        ).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+
+    # Pull every non-deleted evaluation this teacher has filed for
+    # this student. evaluation_month is YYYY-MM text; ORDER BY DESC
+    # on text sorts lexicographically which matches numeric order
+    # for that format.
+    try:
+        rows = db.execute(
+            "SELECT id, evaluation_month, "
+            "COALESCE(updated_at, created_at) AS evaluated_at "
+            "FROM evaluations "
+            "WHERE teacher_id=? AND student_id=? "
+            "AND COALESCE(is_deleted,0)=0 "
+            "AND evaluation_month IS NOT NULL "
+            "AND TRIM(evaluation_month) <> '' "
+            "ORDER BY evaluation_month DESC",
+            (tid, student_id)
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+
+    months_evaluated = []
+    for r in rows:
+        d = dict(r)
+        eid = d.get("id")
+        m = (d.get("evaluation_month") or "").strip()
+        months_evaluated.append({
+            "evaluation_id":  eid,
+            "month":          m,
+            "month_label_ar": _ev_arabic_month_label(m),
+            "evaluated_at":   d.get("evaluated_at") or "",
+            "edit_url":       "/teacher/evaluations?edit=" + str(eid),
+        })
+
+    # Current month is the server's "today" YYYY-MM. The form auto-
+    # fills client-side from new Date() but the spec says current —
+    # we resolve server-side so the response is self-contained and
+    # identical regardless of client clock skew.
+    import datetime as _dt_h
+    today = _dt_h.date.today()
+    cur_month = "%04d-%02d" % (today.year, today.month)
+    cur_match = next((x for x in months_evaluated if x["month"] == cur_month),
+                     None)
+    return jsonify({
+        "ok":                              True,
+        "student_id":                      student_id,
+        "months_evaluated":                months_evaluated,
+        "current_month":                   cur_month,
+        "current_month_label_ar":          _ev_arabic_month_label(cur_month),
+        "current_month_already_evaluated": bool(cur_match),
+        "current_month_evaluation_id":     (cur_match["evaluation_id"]
+                                            if cur_match else None),
+    })
+
+
 @app.route('/api/monthly-evaluations/stats/<int:sid>', methods=['GET'])
 @login_required
 def api_mev_student_trend(sid):
