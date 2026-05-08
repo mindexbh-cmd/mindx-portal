@@ -66960,6 +66960,7 @@ def _ev_row_to_dict(r):
         "released_to_parent":   int(d.get("released_to_parent") or 0),
         "whatsapp_sent_at":     d.get("whatsapp_sent_at") or "",
         "whatsapp_sent_by":     d.get("whatsapp_sent_by"),
+        "whatsapp_send_count":  int(d.get("whatsapp_send_count") or 0),
         "is_deleted":           int(d.get("is_deleted") or 0),
         "created_at":           d.get("created_at") or "",
         "updated_at":           d.get("updated_at") or "",
@@ -67441,24 +67442,49 @@ def api_mev_send_to_parent(eid):
                 "SELECT last_insert_rowid()").fetchone()[0])
         except Exception: pass
     except Exception: pass
-    # Mark the evaluation as sent.
+    # Mark the evaluation as sent. The count increment runs in the
+    # SAME UPDATE so the timestamp/by-user/count triple is atomic — no
+    # race where one field updates without the others. COALESCE guards
+    # against legacy rows where the column was added after creation
+    # and never explicitly initialised (the DEFAULT 0 should cover
+    # this, but COALESCE is cheap insurance).
     try:
         db.execute(
             "UPDATE evaluations SET whatsapp_sent_at=CURRENT_TIMESTAMP, "
-            "whatsapp_sent_by=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "whatsapp_sent_by=?, "
+            "whatsapp_send_count=COALESCE(whatsapp_send_count, 0) + 1, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (int(user.get("id") or 0) or None, eid),
         )
         db.commit()
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
+    # Re-read the row so we can return the fresh count + timestamp the
+    # UI needs to update the badge in place. Failing to re-read is not
+    # fatal — fall back to the values we know (the UPDATE succeeded).
+    new_count = 0
+    new_sent_at = ""
+    try:
+        fresh = db.execute(
+            "SELECT whatsapp_sent_at, whatsapp_send_count "
+            "FROM evaluations WHERE id=?", (eid,)
+        ).fetchone()
+        if fresh is not None:
+            fd = dict(fresh)
+            new_count = int(fd.get("whatsapp_send_count") or 0)
+            new_sent_at = fd.get("whatsapp_sent_at") or ""
+    except Exception: pass
     try:
         _audit("evaluations.send_to_parent", target_type="evaluations",
                target_id=eid,
-               new_value={"phone_clean": phone, "custom": bool(custom)})
+               new_value={"phone_clean": phone, "custom": bool(custom),
+                          "send_count": new_count})
     except Exception: pass
     return jsonify({
         "ok": True, "success": True, "id": eid,
         "sent_at":   "now",
+        "whatsapp_sent_at":    new_sent_at,
+        "whatsapp_send_count": new_count,
         "message_id": msg_log_id,
         "phone":     phone,
         "text":      text,
