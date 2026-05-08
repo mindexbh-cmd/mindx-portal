@@ -39645,6 +39645,14 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
               aria-label="إغلاق">×</button>
     </header>
     <div class="tm-modal-body">
+      <!-- Resend-mode warning banner — hidden by default; tmEvsOpen()
+           toggles its visibility when the click came from a resend
+           button (data-tm-eval-resend) instead of the first-send
+           button (data-tm-eval-send). -->
+      <div class="tm-evs-resend-warn" id="tm-evs-resend-warn" hidden>
+        <span class="tm-evs-resend-icon" aria-hidden="true">⚠️</span>
+        <span class="tm-evs-resend-text" id="tm-evs-resend-text"></span>
+      </div>
       <div class="tm-evs-row">
         <span class="tm-evs-key">سيتم إرسال الرسالة التالية إلى ولي أمر:</span>
         <span class="tm-evs-val" id="tm-evs-student">—</span>
@@ -39872,6 +39880,21 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-evs-error{background:#ffebee;color:#b71c1c;border:0.5px solid #ef9a9a;
               border-radius:8px;padding:9px 12px;font-weight:700;
               font-size:.88rem;}
+.tm-evs-resend-warn{background:#FEF7E0;color:#7C5800;
+                    border:0.5px solid #F4C430;border-radius:8px;
+                    padding:10px 12px;display:flex;gap:10px;
+                    align-items:flex-start;font-weight:700;
+                    font-size:.9rem;line-height:1.55;}
+.tm-evs-resend-icon{font-size:1.1rem;flex-shrink:0;line-height:1.4;}
+.tm-evs-resend-text{flex:1;color:#7C5800;}
+.tm-eval-foot-row{display:flex;flex-wrap:wrap;align-items:center;
+                  gap:10px;}
+.tm-btn-resend{background:#FEF7E0;color:#7C5800;
+               border:0.5px solid #F4C430;padding:6px 12px;
+               border-radius:8px;font-weight:700;font-size:.82rem;
+               font-family:inherit;cursor:pointer;}
+.tm-btn-resend:hover{background:#FDECC4;}
+.tm-btn-resend:disabled{opacity:.5;cursor:not-allowed;}
 
 /* ── Phase-2: approve-and-send progress modal extras ───────── */
 .tm-send-status{color:#4a148c;font-weight:800;font-size:1rem;
@@ -41181,22 +41204,30 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         '</div>';
     });
 
-    // Footer: either a placeholder send button (no handler — Step E
-    // will wire) OR a sent-badge with formatted timestamp.
+    // Footer: either a sent-badge + resend button (when whatsapp_sent_at
+    // is set) OR the first-send button (when never sent). The resend
+    // button reuses the same modal (tm-eval-send-overlay) via the
+    // data-tm-eval-resend marker which puts the modal in resend-mode.
     var sentAt = (e.whatsapp_sent_at == null ? '' :
                    String(e.whatsapp_sent_at)).trim();
     var footHtml;
     if(sentAt){
       var sentLbl = tmEscape(tmFormatTimestamp(sentAt));
+      var cnt     = parseInt(e.whatsapp_send_count, 10) || 0;
+      var cntLbl  = tmFmtSendCount(cnt);
+      var badgeText = 'تم الإرسال ✓ ' + sentLbl +
+                      (cntLbl ? ' — (' + tmEscape(cntLbl) + ')' : '');
       footHtml =
-        '<div class="tm-ecard-foot">' +
+        '<div class="tm-ecard-foot tm-eval-foot-row">' +
           '<span class="tm-badge tm-badge-success tm-eval-sent-badge">' +
-            'تم الإرسال ✓ ' + sentLbl + '</span>' +
+            badgeText + '</span>' +
+          '<button type="button" class="tm-btn-resend" ' +
+            'data-tm-eval-resend="' + (parseInt(e.id, 10) || 0) + '" ' +
+            'aria-label="إعادة إرسال التقييم لولي الأمر">' +
+            '🔄 إعادة الإرسال' +
+          '</button>' +
         '</div>';
     } else {
-      // TODO(Step E): attach click handler to data-tm-eval-send.
-      // Intentionally NO handler in this commit — UI placeholder
-      // only per the round-3 plan.
       footHtml =
         '<footer class="tm-ecard-foot">' +
           '<button type="button" class="tm-btn tm-btn-success" ' +
@@ -41253,20 +41284,38 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
            ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
+  // Arabic-aware count pluralization. Returns "" for 0 so the badge
+  // text doesn't render an empty parenthetical when count is missing.
+  function tmFmtSendCount(n){
+    n = parseInt(n, 10) || 0;
+    if(n === 0) return '';
+    if(n === 1) return 'مرة واحدة';
+    if(n === 2) return 'مرتين';
+    if(n >= 3 && n <= 10) return n + ' مرات';
+    return n + ' مرة';
+  }
+
   // Send-evaluation-to-parent confirmation modal — replaces the
   // legacy native confirm() flow. Loads the templated text via
   // GET /api/monthly-evaluations/preview-message/<eid>, then on
   // إرسال POSTs to /send-to-parent and opens the wa.me tab in the
   // same gesture chain (the click on tm-evs-confirm).
-  var _evsState = { eid:0, btn:null, sending:false };
-  var evsOverlay = document.getElementById('tm-eval-send-overlay');
-  var evsStudent = document.getElementById('tm-evs-student');
-  var evsPhone   = document.getElementById('tm-evs-phone');
-  var evsPreview = document.getElementById('tm-evs-preview');
-  var evsError   = document.getElementById('tm-evs-error');
-  var evsCancel  = document.getElementById('tm-evs-cancel');
-  var evsClose   = document.getElementById('tm-eval-send-close-x');
-  var evsConfirm = document.getElementById('tm-evs-confirm');
+  // Modes: 'send'   — first send, no warning banner.
+  //        'resend' — yellow warning banner shown with previous count
+  //                   + last sent timestamp, confirm button reads
+  //                   "إعادة الإرسال", title says "تأكيد إعادة...".
+  var _evsState = { eid:0, btn:null, sending:false, mode:'send' };
+  var evsOverlay    = document.getElementById('tm-eval-send-overlay');
+  var evsTitle      = document.getElementById('tm-eval-send-title');
+  var evsStudent    = document.getElementById('tm-evs-student');
+  var evsPhone      = document.getElementById('tm-evs-phone');
+  var evsPreview    = document.getElementById('tm-evs-preview');
+  var evsError      = document.getElementById('tm-evs-error');
+  var evsCancel     = document.getElementById('tm-evs-cancel');
+  var evsClose      = document.getElementById('tm-eval-send-close-x');
+  var evsConfirm    = document.getElementById('tm-evs-confirm');
+  var evsResendWarn = document.getElementById('tm-evs-resend-warn');
+  var evsResendText = document.getElementById('tm-evs-resend-text');
 
   function tmFmtPhone(raw, clean){
     var s = String(raw || clean || '').trim();
@@ -41285,29 +41334,44 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     if(_evsState.sending) return;
     if(evsOverlay) evsOverlay.setAttribute('hidden','');
     if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
+    if(evsResendWarn) evsResendWarn.setAttribute('hidden','');
+    if(evsResendText) evsResendText.textContent = '';
+    if(evsTitle) evsTitle.textContent = 'تأكيد إرسال رسالة الواتساب';
     var btn = _evsState.btn;
     if(btn && btn._origLabel != null){
       btn.disabled = false;
       btn.textContent = btn._origLabel;
       btn._origLabel = null;
     }
-    _evsState.eid = 0;
-    _evsState.btn = null;
+    _evsState.eid  = 0;
+    _evsState.btn  = null;
+    _evsState.mode = 'send';
   }
   function tmEvsShowError(msg){
     if(!evsError) return;
     evsError.textContent = msg || 'تعذّر الإرسال';
     evsError.removeAttribute('hidden');
   }
-  function tmEvsOpen(eid, btn){
-    _evsState.eid = eid;
-    _evsState.btn = btn;
+  function tmEvsOpen(eid, btn, mode){
+    var isResend = (mode === 'resend');
+    _evsState.eid  = eid;
+    _evsState.btn  = btn;
+    _evsState.mode = isResend ? 'resend' : 'send';
     _evsState.sending = false;
     if(btn){
       btn._origLabel = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'جاري التحميل...';
     }
+    // Mode-specific labels. Confirm button stays disabled until the
+    // preview-message fetch resolves (we need the parent_phone_clean
+    // check before enabling).
+    if(evsTitle){
+      evsTitle.textContent = isResend
+        ? 'تأكيد إعادة إرسال رسالة الواتساب'
+        : 'تأكيد إرسال رسالة الواتساب';
+    }
+    var primaryLabel = isResend ? 'إعادة الإرسال' : 'إرسال';
     if(evsStudent) evsStudent.textContent = '...';
     if(evsPhone)   evsPhone.textContent   = '...';
     if(evsPreview){
@@ -41315,8 +41379,28 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       evsPreview.placeholder = 'جاري التحميل...';
     }
     if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
-    if(evsConfirm){ evsConfirm.disabled = true; evsConfirm.textContent = 'إرسال'; }
+    if(evsConfirm){ evsConfirm.disabled = true; evsConfirm.textContent = primaryLabel; }
     if(evsCancel) evsCancel.disabled = false;
+    // Resend warning banner — populated from cache so it shows even
+    // before the preview fetch resolves; we re-populate from fresh
+    // server data in the .then() below to cover stale-cache cases.
+    if(evsResendWarn && evsResendText){
+      if(isResend){
+        var cached = tmFindEvalInCache(eid) || {};
+        var cnt = parseInt(cached.whatsapp_send_count, 10) || 0;
+        var sentRaw = (cached.whatsapp_sent_at == null ? ''
+                        : String(cached.whatsapp_sent_at)).trim();
+        var sentLbl = sentRaw ? tmFormatTimestamp(sentRaw) : '—';
+        var cntLbl  = tmFmtSendCount(cnt) || '—';
+        evsResendText.textContent =
+          'تم إرسال هذه الرسالة من قبل (' + cntLbl + ') — ' +
+          'آخر إرسال: ' + sentLbl + '. هل تريدين إعادة الإرسال؟';
+        evsResendWarn.removeAttribute('hidden');
+      } else {
+        evsResendWarn.setAttribute('hidden','');
+        evsResendText.textContent = '';
+      }
+    }
     if(evsOverlay) evsOverlay.removeAttribute('hidden');
     setTimeout(function(){
       if(evsCancel) try { evsCancel.focus(); } catch(e){}
@@ -41344,13 +41428,25 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
           evsPreview.value = j.text || '';
           evsPreview.placeholder = '';
         }
+        // Refresh the resend banner with server-fresh count/timestamp
+        // so a cache that's out of sync doesn't mislead the admin.
+        if(isResend && evsResendWarn && evsResendText){
+          var freshCnt = parseInt(e.whatsapp_send_count, 10) || 0;
+          var freshSent = (e.whatsapp_sent_at == null ? ''
+                            : String(e.whatsapp_sent_at)).trim();
+          var freshSentLbl = freshSent ? tmFormatTimestamp(freshSent) : '—';
+          var freshCntLbl  = tmFmtSendCount(freshCnt) || '—';
+          evsResendText.textContent =
+            'تم إرسال هذه الرسالة من قبل (' + freshCntLbl + ') — ' +
+            'آخر إرسال: ' + freshSentLbl + '. هل تريدين إعادة الإرسال؟';
+        }
         if(evsConfirm){
           if(!j.parent_phone_clean){
             evsConfirm.disabled = true;
             evsConfirm.textContent = 'رقم ولي الأمر غير مسجل';
           } else {
             evsConfirm.disabled = false;
-            evsConfirm.textContent = 'إرسال';
+            evsConfirm.textContent = primaryLabel;
           }
         }
       })
@@ -41361,8 +41457,15 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   function tmEvsSend(){
     var eid = _evsState.eid;
     if(!eid || _evsState.sending) return;
+    var isResend = (_evsState.mode === 'resend');
+    var primaryLabel = isResend ? 'إعادة الإرسال' : 'إرسال';
     _evsState.sending = true;
-    if(evsConfirm){ evsConfirm.disabled = true; evsConfirm.textContent = '⏳ جاري الإرسال...'; }
+    if(evsConfirm){
+      evsConfirm.disabled = true;
+      evsConfirm.textContent = isResend
+        ? '⏳ جاري إعادة الإرسال...'
+        : '⏳ جاري الإرسال...';
+    }
     if(evsCancel)  evsCancel.disabled = true;
     if(evsError){ evsError.setAttribute('hidden',''); evsError.textContent = ''; }
     fetch('/api/monthly-evaluations/' + encodeURIComponent(eid) +
@@ -41375,7 +41478,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       .then(function(j){
         _evsState.sending = false;
         if(!j || !j.ok){
-          if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = 'إرسال'; }
+          if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = primaryLabel; }
           if(evsCancel)  evsCancel.disabled = false;
           tmEvsShowError((j && j.error) || 'تعذّر الإرسال');
           return;
@@ -41384,10 +41487,20 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         // started with the click on tm-evs-confirm and Chrome/Edge
         // accept the popup as long as the fetch resolved quickly.
         try { window.open(j.wa_url, '_blank'); } catch(e){}
-        // Flip the card → "تم الإرسال ✓" badge without re-fetching.
+        // Patch the cache from the server response so the badge re-renders
+        // with the authoritative count. Falls back to a +1 from the cached
+        // value (and to a client-side timestamp) if the server omitted
+        // either field.
         var entry = tmFindEvalInCache(eid);
         if(entry){
-          entry.whatsapp_sent_at = tmNowTimestampStr();
+          var srvCount = parseInt(j.whatsapp_send_count, 10);
+          if(isNaN(srvCount)){
+            srvCount = (parseInt(entry.whatsapp_send_count, 10) || 0) + 1;
+          }
+          entry.whatsapp_send_count = srvCount;
+          var srvSentAt = (j.whatsapp_sent_at == null ? '' :
+                           String(j.whatsapp_sent_at)).trim();
+          entry.whatsapp_sent_at = srvSentAt || tmNowTimestampStr();
         }
         // Clear button state before close so it doesn't get
         // re-enabled with the old "جاري التحميل..." label.
@@ -41397,7 +41510,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
       })
       .catch(function(){
         _evsState.sending = false;
-        if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = 'إرسال'; }
+        if(evsConfirm){ evsConfirm.disabled = false; evsConfirm.textContent = primaryLabel; }
         if(evsCancel)  evsCancel.disabled = false;
         tmEvsShowError('تعذّر الاتصال بالخادم');
       });
@@ -41420,11 +41533,19 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   var evalsPanel = document.getElementById('tm-evals-body');
   if(evalsPanel){
     evalsPanel.addEventListener('click', function(ev){
-      var btn = ev.target.closest('[data-tm-eval-send]');
-      if(!btn) return;
-      var eid = parseInt(btn.getAttribute('data-tm-eval-send'), 10);
-      if(!eid) return;
-      tmEvsOpen(eid, btn);
+      var sendBtn = ev.target.closest('[data-tm-eval-send]');
+      if(sendBtn){
+        var eid = parseInt(sendBtn.getAttribute('data-tm-eval-send'), 10);
+        if(!eid) return;
+        tmEvsOpen(eid, sendBtn, 'send');
+        return;
+      }
+      var resendBtn = ev.target.closest('[data-tm-eval-resend]');
+      if(resendBtn){
+        var rid = parseInt(resendBtn.getAttribute('data-tm-eval-resend'), 10);
+        if(!rid) return;
+        tmEvsOpen(rid, resendBtn, 'resend');
+      }
     });
   }
 })();
