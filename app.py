@@ -998,6 +998,7 @@ def init_db():
         released_to_parent INTEGER DEFAULT 0,
         whatsapp_sent_at DATETIME,
         whatsapp_sent_by INTEGER,
+        whatsapp_send_count INTEGER NOT NULL DEFAULT 0,
         is_deleted INTEGER DEFAULT 0,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -7745,6 +7746,7 @@ if True:
         ("released_to_parent",  "INTEGER DEFAULT 0"),
         ("whatsapp_sent_at",    "DATETIME"),
         ("whatsapp_sent_by",    "INTEGER"),
+        ("whatsapp_send_count", "INTEGER NOT NULL DEFAULT 0"),
         ("is_deleted",          "INTEGER DEFAULT 0"),
         ("updated_at",          "DATETIME"),
     ]:
@@ -7757,6 +7759,25 @@ if True:
                     "ON evaluations(student_id, evaluation_month)")
     except Exception: pass
     db2.commit()
+
+    # ── evaluations_send_count_backfill_v1: rows that were sent before
+    # the whatsapp_send_count column existed have whatsapp_sent_at IS
+    # NOT NULL but count=0. Promote those rows to count=1 (we know they
+    # were sent at least once). Only touches rows that need it
+    # (count=0 AND sent_at non-null) so a re-run is a no-op. Tag-gated
+    # so it stamps schema_migrations only after a clean update.
+    if "evaluations_send_count_backfill_v1" not in applied:
+        try:
+            db2.execute(
+                "UPDATE evaluations SET whatsapp_send_count = 1 "
+                "WHERE whatsapp_sent_at IS NOT NULL "
+                "AND COALESCE(whatsapp_send_count, 0) = 0"
+            )
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("evaluations_send_count_backfill_v1",))
+            db2.commit()
+        except Exception:
+            pass
 
     # ── column_labels: backfill any rows that were inserted without
     # table_name (legacy auto-add behaviour pre-v4 unified schema).
