@@ -18343,7 +18343,7 @@ input.date-input:focus{border-color:#00897B;background:#fff;}
         <div class="atfreq-fld">
           <label for="atfreqGroup">&#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x629; (&#x627;&#x62E;&#x62A;&#x64A;&#x627;&#x631;&#x64A;)</label>
           <select id="atfreqGroup">
-            <option value="">&#8212; &#x643;&#x644; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#8212;</option>
+            <option value="">&#8212; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x645;&#x62C;&#x645;&#x648;&#x639;&#x627;&#x62A; &#8212;</option>
           </select>
         </div>
         <div class="atfreq-fld atfreq-search-wrap">
@@ -68547,10 +68547,13 @@ def api_attfreq_query():
     # Group by personal_id when present, falling back to
     # (student_name, group_name) for legacy rows. We keep BOTH key
     # tuples so the JS can render group context per row.
+    # Two-query aggregation (no GROUP_CONCAT/STRING_AGG): Postgres has
+    # no GROUP_CONCAT, so we run the COUNT-only query first and then
+    # fetch absence dates per matched student. Result set is small
+    # (only students above threshold) so N+1 cost is negligible.
     sql = ("SELECT COALESCE(NULLIF(TRIM(personal_id),''), '') AS pid, "
            "TRIM(student_name) AS sn, TRIM(group_name) AS gn, "
-           "COUNT(*) AS absence_count, "
-           "GROUP_CONCAT(attendance_date) AS dates "
+           "COUNT(*) AS absence_count "
            "FROM attendance WHERE " + sql_where + " "
            "GROUP BY pid, sn, gn HAVING COUNT(*) >= ? "
            "ORDER BY absence_count DESC, sn ASC")
@@ -68565,13 +68568,29 @@ def api_attfreq_query():
         rd = dict(r)
         sid = _attfreq_resolve_student_id(
             db, rd.get("pid"), rd.get("sn"), rd.get("gn"))
-        # Build the date list — strip empties, keep order, dedupe.
-        raw_dates = (rd.get("dates") or "")
-        parts = [p.strip() for p in raw_dates.split(",") if p and p.strip()]
+        # Per-student dates — same key tuple as the GROUP BY above so
+        # the row count matches absence_count from query 1.
+        dq_params = [from_d, to_d,
+                     rd.get("sn") or "",
+                     rd.get("gn") or "",
+                     rd.get("pid") or ""]
+        try:
+            d_rows = db.execute(
+                "SELECT attendance_date FROM attendance WHERE "
+                "attendance_date BETWEEN ? AND ? "
+                "AND status IN ('غائب','absent','A','0') "
+                "AND TRIM(student_name)=? "
+                "AND TRIM(group_name)=? "
+                "AND COALESCE(NULLIF(TRIM(personal_id),''), '')=? "
+                "ORDER BY attendance_date",
+                tuple(dq_params)).fetchall()
+        except Exception:
+            d_rows = []
         seen = set(); dates_list = []
-        for p in parts:
-            if p in seen: continue
-            seen.add(p); dates_list.append(p)
+        for dr in d_rows:
+            d = (dict(dr).get("attendance_date") or "").strip()
+            if not d or d in seen: continue
+            seen.add(d); dates_list.append(d)
         # Phone resolution — only if we resolved an id; legacy rows
         # without a pid + name match return blank.
         phone_clean = ""; phone_raw = ""
