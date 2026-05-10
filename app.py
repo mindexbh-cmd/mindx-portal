@@ -70376,17 +70376,22 @@ def _books_v2_send_file(bid, *, as_attachment):
     # Priority 0: in-DB BYTEA blob (canonical from books_v2_file_data_v1
     # onwards). psycopg returns memoryview for BYTEA; sqlite returns
     # bytes — coerce to bytes either way before handing to Flask.
+    # Use Flask's send_file so the download_name is RFC 5987-encoded
+    # for Arabic titles (raw Arabic in Content-Disposition would fail
+    # the latin-1 header encoding step inside werkzeug).
     blob = rd.get("file_data")
     if blob:
+        import io as _io_blob
         body = bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
         safe_title = (rd.get("title") or "book") + ".pdf"
-        resp = Response(body, mimetype="application/pdf")
-        disp = "attachment" if as_attachment else "inline"
-        resp.headers["Content-Disposition"] = (
-            disp + '; filename="' + safe_title.replace('"', '') + '"')
-        resp.headers["Cache-Control"] = "private, no-store"
-        resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        resp = _send_b(_io_blob.BytesIO(body), mimetype="application/pdf",
+                       as_attachment=as_attachment,
+                       download_name=safe_title, conditional=False)
+        try:
+            resp.headers["Cache-Control"] = "private, no-store"
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        except Exception: pass
         return resp
     # Priority 1: legacy Cloudinary URL (rows uploaded under the
     # cloudinary_v1 path; never written by current code).
@@ -70536,18 +70541,22 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
                         "view_only": True,
                         "book_id": int(bid)}), 403
     # Priority 0: in-DB BYTEA blob (canonical from books_v2_file_data_v1
-    # onwards).
+    # onwards). Use send_file so Arabic download_name is RFC 5987-
+    # encoded by werkzeug instead of injected raw into Content-
+    # Disposition (the raw form fails latin-1 header encoding).
     blob = rd.get("file_data")
     if blob:
+        import io as _io_blob_p
         body = bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
         safe_title = (rd.get("title") or "book") + ".pdf"
-        resp = Response(body, mimetype="application/pdf")
-        disp = "attachment" if as_attachment else "inline"
-        resp.headers["Content-Disposition"] = (
-            disp + '; filename="' + safe_title.replace('"', '') + '"')
-        resp.headers["Cache-Control"] = "private, no-store"
-        resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        resp = _send_b(_io_blob_p.BytesIO(body), mimetype="application/pdf",
+                       as_attachment=as_attachment,
+                       download_name=safe_title, conditional=False)
+        try:
+            resp.headers["Cache-Control"] = "private, no-store"
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        except Exception: pass
         return resp
     # Priority 1: legacy Cloudinary URL.
     cl_url = (rd.get("cloudinary_url") or "").strip()
