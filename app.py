@@ -69713,12 +69713,15 @@ def _books_v2_row_to_dict(row, *, group_ids=None, group_names=None,
                            teacher_ids=None, teacher_names=None):
     if row is None: return None
     d = dict(row)
-    # has_file marks whether this row has any retrievable backing file
-    # — Cloudinary first (the new path), legacy file_path second. The
-    # admin UI uses this to render the "⚠ الملف مفقود" badge and the
-    # re-upload button when both are missing.
+    # has_file_data → in-DB BYTEA blob present (the canonical path
+    # since books_v2_file_data_v1). has_cloudinary → legacy CDN URL,
+    # has_legacy_file → legacy on-disk file. The admin UI uses any
+    # of the three being true to suppress the "⚠ الملف مفقود" badge
+    # and the re-upload button — so a fresh BYTEA upload no longer
+    # trips the missing-file UI even though cloudinary_url is empty.
     cl_url = (d.get("cloudinary_url") or "").strip() if d.get("cloudinary_url") is not None else ""
     fp = (d.get("file_path") or "").strip() if d.get("file_path") is not None else ""
+    has_blob = bool(int(d.get("file_data_len") or 0))
     return {
         "id":               int(d.get("id") or 0),
         "title":            d.get("title") or "",
@@ -69729,6 +69732,7 @@ def _books_v2_row_to_dict(row, *, group_ids=None, group_names=None,
         "uploaded_by_name":     d.get("uploaded_by_name") or "",
         "uploaded_at":      d.get("uploaded_at") or "",
         "cloudinary_url":   cl_url,
+        "has_file_data":    has_blob,
         "has_cloudinary":   bool(cl_url),
         "has_legacy_file":  bool(fp),
         "groups":           [{"id": gi, "name": gn} for gi, gn
@@ -69839,10 +69843,21 @@ def _books_v2_resolve_group_ids_for_students(db, sids):
 
 
 def _books_v2_load_book_with_assignments(db, bid):
-    """Returns dict shape used by /api/books and /api/books/<bid>."""
+    """Returns dict shape used by /api/books and /api/books/<bid>.
+
+    The SELECT enumerates metadata columns explicitly and only asks
+    Postgres/SQLite for the LENGTH of file_data — never the bytes
+    themselves — so listing the library doesn't pull every PDF blob
+    into memory. The view/download routes have their own SELECTs
+    that DO fetch file_data when serving a specific book."""
     try:
         row = db.execute(
-            "SELECT * FROM books_v2 WHERE id=? "
+            "SELECT id, title, description, file_path, file_size_bytes, "
+            "       can_download, uploaded_by_username, uploaded_by_name, "
+            "       uploaded_at, is_deleted, cloudinary_url, "
+            "       cloudinary_public_id, "
+            "       COALESCE(LENGTH(file_data), 0) AS file_data_len "
+            "FROM books_v2 WHERE id=? "
             "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
     except Exception:
         row = None
