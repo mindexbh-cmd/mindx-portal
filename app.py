@@ -70304,6 +70304,23 @@ def api_books_v2_upload():
         db.commit()
         try: bid = int(cur.lastrowid)
         except Exception: bid = 0
+        if not bid:
+            # Postgres: _PgCursor doesn't expose .lastrowid (only sqlite3
+            # does natively). The wrapper stashes the new id on the
+            # connection during the INSERT and exposes it via the
+            # SQLite-compat SELECT last_insert_rowid() function. Without
+            # this fallback the subsequent books_v2_groups inserts would
+            # bind book_id=0 and silently orphan the picked groups, so
+            # the upload would appear to succeed but the listing would
+            # show "—" until the admin opened "تعديل" and re-saved.
+            try:
+                row = db.execute("SELECT last_insert_rowid()").fetchone()
+                if row: bid = int(row[0] or 0)
+            except Exception: pass
+        if not bid:
+            return jsonify({"ok": False, "error":
+                            "تعذّر الحصول على معرّف الكتاب الجديد"
+                            }), 500
     except Exception as ex:
         return jsonify({"ok": False, "error": str(ex)}), 500
 
