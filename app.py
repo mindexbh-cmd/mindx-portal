@@ -69977,52 +69977,12 @@ def api_books_v2_upload():
     if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
         return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
 
-    # Cloudinary required: refuse the upload up-front rather than
-    # leak through to a half-finished DB row. The three env vars
-    # (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY /
-    # CLOUDINARY_API_SECRET) must be set in Render → Environment;
-    # the boot log shows whether they're configured.
-    if not CLOUDINARY_ENABLED:
-        return jsonify({"ok": False, "error":
-                        "خدمة تخزين الملفات غير مهيّأة — تواصل مع الإدارة"
-                        }), 503
-
-    # Upload to Cloudinary FIRST so the DB row never exists without a
-    # backing file. resource_type='raw' is required for non-image
-    # assets (PDFs); folder='mindex/books' keeps them grouped in the
-    # Cloudinary dashboard. Pass bytes via io.BytesIO since the SDK
-    # accepts either a file path or a file-like object — we already
-    # read the upload into `raw` for size/magic-byte validation.
-    import io as _io_cl
-    from cloudinary import uploader as _cl_uploader
-    try:
-        result = _cl_uploader.upload(
-            _io_cl.BytesIO(raw),
-            resource_type="raw",
-            folder="mindex/books",
-            use_filename=True,
-            unique_filename=True,
-            filename_override=_books_v2_safe_title_slug(title) + ".pdf",
-        )
-    except Exception as ex:
-        try:
-            sys_cl_log = __import__("sys")
-            sys_cl_log.stderr.write("[cloudinary] upload failed: " + str(ex) + "\n")
-            sys_cl_log.stderr.flush()
-        except Exception: pass
-        return jsonify({"ok": False, "error":
-                        "فشل رفع الملف إلى التخزين السحابي — حاول مرة أخرى"
-                        }), 502
-    cl_url = (result or {}).get("secure_url") or (result or {}).get("url") or ""
-    cl_pub = (result or {}).get("public_id") or ""
-    if not cl_url or not cl_pub:
-        return jsonify({"ok": False, "error":
-                        "استجابة التخزين السحابي غير مكتملة — حاول مرة أخرى"
-                        }), 502
-
-    # New rows leave file_path EMPTY — the legacy column stays in
-    # the schema for backward compat with pre-migration rows but is
-    # never written to from this point on.
+    # Store the PDF bytes directly in the books_v2.file_data column
+    # (Postgres BYTEA / SQLite BLOB-affinity). New rows leave
+    # file_path AND cloudinary_url empty — the legacy columns stay
+    # in the schema for backward compat with pre-migration rows but
+    # are never written to from this point on. psycopg2 accepts
+    # Python bytes for BYTEA without an explicit Binary() wrapper.
     db = get_db()
     uname = (user.get("username") or "").strip()
     uname_disp = (user.get("name") or uname).strip()
@@ -70031,19 +69991,14 @@ def api_books_v2_upload():
             "INSERT INTO books_v2(title, description, file_path, "
             "file_size_bytes, can_download, uploaded_by_username, "
             "uploaded_by_name, uploaded_at, is_deleted, "
-            "cloudinary_url, cloudinary_public_id) "
-            "VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0,?,?)",
+            "cloudinary_url, cloudinary_public_id, file_data) "
+            "VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,0,?,?,?)",
             (title, description, "", len(raw), can_dl, uname, uname_disp,
-             cl_url, cl_pub))
+             "", "", raw))
         db.commit()
         try: bid = int(cur.lastrowid)
         except Exception: bid = 0
     except Exception as ex:
-        # DB insert failed AFTER cloud upload — best-effort cleanup
-        # of the orphan asset on Cloudinary so we don't accumulate
-        # paid storage for files no row references.
-        try: _cl_uploader.destroy(cl_pub, resource_type="raw")
-        except Exception: pass
         return jsonify({"ok": False, "error": str(ex)}), 500
 
     # Optional inline assignment payloads for the all-in-one upload
@@ -70090,30 +70045,26 @@ def api_books_v2_upload():
 @login_required
 def api_books_v2_reupload(bid):
     """File-only re-upload for a row whose backing file is gone
-    (legacy file_path on the wiped ephemeral disk, or a Cloudinary
-    asset that was deleted out-of-band). Updates cloudinary_url,
-    cloudinary_public_id, file_size_bytes; clears file_path; leaves
-    title / description / can_download / groups / teachers untouched
-    so the assignment graph survives the swap.
-
-    Best-effort destroys the previous Cloudinary asset (if any) so
-    we don't accumulate paid storage for orphan files."""
+    (legacy file_path on the wiped ephemeral disk, or a stale
+    cloudinary_url left over from the pre-BYTEA storage path).
+    Writes the fresh PDF bytes into books_v2.file_data and clears
+    BOTH legacy pointer columns so the serve helper picks the new
+    blob first via Priority 0. Title / description / can_download
+    / groups / teachers stay untouched — the assignment graph
+    survives the swap."""
     user = session.get("user") or {}
     if not _has_books_full_access(user):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
     db = get_db()
     try:
         row = db.execute(
-            "SELECT id, title, cloudinary_public_id FROM books_v2 "
+            "SELECT id, title FROM books_v2 "
             "WHERE id=? AND COALESCE(is_deleted,0)=0",
             (int(bid),)).fetchone()
     except Exception:
         row = None
     if not row:
         return jsonify({"ok": False, "error": "غير موجود"}), 404
-    rd = dict(row)
-    title = rd.get("title") or "book"
-    old_pub = (rd.get("cloudinary_public_id") or "").strip()
 
     if "pdf_file" not in request.files:
         return jsonify({"ok": False, "error": "ملف PDF مطلوب"}), 400
@@ -70128,57 +70079,25 @@ def api_books_v2_reupload(bid):
     if not raw.startswith(_BOOKS_V2_PDF_MAGIC):
         return jsonify({"ok": False, "error": "الملف ليس PDF صالحاً"}), 400
 
-    if not CLOUDINARY_ENABLED:
-        return jsonify({"ok": False, "error":
-                        "خدمة تخزين الملفات غير مهيّأة — تواصل مع الإدارة"
-                        }), 503
-
-    import io as _io_ru
-    from cloudinary import uploader as _cl_uploader_ru
-    try:
-        result = _cl_uploader_ru.upload(
-            _io_ru.BytesIO(raw),
-            resource_type="raw",
-            folder="mindex/books",
-            use_filename=True,
-            unique_filename=True,
-            filename_override=_books_v2_safe_title_slug(title) + ".pdf",
-        )
-    except Exception as ex:
-        return jsonify({"ok": False, "error":
-                        "فشل رفع الملف إلى التخزين السحابي — حاول مرة أخرى"
-                        }), 502
-    cl_url = (result or {}).get("secure_url") or (result or {}).get("url") or ""
-    cl_pub = (result or {}).get("public_id") or ""
-    if not cl_url or not cl_pub:
-        return jsonify({"ok": False, "error":
-                        "استجابة التخزين السحابي غير مكتملة — حاول مرة أخرى"
-                        }), 502
-
+    # Replace bytes in-place; clear the legacy cloudinary_url +
+    # file_path so the serve helper picks the new BYTEA blob first
+    # via Priority 0 instead of redirecting to a stale Cloudinary URL.
     try:
         db.execute(
-            "UPDATE books_v2 SET cloudinary_url=?, cloudinary_public_id=?, "
-            "file_size_bytes=?, file_path='' WHERE id=?",
-            (cl_url, cl_pub, len(raw), int(bid)))
+            "UPDATE books_v2 SET file_data=?, file_size_bytes=?, "
+            "file_path='', cloudinary_url='', cloudinary_public_id='' "
+            "WHERE id=?",
+            (raw, len(raw), int(bid)))
         db.commit()
     except Exception as ex:
-        try: _cl_uploader_ru.destroy(cl_pub, resource_type="raw")
-        except Exception: pass
         return jsonify({"ok": False, "error": str(ex)}), 500
-
-    if old_pub and old_pub != cl_pub:
-        try: _cl_uploader_ru.destroy(old_pub, resource_type="raw")
-        except Exception: pass
 
     try:
         _audit("books_v2.reupload", target_type="books_v2",
                target_id=int(bid),
-               new_value={"size": len(raw),
-                          "old_public_id": old_pub,
-                          "new_public_id": cl_pub})
+               new_value={"size": len(raw)})
     except Exception: pass
     return jsonify({"ok": True, "id": int(bid),
-                    "cloudinary_url": cl_url,
                     "size_bytes": len(raw)})
 
 
@@ -70418,7 +70337,7 @@ def _books_v2_send_file(bid, *, as_attachment):
     try:
         row = db.execute(
             "SELECT title, file_path, can_download, "
-            "       cloudinary_url, cloudinary_public_id "
+            "       cloudinary_url, cloudinary_public_id, file_data "
             "FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
             (int(bid),)).fetchone()
     except Exception:
@@ -70434,9 +70353,23 @@ def _books_v2_send_file(bid, *, as_attachment):
                         "هذا المنهج للقراءة فقط",
                         "view_only": True,
                         "book_id": int(bid)}), 403
-    # Priority 1: Cloudinary URL (new path). Redirect the browser
-    # straight to the CDN — view-only books still serve over the
-    # raw URL (no fl_attachment), so the PDF renders inline.
+    # Priority 0: in-DB BYTEA blob (canonical from books_v2_file_data_v1
+    # onwards). psycopg returns memoryview for BYTEA; sqlite returns
+    # bytes — coerce to bytes either way before handing to Flask.
+    blob = rd.get("file_data")
+    if blob:
+        body = bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
+        safe_title = (rd.get("title") or "book") + ".pdf"
+        resp = Response(body, mimetype="application/pdf")
+        disp = "attachment" if as_attachment else "inline"
+        resp.headers["Content-Disposition"] = (
+            disp + '; filename="' + safe_title.replace('"', '') + '"')
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return resp
+    # Priority 1: legacy Cloudinary URL (rows uploaded under the
+    # cloudinary_v1 path; never written by current code).
     cl_url = (rd.get("cloudinary_url") or "").strip()
     if cl_url:
         target = _books_v2_cloudinary_attachment_url(cl_url) if as_attachment else cl_url
@@ -70565,7 +70498,7 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
     try:
         row = db.execute(
             "SELECT title, file_path, can_download, "
-            "       cloudinary_url, cloudinary_public_id "
+            "       cloudinary_url, cloudinary_public_id, file_data "
             "FROM books_v2 WHERE id=? AND COALESCE(is_deleted,0)=0",
             (int(bid),)).fetchone()
     except Exception:
@@ -70579,12 +70512,26 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
                         "هذا المنهج للقراءة فقط",
                         "view_only": True,
                         "book_id": int(bid)}), 403
-    # Cloudinary first (new path).
+    # Priority 0: in-DB BYTEA blob (canonical from books_v2_file_data_v1
+    # onwards).
+    blob = rd.get("file_data")
+    if blob:
+        body = bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
+        safe_title = (rd.get("title") or "book") + ".pdf"
+        resp = Response(body, mimetype="application/pdf")
+        disp = "attachment" if as_attachment else "inline"
+        resp.headers["Content-Disposition"] = (
+            disp + '; filename="' + safe_title.replace('"', '') + '"')
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return resp
+    # Priority 1: legacy Cloudinary URL.
     cl_url = (rd.get("cloudinary_url") or "").strip()
     if cl_url:
         target = _books_v2_cloudinary_attachment_url(cl_url) if as_attachment else cl_url
         return _redirect_b(target, code=302)
-    # Legacy local-disk fallback for pre-migration rows.
+    # Priority 2: legacy local-disk fallback for pre-migration rows.
     fp = rd.get("file_path") or ""
     sd = os.path.realpath(_books_v2_storage_dir())
     rp = os.path.realpath(fp) if fp else ""
