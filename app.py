@@ -71045,22 +71045,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   </span>
   <button id="pv-next" disabled>→ التالي</button>
 </div>
-<script type="module">
-  // PDF.js 4.x ships as ES modules. Import dynamically, expose
-  // pdfjsLib globally so the synchronous IIFE below can use it,
-  // configure the worker URL, then signal readiness via a custom
-  // event so the IIFE knows when to call getDocument(). The
-  // upgrade from 3.11.174 → 4.10.38 ships much-improved Arabic
-  // text shaping (the v3 build rendered "التميز" as disconnected
-  // glyphs); v4 also lets us pass cMapUrl + standardFontDataUrl
-  // to getDocument so embedded Arabic fonts with custom encodings
-  // map correctly via Adobe CMaps.
-  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
-  window.pdfjsLib = pdfjsLib;
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-  window.dispatchEvent(new Event('pdfjs-ready'));
-</script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
 (function(){
   var BOOK_TITLE   = __BOOK_TITLE_JSON__;
@@ -71071,6 +71056,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 
   document.getElementById('pv-title').textContent =
       BOOK_TITLE.length > 50 ? (BOOK_TITLE.slice(0,50) + '…') : BOOK_TITLE;
+
+  if (window['pdfjsLib']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
 
   var canvas    = document.getElementById('pv-canvas');
   var ctx       = canvas.getContext('2d');
@@ -71253,39 +71243,20 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     }
   });
 
-  // PDF.js 4.x is loaded as an ES module by the <script type="module">
-  // block above; that runs deferred (after this synchronous IIFE) and
-  // dispatches 'pdfjs-ready' once window.pdfjsLib is wired. We may
-  // already be late (cached load) so check first, otherwise wait.
-  function loadPdf(){
-    if (!window.pdfjsLib){
-      showError('تعذّر تحميل قارئ PDF. تحقّقي من الاتصال بالإنترنت.');
-      return;
-    }
-    // Pass options so embedded Arabic fonts and standard fonts both
-    // resolve correctly. cMapPacked: true matches the .bcmap files
-    // shipped under cmaps/ on the CDN.
-    window.pdfjsLib.getDocument({
-      url: PDF_URL,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-      cMapPacked: true,
-      standardFontDataUrl:
-        'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/standard_fonts/',
-    }).promise.then(function(pdf){
-      pdfDoc = pdf;
-      totalPages = pdf.numPages;
-      pageInput.max = totalPages;
-      pageTotal.textContent = totalPages;
-      renderPage(1);
-    }).catch(function(){
-      showError('تعذّر تحميل المنهج. قد تكون الجلسة منتهية — أعيدي الفتح من صفحة المناهج.');
-    });
+  if (!window['pdfjsLib']){
+    showError('تعذّر تحميل قارئ PDF. تحقّقي من الاتصال بالإنترنت.');
+    return;
   }
-  if (window.pdfjsLib){
-    loadPdf();
-  } else {
-    window.addEventListener('pdfjs-ready', loadPdf, {once: true});
-  }
+
+  pdfjsLib.getDocument(PDF_URL).promise.then(function(pdf){
+    pdfDoc = pdf;
+    totalPages = pdf.numPages;
+    pageInput.max = totalPages;
+    pageTotal.textContent = totalPages;
+    renderPage(1);
+  }).catch(function(){
+    showError('تعذّر تحميل المنهج. قد تكون الجلسة منتهية — أعيدي الفتح من صفحة المناهج.');
+  });
 })();
 </script>
 </body></html>"""
