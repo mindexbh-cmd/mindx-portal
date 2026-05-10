@@ -49815,6 +49815,166 @@ def api_admin_teacher_students(teacher_id):
     return jsonify({"ok": True, "students": out})
 
 
+# ── /api/admin/teacher/<id>/send-request ─────────────────────────────
+# Backs the "إرسال طلب للمعلمة" modal on /admin/teacher-deliveries.
+# Composes a WhatsApp message for the admin to send and persists an
+# audit row. There's no users.phone column (see existing convention
+# in /admin/missing-lessons line ~38980), so the wa.me URL is built
+# WITHOUT a recipient — the admin picks the teacher's contact in
+# WhatsApp itself when the new tab opens.
+#
+# Body shape:
+#   {
+#     "target_type":  "student" | "group" | "all_groups",
+#     "request_kind": "evaluation" | "parent_message" | "general",
+#     "student_id":   <int>     (required when target_type == "student"),
+#     "group_id":     <int>     (required when target_type == "group"),
+#     "message_text": <str>     (required, non-empty)
+#   }
+#
+# Validates that the named student/group is actually owned by the
+# named teacher (403 otherwise) so a malicious admin can't send a
+# request that name-drops a student under a different teacher's
+# section. Returns {ok, wa_url, target_label, teacher_name}.
+@app.route('/api/admin/teacher/<int:teacher_id>/send-request',
+           methods=['POST'])
+@login_required
+def api_admin_teacher_send_request(teacher_id):
+    user = session.get("user") or {}
+    if not _td_can_view(user):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    body = request.get_json(silent=True) or {}
+
+    target_type = (body.get("target_type") or "").strip().lower()
+    if target_type not in ("student", "group", "all_groups"):
+        return jsonify({"ok": False,
+                        "error": "نوع المستهدف غير صحيح"}), 400
+
+    request_kind = (body.get("request_kind") or "general").strip().lower()
+    if request_kind not in ("evaluation", "parent_message", "general"):
+        request_kind = "general"
+
+    message_text = (body.get("message_text") or "").strip()
+    if not message_text:
+        return jsonify({"ok": False, "error": "نص الطلب مطلوب"}), 400
+
+    db = get_db()
+    try:
+        trow = db.execute(
+            "SELECT id, COALESCE(name,'') AS name, "
+            "COALESCE(username,'') AS username FROM users "
+            "WHERE id=? AND role='teacher'",
+            (int(teacher_id),)).fetchone()
+    except Exception:
+        trow = None
+    if not trow:
+        return jsonify({"ok": False, "error": "المعلمة غير موجودة"}), 404
+    teacher = dict(trow)
+    teacher_display = ((teacher.get("name") or "").strip()
+                       or (teacher.get("username") or "").strip()
+                       or "المعلمة")
+
+    teacher_keys = _teacher_match_keys(teacher)
+    try:
+        all_grp_rows = db.execute(
+            "SELECT id, COALESCE(group_name,'') AS group_name, "
+            "COALESCE(teacher_name,'') AS teacher_name FROM student_groups "
+            "WHERE group_name IS NOT NULL AND TRIM(group_name) <> ''"
+        ).fetchall()
+    except Exception:
+        all_grp_rows = []
+    teacher_groups = []
+    for r in all_grp_rows:
+        rd = dict(r)
+        gn = (rd.get("group_name") or "").strip()
+        tn = (rd.get("teacher_name") or "").strip().lower()
+        if gn and tn and tn in teacher_keys:
+            teacher_groups.append({"id": int(rd.get("id") or 0), "name": gn})
+    teacher_group_names = {g["name"] for g in teacher_groups}
+
+    target_label = ""
+    if target_type == "student":
+        try: sid = int(body.get("student_id") or 0)
+        except Exception: sid = 0
+        if not sid:
+            return jsonify({"ok": False, "error": "الطالبة مطلوبة"}), 400
+        try:
+            srow = db.execute(
+                "SELECT id, COALESCE(student_name,'') AS student_name, "
+                "COALESCE(group_name_student,'') AS gns, "
+                "COALESCE(group_online,'') AS gon "
+                "FROM students WHERE id=?", (sid,)).fetchone()
+        except Exception:
+            srow = None
+        if not srow:
+            return jsonify({"ok": False, "error": "الطالبة غير موجودة"}), 404
+        sd = dict(srow)
+        student_groups_set = {(sd.get("gns") or "").strip(),
+                              (sd.get("gon") or "").strip()} - {""}
+        if not (student_groups_set & teacher_group_names):
+            return jsonify({"ok": False,
+                            "error": "الطالبة ليست في أي مجموعة لهذه المعلمة"
+                            }), 403
+        target_label = ("بخصوص الطالبة "
+                        + ((sd.get("student_name") or "").strip()
+                           or "الطالبة"))
+    elif target_type == "group":
+        try: gid = int(body.get("group_id") or 0)
+        except Exception: gid = 0
+        if not gid:
+            return jsonify({"ok": False, "error": "المجموعة مطلوبة"}), 400
+        match = next((g for g in teacher_groups if g["id"] == gid), None)
+        if not match:
+            return jsonify({"ok": False,
+                            "error": "هذه المجموعة ليست لهذه المعلمة"
+                            }), 403
+        target_label = "بخصوص طلاب " + match["name"]
+    else:
+        if not teacher_groups:
+            return jsonify({"ok": False,
+                            "error": "لا توجد مجموعات لهذه المعلمة"
+                            }), 422
+        target_label = "بخصوص جميع طلاب المعلمة"
+
+    kind_labels = {
+        "evaluation":     "نوع الطلب: تقييم",
+        "parent_message": "نوع الطلب: رسالة لولي الأمر",
+        "general":        "نوع الطلب: ملاحظة إدارية",
+    }
+    composed_lines = ["السلام عليكم " + teacher_display + "،",
+                      "", target_label, ""]
+    kind_line = kind_labels.get(request_kind, "")
+    if kind_line:
+        composed_lines.append(kind_line)
+        composed_lines.append("")
+    composed_lines.append(message_text)
+    composed = "\n".join(composed_lines)
+
+    import urllib.parse as _up_tr
+    wa_url = "https://wa.me/?text=" + _up_tr.quote(composed)
+
+    try:
+        _audit("teacher_request.send",
+               target_type="user", target_id=int(teacher_id),
+               new_value={
+                   "target_type":     target_type,
+                   "request_kind":    request_kind,
+                   "student_id":      body.get("student_id"),
+                   "group_id":        body.get("group_id"),
+                   "target_label":    target_label,
+                   "teacher_display": teacher_display,
+                   "message_preview": message_text[:200],
+               })
+    except Exception: pass
+
+    return jsonify({
+        "ok":            True,
+        "wa_url":        wa_url,
+        "target_label":  target_label,
+        "teacher_name":  teacher_display,
+    })
+
+
 @app.route('/api/teacher-deliveries/summary', methods=['GET'])
 @login_required
 def api_teacher_deliveries_summary():
