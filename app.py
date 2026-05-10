@@ -1395,7 +1395,8 @@ def init_db():
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0,
         cloudinary_url TEXT,
-        cloudinary_public_id TEXT
+        cloudinary_public_id TEXT,
+        file_data BYTEA
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6989,7 +6990,8 @@ if True:
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0,
         cloudinary_url TEXT,
-        cloudinary_public_id TEXT
+        cloudinary_public_id TEXT,
+        file_data BYTEA
     )""")
     db2.execute("""CREATE TABLE IF NOT EXISTS books_v2_groups(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7046,6 +7048,27 @@ if True:
         try:
             db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
                         ("books_v2_cloudinary_v1",))
+            db2.commit()
+        except Exception: pass
+
+    # ── books_v2_file_data_v1: store PDF bytes directly in the DB
+    # (BYTEA on Postgres, BLOB-affinity on SQLite — same literal type
+    # name works on both engines, see parent_receipts precedent).
+    # This replaces the Cloudinary external dependency. Existing
+    # rows keep their cloudinary_url / file_path values; the serve
+    # helpers fall back through file_data → cloudinary_url → file_path.
+    if "books_v2_file_data_v1" not in applied:
+        try:
+            _bk_cols2 = [r[1] for r in db2.execute(
+                "PRAGMA table_info(books_v2)").fetchall()]
+        except Exception:
+            _bk_cols2 = []
+        if "file_data" not in _bk_cols2:
+            try: db2.execute("ALTER TABLE books_v2 ADD COLUMN file_data BYTEA")
+            except Exception: pass
+        try:
+            db2.execute("INSERT INTO schema_migrations(tag) VALUES(?)",
+                        ("books_v2_file_data_v1",))
             db2.commit()
         except Exception: pass
 
