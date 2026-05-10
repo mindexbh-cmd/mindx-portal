@@ -71185,9 +71185,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
           var dlTag = b.can_download
             ? '<span class="free">⬇ تحميل مسموح</span>'
             : '<span class="lock">🔒 عرض فقط</span>';
-          // Backing-file presence: server returns has_cloudinary +
-          // has_legacy_file; missing if both are false.
-          var hasFile = !!(b.has_cloudinary || b.has_legacy_file);
+          // Backing-file presence: server returns has_file_data
+          // (in-DB BYTEA, canonical), has_cloudinary, has_legacy_file.
+          // Missing only if all three are false.
+          var hasFile = !!(b.has_file_data || b.has_cloudinary || b.has_legacy_file);
           var missingBadge = hasFile ? '' :
             '<div class="bk-missing-badge">⚠ الملف مفقود</div>';
           var reuploadBtn = '<button class="act-reupload" onclick="bkOpenReupload('+b.id+', '+JSON.stringify(b.title||'')+')">📤 إعادة رفع الملف</button>';
