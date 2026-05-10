@@ -71002,6 +71002,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
     <button data-zoom="1.25">125%</button>
     <button data-zoom="1.5">150%</button>
   </div>
+  <button id="pv-fullscreen"
+          style="padding:6px 12px;border:1.5px solid #d8c8ec;
+                 background:#fff;border-radius:7px;cursor:pointer;
+                 font-size:.85rem;color:#4a148c;font-weight:700;
+                 font-family:inherit;margin-right:8px;">
+    ⛶ ملء الشاشة
+  </button>
 </div>
 <div class="pv-canvas-wrap">
   <div id="pv-loading" class="pv-loading">جاري تحميل المنهج...</div>
@@ -71010,7 +71017,15 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
 </div>
 <div class="pv-bottombar">
   <button id="pv-prev" disabled>السابق ←</button>
-  <span id="pv-page-indicator">صفحة 0 من 0</span>
+  <span id="pv-page-indicator">
+    صفحة
+    <input type="number" id="pv-page-input"
+           min="1" value="1"
+           style="width:60px;padding:4px 6px;border:1.5px solid #d8c8ec;
+                  border-radius:6px;font-weight:800;color:#4a148c;
+                  text-align:center;font-family:inherit;font-size:.95rem;">
+    من <span id="pv-page-total">0</span>
+  </span>
   <button id="pv-next" disabled>→ التالي</button>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -71035,9 +71050,13 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   var loadingEl = document.getElementById('pv-loading');
   var errorEl   = document.getElementById('pv-error');
   var indicator = document.getElementById('pv-page-indicator');
+  var pageInput = document.getElementById('pv-page-input');
+  var pageTotal = document.getElementById('pv-page-total');
   var prevBtn   = document.getElementById('pv-prev');
   var nextBtn   = document.getElementById('pv-next');
   var zoomCtrls = document.getElementById('pv-zoom-controls');
+  var fsBtn     = document.getElementById('pv-fullscreen');
+  var canvasWrap = document.querySelector('.pv-canvas-wrap');
 
   var pdfDoc = null;
   var currentPage = 1;
@@ -71097,7 +71116,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
       rendering = false;
       showError('تعذّر عرض الصفحة. حاولي إعادة فتح المنهج.');
     });
-    indicator.textContent = 'صفحة ' + num + ' من ' + totalPages;
+    pageInput.value = num;
+    pageInput.max = totalPages;
+    pageTotal.textContent = totalPages;
     prevBtn.disabled = (num <= 1);
     nextBtn.disabled = (num >= totalPages);
   }
@@ -71117,6 +71138,78 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
         function(x){ x.classList.toggle('active', x === b); });
       renderPage(currentPage);
     }
+  });
+
+  // Page-jump input: type a number → Enter or blur jumps the viewer.
+  function jumpToPage(){
+    var n = parseInt(pageInput.value, 10);
+    if (isNaN(n) || n < 1) n = 1;
+    if (n > totalPages) n = totalPages;
+    pageInput.value = n;
+    if (n !== currentPage){
+      currentPage = n;
+      renderPage(currentPage);
+    }
+  }
+  pageInput.addEventListener('change', jumpToPage);
+  pageInput.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter'){
+      ev.preventDefault();
+      jumpToPage();
+      pageInput.blur();
+    }
+  });
+
+  // Vertical-swipe gestures on the canvas area: up = next, down = prev.
+  // Horizontal drift > tolerance disqualifies the swipe so the user
+  // can still tap or drag-select without flipping a page.
+  var touchStartY = 0;
+  var touchStartX = 0;
+  var SWIPE_THRESHOLD = 60;
+  var SWIPE_HORIZ_TOLERANCE = 40;
+  canvasWrap.addEventListener('touchstart', function(ev){
+    var t = ev.changedTouches[0];
+    touchStartY = t.screenY;
+    touchStartX = t.screenX;
+  }, {passive: true});
+  canvasWrap.addEventListener('touchend', function(ev){
+    var t = ev.changedTouches[0];
+    var dy = t.screenY - touchStartY;
+    var dx = Math.abs(t.screenX - touchStartX);
+    if (Math.abs(dy) >= SWIPE_THRESHOLD && dx <= SWIPE_HORIZ_TOLERANCE){
+      if (dy < 0 && currentPage < totalPages){
+        currentPage++;
+        renderPage(currentPage);
+      } else if (dy > 0 && currentPage > 1){
+        currentPage--;
+        renderPage(currentPage);
+      }
+    }
+  }, {passive: true});
+
+  // Fullscreen toggle (vendor-prefix fallbacks for older Safari/iOS).
+  function toggleFullscreen(){
+    var el = document.documentElement;
+    var isFs = !!(document.fullscreenElement
+                  || document.webkitFullscreenElement);
+    if (!isFs){
+      var req = el.requestFullscreen || el.webkitRequestFullscreen
+                || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req) req.call(el);
+    } else {
+      var exit = document.exitFullscreen || document.webkitExitFullscreen
+                 || document.mozCancelFullScreen || document.msExitFullscreen;
+      if (exit) exit.call(document);
+    }
+  }
+  fsBtn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', function(){
+    var isFs = !!document.fullscreenElement;
+    fsBtn.textContent = isFs ? '⛶ خروج' : '⛶ ملء الشاشة';
+  });
+  document.addEventListener('webkitfullscreenchange', function(){
+    var isFs = !!document.webkitFullscreenElement;
+    fsBtn.textContent = isFs ? '⛶ خروج' : '⛶ ملء الشاشة';
   });
 
   canvas.addEventListener('contextmenu', function(ev){
@@ -71141,7 +71234,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
   pdfjsLib.getDocument(PDF_URL).promise.then(function(pdf){
     pdfDoc = pdf;
     totalPages = pdf.numPages;
-    indicator.textContent = 'صفحة 1 من ' + totalPages;
+    pageInput.max = totalPages;
+    pageTotal.textContent = totalPages;
     renderPage(1);
   }).catch(function(){
     showError('تعذّر تحميل المنهج. قد تكون الجلسة منتهية — أعيدي الفتح من صفحة المناهج.');
