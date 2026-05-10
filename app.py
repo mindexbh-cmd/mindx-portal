@@ -40784,11 +40784,37 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
           <span>تذكير/ملاحظة إدارية عامة</span>
         </label>
       </div>
+      <div class="tm-field">
+        <span class="tm-radio-legend">المستهدف:</span>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-target" value="student" checked>
+          <span>طالبة معينة</span>
+        </label>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-target" value="group">
+          <span>مجموعة كاملة</span>
+        </label>
+        <label class="tm-radio">
+          <input type="radio" name="tm-req-target" value="all_groups">
+          <span>كل مجموعات المعلمة</span>
+        </label>
+      </div>
       <div class="tm-field" id="tm-req-student-wrap">
         <label for="tm-req-student">الطالبة:</label>
         <select id="tm-req-student">
           <option value="">— اختاري الطالبة —</option>
         </select>
+      </div>
+      <div class="tm-field" id="tm-req-group-wrap" hidden>
+        <label for="tm-req-group">المجموعة:</label>
+        <select id="tm-req-group">
+          <option value="">— اختاري المجموعة —</option>
+        </select>
+      </div>
+      <div class="tm-field" id="tm-req-allgroups-note" hidden
+           style="background:#f3e5f5;padding:10px 12px;border-radius:8px;
+                  color:#4a148c;font-size:.92rem;">
+        سيتم إرسال الطلب لجميع طلاب المعلمة
       </div>
       <div class="tm-field">
         <label for="tm-req-text">نص الطلب:</label>
@@ -41760,45 +41786,66 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   teacherSel.addEventListener('change', tmLoadParentMsgs);
   groupSel.addEventListener('change',   tmLoadParentMsgs);
 
-  // ── Step-6: request-to-teacher modal (UI only) ───────────────
-  // The "إرسال" button is wired to a no-op placeholder per spec —
-  // real send / DB write logic will land in a later commit. The
-  // student dropdown is populated from /api/admin/teacher/<id>/students
-  // (added in this same commit) the first time the modal is opened
-  // for a given teacher; subsequent opens reuse the cached list.
+  // ── request-to-teacher modal ─────────────────────────────────
+  // Modal supports three target types (طالبة / مجموعة / كل المجموعات).
+  // Student + group dropdowns are populated via cached calls to
+  // /api/admin/teacher/<id>/{students,groups}. Send POSTs to
+  // /api/admin/teacher/<id>/send-request and opens the returned
+  // wa.me URL in a pre-opened blank tab so popup blockers don't
+  // kill the user-gesture window between fetch and window.open.
   var reqOverlay   = document.getElementById('tm-req-overlay');
   var reqStudent   = document.getElementById('tm-req-student');
   var reqStuWrap   = document.getElementById('tm-req-student-wrap');
+  var reqGroup     = document.getElementById('tm-req-group');
+  var reqGrpWrap   = document.getElementById('tm-req-group-wrap');
+  var reqAllNote   = document.getElementById('tm-req-allgroups-note');
   var reqText      = document.getElementById('tm-req-text');
-  var reqRadios    = document.querySelectorAll('input[name="tm-req-type"]');
+  var reqKindRadios   = document.querySelectorAll('input[name="tm-req-type"]');
+  var reqTargetRadios = document.querySelectorAll('input[name="tm-req-target"]');
   var reqCloseBtn  = document.getElementById('tm-req-close');
   var reqCancelBtn = document.getElementById('tm-req-cancel');
   var reqSendBtn   = document.getElementById('tm-req-send');
   var reqOpenBtn   = document.getElementById('tm-request-btn');
   var reqStudentsCache = {};   // tid → students[]
+  var reqGroupsCache   = {};   // tid → groups[]
 
-  function tmReqApplyType(){
-    var sel = '';
-    for(var i=0; i<reqRadios.length; i++){
-      if(reqRadios[i].checked){ sel = reqRadios[i].value; break; }
+  function tmReqGetTarget(){
+    for(var i=0; i<reqTargetRadios.length; i++){
+      if(reqTargetRadios[i].checked) return reqTargetRadios[i].value;
     }
-    var needsStudent = (sel === 'evaluation' || sel === 'parent_message');
-    reqStuWrap.hidden = !needsStudent;
+    return 'student';
+  }
+  function tmReqGetKind(){
+    for(var i=0; i<reqKindRadios.length; i++){
+      if(reqKindRadios[i].checked) return reqKindRadios[i].value;
+    }
+    return 'general';
+  }
+  function tmReqApplyTarget(){
+    var sel = tmReqGetTarget();
+    reqStuWrap.hidden = (sel !== 'student');
+    reqGrpWrap.hidden = (sel !== 'group');
+    reqAllNote.hidden = (sel !== 'all_groups');
   }
   function tmReqResetForm(){
-    if(reqRadios.length){
-      reqRadios.forEach(function(rb, idx){ rb.checked = (idx === 0); });
+    if(reqKindRadios.length){
+      reqKindRadios.forEach(function(rb, idx){ rb.checked = (idx === 0); });
+    }
+    if(reqTargetRadios.length){
+      reqTargetRadios.forEach(function(rb, idx){ rb.checked = (idx === 0); });
     }
     reqStudent.value = '';
+    reqGroup.value = '';
     reqText.value = '';
-    tmReqApplyType();
+    tmReqApplyTarget();
   }
   function tmReqOpen(){
     var tid = teacherSel.value || '';
     if(!tid){ return; }   // safety: button is inside the teacher card
     tmReqResetForm();
-    // Populate the student dropdown for this teacher (cached).
+    // Populate both dropdowns for this teacher (independently cached).
     reqStudent.innerHTML = '<option value="">— اختاري الطالبة —</option>';
+    reqGroup.innerHTML   = '<option value="">— اختاري المجموعة —</option>';
     var fillStudents = function(students){
       students.forEach(function(s){
         var opt = document.createElement('option');
@@ -41806,6 +41853,16 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         opt.textContent = (s.student_name || '') +
           (s.group_name ? ' (' + s.group_name + ')' : '');
         reqStudent.appendChild(opt);
+      });
+    };
+    var fillGroups = function(groups){
+      groups.forEach(function(g){
+        var opt = document.createElement('option');
+        opt.value = String(g.id);
+        var sc = (typeof g.students_count === 'number')
+          ? ' (' + g.students_count + ' طالبة)' : '';
+        opt.textContent = (g.name || '') + sc;
+        reqGroup.appendChild(opt);
       });
     };
     if(reqStudentsCache[tid]){
@@ -41821,6 +41878,19 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         })
         .catch(function(){ /* leave the placeholder */ });
     }
+    if(reqGroupsCache[tid]){
+      fillGroups(reqGroupsCache[tid]);
+    } else {
+      fetch('/api/admin/teacher/' + encodeURIComponent(tid) + '/groups',
+            {credentials:'include'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          var list = (j && j.groups) || [];
+          reqGroupsCache[tid] = list;
+          fillGroups(list);
+        })
+        .catch(function(){ /* leave the placeholder */ });
+    }
     reqOverlay.hidden = false;
   }
   function tmReqClose(){ reqOverlay.hidden = true; }
@@ -41833,8 +41903,8 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
   }
   if(reqCloseBtn){  reqCloseBtn .addEventListener('click', tmReqClose); }
   if(reqCancelBtn){ reqCancelBtn.addEventListener('click', tmReqClose); }
-  reqRadios.forEach(function(rb){
-    rb.addEventListener('change', tmReqApplyType);
+  reqTargetRadios.forEach(function(rb){
+    rb.addEventListener('change', tmReqApplyTarget);
   });
   // Click on the dimmed overlay (not the modal itself) closes too.
   reqOverlay.addEventListener('click', function(ev){
@@ -41845,14 +41915,68 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     if(ev.key === 'Escape' && !reqOverlay.hidden) tmReqClose();
   });
 
-  // PER SPEC: the "إرسال" button MUST be a no-op until later steps
-  // wire real send/save logic. We attach a click listener purely so
-  // future maintainers see WHERE to wire it, and so accidental form
-  // submissions are blocked even if the markup is later edited.
+  // Send: POST to /api/admin/teacher/<tid>/send-request, then open
+  // the returned wa.me URL in a tab. We pre-open about:blank inside
+  // the click gesture so the eventual location.href = wa_url isn't
+  // blocked as a popup once the fetch promise resolves.
   if(reqSendBtn){
     reqSendBtn.addEventListener('click', function(ev){
       ev.preventDefault();
-      /* TODO: real send logic — intentionally no-op for now. */
+      var tid = teacherSel.value || '';
+      if(!tid){ alert('اختاري المعلمة أولاً'); return; }
+      var target = tmReqGetTarget();
+      var kind   = tmReqGetKind();
+      var msg    = (reqText.value || '').trim();
+      if(!msg){ alert('اكتبي نص الطلب'); reqText.focus(); return; }
+      var payload = {
+        target_type:  target,
+        request_kind: kind,
+        message_text: msg,
+      };
+      if(target === 'student'){
+        var sid = (reqStudent.value || '').trim();
+        if(!sid){ alert('اختاري الطالبة'); return; }
+        payload.student_id = parseInt(sid, 10);
+      } else if(target === 'group'){
+        var gid = (reqGroup.value || '').trim();
+        if(!gid){ alert('اختاري المجموعة'); return; }
+        payload.group_id = parseInt(gid, 10);
+      }
+      // Pre-open inside the click gesture; we'll redirect once the
+      // fetch resolves. If the popup is blocked anyway (popup === null),
+      // we fall back to a second window.open() attempt after the fetch.
+      var popup = null;
+      try { popup = window.open('about:blank', '_blank'); } catch(e){}
+      reqSendBtn.disabled = true;
+      fetch('/api/admin/teacher/' + encodeURIComponent(tid) + '/send-request',
+            {method:'POST',
+             headers:{'Content-Type':'application/json'},
+             credentials:'include',
+             body: JSON.stringify(payload)})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(res){
+          reqSendBtn.disabled = false;
+          if(!res.ok || !res.j || !res.j.ok){
+            if(popup){ try { popup.close(); } catch(e){} }
+            alert((res.j && res.j.error) || 'تعذر تجهيز الطلب');
+            return;
+          }
+          var url = res.j.wa_url;
+          if(popup){
+            try { popup.location.href = url; } catch(e){
+              try { window.open(url, '_blank'); } catch(_){}
+            }
+          } else {
+            try { window.open(url, '_blank'); } catch(_){}
+          }
+          alert('تم تجهيز رسالة الواتساب — اختاري المعلمة في تطبيق الواتساب');
+          tmReqClose();
+        })
+        .catch(function(){
+          reqSendBtn.disabled = false;
+          if(popup){ try { popup.close(); } catch(e){} }
+          alert('تعذر الاتصال بالخادم. حاولي مرة أخرى.');
+        });
     });
   }
 
