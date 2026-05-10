@@ -70309,9 +70309,14 @@ def api_books_v2_for_student(sid):
     if not gids:
         return jsonify({"ok": True, "books": [], "count": 0})
     ph = ",".join("?" for _ in gids)
+    # Postgres requires every ORDER BY column to appear in the SELECT
+    # list when DISTINCT is used. Including b.uploaded_at + b.id keeps
+    # the row uniqueness logically per-book (uploaded_at is per-book)
+    # while satisfying that rule. SQLite tolerated the original form,
+    # which is why this only manifested on prod.
     try:
         rows = db.execute(
-            "SELECT DISTINCT b.id FROM books_v2 b "
+            "SELECT DISTINCT b.id, b.uploaded_at FROM books_v2 b "
             "JOIN books_v2_groups bg ON bg.book_id=b.id "
             "WHERE bg.group_id IN (" + ph + ") "
             "AND COALESCE(b.is_deleted,0)=0 "
@@ -70451,9 +70456,12 @@ def _books_v2_books_for_personal_id(db, pid):
     gids = _books_v2_resolve_group_ids_for_students(db, {sid})
     if not gids: return []
     ph = ",".join("?" for _ in gids)
+    # Postgres requires every ORDER BY column to appear in the SELECT
+    # list when DISTINCT is used (see api_books_v2_for_student for the
+    # same fix).
     try:
         rows = db.execute(
-            "SELECT DISTINCT b.id FROM books_v2 b "
+            "SELECT DISTINCT b.id, b.uploaded_at FROM books_v2 b "
             "JOIN books_v2_groups bg ON bg.book_id=b.id "
             "WHERE bg.group_id IN (" + ph + ") "
             "AND COALESCE(b.is_deleted,0)=0 "
