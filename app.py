@@ -8986,8 +8986,15 @@ function _ppRender(d){
         bh += '<div class="meta">' + (dt ? _ppEsc(dt) : '') +
               (dt && lock ? ' • ' : '') + lock + '</div>';
         bh += '<div class="acts">';
-        bh += '<a class="pp-bk-btn" href="/parent/book/' + b.id +
-              '/view?pid=' + pidEnc +
+        // View-only books (can_download=0) go through the custom
+        // PDF.js viewer at /viewer which hides the browser's native
+        // download/print toolbar and overlays a watermark. Books
+        // marked as downloadable use the existing native /view path
+        // unchanged so their toolbar download button still works.
+        var viewHref = b.can_download
+          ? ('/parent/book/' + b.id + '/view?pid='   + pidEnc)
+          : ('/parent/book/' + b.id + '/viewer?pid=' + pidEnc);
+        bh += '<a class="pp-bk-btn" href="' + viewHref +
               '" target="_blank" rel="noopener">👁️ عرض</a>';
         bh += dlBtn;
         bh += '</div>';
