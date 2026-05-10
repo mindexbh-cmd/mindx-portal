@@ -70869,15 +70869,365 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
                     "book_id": int(bid)}), 410
 
 
-@app.route('/parent/book/<int:bid>/view', methods=['GET'])
-def parent_book_view(bid):
-    """Public viewer. Requires ?pid=<personal_id>. The pid+bid
-    combo must validate against books_v2_groups for the student's
-    group; otherwise 403 with no information leakage."""
+# ── Parent PDF viewer (custom PDF.js page for view-only books) ──────
+# Books with can_download=0 are served through a custom PDF.js page
+# that hides the browser's native download/print buttons and overlays
+# a diagonal watermark (student name + personal_id) on every rendered
+# page. The raw bytes URL (/parent/book/<bid>/view) is gated by a
+# short-lived HMAC token bound to (pid, bid) so a copied URL can't
+# bypass the viewer for view-only content.
+#
+# Token format (intentionally stdlib-only; itsdangerous is available
+# transitively but not used elsewhere in app.py):
+#   payload = "<pid>:<bid>:<unix_ts>".encode()
+#   sig     = HMAC-SHA256(app.secret_key, payload)
+#   token   = urlsafe_b64encode(payload + b"|" + sig).rstrip("=")
+# Verify: split on b"|", constant-time compare sig, check ts within
+# _PARENT_VIEWER_TTL seconds, check (pid, bid) match the request.
+
+import hmac as _pv_hmac
+import hashlib as _pv_hashlib
+import base64 as _pv_base64
+import time as _pv_time
+
+_PARENT_VIEWER_TTL = 300  # 5 minutes
+
+
+def _books_v2_make_viewer_token(pid, bid):
+    ts = int(_pv_time.time())
+    payload = (str(pid) + ":" + str(int(bid)) + ":" + str(ts)).encode("utf-8")
+    sig = _pv_hmac.new(app.secret_key.encode("utf-8"), payload,
+                       _pv_hashlib.sha256).digest()
+    raw = payload + b"|" + sig
+    return _pv_base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _books_v2_verify_viewer_token(token, pid, bid):
+    """True iff token is well-formed, signature matches the current
+    secret, the embedded (pid, bid) matches the request, and the
+    timestamp is within _PARENT_VIEWER_TTL seconds. Never raises."""
+    if not token: return False
+    try:
+        pad = "=" * ((4 - len(token) % 4) % 4)
+        raw = _pv_base64.urlsafe_b64decode(token + pad)
+        i = raw.rfind(b"|")
+        if i < 0: return False
+        payload = raw[:i]
+        sig     = raw[i+1:]
+        expected = _pv_hmac.new(app.secret_key.encode("utf-8"),
+                                payload, _pv_hashlib.sha256).digest()
+        if not _pv_hmac.compare_digest(sig, expected):
+            return False
+        parts = payload.decode("utf-8").split(":")
+        if len(parts) != 3: return False
+        tok_pid, tok_bid, tok_ts = parts
+        if str(tok_pid) != str(pid): return False
+        if int(tok_bid) != int(bid): return False
+        if (int(_pv_time.time()) - int(tok_ts)) > _PARENT_VIEWER_TTL:
+            return False
+    except Exception:
+        return False
+    return True
+
+
+# Full HTML page — placeholders are JSON-encoded by the route handler
+# so the substituted values are valid JS string literals (handles
+# Arabic, quotes, backslashes safely without an HTML-escape pass).
+PARENT_PDF_VIEWER_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>قارئ المنهج — مايندكس</title>
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
+     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+.pv-topbar{background:rgba(255,255,255,.95);padding:10px 16px;
+           display:flex;justify-content:space-between;align-items:center;
+           gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.08);
+           position:sticky;top:0;z-index:50;}
+.pv-back{color:#4a148c;text-decoration:none;background:#f3e5f5;
+         padding:8px 14px;border-radius:9px;font-weight:700;font-size:.85rem;
+         white-space:nowrap;}
+.pv-title{font-weight:900;color:#4a148c;font-size:1rem;
+          flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap;min-width:0;}
+.pv-zoom{display:flex;gap:6px;}
+.pv-zoom button{padding:6px 10px;border:1.5px solid #d8c8ec;background:#fff;
+                border-radius:7px;cursor:pointer;font-size:.85rem;color:#4a148c;
+                font-weight:700;font-family:inherit;}
+.pv-zoom button.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
+.pv-canvas-wrap{padding:18px 12px 90px 12px;display:flex;flex-direction:column;
+                align-items:center;}
+#pv-canvas{max-width:100%;height:auto;display:block;
+           box-shadow:0 8px 32px rgba(74,20,140,.18);border-radius:6px;
+           background:#fff;-webkit-user-select:none;user-select:none;}
+.pv-bottombar{position:fixed;bottom:0;left:0;right:0;
+              background:rgba(255,255,255,.97);backdrop-filter:blur(8px);
+              padding:10px 16px;display:flex;justify-content:center;
+              align-items:center;gap:14px;
+              box-shadow:0 -2px 10px rgba(0,0,0,.08);z-index:50;}
+.pv-bottombar button{padding:9px 18px;
+                     background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                     color:#fff;border:none;border-radius:9px;cursor:pointer;
+                     font-weight:700;font-size:.95rem;font-family:inherit;
+                     min-width:110px;min-height:44px;}
+.pv-bottombar button:disabled{opacity:.4;cursor:not-allowed;}
+#pv-page-indicator{font-weight:800;color:#4a148c;font-size:.95rem;}
+.pv-loading{text-align:center;padding:60px 20px;color:#4a148c;
+            font-size:1.1rem;font-weight:700;}
+.pv-error{background:#ffebee;color:#c62828;padding:14px 18px;
+          border-radius:10px;text-align:center;margin:30px auto;
+          max-width:600px;font-weight:700;}
+@media (max-width:540px){
+  .pv-title{font-size:.9rem;}
+  .pv-zoom button{padding:5px 8px;font-size:.78rem;}
+  .pv-bottombar button{padding:9px 14px;font-size:.88rem;min-width:80px;}
+}
+</style></head><body oncontextmenu="return false;">
+<div class="pv-topbar">
+  <a class="pv-back" href="/parent">← رجوع</a>
+  <div class="pv-title" id="pv-title">—</div>
+  <div class="pv-zoom" id="pv-zoom-controls">
+    <button data-zoom="0.75">75%</button>
+    <button data-zoom="1.0" class="active">100%</button>
+    <button data-zoom="1.25">125%</button>
+    <button data-zoom="1.5">150%</button>
+  </div>
+</div>
+<div class="pv-canvas-wrap">
+  <div id="pv-loading" class="pv-loading">جاري تحميل المنهج...</div>
+  <canvas id="pv-canvas" hidden></canvas>
+  <div id="pv-error" class="pv-error" hidden></div>
+</div>
+<div class="pv-bottombar">
+  <button id="pv-prev" disabled>السابق ←</button>
+  <span id="pv-page-indicator">صفحة 0 من 0</span>
+  <button id="pv-next" disabled>→ التالي</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(function(){
+  var BOOK_TITLE   = __BOOK_TITLE_JSON__;
+  var STUDENT_NAME = __STUDENT_NAME_JSON__;
+  var STUDENT_PID  = __STUDENT_PID_JSON__;
+  var PDF_URL      = __PDF_URL_JSON__;
+  var WATERMARK    = STUDENT_NAME + ' • ' + STUDENT_PID;
+
+  document.getElementById('pv-title').textContent =
+      BOOK_TITLE.length > 50 ? (BOOK_TITLE.slice(0,50) + '…') : BOOK_TITLE;
+
+  if (window['pdfjsLib']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+
+  var canvas    = document.getElementById('pv-canvas');
+  var ctx       = canvas.getContext('2d');
+  var loadingEl = document.getElementById('pv-loading');
+  var errorEl   = document.getElementById('pv-error');
+  var indicator = document.getElementById('pv-page-indicator');
+  var prevBtn   = document.getElementById('pv-prev');
+  var nextBtn   = document.getElementById('pv-next');
+  var zoomCtrls = document.getElementById('pv-zoom-controls');
+
+  var pdfDoc = null;
+  var currentPage = 1;
+  var totalPages = 0;
+  var currentScale = 1.0;
+  var rendering = false;
+  var pendingPage = null;
+
+  function showError(msg){
+    loadingEl.hidden = true;
+    canvas.hidden = true;
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  }
+
+  function paintWatermark(c, w, h){
+    c.save();
+    c.fillStyle = 'rgba(150, 150, 150, 0.18)';
+    c.font = 'bold 22px Arial';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.translate(w/2, h/2);
+    c.rotate(-Math.PI / 4);
+    var stepY = 250, stepX = 350;
+    var span = Math.max(w, h) * 1.5;
+    for (var y = -span; y < span; y += stepY) {
+      for (var x = -span; x < span; x += stepX) {
+        c.fillText(WATERMARK, x, y);
+      }
+    }
+    c.restore();
+  }
+
+  function renderPage(num){
+    if (!pdfDoc) return;
+    if (rendering) { pendingPage = num; return; }
+    rendering = true;
+    var dpr = (window.devicePixelRatio || 1);
+    pdfDoc.getPage(num).then(function(page){
+      var viewport = page.getViewport({scale: currentScale * dpr});
+      canvas.width  = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width  = (viewport.width  / dpr) + 'px';
+      canvas.style.height = (viewport.height / dpr) + 'px';
+      var task = page.render({canvasContext: ctx, viewport: viewport});
+      return task.promise.then(function(){
+        paintWatermark(ctx, canvas.width, canvas.height);
+        loadingEl.hidden = true;
+        canvas.hidden = false;
+        rendering = false;
+        if (pendingPage !== null) {
+          var p = pendingPage; pendingPage = null;
+          renderPage(p);
+        }
+      });
+    }).catch(function(){
+      rendering = false;
+      showError('تعذّر عرض الصفحة. حاولي إعادة فتح المنهج.');
+    });
+    indicator.textContent = 'صفحة ' + num + ' من ' + totalPages;
+    prevBtn.disabled = (num <= 1);
+    nextBtn.disabled = (num >= totalPages);
+  }
+
+  prevBtn.addEventListener('click', function(){
+    if (currentPage > 1){ currentPage--; renderPage(currentPage); }
+  });
+  nextBtn.addEventListener('click', function(){
+    if (currentPage < totalPages){ currentPage++; renderPage(currentPage); }
+  });
+  zoomCtrls.addEventListener('click', function(ev){
+    var b = ev.target;
+    if (b && b.tagName === 'BUTTON' && b.dataset.zoom){
+      currentScale = parseFloat(b.dataset.zoom);
+      Array.prototype.forEach.call(
+        zoomCtrls.querySelectorAll('button'),
+        function(x){ x.classList.toggle('active', x === b); });
+      renderPage(currentPage);
+    }
+  });
+
+  canvas.addEventListener('contextmenu', function(ev){
+    ev.preventDefault(); ev.stopPropagation(); return false;
+  });
+  window.addEventListener('keydown', function(ev){
+    if (ev.ctrlKey || ev.metaKey){
+      var k = (ev.key || '').toLowerCase();
+      if (k === 's' || k === 'p' || k === 'a'){
+        ev.preventDefault();
+        ev.stopPropagation();
+        return false;
+      }
+    }
+  });
+
+  if (!window['pdfjsLib']){
+    showError('تعذّر تحميل قارئ PDF. تحقّقي من الاتصال بالإنترنت.');
+    return;
+  }
+
+  pdfjsLib.getDocument(PDF_URL).promise.then(function(pdf){
+    pdfDoc = pdf;
+    totalPages = pdf.numPages;
+    indicator.textContent = 'صفحة 1 من ' + totalPages;
+    renderPage(1);
+  }).catch(function(){
+    showError('تعذّر تحميل المنهج. قد تكون الجلسة منتهية — أعيدي الفتح من صفحة المناهج.');
+  });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/parent/book/<int:bid>/viewer', methods=['GET'])
+def parent_book_viewer(bid):
+    """Custom PDF.js viewer page for view-only books. For
+    can_download=1 books, redirects to the existing /view URL so
+    parents using a downloadable book still get the native browser
+    viewer (with its built-in download button — by design)."""
     pid = (request.args.get('pid') or '').strip()
     db = get_db()
     if not _books_v2_pid_can_view(db, pid, bid):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try:
+        srow = db.execute(
+            "SELECT id, COALESCE(student_name,'') AS student_name "
+            "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        srow = None
+    if not srow:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    student_name = ((dict(srow).get("student_name") or "").strip()
+                    or "طالب/ة")
+    try:
+        brow = db.execute(
+            "SELECT title, can_download FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        brow = None
+    if not brow:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    bd = dict(brow)
+    title = (bd.get("title") or "كتاب").strip()
+    can_dl = int(bd.get("can_download") or 0)
+    if can_dl:
+        from flask import redirect as _redir_pv
+        import urllib.parse as _up_pv1
+        return _redir_pv('/parent/book/' + str(int(bid)) +
+                         '/view?pid=' + _up_pv1.quote(pid), code=302)
+    token = _books_v2_make_viewer_token(pid, int(bid))
+    import json as _json_pv
+    import urllib.parse as _up_pv2
+    pdf_url = ('/parent/book/' + str(int(bid)) +
+               '/view?pid=' + _up_pv2.quote(pid) +
+               '&_vt=' + _up_pv2.quote(token))
+    return (PARENT_PDF_VIEWER_HTML
+            .replace("__BOOK_TITLE_JSON__",
+                     _json_pv.dumps(title, ensure_ascii=False))
+            .replace("__STUDENT_NAME_JSON__",
+                     _json_pv.dumps(student_name, ensure_ascii=False))
+            .replace("__STUDENT_PID_JSON__",
+                     _json_pv.dumps(pid, ensure_ascii=False))
+            .replace("__PDF_URL_JSON__",
+                     _json_pv.dumps(pdf_url, ensure_ascii=False)))
+
+
+@app.route('/parent/book/<int:bid>/view', methods=['GET'])
+def parent_book_view(bid):
+    """Public viewer. Requires ?pid=<personal_id>. The pid+bid
+    combo must validate against books_v2_groups for the student's
+    group; otherwise 403 with no information leakage.
+
+    For view-only books (can_download=0), additionally requires a
+    short-lived &_vt=<token> minted by /viewer so a copied /view URL
+    can't bypass the custom PDF.js page (which is the only surface
+    that hides the browser's native download/print controls)."""
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if not _books_v2_pid_can_view(db, pid, bid):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try:
+        crow = db.execute(
+            "SELECT can_download FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        crow = None
+    if not crow:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    can_dl = int(dict(crow).get("can_download") or 0)
+    if not can_dl:
+        token = (request.args.get('_vt') or '').strip()
+        if not _books_v2_verify_viewer_token(token, pid, int(bid)):
+            return jsonify({"ok": False, "error":
+                            "هذا الكتاب للعرض داخل القارئ فقط. "
+                            "يرجى استخدام زر العرض من صفحة المناهج."
+                            }), 403
     return _books_v2_send_file_public(db, int(bid), as_attachment=False)
 
 
