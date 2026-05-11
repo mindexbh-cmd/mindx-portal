@@ -25518,13 +25518,19 @@ def api_parent_lookup():
     if not pid:
         return jsonify({"ok": False, "error": "أدخل الرقم الشخصي"}), 400
     db = get_db()
-    student = db.execute(
-        "SELECT * FROM students WHERE TRIM(personal_id)=? LIMIT 1", (pid,)
-    ).fetchone()
+    # Tolerate bidi marks in either the input or the stored cell —
+    # some imported students.personal_id rows have invisible U+202A
+    # which would otherwise make this lookup miss.
+    student = _resolve_student_row_by_pid(db, pid, columns="*")
     if not student:
         return jsonify({"ok": False, "error": "الرقم الشخصي غير صحيح"}), 404
     s = dict(student)
     sid = s["id"]
+    # Normalize the pid we'll thread through the rest of this request
+    # so downstream queries that compare against student fields use
+    # the canonical form. The original (parent-typed) pid is preserved
+    # for error messages above this point.
+    pid = _strip_directional_marks(s.get("personal_id") or pid).strip() or pid
     # Attendance summary by student_name (matches existing flow).
     # Only rows with a canonical status count — empty/placeholder rows
     # are roster scaffolding and must not inflate the denominator.
@@ -57084,6 +57090,68 @@ def _paylog_inst_select_clause(db):
     return ",".join(pieces)
 
 
+_DIR_MARK_CHARS = frozenset(
+    '‎‏‪‫‬‭‮⁦⁧⁨⁩')
+
+
+def _strip_directional_marks(s):
+    """Remove Unicode bidi/embedding control chars from a string.
+    Some imported student records have U+202A (LRE) embedded inside
+    the personal_id cell, which makes naive equality lookups against
+    parent-entered PIDs miss. Apply to BOTH the input and the stored
+    value before comparing. Never raises; returns the original on
+    a None/non-string input."""
+    if s is None:
+        return s
+    try:
+        return ''.join(c for c in str(s) if c not in _DIR_MARK_CHARS)
+    except Exception:
+        return s
+
+
+def _resolve_student_row_by_pid(db, pid, columns="id, student_name, personal_id"):
+    """Find a students row by personal_id, tolerating Unicode bidi
+    marks in either the input OR the stored cell. Fast path uses
+    TRIM(personal_id)=? (hits any existing index); on miss, falls
+    back to a full table scan with stripped-comparison. The fallback
+    is O(n) over students (~few hundred on prod) — acceptable for
+    rare cases where bidi-polluted PIDs slipped through import.
+
+    `columns` is interpolated raw — callers must pass a static SQL
+    column list, never user input.
+    """
+    pid_clean = _strip_directional_marks(pid).strip() if pid else ""
+    if not pid_clean:
+        return None
+    try:
+        r = db.execute(
+            "SELECT " + columns + " FROM students "
+            "WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid_clean,)).fetchone()
+    except Exception:
+        r = None
+    if r:
+        return r
+    try:
+        rows = db.execute(
+            "SELECT " + columns + " FROM students "
+            "WHERE personal_id IS NOT NULL AND personal_id <> ''"
+        ).fetchall()
+    except Exception:
+        return None
+    for row in rows:
+        try:
+            stored = row["personal_id"]
+        except Exception:
+            try: stored = row[-1]  # personal_id is the last col in default list
+            except Exception: stored = None
+        if not stored:
+            continue
+        if _strip_directional_marks(stored).strip() == pid_clean:
+            return row
+    return None
+
+
 def _payment_normalize_name(s):
     """Whitespace-collapse, strip diacritics + presentation chars so
     a payment_log row survives slight name spelling differences when
@@ -71235,15 +71303,14 @@ def _books_v2_books_for_personal_id(db, pid):
 def _books_v2_pid_can_view(db, pid, book_id):
     """Verify that the student identified by personal_id has at
     least one group assigned to this book. Returns False on any
-    miss — no information leakage about whether the book exists."""
-    pid = (pid or "").strip()
-    if not pid: return False
-    try:
-        row = db.execute(
-            "SELECT id FROM students WHERE TRIM(personal_id)=? LIMIT 1",
-            (pid,)).fetchone()
-    except Exception:
-        row = None
+    miss — no information leakage about whether the book exists.
+
+    Tolerates Unicode bidi marks (e.g. U+202A) embedded inside the
+    stored personal_id — some imported records carry them invisibly,
+    which would otherwise break the equality lookup against the
+    parent-entered PID."""
+    if not (pid or "").strip(): return False
+    row = _resolve_student_row_by_pid(db, pid, columns="id, personal_id")
     if not row: return False
     try:
         sid = int(dict(row).get("id") or 0)
@@ -72107,18 +72174,14 @@ _EV_PARENT_SCORE_KEYS = (
 
 def _eval_pid_resolve_student(db, pid):
     """Return (student_id, student_name) for a personal_id, or None
-    if the pid isn't registered. Trims whitespace defensively to
-    match the books-viewer pattern."""
-    pid = (pid or "").strip()
-    if not pid:
+    if the pid isn't registered. Trims whitespace defensively and
+    tolerates Unicode bidi marks in either the input or the stored
+    cell (some imported rows have invisible U+202A inside the PID)."""
+    if not (pid or "").strip():
         return None
-    try:
-        row = db.execute(
-            "SELECT id, COALESCE(student_name,'') AS student_name "
-            "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
-            (pid,)).fetchone()
-    except Exception:
-        return None
+    row = _resolve_student_row_by_pid(
+        db, pid,
+        columns="id, COALESCE(student_name,'') AS student_name, personal_id")
     if not row:
         return None
     rd = dict(row)
