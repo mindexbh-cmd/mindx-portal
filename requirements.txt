@@ -9,6 +9,16 @@ qrcode[pil]>=7.4.2
 playwright>=1.40
 Pillow>=10.0
 cloudinary>=1.40
+# Server-side PDF watermarking for view-only books (see /parent/book/<bid>/view).
+# All four are pure-Python — no system deps, safe for Render. The two
+# shaping libs are needed because reportlab itself does NOT join/order
+# Arabic glyphs; without them an Arabic watermark renders disconnected.
+pypdf==4.3.1
+reportlab>=4.0
+arabic-reshaper>=3.0
+# python-bidi 0.5+ is Rust-built (needs cargo); 0.4.2 is the last
+# pure-Python release. Pin it so the build works on any host.
+python-bidi==0.4.2
 # NOTE: pillow-heif is intentionally NOT pinned here. The package
 # needs the system libheif/libde265 libraries which Render's stock
 # Python image doesn't always provide — when the wheel falls back to

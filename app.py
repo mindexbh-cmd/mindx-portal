@@ -70954,6 +70954,203 @@ def _books_v2_verify_viewer_token(token, pid, bid):
     return True
 
 
+# ── Server-side PDF watermarking for view-only books ─────────────
+# When a parent loads /parent/book/<bid>/view for a can_download=0
+# book, we merge a diagonal "<student_name> • <pid> • <YYYY-MM-DD>"
+# layer onto every page server-side, then serve the watermarked
+# bytes. The native browser PDF viewer renders the result (handles
+# Arabic shaping correctly — same engine as Chrome's built-in
+# viewer); a leaked file carries the responsible student's PID
+# visibly on every page.
+#
+# Reportlab itself does NOT shape Arabic glyphs (Helvetica is
+# Latin-only; even with an Arabic-capable TTF the characters are
+# laid out in logical order with disconnected forms). We probe
+# the host for an Arabic-capable TTF at first use and combine it
+# with arabic-reshaper + python-bidi to produce correct visual-
+# order glyphs. If no font is found we fall back to a PID+date
+# watermark (still useful as a forensic marker) rather than
+# rendering broken glyph boxes.
+import functools as _wm_functools
+import datetime as _wm_dt
+
+_WM_FONT_NAME = None        # reportlab font name; None means probe pending
+_WM_FONT_PROBED = False     # True once we've tried (success or failure)
+
+
+def _books_v2_register_watermark_font():
+    """Probe common system paths for an Arabic-capable TTF and register
+    it with reportlab. Returns the font name on success, None on failure.
+    Result is memoised process-wide."""
+    global _WM_FONT_NAME, _WM_FONT_PROBED
+    if _WM_FONT_PROBED:
+        return _WM_FONT_NAME
+    _WM_FONT_PROBED = True
+    candidates = [
+        # Ubuntu / Debian (Render's base image typically ships these)
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        # Windows (local dev)
+        "C:\\Windows\\Fonts\\arialbd.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\tahomabd.ttf",
+        "C:\\Windows\\Fonts\\tahoma.ttf",
+        # macOS
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/Library/Fonts/Arial.ttf",
+    ]
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            from reportlab.pdfbase import pdfmetrics as _rl_pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont as _rl_TTFont
+            name = "MindxWMFont"
+            _rl_pdfmetrics.registerFont(_rl_TTFont(name, path))
+            _WM_FONT_NAME = name
+            return name
+        except Exception:
+            continue
+    return None
+
+
+def _books_v2_shape_for_pdf(text):
+    """Reshape Arabic glyphs and apply BIDI reordering so a PDF canvas
+    draws them visually correct. Pass-through for Latin-only text."""
+    try:
+        import arabic_reshaper as _ar_reshaper
+        from bidi.algorithm import get_display as _bidi_get_display
+        return _bidi_get_display(_ar_reshaper.reshape(text))
+    except Exception:
+        return text
+
+
+def _books_v2_make_watermark_overlay(text, width, height):
+    """Build a single-page PDF (in-memory) of width×height points with
+    diagonal tiled grey text. Returns BytesIO positioned at 0."""
+    from reportlab.pdfgen import canvas as _rl_canvas
+    from reportlab.lib.colors import Color as _rl_Color
+    from io import BytesIO as _rl_BytesIO
+    buf = _rl_BytesIO()
+    c = _rl_canvas.Canvas(buf, pagesize=(width, height))
+    font_name = _books_v2_register_watermark_font() or "Helvetica-Bold"
+    c.setFillColor(_rl_Color(0.35, 0.35, 0.35, alpha=0.18))
+    try:
+        c.setFont(font_name, 20)
+    except Exception:
+        c.setFont("Helvetica-Bold", 20)
+    c.saveState()
+    c.translate(width / 2.0, height / 2.0)
+    c.rotate(-30)
+    step_x, step_y = 340, 200
+    span = max(width, height) * 1.6
+    y = -span
+    while y < span:
+        x = -span
+        while x < span:
+            try:
+                c.drawCentredString(x, y, text)
+            except Exception:
+                pass
+            x += step_x
+        y += step_y
+    c.restoreState()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
+def _books_v2_apply_watermark(pdf_bytes, student_name, personal_id, date_str):
+    """Apply a tiled diagonal watermark to every page of pdf_bytes.
+    On any failure returns the original bytes unchanged so the serve
+    path never breaks because of a watermark error."""
+    try:
+        from pypdf import PdfReader as _pp_Reader, PdfWriter as _pp_Writer
+        from io import BytesIO as _pp_BytesIO
+        name = (student_name or "").strip()
+        pid  = (personal_id or "").strip()
+        date = (date_str or "").strip()
+        font_name = _books_v2_register_watermark_font()
+        # Decide watermark text. If no Arabic-capable TTF, drop the
+        # name (broken glyph boxes look worse than no name); PID + date
+        # still pin a leaked file to a student.
+        if name and font_name:
+            shaped = _books_v2_shape_for_pdf(name)
+            parts = [shaped, pid, date]
+        else:
+            parts = [pid, date]
+        wm_text = "  •  ".join(p for p in parts if p)
+        if not wm_text:
+            return pdf_bytes
+        reader = _pp_Reader(_pp_BytesIO(pdf_bytes))
+        writer = _pp_Writer()
+        for page in reader.pages:
+            try:
+                w = float(page.mediabox.width)
+                h = float(page.mediabox.height)
+            except Exception:
+                w, h = 595.0, 842.0  # A4 default
+            wm_buf = _books_v2_make_watermark_overlay(wm_text, w, h)
+            try:
+                wm_page = _pp_Reader(wm_buf).pages[0]
+                page.merge_page(wm_page)
+            except Exception:
+                pass  # page-level failure → leave page un-watermarked
+            writer.add_page(page)
+        out = _pp_BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception as ex:
+        try:
+            app.logger.warning("watermark failed, serving original: %s", ex)
+        except Exception:
+            pass
+        return pdf_bytes
+
+
+@_wm_functools.lru_cache(maxsize=32)
+def _books_v2_watermarked_bytes_cached(bid, pid, date_str, name_norm):
+    """Process-lifetime LRU cache of watermarked bytes. Reloads the
+    original from the request-scoped DB on a miss. Returns bytes on
+    success, None when the source bytes aren't available locally
+    (e.g. legacy Cloudinary-only rows — caller should fall back to
+    the existing serve path). Cache key includes name_norm so a
+    student rename auto-invalidates."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT file_data, file_path FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return None
+    rd = dict(row)
+    raw = None
+    blob = rd.get("file_data")
+    if blob:
+        try:
+            raw = bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
+        except Exception:
+            raw = None
+    if raw is None:
+        fp = rd.get("file_path") or ""
+        try:
+            sd = os.path.realpath(_books_v2_storage_dir())
+            rp = os.path.realpath(fp) if fp else ""
+            if rp and rp.startswith(sd + os.sep) and os.path.isfile(rp):
+                with open(rp, "rb") as f:
+                    raw = f.read()
+        except Exception:
+            raw = None
+    if raw is None:
+        return None
+    return _books_v2_apply_watermark(raw, name_norm, pid, date_str)
+
+
 # Full HTML page — placeholders are JSON-encoded by the route handler
 # so the substituted values are valid JS string literals (handles
 # Arabic, quotes, backslashes safely without an HTML-escape pass).
@@ -71323,22 +71520,25 @@ def parent_book_view(bid):
     group; otherwise 403 with no information leakage.
 
     For view-only books (can_download=0), additionally requires a
-    short-lived &_vt=<token> minted by /viewer so a copied /view URL
-    can't bypass the custom PDF.js page (which is the only surface
-    that hides the browser's native download/print controls)."""
+    short-lived &_vt=<token> minted by /viewer, AND every page is
+    server-side watermarked with the responsible student's name +
+    personal_id + today's date so a leaked file traces back to its
+    source. Cloudinary-hosted legacy books fall through to the 302
+    redirect path (no watermark — server can't rewrite a remote URL)."""
     pid = (request.args.get('pid') or '').strip()
     db = get_db()
     if not _books_v2_pid_can_view(db, pid, bid):
         return jsonify({"ok": False, "error": "غير مصرح"}), 403
     try:
         crow = db.execute(
-            "SELECT can_download FROM books_v2 WHERE id=? "
+            "SELECT title, can_download FROM books_v2 WHERE id=? "
             "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
     except Exception:
         crow = None
     if not crow:
         return jsonify({"ok": False, "error": "غير موجود"}), 404
-    can_dl = int(dict(crow).get("can_download") or 0)
+    cd = dict(crow)
+    can_dl = int(cd.get("can_download") or 0)
     if not can_dl:
         token = (request.args.get('_vt') or '').strip()
         if not _books_v2_verify_viewer_token(token, pid, int(bid)):
@@ -71346,6 +71546,36 @@ def parent_book_view(bid):
                             "هذا الكتاب للعرض داخل القارئ فقط. "
                             "يرجى استخدام زر العرض من صفحة المناهج."
                             }), 403
+        # Resolve student name for the watermark (mirrors /viewer).
+        try:
+            srow = db.execute(
+                "SELECT COALESCE(student_name,'') AS student_name "
+                "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+                (pid,)).fetchone()
+        except Exception:
+            srow = None
+        student_name = ""
+        if srow:
+            student_name = (dict(srow).get("student_name") or "").strip()
+        date_str = _wm_dt.date.today().isoformat()
+        wm_bytes = _books_v2_watermarked_bytes_cached(
+            int(bid), pid, date_str, student_name)
+        if wm_bytes is not None:
+            from flask import send_file as _send_wm
+            import io as _io_wm
+            safe_title = (cd.get("title") or "book") + ".pdf"
+            resp = _send_wm(_io_wm.BytesIO(wm_bytes),
+                            mimetype="application/pdf",
+                            as_attachment=False,
+                            download_name=safe_title, conditional=False)
+            try:
+                resp.headers["Cache-Control"] = "private, no-store"
+                resp.headers["X-Content-Type-Options"] = "nosniff"
+                resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+            except Exception: pass
+            return resp
+        # Fall through: no local bytes (Cloudinary-only legacy row) —
+        # serve via the existing path; watermark is silently skipped.
     return _books_v2_send_file_public(db, int(bid), as_attachment=False)
 
 
