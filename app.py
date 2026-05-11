@@ -1092,7 +1092,8 @@ def init_db():
         redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         status TEXT DEFAULT 'pending',
         delivered_by INTEGER,
-        delivered_at DATETIME)""")
+        delivered_at DATETIME,
+        request_source TEXT DEFAULT '')""")
     db.execute("""CREATE TABLE IF NOT EXISTS avatars(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -5702,7 +5703,8 @@ if True:
                 redeemed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 status TEXT DEFAULT 'pending',
                 delivered_by INTEGER,
-                delivered_at DATETIME)""")
+                delivered_at DATETIME,
+                request_source TEXT DEFAULT '')""")
             db2.execute("""CREATE TABLE IF NOT EXISTS avatars(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
@@ -7810,6 +7812,22 @@ if True:
     ]:
         if _col not in _rw_cols:
             try: db2.execute("ALTER TABLE rewards ADD COLUMN " +
+                             _col + " " + _decl)
+            except Exception: pass
+    try:
+        _rd_cols = {r[1] for r in db2.execute(
+            "PRAGMA table_info(redemptions)").fetchall()}
+    except Exception:
+        _rd_cols = set()
+    for _col, _decl in [
+        # Audit trail: which surface created this redemption row.
+        # Values: 'parent_pid' (public /parent), 'student_portal'
+        # (logged-in /portal/parent-hub), 'staff' (admin/teacher
+        # initiated via /api/points/redeem), '' (legacy rows).
+        ("request_source", "TEXT DEFAULT ''"),
+    ]:
+        if _col not in _rd_cols:
+            try: db2.execute("ALTER TABLE redemptions ADD COLUMN " +
                              _col + " " + _decl)
             except Exception: pass
     db2.commit()
