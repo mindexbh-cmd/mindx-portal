@@ -8860,6 +8860,75 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
   .pp-hero{padding:18px 14px;}
   .pp-card{padding:14px 12px;border-radius:14px;}
 }
+/* ── Public /parent points-store section (Phase 3, mockup approved
+   2026-05-12). Append-only — no existing class is modified. ──── */
+.pp-balance-row{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+                color:#fff;padding:10px 14px;border-radius:12px;
+                display:flex;justify-content:space-between;align-items:center;
+                margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.pp-balance-row .lbl{font-size:.92rem;font-weight:700;}
+.pp-balance-row .num{font-size:1.55rem;font-weight:900;}
+.pp-balance-row .num small{font-size:.78rem;font-weight:700;
+                           margin-right:4px;opacity:.9;}
+.pp-store-tabs{display:flex;gap:8px;margin-bottom:14px;
+               border-bottom:2px solid #f3e5f5;padding-bottom:0;}
+.pp-store-tab{flex:1;padding:10px 14px;background:transparent;border:none;
+              border-bottom:3px solid transparent;color:#6B3FA0;
+              font-weight:800;font-size:.95rem;cursor:pointer;
+              font-family:inherit;transition:all .15s;
+              display:flex;align-items:center;justify-content:center;gap:6px;}
+.pp-store-tab.active{color:#4a148c;border-bottom-color:#6B3FA0;}
+.pp-store-tab:hover:not(.active){background:#f8f4fb;}
+.pp-store-tab .count{background:#c4a8e8;color:#fff;padding:1px 8px;
+                     border-radius:999px;font-size:.72rem;}
+.pp-store-tab.active .count{background:#6B3FA0;}
+.pp-store-grid{display:grid;
+               grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+               gap:12px;}
+.pp-store-card{background:#fafafa;border:1.5px solid #f3e5f5;border-radius:14px;
+               padding:12px 10px;display:flex;flex-direction:column;
+               align-items:stretch;text-align:center;
+               transition:transform .15s, box-shadow .15s;}
+.pp-store-card:hover{transform:translateY(-2px);
+                     box-shadow:0 6px 16px rgba(107,63,160,.12);}
+.pp-store-card.disabled-card{opacity:.85;}
+.pp-store-img{width:100%;height:110px;
+              background:linear-gradient(135deg,#f3e5f5,#fff);
+              border-radius:10px;display:flex;align-items:center;
+              justify-content:center;font-size:3rem;margin-bottom:8px;
+              border:1px dashed #c4a8e8;overflow:hidden;}
+.pp-store-img img{width:100%;height:100%;object-fit:cover;border-radius:10px;}
+.pp-store-name{font-weight:800;font-size:.92rem;color:#212121;
+               margin-bottom:6px;min-height:2.4em;line-height:1.3;}
+.pp-store-cost{background:#f3e5f5;color:#4a148c;padding:4px 10px;
+               border-radius:999px;font-weight:900;font-size:.85rem;
+               margin:0 auto 10px;display:inline-block;}
+.pp-store-btn{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
+              color:#fff;border:none;padding:9px 12px;border-radius:9px;
+              font-weight:800;font-size:.88rem;font-family:inherit;
+              cursor:pointer;
+              transition:transform .1s, box-shadow .1s;}
+.pp-store-btn:hover:not(:disabled){transform:translateY(-1px);
+                                   box-shadow:0 4px 10px rgba(107,63,160,.3);}
+.pp-store-btn:disabled{background:#e0e0e0;color:#999;cursor:not-allowed;}
+.pp-disabled-hint{margin-top:6px;font-size:.74rem;color:#c62828;font-weight:700;}
+.pp-pending-card{background:linear-gradient(135deg,#fff8e1,#ffe0b2);
+                 border:1.5px solid #ffd54f;border-radius:12px;
+                 padding:12px 14px;margin-bottom:10px;
+                 display:flex;align-items:center;gap:12px;}
+.pp-pending-card .icon{font-size:1.8rem;flex-shrink:0;}
+.pp-pending-card .body{flex:1;min-width:0;}
+.pp-pending-card .ttl{font-weight:900;color:#e65100;
+                      font-size:.95rem;margin-bottom:2px;}
+.pp-pending-card .meta{font-size:.84rem;color:#5d4037;}
+.pp-pending-card .badge{background:#FB8C00;color:#fff;padding:3px 10px;
+                        border-radius:999px;font-size:.74rem;font-weight:900;
+                        flex-shrink:0;white-space:nowrap;}
+@media (max-width:600px){
+  .pp-store-grid{grid-template-columns:repeat(2,1fr);}
+  .pp-store-img{height:90px;font-size:2.2rem;}
+  .pp-store-tabs{font-size:.85rem;}
+}
 </style>
 </head>
 <body>
@@ -8919,6 +8988,10 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
   <div class="pp-card pp-section" id="pp-books-card">
     <h2>&#x1F4DA; &#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</h2>
     <div id="pp-books"></div>
+  </div>
+  <div class="pp-card pp-section" id="ppStoreCard" style="display:none;">
+    <h2>&#x1F6CD;&#xFE0F; &#x645;&#x62A;&#x62C;&#x631; &#x627;&#x644;&#x646;&#x642;&#x627;&#x637;</h2>
+    <div id="pp-store-body"></div>
   </div>
 </div>
 
@@ -9234,6 +9307,11 @@ function _ppRender(d){
     paidMsg.style.display = 'none';
   }
   document.getElementById('pp-content').style.display = 'block';
+  /* Points store section — fires its own fetch and reveals itself
+     only when items exist. Failure is silent (the section stays
+     hidden) so a backend hiccup never breaks the rest of /parent. */
+  try { if (typeof loadStoreMenu === 'function') loadStoreMenu(s.personal_id); }
+  catch(_e) {}
   /* Smooth scroll to results. */
   setTimeout(function(){ document.getElementById('pp-content').scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
 }
@@ -9352,6 +9430,152 @@ function ppUpload(){
     if (e.key === 'Enter') ppLookup();
   });
 })();
+
+/* ── Points store — Phase 3, mockup at reports/mindex_store_preview.html.
+   Self-contained. Hidden until /api/parent/store/menu returns at least
+   one item with category_type='food' or 'toy'. Re-uses _ppToast for
+   user feedback (defined above). */
+var _ppStorePID = '';
+var _ppStoreState = { balance: 0, items: {food:[], toy:[]},
+                      pending: [], activeTab: 'food' };
+
+function loadStoreMenu(pid){
+  if (!pid) return;
+  _ppStorePID = pid;
+  fetch('/api/parent/store/menu?pid=' + encodeURIComponent(pid),
+        {credentials:'include'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var card = document.getElementById('ppStoreCard');
+      if (!card) return;
+      if (!d || !d.ok){ card.style.display = 'none'; return; }
+      var items = d.items || {food:[], toy:[]};
+      var nFood = (items.food || []).length;
+      var nToy  = (items.toy  || []).length;
+      if (nFood + nToy === 0){ card.style.display = 'none'; return; }
+      _ppStoreState.balance = parseInt(d.balance || 0, 10) || 0;
+      _ppStoreState.items   = items;
+      _ppStoreState.pending = d.pending_requests || [];
+      /* Default to the tab that has items if the active one is empty. */
+      if (_ppStoreState.activeTab === 'food' && nFood === 0)
+        _ppStoreState.activeTab = 'toy';
+      else if (_ppStoreState.activeTab === 'toy' && nToy === 0)
+        _ppStoreState.activeTab = 'food';
+      _ppRenderStore();
+      card.style.display = '';
+    })
+    .catch(function(){ /* silent — section stays hidden on error */ });
+}
+
+function _ppPendingByReward(){
+  var idx = {};
+  (_ppStoreState.pending || []).forEach(function(p){
+    idx[p.reward_id] = p;
+  });
+  return idx;
+}
+
+function _ppFormatStoreCard(item, balance, pendingIdx){
+  var cost     = parseInt(item.point_cost || 0, 10) || 0;
+  var stock    = parseInt(item.stock != null ? item.stock : -1, 10);
+  var isPending = !!pendingIdx[item.id];
+  var img      = (item.image_url || '').trim();
+  var icon     = (item.icon || '').trim() || '🎁';
+  var imgHtml  = img
+    ? '<div class="pp-store-img"><img src="' + _ppEsc(img) + '" alt=""></div>'
+    : '<div class="pp-store-img">' + _ppEsc(icon) + '</div>';
+  var disabled = false, hint = '';
+  if (isPending){ disabled = true; hint = 'طلبك على هذه القطعة قيد المراجعة'; }
+  else if (stock === 0){ disabled = true; hint = 'نفد المخزون'; }
+  else if (balance < cost){ disabled = true; hint = 'نقاطك غير كافية'; }
+  var btnLabel = isPending ? 'قيد المراجعة'
+                 : (stock === 0 ? 'نفد المخزون'
+                    : (balance < cost ? 'غير متاح' : 'اطلب الآن'));
+  return '<div class="pp-store-card' + (disabled ? ' disabled-card' : '') + '">' +
+           imgHtml +
+           '<div class="pp-store-name">' + _ppEsc(item.name_ar || '') + '</div>' +
+           '<span class="pp-store-cost">' + cost + ' نقطة</span>' +
+           '<button class="pp-store-btn" ' +
+             (disabled ? 'disabled' : 'onclick="requestStoreItem(' + item.id + ')"') +
+             '>' + _ppEsc(btnLabel) + '</button>' +
+           (hint ? '<div class="pp-disabled-hint">' + _ppEsc(hint) + '</div>' : '') +
+         '</div>';
+}
+
+function _ppRenderStore(){
+  var box = document.getElementById('pp-store-body');
+  if (!box) return;
+  var items = _ppStoreState.items || {food:[], toy:[]};
+  var pendIdx = _ppPendingByReward();
+  var bal = _ppStoreState.balance;
+  var html = '';
+  html += '<div class="pp-balance-row">' +
+            '<div class="lbl">رصيد النقاط الحالي</div>' +
+            '<div class="num">' + bal + ' <small>نقطة</small></div>' +
+          '</div>';
+  /* Pending request callouts — one card per pending. */
+  (_ppStoreState.pending || []).forEach(function(p){
+    html += '<div class="pp-pending-card">' +
+              '<div class="icon">⏳</div>' +
+              '<div class="body">' +
+                '<div class="ttl">طلبك قيد المراجعة من الإدارة</div>' +
+                '<div class="meta">' + _ppEsc(p.reward_name || '') +
+                  ' • ' + (parseInt(p.points_spent||0,10)|0) + ' نقطة' +
+                  (p.requested_at ? ' • ' + _ppEsc(String(p.requested_at).slice(0,16)) : '') +
+                '</div>' +
+              '</div>' +
+              '<div class="badge">قيد المراجعة</div>' +
+            '</div>';
+  });
+  var nFood = (items.food || []).length;
+  var nToy  = (items.toy  || []).length;
+  html += '<div class="pp-store-tabs">' +
+            '<button class="pp-store-tab' +
+              (_ppStoreState.activeTab === 'food' ? ' active' : '') + '" ' +
+              'onclick="switchStoreTab(\'food\')">' +
+              '🍔 مأكولات <span class="count">' + nFood + '</span>' +
+            '</button>' +
+            '<button class="pp-store-tab' +
+              (_ppStoreState.activeTab === 'toy' ? ' active' : '') + '" ' +
+              'onclick="switchStoreTab(\'toy\')">' +
+              '🎮 ألعاب <span class="count">' + nToy + '</span>' +
+            '</button>' +
+          '</div>';
+  var list = items[_ppStoreState.activeTab] || [];
+  if (!list.length){
+    html += '<div class="pp-empty">لا توجد عناصر في هذا التبويب حالياً.</div>';
+  } else {
+    html += '<div class="pp-store-grid">';
+    list.forEach(function(it){ html += _ppFormatStoreCard(it, bal, pendIdx); });
+    html += '</div>';
+  }
+  box.innerHTML = html;
+}
+
+function switchStoreTab(tab){
+  if (tab !== 'food' && tab !== 'toy') return;
+  _ppStoreState.activeTab = tab;
+  _ppRenderStore();
+}
+
+function requestStoreItem(rewardId){
+  if (!_ppStorePID || !rewardId) return;
+  fetch('/api/parent/store/request', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({pid: _ppStorePID, reward_id: rewardId})
+  })
+  .then(function(r){ return r.json().then(function(d){return {status:r.status, data:d};}); })
+  .then(function(o){
+    if (o.data && o.data.ok){
+      _ppToast('تم إرسال طلبك للإدارة');
+      loadStoreMenu(_ppStorePID);  // refresh balance + pending list
+    } else {
+      _ppToast((o.data && o.data.error) || 'تعذّر إرسال الطلب', 'error');
+    }
+  })
+  .catch(function(){ _ppToast('خطأ في الاتصال', 'error'); });
+}
 </script>
 </body>
 </html>"""
