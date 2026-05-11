@@ -8855,6 +8855,10 @@ body{background:linear-gradient(135deg,#eef2ff 0%,#fdf2f8 50%,#ecfeff 100%);min-
       &#x2705; &#x62A;&#x645; &#x62F;&#x641;&#x639; &#x62C;&#x645;&#x64A;&#x639; &#x627;&#x644;&#x623;&#x642;&#x633;&#x627;&#x637;
     </div>
   </div>
+  <div class="pp-card pp-section" id="pp-evals-card">
+    <h2>&#x1F4CA; &#x627;&#x644;&#x62A;&#x642;&#x64A;&#x64A;&#x645;&#x627;&#x62A; &#x627;&#x644;&#x634;&#x647;&#x631;&#x64A;&#x629;</h2>
+    <div id="pp-evals-body"></div>
+  </div>
   <div class="pp-card pp-section" id="pp-books-card">
     <h2>&#x1F4DA; &#x627;&#x644;&#x645;&#x646;&#x627;&#x647;&#x62C;</h2>
     <div id="pp-books"></div>
@@ -9003,6 +9007,22 @@ function _ppRender(d){
       bh += '</div>';
       booksBox.innerHTML = bh;
     }
+  }
+  /* Evaluations — single button into the dedicated viewer page.
+     The page itself fetches /parent/evaluations?pid=... and renders
+     the full hero + chart + history; here we just expose the link. */
+  var evalsBox = document.getElementById('pp-evals-body');
+  if (evalsBox){
+    var pidEnc2 = encodeURIComponent(s.personal_id || '');
+    evalsBox.innerHTML =
+      '<div style="color:#555;font-size:.92rem;line-height:1.7;margin-bottom:12px;">' +
+        'اطلعي على تقييمات الطفل الشهرية: درجات المشاركة، السلوك، القراءة، ' +
+        'الإملاء، المفردات، المحادثة، التعبير، والقواعد — مع ملاحظات المعلمة.' +
+      '</div>' +
+      '<a class="pp-bk-btn" href="/parent/evaluations/view?pid=' + pidEnc2 +
+        '" target="_blank" rel="noopener" style="display:block;text-align:center;">' +
+        '📊 عرض كل التقييمات' +
+      '</a>';
   }
   /* Installment picker — show every still-owed installment (unpaid or
      partial) so the parent can see the receipt status next to each.
