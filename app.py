@@ -69532,6 +69532,86 @@ def api_mev_delete(eid):
     return jsonify({"ok": True, "id": eid})
 
 
+@app.route('/api/monthly-evaluations/bulk-release', methods=['POST'])
+@login_required
+def api_mev_bulk_release():
+    """Flip released_to_parent for a list of evaluation ids in one
+    request. Admin/manager only — same gate as the single-row
+    released_to_parent path in api_mev_update. Body:
+      {"ids": [int, ...], "released": 0|1?}
+    `released` defaults to 1 (publish). Skips already-correct rows and
+    soft-deleted rows; returns the list of ids that actually changed
+    plus a count of skipped vs not-found, so the UI can show a useful
+    toast even when part of the request was a no-op."""
+    user = session.get("user") or {}
+    if not _ev_can_admin(user):
+        return jsonify({"ok": False, "error": "للأدمن فقط"}), 403
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("ids") or []
+    try:
+        target = 1 if int(body.get("released", 1)) else 0
+    except Exception:
+        target = 1
+    ids = []
+    for v in raw_ids:
+        try:
+            n = int(v)
+            if n > 0: ids.append(n)
+        except Exception:
+            continue
+    # Dedup while preserving order
+    seen = set(); ids = [x for x in ids if not (x in seen or seen.add(x))]
+    if not ids:
+        return jsonify({"ok": False, "error": "لا توجد تقييمات للنشر"}), 400
+    # Cap to a sane batch so a malformed request can't hammer the DB.
+    if len(ids) > 500:
+        return jsonify({"ok": False,
+                        "error": "تجاوز الحد الأقصى (500 تقييم)"}), 400
+    db = get_db()
+    ph = ",".join("?" for _ in ids)
+    try:
+        rows = db.execute(
+            "SELECT id, released_to_parent, student_id, evaluation_month "
+            "FROM evaluations WHERE id IN (" + ph + ") "
+            "AND COALESCE(is_deleted,0)=0", tuple(ids)).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    found = {int(dict(r)["id"]): dict(r) for r in rows}
+    not_found = [i for i in ids if i not in found]
+    to_change = [i for i, r in found.items()
+                 if int(r.get("released_to_parent") or 0) != target]
+    already = [i for i in ids if i in found and i not in to_change]
+    if to_change:
+        ph2 = ",".join("?" for _ in to_change)
+        try:
+            db.execute(
+                "UPDATE evaluations SET released_to_parent=?, "
+                "updated_at=CURRENT_TIMESTAMP "
+                "WHERE id IN (" + ph2 + ")",
+                tuple([target] + to_change))
+            db.commit()
+        except Exception as ex:
+            return jsonify({"ok": False, "error": str(ex)}), 500
+        # Per-row audit so the trail is searchable like single PATCH.
+        for i in to_change:
+            try:
+                _audit("evaluations.update", target_type="evaluations",
+                       target_id=i,
+                       old_value={"released_to_parent":
+                                  int(found[i].get("released_to_parent") or 0)},
+                       new_value={"released_to_parent": target,
+                                  "bulk": True})
+            except Exception: pass
+    return jsonify({
+        "ok":            True,
+        "released":      target,
+        "updated_count": len(to_change),
+        "ids_updated":   to_change,
+        "ids_unchanged": already,
+        "ids_not_found": not_found,
+    })
+
+
 @app.route('/api/monthly-evaluations/preview-message/<int:eid>', methods=['GET'])
 @login_required
 def api_mev_preview_message(eid):
