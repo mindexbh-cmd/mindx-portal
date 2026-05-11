@@ -40806,6 +40806,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         <div id="tm-lessons-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="evaluations" hidden>
+        <div id="tm-evals-bulk-header"></div>
         <div id="tm-evals-body"></div>
       </div>
       <div class="tm-panel" data-tm-panel="messages" hidden>
@@ -41246,6 +41247,40 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
 .tm-ecard-foot{margin-top:12px;display:flex;justify-content:flex-start;
                flex-wrap:wrap;gap:8px;align-items:center;}
 .tm-eval-sent-badge{padding:6px 14px;font-size:.86rem;}
+/* Publish-to-parent-portal control. Independent of WhatsApp send. */
+.tm-rel-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+            margin:8px 0 12px;padding:10px 12px;background:#f8f4fb;
+            border:1px solid #e6d8f0;border-radius:10px;}
+.tm-rel-pill{display:inline-flex;align-items:center;gap:5px;font-size:.82rem;
+             font-weight:800;padding:4px 11px;border-radius:999px;line-height:1.4;
+             white-space:nowrap;}
+.tm-rel-pill.on{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+.tm-rel-pill.off{background:#f5f5f5;color:#616161;border:1px solid #e0e0e0;}
+.tm-rel-btn{padding:7px 14px;border-radius:9px;border:none;cursor:pointer;
+            font-size:.86rem;font-weight:800;font-family:inherit;
+            transition:transform .12s, box-shadow .12s;}
+.tm-rel-btn:hover{transform:translateY(-1px);
+                  box-shadow:0 4px 10px rgba(0,0,0,.12);}
+.tm-rel-btn.publish{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;}
+.tm-rel-btn.hide{background:linear-gradient(135deg,#FB8C00,#E65100);color:#fff;}
+.tm-rel-btn:disabled{opacity:.6;cursor:wait;}
+/* Sticky bulk-publish header above the evals list. */
+.tm-bulk-bar{position:sticky;top:0;z-index:5;background:#fff;
+             border:1px solid #e6d8f0;border-radius:10px;
+             padding:10px 14px;margin-bottom:12px;display:flex;
+             align-items:center;gap:10px;flex-wrap:wrap;
+             box-shadow:0 2px 10px rgba(74,20,140,.06);}
+.tm-bulk-bar .tm-bulk-info{color:#5d4037;font-weight:700;font-size:.92rem;
+                            flex:1;min-width:180px;}
+.tm-bulk-bar .tm-bulk-info strong{color:#4a148c;}
+.tm-bulk-btn{padding:8px 16px;border-radius:9px;border:none;cursor:pointer;
+             font-size:.9rem;font-weight:800;font-family:inherit;
+             background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;
+             transition:transform .12s, box-shadow .12s;}
+.tm-bulk-btn:hover{transform:translateY(-1px);
+                   box-shadow:0 4px 12px rgba(46,125,50,.3);}
+.tm-bulk-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;
+                      box-shadow:none;}
 </style>
 
 <script>
@@ -42243,6 +42278,146 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
     statEl.textContent = String(count);
   };
 
+  // ── Release-to-parent: bulk bar + per-row click delegate ────
+  //    Wraps tmRenderEvals again so every re-render also refreshes
+  //    the sticky "نشر الكل" bar in #tm-evals-bulk-header. The bar
+  //    counts unreleased evals in the CURRENT filtered set (which is
+  //    what tmRenderEvals already received). Click → confirmation →
+  //    POST /api/monthly-evaluations/bulk-release with the visible
+  //    ids → toast → re-render from updated cache.
+  var _tmRel_PrevRenderEvals = tmRenderEvals;
+  tmRenderEvals = function(entries){
+    _tmRel_PrevRenderEvals(entries);
+    tmRenderBulkPublishBar(entries);
+  };
+
+  function tmRenderBulkPublishBar(entries){
+    var bar = document.getElementById('tm-evals-bulk-header');
+    if(!bar) return;
+    var list = entries || [];
+    var unreleased = list.filter(function(e){
+      return !parseInt(e.released_to_parent, 10);
+    });
+    if(!list.length || !unreleased.length){
+      bar.innerHTML = '';
+      return;
+    }
+    var ids = unreleased.map(function(e){
+      return parseInt(e.id, 10) || 0;
+    }).filter(function(n){ return n > 0; });
+    bar.innerHTML =
+      '<div class="tm-bulk-bar">' +
+        '<div class="tm-bulk-info">' +
+          '<strong>' + ids.length + '</strong> ' +
+          'تقييم غير منشور في بوابة ولي الأمر' +
+        '</div>' +
+        '<button type="button" class="tm-bulk-btn" ' +
+          'data-tm-eval-bulk-release="' + ids.join(',') + '">' +
+          '📢 نشر الكل في بوابة ولي الأمر' +
+        '</button>' +
+      '</div>';
+  }
+
+  function tmEvalRelease(eid, target, btn){
+    if(btn) btn.disabled = true;
+    fetch('/api/monthly-evaluations/' + eid, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({released_to_parent: target ? 1 : 0})
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.ok){
+        // Patch the in-memory cache so the bulk-bar count + the
+        // re-rendered card both reflect the new state without a
+        // round-trip to /api/evaluations.
+        var cached = tmFindEvalInCache(eid);
+        if(cached) cached.released_to_parent = target ? 1 : 0;
+        tmFilterAndRenderEvals();
+      } else {
+        if(btn) btn.disabled = false;
+        alert((j && j.error) || 'تعذر التحديث');
+      }
+    }).catch(function(){
+      if(btn) btn.disabled = false;
+      alert('تعذر الاتصال بالخادم');
+    });
+  }
+
+  function tmEvalBulkPublish(ids, btn){
+    if(!ids || !ids.length) return;
+    var teacherLabel = '';
+    try {
+      var sel = teacherSel.options[teacherSel.selectedIndex];
+      if(sel) teacherLabel = (sel.textContent || '').trim();
+    } catch(_){}
+    var msg = 'هل أنتي متأكدة من نشر ' + ids.length +
+              ' تقييم' + (ids.length > 2 ? 'اً' : '') +
+              (teacherLabel ? ' للمعلمة ' + teacherLabel : '') +
+              ' في بوابة ولي الأمر؟';
+    if(!confirm(msg)) return;
+    if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري النشر...'; }
+    fetch('/api/monthly-evaluations/bulk-release', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({ids: ids, released: 1})
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.ok){
+        var updated = parseInt(j.updated_count, 10) || 0;
+        // Patch cache in place so the UI updates without a refetch.
+        if(j.ids_updated && evalsAll){
+          var s = {};
+          j.ids_updated.forEach(function(x){ s[x] = 1; });
+          evalsAll.forEach(function(e){
+            if(s[parseInt(e.id, 10)]) e.released_to_parent = 1;
+          });
+        }
+        tmFilterAndRenderEvals();
+        alert('✓ تم نشر ' + updated + ' تقييم في بوابة أولياء الأمور');
+      } else {
+        if(btn){
+          btn.disabled = false;
+          btn.textContent = '📢 نشر الكل في بوابة ولي الأمر';
+        }
+        alert((j && j.error) || 'تعذر النشر');
+      }
+    }).catch(function(){
+      if(btn){
+        btn.disabled = false;
+        btn.textContent = '📢 نشر الكل في بوابة ولي الأمر';
+      }
+      alert('تعذر الاتصال بالخادم');
+    });
+  }
+
+  // Click delegate on the evals panel — handles both the per-row
+  // publish/hide button and the sticky bulk-release button.
+  var _tmRelPanelHookDone = false;
+  function tmRelInstallPanelHook(){
+    if(_tmRelPanelHookDone) return;
+    var panel = document.querySelector('[data-tm-panel="evaluations"]');
+    if(!panel) return;
+    _tmRelPanelHookDone = true;
+    panel.addEventListener('click', function(ev){
+      var rel = ev.target.closest('[data-tm-eval-release]');
+      if(rel){
+        var eid = parseInt(rel.getAttribute('data-tm-eval-release'), 10) || 0;
+        var tgt = parseInt(rel.getAttribute('data-target'), 10) || 0;
+        if(eid) tmEvalRelease(eid, tgt, rel);
+        return;
+      }
+      var bulk = ev.target.closest('[data-tm-eval-bulk-release]');
+      if(bulk){
+        var raw = bulk.getAttribute('data-tm-eval-bulk-release') || '';
+        var ids = raw.split(',').map(function(s){
+          return parseInt(s, 10);
+        }).filter(function(n){ return n > 0; });
+        tmEvalBulkPublish(ids, bulk);
+      }
+    });
+  }
+  tmRelInstallPanelHook();
+
   // ── Phase-4: inline edit for pending parent messages.
   //    Reuses PATCH /api/parent-messages/<id> (admin can edit any
   //    not-yet-sent row). Edit mode replaces the inner card body
@@ -42597,6 +42772,24 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         '</div>';
     });
 
+    // Publish-to-parent-portal row — independent of WhatsApp send.
+    // Visually above the WhatsApp footer so the workflow reads as
+    // publish-first → send-WhatsApp.
+    var rel = parseInt(e.released_to_parent, 10) || 0;
+    var releaseHtml =
+      '<div class="tm-rel-row">' +
+        (rel
+          ? '<span class="tm-rel-pill on">🟢 منشور في بوابة ولي الأمر</span>' +
+            '<button type="button" class="tm-rel-btn hide" ' +
+              'data-tm-eval-release="' + (parseInt(e.id, 10) || 0) + '" ' +
+              'data-target="0">🚫 إخفاء عن الأهل</button>'
+          : '<span class="tm-rel-pill off">⚪ غير منشور</span>' +
+            '<button type="button" class="tm-rel-btn publish" ' +
+              'data-tm-eval-release="' + (parseInt(e.id, 10) || 0) + '" ' +
+              'data-target="1">📢 نشره في بوابة ولي الأمر</button>'
+        ) +
+      '</div>';
+
     // Footer: either a sent-badge + resend button (when whatsapp_sent_at
     // is set) OR the first-send button (when never sent). The resend
     // button reuses the same modal (tm-eval-send-overlay) via the
@@ -42644,6 +42837,7 @@ table.tbl tr:hover td{background:#faf5ff;cursor:pointer;}
         overallHtml +
         scoresHtml +
         notesHtml +
+        releaseHtml +
         footHtml +
       '</article>'
     );
