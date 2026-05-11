@@ -34792,6 +34792,82 @@ def api_pts_redeem_cancel(redeem_id):
     return jsonify({"ok": True})
 
 
+# ── Parent-store admin approval flow ─────────────────────────────
+# 'requested' rows are created by /api/parent/store/request (no
+# debit, no stock change). Admin reviews via /points/manage and
+# either approves (→ 'pending', triggers debit + stock decrement)
+# or rejects (→ 'rejected', no state change beyond the status).
+# Once approved, the existing /deliver flow takes over unchanged.
+
+@app.route('/api/points/redemptions/<int:redeem_id>/approve',
+           methods=['POST'])
+@login_required
+def api_pts_redeem_approve(redeem_id):
+    """Admin approves a parent-submitted redemption request. Flips
+    status 'requested' → 'pending' (which triggers the balance debit
+    via _pts_balance) AND decrements stock atomically. Re-validates
+    balance + stock at approval time so an admin can't approve a
+    request the student can no longer afford."""
+    err = _require_admin_response()
+    if err: return err
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, student_id, reward_id, points_spent, status "
+            "FROM redemptions WHERE id=?", (redeem_id,)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    rd = dict(row)
+    if (rd.get("status") or "").strip() != "requested":
+        return jsonify({"ok": False, "error":
+                        "هذا الطلب ليس في حالة 'قيد المراجعة'"}), 400
+    sid  = int(rd.get("student_id") or 0)
+    rid  = int(rd.get("reward_id") or 0)
+    cost = int(rd.get("points_spent") or 0)
+    # Re-validate stock (someone else may have approved/redeemed
+    # since the parent submitted)
+    try:
+        rrow = db.execute(
+            "SELECT stock, is_active FROM rewards WHERE id=?", (rid,)
+        ).fetchone()
+    except Exception:
+        rrow = None
+    if not rrow:
+        return jsonify({"ok": False, "error": "المكافأة لم تعد موجودة"}), 400
+    stock = int(dict(rrow).get("stock") if dict(rrow).get("stock") is not None else -1)
+    if stock == 0:
+        return jsonify({"ok": False, "error": "نفد المخزون"}), 400
+    # Re-validate balance — the student may have spent points elsewhere
+    # since the request was created. Balance currently excludes
+    # 'requested' so this row's cost is NOT already debited.
+    bal = _pts_balance(db, sid)
+    if bal < cost:
+        return jsonify({"ok": False, "error":
+                        "رصيد الطالب لا يكفي. الرصيد الحالي: " + str(bal),
+                        "balance": bal, "cost": cost}), 400
+    try:
+        # Single transaction: flip status (this is what debits the
+        # balance via _pts_balance) + decrement stock.
+        db.execute(
+            "UPDATE redemptions SET status='pending' "
+            "WHERE id=? AND status='requested'", (redeem_id,))
+        if stock > 0:
+            db.execute(
+                "UPDATE rewards SET stock=stock-1 "
+                "WHERE id=? AND stock>0", (rid,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    return jsonify({
+        "ok":      True,
+        "id":      redeem_id,
+        "balance": _pts_balance(db, sid),
+    })
+
+
 # ── Levels lookup (read-only) ────────────────────────────────────
 @app.route('/api/points/levels', methods=['GET'])
 @login_required
