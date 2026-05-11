@@ -24,6 +24,14 @@ DB = os.environ.get("DB_PATH", "mindx.db")
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_PG = bool(DATABASE_URL)
 
+# Ensure the /static/rewards upload directory exists at startup so the
+# /api/admin/rewards/upload-image endpoint can write to it. Idempotent;
+# matches the lazy-makedirs pattern used by other upload paths.
+try:
+    os.makedirs("static/rewards", exist_ok=True)
+except Exception:
+    pass
+
 if USE_PG:
     import psycopg2
     import psycopg2.extras
