@@ -33512,7 +33512,13 @@ def _pts_visible_groups(db, user):
 
 def _pts_balance(db, sid):
     """Current points balance for a student = sum of all event values
-    minus sum of redemption costs (delivered + pending)."""
+    minus sum of redemption costs (pending + delivered only).
+
+    'requested' and 'rejected' rows (introduced for the public /parent
+    store flow) are NOT debited: 'requested' rows wait on admin
+    approval, and 'rejected' rows are dead. 'cancelled' rows continue
+    to refund. Backward-compatible since no existing row carries the
+    new statuses."""
     try:
         earned = db.execute(
             "SELECT COALESCE(SUM(points_value), 0) FROM point_events WHERE student_id=?",
@@ -33523,8 +33529,9 @@ def _pts_balance(db, sid):
     try:
         spent = db.execute(
             "SELECT COALESCE(SUM(points_spent), 0) FROM redemptions "
-            "WHERE student_id=? AND status<>?",
-            (int(sid), "cancelled"),
+            "WHERE student_id=? AND status NOT IN "
+            "('cancelled','requested','rejected')",
+            (int(sid),),
         ).fetchone()[0] or 0
     except Exception:
         spent = 0
