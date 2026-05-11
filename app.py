@@ -1079,6 +1079,7 @@ def init_db():
         category TEXT DEFAULT '',
         is_active INTEGER DEFAULT 1,
         image_url TEXT DEFAULT '',
+        category_type TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS redemptions(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5687,6 +5688,7 @@ if True:
                 category TEXT DEFAULT '',
                 is_active INTEGER DEFAULT 1,
                 image_url TEXT DEFAULT '',
+                category_type TEXT DEFAULT '',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
             db2.execute("""CREATE TABLE IF NOT EXISTS redemptions(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7797,7 +7799,8 @@ if True:
     except Exception:
         _rw_cols = set()
     for _col, _decl in [
-        ("image_url", "TEXT DEFAULT ''"),
+        ("image_url",     "TEXT DEFAULT ''"),
+        ("category_type", "TEXT DEFAULT ''"),  # 'food' | 'toy' | ''
     ]:
         if _col not in _rw_cols:
             try: db2.execute("ALTER TABLE rewards ADD COLUMN " +
