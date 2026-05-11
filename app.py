@@ -25706,6 +25706,120 @@ def api_parent_lookup():
         "books":   books_payload,
     })
 
+
+# ─── Public /parent points-store endpoints ────────────────────────
+# The public /parent surface authorises by personal_id alone (no
+# session), so these endpoints NEVER deduct points directly — they
+# only create 'requested' rows that an admin must approve. The
+# approve/reject flow lives in the admin endpoint group below.
+# Rate-limit via the existing _parent_rate_check helper (currently a
+# no-op; kept as a hook for future tightening). All Arabic errors
+# match the tone of /api/parent/lookup.
+
+def _store_parent_pid_resolve(pid):
+    """Validate a parent-supplied PID and return (student_id, student_name)
+    or (None, error_message). Tolerates Unicode bidi marks per the
+    payment-mismatch fix (commit 1107de4)."""
+    pid = (pid or "").strip()
+    if not pid:
+        return (None, None, "أدخل الرقم الشخصي")
+    db = get_db()
+    row = _resolve_student_row_by_pid(
+        db, pid, columns="id, COALESCE(student_name,'') AS student_name, personal_id")
+    if not row:
+        return (None, None, "الرقم الشخصي غير صحيح")
+    try:
+        sid = int(dict(row).get("id") or 0)
+    except Exception:
+        sid = 0
+    if not sid:
+        return (None, None, "الرقم الشخصي غير صحيح")
+    sname = (dict(row).get("student_name") or "").strip()
+    return (sid, sname, None)
+
+
+@app.route("/api/parent/store/menu", methods=["GET"])
+def api_parent_store_menu():
+    """Returns the points-store menu for a given student PID, scoped to
+    rewards with is_menu_item=1 AND is_active=1. Bucketed by
+    category_type ('food' / 'toy') so the UI can render tabs. Includes
+    the current balance and any pending 'requested' rows so the UI
+    can disable the corresponding tiles.
+
+    No session — authorised by PID alone, like /api/parent/lookup.
+    Read-only: never mutates."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '0').split(',')[0].strip()
+    if not _parent_rate_check(ip):
+        return jsonify({"ok": False, "error":
+                        "تم تجاوز الحد الأعلى للمحاولات. الرجاء المحاولة لاحقاً."}), 429
+    pid = (request.args.get('pid') or '').strip()
+    sid, sname, err = _store_parent_pid_resolve(pid)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400 if err == "أدخل الرقم الشخصي" else 404
+    db = get_db()
+    # Pull rewards that opted into the menu surface. Schema additions
+    # in Phase 1 (image_url, category_type, is_menu_item) are read
+    # defensively — they may be NULL on legacy rows where the
+    # migration just ADD COLUMN'd them without a backfill.
+    try:
+        rows = db.execute(
+            "SELECT id, name_ar, point_cost, icon, stock, "
+            "       COALESCE(image_url,'') AS image_url, "
+            "       COALESCE(category_type,'') AS category_type "
+            "FROM rewards "
+            "WHERE COALESCE(is_active,0)=1 "
+            "AND COALESCE(is_menu_item,0)=1 "
+            "ORDER BY point_cost, id"
+        ).fetchall()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذّر تحميل القائمة"}), 500
+    items = {"food": [], "toy": []}
+    for r in rows:
+        d = dict(r)
+        ct = (d.get("category_type") or "").strip().lower()
+        bucket = "food" if ct == "food" else ("toy" if ct == "toy" else None)
+        if not bucket:
+            continue  # rewards without a category_type don't appear
+        items[bucket].append({
+            "id":            int(d.get("id") or 0),
+            "name_ar":       d.get("name_ar") or "",
+            "point_cost":    int(d.get("point_cost") or 0),
+            "icon":          d.get("icon") or "",
+            "image_url":     d.get("image_url") or "",
+            "stock":         int(d.get("stock") if d.get("stock") is not None else -1),
+            "category_type": bucket,
+        })
+    # Pending 'requested' rows for THIS student so the UI can lock the
+    # corresponding tile + render a "قيد المراجعة" callout.
+    try:
+        pend = db.execute(
+            "SELECT id, reward_id, reward_name, points_spent, redeemed_at "
+            "FROM redemptions "
+            "WHERE student_id=? AND status='requested' "
+            "ORDER BY id DESC LIMIT 50",
+            (sid,)
+        ).fetchall()
+    except Exception:
+        pend = []
+    pending_requests = []
+    for r in pend:
+        d = dict(r)
+        pending_requests.append({
+            "redemption_id":  int(d.get("id") or 0),
+            "reward_id":      int(d.get("reward_id") or 0),
+            "reward_name":    d.get("reward_name") or "",
+            "points_spent":   int(d.get("points_spent") or 0),
+            "requested_at":   d.get("redeemed_at") or "",
+        })
+    return jsonify({
+        "ok":               True,
+        "balance":          _pts_balance(db, sid),
+        "student_name":     sname,
+        "items":            items,
+        "pending_requests": pending_requests,
+    })
+
+
 # ─── Admin receipts management ─────────────────────────────────────
 ADMIN_RECEIPTS_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
