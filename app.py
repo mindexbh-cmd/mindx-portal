@@ -39786,6 +39786,20 @@ table.tbl tr:hover td{background:#fff8e1;}
 .toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
         font-size:.82rem;font-weight:700;}
 .toggle input{cursor:pointer;}
+/* Release-to-parent control. Replaces the older inline checkbox so
+   the action is harder to miss in a row crowded with view/edit/send/del. */
+.rel-cell{display:flex;flex-direction:column;align-items:flex-start;gap:5px;}
+.rel-pill{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;
+          font-weight:800;padding:3px 9px;border-radius:999px;line-height:1.4;}
+.rel-pill.on{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+.rel-pill.off{background:#f5f5f5;color:#616161;border:1px solid #e0e0e0;}
+.rel-btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;
+         font-size:.82rem;font-weight:800;font-family:inherit;
+         transition:transform .12s, box-shadow .12s;white-space:nowrap;}
+.rel-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,.12);}
+.rel-btn.publish{background:linear-gradient(135deg,#43A047,#2E7D32);color:#fff;}
+.rel-btn.hide{background:linear-gradient(135deg,#FB8C00,#E65100);color:#fff;}
+.rel-btn:disabled{opacity:.6;cursor:wait;}
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.86rem;}
 .bar-row .b-lbl{flex:0 0 130px;color:#5d4037;}
 .bar-row .b-bar{flex:1;height:14px;background:#fff3e0;border-radius:7px;overflow:hidden;
@@ -40160,10 +40174,17 @@ table.tbl tr:hover td{background:#fff8e1;}
         '<td data-label="التقييم العام"><span class="score-pill '+sCls+'">'+
             (e.overall_score==null?'—':(e.overall_score+'/10'))+'</span></td>'+
         '<td data-label="منشور؟">'+
-          '<label class="toggle"><input type="checkbox" '+
-            (e.released_to_parent?'checked':'')+
-            ' onchange="toggleRelease('+e.id+', this.checked)"> '+
-            (e.released_to_parent?'منشور':'غير منشور')+'</label></td>'+
+          '<div class="rel-cell">'+
+            '<span class="rel-pill '+(e.released_to_parent?'on':'off')+'">'+
+              (e.released_to_parent?'🟢 منشور للأهل':'⚪ غير منشور')+
+            '</span>'+
+            '<button class="rel-btn '+(e.released_to_parent?'hide':'publish')+'" '+
+              'data-eid="'+e.id+'" '+
+              'data-target="'+(e.released_to_parent?0:1)+'" '+
+              'onclick="toggleRelease('+e.id+', '+(e.released_to_parent?0:1)+', this)">'+
+              (e.released_to_parent?'🚫 إخفاء عن الأهل':'📢 نشر للأهل')+
+            '</button>'+
+          '</div></td>'+
         '<td data-label="حالة الإرسال">'+escapeHtml(sentLbl)+'</td>'+
         '<td data-label="إجراءات">'+
           '<button class="act-btn view" onclick="openView('+e.id+')">عرض</button>'+
@@ -40221,7 +40242,12 @@ table.tbl tr:hover td{background:#fff8e1;}
   };
 
   // ── release toggle ──
-  window.toggleRelease = function(id, val){
+  // Third arg is the clicked button element (passed via inline onclick)
+  // so we can disable it while the PATCH is in flight; the row is
+  // re-rendered by loadData() afterwards and the disabled state is
+  // discarded.
+  window.toggleRelease = function(id, val, btn){
+    if (btn) { btn.disabled = true; }
     fetch('/api/monthly-evaluations/'+id, {
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
@@ -40231,9 +40257,13 @@ table.tbl tr:hover td{background:#fff8e1;}
         toast(val ? 'تم النشر للأهالي ✓' : 'تم إلغاء النشر');
         loadData(); loadStats();
       } else {
+        if (btn) { btn.disabled = false; }
         toast((j && j.error) || 'تعذر التحديث', true);
         loadData();
       }
+    }).catch(function(){
+      if (btn) { btn.disabled = false; }
+      toast('تعذر الاتصال بالخادم', true);
     });
   };
 
