@@ -71647,6 +71647,111 @@ body{font-family:'Cairo','Tajawal','Segoe UI',Tahoma,sans-serif;
 </body></html>"""
 
 
+# ── Public parent evaluations endpoint ───────────────────────────
+# Mirrors the books-viewer auth pattern: ?pid=<personal_id> resolves
+# to a student row, and only released_to_parent=1 evaluations are
+# exposed. No login required. The teacher-form / admin-release flow
+# is unchanged — this is a read-only window.
+
+_EV_PARENT_SCORE_KEYS = (
+    ("score_participation", "participation"),
+    ("score_behavior",      "behavior"),
+    ("score_reading",       "reading"),
+    ("score_dictation",     "dictation"),
+    ("score_vocabulary",    "vocabulary"),
+    ("score_conversation",  "conversation"),
+    ("score_expression",    "expression"),
+    ("score_grammar",       "grammar"),
+)
+
+
+def _eval_pid_resolve_student(db, pid):
+    """Return (student_id, student_name) for a personal_id, or None
+    if the pid isn't registered. Trims whitespace defensively to
+    match the books-viewer pattern."""
+    pid = (pid or "").strip()
+    if not pid:
+        return None
+    try:
+        row = db.execute(
+            "SELECT id, COALESCE(student_name,'') AS student_name "
+            "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    rd = dict(row)
+    try:
+        sid = int(rd.get("id") or 0)
+    except Exception:
+        sid = 0
+    if not sid:
+        return None
+    return (sid, (rd.get("student_name") or "").strip())
+
+
+@app.route('/parent/evaluations', methods=['GET'])
+def parent_evaluations_api():
+    """JSON list of every released evaluation for the student
+    identified by ?pid=<personal_id>. Empty list is a normal 200
+    response (not 404) so the frontend can render the empty state
+    without distinguishing it from a network error."""
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    info = _eval_pid_resolve_student(db, pid)
+    if info is None:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    sid, sname = info
+    score_cols = ", ".join(c for c, _ in _EV_PARENT_SCORE_KEYS)
+    sql = (
+        "SELECT id, evaluation_month, evaluation_date, teacher_name, "
+        "       overall_score, notes_behavior, notes_language, "
+        "       general_notes, " + score_cols + " "
+        "FROM evaluations "
+        "WHERE student_id=? "
+        "AND COALESCE(is_deleted,0)=0 "
+        "AND COALESCE(released_to_parent,0)=1 "
+        "AND evaluation_month IS NOT NULL "
+        "AND TRIM(evaluation_month) <> '' "
+        "ORDER BY evaluation_month DESC, id DESC")
+    try:
+        rows = db.execute(sql, (sid,)).fetchall()
+    except Exception as ex:
+        try:
+            app.logger.warning("parent evaluations query failed pid=%s: %s",
+                               pid, ex)
+        except Exception: pass
+        return jsonify({"ok": False, "error":
+                        "تعذّر تحميل التقييمات. حاول لاحقاً."}), 500
+    evaluations = []
+    for r in rows:
+        d = dict(r)
+        month = (d.get("evaluation_month") or "").strip()
+        scores = {}
+        for col, key in _EV_PARENT_SCORE_KEYS:
+            v = d.get(col)
+            scores[key] = int(v) if v is not None else None
+        evaluations.append({
+            "id":              int(d.get("id") or 0),
+            "month":           month,
+            "month_label":     _ev_arabic_month_label(month),
+            "evaluation_date": (d.get("evaluation_date") or "").strip(),
+            "teacher_name":    (d.get("teacher_name") or "").strip(),
+            "overall":         (int(d["overall_score"])
+                                if d.get("overall_score") is not None else None),
+            "scores":          scores,
+            "notes_behavior":  (d.get("notes_behavior") or "").strip(),
+            "notes_language":  (d.get("notes_language") or "").strip(),
+            "general_notes":   (d.get("general_notes") or "").strip(),
+        })
+    return jsonify({
+        "ok": True,
+        "student_name": sname,
+        "evaluations":  evaluations,
+    })
+
+
 @app.route('/parent/book/<int:bid>/viewer', methods=['GET'])
 def parent_book_viewer(bid):
     """Custom PDF.js viewer page for view-only books. For
