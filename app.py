@@ -8939,7 +8939,17 @@ function _ppRender(d){
   /* Payment plan */
   var p = '';
   if (!pd.has_plan){
-    p = '<div class="pp-empty">لم يتم تحديد طريقة تقسيط لهذا الطالب</div>';
+    // When the backend flagged that the student has real payments in
+    // payment_log but no plan resolves, show a soft "data being
+    // updated" message instead of the bare "no plan" line — avoids
+    // implying that no payments exist when they actually do.
+    if (pd.warning_code === 'missing_installment_type'){
+      p = '<div style="background:#fff8e1;border:1.5px solid #ffd54f;border-radius:10px;padding:12px 14px;color:#5d4037;font-size:.92rem;line-height:1.7;text-align:center;">' +
+          '⏳ بيانات الدفع قيد التحديث من قبل الإدارة. لمراجعة سجل المدفوعات، يرجى التواصل مع المركز.' +
+          '</div>';
+    } else {
+      p = '<div class="pp-empty">لم يتم تحديد طريقة تقسيط لهذا الطالب</div>';
+    }
   } else {
     p += '<div style="background:#fff;border:1.5px solid #e0d0f8;border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
     p += _row('طريقة التقسيط', 'طريقة ' + (pd.method || pd.method_id || '—'));
@@ -25530,7 +25540,7 @@ def api_parent_lookup():
     pres_rate = round(present / total * 100, 1) if total else 0.0
     # Payment plan + per-installment paid/remaining (reuse the helper
     # from the متابعة الدفع feature). Filter out empty plan slots.
-    pay_payload = {"has_plan": False}
+    pay_payload = {"has_plan": False, "warning_code": "", "warning_message_ar": ""}
     # Receipts the parent has already uploaded for THIS student, grouped
     # by installment_number. Used to decorate each installment with its
     # latest receipt status + history of previous attempts (rejected).
@@ -25563,6 +25573,12 @@ def api_parent_lookup():
         receipts_by_inst = {}
     try:
         plan = _payment_compute_plan(db, sid)
+        # Propagate the structured warning to the parent even when
+        # has_plan stays False — the pp-pay card uses it to render
+        # a soft "بيانات قيد التحديث" message instead of an empty box.
+        if plan and (plan.get("plan") or {}).get("warning_code"):
+            pay_payload["warning_code"] = plan["plan"]["warning_code"]
+            pay_payload["warning_message_ar"] = plan["plan"].get("warning_message_ar") or ""
         if plan and plan["plan"]["num_installments"]:
             insts_filtered = []
             for inst in plan["plan"]["installments"]:
