@@ -71752,6 +71752,391 @@ def parent_evaluations_api():
     })
 
 
+# Rich parent evaluations page (read-only). Same Mindex purple
+# gradient + Cairo + RTL chrome as the PDF viewer. The page is a
+# self-contained HTML blob with inline CSS+JS; data is fetched at
+# load time from the JSON endpoint above.
+PARENT_EVALUATIONS_HTML = r"""<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>التقييمات الشهرية — مايندكس</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;min-height:100%;}
+body{font-family:'Cairo','Tajawal','Segoe UI',Tahoma,sans-serif;
+     background:linear-gradient(135deg,#4a148c 0%,#6a1b9a 50%,#8e24aa 100%);
+     background-attachment:fixed;color:#212121;direction:rtl;
+     min-height:100vh;-webkit-tap-highlight-color:transparent;}
+.pe-topbar{background:rgba(255,255,255,.12);backdrop-filter:blur(8px);
+           -webkit-backdrop-filter:blur(8px);padding:10px 16px;display:flex;
+           justify-content:space-between;align-items:center;gap:10px;
+           border-bottom:1px solid rgba(255,255,255,.15);position:sticky;
+           top:0;z-index:20;}
+.pe-back{background:rgba(255,255,255,.92);color:#4a148c;text-decoration:none;
+         padding:8px 16px;border-radius:10px;font-weight:800;font-size:.9rem;
+         white-space:nowrap;font-family:inherit;transition:all .15s;}
+.pe-back:hover{background:#fff;transform:translateX(-2px);
+               box-shadow:0 4px 12px rgba(0,0,0,.18);}
+.pe-title{flex:1;text-align:center;font-weight:900;font-size:1.05rem;color:#fff;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;}
+.pe-spacer{width:60px;flex-shrink:0;}
+.pe-wrap{max-width:920px;margin:0 auto;padding:18px 14px 40px;}
+.pe-status{text-align:center;padding:60px 20px;color:#fff;font-weight:700;
+           font-size:1.05rem;line-height:1.7;}
+.pe-status .pe-spin{display:inline-block;width:36px;height:36px;
+                    border:3.5px solid rgba(255,255,255,.3);border-top-color:#fff;
+                    border-radius:50%;animation:pe-spin 1s linear infinite;
+                    margin-bottom:14px;}
+@keyframes pe-spin{to{transform:rotate(360deg);}}
+.pe-empty-icon{font-size:3.6rem;margin-bottom:12px;display:block;}
+.pe-card{background:rgba(255,255,255,.97);border-radius:18px;
+         padding:22px 20px;margin-bottom:16px;
+         box-shadow:0 8px 30px rgba(0,0,0,.18);}
+.pe-hero-top{display:flex;align-items:center;justify-content:space-between;
+             flex-wrap:wrap;gap:12px;margin-bottom:8px;
+             padding-bottom:12px;border-bottom:1.5px solid #f3e5f5;}
+.pe-hero-month{font-weight:900;color:#4a148c;font-size:1.25rem;}
+.pe-hero-teacher{font-size:.9rem;color:#6a1b9a;background:#f3e5f5;
+                 padding:5px 12px;border-radius:8px;font-weight:700;}
+.pe-hero-body{display:flex;align-items:center;gap:24px;flex-wrap:wrap;
+              padding-top:16px;}
+.pe-ring-wrap{display:flex;flex-direction:column;align-items:center;
+              flex-shrink:0;}
+.pe-ring{position:relative;width:140px;height:140px;}
+.pe-ring svg{width:100%;height:100%;transform:rotate(-90deg);}
+.pe-ring-bg{stroke:#f3e5f5;}
+.pe-ring-fg{stroke:#6B3FA0;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
+.pe-ring-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+               text-align:center;}
+.pe-ring-num{font-size:2.4rem;font-weight:900;color:#4a148c;line-height:1;}
+.pe-ring-of{font-size:.8rem;color:#888;font-weight:700;margin-top:2px;}
+.pe-ring-cap{margin-top:8px;color:#6a1b9a;font-weight:800;font-size:.92rem;}
+.pe-axes{flex:1;min-width:240px;display:flex;flex-direction:column;gap:9px;}
+.pe-axis{display:flex;align-items:center;gap:10px;}
+.pe-axis-name{flex:0 0 95px;font-size:.88rem;color:#444;font-weight:700;
+              text-align:start;}
+.pe-axis-bar{flex:1;height:9px;background:#f3e5f5;border-radius:6px;
+             overflow:hidden;}
+.pe-axis-fill{height:100%;border-radius:6px;transition:width .8s ease;}
+.pe-axis-score{flex:0 0 36px;text-align:center;font-weight:900;
+               color:#4a148c;font-size:.95rem;}
+.pe-notes-wrap{margin-top:18px;border-top:1.5px solid #f3e5f5;padding-top:14px;}
+.pe-note{margin-bottom:8px;}
+.pe-note summary{cursor:pointer;font-weight:800;color:#6a1b9a;
+                 padding:9px 12px;background:#f3e5f5;border-radius:9px;
+                 font-size:.92rem;list-style:none;display:flex;
+                 align-items:center;justify-content:space-between;
+                 transition:background .15s;}
+.pe-note summary::-webkit-details-marker{display:none;}
+.pe-note summary:hover{background:#e1bee7;}
+.pe-note summary::after{content:'▾';font-size:.85rem;
+                        transition:transform .2s;color:#4a148c;}
+.pe-note[open] summary::after{transform:rotate(180deg);}
+.pe-note-body{padding:12px 14px;background:#fafafa;border-radius:0 0 9px 9px;
+              color:#333;font-size:.92rem;line-height:1.7;
+              border:1.5px solid #f3e5f5;border-top:0;
+              white-space:pre-wrap;word-break:break-word;}
+.pe-chart-h{font-weight:900;color:#4a148c;font-size:1.05rem;margin-bottom:14px;
+            text-align:center;}
+.pe-chart-svg{width:100%;height:200px;display:block;}
+.pe-chart-empty{text-align:center;color:#888;font-size:.9rem;padding:30px 0;}
+.pe-hist-h{font-weight:900;color:#4a148c;font-size:1.05rem;margin-bottom:14px;}
+.pe-hist-item{border:1.5px solid #f3e5f5;border-radius:10px;margin-bottom:8px;
+              overflow:hidden;background:#fff;}
+.pe-hist-head{padding:12px 14px;display:flex;align-items:center;gap:10px;
+              cursor:pointer;transition:background .15s;}
+.pe-hist-head:hover{background:#fafafa;}
+.pe-hist-month{flex:1;font-weight:800;color:#4a148c;font-size:.95rem;}
+.pe-hist-overall{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;
+                 padding:4px 12px;border-radius:8px;font-weight:900;
+                 font-size:.85rem;}
+.pe-hist-toggle{color:#6a1b9a;font-size:.85rem;font-weight:800;
+                transition:transform .2s;}
+.pe-hist-item.open .pe-hist-toggle{transform:rotate(180deg);}
+.pe-hist-body{display:none;padding:14px;border-top:1.5px solid #f3e5f5;
+              background:#fafafa;}
+.pe-hist-item.open .pe-hist-body{display:block;}
+.pe-empty-card{text-align:center;padding:40px 24px;color:#4a148c;}
+.pe-empty-card .pe-empty-icon{color:#6a1b9a;}
+.pe-empty-card h3{margin:0 0 8px;font-size:1.15rem;font-weight:900;color:#4a148c;}
+.pe-empty-card p{margin:0;font-size:.95rem;color:#666;line-height:1.7;}
+@media (max-width:560px){
+  .pe-topbar{padding:8px 10px;}
+  .pe-title{font-size:.95rem;}
+  .pe-wrap{padding:14px 10px 28px;}
+  .pe-card{padding:18px 14px;border-radius:14px;}
+  .pe-hero-body{gap:18px;}
+  .pe-ring{width:120px;height:120px;}
+  .pe-ring-num{font-size:2rem;}
+  .pe-axis-name{flex-basis:80px;font-size:.83rem;}
+  .pe-axis-score{font-size:.88rem;}
+}
+</style>
+</head><body oncontextmenu="return false;">
+<div class="pe-topbar">
+  <a class="pe-back" href="/parent">← رجوع</a>
+  <div class="pe-title">📊 التقييمات الشهرية</div>
+  <span class="pe-spacer"></span>
+</div>
+<div class="pe-wrap">
+  <div id="pe-status" class="pe-status">
+    <span class="pe-spin"></span><br>جاري التحميل...
+  </div>
+  <div id="pe-content" style="display:none;"></div>
+</div>
+<script>
+(function(){
+  var PID = __PID_JSON__;
+  var AXES = [
+    {k:'participation', l:'المشاركة'},
+    {k:'behavior',      l:'السلوك'},
+    {k:'reading',       l:'القراءة'},
+    {k:'dictation',     l:'الإملاء'},
+    {k:'vocabulary',    l:'المفردات'},
+    {k:'conversation',  l:'المحادثة'},
+    {k:'expression',    l:'التعبير'},
+    {k:'grammar',       l:'القواعد'}
+  ];
+
+  function esc(s){
+    s = s == null ? '' : String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function scoreColor(n){
+    n = parseInt(n, 10) || 0;
+    if (n >= 8) return '#2E7D32';
+    if (n >= 6) return '#43A047';
+    if (n >= 4) return '#F9A825';
+    return '#C62828';
+  }
+  function ratingLabel(n){
+    n = parseInt(n, 10) || 0;
+    if (n >= 9) return 'ممتاز';
+    if (n >= 7) return 'جيد جداً';
+    if (n >= 5) return 'جيد';
+    if (n >= 3) return 'مقبول';
+    return 'يحتاج تحسين';
+  }
+
+  function setStatus(msg, isEmpty){
+    var s = document.getElementById('pe-status');
+    if (isEmpty) {
+      s.innerHTML =
+        '<div class="pe-card pe-empty-card">' +
+        '<div class="pe-empty-icon">📭</div>' +
+        '<h3>لا توجد تقييمات بعد</h3>' +
+        '<p>' + esc(msg) + '</p>' +
+        '</div>';
+    } else {
+      s.textContent = msg;
+    }
+    s.style.display = '';
+    document.getElementById('pe-content').style.display = 'none';
+  }
+
+  function renderRing(overall){
+    var n = parseInt(overall, 10) || 0;
+    var R = 60, C = 2 * Math.PI * R;
+    var dash = (n / 10) * C;
+    return (
+      '<div class="pe-ring-wrap">' +
+        '<div class="pe-ring">' +
+          '<svg viewBox="0 0 140 140">' +
+            '<circle class="pe-ring-bg" cx="70" cy="70" r="' + R + '" stroke-width="11" fill="none"/>' +
+            '<circle class="pe-ring-fg" cx="70" cy="70" r="' + R + '" stroke-width="11" fill="none"' +
+              ' stroke-dasharray="' + dash + ' ' + C + '" />' +
+          '</svg>' +
+          '<div class="pe-ring-inner">' +
+            '<div class="pe-ring-num">' + n + '</div>' +
+            '<div class="pe-ring-of">من 10</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pe-ring-cap">' + ratingLabel(n) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderAxes(scores){
+    var html = '<div class="pe-axes">';
+    for (var i = 0; i < AXES.length; i++) {
+      var ax = AXES[i];
+      var v = scores[ax.k];
+      var n = (v == null || v === '') ? 0 : parseInt(v, 10) || 0;
+      var pct = Math.max(0, Math.min(100, n * 10));
+      html += '<div class="pe-axis">' +
+              '<span class="pe-axis-name">' + esc(ax.l) + '</span>' +
+              '<div class="pe-axis-bar">' +
+                '<div class="pe-axis-fill" style="width:' + pct + '%;background:' + scoreColor(n) + ';"></div>' +
+              '</div>' +
+              '<span class="pe-axis-score" style="color:' + scoreColor(n) + ';">' + n + '</span>' +
+              '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderNotes(ev){
+    var rows = [
+      {l:'ملاحظات السلوك',    v:ev.notes_behavior},
+      {l:'ملاحظات اللغة',      v:ev.notes_language},
+      {l:'ملاحظات عامة',       v:ev.general_notes}
+    ];
+    var html = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!r.v) continue;
+      html += '<details class="pe-note"><summary>' + esc(r.l) +
+              '</summary><div class="pe-note-body">' + esc(r.v) + '</div></details>';
+    }
+    return html ? '<div class="pe-notes-wrap">' + html + '</div>' : '';
+  }
+
+  function renderHero(ev){
+    return '<div class="pe-card">' +
+           '<div class="pe-hero-top">' +
+             '<div class="pe-hero-month">' + esc(ev.month_label || ev.month) + '</div>' +
+             (ev.teacher_name
+                ? '<div class="pe-hero-teacher">المعلمة: ' + esc(ev.teacher_name) + '</div>'
+                : '') +
+           '</div>' +
+           '<div class="pe-hero-body">' +
+             renderRing(ev.overall || 0) +
+             renderAxes(ev.scores || {}) +
+           '</div>' +
+           renderNotes(ev) +
+           '</div>';
+  }
+
+  function renderChart(evals){
+    if (!evals.length) return '';
+    // X-axis is time-ordered ascending (oldest left in LTR, but RTL flips
+    // visually so newest sits on the right edge — the natural Arabic
+    // reading direction).
+    var data = evals.slice().reverse();  // ascending by month
+    var W = 600, H = 200, padL = 36, padR = 18, padT = 18, padB = 36;
+    var plotW = W - padL - padR;
+    var plotH = H - padT - padB;
+    var n = data.length;
+    function xAt(i){
+      if (n === 1) return padL + plotW / 2;
+      return padL + (i / (n - 1)) * plotW;
+    }
+    function yAt(v){
+      v = parseInt(v, 10) || 0;
+      return padT + plotH - (v / 10) * plotH;
+    }
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pe-chart-svg" preserveAspectRatio="xMidYMid meet">';
+    // Grid + Y labels
+    for (var g = 0; g <= 10; g += 2) {
+      var y = yAt(g);
+      svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y +
+             '" stroke="rgba(74,20,140,.15)" stroke-width="1"/>' +
+             '<text x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end" fill="#6a1b9a" font-size="11" font-weight="700">' + g + '</text>';
+    }
+    // Polyline
+    if (n > 1) {
+      var pts = data.map(function(d, i){ return xAt(i) + ',' + yAt(d.overall || 0); }).join(' ');
+      svg += '<polyline points="' + pts + '" fill="none" stroke="#6B3FA0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    // Dots + month labels
+    for (var i = 0; i < n; i++) {
+      var d = data[i];
+      var cx = xAt(i), cy = yAt(d.overall || 0);
+      svg += '<circle cx="' + cx + '" cy="' + cy + '" r="6" fill="#fff" stroke="#6B3FA0" stroke-width="3"/>';
+      svg += '<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" fill="#4a148c" font-size="11" font-weight="900">' + (d.overall || 0) + '</text>';
+      // Month label below x-axis; truncate to short form
+      var m = (d.month || '').slice(5);  // MM
+      svg += '<text x="' + cx + '" y="' + (H - 12) + '" text-anchor="middle" fill="#6a1b9a" font-size="10" font-weight="700">' + m + '/' + (d.month || '').slice(2, 4) + '</text>';
+    }
+    svg += '</svg>';
+    return '<div class="pe-card">' +
+           '<div class="pe-chart-h">📈 التقييم العام عبر الأشهر</div>' +
+           svg + '</div>';
+  }
+
+  function renderHistory(evals){
+    if (!evals.length) return '';
+    var html = '<div class="pe-card">' +
+               '<div class="pe-hist-h">📚 التقييمات السابقة</div>';
+    for (var i = 0; i < evals.length; i++) {
+      var ev = evals[i];
+      html += '<div class="pe-hist-item">' +
+              '<div class="pe-hist-head">' +
+                '<span class="pe-hist-month">' + esc(ev.month_label || ev.month) + '</span>' +
+                '<span class="pe-hist-overall">' + (ev.overall || 0) + '/10</span>' +
+                '<span class="pe-hist-toggle">▾</span>' +
+              '</div>' +
+              '<div class="pe-hist-body">' +
+                '<div class="pe-hero-body">' +
+                  renderRing(ev.overall || 0) +
+                  renderAxes(ev.scores || {}) +
+                '</div>' +
+                renderNotes(ev) +
+              '</div>' +
+              '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function bindHistoryToggles(){
+    var heads = document.querySelectorAll('.pe-hist-head');
+    heads.forEach(function(h){
+      h.addEventListener('click', function(){
+        var item = h.parentElement;
+        item.classList.toggle('open');
+      });
+    });
+  }
+
+  fetch('/parent/evaluations?pid=' + encodeURIComponent(PID), { credentials: 'same-origin' })
+    .then(function(r){
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    })
+    .then(function(d){
+      if (!d || !d.ok) throw new Error('payload not ok');
+      var evals = d.evaluations || [];
+      if (!evals.length) {
+        setStatus('بمجرد أن تقوم المعلمة بإرسال أول تقييم شهري، سيظهر هنا.', true);
+        return;
+      }
+      var html = renderHero(evals[0]) +
+                 renderChart(evals) +
+                 (evals.length > 1 ? renderHistory(evals.slice(1)) : '');
+      document.getElementById('pe-status').style.display = 'none';
+      var content = document.getElementById('pe-content');
+      content.innerHTML = html;
+      content.style.display = '';
+      bindHistoryToggles();
+    })
+    .catch(function(err){
+      setStatus('تعذّر تحميل التقييمات. حاول مرة أخرى أو اتصل بالإدارة.', false);
+    });
+})();
+</script>
+</body></html>"""
+
+
+@app.route('/parent/evaluations/view', methods=['GET'])
+def parent_evaluations_page():
+    """Public read-only page rendering the student's released
+    evaluations. Validates pid up-front (cheap student lookup) so
+    a typo / bogus URL gets a 403 instead of a blank page that
+    only fails on the JSON fetch. Same pattern as /parent/book/.../viewer."""
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if _eval_pid_resolve_student(db, pid) is None:
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    import json as _json_ev
+    return PARENT_EVALUATIONS_HTML.replace(
+        "__PID_JSON__",
+        _json_ev.dumps(pid, ensure_ascii=False))
+
+
 @app.route('/parent/book/<int:bid>/viewer', methods=['GET'])
 def parent_book_viewer(bid):
     """Custom PDF.js viewer page for view-only books. For
