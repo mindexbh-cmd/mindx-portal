@@ -34868,6 +34868,49 @@ def api_pts_redeem_approve(redeem_id):
     })
 
 
+@app.route('/api/points/redemptions/<int:redeem_id>/reject',
+           methods=['POST'])
+@login_required
+def api_pts_redeem_reject(redeem_id):
+    """Admin rejects a parent-submitted redemption request. Flips
+    status 'requested' → 'rejected'. Stock is untouched (was never
+    decremented). Points untouched (were never debited).
+
+    Optional body {reason: <text>} is recorded in the audit log
+    only — no dedicated column to avoid a schema change in this
+    commit. Reason is informational."""
+    err = _require_admin_response()
+    if err: return err
+    body = request.get_json(silent=True) or {}
+    reason = (body.get("reason") or "").strip()
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id, status FROM redemptions WHERE id=?", (redeem_id,)
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    if (dict(row).get("status") or "").strip() != "requested":
+        return jsonify({"ok": False, "error":
+                        "هذا الطلب ليس في حالة 'قيد المراجعة'"}), 400
+    try:
+        db.execute(
+            "UPDATE redemptions SET status='rejected' "
+            "WHERE id=? AND status='requested'", (redeem_id,))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 500
+    if reason:
+        try:
+            _audit("redemptions.reject", target_type="redemptions",
+                   target_id=redeem_id,
+                   new_value={"status": "rejected", "reason": reason})
+        except Exception: pass
+    return jsonify({"ok": True, "id": redeem_id})
+
+
 # ── Levels lookup (read-only) ────────────────────────────────────
 @app.route('/api/points/levels', methods=['GET'])
 @login_required
