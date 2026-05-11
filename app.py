@@ -70901,13 +70901,18 @@ def _books_v2_send_file_public(db, bid, *, as_attachment):
 # short-lived HMAC token bound to (pid, bid) so a copied URL can't
 # bypass the viewer for view-only content.
 #
-# Token format (intentionally stdlib-only; itsdangerous is available
-# transitively but not used elsewhere in app.py):
-#   payload = "<pid>:<bid>:<unix_ts>".encode()
-#   sig     = HMAC-SHA256(app.secret_key, payload)
-#   token   = urlsafe_b64encode(payload + b"|" + sig).rstrip("=")
-# Verify: split on b"|", constant-time compare sig, check ts within
-# _PARENT_VIEWER_TTL seconds, check (pid, bid) match the request.
+# Token format (JWT-style compact; stdlib-only):
+#   payload_b64 = urlsafe_b64encode("<pid>:<bid>:<unix_ts>").rstrip("=")
+#   sig_b64     = urlsafe_b64encode(HMAC-SHA256(secret, payload)).rstrip("=")
+#   token       = payload_b64 + "." + sig_b64
+# The earlier format concatenated raw payload+b"|"+sig and base64'd the
+# whole thing — but HMAC-SHA256 emits 32 random bytes, ~10% of which
+# happen to contain a 0x7c byte ("|"). rfind(b"|") on the decoded raw
+# then picked the wrong separator and verification spuriously failed.
+# Encoding the two halves separately removes the alphabet collision
+# (the base64-urlsafe alphabet is [A-Za-z0-9_-], so "." is unambiguous).
+# Verify: split on the LAST ".", constant-time compare sig, check ts
+# within _PARENT_VIEWER_TTL seconds, check (pid, bid) match the request.
 
 import hmac as _pv_hmac
 import hashlib as _pv_hashlib
@@ -70917,27 +70922,31 @@ import time as _pv_time
 _PARENT_VIEWER_TTL = 300  # 5 minutes
 
 
+def _pv_b64u_decode(s):
+    pad = "=" * ((4 - len(s) % 4) % 4)
+    return _pv_base64.urlsafe_b64decode(s + pad)
+
+
 def _books_v2_make_viewer_token(pid, bid):
     ts = int(_pv_time.time())
     payload = (str(pid) + ":" + str(int(bid)) + ":" + str(ts)).encode("utf-8")
     sig = _pv_hmac.new(app.secret_key.encode("utf-8"), payload,
                        _pv_hashlib.sha256).digest()
-    raw = payload + b"|" + sig
-    return _pv_base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+    p64 = _pv_base64.urlsafe_b64encode(payload).rstrip(b"=")
+    s64 = _pv_base64.urlsafe_b64encode(sig).rstrip(b"=")
+    return (p64 + b"." + s64).decode("ascii")
 
 
 def _books_v2_verify_viewer_token(token, pid, bid):
     """True iff token is well-formed, signature matches the current
     secret, the embedded (pid, bid) matches the request, and the
     timestamp is within _PARENT_VIEWER_TTL seconds. Never raises."""
-    if not token: return False
+    if not token or "." not in token:
+        return False
     try:
-        pad = "=" * ((4 - len(token) % 4) % 4)
-        raw = _pv_base64.urlsafe_b64decode(token + pad)
-        i = raw.rfind(b"|")
-        if i < 0: return False
-        payload = raw[:i]
-        sig     = raw[i+1:]
+        p64, s64 = token.rsplit(".", 1)
+        payload = _pv_b64u_decode(p64)
+        sig     = _pv_b64u_decode(s64)
         expected = _pv_hmac.new(app.secret_key.encode("utf-8"),
                                 payload, _pv_hashlib.sha256).digest()
         if not _pv_hmac.compare_digest(sig, expected):
