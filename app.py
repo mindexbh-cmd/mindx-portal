@@ -71393,55 +71393,255 @@ def _books_v2_render_page_webp_cached(bid, pid, page_n, date_str, name_norm):
         return None
 
 
-# Minimal iframe wrapper for view-only books. The PDF.js client-side
-# rendering pipeline has been replaced with the browser's native PDF
-# viewer because (a) it handles Arabic shaping correctly out of the
-# box and (b) the deterrent watermark is now embedded server-side, so
-# we no longer need a JS canvas overlay. The iframe is sandboxed via
-# headers set on the /view response (X-Frame-Options: SAMEORIGIN).
+# Rich image-based viewer for view-only books. Each PDF page is
+# fetched as a watermarked WebP from /parent/book/<bid>/page/<n>.webp
+# and displayed inside fully Mindex-branded chrome (purple gradient,
+# Cairo font, RTL). No Chrome PDF toolbar, no native download button.
 PARENT_PDF_VIEWER_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>قارئ المنهج — مايندكس</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;height:100%;}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
-     background:#f5f5f7;direction:rtl;color:#212121;
-     display:flex;flex-direction:column;height:100vh;overflow:hidden;}
-.pv-topbar{background:rgba(255,255,255,.95);padding:10px 16px;
-           display:flex;justify-content:space-between;align-items:center;
-           gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.08);
-           flex-shrink:0;}
-.pv-back{color:#4a148c;text-decoration:none;background:#f3e5f5;
-         padding:8px 14px;border-radius:9px;font-weight:700;font-size:.85rem;
-         white-space:nowrap;}
-.pv-back:hover{background:#e1bee7;}
-.pv-title{font-weight:900;color:#4a148c;font-size:1rem;
-          flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;
-          white-space:nowrap;min-width:0;padding:0 10px;}
-.pv-spacer{width:64px;flex-shrink:0;}
-.pv-frame{flex:1;width:100%;border:0;background:#fff;display:block;
-          min-height:0;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+body{font-family:'Cairo','Tajawal','Segoe UI',Tahoma,sans-serif;
+     background:linear-gradient(135deg,#4a148c 0%,#6a1b9a 50%,#8e24aa 100%);
+     color:#fff;direction:rtl;display:flex;flex-direction:column;
+     height:100vh;user-select:none;-webkit-user-select:none;
+     -webkit-tap-highlight-color:transparent;}
+.pv-topbar{background:rgba(255,255,255,.12);backdrop-filter:blur(8px);
+           -webkit-backdrop-filter:blur(8px);padding:10px 16px;display:flex;
+           justify-content:space-between;align-items:center;gap:10px;
+           border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;}
+.pv-back{background:rgba(255,255,255,.92);color:#4a148c;text-decoration:none;
+         padding:8px 16px;border-radius:10px;font-weight:800;font-size:.9rem;
+         white-space:nowrap;transition:all .15s;border:0;cursor:pointer;
+         font-family:inherit;}
+.pv-back:hover{background:#fff;transform:translateX(-2px);
+               box-shadow:0 4px 12px rgba(0,0,0,.18);}
+.pv-title{flex:1;text-align:center;font-weight:800;font-size:1rem;color:#fff;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;}
+.pv-zoom{display:flex;gap:4px;background:rgba(255,255,255,.1);padding:3px;
+         border-radius:10px;}
+.pv-zoom button{background:transparent;color:#fff;border:0;padding:6px 10px;
+                border-radius:7px;font-weight:700;font-size:.78rem;cursor:pointer;
+                font-family:inherit;transition:all .15s;}
+.pv-zoom button:hover{background:rgba(255,255,255,.15);}
+.pv-zoom button.active{background:#fff;color:#4a148c;}
+.pv-main{flex:1;display:flex;align-items:center;justify-content:center;
+         overflow:auto;padding:20px;position:relative;min-height:0;}
+.pv-page-wrap{display:flex;align-items:center;justify-content:center;
+              transform-origin:center center;transition:transform .25s ease;}
+#pv-page{max-width:100%;max-height:calc(100vh - 160px);
+         box-shadow:0 10px 40px rgba(0,0,0,.4);border-radius:8px;
+         display:block;pointer-events:none;transition:opacity .2s;
+         -webkit-user-drag:none;user-drag:none;}
+#pv-page.loading{opacity:0;}
+#pv-page.empty{display:none;}
+.pv-spinner{position:absolute;top:50%;left:50%;
+            transform:translate(-50%,-50%);width:48px;height:48px;
+            border:4px solid rgba(255,255,255,.3);border-top-color:#fff;
+            border-radius:50%;animation:pv-spin 1s linear infinite;display:none;}
+.pv-main.loading .pv-spinner{display:block;}
+@keyframes pv-spin{to{transform:translate(-50%,-50%) rotate(360deg);}}
+.pv-err{background:rgba(255,255,255,.95);color:#4a148c;padding:20px 30px;
+        border-radius:12px;font-weight:700;max-width:480px;text-align:center;
+        line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.25);}
+.pv-botbar{background:rgba(255,255,255,.12);backdrop-filter:blur(8px);
+           -webkit-backdrop-filter:blur(8px);padding:10px 16px;display:flex;
+           justify-content:center;align-items:center;gap:12px;
+           border-top:1px solid rgba(255,255,255,.15);flex-shrink:0;}
+.pv-nav-btn{background:rgba(255,255,255,.92);color:#4a148c;border:0;
+            padding:9px 18px;border-radius:10px;font-weight:800;font-size:.92rem;
+            cursor:pointer;font-family:inherit;transition:all .15s;}
+.pv-nav-btn:hover:not(:disabled){background:#fff;transform:scale(1.04);}
+.pv-nav-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pv-pageinfo{display:flex;align-items:center;gap:8px;font-weight:700;
+             font-size:.92rem;color:#fff;}
+.pv-pageinput{width:62px;padding:6px 8px;border-radius:8px;
+              border:1.5px solid rgba(255,255,255,.4);
+              background:rgba(255,255,255,.15);color:#fff;font-weight:700;
+              text-align:center;font-family:inherit;font-size:1rem;
+              -moz-appearance:textfield;}
+.pv-pageinput::-webkit-outer-spin-button,
+.pv-pageinput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.pv-pageinput:focus{outline:none;background:rgba(255,255,255,.95);
+                    color:#4a148c;border-color:#fff;}
+@media (max-width:600px){
+  .pv-topbar{padding:8px 10px;gap:6px;}
+  .pv-title{font-size:.82rem;}
+  .pv-zoom{display:none;}
+  .pv-nav-btn{padding:7px 12px;font-size:.82rem;}
+  .pv-back{padding:7px 12px;font-size:.82rem;}
+  #pv-page{max-height:calc(100vh - 140px);}
+}
 </style>
 </head><body oncontextmenu="return false;">
 <div class="pv-topbar">
   <a class="pv-back" href="/parent">← رجوع</a>
   <div class="pv-title" id="pv-title">…</div>
-  <span class="pv-spacer"></span>
+  <div class="pv-zoom" id="pv-zoom">
+    <button data-z="0.75">٧٥٪</button>
+    <button data-z="1.0" class="active">١٠٠٪</button>
+    <button data-z="1.25">١٢٥٪</button>
+    <button data-z="1.5">١٥٠٪</button>
+  </div>
 </div>
-<iframe class="pv-frame" id="pv-frame" src="" title="قارئ PDF"
-        oncontextmenu="return false;"></iframe>
+<div class="pv-main" id="pv-main">
+  <div class="pv-page-wrap" id="pv-page-wrap">
+    <img id="pv-page" class="empty" alt="">
+  </div>
+  <div class="pv-spinner"></div>
+</div>
+<div class="pv-botbar">
+  <button class="pv-nav-btn" id="pv-prev">→ السابقة</button>
+  <div class="pv-pageinfo">
+    <input class="pv-pageinput" id="pv-page-input" type="number" min="1" value="1" inputmode="numeric">
+    <span>من <span id="pv-total">—</span></span>
+  </div>
+  <button class="pv-nav-btn" id="pv-next">التالية ←</button>
+</div>
 <script>
 (function(){
   var BOOK_TITLE = __BOOK_TITLE_JSON__;
-  var PDF_URL    = __PDF_URL_JSON__;
-  try {
-    document.title = BOOK_TITLE + ' — مايندكس';
-    document.getElementById('pv-title').textContent = BOOK_TITLE;
-  } catch(e) {}
-  document.getElementById('pv-frame').src = PDF_URL;
+  var BID    = __BID_JSON__;
+  var PID    = __PID_JSON__;
+  var TOKEN  = __TOKEN_JSON__;
+  var state = { page: 1, total: 0, zoom: 1.0, lastLoadedSrc: null };
+
+  var $img   = document.getElementById('pv-page');
+  var $wrap  = document.getElementById('pv-page-wrap');
+  var $main  = document.getElementById('pv-main');
+  var $title = document.getElementById('pv-title');
+  var $total = document.getElementById('pv-total');
+  var $input = document.getElementById('pv-page-input');
+  var $prev  = document.getElementById('pv-prev');
+  var $next  = document.getElementById('pv-next');
+  var $zoomBtns = document.querySelectorAll('#pv-zoom button');
+
+  document.title = BOOK_TITLE + ' — مايندكس';
+  $title.textContent = BOOK_TITLE;
+
+  function authQS(){
+    return 'pid=' + encodeURIComponent(PID) + '&_vt=' + encodeURIComponent(TOKEN);
+  }
+  function pageUrl(n){ return '/parent/book/' + BID + '/page/' + n + '.webp?' + authQS(); }
+  function metaUrl(){  return '/parent/book/' + BID + '/meta?' + authQS(); }
+
+  function setLoading(on){
+    if (on) { $main.classList.add('loading'); $img.classList.add('loading'); }
+    else { $main.classList.remove('loading'); $img.classList.remove('loading'); }
+  }
+  function applyZoom(){ $wrap.style.transform = 'scale(' + state.zoom + ')'; }
+  function updateNav(){
+    $prev.disabled = (state.page <= 1);
+    $next.disabled = (state.page >= state.total);
+    $input.value = state.page;
+  }
+  function preloadNext(){
+    if (state.page < state.total) {
+      var n = state.page + 1;
+      var pre = new Image();
+      pre.src = pageUrl(n);
+    }
+  }
+  function showError(msg){
+    setLoading(false);
+    $img.classList.add('empty');
+    var ex = document.getElementById('pv-err');
+    if (ex) ex.remove();
+    var el = document.createElement('div');
+    el.id = 'pv-err';
+    el.className = 'pv-err';
+    el.textContent = msg;
+    $main.appendChild(el);
+  }
+  function clearError(){
+    var ex = document.getElementById('pv-err');
+    if (ex) ex.remove();
+    $img.classList.remove('empty');
+  }
+  function gotoPage(n){
+    if (!state.total) return;
+    n = Math.max(1, Math.min(state.total, parseInt(n, 10) || 1));
+    state.page = n;
+    updateNav();
+    clearError();
+    setLoading(true);
+    var url = pageUrl(n);
+    state.lastLoadedSrc = url;
+    $img.onload = function(){
+      if (state.lastLoadedSrc !== url) return;
+      setLoading(false);
+      preloadNext();
+    };
+    $img.onerror = function(){
+      if (state.lastLoadedSrc !== url) return;
+      showError('انتهت الجلسة أو تعذّر تحميل الصفحة. يرجى إعادة فتح المنهج من صفحة المناهج.');
+    };
+    $img.src = url;
+  }
+
+  fetch(metaUrl()).then(function(r){
+    if (!r.ok) throw new Error('meta ' + r.status);
+    return r.json();
+  }).then(function(d){
+    if (!d || !d.ok) throw new Error('meta not ok');
+    state.total = parseInt(d.page_count, 10) || 0;
+    $total.textContent = state.total;
+    $input.max = state.total;
+    if (d.title) { $title.textContent = d.title; document.title = d.title + ' — مايندكس'; }
+    if (state.total > 0) gotoPage(1);
+    else showError('لا توجد صفحات لعرضها في هذا المنهج.');
+  }).catch(function(){
+    showError('تعذّر تحميل المنهج. حاول مرة أخرى أو اتصل بالإدارة.');
+  });
+
+  $prev.addEventListener('click', function(){ gotoPage(state.page - 1); });
+  $next.addEventListener('click', function(){ gotoPage(state.page + 1); });
+  $input.addEventListener('change', function(){ gotoPage(this.value); });
+  $input.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); gotoPage(this.value); this.blur(); }
+  });
+  $zoomBtns.forEach(function(b){
+    b.addEventListener('click', function(){
+      $zoomBtns.forEach(function(x){ x.classList.remove('active'); });
+      this.classList.add('active');
+      state.zoom = parseFloat(this.getAttribute('data-z'));
+      applyZoom();
+    });
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.target === $input) return;
+    if (e.key === 'ArrowLeft')      gotoPage(state.page + 1);
+    else if (e.key === 'ArrowRight') gotoPage(state.page - 1);
+    else if (e.key === 'Home')       gotoPage(1);
+    else if (e.key === 'End')        gotoPage(state.total);
+    else if ((e.ctrlKey || e.metaKey) && ['s','p','a','c'].indexOf((e.key||'').toLowerCase()) >= 0) {
+      e.preventDefault();
+    }
+  });
+  var touchStartX = null;
+  $main.addEventListener('touchstart', function(e){
+    if (e.touches.length === 1) touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  $main.addEventListener('touchend', function(e){
+    if (touchStartX === null) return;
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    touchStartX = null;
+    if (Math.abs(dx) > 60) {
+      if (dx > 0) gotoPage(state.page - 1);
+      else        gotoPage(state.page + 1);
+    }
+  });
+
+  $img.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  $img.addEventListener('dragstart',   function(e){ e.preventDefault(); });
+
+  applyZoom();
 })();
 </script>
 </body></html>"""
@@ -71486,17 +71686,20 @@ def parent_book_viewer(bid):
                          '/view?pid=' + _up_pv1.quote(pid), code=302)
     token = _books_v2_make_viewer_token(pid, int(bid))
     import json as _json_pv
-    import urllib.parse as _up_pv2
-    pdf_url = ('/parent/book/' + str(int(bid)) +
-               '/view?pid=' + _up_pv2.quote(pid) +
-               '&_vt=' + _up_pv2.quote(token))
     # student_name is loaded above purely for the 403-on-missing-row
-    # check; the watermark itself is now embedded server-side in /view.
+    # check; the image watermark in /page/<n>.webp re-resolves it from
+    # the DB each render so a rename takes effect immediately. The
+    # same HMAC token works for both /view (5 min TTL) and the image
+    # endpoints (1 hour TTL).
     return (PARENT_PDF_VIEWER_HTML
             .replace("__BOOK_TITLE_JSON__",
                      _json_pv.dumps(title, ensure_ascii=False))
-            .replace("__PDF_URL_JSON__",
-                     _json_pv.dumps(pdf_url, ensure_ascii=False)))
+            .replace("__BID_JSON__",
+                     _json_pv.dumps(int(bid)))
+            .replace("__PID_JSON__",
+                     _json_pv.dumps(pid, ensure_ascii=False))
+            .replace("__TOKEN_JSON__",
+                     _json_pv.dumps(token, ensure_ascii=False)))
 
 
 # ── Image-based parent viewer endpoints ──────────────────────────
