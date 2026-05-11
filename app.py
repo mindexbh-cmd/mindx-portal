@@ -25820,6 +25820,93 @@ def api_parent_store_menu():
     })
 
 
+@app.route("/api/parent/store/request", methods=["POST"])
+def api_parent_store_request():
+    """Parent submits a redemption request from the public /parent
+    store. Creates a redemptions row with status='requested' —
+    points are NOT deducted, stock is NOT decremented. Admin must
+    approve via /api/points/redemptions/<id>/approve before any
+    debit happens (see _pts_balance: 'requested' is excluded from
+    the spent sum).
+
+    Body: {pid, reward_id}
+    Validation order: PID → reward existence/active/menu-item →
+    stock → balance → no-duplicate-pending. Each failure returns
+    a 400 with an Arabic error string."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '0').split(',')[0].strip()
+    if not _parent_rate_check(ip):
+        return jsonify({"ok": False, "error":
+                        "تم تجاوز الحد الأعلى للمحاولات. الرجاء المحاولة لاحقاً."}), 429
+    body = request.get_json(silent=True) or {}
+    pid = (body.get('pid') or '').strip()
+    try:
+        rid = int(body.get('reward_id') or 0)
+    except Exception:
+        rid = 0
+    sid, sname, err = _store_parent_pid_resolve(pid)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    if not rid:
+        return jsonify({"ok": False, "error": "معرّف المكافأة مطلوب"}), 400
+    db = get_db()
+    # Reward must exist, be active, AND be flagged for the parent
+    # store. Legacy rewards (is_menu_item=0) MUST NOT be requestable
+    # via this endpoint — that protects the existing 4 seeded rewards
+    # from leaking onto the public surface.
+    try:
+        rrow = db.execute(
+            "SELECT id, name_ar, point_cost, stock, "
+            "       COALESCE(is_active,0) AS is_active, "
+            "       COALESCE(is_menu_item,0) AS is_menu_item "
+            "FROM rewards WHERE id=?", (rid,)).fetchone()
+    except Exception:
+        rrow = None
+    if not rrow:
+        return jsonify({"ok": False, "error": "المكافأة غير موجودة"}), 404
+    rd = dict(rrow)
+    if not int(rd.get("is_active") or 0):
+        return jsonify({"ok": False, "error": "هذه المكافأة غير متاحة حالياً"}), 400
+    if not int(rd.get("is_menu_item") or 0):
+        return jsonify({"ok": False, "error": "هذه المكافأة غير متاحة في متجر ولي الأمر"}), 400
+    cost = int(rd.get("point_cost") or 0)
+    stock = int(rd.get("stock") if rd.get("stock") is not None else -1)
+    # Stock check (preview only — no decrement here)
+    if stock == 0:
+        return jsonify({"ok": False, "error": "نفد المخزون"}), 400
+    # Balance preview check
+    bal = _pts_balance(db, sid)
+    if bal < cost:
+        return jsonify({"ok": False, "error":
+                        "نقاطك غير كافية. الرصيد الحالي: " + str(bal),
+                        "balance": bal, "cost": cost}), 400
+    # Duplicate guard: one outstanding 'requested' row per (student, reward)
+    try:
+        dup = db.execute(
+            "SELECT id FROM redemptions WHERE student_id=? AND reward_id=? "
+            "AND status='requested' LIMIT 1", (sid, rid)).fetchone()
+    except Exception:
+        dup = None
+    if dup:
+        return jsonify({"ok": False, "error":
+                        "طلبك على هذه المكافأة قيد المراجعة بالفعل",
+                        "redemption_id": int(dict(dup).get("id") or 0)}), 400
+    try:
+        cur = db.execute(
+            "INSERT INTO redemptions(student_id, student_name, reward_id, "
+            "reward_name, points_spent, status, request_source) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (sid, sname, rid, rd.get("name_ar") or "", cost,
+             "requested", "parent_pid"))
+        db.commit()
+    except Exception as ex:
+        return jsonify({"ok": False, "error": "تعذّر إنشاء الطلب"}), 500
+    return jsonify({
+        "ok":           True,
+        "request_id":   cur.lastrowid,
+        "message":      "تم إرسال طلبك للإدارة",
+    })
+
+
 # ─── Admin receipts management ─────────────────────────────────────
 ADMIN_RECEIPTS_HTML = """<!DOCTYPE html>
 <html lang="ar" dir="rtl">
