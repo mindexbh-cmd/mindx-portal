@@ -1080,6 +1080,7 @@ def init_db():
         is_active INTEGER DEFAULT 1,
         image_url TEXT DEFAULT '',
         category_type TEXT DEFAULT '',
+        is_menu_item INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS redemptions(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5689,6 +5690,7 @@ if True:
                 is_active INTEGER DEFAULT 1,
                 image_url TEXT DEFAULT '',
                 category_type TEXT DEFAULT '',
+                is_menu_item INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
             db2.execute("""CREATE TABLE IF NOT EXISTS redemptions(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7801,6 +7803,10 @@ if True:
     for _col, _decl in [
         ("image_url",     "TEXT DEFAULT ''"),
         ("category_type", "TEXT DEFAULT ''"),  # 'food' | 'toy' | ''
+        # DEFAULT 0 is critical — keeps the 4 legacy seeded rewards out
+        # of the new public /parent store. Only rewards explicitly
+        # toggled to is_menu_item=1 from the admin form will appear.
+        ("is_menu_item",  "INTEGER DEFAULT 0"),
     ]:
         if _col not in _rw_cols:
             try: db2.execute("ALTER TABLE rewards ADD COLUMN " +
