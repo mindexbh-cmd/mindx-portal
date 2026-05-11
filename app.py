@@ -17080,7 +17080,28 @@ function _pmRenderCard(card, sid, name, res){
       + '<div style="font-size:12.5px;color:#999;">\u0639\u064A\u0651\u0646 \u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u0633\u064A\u0637 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0645\u0646 \u062C\u062F\u0648\u0644 \u0627\u0644\u0637\u0644\u0628\u0629 \u0623\u0648\u0644\u0627\u064B.</div>';
     return;
   }
-  var p = res.plan; var lbl = _pmStatusLabel(p.status);
+  var p = res.plan;
+  // Backend surfaced a structured warning \u2014 the student has recorded
+  // payments in payment_log but no taqseet template was resolved (most
+  // commonly: installment_type is unset on the student). Show a clear
+  // banner instead of a misleading "course=0 / paid=0" plan card.
+  if (p && p.warning_code === 'missing_installment_type'){
+    var headW = '<div class="pm-card-head"><span>\u1F464</span><span class="pm-name">' + (name || "") + '</span>'
+              + '<span class="pm-status unpaid" style="margin-right:auto;">\u26A0\uFE0F \u0628\u064A\u0627\u0646\u0627\u062A \u063A\u064A\u0631 \u0645\u062A\u0637\u0627\u0628\u0642\u0629</span></div>';
+    var msg = (p.warning_message_ar ||
+      '\u0647\u0630\u0627 \u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u062F\u064A\u0647 \u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0641\u064A \u0633\u062C\u0644 \u0627\u0644\u062F\u0641\u0639 \u0644\u0643\u0646 \u0644\u0645 \u064A\u062A\u0645 \u062A\u062D\u062F\u064A\u062F \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637.');
+    card.innerHTML = headW +
+      '<div style="background:#fff8e1;border:1.5px solid #ffd54f;border-radius:10px;'+
+        'padding:12px 14px;color:#5d4037;font-size:13px;line-height:1.7;'+
+        'margin-top:8px;">'+
+        '<div style="font-weight:800;color:#e65100;margin-bottom:6px;">'+
+          '\u26A0\uFE0F \u062D\u062F\u062F\u064A \u0637\u0631\u064A\u0642\u0629 \u0627\u0644\u062A\u0642\u0633\u064A\u0637 \u0623\u0648\u0644\u0627\u064B'+
+        '</div>'+
+        '<div>'+msg+'</div>'+
+      '</div>';
+    return;
+  }
+  var lbl = _pmStatusLabel(p.status);
   var head = '<div class="pm-card-head"><span>\u1F464</span><span class="pm-name">' + (name || "") + '</span>'
            + '<span class="pm-status ' + lbl.cls + '" style="margin-right:auto;">' + lbl.txt + '</span></div>';
   var summary = '<div class="pm-summary-grid">'
@@ -57952,6 +57973,37 @@ def _payment_compute_plan(db, sid):
         status = 'unpaid'
     else:
         status = 'partial'
+    # Diagnostic: when the student has real payments recorded in
+    # payment_log but no taqseet template resolved (installment_type
+    # is unset or doesn't match any plan row), every per-installment
+    # value gets silently zeroed because the `if tq:` loop above is
+    # skipped. Surface a structured warning so the admin UI can prompt
+    # the user to set installment_type instead of showing a misleading
+    # "course=0 / paid=0" plan. Investigation report at the
+    # pre-investigate/payment-data-mismatch tag.
+    warning_code = ''
+    warning_message_ar = ''
+    if not tq and pl_row:
+        has_paylog_payment = False
+        try:
+            for n in range(1, 6):
+                v = pl_row.get('inst' + str(n))
+                if v is None: continue
+                if str(v).strip(): has_paylog_payment = True; break
+        except Exception:
+            pass
+        # Also count total_paid TEXT field as evidence of real payments.
+        if not has_paylog_payment:
+            v = pl_row.get('total_paid')
+            if v is not None and str(v).strip(): has_paylog_payment = True
+        if has_paylog_payment:
+            warning_code = 'missing_installment_type'
+            warning_message_ar = (
+                'هذا الطالب لديه مدفوعات مسجلة في سجل الدفع، '
+                'لكن لم يتم تحديد طريقة التقسيط له. '
+                'حددي طريقة التقسيط من سجل الطلاب لعرض الخطة.'
+            )
+
     return {
         "student": {
             "id":           student['id'],
@@ -57972,6 +58024,8 @@ def _payment_compute_plan(db, sid):
             "status":          status,
             "paylog_matched":  bool(pl_row),
             "totals_source":   "payment_log" if total_paid_pl is not None else "computed",
+            "warning_code":    warning_code,
+            "warning_message_ar": warning_message_ar,
         },
     }
 
