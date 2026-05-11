@@ -40283,9 +40283,26 @@ table.tbl tr:hover td{background:#fff8e1;}
     var sentLine = e.whatsapp_sent_at ?
       '<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;margin-bottom:10px;color:#f57c00;font-weight:700;">📨 تم الإرسال للأهل في '+
       (e.whatsapp_sent_at||'').slice(0,16)+'</div>' : '';
+    // Publish-to-parent control — prominent header so the admin can
+    // flip portal visibility while reviewing without closing the modal.
+    var releaseLine =
+      '<div class="rel-cell" style="margin-bottom:14px;padding:10px 12px;'+
+        'background:#f8f4fb;border:1px solid #e6d8f0;border-radius:10px;'+
+        'flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap;">'+
+        '<span class="rel-pill '+(e.released_to_parent?'on':'off')+'" '+
+          'style="font-size:.85rem;padding:5px 12px;">'+
+          (e.released_to_parent?'🟢 منشور في بوابة ولي الأمر':'⚪ غير منشور')+
+        '</span>'+
+        '<button class="rel-btn '+(e.released_to_parent?'hide':'publish')+'" '+
+          'style="font-size:.88rem;padding:7px 14px;" '+
+          'onclick="viewToggleRelease('+e.id+', '+(e.released_to_parent?0:1)+', this)">'+
+          (e.released_to_parent?'🚫 إخفاء عن الأهل':'📢 نشره في بوابة ولي الأمر')+
+        '</button>'+
+      '</div>';
     document.getElementById('viewTitle').textContent =
       'تقييم ' + (e.student_name||'') + ' — ' + (e.month_label||e.evaluation_month||'');
     document.getElementById('viewBody').innerHTML =
+      releaseLine +
       sentLine +
       '<div style="margin-bottom:10px;"><b>المعلمة:</b> '+escapeHtml(e.teacher_name||'')+'</div>'+
       '<div style="margin-bottom:10px;"><b>المجموعة:</b> '+escapeHtml(e.group_name||'')+'</div>'+
@@ -40299,6 +40316,35 @@ table.tbl tr:hover td{background:#fff8e1;}
   };
   window.closeView = function(){
     document.getElementById('viewBack').classList.remove('show');
+  };
+
+  // Modal-aware release toggle. Updates the cached row in ALL so
+  // the table behind the modal reflects the new state too, then
+  // re-runs openView(id) to refresh the modal's pill+button.
+  window.viewToggleRelease = function(id, val, btn){
+    if(btn) btn.disabled = true;
+    fetch('/api/monthly-evaluations/'+id, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({released_to_parent: val ? 1 : 0})
+    }).then(function(r){return r.json();}).then(function(j){
+      if(j && j.ok){
+        toast(val ? 'تم النشر للأهالي ✓' : 'تم إلغاء النشر');
+        // Patch the in-memory row so the underlying table updates
+        // when the user closes the modal, without a full refetch.
+        var idx = ALL.findIndex(function(x){return x.id===id;});
+        if(idx >= 0) ALL[idx].released_to_parent = val ? 1 : 0;
+        renderTable();
+        loadStats();
+        openView(id);  // re-render modal body with fresh state
+      } else {
+        if(btn) btn.disabled = false;
+        toast((j && j.error) || 'تعذر التحديث', true);
+      }
+    }).catch(function(){
+      if(btn) btn.disabled = false;
+      toast('تعذر الاتصال بالخادم', true);
+    });
   };
 
   // ── edit modal ──
