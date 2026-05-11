@@ -19,6 +19,11 @@ arabic-reshaper>=3.0
 # python-bidi 0.5+ is Rust-built (needs cargo); 0.4.2 is the last
 # pure-Python release. Pin it so the build works on any host.
 python-bidi==0.4.2
+# pypdfium2 renders PDF pages to bitmaps using the same pdfium engine
+# Chrome ships. Used by the custom parent viewer (/parent/book/<bid>/viewer)
+# to display view-only books as page images instead of an iframe'd PDF —
+# this lets us strip the Chrome PDF toolbar's download button.
+pypdfium2>=4.20
 # NOTE: pillow-heif is intentionally NOT pinned here. The package
 # needs the system libheif/libde265 libraries which Render's stock
 # Python image doesn't always provide — when the wheel falls back to

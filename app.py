@@ -70995,7 +70995,13 @@ def _books_v2_register_watermark_font():
     if _WM_FONT_PROBED:
         return _WM_FONT_NAME
     _WM_FONT_PROBED = True
+    # Repo-bundled Noto Sans Arabic — first candidate so the watermark
+    # always works on Render regardless of system font availability.
+    # Resolved relative to this file's directory so it works whether
+    # the app runs from /opt/render/project or any local checkout.
+    _here = os.path.dirname(os.path.abspath(__file__))
     candidates = [
+        os.path.join(_here, "data", "fonts", "NotoSansArabic-Regular.ttf"),
         # Ubuntu / Debian (Render's base image typically ships these)
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -71160,6 +71166,233 @@ def _books_v2_watermarked_bytes_cached(bid, pid, date_str, name_norm):
     return _books_v2_apply_watermark(raw, name_norm, pid, date_str)
 
 
+# ── Image-based viewer pipeline ──────────────────────────────────
+# The native PDF viewer iframe still exposes Chrome's PDF toolbar
+# (with its download button). To hide it entirely we rasterize each
+# PDF page to a watermarked WebP image server-side and let the
+# custom HTML viewer (PARENT_PDF_VIEWER_HTML) request them by page
+# number. pypdfium2 wraps the same pdfium engine Chrome embeds, so
+# Arabic shaping matches what a native viewer would draw.
+#
+# Token TTL for image endpoints is _PARENT_VIEWER_IMG_TTL (1 hour),
+# longer than the 5-min /view TTL because the parent might spend
+# 20-30 min on a book sequentially. The longer window applies only
+# to the image endpoints; the downloadable /view path keeps the
+# 5-min TTL unchanged.
+
+_PARENT_VIEWER_IMG_TTL = 3600  # 1 hour
+
+
+def _books_v2_verify_image_token(token, pid, bid):
+    """True iff a /viewer-minted token matches and is within the
+    image-viewer TTL. Same HMAC format as _books_v2_verify_viewer_token —
+    the only divergence is the accepted timestamp window. Never raises."""
+    if not token or "." not in token:
+        return False
+    try:
+        p64, s64 = token.rsplit(".", 1)
+        payload = _pv_b64u_decode(p64)
+        sig     = _pv_b64u_decode(s64)
+        expected = _pv_hmac.new(app.secret_key.encode("utf-8"),
+                                payload, _pv_hashlib.sha256).digest()
+        if not _pv_hmac.compare_digest(sig, expected):
+            return False
+        parts = payload.decode("utf-8").split(":")
+        if len(parts) != 3: return False
+        tok_pid, tok_bid, tok_ts = parts
+        if str(tok_pid) != str(pid): return False
+        if int(tok_bid) != int(bid): return False
+        if (int(_pv_time.time()) - int(tok_ts)) > _PARENT_VIEWER_IMG_TTL:
+            return False
+    except Exception:
+        return False
+    return True
+
+
+def _books_v2_load_book_bytes_uncached(bid):
+    """Return the source PDF bytes (BYTEA blob or local-disk file) or
+    None when only a Cloudinary URL exists / file is missing. Not LRU-
+    cached itself because the callers wrap it in their own LRU keyed
+    by post-processing args."""
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT file_data, file_path FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    rd = dict(row)
+    blob = rd.get("file_data")
+    if blob:
+        try:
+            return bytes(blob) if not isinstance(blob, (bytes, bytearray)) else bytes(blob)
+        except Exception:
+            pass
+    fp = rd.get("file_path") or ""
+    try:
+        sd = os.path.realpath(_books_v2_storage_dir())
+        rp = os.path.realpath(fp) if fp else ""
+        if rp and rp.startswith(sd + os.sep) and os.path.isfile(rp):
+            with open(rp, "rb") as f:
+                return f.read()
+    except Exception:
+        pass
+    return None
+
+
+@_wm_functools.lru_cache(maxsize=128)
+def _books_v2_page_count_cached(bid):
+    """PDF page count, or 0 on any failure. Per-process LRU so repeat
+    /meta calls don't re-parse the PDF on every refresh."""
+    raw = _books_v2_load_book_bytes_uncached(int(bid))
+    if not raw:
+        return 0
+    try:
+        import pypdfium2 as _pdfium
+        from io import BytesIO as _BIO
+        pdf = _pdfium.PdfDocument(_BIO(raw))
+        n = len(pdf)
+        try: pdf.close()
+        except Exception: pass
+        return int(n)
+    except Exception:
+        return 0
+
+
+_PIL_WM_FONT_PROBED = False
+_PIL_WM_FONT = None
+
+
+def _pil_watermark_font(size=26):
+    """PIL.ImageFont for the image watermark. Probes the repo TTF first
+    (Noto Sans Arabic, shaping-correct without raqm), then common system
+    paths. Returns None if nothing usable is found — the caller drops
+    the Arabic name from the watermark text in that case."""
+    global _PIL_WM_FONT_PROBED, _PIL_WM_FONT
+    if _PIL_WM_FONT_PROBED:
+        return _PIL_WM_FONT
+    _PIL_WM_FONT_PROBED = True
+    _here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_here, "data", "fonts", "NotoSansArabic-Regular.ttf"),
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "C:\\Windows\\Fonts\\arialbd.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+    ]
+    from PIL import ImageFont as _PILFont
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            _PIL_WM_FONT = _PILFont.truetype(path, size)
+            return _PIL_WM_FONT
+        except Exception:
+            continue
+    return None
+
+
+def _apply_image_watermark(img, name, pid, date_str):
+    """Overlay a tiled diagonal watermark onto a PIL RGBA Image in place.
+    Falls back to PID+date only when no Arabic-capable font is available."""
+    from PIL import ImageDraw as _PILDraw, Image as _PILImage
+    pil_font = _pil_watermark_font()
+    name = (name or "").strip()
+    pid = (str(pid) or "").strip()
+    date_str = (str(date_str) or "").strip()
+    if pil_font and name:
+        parts = [name, pid, date_str]
+    else:
+        parts = [pid, date_str]
+    # Hyphen separator (not "•"): U+2022 isn't in every Noto subset,
+    # so a missing-glyph box pollutes the watermark. " - " always
+    # works and reads naturally.
+    text = "  -  ".join(p for p in parts if p)
+    if not text:
+        return
+    if pil_font is None:
+        # No TTF at all — use PIL default font (ASCII only). Watermark
+        # still has the PID + date for forensic value.
+        from PIL import ImageFont as _PILFont
+        pil_font = _PILFont.load_default()
+    w, h = img.size
+    diag = int((w * w + h * h) ** 0.5) + 100
+    overlay = _PILImage.new("RGBA", (diag, diag), (255, 255, 255, 0))
+    d = _PILDraw.Draw(overlay)
+    try:
+        bb = d.textbbox((0, 0), text, font=pil_font)
+        tw, th = max(1, bb[2] - bb[0]), max(1, bb[3] - bb[1])
+    except Exception:
+        tw, th = 280, 32
+    step_x = tw + 90
+    step_y = th + 110
+    fill = (80, 80, 80, 64)  # ~25% alpha grey
+    row = 0
+    for y in range(0, diag, step_y):
+        x_off = (step_x // 2) if (row % 2) else 0
+        x = -step_x + x_off
+        while x < diag:
+            try:
+                d.text((x, y), text, fill=fill, font=pil_font)
+            except Exception:
+                pass
+            x += step_x
+        row += 1
+    rotated = overlay.rotate(-28, resample=_PILImage.BICUBIC)
+    rx, ry = rotated.size
+    ox = (rx - w) // 2
+    oy = (ry - h) // 2
+    img.alpha_composite(rotated.crop((ox, oy, ox + w, oy + h)))
+
+
+@_wm_functools.lru_cache(maxsize=64)
+def _books_v2_render_page_webp_cached(bid, pid, page_n, date_str, name_norm):
+    """Render the given 1-indexed page as a watermarked WebP. Returns
+    a bytes payload on success, None on out-of-range / missing-source
+    / render failure. Caller is expected to have already verified pid
+    + token. Cache key includes date_str + name_norm so a student
+    rename or a date rollover refreshes the watermark automatically."""
+    raw = _books_v2_load_book_bytes_uncached(int(bid))
+    if not raw:
+        return None
+    try:
+        import pypdfium2 as _pdfium
+        from PIL import Image as _PILImage
+        from io import BytesIO as _BIO
+        pdf = _pdfium.PdfDocument(_BIO(raw))
+        try:
+            n = len(pdf)
+            if page_n < 1 or page_n > n:
+                return None
+            page = pdf[page_n - 1]
+            try:
+                img = page.render(scale=2.0).to_pil().convert("RGBA")
+            finally:
+                try: page.close()
+                except Exception: pass
+        finally:
+            try: pdf.close()
+            except Exception: pass
+        try:
+            _apply_image_watermark(img, name_norm, pid, date_str)
+        except Exception as ex:
+            try: app.logger.warning("image wm failed bid=%s n=%s: %s",
+                                    bid, page_n, ex)
+            except Exception: pass
+        buf = _BIO()
+        # method=2: faster encode (~50% of method=4) for negligible
+        # size cost on photographic-style content like rendered text.
+        img.convert("RGB").save(buf, format="WEBP", quality=85, method=2)
+        return buf.getvalue()
+    except Exception as ex:
+        try: app.logger.warning("page render failed bid=%s n=%s: %s",
+                                bid, page_n, ex)
+        except Exception: pass
+        return None
+
+
 # Minimal iframe wrapper for view-only books. The PDF.js client-side
 # rendering pipeline has been replaced with the browser's native PDF
 # viewer because (a) it handles Arabic shaping correctly out of the
@@ -71264,6 +71497,106 @@ def parent_book_viewer(bid):
                      _json_pv.dumps(title, ensure_ascii=False))
             .replace("__PDF_URL_JSON__",
                      _json_pv.dumps(pdf_url, ensure_ascii=False)))
+
+
+# ── Image-based parent viewer endpoints ──────────────────────────
+# /meta returns book metadata (page count, title, student name) for
+# the custom viewer's UI. /page/<n>.webp returns one rasterized page
+# with the diagonal watermark baked in. Both require the same pid +
+# _vt token that /viewer mints, but verified against the longer
+# _PARENT_VIEWER_IMG_TTL (1 hour) so a reading session doesn't expire
+# mid-book.
+
+@app.route('/parent/book/<int:bid>/meta', methods=['GET'])
+def parent_book_meta(bid):
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if not _books_v2_pid_can_view(db, pid, int(bid)):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try:
+        brow = db.execute(
+            "SELECT title, can_download FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        brow = None
+    if not brow:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    bd = dict(brow)
+    can_dl = int(bd.get("can_download") or 0)
+    if not can_dl:
+        token = (request.args.get('_vt') or '').strip()
+        if not _books_v2_verify_image_token(token, pid, int(bid)):
+            return jsonify({"ok": False, "error":
+                            "هذا الكتاب للعرض داخل القارئ فقط."}), 403
+    try:
+        srow = db.execute(
+            "SELECT COALESCE(student_name,'') AS student_name "
+            "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        srow = None
+    student_name = ""
+    if srow:
+        student_name = (dict(srow).get("student_name") or "").strip()
+    return jsonify({
+        "ok": True,
+        "page_count": _books_v2_page_count_cached(int(bid)),
+        "title": (bd.get("title") or "كتاب").strip(),
+        "student_name": student_name,
+    })
+
+
+@app.route('/parent/book/<int:bid>/page/<int:n>.webp', methods=['GET'])
+def parent_book_page_webp(bid, n):
+    pid = (request.args.get('pid') or '').strip()
+    db = get_db()
+    if not _books_v2_pid_can_view(db, pid, int(bid)):
+        return jsonify({"ok": False, "error": "غير مصرح"}), 403
+    try:
+        brow = db.execute(
+            "SELECT can_download FROM books_v2 WHERE id=? "
+            "AND COALESCE(is_deleted,0)=0", (int(bid),)).fetchone()
+    except Exception:
+        brow = None
+    if not brow:
+        return jsonify({"ok": False, "error": "غير موجود"}), 404
+    can_dl = int(dict(brow).get("can_download") or 0)
+    if not can_dl:
+        token = (request.args.get('_vt') or '').strip()
+        if not _books_v2_verify_image_token(token, pid, int(bid)):
+            return jsonify({"ok": False, "error":
+                            "هذا الكتاب للعرض داخل القارئ فقط."}), 403
+    try:
+        srow = db.execute(
+            "SELECT COALESCE(student_name,'') AS student_name "
+            "FROM students WHERE TRIM(personal_id)=? LIMIT 1",
+            (pid,)).fetchone()
+    except Exception:
+        srow = None
+    student_name = ""
+    if srow:
+        student_name = (dict(srow).get("student_name") or "").strip()
+    date_str = _wm_dt.date.today().isoformat()
+    img_bytes = _books_v2_render_page_webp_cached(
+        int(bid), pid, int(n), date_str, student_name)
+    if img_bytes is None:
+        # Distinguish out-of-range from render failure for the client
+        total = _books_v2_page_count_cached(int(bid))
+        if total and (n < 1 or n > total):
+            return jsonify({"ok": False, "error": "رقم الصفحة غير صحيح"}), 404
+        return jsonify({"ok": False, "error":
+                        "تعذّر تحضير الصفحة. حاول مرة أخرى أو "
+                        "اتصل بالإدارة."}), 500
+    from flask import send_file as _send_pg
+    from io import BytesIO as _BIO_pg
+    resp = _send_pg(_BIO_pg(img_bytes), mimetype="image/webp",
+                    as_attachment=False, conditional=False)
+    try:
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    except Exception: pass
+    return resp
 
 
 @app.route('/parent/book/<int:bid>/view', methods=['GET'])
