@@ -1078,6 +1078,7 @@ def init_db():
         stock INTEGER DEFAULT -1,
         category TEXT DEFAULT '',
         is_active INTEGER DEFAULT 1,
+        image_url TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS redemptions(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5685,6 +5686,7 @@ if True:
                 stock INTEGER DEFAULT -1,
                 category TEXT DEFAULT '',
                 is_active INTEGER DEFAULT 1,
+                image_url TEXT DEFAULT '',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""")
             db2.execute("""CREATE TABLE IF NOT EXISTS redemptions(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7781,6 +7783,26 @@ if True:
         db2.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_student_month "
                     "ON evaluations(student_id, evaluation_month)")
     except Exception: pass
+    db2.commit()
+
+    # ── points_menu_store: additive columns on rewards + redemptions
+    # for the public /parent points-store feature (mockup approved
+    # 2026-05-12). Un-tagged migration block — idempotent via PRAGMA
+    # checks. Each column commit appends one entry to the lists below.
+    # Mirrored in init_db() CREATE TABLE so a fresh DB has the columns
+    # on first boot.
+    try:
+        _rw_cols = {r[1] for r in db2.execute(
+            "PRAGMA table_info(rewards)").fetchall()}
+    except Exception:
+        _rw_cols = set()
+    for _col, _decl in [
+        ("image_url", "TEXT DEFAULT ''"),
+    ]:
+        if _col not in _rw_cols:
+            try: db2.execute("ALTER TABLE rewards ADD COLUMN " +
+                             _col + " " + _decl)
+            except Exception: pass
     db2.commit()
 
     # ── evaluations_send_count_backfill_v1: rows that were sent before
