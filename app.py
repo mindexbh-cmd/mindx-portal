@@ -34642,6 +34642,63 @@ def api_pts_rewards_update(rid):
     return jsonify({"ok": True})
 
 
+@app.route('/api/admin/rewards/upload-image', methods=['POST'])
+@login_required
+def api_admin_rewards_upload_image():
+    """Admin uploads a reward image. Saved to static/rewards/<sha1>.<ext>
+    so the same image isn't stored twice. Validates extension AND magic
+    bytes — extension-only checks are bypassable. Max 2 MB. Returns
+    {ok, image_url} that the caller stores in rewards.image_url."""
+    err = _require_admin_response()
+    if err: return err
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"ok": False, "error": "لم يتم اختيار ملف"}), 400
+    # Read into memory once. Cap at 2 MB + 1 byte so an oversize file
+    # still gets caught (Flask's max_content_length is global and we
+    # don't want to change it for this one endpoint).
+    MAX = 2 * 1024 * 1024
+    blob = f.read(MAX + 1)
+    if len(blob) == 0:
+        return jsonify({"ok": False, "error": "الملف فارغ"}), 400
+    if len(blob) > MAX:
+        return jsonify({"ok": False, "error":
+                        "الملف أكبر من 2 ميجابايت"}), 400
+    # Magic-byte allowlist. Extension is informational only.
+    ext = ""
+    if blob.startswith(b"\xff\xd8\xff"):
+        ext = "jpg"
+    elif blob.startswith(b"\x89PNG\r\n\x1a\n"):
+        ext = "png"
+    elif blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+        ext = "webp"
+    else:
+        return jsonify({"ok": False, "error":
+                        "صيغة غير مدعومة. المسموح: JPG / PNG / WebP"}), 400
+    import hashlib as _hashlib_iu
+    sha = _hashlib_iu.sha1(blob).hexdigest()
+    fname = sha + "." + ext
+    here = os.path.dirname(os.path.abspath(__file__))
+    dest_dir = os.path.join(here, "static", "rewards")
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except Exception: pass
+    dest = os.path.join(dest_dir, fname)
+    if not os.path.isfile(dest):
+        try:
+            with open(dest, "wb") as out:
+                out.write(blob)
+        except Exception as ex:
+            return jsonify({"ok": False, "error":
+                            "تعذّر حفظ الملف على القرص"}), 500
+    return jsonify({
+        "ok":        True,
+        "image_url": "/static/rewards/" + fname,
+        "size":      len(blob),
+        "ext":       ext,
+    })
+
+
 @app.route('/api/points/redemptions', methods=['GET'])
 @login_required
 def api_pts_redemptions_list():
