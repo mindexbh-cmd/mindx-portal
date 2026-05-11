@@ -71151,9 +71151,12 @@ def _books_v2_watermarked_bytes_cached(bid, pid, date_str, name_norm):
     return _books_v2_apply_watermark(raw, name_norm, pid, date_str)
 
 
-# Full HTML page — placeholders are JSON-encoded by the route handler
-# so the substituted values are valid JS string literals (handles
-# Arabic, quotes, backslashes safely without an HTML-escape pass).
+# Minimal iframe wrapper for view-only books. The PDF.js client-side
+# rendering pipeline has been replaced with the browser's native PDF
+# viewer because (a) it handles Arabic shaping correctly out of the
+# box and (b) the deterrent watermark is now embedded server-side, so
+# we no longer need a JS canvas overlay. The iframe is sandboxed via
+# headers set on the /view response (X-Frame-Options: SAMEORIGIN).
 PARENT_PDF_VIEWER_HTML = r"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8">
@@ -71161,299 +71164,42 @@ PARENT_PDF_VIEWER_HTML = r"""<!DOCTYPE html>
 <title>قارئ المنهج — مايندكس</title>
 <style>
 *{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
 body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;
-     background:linear-gradient(135deg,#eef2ff,#fdf2f8 55%,#ecfeff);
-     margin:0;min-height:100vh;direction:rtl;color:#212121;padding:0;}
+     background:#f5f5f7;direction:rtl;color:#212121;
+     display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 .pv-topbar{background:rgba(255,255,255,.95);padding:10px 16px;
            display:flex;justify-content:space-between;align-items:center;
            gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.08);
-           position:sticky;top:0;z-index:50;}
+           flex-shrink:0;}
 .pv-back{color:#4a148c;text-decoration:none;background:#f3e5f5;
          padding:8px 14px;border-radius:9px;font-weight:700;font-size:.85rem;
          white-space:nowrap;}
+.pv-back:hover{background:#e1bee7;}
 .pv-title{font-weight:900;color:#4a148c;font-size:1rem;
           flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;
-          white-space:nowrap;min-width:0;}
-.pv-zoom{display:flex;gap:6px;}
-.pv-zoom button{padding:6px 10px;border:1.5px solid #d8c8ec;background:#fff;
-                border-radius:7px;cursor:pointer;font-size:.85rem;color:#4a148c;
-                font-weight:700;font-family:inherit;}
-.pv-zoom button.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0;}
-.pv-canvas-wrap{padding:18px 12px 90px 12px;display:flex;flex-direction:column;
-                align-items:center;}
-#pv-canvas{max-width:100%;height:auto;display:block;
-           box-shadow:0 8px 32px rgba(74,20,140,.18);border-radius:6px;
-           background:#fff;-webkit-user-select:none;user-select:none;}
-.pv-bottombar{position:fixed;bottom:0;left:0;right:0;
-              background:rgba(255,255,255,.97);backdrop-filter:blur(8px);
-              padding:10px 16px;display:flex;justify-content:center;
-              align-items:center;gap:14px;
-              box-shadow:0 -2px 10px rgba(0,0,0,.08);z-index:50;}
-.pv-bottombar button{padding:9px 18px;
-                     background:linear-gradient(135deg,#6B3FA0,#8B5CC8);
-                     color:#fff;border:none;border-radius:9px;cursor:pointer;
-                     font-weight:700;font-size:.95rem;font-family:inherit;
-                     min-width:110px;min-height:44px;}
-.pv-bottombar button:disabled{opacity:.4;cursor:not-allowed;}
-#pv-page-indicator{font-weight:800;color:#4a148c;font-size:.95rem;}
-.pv-loading{text-align:center;padding:60px 20px;color:#4a148c;
-            font-size:1.1rem;font-weight:700;}
-.pv-error{background:#ffebee;color:#c62828;padding:14px 18px;
-          border-radius:10px;text-align:center;margin:30px auto;
-          max-width:600px;font-weight:700;}
-@media (max-width:540px){
-  .pv-title{font-size:.9rem;}
-  .pv-zoom button{padding:5px 8px;font-size:.78rem;}
-  .pv-bottombar button{padding:9px 14px;font-size:.88rem;min-width:80px;}
-}
-</style></head><body oncontextmenu="return false;">
+          white-space:nowrap;min-width:0;padding:0 10px;}
+.pv-spacer{width:64px;flex-shrink:0;}
+.pv-frame{flex:1;width:100%;border:0;background:#fff;display:block;
+          min-height:0;}
+</style>
+</head><body oncontextmenu="return false;">
 <div class="pv-topbar">
   <a class="pv-back" href="/parent">← رجوع</a>
-  <div class="pv-title" id="pv-title">—</div>
-  <div class="pv-zoom" id="pv-zoom-controls">
-    <button data-zoom="0.75">75%</button>
-    <button data-zoom="1.0" class="active">100%</button>
-    <button data-zoom="1.25">125%</button>
-    <button data-zoom="1.5">150%</button>
-  </div>
-  <button id="pv-fullscreen"
-          style="padding:6px 12px;border:1.5px solid #d8c8ec;
-                 background:#fff;border-radius:7px;cursor:pointer;
-                 font-size:.85rem;color:#4a148c;font-weight:700;
-                 font-family:inherit;margin-right:8px;">
-    ⛶ ملء الشاشة
-  </button>
+  <div class="pv-title" id="pv-title">…</div>
+  <span class="pv-spacer"></span>
 </div>
-<div class="pv-canvas-wrap">
-  <div id="pv-loading" class="pv-loading">جاري تحميل المنهج...</div>
-  <canvas id="pv-canvas" hidden></canvas>
-  <div id="pv-error" class="pv-error" hidden></div>
-</div>
-<div class="pv-bottombar">
-  <button id="pv-prev" disabled>السابق ←</button>
-  <span id="pv-page-indicator">
-    صفحة
-    <input type="number" id="pv-page-input"
-           min="1" value="1"
-           style="width:60px;padding:4px 6px;border:1.5px solid #d8c8ec;
-                  border-radius:6px;font-weight:800;color:#4a148c;
-                  text-align:center;font-family:inherit;font-size:.95rem;">
-    من <span id="pv-page-total">0</span>
-  </span>
-  <button id="pv-next" disabled>→ التالي</button>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<iframe class="pv-frame" id="pv-frame" src="" title="قارئ PDF"
+        oncontextmenu="return false;"></iframe>
 <script>
 (function(){
-  var BOOK_TITLE   = __BOOK_TITLE_JSON__;
-  var STUDENT_NAME = __STUDENT_NAME_JSON__;
-  var STUDENT_PID  = __STUDENT_PID_JSON__;
-  var PDF_URL      = __PDF_URL_JSON__;
-  var WATERMARK    = STUDENT_NAME + ' • ' + STUDENT_PID;
-
-  document.getElementById('pv-title').textContent =
-      BOOK_TITLE.length > 50 ? (BOOK_TITLE.slice(0,50) + '…') : BOOK_TITLE;
-
-  if (window['pdfjsLib']) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-  }
-
-  var canvas    = document.getElementById('pv-canvas');
-  var ctx       = canvas.getContext('2d');
-  var loadingEl = document.getElementById('pv-loading');
-  var errorEl   = document.getElementById('pv-error');
-  var indicator = document.getElementById('pv-page-indicator');
-  var pageInput = document.getElementById('pv-page-input');
-  var pageTotal = document.getElementById('pv-page-total');
-  var prevBtn   = document.getElementById('pv-prev');
-  var nextBtn   = document.getElementById('pv-next');
-  var zoomCtrls = document.getElementById('pv-zoom-controls');
-  var fsBtn     = document.getElementById('pv-fullscreen');
-  var canvasWrap = document.querySelector('.pv-canvas-wrap');
-
-  var pdfDoc = null;
-  var currentPage = 1;
-  var totalPages = 0;
-  var currentScale = 1.0;
-  var rendering = false;
-  var pendingPage = null;
-
-  function showError(msg){
-    loadingEl.hidden = true;
-    canvas.hidden = true;
-    errorEl.textContent = msg;
-    errorEl.hidden = false;
-  }
-
-  function paintWatermark(c, w, h){
-    c.save();
-    c.fillStyle = 'rgba(150, 150, 150, 0.18)';
-    c.font = 'bold 22px Arial';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.translate(w/2, h/2);
-    c.rotate(-Math.PI / 4);
-    var stepY = 250, stepX = 350;
-    var span = Math.max(w, h) * 1.5;
-    for (var y = -span; y < span; y += stepY) {
-      for (var x = -span; x < span; x += stepX) {
-        c.fillText(WATERMARK, x, y);
-      }
-    }
-    c.restore();
-  }
-
-  function renderPage(num){
-    if (!pdfDoc) return;
-    if (rendering) { pendingPage = num; return; }
-    rendering = true;
-    var dpr = (window.devicePixelRatio || 1);
-    pdfDoc.getPage(num).then(function(page){
-      var viewport = page.getViewport({scale: currentScale * dpr});
-      canvas.width  = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.width  = (viewport.width  / dpr) + 'px';
-      canvas.style.height = (viewport.height / dpr) + 'px';
-      var task = page.render({canvasContext: ctx, viewport: viewport});
-      return task.promise.then(function(){
-        paintWatermark(ctx, canvas.width, canvas.height);
-        loadingEl.hidden = true;
-        canvas.hidden = false;
-        rendering = false;
-        if (pendingPage !== null) {
-          var p = pendingPage; pendingPage = null;
-          renderPage(p);
-        }
-      });
-    }).catch(function(){
-      rendering = false;
-      showError('تعذّر عرض الصفحة. حاولي إعادة فتح المنهج.');
-    });
-    pageInput.value = num;
-    pageInput.max = totalPages;
-    pageTotal.textContent = totalPages;
-    prevBtn.disabled = (num <= 1);
-    nextBtn.disabled = (num >= totalPages);
-  }
-
-  prevBtn.addEventListener('click', function(){
-    if (currentPage > 1){ currentPage--; renderPage(currentPage); }
-  });
-  nextBtn.addEventListener('click', function(){
-    if (currentPage < totalPages){ currentPage++; renderPage(currentPage); }
-  });
-  zoomCtrls.addEventListener('click', function(ev){
-    var b = ev.target;
-    if (b && b.tagName === 'BUTTON' && b.dataset.zoom){
-      currentScale = parseFloat(b.dataset.zoom);
-      Array.prototype.forEach.call(
-        zoomCtrls.querySelectorAll('button'),
-        function(x){ x.classList.toggle('active', x === b); });
-      renderPage(currentPage);
-    }
-  });
-
-  // Page-jump input: type a number → Enter or blur jumps the viewer.
-  function jumpToPage(){
-    var n = parseInt(pageInput.value, 10);
-    if (isNaN(n) || n < 1) n = 1;
-    if (n > totalPages) n = totalPages;
-    pageInput.value = n;
-    if (n !== currentPage){
-      currentPage = n;
-      renderPage(currentPage);
-    }
-  }
-  pageInput.addEventListener('change', jumpToPage);
-  pageInput.addEventListener('keydown', function(ev){
-    if (ev.key === 'Enter'){
-      ev.preventDefault();
-      jumpToPage();
-      pageInput.blur();
-    }
-  });
-
-  // Vertical-swipe gestures on the canvas area: up = next, down = prev.
-  // Horizontal drift > tolerance disqualifies the swipe so the user
-  // can still tap or drag-select without flipping a page.
-  var touchStartY = 0;
-  var touchStartX = 0;
-  var SWIPE_THRESHOLD = 60;
-  var SWIPE_HORIZ_TOLERANCE = 40;
-  canvasWrap.addEventListener('touchstart', function(ev){
-    var t = ev.changedTouches[0];
-    touchStartY = t.screenY;
-    touchStartX = t.screenX;
-  }, {passive: true});
-  canvasWrap.addEventListener('touchend', function(ev){
-    var t = ev.changedTouches[0];
-    var dy = t.screenY - touchStartY;
-    var dx = Math.abs(t.screenX - touchStartX);
-    if (Math.abs(dy) >= SWIPE_THRESHOLD && dx <= SWIPE_HORIZ_TOLERANCE){
-      if (dy < 0 && currentPage < totalPages){
-        currentPage++;
-        renderPage(currentPage);
-      } else if (dy > 0 && currentPage > 1){
-        currentPage--;
-        renderPage(currentPage);
-      }
-    }
-  }, {passive: true});
-
-  // Fullscreen toggle (vendor-prefix fallbacks for older Safari/iOS).
-  function toggleFullscreen(){
-    var el = document.documentElement;
-    var isFs = !!(document.fullscreenElement
-                  || document.webkitFullscreenElement);
-    if (!isFs){
-      var req = el.requestFullscreen || el.webkitRequestFullscreen
-                || el.mozRequestFullScreen || el.msRequestFullscreen;
-      if (req) req.call(el);
-    } else {
-      var exit = document.exitFullscreen || document.webkitExitFullscreen
-                 || document.mozCancelFullScreen || document.msExitFullscreen;
-      if (exit) exit.call(document);
-    }
-  }
-  fsBtn.addEventListener('click', toggleFullscreen);
-  document.addEventListener('fullscreenchange', function(){
-    var isFs = !!document.fullscreenElement;
-    fsBtn.textContent = isFs ? '⛶ خروج' : '⛶ ملء الشاشة';
-  });
-  document.addEventListener('webkitfullscreenchange', function(){
-    var isFs = !!document.webkitFullscreenElement;
-    fsBtn.textContent = isFs ? '⛶ خروج' : '⛶ ملء الشاشة';
-  });
-
-  canvas.addEventListener('contextmenu', function(ev){
-    ev.preventDefault(); ev.stopPropagation(); return false;
-  });
-  window.addEventListener('keydown', function(ev){
-    if (ev.ctrlKey || ev.metaKey){
-      var k = (ev.key || '').toLowerCase();
-      if (k === 's' || k === 'p' || k === 'a'){
-        ev.preventDefault();
-        ev.stopPropagation();
-        return false;
-      }
-    }
-  });
-
-  if (!window['pdfjsLib']){
-    showError('تعذّر تحميل قارئ PDF. تحقّقي من الاتصال بالإنترنت.');
-    return;
-  }
-
-  pdfjsLib.getDocument(PDF_URL).promise.then(function(pdf){
-    pdfDoc = pdf;
-    totalPages = pdf.numPages;
-    pageInput.max = totalPages;
-    pageTotal.textContent = totalPages;
-    renderPage(1);
-  }).catch(function(){
-    showError('تعذّر تحميل المنهج. قد تكون الجلسة منتهية — أعيدي الفتح من صفحة المناهج.');
-  });
+  var BOOK_TITLE = __BOOK_TITLE_JSON__;
+  var PDF_URL    = __PDF_URL_JSON__;
+  try {
+    document.title = BOOK_TITLE + ' — مايندكس';
+    document.getElementById('pv-title').textContent = BOOK_TITLE;
+  } catch(e) {}
+  document.getElementById('pv-frame').src = PDF_URL;
 })();
 </script>
 </body></html>"""
@@ -71502,13 +71248,11 @@ def parent_book_viewer(bid):
     pdf_url = ('/parent/book/' + str(int(bid)) +
                '/view?pid=' + _up_pv2.quote(pid) +
                '&_vt=' + _up_pv2.quote(token))
+    # student_name is loaded above purely for the 403-on-missing-row
+    # check; the watermark itself is now embedded server-side in /view.
     return (PARENT_PDF_VIEWER_HTML
             .replace("__BOOK_TITLE_JSON__",
                      _json_pv.dumps(title, ensure_ascii=False))
-            .replace("__STUDENT_NAME_JSON__",
-                     _json_pv.dumps(student_name, ensure_ascii=False))
-            .replace("__STUDENT_PID_JSON__",
-                     _json_pv.dumps(pid, ensure_ascii=False))
             .replace("__PDF_URL_JSON__",
                      _json_pv.dumps(pdf_url, ensure_ascii=False)))
 
