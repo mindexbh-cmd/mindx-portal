@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mindex — معاينة نظام المهام والأداء (Phase 3a mockup)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f6f0fa;color:#222;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 22px 60px}
+  .divider{margin:50px 0;padding:18px 22px;background:linear-gradient(135deg,#4a148c,#6B3FA0);color:#fff;border-radius:14px;text-align:center;box-shadow:0 6px 20px rgba(74,20,140,.25)}
+  .divider h2{margin:0;font-size:20px}
+  .divider small{display:block;margin-top:6px;opacity:.85;font-size:13px}
+  .view{background:#fff;border-radius:14px;padding:24px;box-shadow:0 4px 18px rgba(74,20,140,.08);border:1px solid #e8d8f3}
+  .view h3{margin:0 0 18px;color:#4a148c;font-size:18px;border-bottom:2px solid #f3e5f5;padding-bottom:8px}
+
+  /* ───── Status + priority pills (shared) ───── */
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:14px;font-size:12px;font-weight:700;border:1px solid;line-height:1.4}
+  .pill-pri-critical{background:#FFEBEE;color:#c62828;border-color:#ef9a9a}
+  .pill-pri-urgent{background:#fff3e0;color:#E65100;border-color:#ffcc80}
+  .pill-pri-normal{background:#e3f2fd;color:#0277bd;border-color:#90caf9}
+  .pill-pri-low{background:#eeeeee;color:#616161;border-color:#bdbdbd}
+  .pill-st-new{background:#f3e5f5;color:#4a148c;border-color:#c4a8e8}
+  .pill-st-in_progress{background:#fff8e1;color:#FB8C00;border-color:#ffcc80}
+  .pill-st-completed{background:#E8F5E9;color:#1B5E20;border-color:#a5d6a7}
+  .pill-st-cancelled{background:#eeeeee;color:#9e9e9e;border-color:#bdbdbd}
+  .tag{display:inline-block;padding:2px 8px;background:#faf6fd;border:1px solid #e8d8f3;border-radius:8px;font-size:11px;color:#4a148c;margin-left:4px}
+
+  /* ───── Buttons (shared) ───── */
+  .btn{padding:11px 22px;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px}
+  .btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;box-shadow:0 4px 12px rgba(107,63,160,.3)}
+  .btn-sec{background:#f3e5f5;color:#4a148c;border:1px solid #c4a8e8}
+  .btn-edit{background:#fff8e1;color:#FB8C00;border:1px solid #ffcc80;padding:6px 10px;font-size:12px;border-radius:8px}
+  .btn-danger{background:#FFEBEE;color:#c62828;border:1px solid #ef9a9a;padding:6px 10px;font-size:12px;border-radius:8px}
+
+  /* ───── Filter bar (V1) ───── */
+  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 14px;background:#faf6fd;border:1px dashed #c4a8e8;border-radius:10px;margin-bottom:14px}
+  .filters label{font-size:13px;color:#4a148c;font-weight:600;display:flex;align-items:center;gap:6px}
+  .filters input,.filters select{padding:8px 10px;border:1px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff}
+
+  /* ───── Table (V1) ───── */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:#f3e5f5;color:#4a148c;padding:11px 9px;text-align:right;font-weight:700;border-bottom:2px solid #c4a8e8}
+  tbody td{padding:10px 9px;border-bottom:1px solid #eee;vertical-align:top}
+  tbody tr:hover{background:#faf6fd}
+  .overdue{color:#c62828;font-weight:700}
+  .dept-cell{display:inline-flex;align-items:center;gap:4px}
+
+  /* ───── Stat cards (V4 personal, V6 admin) ───── */
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .stat{padding:18px;border-radius:12px;border:1px solid;text-align:center;background:#fff}
+  .stat .lbl{font-size:13px;font-weight:600;margin-bottom:6px}
+  .stat .num{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1}
+  .stat .sub{font-size:11px;color:#888;margin-top:4px}
+  .stat-purple{background:#f3e5f5;border-color:#c4a8e8}
+  .stat-purple .lbl,.stat-purple .num{color:#4a148c}
+  .stat-green{background:#E8F5E9;border-color:#a5d6a7}
+  .stat-green .lbl,.stat-green .num{color:#1B5E20}
+  .stat-amber{background:#fff8e1;border-color:#ffcc80}
+  .stat-amber .lbl,.stat-amber .num{color:#E65100}
+  .stat-red{background:#FFEBEE;border-color:#ef9a9a}
+  .stat-red .lbl,.stat-red .num{color:#c62828}
+  .stat-blue{background:#e3f2fd;border-color:#90caf9}
+  .stat-blue .lbl,.stat-blue .num{color:#0277bd}
+
+  /* ───── Panels (V4 V5 V6) ───── */
+  .panel{background:#fafafa;border:1px solid #e8d8f3;border-radius:12px;padding:16px;margin-bottom:14px}
+  .panel h4{margin:0 0 12px;color:#4a148c;font-size:15px}
+  .midrow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+
+  /* ───── Badges grid (V4) ───── */
+  .badges-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .badge-tile{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border:1px solid #c4a8e8;border-radius:10px}
+  .badge-tile .icon{font-size:24px}
+  .badge-tile .name{font-size:13px;color:#4a148c;font-weight:600;flex:1;margin:0 10px}
+  .badge-tile .count{font-size:18px;font-weight:700;color:#6B3FA0}
+  .badge-tile.zero{opacity:.4}
+
+  /* ───── Top performers (V5) ───── */
+  .podium{display:flex;justify-content:center;align-items:flex-end;gap:14px;margin:30px 0}
+  .podium-pos{flex:1;max-width:200px;background:linear-gradient(135deg,#fff,#faf6fd);border:1px solid #c4a8e8;border-radius:14px;padding:18px;text-align:center}
+  .podium-pos.gold{border-color:#FFC107;background:linear-gradient(135deg,#fff8e1,#fff);transform:translateY(-12px)}
+  .podium-pos.silver{border-color:#BDBDBD;background:linear-gradient(135deg,#f5f5f5,#fff)}
+  .podium-pos.bronze{border-color:#FF9800;background:linear-gradient(135deg,#fff3e0,#fff)}
+  .podium-pos .medal{font-size:36px;margin-bottom:6px}
+  .podium-pos .name{font-weight:700;color:#4a148c;font-size:14px;margin-bottom:4px}
+  .podium-pos .count{font-size:24px;font-weight:700;color:#6B3FA0}
+  .podium-pos .count-lbl{font-size:11px;color:#888;margin-top:2px}
+  .motivation-card{background:linear-gradient(135deg,#4a148c,#8B5CC8);color:#fff;padding:22px;border-radius:14px;text-align:center;margin-top:20px;font-size:16px;font-weight:600}
+
+  /* ───── Comments (V2) ───── */
+  .comment{padding:12px 14px;background:#faf6fd;border-right:3px solid #c4a8e8;border-radius:8px;margin-bottom:10px}
+  .comment.mine{background:#f3e5f5;border-color:#6B3FA0}
+  .comment .meta{font-size:11px;color:#888;margin-bottom:4px}
+  .comment .meta b{color:#4a148c}
+  .comment .body{font-size:13px;color:#222;line-height:1.55}
+  .comment-form{display:flex;gap:8px;margin-top:12px}
+  .comment-form textarea{flex:1;padding:8px 12px;border:1px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;min-height:50px}
+
+  /* ───── Attachments (V2) ───── */
+  .attachments{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .attach-card{padding:10px;background:#fff;border:1px solid #c4a8e8;border-radius:10px;display:flex;align-items:center;gap:10px}
+  .attach-card .icon{font-size:28px}
+  .attach-card .meta{flex:1;font-size:12px}
+  .attach-card .meta b{display:block;color:#4a148c}
+  .attach-card .meta small{color:#888}
+
+  /* ───── Stars rating (V2 V7) ───── */
+  .stars{display:inline-flex;gap:2px;font-size:24px;color:#FFC107}
+  .stars .off{color:#e0e0e0}
+
+  /* ───── Form (V3 V7) ───── */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1 / -1}
+  .field label{font-size:13px;color:#4a148c;font-weight:600}
+  .field input,.field textarea,.field select{padding:9px 11px;border:1px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff}
+  .field textarea{min-height:64px;resize:vertical}
+  .pri-pills{display:flex;gap:6px;flex-wrap:wrap}
+  .pri-pill{padding:7px 12px;border-radius:18px;border:1.5px solid #c4a8e8;font-size:12px;color:#4a148c;font-weight:600;cursor:pointer;background:#fff}
+  .pri-pill.active.critical{background:#c62828;color:#fff;border-color:#c62828}
+  .pri-pill.active.urgent{background:#FB8C00;color:#fff;border-color:#FB8C00}
+  .pri-pill.active.normal{background:#0277bd;color:#fff;border-color:#0277bd}
+  .pri-pill.active.low{background:#616161;color:#fff;border-color:#616161}
+
+  /* ───── Modal (V3 V7) ───── */
+  .modal-backdrop{position:relative;background:rgba(74,20,140,.5);padding:30px 20px;border-radius:14px}
+  .modal-box{background:#fff;border-radius:14px;padding:24px;max-width:700px;margin:0 auto;box-shadow:0 10px 40px rgba(74,20,140,.4)}
+  .modal-box h4{margin:0 0 18px;color:#4a148c;font-size:17px;display:flex;justify-content:space-between;align-items:center}
+  .modal-box h4 .x{background:#f3e5f5;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#4a148c;font-weight:700}
+  .modal-footer{margin-top:22px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #f3e5f5;padding-top:16px}
+  .hint{font-size:11px;color:#888;margin-top:2px}
+
+  /* ───── Strength badges selector (V7) ───── */
+  .strength-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .strength-pill{padding:10px;background:#fff;border:2px solid #c4a8e8;border-radius:10px;text-align:center;cursor:pointer;font-size:12px;color:#4a148c;font-weight:600}
+  .strength-pill .icon{font-size:22px;display:block;margin-bottom:4px}
+  .strength-pill.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:#6B3FA0}
+
+  /* ───── Points preview (V7) ───── */
+  .points-preview{padding:14px;background:linear-gradient(135deg,#fff8e1,#fff3e0);border:1px solid #ffcc80;border-radius:10px;margin-top:14px}
+  .points-preview h5{margin:0 0 8px;color:#E65100;font-size:14px}
+  .points-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;color:#666}
+  .points-row b{color:#E65100;font-weight:700;direction:ltr;display:inline-block}
+  .points-total{margin-top:8px;padding-top:8px;border-top:1px dashed #ffcc80;font-weight:800;color:#E65100;font-size:16px;display:flex;justify-content:space-between}
+
+  /* ───── Admin dashboard table (V6) ───── */
+  .employee-table{margin-bottom:18px}
+  .employee-table .progress{width:80px;height:10px;background:#f3e5f5;border-radius:5px;display:inline-block;position:relative;overflow:hidden}
+  .employee-table .progress-fill{position:absolute;top:0;right:0;height:100%;background:linear-gradient(90deg,#1B5E20,#4CAF50);border-radius:5px}
+  .mini-badges{display:inline-flex;gap:3px}
+  .mini-badges .mb{padding:2px 6px;background:#f3e5f5;border-radius:6px;font-size:10px;color:#4a148c}
+
+  /* ───── 6-month trend (V6) ───── */
+  .trend{display:flex;align-items:flex-end;justify-content:space-around;height:160px;gap:8px;padding:0 8px;border-bottom:2px solid #c4a8e8;margin-bottom:6px}
+  .trend .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .trend .bar .pair{display:flex;gap:2px;align-items:flex-end;height:130px}
+  .trend .bar .b{width:14px;border-radius:3px 3px 0 0}
+  .trend .bar .b.created{background:linear-gradient(0deg,#6B3FA0,#8B5CC8)}
+  .trend .bar .b.completed{background:linear-gradient(0deg,#1B5E20,#4CAF50)}
+  .trend .bar .lbl{font-size:10px;color:#666;font-weight:600}
+  .trend-legend{display:flex;gap:14px;justify-content:center;font-size:11px;margin-top:6px;color:#666}
+  .trend-legend span{display:inline-flex;align-items:center;gap:4px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+  /* ───── Recurring templates section ───── */
+  .freq-pill{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid}
+  .freq-daily{background:#fff8e1;color:#FB8C00;border-color:#ffcc80}
+  .freq-weekly{background:#e3f2fd;color:#0277bd;border-color:#90caf9}
+  .freq-monthly{background:#f3e5f5;color:#4a148c;border-color:#c4a8e8}
+
+  @media (max-width:760px){
+    .stat-row,.midrow,.form-grid{grid-template-columns:1fr 1fr}
+    .badges-grid,.strength-grid{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:520px){
+    .stat-row,.midrow,.form-grid{grid-template-columns:1fr}
+    .podium{flex-direction:column}
+    .podium-pos.gold{transform:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="divider">
+    <h2>📋 معاينة نظام المهام والأداء — Phase 3a Mockup</h2>
+    <small>7 شاشات: قائمة المهام | تفاصيل المهمة | إضافة مهمة | لوحة الموظف | لوحة الفريق | لوحة المدير | تقييم المهمة</small>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 1 — Task list (admin's view)
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>📋 View 1 — قائمة المهام (عرض المدير)</h2></div>
+  <section class="view">
+    <h3>📋 المهام النشطة</h3>
+
+    <div class="filters">
+      <label>الحالة
+        <select>
+          <option>الكل</option>
+          <option>جديدة</option>
+          <option>قيد التنفيذ</option>
+          <option>منجزة</option>
+          <option>ملغية</option>
+        </select>
+      </label>
+      <label>الأولوية
+        <select>
+          <option>الكل</option>
+          <option>عاجلة جدًا</option>
+          <option>عاجلة</option>
+          <option>عادية</option>
+          <option>منخفضة</option>
+        </select>
+      </label>
+      <label>القسم
+        <select>
+          <option>الكل</option>
+          <option>الإدارة</option>
+          <option>قسم الفعاليات</option>
+          <option>قسم شؤون الطلاب</option>
+        </select>
+      </label>
+      <label>المُسند إلى
+        <select>
+          <option>الكل</option>
+          <option>رائد</option>
+          <option>زهراء</option>
+          <option>كوثر</option>
+        </select>
+      </label>
+      <label>من تاريخ <input type="date" value="2026-05-01"></label>
+      <label>إلى تاريخ <input type="date" value="2026-05-30"></label>
+      <button class="btn btn-sec">🔍 تصفية</button>
+      <button class="btn btn-pri">+ مهمة جديدة</button>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>العنوان</th>
+        <th>القسم</th>
+        <th>المُسند</th>
+        <th>الأولوية</th>
+        <th>الحالة</th>
+        <th>الموعد</th>
+        <th>الإجراءات</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <b>تنظيف القاعة 2 قبل فعالية الأسبوع</b>
+            <div><span class="tag">فعالية</span><span class="tag">تنظيف</span></div>
+          </td>
+          <td><span class="dept-cell">🎉 الفعاليات</span></td>
+          <td>👤 رائد</td>
+          <td><span class="pill pill-pri-urgent">⚡ عاجلة</span></td>
+          <td><span class="pill pill-st-in_progress">⏳ قيد التنفيذ</span></td>
+          <td>2026-05-18</td>
+          <td>
+            <button class="btn-edit">📝 عرض</button>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>إعداد تقرير شهري للأدمن</b>
+            <div><span class="tag">تقارير</span></div>
+          </td>
+          <td><span class="dept-cell">👔 الإدارة</span></td>
+          <td>👤 زهراء</td>
+          <td><span class="pill pill-pri-normal">📌 عادية</span></td>
+          <td><span class="pill pill-st-new">🆕 جديدة</span></td>
+          <td class="overdue">2026-05-10 ⚠️</td>
+          <td><button class="btn-edit">📝 عرض</button></td>
+        </tr>
+        <tr>
+          <td>
+            <b>تنسيق ورشة التدريب</b>
+            <div><span class="tag">تدريب</span><span class="tag">ورشة</span></div>
+          </td>
+          <td><span class="dept-cell">📚 المناهج</span></td>
+          <td>👤 كوثر</td>
+          <td><span class="pill pill-pri-critical">🔥 عاجلة جدًا</span></td>
+          <td><span class="pill pill-st-new">🆕 جديدة</span></td>
+          <td>2026-05-20</td>
+          <td><button class="btn-edit">📝 عرض</button></td>
+        </tr>
+        <tr>
+          <td><b>مراجعة لوحة الحضور</b></td>
+          <td><span class="dept-cell">👨‍🎓 شؤون الطلاب</span></td>
+          <td>👤 أحمد</td>
+          <td><span class="pill pill-pri-low">🌙 منخفضة</span></td>
+          <td><span class="pill pill-st-completed">✅ منجزة</span></td>
+          <td>2026-05-08</td>
+          <td><button class="btn-edit">📝 عرض</button></td>
+        </tr>
+        <tr>
+          <td><b>طباعة شهادات الشهر</b></td>
+          <td><span class="dept-cell">📷 الإعلام</span></td>
+          <td>👤 رائد</td>
+          <td><span class="pill pill-pri-normal">📌 عادية</span></td>
+          <td><span class="pill pill-st-cancelled">❌ ملغية</span></td>
+          <td>—</td>
+          <td><button class="btn-edit">📝 عرض</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:14px;font-size:12px;color:#666;text-align:left">صفحة 1 من 4 — إجمالي 28 مهمة</div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 2 — Task detail (with comments + attachments + evaluation)
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>📄 View 2 — تفاصيل المهمة</h2></div>
+  <section class="view">
+    <h3>📋 تنظيف القاعة 2 قبل فعالية الأسبوع</h3>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px">
+      <!-- LEFT: Description + Comments + Attachments -->
+      <div>
+        <div class="panel">
+          <h4>📝 الوصف</h4>
+          <p style="margin:0;font-size:13px;line-height:1.7">تجهيز القاعة 2 بالكامل قبل فعالية يوم السبت: ترتيب الكراسي، تنظيف السبورة، تجهيز جهاز العرض، التأكد من وجود مياه ومرطبات للضيوف.</p>
+        </div>
+
+        <div class="panel">
+          <h4>💬 التعليقات (3)</h4>
+          <div class="comment">
+            <div class="meta">👤 <b>المدير</b> — قبل ساعتين</div>
+            <div class="body">يا رائد، تأكد من إحضار 30 كرسي على الأقل والتنسيق مع كوثر لتجهيز الضيافة.</div>
+          </div>
+          <div class="comment mine">
+            <div class="meta">👤 <b>رائد</b> — قبل ساعة</div>
+            <div class="body">تم البدء بتجهيز الكراسي والسبورة. سأنسق مع كوثر بخصوص الضيافة الآن.</div>
+          </div>
+          <div class="comment">
+            <div class="meta">👤 <b>كوثر</b> — قبل 30 دقيقة</div>
+            <div class="body">تم تجهيز الضيافة. هل أنزل العصائر إلى القاعة الآن أم قبل بدء الفعالية؟</div>
+          </div>
+          <div class="comment-form">
+            <textarea placeholder="أضف تعليقاً..."></textarea>
+            <button class="btn btn-pri" style="padding:10px 18px">💬 إرسال</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>📎 المرفقات (2)</h4>
+          <div class="attachments">
+            <div class="attach-card">
+              <div class="icon">🖼️</div>
+              <div class="meta">
+                <b>قاعة-2-قبل.png</b>
+                <small>صورة قبل التجهيز — 124 KB</small>
+              </div>
+            </div>
+            <div class="attach-card">
+              <div class="icon">📄</div>
+              <div class="meta">
+                <b>قائمة-المتطلبات.pdf</b>
+                <small>قائمة المتطلبات — 38 KB</small>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-sec" style="margin-top:10px">📎 إرفاق ملف</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Meta panel -->
+      <div>
+        <div class="panel">
+          <h4>🏷️ معلومات المهمة</h4>
+          <div style="font-size:13px;line-height:1.9">
+            <div><b>الحالة:</b> <span class="pill pill-st-in_progress">⏳ قيد التنفيذ</span></div>
+            <div><b>الأولوية:</b> <span class="pill pill-pri-urgent">⚡ عاجلة</span></div>
+            <div><b>القسم:</b> 🎉 قسم الفعاليات</div>
+            <div><b>المُسند:</b> 👤 رائد</div>
+            <div><b>المنشئ:</b> 👤 المدير</div>
+            <div><b>تاريخ التسليم:</b> 2026-05-18</div>
+            <div><b>المدة المتوقعة:</b> 2.5 ساعة</div>
+            <div><b>الوسوم:</b><br>
+              <span class="tag">فعالية</span>
+              <span class="tag">تنظيف</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>⏱️ الجدول الزمني</h4>
+          <div style="font-size:12px;color:#666;line-height:1.9">
+            <div>🆕 أُنشئت: 2026-05-10 10:23</div>
+            <div>▶️ بدأ التنفيذ: 2026-05-12 07:30</div>
+            <div>✅ مُنجزة: —</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>⚡ الإجراءات</h4>
+          <button class="btn btn-sec" style="display:block;width:100%;margin-bottom:8px">✏️ تعديل المهمة</button>
+          <button class="btn btn-pri" style="display:block;width:100%;margin-bottom:8px;background:linear-gradient(135deg,#1B5E20,#4CAF50)">✅ إنجاز المهمة</button>
+          <button class="btn btn-danger" style="display:block;width:100%;padding:11px">❌ إلغاء المهمة</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 3 — Add/Edit task modal
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>➕ View 3 — نموذج إضافة/تعديل مهمة</h2></div>
+  <div class="modal-backdrop">
+    <div class="modal-box">
+      <h4>
+        <span>+ إضافة مهمة جديدة</span>
+        <span class="x">✕</span>
+      </h4>
+
+      <div class="form-grid">
+        <div class="field full">
+          <label>عنوان المهمة *</label>
+          <input value="تنظيف القاعة 2 قبل فعالية الأسبوع">
+          <small class="hint">حد أقصى 200 حرف</small>
+        </div>
+        <div class="field full">
+          <label>الوصف</label>
+          <textarea>تجهيز القاعة 2 بالكامل قبل فعالية يوم السبت...</textarea>
+        </div>
+
+        <div class="field">
+          <label>القسم *</label>
+          <select>
+            <option>الإدارة</option>
+            <option>قسم المناهج والامتحانات</option>
+            <option>قسم الجودة</option>
+            <option>قسم الإعلام</option>
+            <option>قسم الأفكار والتحفيز</option>
+            <option selected>قسم الفعاليات</option>
+            <option>قسم شؤون الطلاب</option>
+            <option>قسم شؤون الاستقبال</option>
+            <option>قسم شؤون المقر</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>المُسند إلى *</label>
+          <select>
+            <option>— اختر موظفًا —</option>
+            <option selected>رائد</option>
+            <option>زهراء</option>
+            <option>كوثر</option>
+            <option>أحمد</option>
+          </select>
+          <small class="hint">فقط الموظفون المؤهلون لتلقي المهام</small>
+        </div>
+
+        <div class="field full">
+          <label>الأولوية *</label>
+          <div class="pri-pills">
+            <span class="pri-pill">🔥 عاجلة جدًا</span>
+            <span class="pri-pill active urgent">⚡ عاجلة</span>
+            <span class="pri-pill">📌 عادية</span>
+            <span class="pri-pill">🌙 منخفضة</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>تاريخ التسليم *</label>
+          <input type="date" value="2026-05-18">
+          <small class="hint">لا يمكن أن يكون في الماضي</small>
+        </div>
+        <div class="field">
+          <label>المدة المتوقعة (ساعات) *</label>
+          <input type="number" min="0.5" step="0.5" value="2.5">
+        </div>
+
+        <div class="field full">
+          <label>الوسوم (اختياري)</label>
+          <input value="فعالية, تنظيف">
+          <small class="hint">حد أقصى 10 وسوم، مفصولة بفاصلة</small>
+        </div>
+
+        <div class="field full">
+          <label>المرفقات (اختياري)</label>
+          <div style="padding:18px;border:2px dashed #c4a8e8;border-radius:10px;text-align:center;background:#faf6fd;color:#4a148c;font-size:13px;cursor:pointer">
+            <strong style="display:block;margin-bottom:4px">📎 اسحب الملفات هنا أو انقر للاختيار</strong>
+            <small style="color:#888">JPG / PNG / WebP / PDF / Word / Excel — الحد الأقصى 5 ميجابايت</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-sec">إلغاء</button>
+        <button class="btn btn-pri">💾 حفظ المهمة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 4 — Personal dashboard
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>👤 View 4 — لوحة الموظف الشخصية</h2></div>
+  <section class="view">
+    <h3>👤 لوحة رائد — مرحبا بك!</h3>
+
+    <div class="stat-row">
+      <div class="stat stat-purple">
+        <div class="lbl">إجمالي مهامي</div>
+        <div class="num">28</div>
+        <div class="sub">في كل الحالات</div>
+      </div>
+      <div class="stat stat-amber">
+        <div class="lbl">قيد التنفيذ</div>
+        <div class="num">4</div>
+        <div class="sub">+1 جديدة</div>
+      </div>
+      <div class="stat stat-red">
+        <div class="lbl">متأخرة</div>
+        <div class="num">2</div>
+        <div class="sub">⚠️ تحتاج إجراء</div>
+      </div>
+      <div class="stat stat-green">
+        <div class="lbl">منجزة هذا الشهر</div>
+        <div class="num">12</div>
+        <div class="sub">رائع! 💪</div>
+      </div>
+    </div>
+
+    <div class="midrow">
+      <div class="panel">
+        <h4>📋 مهامي الحالية (5 من 7)</h4>
+        <table style="font-size:12px">
+          <tbody>
+            <tr><td><b>تنظيف القاعة 2</b><br><small style="color:#888">تسليم: 2026-05-18</small></td>
+              <td><span class="pill pill-pri-urgent">⚡</span></td>
+              <td><span class="pill pill-st-in_progress">⏳</span></td></tr>
+            <tr><td><b>طباعة شهادات الشهر</b><br><small style="color:#888">تسليم: 2026-05-20</small></td>
+              <td><span class="pill pill-pri-normal">📌</span></td>
+              <td><span class="pill pill-st-new">🆕</span></td></tr>
+            <tr><td><b>مراجعة قائمة الأدوات</b><br><small style="color:#888">تسليم: 2026-05-22</small></td>
+              <td><span class="pill pill-pri-low">🌙</span></td>
+              <td><span class="pill pill-st-new">🆕</span></td></tr>
+            <tr><td><b>تحديث صيانة الميكروفون</b><br><small class="overdue">⚠️ متأخرة! تسليم: 2026-05-10</small></td>
+              <td><span class="pill pill-pri-urgent">⚡</span></td>
+              <td><span class="pill pill-st-in_progress">⏳</span></td></tr>
+            <tr><td><b>تنسيق رحلة المتحف</b><br><small style="color:#888">تسليم: 2026-05-25</small></td>
+              <td><span class="pill pill-pri-normal">📌</span></td>
+              <td><span class="pill pill-st-new">🆕</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h4>🌟 نقاطي التحفيزية</h4>
+        <div style="text-align:center;padding:14px">
+          <div style="font-size:48px;font-weight:800;color:#6B3FA0;line-height:1">350</div>
+          <div style="font-size:13px;color:#888;margin-top:4px">نقطة إجمالية</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div style="padding:10px;background:#E8F5E9;border:1px solid #a5d6a7;border-radius:8px;text-align:center">
+            <div style="font-size:11px;color:#1B5E20">هذا الشهر</div>
+            <div style="font-size:20px;font-weight:700;color:#1B5E20">120</div>
+          </div>
+          <div style="padding:10px;background:#f3e5f5;border:1px solid #c4a8e8;border-radius:8px;text-align:center">
+            <div style="font-size:11px;color:#4a148c">الشهر الماضي</div>
+            <div style="font-size:20px;font-weight:700;color:#4a148c">95</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>🏅 شارات قوتي</h4>
+      <div class="badges-grid">
+        <div class="badge-tile">
+          <div class="icon">⚡</div>
+          <div class="name">السرعة</div>
+          <div class="count">5</div>
+        </div>
+        <div class="badge-tile">
+          <div class="icon">💎</div>
+          <div class="name">الجودة</div>
+          <div class="count">4</div>
+        </div>
+        <div class="badge-tile">
+          <div class="icon">💡</div>
+          <div class="name">الإبداع</div>
+          <div class="count">3</div>
+        </div>
+        <div class="badge-tile">
+          <div class="icon">🤝</div>
+          <div class="name">العمل الجماعي</div>
+          <div class="count">2</div>
+        </div>
+        <div class="badge-tile zero">
+          <div class="icon">🎯</div>
+          <div class="name">الدقة</div>
+          <div class="count">0</div>
+        </div>
+        <div class="badge-tile">
+          <div class="icon">🚀</div>
+          <div class="name">المبادرة</div>
+          <div class="count">1</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 5 — Team motivational dashboard
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>👥 View 5 — لوحة الفريق التحفيزية</h2></div>
+  <section class="view">
+    <h3>👥 فريق مايندكس — مايو 2026</h3>
+
+    <div class="stat-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat stat-green">
+        <div class="lbl">إجمالي المهام المنجزة هذا الشهر</div>
+        <div class="num">42</div>
+        <div class="sub">🎉 إنجاز رائع</div>
+      </div>
+      <div class="stat stat-blue">
+        <div class="lbl">قيد التنفيذ الآن</div>
+        <div class="num">17</div>
+        <div class="sub">معاً نُكمل!</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>🏆 أفضل 3 منجزين هذا الشهر</h4>
+      <div class="podium">
+        <div class="podium-pos silver">
+          <div class="medal">🥈</div>
+          <div class="name">زهراء</div>
+          <div class="count">10</div>
+          <div class="count-lbl">مهمة منجزة</div>
+        </div>
+        <div class="podium-pos gold">
+          <div class="medal">🥇</div>
+          <div class="name">رائد</div>
+          <div class="count">12</div>
+          <div class="count-lbl">مهمة منجزة</div>
+        </div>
+        <div class="podium-pos bronze">
+          <div class="medal">🥉</div>
+          <div class="name">كوثر</div>
+          <div class="count">8</div>
+          <div class="count-lbl">مهمة منجزة</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="motivation-card">
+      ✨ معاً نبني مايندكس 💪
+      <div style="font-size:13px;font-weight:400;opacity:.9;margin-top:6px">شكراً لكل عضو في الفريق — كل مهمة منجزة خطوة نحو الأفضل</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 6 — Admin full analytics dashboard
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>📊 View 6 — لوحة المدير التحليلية الكاملة</h2></div>
+  <section class="view">
+    <h3>📊 تحليل الأداء — مايو 2026 (للمدير فقط)</h3>
+
+    <div class="stat-row">
+      <div class="stat stat-purple">
+        <div class="lbl">إجمالي المهام</div>
+        <div class="num">128</div>
+      </div>
+      <div class="stat stat-green">
+        <div class="lbl">منجزة</div>
+        <div class="num">87</div>
+        <div class="sub">68% معدل الإنجاز</div>
+      </div>
+      <div class="stat stat-amber">
+        <div class="lbl">قيد التنفيذ</div>
+        <div class="num">23</div>
+      </div>
+      <div class="stat stat-red">
+        <div class="lbl">متأخرة</div>
+        <div class="num">8</div>
+      </div>
+    </div>
+
+    <div class="stat-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="stat stat-blue">
+        <div class="lbl">متوسط الإنجاز</div>
+        <div class="num">3.8 <span style="font-size:14px;opacity:.7">يوم</span></div>
+        <div class="sub">منذ الإنشاء إلى الإنجاز</div>
+      </div>
+      <div class="stat stat-amber">
+        <div class="lbl">متوسط التقييم</div>
+        <div class="num">4.2 <span style="font-size:14px;opacity:.7">/ 5</span></div>
+        <div class="sub">من 64 مهمة مُقيَّمة</div>
+      </div>
+    </div>
+
+    <div class="panel employee-table">
+      <h4>👥 أداء الموظفين (مرتبة بحسب المهام المنجزة)</h4>
+      <table>
+        <thead><tr>
+          <th>الموظف</th>
+          <th>القسم</th>
+          <th>إجمالي</th>
+          <th>منجزة</th>
+          <th>متأخرة</th>
+          <th>الالتزام</th>
+          <th>متوسط التقييم</th>
+          <th>النقاط</th>
+          <th>الشارات</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>👤 رائد</td>
+            <td>الفعاليات</td>
+            <td>28</td>
+            <td>12</td>
+            <td>2</td>
+            <td><div class="progress"><div class="progress-fill" style="width:85%"></div></div> 85%</td>
+            <td><span class="stars" style="font-size:14px">★★★★<span class="off">★</span></span> 4.3</td>
+            <td><b style="color:#1B5E20">350</b></td>
+            <td><span class="mini-badges">
+              <span class="mb">⚡5</span>
+              <span class="mb">💎4</span>
+              <span class="mb">💡3</span>
+            </span></td>
+          </tr>
+          <tr>
+            <td>👤 زهراء</td>
+            <td>الاستقبال</td>
+            <td>22</td>
+            <td>10</td>
+            <td>1</td>
+            <td><div class="progress"><div class="progress-fill" style="width:90%"></div></div> 90%</td>
+            <td><span class="stars" style="font-size:14px">★★★★★</span> 4.7</td>
+            <td><b style="color:#1B5E20">295</b></td>
+            <td><span class="mini-badges">
+              <span class="mb">💎6</span>
+              <span class="mb">🤝3</span>
+            </span></td>
+          </tr>
+          <tr>
+            <td>👤 كوثر</td>
+            <td>المناهج</td>
+            <td>18</td>
+            <td>8</td>
+            <td>0</td>
+            <td><div class="progress"><div class="progress-fill" style="width:100%"></div></div> 100%</td>
+            <td><span class="stars" style="font-size:14px">★★★★<span class="off">★</span></span> 4.4</td>
+            <td><b style="color:#1B5E20">245</b></td>
+            <td><span class="mini-badges">
+              <span class="mb">🎯4</span>
+              <span class="mb">💡2</span>
+            </span></td>
+          </tr>
+          <tr>
+            <td>👤 أحمد</td>
+            <td>شؤون الطلاب</td>
+            <td>14</td>
+            <td>6</td>
+            <td>3</td>
+            <td><div class="progress"><div class="progress-fill" style="width:60%"></div></div> 60%</td>
+            <td><span class="stars" style="font-size:14px">★★★<span class="off">★★</span></span> 3.5</td>
+            <td><b style="color:#1B5E20">155</b></td>
+            <td><span class="mini-badges">
+              <span class="mb">🚀2</span>
+            </span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="midrow">
+      <div class="panel">
+        <h4>🏢 الأداء حسب القسم</h4>
+        <table>
+          <tbody>
+            <tr><td>🎉 الفعاليات</td>
+              <td>28 → 16</td>
+              <td><div class="progress"><div class="progress-fill" style="width:57%"></div></div> 57%</td></tr>
+            <tr><td>👋 الاستقبال</td>
+              <td>22 → 18</td>
+              <td><div class="progress"><div class="progress-fill" style="width:82%"></div></div> 82%</td></tr>
+            <tr><td>📚 المناهج</td>
+              <td>18 → 14</td>
+              <td><div class="progress"><div class="progress-fill" style="width:78%"></div></div> 78%</td></tr>
+            <tr><td>👨‍🎓 شؤون الطلاب</td>
+              <td>14 → 7</td>
+              <td><div class="progress"><div class="progress-fill" style="width:50%"></div></div> 50%</td></tr>
+            <tr><td>👔 الإدارة</td>
+              <td>10 → 9</td>
+              <td><div class="progress"><div class="progress-fill" style="width:90%"></div></div> 90%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h4>⚡ الأداء حسب الأولوية</h4>
+        <table>
+          <tbody>
+            <tr><td><span class="pill pill-pri-critical">🔥 عاجلة جدًا</span></td>
+              <td>6 إجمالي</td>
+              <td><b>4 منجزة</b></td></tr>
+            <tr><td><span class="pill pill-pri-urgent">⚡ عاجلة</span></td>
+              <td>22 إجمالي</td>
+              <td><b>15 منجزة</b></td></tr>
+            <tr><td><span class="pill pill-pri-normal">📌 عادية</span></td>
+              <td>78 إجمالي</td>
+              <td><b>56 منجزة</b></td></tr>
+            <tr><td><span class="pill pill-pri-low">🌙 منخفضة</span></td>
+              <td>22 إجمالي</td>
+              <td><b>12 منجزة</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>📈 آخر 30 يوم — المهام المُنشأة مقابل المنجزة</h4>
+      <div class="trend">
+        <div class="bar"><div class="pair"><div class="b created" style="height:40%"></div><div class="b completed" style="height:30%"></div></div><div class="lbl">س 1</div></div>
+        <div class="bar"><div class="pair"><div class="b created" style="height:55%"></div><div class="b completed" style="height:35%"></div></div><div class="lbl">س 2</div></div>
+        <div class="bar"><div class="pair"><div class="b created" style="height:70%"></div><div class="b completed" style="height:50%"></div></div><div class="lbl">س 3</div></div>
+        <div class="bar"><div class="pair"><div class="b created" style="height:60%"></div><div class="b completed" style="height:65%"></div></div><div class="lbl">س 4</div></div>
+        <div class="bar"><div class="pair"><div class="b created" style="height:80%"></div><div class="b completed" style="height:72%"></div></div><div class="lbl">س الحالي</div></div>
+      </div>
+      <div class="trend-legend">
+        <span><span class="swatch" style="background:#6B3FA0"></span>مُنشأة</span>
+        <span><span class="swatch" style="background:#1B5E20"></span>مُنجزة</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>🔁 القوالب المتكررة (5)</h4>
+      <table>
+        <tbody>
+          <tr>
+            <td><b>فحص المخزون اليومي</b></td>
+            <td><span class="freq-pill freq-daily">يومي</span></td>
+            <td>👤 رائد</td>
+            <td>👨‍💼 الإدارة</td>
+            <td><button class="btn-edit">✏️</button> <button class="btn-danger">🗑️</button></td>
+          </tr>
+          <tr>
+            <td><b>تقرير أسبوعي للأهالي</b></td>
+            <td><span class="freq-pill freq-weekly">أسبوعي - الأحد</span></td>
+            <td>👤 زهراء</td>
+            <td>👋 الاستقبال</td>
+            <td><button class="btn-edit">✏️</button> <button class="btn-danger">🗑️</button></td>
+          </tr>
+          <tr>
+            <td><b>تقييم شهري للموظفين</b></td>
+            <td><span class="freq-pill freq-monthly">شهري - يوم 1</span></td>
+            <td>👤 المدير</td>
+            <td>👔 الإدارة</td>
+            <td><button class="btn-edit">✏️</button> <button class="btn-danger">🗑️</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button class="btn btn-pri" style="margin-top:12px">+ قالب متكرر جديد</button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 7 — Evaluate task modal (admin only)
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>⭐ View 7 — تقييم المهمة (للمدير فقط)</h2></div>
+  <div class="modal-backdrop">
+    <div class="modal-box">
+      <h4>
+        <span>⭐ تقييم مهمة: تنظيف القاعة 2 قبل فعالية الأسبوع</span>
+        <span class="x">✕</span>
+      </h4>
+
+      <div style="padding:10px 14px;background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;margin-bottom:14px;font-size:13px;color:#0277bd">
+        ℹ️ المهمة منجزة في 2026-05-12 — قبل موعد التسليم (2026-05-18) ✅
+      </div>
+
+      <div class="field full">
+        <label style="font-size:14px">⭐ التقييم الرئيسي *</label>
+        <div style="text-align:center;padding:14px 0">
+          <span class="stars" style="font-size:42px;cursor:pointer">★★★★★</span>
+          <div style="font-size:13px;color:#888;margin-top:6px">5 من 5 — ممتاز</div>
+        </div>
+      </div>
+
+      <div class="field full" style="margin-top:14px">
+        <label>🏅 الشارات (اختر حتى 6)</label>
+        <div class="strength-grid">
+          <div class="strength-pill active">
+            <span class="icon">⚡</span>
+            السرعة
+          </div>
+          <div class="strength-pill active">
+            <span class="icon">💎</span>
+            الجودة
+          </div>
+          <div class="strength-pill">
+            <span class="icon">💡</span>
+            الإبداع
+          </div>
+          <div class="strength-pill">
+            <span class="icon">🤝</span>
+            العمل الجماعي
+          </div>
+          <div class="strength-pill">
+            <span class="icon">🎯</span>
+            الدقة
+          </div>
+          <div class="strength-pill">
+            <span class="icon">🚀</span>
+            المبادرة
+          </div>
+        </div>
+      </div>
+
+      <div class="field full" style="margin-top:14px">
+        <label>💬 تعليق المدير (اختياري)</label>
+        <textarea>تنفيذ ممتاز وفي الوقت المحدد. جودة العمل عالية والتنسيق مع كوثر كان منظماً.</textarea>
+      </div>
+
+      <div class="points-preview">
+        <h5>💰 معاينة النقاط المُحتسبة</h5>
+        <div class="points-row">
+          <span>التقييم الأساسي (5 نجوم × 10)</span>
+          <b>+50</b>
+        </div>
+        <div class="points-row">
+          <span>مكافأة الأولوية (عاجلة)</span>
+          <b>+10</b>
+        </div>
+        <div class="points-row">
+          <span>مكافأة الإنجاز قبل الموعد</span>
+          <b>+10</b>
+        </div>
+        <div class="points-total">
+          <span>💎 إجمالي النقاط:</span>
+          <b>70 نقطة</b>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-sec">إلغاء</button>
+        <button class="btn btn-pri">⭐ تأكيد التقييم</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" style="background:linear-gradient(135deg,#1B5E20,#388E3C)">
+    <h2>✅ نهاية المعاينة</h2>
+    <small>7 شاشات جاهزة للمراجعة — في انتظار موافقة المالك قبل بدء التنفيذ</small>
+  </div>
+
+</div>
+</body>
+</html>
