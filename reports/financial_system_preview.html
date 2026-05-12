@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mindex — معاينة النظام المالي (Phase 3 mockup)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f6f0fa;color:#222;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 22px 60px}
+  .divider{margin:50px 0;padding:18px 22px;background:linear-gradient(135deg,#4a148c,#6B3FA0);color:#fff;border-radius:14px;text-align:center;box-shadow:0 6px 20px rgba(74,20,140,.25)}
+  .divider h2{margin:0;font-size:20px;letter-spacing:.3px}
+  .divider small{display:block;margin-top:6px;opacity:.85;font-size:13px}
+  .view{background:#fff;border-radius:14px;padding:24px;box-shadow:0 4px 18px rgba(74,20,140,.08);border:1px solid #e8d8f3}
+  .view h3{margin:0 0 18px;color:#4a148c;font-size:18px;border-bottom:2px solid #f3e5f5;padding-bottom:8px}
+
+  /* --- Top stat cards --- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .stat{padding:18px;border-radius:12px;border:1px solid;text-align:center;background:#fff}
+  .stat .lbl{font-size:13px;font-weight:600;margin-bottom:6px}
+  .stat .num{font-size:28px;font-weight:700;letter-spacing:.5px}
+  .stat .unit{font-size:13px;opacity:.7;margin-right:4px}
+  .stat-rev{background:#E8F5E9;border-color:#a5d6a7}
+  .stat-rev .lbl,.stat-rev .num{color:#1B5E20}
+  .stat-exp{background:#fff3e0;border-color:#ffcc80}
+  .stat-exp .lbl,.stat-exp .num{color:#E65100}
+  .stat-net-pos{background:#f3e5f5;border-color:#c4a8e8}
+  .stat-net-pos .lbl,.stat-net-pos .num{color:#4a148c}
+  .stat-net-neg{background:#FFEBEE;border-color:#ef9a9a}
+  .stat-net-neg .lbl,.stat-net-neg .num{color:#c62828}
+
+  /* --- Middle: pie + bar --- */
+  .midrow{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+  .panel{background:#fafafa;border:1px solid #e8d8f3;border-radius:12px;padding:16px}
+  .panel h4{margin:0 0 14px;color:#4a148c;font-size:15px}
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .donut{width:160px;height:160px;border-radius:50%;
+    background:conic-gradient(
+      #1976D2 0% 28%,
+      #388E3C 28% 50%,
+      #F57C00 50% 64%,
+      #7B1FA2 64% 76%,
+      #FF5722 76% 84%,
+      #C2185B 84% 90%,
+      #00838F 90% 96%,
+      #616161 96% 100%);
+    position:relative;flex-shrink:0}
+  .donut::after{content:'';position:absolute;inset:24px;background:#fafafa;border-radius:50%}
+  .donut .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;color:#4a148c;font-weight:600;z-index:2}
+  .donut .center b{font-size:18px}
+  .legend{flex:1;font-size:13px}
+  .legend .item{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .legend .dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+  .legend .pct{margin-right:auto;color:#666;font-weight:600}
+
+  .barchart{display:flex;align-items:flex-end;justify-content:space-around;height:200px;padding:0 6px;gap:10px;border-bottom:2px solid #c4a8e8}
+  .bcol{display:flex;flex-direction:column;align-items:center;flex:1}
+  .bcol .pair{display:flex;gap:3px;align-items:flex-end;height:160px}
+  .bcol .bar{width:18px;border-radius:4px 4px 0 0}
+  .bcol .bar.rev{background:linear-gradient(0deg,#388E3C,#66BB6A)}
+  .bcol .bar.exp{background:linear-gradient(0deg,#F57C00,#FFB74D)}
+  .bcol .mlabel{font-size:11px;color:#666;margin-top:6px;font-weight:600}
+  .blegend{display:flex;gap:14px;justify-content:center;font-size:12px;margin-top:8px;color:#666}
+  .blegend .pill{display:flex;align-items:center;gap:5px}
+  .blegend .swatch{width:14px;height:14px;border-radius:3px}
+
+  /* --- Vendors strip --- */
+  .vendors{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 22px}
+  .vendor-pill{padding:8px 14px;background:#f3e5f5;border:1px solid #c4a8e8;border-radius:20px;color:#4a148c;font-size:13px;font-weight:600}
+  .vendor-pill b{color:#1B5E20;margin-right:6px}
+
+  /* --- Buttons --- */
+  .btn{padding:11px 22px;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px}
+  .btn-pri{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;box-shadow:0 4px 12px rgba(107,63,160,.3)}
+  .btn-sec{background:#f3e5f5;color:#4a148c;border:1px solid #c4a8e8}
+  .btn-danger{background:#FFEBEE;color:#c62828;border:1px solid #ef9a9a;padding:6px 10px;font-size:12px;border-radius:8px}
+  .btn-edit{background:#fff8e1;color:#FB8C00;border:1px solid #ffcc80;padding:6px 10px;font-size:12px;border-radius:8px}
+  .btn-big{padding:14px 30px;font-size:15px}
+  .actionrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+
+  /* --- Filter bar --- */
+  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 14px;background:#faf6fd;border:1px dashed #c4a8e8;border-radius:10px;margin-bottom:14px}
+  .filters label{font-size:13px;color:#4a148c;font-weight:600;display:flex;align-items:center;gap:6px}
+  .filters input,.filters select{padding:8px 10px;border:1px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff}
+
+  /* --- Table --- */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:#f3e5f5;color:#4a148c;padding:11px 9px;text-align:right;font-weight:700;border-bottom:2px solid #c4a8e8}
+  tbody td{padding:10px 9px;border-bottom:1px solid #eee}
+  tbody tr:hover{background:#faf6fd}
+  .cat-cell{display:flex;align-items:center;gap:6px}
+  .cat-dot{width:10px;height:10px;border-radius:50%}
+  .receipt-thumb{display:inline-block;width:36px;height:28px;background:#f3e5f5;border:1px solid #c4a8e8;border-radius:5px;font-size:14px;text-align:center;line-height:28px;cursor:pointer}
+  .amount{font-weight:700;color:#E65100;direction:ltr;display:inline-block}
+
+  /* --- Raed view extras --- */
+  .raed-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:linear-gradient(135deg,#FB8C00,#FFB74D);color:#fff;border-radius:14px;font-size:12px;font-weight:700;margin-right:8px}
+  .raed-card{padding:18px 22px;background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:12px;text-align:right;margin-bottom:14px}
+  .raed-card .lbl{font-size:13px;color:#E65100;font-weight:600;margin-bottom:4px}
+  .raed-card .num{font-size:30px;font-weight:700;color:#E65100}
+  .raed-card .sub{margin-top:6px;font-size:13px;color:#888}
+  .hbar-row{display:grid;grid-template-columns:160px 1fr 60px;gap:10px;align-items:center;margin-bottom:8px}
+  .hbar-row .label{font-size:13px;color:#444}
+  .hbar-wrap{height:14px;background:#f3e5f5;border-radius:7px;overflow:hidden}
+  .hbar{height:100%;border-radius:7px}
+  .hbar-row .pct{font-size:12px;color:#666;font-weight:600;text-align:left}
+
+  /* --- Modal --- */
+  .modal-backdrop{position:relative;background:rgba(74,20,140,.5);padding:30px 20px;border-radius:14px}
+  .modal-box{background:#fff;border-radius:14px;padding:24px;max-width:680px;margin:0 auto;box-shadow:0 10px 40px rgba(74,20,140,.4)}
+  .modal-box h4{margin:0 0 18px;color:#4a148c;font-size:17px;display:flex;justify-content:space-between;align-items:center}
+  .modal-box h4 .x{background:#f3e5f5;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#4a148c;font-weight:700}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1 / -1}
+  .field label{font-size:13px;color:#4a148c;font-weight:600}
+  .field input,.field textarea,.field select{padding:9px 11px;border:1px solid #c4a8e8;border-radius:8px;font-family:inherit;font-size:13px;background:#fff}
+  .field textarea{min-height:64px;resize:vertical}
+  .hint{font-size:11px;color:#888;margin-top:2px}
+  .input-suffix{position:relative}
+  .input-suffix input{padding-left:42px;text-align:left;direction:ltr}
+  .input-suffix .suf{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:12px;color:#666;font-weight:700}
+
+  /* category pills */
+  .cat-pills{display:flex;flex-wrap:wrap;gap:6px}
+  .cat-pill{padding:8px 12px;border-radius:18px;border:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;background:#fafafa;color:#555}
+  .cat-pill.active{color:#fff;border-color:rgba(0,0,0,.1);box-shadow:0 3px 8px rgba(0,0,0,.15)}
+  .pay-pills{display:flex;gap:6px;flex-wrap:wrap}
+  .pay-pill{padding:8px 16px;border:1.5px solid #c4a8e8;border-radius:18px;font-size:12px;color:#4a148c;font-weight:600;cursor:pointer;background:#fff}
+  .pay-pill.active{background:linear-gradient(135deg,#6B3FA0,#8B5CC8);color:#fff;border-color:#6B3FA0}
+
+  .dropzone{padding:18px;border:2px dashed #c4a8e8;border-radius:10px;text-align:center;background:#faf6fd;color:#4a148c;font-size:13px;cursor:pointer}
+  .dropzone strong{display:block;margin-bottom:4px;font-size:14px}
+  .dropzone small{color:#888}
+
+  /* store link conditional */
+  .store-link{margin-top:18px;padding:18px;background:#e3f2fd;border:1px solid #90caf9;border-radius:10px}
+  .store-link h5{margin:0 0 12px;color:#0277bd;font-size:14px}
+  .toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#0277bd;font-weight:600;font-size:13px}
+  .toggle{width:42px;height:22px;background:#0277bd;border-radius:11px;position:relative;cursor:pointer}
+  .toggle::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .15s}
+  .toggle.off{background:#bbb}
+  .toggle.off::after{left:auto;right:2px}
+  .preview-pills{display:flex;gap:8px;flex-wrap:wrap}
+  .preview-pill{padding:6px 12px;background:#fff;border:1px solid #90caf9;border-radius:14px;font-size:12px;color:#0277bd;font-weight:600}
+  .preview-pill.cost b{color:#1B5E20;direction:ltr;display:inline-block;margin-right:4px}
+
+  .modal-footer{margin-top:22px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #f3e5f5;padding-top:16px}
+
+  /* --- Assets grid --- */
+  .total-card{padding:22px;background:linear-gradient(135deg,#4a148c,#8B5CC8);color:#fff;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+  .total-card .lbl{font-size:14px;opacity:.9}
+  .total-card .num{font-size:32px;font-weight:700;letter-spacing:.5px}
+  .chips-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center}
+  .chips-row .clbl{font-size:12px;color:#666;font-weight:700;margin-left:6px}
+  .chip{padding:6px 14px;border-radius:14px;border:1px solid #c4a8e8;font-size:12px;color:#4a148c;cursor:pointer;background:#fff;font-weight:600}
+  .chip.active{background:#6B3FA0;color:#fff;border-color:#6B3FA0}
+  .asset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+  .asset-card{background:#fff;border:1px solid #e8d8f3;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
+  .asset-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(74,20,140,.15)}
+  .asset-img{height:120px;background:#f3e5f5;display:flex;align-items:center;justify-content:center;font-size:42px;color:#c4a8e8;border-bottom:1px solid #e8d8f3}
+  .asset-img img{width:100%;height:100%;object-fit:cover}
+  .asset-body{padding:12px;flex:1;display:flex;flex-direction:column;gap:6px;font-size:12px}
+  .asset-body .name{font-weight:700;color:#4a148c;font-size:14px}
+  .asset-body .meta{color:#666;display:flex;align-items:center;gap:5px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;border:1px solid}
+  .bg-cat{background:#f3e5f5;color:#4a148c;border-color:#c4a8e8}
+  .bg-cond-excellent{background:#E8F5E9;color:#1B5E20;border-color:#a5d6a7}
+  .bg-cond-good{background:#e3f2fd;color:#0277bd;border-color:#90caf9}
+  .bg-cond-maint{background:#fff8e1;color:#FB8C00;border-color:#ffcc80}
+  .bg-cond-damaged{background:#FFEBEE;color:#c62828;border-color:#ef9a9a}
+  .asset-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f3e5f5;padding:8px 12px;gap:6px}
+  .asset-foot .det{flex:1;padding:6px 0;text-align:center;color:#6B3FA0;font-size:12px;font-weight:600;cursor:pointer;border-radius:6px;background:#faf6fd}
+  .asset-foot .edit-ic{font-size:14px;color:#FB8C00;cursor:pointer;padding:4px 8px;border-radius:6px;background:#fff8e1}
+
+  /* Asset modal special pills */
+  .cond-pills{display:flex;gap:6px;flex-wrap:wrap}
+  .cond-pill{padding:8px 14px;border-radius:18px;border:1.5px solid #c4a8e8;font-size:12px;font-weight:600;cursor:pointer;background:#fff;display:inline-flex;align-items:center;gap:6px;color:#555}
+  .cond-pill .cdot{width:9px;height:9px;border-radius:50%}
+  .cond-pill.active{border-width:2px;background:#fafafa}
+
+  @media (max-width:600px){
+    .stats,.midrow,.form-grid,.asset-grid{grid-template-columns:1fr}
+    .barchart{height:150px}
+    .bcol .pair{height:110px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="divider">
+    <h2>📊 معاينة النظام المالي — Phase 3 Mockup</h2>
+    <small>5 شاشات: لوحة المدير | عرض رائد | نموذج المصروف | الممتلكات | نموذج الممتلك</small>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 1 — Admin Dashboard
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>🎯 View 1 — لوحة المصاريف للمدير</h2></div>
+  <section class="view">
+    <h3>💰 لوحة المالية — مايو 2026</h3>
+
+    <div class="stats">
+      <div class="stat stat-rev">
+        <div class="lbl">إجمالي الإيرادات</div>
+        <div class="num">12,450<span class="unit">د.ب</span></div>
+      </div>
+      <div class="stat stat-exp">
+        <div class="lbl">إجمالي المصاريف</div>
+        <div class="num">4,820<span class="unit">د.ب</span></div>
+      </div>
+      <div class="stat stat-net-pos">
+        <div class="lbl">الصافي</div>
+        <div class="num">+7,630<span class="unit">د.ب</span></div>
+      </div>
+    </div>
+
+    <div class="midrow">
+      <div class="panel">
+        <h4>توزيع المصاريف حسب الفئة</h4>
+        <div class="donut-wrap">
+          <div class="donut">
+            <div class="center"><b>4,820</b><span>د.ب</span></div>
+          </div>
+          <div class="legend">
+            <div class="item"><span class="dot" style="background:#1976D2"></span>تشغيلي<span class="pct">28%</span></div>
+            <div class="item"><span class="dot" style="background:#388E3C"></span>رواتب وأجور<span class="pct">22%</span></div>
+            <div class="item"><span class="dot" style="background:#F57C00"></span>مشتريات للمتجر<span class="pct">14%</span></div>
+            <div class="item"><span class="dot" style="background:#7B1FA2"></span>مستلزمات تعليمية<span class="pct">12%</span></div>
+            <div class="item"><span class="dot" style="background:#FF5722"></span>صيانة وتصليح<span class="pct">8%</span></div>
+            <div class="item"><span class="dot" style="background:#C2185B"></span>تسويق<span class="pct">6%</span></div>
+            <div class="item"><span class="dot" style="background:#00838F"></span>فعاليات<span class="pct">6%</span></div>
+            <div class="item"><span class="dot" style="background:#616161"></span>أخرى<span class="pct">4%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>الإيرادات مقابل المصاريف — آخر 6 أشهر</h4>
+        <div class="barchart">
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:60%"></div>
+              <div class="bar exp" style="height:35%"></div>
+            </div>
+            <div class="mlabel">ديسمبر</div>
+          </div>
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:75%"></div>
+              <div class="bar exp" style="height:45%"></div>
+            </div>
+            <div class="mlabel">يناير</div>
+          </div>
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:70%"></div>
+              <div class="bar exp" style="height:50%"></div>
+            </div>
+            <div class="mlabel">فبراير</div>
+          </div>
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:82%"></div>
+              <div class="bar exp" style="height:38%"></div>
+            </div>
+            <div class="mlabel">مارس</div>
+          </div>
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:90%"></div>
+              <div class="bar exp" style="height:42%"></div>
+            </div>
+            <div class="mlabel">أبريل</div>
+          </div>
+          <div class="bcol">
+            <div class="pair">
+              <div class="bar rev" style="height:95%"></div>
+              <div class="bar exp" style="height:48%"></div>
+            </div>
+            <div class="mlabel">مايو</div>
+          </div>
+        </div>
+        <div class="blegend">
+          <div class="pill"><span class="swatch" style="background:#388E3C"></span>الإيرادات</div>
+          <div class="pill"><span class="swatch" style="background:#F57C00"></span>المصاريف</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:18px">
+      <h4>أعلى 5 موردين</h4>
+      <div class="vendors">
+        <div class="vendor-pill">Batelco <b>1,250 د.ب</b></div>
+        <div class="vendor-pill">EWA <b>820 د.ب</b></div>
+        <div class="vendor-pill">Carrefour <b>485 د.ب</b></div>
+        <div class="vendor-pill">SLS للمكاتب <b>340 د.ب</b></div>
+        <div class="vendor-pill">ورشة محمد <b>220 د.ب</b></div>
+      </div>
+    </div>
+
+    <div class="actionrow">
+      <button class="btn btn-pri btn-big">+ إضافة مصروف جديد</button>
+    </div>
+
+    <div class="filters">
+      <label>من تاريخ<input type="date" value="2026-05-01"></label>
+      <label>إلى تاريخ<input type="date" value="2026-05-12"></label>
+      <label>الفئة
+        <select>
+          <option>الكل</option>
+          <option>🏢 تشغيلي</option>
+          <option>💵 رواتب وأجور</option>
+          <option>🛍️ مشتريات للمتجر</option>
+        </select>
+      </label>
+      <button class="btn btn-sec">تصفية</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>التاريخ</th>
+          <th>الفئة</th>
+          <th>المبلغ</th>
+          <th>المورّد</th>
+          <th>الإيصال</th>
+          <th>الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026-05-11</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#1976D2"></span>🏢 كهرباء يناير</span></td>
+          <td><span class="amount">120.500 د.ب</span></td>
+          <td>EWA</td>
+          <td><span class="receipt-thumb">📄</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2026-05-10</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#F57C00"></span>🛍️ شوكولاتة للمتجر</span></td>
+          <td><span class="amount">85.000 د.ب</span></td>
+          <td>Carrefour</td>
+          <td><span class="receipt-thumb">🖼️</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2026-05-08</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#388E3C"></span>💵 راتب يناير</span></td>
+          <td><span class="amount">450.000 د.ب</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2026-05-05</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#FF5722"></span>🔧 صيانة المكيف</span></td>
+          <td><span class="amount">60.000 د.ب</span></td>
+          <td>ورشة محمد</td>
+          <td><span class="receipt-thumb">📄</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 2 — Raed View
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>👤 View 2 — عرض رائد (مصاريفه فقط)</h2></div>
+  <section class="view">
+    <h3><span class="raed-pill">👤 رائد</span>مصاريفي</h3>
+
+    <div class="raed-card">
+      <div class="lbl">إجمالي مصاريفي هذا الشهر</div>
+      <div class="num">285.750<span class="unit" style="font-size:14px">د.ب</span></div>
+      <div class="sub">عدد مصاريفي: <b style="color:#E65100">12</b></div>
+    </div>
+
+    <div class="panel">
+      <h4>توزيع مصاريفي حسب الفئة</h4>
+      <div class="hbar-row">
+        <span class="label">🏢 تشغيلي</span>
+        <div class="hbar-wrap"><div class="hbar" style="width:65%;background:#1976D2"></div></div>
+        <span class="pct">185 د.ب</span>
+      </div>
+      <div class="hbar-row">
+        <span class="label">🔧 صيانة وتصليح</span>
+        <div class="hbar-wrap"><div class="hbar" style="width:30%;background:#FF5722"></div></div>
+        <span class="pct">75 د.ب</span>
+      </div>
+      <div class="hbar-row">
+        <span class="label">🎉 فعاليات</span>
+        <div class="hbar-wrap"><div class="hbar" style="width:12%;background:#00838F"></div></div>
+        <span class="pct">25.750 د.ب</span>
+      </div>
+    </div>
+
+    <div class="actionrow" style="margin-top:22px">
+      <h4 style="margin:0;color:#4a148c">آخر مصاريفي</h4>
+      <button class="btn btn-pri btn-big">+ أضف مصروفاً</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>التاريخ</th>
+          <th>الفئة</th>
+          <th>المبلغ</th>
+          <th>المورّد</th>
+          <th>الإيصال</th>
+          <th>الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026-05-09</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#FF5722"></span>🔧 صيانة بوابة</span></td>
+          <td><span class="amount">35.000 د.ب</span></td>
+          <td>ورشة محمد</td>
+          <td><span class="receipt-thumb">📄</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2026-05-07</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#1976D2"></span>🏢 إنترنت أبريل</span></td>
+          <td><span class="amount">45.500 د.ب</span></td>
+          <td>Batelco</td>
+          <td><span class="receipt-thumb">🖼️</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2026-05-03</td>
+          <td><span class="cat-cell"><span class="cat-dot" style="background:#00838F"></span>🎉 ضيافة لقاء أولياء</span></td>
+          <td><span class="amount">25.750 د.ب</span></td>
+          <td>Carrefour</td>
+          <td><span class="receipt-thumb">📄</span></td>
+          <td>
+            <button class="btn-edit">✏️</button>
+            <button class="btn-danger">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 3 — Add/Edit Expense Modal
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>📝 View 3 — نموذج إضافة/تعديل مصروف (مع ربط المتجر)</h2></div>
+  <div class="modal-backdrop">
+    <div class="modal-box">
+      <h4>+ إضافة مصروف جديد <span class="x">✕</span></h4>
+
+      <div class="form-grid">
+        <div class="field full">
+          <label>فئة المصروف *</label>
+          <div class="cat-pills">
+            <span class="cat-pill" style="background:#1976D2;color:#fff">🏢 تشغيلي</span>
+            <span class="cat-pill" style="border-color:#388E3C;color:#388E3C">💵 رواتب وأجور</span>
+            <span class="cat-pill active" style="background:#F57C00">🛍️ مشتريات للمتجر</span>
+            <span class="cat-pill" style="border-color:#7B1FA2;color:#7B1FA2">📚 مستلزمات تعليمية</span>
+            <span class="cat-pill" style="border-color:#FF5722;color:#FF5722">🔧 صيانة وتصليح</span>
+            <span class="cat-pill" style="border-color:#C2185B;color:#C2185B">📣 تسويق وإعلان</span>
+            <span class="cat-pill" style="border-color:#00838F;color:#00838F">🎉 فعاليات ورحلات</span>
+            <span class="cat-pill" style="border-color:#616161;color:#616161">📌 أخرى</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>المبلغ بالدينار البحريني *</label>
+          <div class="input-suffix"><input value="10.000"><span class="suf">د.ب</span></div>
+          <small class="hint">بالفلس (3 خانات عشرية) — مثال: 10.500</small>
+        </div>
+
+        <div class="field">
+          <label>التاريخ *</label>
+          <input type="date" value="2026-05-12">
+        </div>
+
+        <div class="field full">
+          <label>الوصف *</label>
+          <textarea>20 علبة شوكولاتة لمتجر النقاط</textarea>
+        </div>
+
+        <div class="field">
+          <label>المورّد</label>
+          <input list="vendors" value="Carrefour">
+        </div>
+
+        <div class="field">
+          <label>طريقة الدفع</label>
+          <div class="pay-pills">
+            <span class="pay-pill active">💵 نقدي</span>
+            <span class="pay-pill">💳 بنفت</span>
+            <span class="pay-pill">🏦 تحويل</span>
+            <span class="pay-pill">📃 شيك</span>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>الإيصال (اختياري)</label>
+          <div class="dropzone">
+            <strong>📎 اسحب الإيصال هنا أو انقر للاختيار</strong>
+            <small>صورة (JPG / PNG / WebP) أو PDF — الحد الأقصى 2 ميجابايت</small>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>ملاحظات</label>
+          <textarea placeholder="ملاحظات إضافية (اختياري)"></textarea>
+        </div>
+      </div>
+
+      <!-- conditional store-link block (shown because المتجر is selected) -->
+      <div class="store-link">
+        <h5>🔗 ربط بمتجر النقاط</h5>
+        <div class="toggle-row">
+          <div class="toggle"></div>
+          <span>أضف الكمية إلى مخزون متجر النقاط تلقائياً؟</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>المنتج في المتجر</label>
+            <input list="rewards" placeholder="ابحث عن منتج بالاسم" value="شوكولاتة">
+          </div>
+          <div class="field">
+            <label>الكمية المضافة</label>
+            <input type="number" min="1" value="20">
+          </div>
+        </div>
+        <div class="preview-pills" style="margin-top:12px">
+          <span class="preview-pill">📦 سيُضاف <b>20</b> إلى مخزون <b>شوكولاتة</b></span>
+          <span class="preview-pill cost">💰 تكلفة الوحدة: <b>0.500 د.ب</b></span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-sec">إلغاء</button>
+        <button class="btn btn-pri">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 4 — Assets Page
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>🏛️ View 4 — صفحة الممتلكات (نسخة المدير)</h2></div>
+  <section class="view">
+    <h3>📦 الممتلكات والأصول</h3>
+
+    <div class="total-card">
+      <div>
+        <div class="lbl">إجمالي قيمة الممتلكات</div>
+        <div class="num">18,650 <span style="font-size:18px;opacity:.85">د.ب</span></div>
+      </div>
+      <div style="font-size:42px;opacity:.5">🏛️</div>
+    </div>
+
+    <div class="chips-row">
+      <span class="clbl">الفئة:</span>
+      <span class="chip active">الكل</span>
+      <span class="chip">💻 إلكترونيات</span>
+      <span class="chip">🪑 أثاث</span>
+      <span class="chip">📚 تجهيزات تعليمية</span>
+      <span class="chip">🚗 مركبات</span>
+      <span class="chip">📌 أخرى</span>
+    </div>
+    <div class="chips-row">
+      <span class="clbl">الحالة:</span>
+      <span class="chip active">الكل</span>
+      <span class="chip">✨ ممتاز</span>
+      <span class="chip">✅ جيد</span>
+      <span class="chip">⚠️ يحتاج صيانة</span>
+      <span class="chip">💢 تالف</span>
+      <span class="chip">❓ مفقود</span>
+    </div>
+
+    <div class="actionrow" style="margin-top:16px">
+      <button class="btn btn-pri btn-big">+ إضافة ممتلك جديد</button>
+    </div>
+
+    <div class="asset-grid">
+      <div class="asset-card">
+        <div class="asset-img">💻</div>
+        <div class="asset-body">
+          <div class="name">حاسوب مكتب — Dell OptiPlex</div>
+          <div><span class="badge bg-cat">💻 إلكترونيات</span> <span class="badge bg-cond-good">✅ جيد</span></div>
+          <div class="meta">📍 مكتب الاستقبال</div>
+          <div class="meta">👤 زهراء</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">🪑</div>
+        <div class="asset-body">
+          <div class="name">كرسي إداري × 4</div>
+          <div><span class="badge bg-cat">🪑 أثاث</span> <span class="badge bg-cond-excellent">✨ ممتاز</span></div>
+          <div class="meta">📍 قاعة الإدارة</div>
+          <div class="meta">👤 رائد</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">📽️</div>
+        <div class="asset-body">
+          <div class="name">جهاز عرض BenQ</div>
+          <div><span class="badge bg-cat">📚 تجهيزات</span> <span class="badge bg-cond-maint">⚠️ يحتاج صيانة</span></div>
+          <div class="meta">📍 قاعة 2</div>
+          <div class="meta">👤 كوثر</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">🖨️</div>
+        <div class="asset-body">
+          <div class="name">طابعة HP LaserJet</div>
+          <div><span class="badge bg-cat">💻 إلكترونيات</span> <span class="badge bg-cond-damaged">💢 تالف</span></div>
+          <div class="meta">📍 مكتب الاستقبال</div>
+          <div class="meta">👤 زهراء</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">📚</div>
+        <div class="asset-body">
+          <div class="name">سبورة ذكية Promethean</div>
+          <div><span class="badge bg-cat">📚 تجهيزات</span> <span class="badge bg-cond-good">✅ جيد</span></div>
+          <div class="meta">📍 قاعة 1</div>
+          <div class="meta">👤 أحمد</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">📺</div>
+        <div class="asset-body">
+          <div class="name">شاشة LG 55"</div>
+          <div><span class="badge bg-cat">💻 إلكترونيات</span> <span class="badge bg-cond-excellent">✨ ممتاز</span></div>
+          <div class="meta">📍 الاستقبال</div>
+          <div class="meta">👤 زهراء</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">🚗</div>
+        <div class="asset-body">
+          <div class="name">سيارة المركز — Toyota Hiace</div>
+          <div><span class="badge bg-cat">🚗 مركبة</span> <span class="badge bg-cond-good">✅ جيد</span></div>
+          <div class="meta">📍 موقف المركز</div>
+          <div class="meta">👤 المدير</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+      <div class="asset-card">
+        <div class="asset-img">🎤</div>
+        <div class="asset-body">
+          <div class="name">مايكروفون لاسلكي</div>
+          <div><span class="badge bg-cat">📌 أخرى</span> <span class="badge bg-cond-maint">⚠️ يحتاج صيانة</span></div>
+          <div class="meta">📍 قاعة الفعاليات</div>
+          <div class="meta">👤 رائد</div>
+        </div>
+        <div class="asset-foot">
+          <span class="det">عرض التفاصيل</span>
+          <span class="edit-ic">✏️</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       VIEW 5 — Add/Edit Asset Modal
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="divider"><h2>🧰 View 5 — نموذج إضافة/تعديل ممتلك</h2></div>
+  <div class="modal-backdrop">
+    <div class="modal-box">
+      <h4>+ إضافة ممتلك جديد <span class="x">✕</span></h4>
+
+      <div class="form-grid">
+        <div class="field full">
+          <label>اسم الممتلك *</label>
+          <input value="حاسوب مكتب — Dell OptiPlex">
+        </div>
+
+        <div class="field full">
+          <label>الفئة *</label>
+          <div class="cat-pills">
+            <span class="cat-pill active" style="background:#1976D2">💻 إلكترونيات</span>
+            <span class="cat-pill" style="border-color:#7B1FA2;color:#7B1FA2">🪑 أثاث</span>
+            <span class="cat-pill" style="border-color:#388E3C;color:#388E3C">📚 تجهيزات</span>
+            <span class="cat-pill" style="border-color:#F57C00;color:#F57C00">🚗 مركبة</span>
+            <span class="cat-pill" style="border-color:#616161;color:#616161">📌 أخرى</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>الرقم التسلسلي</label>
+          <input value="DELL-OPT-7090-2025-014">
+        </div>
+
+        <div class="field">
+          <label>الموقع</label>
+          <input value="مكتب الاستقبال">
+        </div>
+
+        <div class="field full">
+          <label>الصورة</label>
+          <div class="dropzone">
+            <strong>🖼️ اسحب صورة الممتلك أو انقر للاختيار</strong>
+            <small>JPG / PNG / WebP فقط — الحد الأقصى 2 ميجابايت</small>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>الحالة</label>
+          <div class="cond-pills">
+            <span class="cond-pill" style="border-color:#a5d6a7;color:#1B5E20"><span class="cdot" style="background:#388E3C"></span>✨ ممتاز</span>
+            <span class="cond-pill active" style="border-color:#90caf9;color:#0277bd"><span class="cdot" style="background:#1976D2"></span>✅ جيد</span>
+            <span class="cond-pill" style="border-color:#ffcc80;color:#FB8C00"><span class="cdot" style="background:#FB8C00"></span>⚠️ يحتاج صيانة</span>
+            <span class="cond-pill" style="border-color:#ef9a9a;color:#c62828"><span class="cdot" style="background:#c62828"></span>💢 تالف</span>
+            <span class="cond-pill" style="border-color:#bdbdbd;color:#616161"><span class="cdot" style="background:#616161"></span>❓ مفقود</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>الشخص المسؤول</label>
+          <input value="زهراء">
+        </div>
+
+        <div class="field">
+          <label>المورّد</label>
+          <input value="SLS للمكاتب">
+        </div>
+
+        <div class="field">
+          <label>تاريخ الشراء</label>
+          <input type="date" value="2025-09-15">
+        </div>
+
+        <div class="field">
+          <label>سعر الشراء</label>
+          <div class="input-suffix"><input value="285.000"><span class="suf">د.ب</span></div>
+        </div>
+
+        <div class="field full">
+          <label>ربط بمصروف موجود (اختياري)</label>
+          <input list="expenses" placeholder="ابحث عن مصروف بالوصف أو التاريخ" value="مصروف #14 — حاسوب 2025-09-15 (285 د.ب)">
+        </div>
+
+        <div class="field">
+          <label>العمر الافتراضي بالسنوات</label>
+          <input type="number" value="5">
+        </div>
+
+        <div class="field"></div>
+
+        <div class="field">
+          <label>تاريخ آخر صيانة</label>
+          <input type="date" value="2026-03-01">
+        </div>
+
+        <div class="field">
+          <label>تاريخ الصيانة القادمة</label>
+          <input type="date" value="2026-09-01">
+        </div>
+
+        <div class="field full">
+          <label>ملاحظات الصيانة</label>
+          <textarea>تم تنظيف المروحة الداخلية وتحديث Windows.</textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-sec">إلغاء</button>
+        <button class="btn btn-pri">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" style="background:linear-gradient(135deg,#1B5E20,#388E3C)">
+    <h2>✅ نهاية المعاينة</h2>
+    <small>5 شاشات جاهزة للمراجعة — في انتظار موافقة المالك قبل بدء التنفيذ</small>
+  </div>
+
+</div>
+</body>
+</html>
