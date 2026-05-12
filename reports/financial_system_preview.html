@@ -90,7 +90,8 @@
   tbody tr:hover{background:#faf6fd}
   .cat-cell{display:flex;align-items:center;gap:6px}
   .cat-dot{width:10px;height:10px;border-radius:50%}
-  .receipt-thumb{display:inline-block;width:36px;height:28px;background:#f3e5f5;border:1px solid #c4a8e8;border-radius:5px;font-size:14px;text-align:center;line-height:28px;cursor:pointer}
+  .receipt-thumb{display:inline-block;width:36px;height:28px;background:#f3e5f5;border:1px solid #c4a8e8;border-radius:5px;font-size:14px;text-align:center;line-height:28px;cursor:pointer;object-fit:cover;vertical-align:middle}
+  .receipt-thumb.pdf{background:#FFEBEE;border-color:#ef9a9a;color:#c62828;font-weight:700;font-size:11px}
   .amount{font-weight:700;color:#E65100;direction:ltr;display:inline-block}
 
   /* --- Raed view extras --- */
@@ -335,7 +336,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#1976D2"></span>🏢 كهرباء يناير</span></td>
           <td><span class="amount">120.500 د.ب</span></td>
           <td>EWA</td>
-          <td><span class="receipt-thumb">📄</span></td>
+          <td><span class="receipt-thumb pdf" title="إيصال PDF">PDF</span></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -346,7 +347,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#F57C00"></span>🛍️ شوكولاتة للمتجر</span></td>
           <td><span class="amount">85.000 د.ب</span></td>
           <td>Carrefour</td>
-          <td><span class="receipt-thumb">🖼️</span></td>
+          <td><img class="receipt-thumb" alt="إيصال" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='28'%3E%3Crect width='100%25' height='100%25' fill='%23e1bee7'/%3E%3Crect x='3' y='3' width='30' height='22' fill='%23ce93d8'/%3E%3Crect x='6' y='6' width='24' height='2' fill='%23fff'/%3E%3Crect x='6' y='11' width='18' height='2' fill='%23fff'/%3E%3Crect x='6' y='16' width='22' height='2' fill='%23fff'/%3E%3Crect x='6' y='21' width='14' height='2' fill='%23fff'/%3E%3C/svg%3E"></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -368,7 +369,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#FF5722"></span>🔧 صيانة المكيف</span></td>
           <td><span class="amount">60.000 د.ب</span></td>
           <td>ورشة محمد</td>
-          <td><span class="receipt-thumb">📄</span></td>
+          <td><span class="receipt-thumb pdf" title="إيصال PDF">PDF</span></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -432,7 +433,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#FF5722"></span>🔧 صيانة بوابة</span></td>
           <td><span class="amount">35.000 د.ب</span></td>
           <td>ورشة محمد</td>
-          <td><span class="receipt-thumb">📄</span></td>
+          <td><span class="receipt-thumb pdf" title="إيصال PDF">PDF</span></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -443,7 +444,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#1976D2"></span>🏢 إنترنت أبريل</span></td>
           <td><span class="amount">45.500 د.ب</span></td>
           <td>Batelco</td>
-          <td><span class="receipt-thumb">🖼️</span></td>
+          <td><img class="receipt-thumb" alt="إيصال" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='28'%3E%3Crect width='100%25' height='100%25' fill='%23e1bee7'/%3E%3Crect x='3' y='3' width='30' height='22' fill='%23ce93d8'/%3E%3Crect x='6' y='6' width='24' height='2' fill='%23fff'/%3E%3Crect x='6' y='11' width='18' height='2' fill='%23fff'/%3E%3Crect x='6' y='16' width='22' height='2' fill='%23fff'/%3E%3Crect x='6' y='21' width='14' height='2' fill='%23fff'/%3E%3C/svg%3E"></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -454,7 +455,7 @@
           <td><span class="cat-cell"><span class="cat-dot" style="background:#00838F"></span>🎉 ضيافة لقاء أولياء</span></td>
           <td><span class="amount">25.750 د.ب</span></td>
           <td>Carrefour</td>
-          <td><span class="receipt-thumb">📄</span></td>
+          <td><span class="receipt-thumb pdf" title="إيصال PDF">PDF</span></td>
           <td>
             <button class="btn-edit">✏️</button>
             <button class="btn-danger">🗑️</button>
@@ -592,7 +593,7 @@
       <span class="chip">✨ ممتاز</span>
       <span class="chip">✅ جيد</span>
       <span class="chip">⚠️ يحتاج صيانة</span>
-      <span class="chip">💢 تالف</span>
+      <span class="chip">🔨 تالف</span>
       <span class="chip">❓ مفقود</span>
     </div>
 
@@ -644,7 +645,7 @@
         <div class="asset-img">🖨️</div>
         <div class="asset-body">
           <div class="name">طابعة HP LaserJet</div>
-          <div><span class="badge bg-cat">💻 إلكترونيات</span> <span class="badge bg-cond-damaged">💢 تالف</span></div>
+          <div><span class="badge bg-cat">💻 إلكترونيات</span> <span class="badge bg-cond-damaged">🔨 تالف</span></div>
           <div class="meta">📍 مكتب الاستقبال</div>
           <div class="meta">👤 زهراء</div>
         </div>
@@ -757,7 +758,7 @@
             <span class="cond-pill" style="border-color:#a5d6a7;color:#1B5E20"><span class="cdot" style="background:#388E3C"></span>✨ ممتاز</span>
             <span class="cond-pill active" style="border-color:#90caf9;color:#0277bd"><span class="cdot" style="background:#1976D2"></span>✅ جيد</span>
             <span class="cond-pill" style="border-color:#ffcc80;color:#FB8C00"><span class="cdot" style="background:#FB8C00"></span>⚠️ يحتاج صيانة</span>
-            <span class="cond-pill" style="border-color:#ef9a9a;color:#c62828"><span class="cdot" style="background:#c62828"></span>💢 تالف</span>
+            <span class="cond-pill" style="border-color:#ef9a9a;color:#c62828"><span class="cdot" style="background:#c62828"></span>🔨 تالف</span>
             <span class="cond-pill" style="border-color:#bdbdbd;color:#616161"><span class="cdot" style="background:#616161"></span>❓ مفقود</span>
           </div>
         </div>
