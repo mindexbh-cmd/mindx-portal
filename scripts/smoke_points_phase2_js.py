@@ -1,4 +1,4 @@
-"""Phase 2 JS validation smoke for the points board UI.
+"""Phase 2 + 3 JS validation smoke for the points board UI.
 
 Mirrors scripts/smoke_parent_html_js_valid.py but targets the
 points-board template constants. Catches the class of bug where
@@ -107,36 +107,51 @@ assert rv.status_code == 200, f"/points/board HTTP {rv.status_code}"
 html = rv.get_data(as_text=True)
 
 PHASE2_MARKERS = {
-    # C1 — budget bar
+    # Phase 2 — C1 budget bar
     "id=\"pb-budget\"":            "C1 budget card DOM",
     "function loadBudget":         "C1 budget loader",
     "function renderBudget":       "C1 budget renderer",
-    # C2 — per-student session chip
+    # Phase 2 — C2 per-student session chip
     "function loadSessionEvents":  "C2 session-events loader",
     "function paintSessionBadge":  "C2 chip painter",
-    # C3 — quick-action buttons
+    # Phase 2 — C3 quick-action buttons
     "function quickGrant":         "C3 quick-grant fn",
     "function pickBehaviorForAmount": "C3 behavior picker",
     "pq-row":                      "C3 quick-action row CSS",
-    # C4 — warnings + disable
+    # Phase 2 — C4 warnings + disable
     "function refreshQuickButtonStates": "C4 button-state refresher",
     "function toastVariant":       "C4 colour toast helper",
     "_lastPctSeen":                "C4 threshold-crossing guard",
-    # C5 — undo
+    # Phase 2 — C5 undo
     "function undoLastGrant":      "C5 undo fn",
     "function rememberLastGrant":  "C5 undo state",
     "id=\"pbUndo\"":               "C5 undo pill DOM",
-    # C6 — absent
+    # Phase 2 — C6 absent
     "function paintAbsentCards":   "C6 absent painter",
     "pb-abs-badge":                "C6 absent badge CSS",
     "pb-absent":                   "C6 absent grayout CSS",
-    # C7 — note modal
+    # Phase 2 — C7 note modal
     "id=\"noteBack\"":             "C7 note modal DOM",
     "function openNoteModal":      "C7 note open fn",
     "function saveNoteGrant":      "C7 note save fn",
     "function selectNoteAmt":      "C7 amount picker fn",
-    # C8 — orchestrator
+    # Phase 2 — C8 orchestrator
     "function refreshBoardState":  "C8 refresh orchestrator",
+    # Phase 3 — C2 stats modal
+    "id=\"statsBack\"":            "P3-C2 stats modal DOM",
+    "function openStatsModal":     "P3-C2 stats open fn",
+    "function closeStatsModal":    "P3-C2 stats close fn",
+    "function renderStatsModal":   "P3-C2 stats renderer",
+    # Phase 3 — C4 distribute modal
+    "id=\"distBack\"":             "P3-C4 distribute modal DOM",
+    "function openDistModal":      "P3-C4 distribute open fn",
+    "function executeDist":        "P3-C4 distribute execute fn",
+    "function selectDistAmt":      "P3-C4 amount picker fn",
+    "function refreshDistPreview": "P3-C4 preview refresher",
+    "function countPresent":       "P3-C4 present-counter helper",
+    # Phase 3 — C5 polish
+    "pb-sess-badge--bumped":       "P3-C5 chip bump anim CSS",
+    "(hover: hover) and (pointer: fine)": "P3-C5 desktop-only hover",
 }
 for needle, label in PHASE2_MARKERS.items():
     assert needle in html, f"missing — {label} ({needle!r})"
@@ -158,4 +173,4 @@ for m in REGRESSION_MARKERS:
     assert m in html, f"regression — pre-Phase-2 piece missing: {m!r}"
 print(f"  {len(REGRESSION_MARKERS)} pre-Phase-2 markers preserved")
 
-print("\nPhase 2 JS validation smoke passed.")
+print("\nPhase 2 + 3 JS validation smoke passed.")
