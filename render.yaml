@@ -17,12 +17,14 @@ services:
       (pip install 'pillow-heif>=0.13' || echo "[deploy] pillow-heif install failed — HEIC parent uploads will fall back to passthrough") &&
       python -m playwright install chromium &&
       (python -m playwright install-deps chromium || echo "[deploy] install-deps non-fatal failure")
-    # --timeout 120: the Drive-import endpoint does pre-import backup +
-    #   xlsx fetch + parse + per-row upsert which can run 30-90s for a
-    #   ~280-row sheet against Postgres. Default 30s causes HTTP 502.
+    # --timeout 300: was 120s for the Drive-import endpoint (pre-import
+    #   backup + xlsx fetch + parse + per-row upsert can run 30-90s for
+    #   ~280 rows against Postgres). Raised to 300s to accommodate
+    #   150 MB book uploads — on a 3 Mbps mobile connection a single
+    #   file upload takes ~6-7 min, well past the old ceiling.
     # --graceful-timeout 30: how long to give in-flight requests to
     #   finish during a deploy/restart before SIGKILL.
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --graceful-timeout 30
     envVars:
       - key: SECRET_KEY
         generateValue: true
