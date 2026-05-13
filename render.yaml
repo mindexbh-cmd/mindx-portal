@@ -24,7 +24,11 @@ services:
     #   file upload takes ~6-7 min, well past the old ceiling.
     # --graceful-timeout 30: how long to give in-flight requests to
     #   finish during a deploy/restart before SIGKILL.
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --graceful-timeout 30
+    # --workers 2 / --threads 4: conservative for the 512 MB RAM
+    #   Starter plan. 2 worker processes × 4 threads = up to 8
+    #   concurrent requests (gthread worker) while keeping per-worker
+    #   memory low. Pre-fork lets idle workers be cheap.
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --graceful-timeout 30 --workers 2 --threads 4
     envVars:
       - key: SECRET_KEY
         generateValue: true
