@@ -124,19 +124,67 @@ jobs:
           echo "=== ~/.bubblewrap/config.json ==="
           cat "$HOME/.bubblewrap/config.json" 2>/dev/null || echo "(file missing)"
           echo ""
-          echo "=== Repo twa-manifest.json (URL fields only) ==="
-          python3 -c "
-          import json
-          d = json.load(open('twa-manifest.json'))
-          for k, v in d.items():
-              if isinstance(v, str) and ('url' in k.lower() or k == 'host' or k.startswith('http')):
-                  print(f'  {k}: {v}')
-              elif k == 'webManifestUrl':
-                  print(f'  {k}: {v}')
-          "
+          echo "=== Raw bytes of twa-manifest.json (first 50 lines of xxd) ==="
+          # Reveals any non-ASCII / zero-width / BOM / underscore
+          # characters that GitHub Actions' log Markdown rendering
+          # might be silently inserting or hiding.
+          xxd twa-manifest.json | head -50
           echo ""
-          echo "=== Live /manifest.json fetch (CI reachability + content) ==="
-          curl -sv https://mindx-portal-1.onrender.com/manifest.json 2>&1 | tail -20
+          echo "=== Node URL.parse() on every twa-manifest.json URL field ==="
+          node <<'NODE_TEST_1'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('twa-manifest.json', 'utf8'));
+          console.log('Parsed twa-manifest.json (pretty):');
+          console.log(JSON.stringify(m, null, 2));
+          console.log('---');
+          console.log('Testing each URL field with new URL():');
+          ['startUrl', 'iconUrl', 'maskableIconUrl',
+           'monochromeIconUrl', 'webManifestUrl', 'fullScopeUrl']
+          .forEach(k => {
+            const v = m[k];
+            try {
+              const u = new URL(v);
+              console.log('  OK  ', k, '=', v, '-> origin', u.origin);
+            } catch (e) {
+              console.log('  FAIL', k, '=', JSON.stringify(v), '->', e.message);
+            }
+          });
+          console.log('---');
+          console.log('Testing host treated as URL (with https:// prefix):');
+          try {
+            const u = new URL('https://' + m.host);
+            console.log('  OK   host as URL =', u.href);
+          } catch (e) {
+            console.log('  FAIL host:', e.message);
+          }
+          NODE_TEST_1
+          echo ""
+          echo "=== Node URL.parse() on every LIVE /manifest.json URL field ==="
+          curl -s https://mindx-portal-1.onrender.com/manifest.json \
+            | node <<'NODE_TEST_2'
+          let body = '';
+          process.stdin.on('data', c => body += c);
+          process.stdin.on('end', () => {
+            const m = JSON.parse(body);
+            console.log('Live manifest URLs:');
+            console.log('  start_url:', JSON.stringify(m.start_url));
+            console.log('  scope    :', JSON.stringify(m.scope));
+            (m.icons || []).forEach((i, idx) =>
+              console.log('  icon[' + idx + '].src:', JSON.stringify(i.src)));
+            console.log('Testing with new URL():');
+            try { new URL(m.start_url); console.log('  start_url OK'); }
+            catch (e) { console.log('  start_url FAIL:', e.message); }
+            try { new URL(m.scope); console.log('  scope OK'); }
+            catch (e) { console.log('  scope FAIL:', e.message); }
+            (m.icons || []).forEach((i, idx) => {
+              try { new URL(i.src); console.log('  icon[' + idx + '] OK'); }
+              catch (e) { console.log('  icon[' + idx + '] FAIL:', e.message); }
+            });
+          });
+          NODE_TEST_2
+          echo ""
+          echo "=== Live /manifest.json reachability headers ==="
+          curl -sI https://mindx-portal-1.onrender.com/manifest.json 2>&1 | head -10
           echo ""
 
       - name: Scaffold Android project from twa-manifest.json
