@@ -158,5 +158,27 @@ assert "data-direct-confirm-wired" in html, (
 print("[16] Direct-order confirm interceptor wired + original "
       "requestStoreItem preserved")
 
+# ── [17] Cart checkout now writes status='requested' (v2.9.10.2-safe):
+#        admin-approval gate preserved (no immediate debit per
+#        _pts_balance), cart orders appear in the قيد المراجعة
+#        pending list (which filters WHERE status='requested'),
+#        and the cancel-by-parent flow already supports them.
+ck_idx = SRC.index("def api_parent_cart_checkout_v2")
+ck_body = SRC[ck_idx:ck_idx + 4000]
+assert '"requested", "parent_cart"' in ck_body, (
+    "cart checkout no longer writes 'requested' status — bugs "
+    "1 + 2 of v2.9.10.2-safe would regress")
+assert '"pending", "parent_cart"' not in ck_body, (
+    "cart checkout still writes 'pending' somewhere — debit "
+    "would fire on order placement")
+assert ("WHERE student_id=? AND status='requested'" in SRC), (
+    "pending-list query no longer filters status='requested' — "
+    "cart orders would not appear in the قيد المراجعة callout")
+assert "status NOT IN " in SRC, (
+    "_pts_balance no longer excludes requested/cancelled/rejected "
+    "from the spent sum — debit semantics broken")
+print("[17] Cart checkout writes status=requested; pending-list "
+      "filter + _pts_balance exclusions intact")
+
 print("")
-print("All 16 invariants passed.")
+print("All 17 invariants passed.")
