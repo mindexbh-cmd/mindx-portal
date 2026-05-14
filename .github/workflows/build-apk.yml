@@ -276,17 +276,24 @@ jobs:
           # Previous attempt used `yes Y | bubblewrap init` —
           # plain `yes` outputs literal "Y" infinitely, which
           # filled the runner's log with 42k lines of Y in <30s
-          # and the workflow self-cancelled.
+          # and the workflow self-cancelled. Switched to
+          # `yes "" | head -100` (100 blank Enters then stdin
+          # closes), but the init wizard has ~15-20 prompts
+          # across 5 sections — when `yes` keeps producing
+          # after `head` has taken its quota, the closed pipe
+          # turns into a SIGPIPE/'Broken pipe' error and the
+          # whole pipeline aborts with exit 130.
           #
-          # Fix: `yes "" | head -100` pipes 100 empty lines
-          # (each "Enter" = accept default) then closes stdin.
-          # Bubblewrap consumes whatever prompts it has, falls
-          # back to defaults, and never sees an infinite stream.
-          #
-          # `--manifest` takes the URL of the LIVE web manifest
-          # (`new URL(value)` is run on the arg — a local path
-          # throws "Invalid URL", per the official docs).
-          yes "" | head -100 | bubblewrap init \
+          # Final shape:
+          #   - `head -500` is comfortably above the wizard's
+          #     question count.
+          #   - `( yes "" || true )` swallows the SIGPIPE the
+          #     producer would otherwise raise when `head` has
+          #     filled its buffer and closed its stdin.
+          #   - `--manifest` is the LIVE web manifest URL
+          #     (Bubblewrap runs `new URL(value)` on the arg
+          #     — a local path throws "Invalid URL").
+          ( yes "" || true ) | head -500 | bubblewrap init \
                 --manifest="https://mindx-portal-1.onrender.com/manifest.json" \
                 --directory="$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
