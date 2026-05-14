@@ -78,7 +78,6 @@ jobs:
 
       - name: Scaffold Android project from twa-manifest.json
         env:
-          # Bubblewrap reads these for the signing pass.
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
         run: |
           # Bubblewrap init wants a workdir.  Use a sibling so the
@@ -88,14 +87,25 @@ jobs:
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # Generate the Android source tree from the committed
-          # manifest.  --directory points init at the current dir;
-          # the existing twa-manifest.json is reused as the source
-          # of truth (no interactive prompts).
-          bubblewrap init \
-            --manifest "./twa-manifest.json" \
-            --directory "$RUNNER_TEMP/twa-build" \
-            --skipPwaValidation
+          # Bubblewrap normally asks two interactive yes/no questions
+          # ("Install JDK?", "Install Android SDK?") which would
+          # hang the workflow.  Two-pronged non-interactive
+          # treatment:
+          #   1. --jdkPath / --androidSdkPath point at the toolchain
+          #      we already installed via setup-java + setup-android,
+          #      which makes Bubblewrap skip the prompts entirely.
+          #   2. Pipe a stream of 'No' answers on stdin as a
+          #      belt-and-suspenders fallback, so if a future CLI
+          #      version adds new prompts the build still proceeds.
+          echo "Using JDK at: $JAVA_HOME"
+          echo "Using Android SDK at: $ANDROID_SDK_ROOT"
+          yes "No" 2>/dev/null | head -20 \
+            | bubblewrap init \
+                --manifest "./twa-manifest.json" \
+                --directory "$RUNNER_TEMP/twa-build" \
+                --jdkPath "$JAVA_HOME" \
+                --androidSdkPath "$ANDROID_SDK_ROOT" \
+                --skipPwaValidation
 
       - name: Build signed release APK
         env:
@@ -105,10 +115,13 @@ jobs:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
         run: |
           cd "$RUNNER_TEMP/twa-build"
-          # Pipe both passwords on stdin in the order Bubblewrap
-          # prompts: keystore password first, key password second.
-          printf '%s\n%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_PASSWORD" \
-            | bubblewrap build \
+          # First two lines for the keystore + key password prompts
+          # (Bubblewrap's documented signing pass). Trailing 'No's
+          # cover any unexpected install prompts from new flags.
+          {
+            printf '%s\n%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_PASSWORD"
+            yes "No" 2>/dev/null | head -10
+          } | bubblewrap build \
                 --skipPwaValidation
           ls -lh ./app-release-signed.apk
 
