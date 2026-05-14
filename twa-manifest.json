@@ -11,7 +11,7 @@
   "navigationDividerColorDark": "#4a148c",
   "backgroundColor": "#ffffff",
   "enableNotifications": true,
-  "startUrl": "/",
+  "startUrl": "https://mindx-portal-1.onrender.com/",
   "iconUrl": "https://mindx-portal-1.onrender.com/static/icons/icon-512.png",
   "maskableIconUrl": "https://mindx-portal-1.onrender.com/static/icons/icon-512-maskable.png",
   "monochromeIconUrl": "https://mindx-portal-1.onrender.com/static/icons/badge-72.png",
