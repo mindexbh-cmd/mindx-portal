@@ -158,32 +158,35 @@ assert "data-direct-confirm-wired" in html, (
 print("[16] Direct-order confirm interceptor wired + original "
       "requestStoreItem preserved")
 
-# ── [17] v2.9.10.3-safe: pending-list query expanded to include
-#        BOTH 'requested' (direct orders) AND 'pending' (cart
-#        orders) so cart orders appear in قيد المراجعة and become
-#        cancellable. Cart-checkout INSERT still writes
-#        status='pending' (immediate debit preserved → spending
-#        cap intact). Cancel endpoint already accepts both.
+# ── [17] v2.9.10.4-safe: cart-checkout writes status='requested'
+#        so points DON'T debit on order placement (matches the
+#        legacy direct-order path). The pending-list query stays
+#        in its expanded form (matching both 'requested' AND
+#        'pending') for backward-compat with any rows still in
+#        'pending' from before this fix. The cancel endpoint
+#        already accepts both statuses.
 assert ("WHERE student_id=? AND status IN ('requested','pending')"
         in SRC), (
-    "pending-list query reverted — cart orders won't appear "
-    "in قيد المراجعة")
+    "pending-list query reverted from the v2.9.10.3 expanded "
+    "form — cart orders or any historical 'pending' rows would "
+    "vanish from قيد المراجعة")
 ck_idx = SRC.index("def api_parent_cart_checkout_v2")
 ck_body = SRC[ck_idx:ck_idx + 4000]
-assert '"pending", "parent_cart"' in ck_body, (
-    "cart checkout no longer writes status='pending' — the "
-    "insufficient-points spending cap would loosen")
-assert '"requested", "parent_cart"' not in ck_body, (
-    "v2.9.10.2-style status='requested' regressed — debit would "
-    "stop firing on cart checkout")
+assert '"requested", "parent_cart"' in ck_body, (
+    "cart checkout no longer writes status='requested' — points "
+    "would debit on placement, breaking the v2.9.10.4-safe "
+    "no-debit-until-approval invariant")
+assert '"pending", "parent_cart"' not in ck_body, (
+    "cart checkout still writes 'pending' somewhere — that path "
+    "regresses to the immediate-debit behavior")
 cn_idx = SRC.index("def api_parent_order_cancel")
 cn_body = SRC[cn_idx:cn_idx + 2500]
 assert "('requested', 'pending')" in cn_body \
        or '("requested", "pending")' in cn_body, (
     "cancel endpoint no longer accepts both statuses")
-print("[17] Pending-list query expanded ('requested'+'pending'); "
-      "cart-checkout still writes 'pending' (debit preserved); "
-      "cancel endpoint accepts both")
+print("[17] Cart checkout writes status=requested (no immediate "
+      "debit); pending-list still includes both statuses; cancel "
+      "endpoint accepts both")
 
 print("")
 print("All 17 invariants passed.")
