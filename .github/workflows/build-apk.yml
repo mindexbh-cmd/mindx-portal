@@ -76,35 +76,57 @@ jobs:
           test -s "$GITHUB_WORKSPACE/android.keystore" \
             && echo "Keystore decoded ($(wc -c < "$GITHUB_WORKSPACE/android.keystore") bytes)"
 
+      - name: Pre-configure Bubblewrap toolchain paths
+        run: |
+          # Bubblewrap stores JDK + Android SDK paths in a config
+          # file at ~/.bubblewrap/config.json. Setting them here
+          # via updateConfig avoids the interactive "install JDK?"
+          # and "install Android SDK?" prompts in `bubblewrap init`
+          # entirely. The flags on init also accept these paths
+          # but on some CLI versions they only set the default
+          # answer for the prompt rather than suppressing it.
+          # Doing both is belt-and-suspenders.
+          # ANDROID_HOME and ANDROID_SDK_ROOT are both set by
+          # setup-android@v3 (same path); use ANDROID_HOME since
+          # it's the canonical variable Bubblewrap reads.
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          bubblewrap updateConfig \
+            --jdkPath "$JAVA_HOME" \
+            --androidSdkPath "$ANDROID_HOME" \
+            || echo "updateConfig not available on this Bubblewrap version — continuing"
+
       - name: Scaffold Android project from twa-manifest.json
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
         run: |
-          # Bubblewrap init wants a workdir.  Use a sibling so the
-          # repo root stays clean.
           mkdir -p "$RUNNER_TEMP/twa-build"
           cp twa-manifest.json "$RUNNER_TEMP/twa-build/twa-manifest.json"
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # Bubblewrap normally asks two interactive yes/no questions
-          # ("Install JDK?", "Install Android SDK?") which would
-          # hang the workflow.  Two-pronged non-interactive
-          # treatment:
-          #   1. --jdkPath / --androidSdkPath point at the toolchain
-          #      we already installed via setup-java + setup-android,
-          #      which makes Bubblewrap skip the prompts entirely.
-          #   2. Pipe a stream of 'No' answers on stdin as a
-          #      belt-and-suspenders fallback, so if a future CLI
-          #      version adds new prompts the build still proceeds.
-          echo "Using JDK at: $JAVA_HOME"
-          echo "Using Android SDK at: $ANDROID_SDK_ROOT"
-          yes "No" 2>/dev/null | head -20 \
-            | bubblewrap init \
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          # Three-layer non-interactive defence:
+          #   1. updateConfig in the prior step seeds Bubblewrap's
+          #      config file with the toolchain paths.
+          #   2. --jdkPath / --androidSdkPath on init pass them
+          #      again as belt-and-suspenders.
+          #   3. stdin script answers in the order Bubblewrap
+          #      prompts in older CLI versions:
+          #         "Install JDK?"   -> No
+          #         "Path to JDK?"   -> $JAVA_HOME
+          #         "Install SDK?"   -> No
+          #         "Path to SDK?"   -> $ANDROID_HOME
+          #         …extra "No"s mop up any newer prompts.
+          {
+            printf 'No\n%s\nNo\n%s\n' "$JAVA_HOME" "$ANDROID_HOME"
+            yes "No" 2>/dev/null | head -20
+          } | bubblewrap init \
                 --manifest "./twa-manifest.json" \
                 --directory "$RUNNER_TEMP/twa-build" \
                 --jdkPath "$JAVA_HOME" \
-                --androidSdkPath "$ANDROID_SDK_ROOT" \
+                --androidSdkPath "$ANDROID_HOME" \
                 --skipPwaValidation
 
       - name: Build signed release APK
