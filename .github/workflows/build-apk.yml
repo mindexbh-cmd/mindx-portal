@@ -1,0 +1,164 @@
+name: Build Mindex Android APK
+
+# Triggers:
+#   - workflow_dispatch  : manual button in the Actions tab
+#   - push to main when  : only when something that actually affects
+#     the PWA surface     the APK changed — avoids rebuilding the
+#                         APK on every backend commit.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'twa-manifest.json'
+      - 'static/icons/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    name: Build TWA APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail fast if signing secrets are missing
+        env:
+          KS:    ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KSP:   ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KP:    ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=()
+          if [ -z "$KS"    ]; then missing+=("ANDROID_KEYSTORE_BASE64"); fi
+          if [ -z "$KSP"   ]; then missing+=("ANDROID_KEYSTORE_PASSWORD"); fi
+          if [ -z "$ALIAS" ]; then missing+=("ANDROID_KEY_ALIAS"); fi
+          if [ -z "$KP"    ]; then missing+=("ANDROID_KEY_PASSWORD"); fi
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required GitHub Actions secrets: ${missing[*]}"
+            echo ""
+            echo "Generate a keystore once locally and add the 4 secrets — see docs/APK_BUILD.md."
+            exit 1
+          fi
+          echo "All four signing secrets present."
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Bubblewrap pulls in build-tools 33+ automatically when it
+          # initialises; declaring nothing here lets the action install
+          # only the always-required cmdline-tools + platform-tools.
+          packages: ''
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli@latest
+
+      - name: Decode keystore from secret
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # Re-decode here rather than reusing one from disk — keeps
+          # the keystore ephemeral to this run.
+          echo "$KS" | base64 -d > "$GITHUB_WORKSPACE/android.keystore"
+          test -s "$GITHUB_WORKSPACE/android.keystore" \
+            && echo "Keystore decoded ($(wc -c < "$GITHUB_WORKSPACE/android.keystore") bytes)"
+
+      - name: Scaffold Android project from twa-manifest.json
+        env:
+          # Bubblewrap reads these for the signing pass.
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+        run: |
+          # Bubblewrap init wants a workdir.  Use a sibling so the
+          # repo root stays clean.
+          mkdir -p "$RUNNER_TEMP/twa-build"
+          cp twa-manifest.json "$RUNNER_TEMP/twa-build/twa-manifest.json"
+          cp "$GITHUB_WORKSPACE/android.keystore" \
+             "$RUNNER_TEMP/twa-build/android.keystore"
+          cd "$RUNNER_TEMP/twa-build"
+          # Generate the Android source tree from the committed
+          # manifest.  --directory points init at the current dir;
+          # the existing twa-manifest.json is reused as the source
+          # of truth (no interactive prompts).
+          bubblewrap init \
+            --manifest "./twa-manifest.json" \
+            --directory "$RUNNER_TEMP/twa-build" \
+            --skipPwaValidation
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+        run: |
+          cd "$RUNNER_TEMP/twa-build"
+          # Pipe both passwords on stdin in the order Bubblewrap
+          # prompts: keystore password first, key password second.
+          printf '%s\n%s\n' "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_PASSWORD" \
+            | bubblewrap build \
+                --skipPwaValidation
+          ls -lh ./app-release-signed.apk
+
+      - name: Extract SHA-256 signing fingerprint
+        id: fingerprint
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          cd "$RUNNER_TEMP/twa-build"
+          fp=$(keytool -list -v -keystore ./android.keystore \
+               -alias "$ANDROID_KEY_ALIAS" \
+               -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>/dev/null \
+               | grep -i "SHA256:" \
+               | head -1 \
+               | sed 's/.*SHA256: //' \
+               | tr -d ' \r\n')
+          if [ -z "$fp" ]; then
+            echo "::error::Could not extract SHA-256 fingerprint from keystore"
+            exit 1
+          fi
+          echo "fingerprint=$fp" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Mindex APK build complete"
+            echo ""
+            echo "**SHA-256 signing fingerprint:**"
+            echo ""
+            echo '```'
+            echo "$fp"
+            echo '```'
+            echo ""
+            echo "**Next step:** paste this value into Render →"
+            echo "mindx-portal service → Environment →"
+            echo "\`TWA_SHA256_FINGERPRINT\` → Save changes."
+            echo ""
+            echo "The APK is available below as a workflow artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindex-apk-${{ github.run_number }}
+          path: ${{ runner.temp }}/twa-build/app-release-signed.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload twa-manifest.json (post-init) for reproducibility
+        uses: actions/upload-artifact@v4
+        with:
+          name: twa-manifest-${{ github.run_number }}
+          path: ${{ runner.temp }}/twa-build/twa-manifest.json
+          retention-days: 30
+          if-no-files-found: warn
