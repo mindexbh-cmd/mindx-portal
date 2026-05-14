@@ -63,8 +63,12 @@ jobs:
           # only the always-required cmdline-tools + platform-tools.
           packages: ''
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli@latest
+      - name: Install Bubblewrap CLI (pinned)
+        # Pinned to 1.20.0 — six "Invalid URL" failures on @latest
+        # (1.24.1 as of 2026-05-15). 1.20.0 is a known-stable
+        # reference version that many TWA tutorials target. If
+        # 1.20.0 succeeds, that confirms a regression in 1.21+.
+        run: npm install -g @bubblewrap/cli@1.20.0
 
       - name: Decode keystore from secret
         env:
@@ -100,6 +104,40 @@ jobs:
           EOF
           echo "--- ~/.bubblewrap/config.json ---"
           cat "$HOME/.bubblewrap/config.json"
+
+      - name: Diagnostic dump (versions, env, manifests, reachability)
+        run: |
+          echo "=== Tool versions ==="
+          node --version
+          npm --version
+          which bubblewrap
+          bubblewrap --version || true
+          npm list -g @bubblewrap/cli 2>/dev/null | head -5
+          echo ""
+          echo "=== Environment ==="
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=${ANDROID_HOME:-(unset)}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-(unset)}"
+          test -d "$JAVA_HOME" && echo "  JAVA_HOME exists" || echo "  JAVA_HOME MISSING"
+          test -d "${ANDROID_HOME:-/nope}" && echo "  ANDROID_HOME exists" || echo "  ANDROID_HOME MISSING"
+          echo ""
+          echo "=== ~/.bubblewrap/config.json ==="
+          cat "$HOME/.bubblewrap/config.json" 2>/dev/null || echo "(file missing)"
+          echo ""
+          echo "=== Repo twa-manifest.json (URL fields only) ==="
+          python3 -c "
+          import json
+          d = json.load(open('twa-manifest.json'))
+          for k, v in d.items():
+              if isinstance(v, str) and ('url' in k.lower() or k == 'host' or k.startswith('http')):
+                  print(f'  {k}: {v}')
+              elif k == 'webManifestUrl':
+                  print(f'  {k}: {v}')
+          "
+          echo ""
+          echo "=== Live /manifest.json fetch (CI reachability + content) ==="
+          curl -sv https://mindx-portal-1.onrender.com/manifest.json 2>&1 | tail -20
+          echo ""
 
       - name: Scaffold Android project from twa-manifest.json
         env:
