@@ -269,16 +269,20 @@ jobs:
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # --manifest is REQUIRED by Bubblewrap CLI (init errors
-          # with "Missing required parameter --manifest" without
-          # it). Pass an absolute path to the committed
-          # twa-manifest.json from the repo checkout — relative
-          # paths trip the CLI's `new URL(arg)` validator. The
-          # v4 commit absolutized the live /manifest.json URLs,
-          # so the "Invalid URL" we hit earlier should now be gone
-          # regardless of which file Bubblewrap parses.
-          yes "No" 2>/dev/null | head -20 \
-            | bubblewrap init \
+          # ROOT CAUSE (revealed by the prior commit's direct-Node
+          # diagnostic): the "Invalid URL" error wasn't a URL
+          # parse failure at all — it was Bubblewrap asking
+          # "Directory /home/runner/work/_temp/twa-build does
+          # not exist. Do you want to create it now? (Y/n)"
+          # and choking on closed stdin. CLI surfaced the broken
+          # readline as a misleading "Invalid URL".
+          #
+          # Fix: `yes |` pipes infinite "y" to stdin so every
+          # prompt — present and future — gets a "yes" answer.
+          # The "Install JDK?" path we worried about earlier is
+          # already short-circuited by ~/.bubblewrap/config.json,
+          # so a "y" there would also be harmless.
+          yes | bubblewrap init \
                 --manifest="$GITHUB_WORKSPACE/twa-manifest.json" \
                 --directory "$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
