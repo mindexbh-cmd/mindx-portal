@@ -1,0 +1,40 @@
+{
+  "packageId": "com.mindex.portal",
+  "host": "mindx-portal-1.onrender.com",
+  "name": "مايندكس",
+  "launcherName": "مايندكس",
+  "display": "standalone",
+  "themeColor": "#4a148c",
+  "navigationColor": "#4a148c",
+  "navigationColorDark": "#4a148c",
+  "navigationDividerColor": "#4a148c",
+  "navigationDividerColorDark": "#4a148c",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://mindx-portal-1.onrender.com/static/icons/icon-512.png",
+  "maskableIconUrl": "https://mindx-portal-1.onrender.com/static/icons/icon-512-maskable.png",
+  "monochromeIconUrl": "https://mindx-portal-1.onrender.com/static/icons/badge-72.png",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://mindx-portal-1.onrender.com/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://mindx-portal-1.onrender.com/",
+  "minSdkVersion": 23,
+  "orientation": "portrait",
+  "fingerprints": []
+}
