@@ -116,13 +116,17 @@ jobs:
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # Bubblewrap auto-detects twa-manifest.json in the current
-          # directory. Dropping --manifest avoids triggering its
-          # URL-parser on the file-path argument (some CLI versions
-          # call new URL(arg) and throw "Invalid URL" on relative
-          # paths).
+          # --manifest is REQUIRED by Bubblewrap CLI (init errors
+          # with "Missing required parameter --manifest" without
+          # it). Pass an absolute path to the committed
+          # twa-manifest.json from the repo checkout — relative
+          # paths trip the CLI's `new URL(arg)` validator. The
+          # v4 commit absolutized the live /manifest.json URLs,
+          # so the "Invalid URL" we hit earlier should now be gone
+          # regardless of which file Bubblewrap parses.
           yes "No" 2>/dev/null | head -20 \
             | bubblewrap init \
+                --manifest="$GITHUB_WORKSPACE/twa-manifest.json" \
                 --directory "$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
 
