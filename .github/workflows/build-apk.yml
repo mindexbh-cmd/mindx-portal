@@ -76,26 +76,30 @@ jobs:
           test -s "$GITHUB_WORKSPACE/android.keystore" \
             && echo "Keystore decoded ($(wc -c < "$GITHUB_WORKSPACE/android.keystore") bytes)"
 
-      - name: Pre-configure Bubblewrap toolchain paths
+      - name: Pre-create Bubblewrap config file
         run: |
-          # Bubblewrap stores JDK + Android SDK paths in a config
-          # file at ~/.bubblewrap/config.json. Setting them here
-          # via updateConfig avoids the interactive "install JDK?"
-          # and "install Android SDK?" prompts in `bubblewrap init`
-          # entirely. The flags on init also accept these paths
-          # but on some CLI versions they only set the default
-          # answer for the prompt rather than suppressing it.
-          # Doing both is belt-and-suspenders.
-          # ANDROID_HOME and ANDROID_SDK_ROOT are both set by
-          # setup-android@v3 (same path); use ANDROID_HOME since
-          # it's the canonical variable Bubblewrap reads.
+          # The DOCUMENTED way to skip Bubblewrap's interactive
+          # "install JDK?" + "install Android SDK?" prompts is to
+          # pre-write its persistent config file at
+          # ~/.bubblewrap/config.json. When init starts it reads
+          # the paths from there and asks nothing.
+          # Ref: github.com/GoogleChromeLabs/bubblewrap/blob/main
+          #      /packages/cli/README.md#configuration
+          # Both prior attempts (updateConfig + --jdkPath flag)
+          # turned out to not actually suppress prompts on the
+          # @bubblewrap/cli@latest version installed in CI.
           export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           echo "JAVA_HOME=$JAVA_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME"
-          bubblewrap updateConfig \
-            --jdkPath "$JAVA_HOME" \
-            --androidSdkPath "$ANDROID_HOME" \
-            || echo "updateConfig not available on this Bubblewrap version — continuing"
+          mkdir -p "$HOME/.bubblewrap"
+          cat > "$HOME/.bubblewrap/config.json" <<EOF
+          {
+            "jdkPath": "$JAVA_HOME",
+            "androidSdkPath": "$ANDROID_HOME"
+          }
+          EOF
+          echo "--- ~/.bubblewrap/config.json ---"
+          cat "$HOME/.bubblewrap/config.json"
 
       - name: Scaffold Android project from twa-manifest.json
         env:
@@ -106,27 +110,14 @@ jobs:
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          # Three-layer non-interactive defence:
-          #   1. updateConfig in the prior step seeds Bubblewrap's
-          #      config file with the toolchain paths.
-          #   2. --jdkPath / --androidSdkPath on init pass them
-          #      again as belt-and-suspenders.
-          #   3. stdin script answers in the order Bubblewrap
-          #      prompts in older CLI versions:
-          #         "Install JDK?"   -> No
-          #         "Path to JDK?"   -> $JAVA_HOME
-          #         "Install SDK?"   -> No
-          #         "Path to SDK?"   -> $ANDROID_HOME
-          #         …extra "No"s mop up any newer prompts.
-          {
-            printf 'No\n%s\nNo\n%s\n' "$JAVA_HOME" "$ANDROID_HOME"
-            yes "No" 2>/dev/null | head -20
-          } | bubblewrap init \
+          # With ~/.bubblewrap/config.json pre-populated above, init
+          # reads the toolchain paths from disk and asks no
+          # questions. Trailing 'yes "No"' pipe stays as a defensive
+          # fallback in case any other prompt slips in.
+          yes "No" 2>/dev/null | head -20 \
+            | bubblewrap init \
                 --manifest "./twa-manifest.json" \
                 --directory "$RUNNER_TEMP/twa-build" \
-                --jdkPath "$JAVA_HOME" \
-                --androidSdkPath "$ANDROID_HOME" \
                 --skipPwaValidation
 
       - name: Build signed release APK
