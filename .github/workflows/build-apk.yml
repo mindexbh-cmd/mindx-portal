@@ -263,35 +263,57 @@ jobs:
           # respect this.
           DEBUG: "*"
           BUBBLEWRAP_LOG_LEVEL: "debug"
+          # Forwarded to the Python patcher below so the
+          # signingKey.alias in twa-manifest.json stays in sync
+          # with the keystore alias the build step expects.
+          ANDROID_KEY_ALIAS_FOR_PATCH: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           mkdir -p "$RUNNER_TEMP/twa-build"
           cp twa-manifest.json "$RUNNER_TEMP/twa-build/twa-manifest.json"
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # ROOT CAUSE (final, per Bubblewrap official docs):
-          # `--manifest` expects a URL to the LIVE web manifest
-          # (the `manifest.json` served by the site), NOT a
-          # file path to the local `twa-manifest.json`. The CLI
-          # runs `new URL(value)` on the arg, and any non-URL
-          # string (e.g. "/home/runner/work/.../twa-manifest.json")
-          # throws "Invalid URL" — which is the exact error we'd
-          # been chasing for a dozen commits.
+          # Previous attempt used `yes Y | bubblewrap init` —
+          # plain `yes` outputs literal "Y" infinitely, which
+          # filled the runner's log with 42k lines of Y in <30s
+          # and the workflow self-cancelled.
           #
-          # Docs example:
-          #   bubblewrap init --manifest https://my-twa.com/manifest.json
+          # Fix: `yes "" | head -100` pipes 100 empty lines
+          # (each "Enter" = accept default) then closes stdin.
+          # Bubblewrap consumes whatever prompts it has, falls
+          # back to defaults, and never sees an infinite stream.
           #
-          # Bubblewrap will fetch the live manifest, generate
-          # its own `twa-manifest.json` in `--directory`, then
-          # build the Android project. We override packageId /
-          # signingKey via the local copy we pre-staged
-          # alongside it (the cp above) — Bubblewrap reads
-          # an existing twa-manifest.json in the working dir
-          # if present, so the values from this repo win.
-          yes Y | bubblewrap init \
+          # `--manifest` takes the URL of the LIVE web manifest
+          # (`new URL(value)` is run on the arg — a local path
+          # throws "Invalid URL", per the official docs).
+          yes "" | head -100 | bubblewrap init \
                 --manifest="https://mindx-portal-1.onrender.com/manifest.json" \
                 --directory="$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
+
+          # Bubblewrap auto-derives packageId from the host
+          # (com.onrender.mindx_portal_1 — not what we want)
+          # and prompts for keystore details interactively
+          # during build. Patch twa-manifest.json in-place
+          # with our canonical packageId + the pre-staged
+          # keystore, then `bubblewrap update` re-applies the
+          # values to the generated Android project.
+          python3 - <<PYEOF
+          import json, os
+          path = 'twa-manifest.json'
+          with open(path, 'r', encoding='utf-8') as f:
+              m = json.load(f)
+          m['packageId'] = 'com.mindex.portal'
+          m['signingKey'] = {
+              'path': os.environ['GITHUB_WORKSPACE'] + '/android.keystore',
+              'alias': os.environ.get('ANDROID_KEY_ALIAS_FOR_PATCH', 'android'),
+          }
+          with open(path, 'w', encoding='utf-8') as f:
+              json.dump(m, f, indent=2, ensure_ascii=False)
+          print('twa-manifest.json patched: packageId + signingKey')
+          PYEOF
+          bubblewrap update --skipVersionUpgrade \
+            --manifest=./twa-manifest.json
 
       - name: Build signed release APK
         env:
