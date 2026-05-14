@@ -137,5 +137,26 @@ for rule in (("/api/parent/cart/add", "POST"),
     assert rule in live, "endpoint gone: " + str(rule)
 print("[15] Cart endpoints + legacy parent-store endpoint intact")
 
+# ── [16] Phase C.1 direct-order confirmation interceptor
+#        (v2.9.10.1-safe): injectOrderConfirmInterceptor +
+#        showDirectOrderConfirm helpers exist, original
+#        requestStoreItem is still defined (we wrap it, never
+#        replace it), and the IIFE-private _confirmMode flag is
+#        present (no dynamic window.* reassignment).
+assert "function injectOrderConfirmInterceptor" in html, (
+    "injectOrderConfirmInterceptor missing")
+assert "function showDirectOrderConfirm" in html, (
+    "showDirectOrderConfirm missing")
+assert "function requestStoreItem" in html, (
+    "legacy requestStoreItem definition gone — we should wrap "
+    "it, not delete it")
+assert "_confirmMode" in html and "_directRewardId" in html, (
+    "_confirmMode / _directRewardId state vars missing — "
+    "branching pattern absent")
+assert "data-direct-confirm-wired" in html, (
+    "interceptor idempotency sentinel missing")
+print("[16] Direct-order confirm interceptor wired + original "
+      "requestStoreItem preserved")
+
 print("")
-print("All 15 invariants passed.")
+print("All 16 invariants passed.")
