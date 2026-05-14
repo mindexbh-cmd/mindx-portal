@@ -132,5 +132,25 @@ assert "var actionHtml" not in html, (
 print("[10] Parent boot + Phase B/C wiring + PWA install banner "
       "all intact")
 
+# ── [11] v3.1.2-push-visibility — admin can see subscriptions
+#        without direct Postgres access. Two changes:
+#        a) GET /api/admin/push-subscriptions-count endpoint
+#        b) /api/admin/parent-audit-log filter widened to include
+#           action LIKE 'push.%'
+assert ("/api/admin/push-subscriptions-count", "GET") in live, (
+    "GET /api/admin/push-subscriptions-count not registered")
+assert "action LIKE 'push.%'" in SRC, (
+    "parent-audit-log filter not extended to include push.* events")
+with app.app.test_client() as c:
+    with c.session_transaction() as s:
+        s["user"] = {"id": 1, "username": "admin", "role": "admin"}
+    rv = c.get("/api/admin/push-subscriptions-count")
+assert rv.status_code == 200, "endpoint status=" + str(rv.status_code)
+d = _j.loads(rv.get_data(as_text=True))
+for k in ("total", "active", "recent"):
+    assert k in d, "response missing key: " + k
+print("[11] /api/admin/push-subscriptions-count returns "
+      "{total,active,recent}; audit filter includes push.* events")
+
 print("")
-print("All 10 invariants passed.")
+print("All 11 invariants passed.")
