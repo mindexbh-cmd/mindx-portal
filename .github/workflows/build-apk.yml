@@ -104,19 +104,25 @@ jobs:
       - name: Scaffold Android project from twa-manifest.json
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+          # Surface 'Invalid URL' details and any other CLI errors
+          # to the workflow log. Set DEBUG=* to maximise verbosity
+          # — most Bubblewrap modules use the 'debug' package and
+          # respect this.
+          DEBUG: "*"
+          BUBBLEWRAP_LOG_LEVEL: "debug"
         run: |
           mkdir -p "$RUNNER_TEMP/twa-build"
           cp twa-manifest.json "$RUNNER_TEMP/twa-build/twa-manifest.json"
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # With ~/.bubblewrap/config.json pre-populated above, init
-          # reads the toolchain paths from disk and asks no
-          # questions. Trailing 'yes "No"' pipe stays as a defensive
-          # fallback in case any other prompt slips in.
+          # Bubblewrap auto-detects twa-manifest.json in the current
+          # directory. Dropping --manifest avoids triggering its
+          # URL-parser on the file-path argument (some CLI versions
+          # call new URL(arg) and throw "Invalid URL" on relative
+          # paths).
           yes "No" 2>/dev/null | head -20 \
             | bubblewrap init \
-                --manifest "./twa-manifest.json" \
                 --directory "$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
 
