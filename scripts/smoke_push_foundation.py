@@ -86,14 +86,19 @@ print("[5] /sw.js has push handler (with requireInteraction+vibrate)")
 print("[6] /sw.js has notificationclick handler")
 
 # ── [7] Permission-prompt UI in main HTML
+# Note: the banner element itself is created at runtime (after the
+# 30s/login-success trigger fires), so the static HTML only carries
+# the #mxPushBanner CSS selector + the JS that builds + shows it.
 with app.app.test_client() as c:
     rv = c.get("/parent/legacy?pid=200603680")
 html = rv.get_data(as_text=True)
-for needle in ('id="mxPushBanner"', "_mxPushSubscribeFlow",
+for needle in ("#mxPushBanner", "_mxPushSubscribeFlow",
                "mx_push_dismissed_until", "mx-login-success",
-               "Notification.requestPermission"):
+               "Notification.requestPermission",
+               "_mxPushEnsureBanner"):
     assert needle in html, "push prompt UI missing: " + needle
-print("[7] Permission-prompt UI + smart-timing IIFE present")
+print("[7] Permission-prompt UI + smart-timing IIFE present "
+      "(CSS + builder + 30s/login triggers)")
 
 # ── [8] requirements.txt deps
 for dep in ("pywebpush==2.0.0", "py-vapid==1.9.0", "cryptography"):
