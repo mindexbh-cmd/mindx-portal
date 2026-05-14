@@ -195,6 +195,65 @@ jobs:
           curl -sI https://mindx-portal-1.onrender.com/manifest.json 2>&1 | head -10
           echo ""
 
+      - name: Direct Node invocation with full stack trace
+        # This step intentionally always succeeds (continue-on-error
+        # + `|| true`) so the subsequent scaffold step still runs
+        # and we get BOTH the stack trace here AND the CLI's
+        # rendered error message there. The two combined narrow
+        # the offending field unambiguously.
+        continue-on-error: true
+        run: |
+          set +e
+          GLOBAL_MODULES=$(npm root -g)
+          export GLOBAL_MODULES
+          echo "Global node_modules: $GLOBAL_MODULES"
+          ls "$GLOBAL_MODULES/@bubblewrap/cli/" 2>/dev/null | head -5
+          echo ""
+          echo "=== Direct require() with uncaughtException trap ==="
+          node --stack-trace-limit=100 <<'NODE_TRACE' || true
+          process.on('uncaughtException', e => {
+            console.error('=== UNCAUGHT EXCEPTION ===');
+            console.error('Message:', e.message);
+            console.error('Code:   ', e.code);
+            console.error('Input:  ', e.input);
+            console.error('Stack:');
+            console.error(e.stack);
+            process.exit(99);
+          });
+          process.on('unhandledRejection', e => {
+            console.error('=== UNHANDLED REJECTION ===');
+            console.error('Message:', e && e.message);
+            console.error('Code:   ', e && e.code);
+            console.error('Input:  ', e && e.input);
+            console.error('Stack:');
+            console.error(e && e.stack);
+            process.exit(98);
+          });
+          const path = require('path');
+          const bubblewrapPath = path.join(
+            process.env.GLOBAL_MODULES,
+            '@bubblewrap/cli/bin/bubblewrap.js'
+          );
+          console.log('Resolving Bubblewrap entry:', bubblewrapPath);
+          console.log('argv before:', process.argv);
+          process.argv = [
+            'node', bubblewrapPath, 'init',
+            '--manifest=' + process.env.GITHUB_WORKSPACE
+              + '/twa-manifest.json',
+            '--directory=' + process.env.RUNNER_TEMP + '/twa-build',
+            '--skipPwaValidation'
+          ];
+          console.log('argv after :', process.argv);
+          console.log('--- invoking Bubblewrap programmatically ---');
+          // Re-require so module-level code in bubblewrap.js
+          // executes with the new argv.
+          delete require.cache[bubblewrapPath];
+          require(bubblewrapPath);
+          NODE_TRACE
+          echo ""
+          echo "=== Direct invocation exit: $? ==="
+          set -e
+
       - name: Scaffold Android project from twa-manifest.json
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
