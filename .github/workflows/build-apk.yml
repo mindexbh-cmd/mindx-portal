@@ -64,17 +64,19 @@ jobs:
           packages: ''
 
       - name: Install Bubblewrap CLI (pinned)
-        # Stepping back through versions to isolate the "Invalid
-        # URL" bug: @latest (1.24.1) and 1.20.0 both failed with
-        # identical error, while the diagnostic step proved every
-        # URL in both twa-manifest.json AND the live web manifest
-        # passes Node's `new URL()` parser cleanly. The error must
-        # come from a Bubblewrap-internal URL it constructs from
-        # our inputs. Trying 1.19.0 — the version before 1.20's
-        # CLI refactoring landed. If 1.19.0 also fails the bug
-        # is deeper than recent CLI churn and we'll pivot to
-        # manual TWA project generation.
-        run: npm install -g @bubblewrap/cli@1.19.0
+        # Version-bisecting the "Invalid URL" error:
+        #   1.24.1 (@latest)        fail
+        #   1.20.0                  fail
+        #   1.19.0                  doesn't exist on npm
+        #
+        # npm registry confirms these stable versions exist:
+        #   1.18.0/.1, 1.19.1, 1.20.0/.1, 1.21.0,
+        #   1.22.0/.2/.3/.4/.5/.6/.7, 1.23.0, 1.24.0/.1
+        #
+        # Trying 1.23.0 next — one minor below latest. Lets us
+        # narrow whether the regression is recent (1.24.x) or
+        # spans more versions.
+        run: npm install -g @bubblewrap/cli@1.23.0
 
       - name: Decode keystore from secret
         env:
