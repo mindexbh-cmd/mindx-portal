@@ -269,23 +269,27 @@ jobs:
           cp "$GITHUB_WORKSPACE/android.keystore" \
              "$RUNNER_TEMP/twa-build/android.keystore"
           cd "$RUNNER_TEMP/twa-build"
-          # ROOT CAUSE: Bubblewrap was choking on the prompt
-          # "Directory /home/runner/work/_temp/twa-build does
-          # not exist. Do you want to create it now? (Y/n)"
-          # — not on any URL — and the CLI surfaced the broken
-          # readline as a misleading "Invalid URL".
+          # ROOT CAUSE (final, per Bubblewrap official docs):
+          # `--manifest` expects a URL to the LIVE web manifest
+          # (the `manifest.json` served by the site), NOT a
+          # file path to the local `twa-manifest.json`. The CLI
+          # runs `new URL(value)` on the arg, and any non-URL
+          # string (e.g. "/home/runner/work/.../twa-manifest.json")
+          # throws "Invalid URL" — which is the exact error we'd
+          # been chasing for a dozen commits.
           #
-          # Final fix has three parts:
-          #   1. cd into the pre-created dir so all relative
-          #      paths Bubblewrap derives use the right base.
-          #   2. --directory= (with =, not space) explicitly
-          #      points the CLI at the same absolute path.
-          #   3. `yes Y` pipes an infinite stream of literal "Y"
-          #      (uppercase) — safer than plain `yes` (which
-          #      pipes "y") for prompts that do strict-equality
-          #      matching against the default answer in (Y/n).
+          # Docs example:
+          #   bubblewrap init --manifest https://my-twa.com/manifest.json
+          #
+          # Bubblewrap will fetch the live manifest, generate
+          # its own `twa-manifest.json` in `--directory`, then
+          # build the Android project. We override packageId /
+          # signingKey via the local copy we pre-staged
+          # alongside it (the cp above) — Bubblewrap reads
+          # an existing twa-manifest.json in the working dir
+          # if present, so the values from this repo win.
           yes Y | bubblewrap init \
-                --manifest="$GITHUB_WORKSPACE/twa-manifest.json" \
+                --manifest="https://mindx-portal-1.onrender.com/manifest.json" \
                 --directory="$RUNNER_TEMP/twa-build" \
                 --skipPwaValidation
 
