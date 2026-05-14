@@ -24,6 +24,15 @@ python-bidi==0.4.2
 # to display view-only books as page images instead of an iframe'd PDF —
 # this lets us strip the Chrome PDF toolbar's download button.
 pypdfium2>=4.20
+# Web Push (Phase 2 — v3.1-push-foundation). pywebpush handles the
+# AES128GCM-encrypted payload + VAPID JWT signing for browser push
+# delivery. py-vapid is the lower-level signer (used by both
+# pywebpush and the one-shot scripts/generate_vapid.py keygen).
+# cryptography is the transitive dep both lean on — pinning the
+# floor here keeps Render builds repeatable.
+pywebpush==2.0.0
+py-vapid==1.9.0
+cryptography>=41.0.0
 # NOTE: pillow-heif is intentionally NOT pinned here. The package
 # needs the system libheif/libde265 libraries which Render's stock
 # Python image doesn't always provide — when the wheel falls back to

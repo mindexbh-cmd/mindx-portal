@@ -40,6 +40,21 @@ services:
         value: /var/data/playwright-browsers
       - key: PYTHONUNBUFFERED
         value: "1"
+      # ── Web Push (VAPID) — Phase 2 (v3.1-push-foundation).
+      # sync:false means Render does NOT carry these into a Blueprint
+      # clone; the owner must paste them manually into the dashboard
+      # for each environment. Generate the key pair locally via
+      #   python scripts/generate_vapid.py
+      # then add the printed values in Render → Environment.
+      # If unset, /api/push/vapid-public-key returns an empty string
+      # and the client-side prompt logic refuses to start the
+      # subscribe flow — feature degrades gracefully until keys land.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CLAIM_SUB
+        value: "mailto:mindex.bh@gmail.com"
     disk:
       name: mindx-data
       mountPath: /var/data
