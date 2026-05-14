@@ -95,10 +95,14 @@ html = rv.get_data(as_text=True)
 for needle in ("#mxPushBanner", "_mxPushSubscribeFlow",
                "mx_push_dismissed_until", "mx-login-success",
                "Notification.requestPermission",
-               "_mxPushEnsureBanner"):
+               "_mxPushEnsureBanner",
+               # v3.1.1-auto-subscribe: silent re-subscribe when
+               # permission is already granted (banner stays hidden)
+               "_mxPushAutoSubscribe",
+               "pushManager.getSubscription"):
     assert needle in html, "push prompt UI missing: " + needle
-print("[7] Permission-prompt UI + smart-timing IIFE present "
-      "(CSS + builder + 30s/login triggers)")
+print("[7] Permission-prompt UI + smart-timing IIFE + auto-"
+      "subscribe path all present")
 
 # ── [8] requirements.txt deps
 for dep in ("pywebpush==2.0.0", "py-vapid==1.9.0", "cryptography"):
