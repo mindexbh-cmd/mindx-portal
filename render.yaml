@@ -55,6 +55,23 @@ services:
         sync: false
       - key: VAPID_CLAIM_SUB
         value: "mailto:mindex.bh@gmail.com"
+      # ── TWA / Android sideloaded APK (Phase 3 v3.3-twa-ready).
+      # Set after the first PWABuilder.com build. The fingerprint
+      # is the SHA-256 of the keystore certificate used to sign the
+      # APK. Format: 32 hex bytes separated by colons, exactly 95
+      # characters total ("AA:BB:CC:...:99"). Multiple fingerprints
+      # can be comma-separated to support keystore rotation. With
+      # the env var unset /.well-known/assetlinks.json returns []
+      # which is a valid 'no verified app yet' response — the TWA
+      # still installs, just falls back to Chrome-Custom-Tab UI
+      # (URL bar visible) until the fingerprint lands.
+      - key: TWA_SHA256_FINGERPRINT
+        sync: false
+      # Optional: override the default Android package_name
+      # (com.mindex.portal). Only needed if the PWABuilder build
+      # used a different package id.
+      - key: TWA_PACKAGE_NAME
+        sync: false
     disk:
       name: mindx-data
       mountPath: /var/data
