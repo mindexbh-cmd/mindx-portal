@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For every non-trivial task, follow this loop:
 
+0. **Vague request? Run `/plan` first.** If the operator's ask is a sentence-level wish ("الموقع بطيء", "أريد ميزة كذا"), invoke `prompt-engineer-agent` via `/plan <description>` to convert it into a phased plan with concrete agent invocations, scripts, and approval gates. Skip this step only when the work is clearly scoped (e.g. "fix the typo on line 1234" — no plan needed).
 1. **Investigate first.** Read the relevant code, query the DB with `scripts/db_query.py` if needed, scan recent commits with `git log -n 20 --oneline`. Don't propose changes until you understand the current behaviour.
 2. **Create a safety tag.** Before any risky change, `git tag safety/pre-<feature>-<timestamp> HEAD`. `scripts/safe_deploy.py` does this automatically for deploys; for purely-local work, do it by hand if you're about to touch >5 files or migration code.
 3. **Implement with atomic commits.** One concern per commit. Run `python -c "import ast; ast.parse(open('app.py', encoding='utf-8').read())"` after every meaningful change to catch syntax issues before they ride a push to Render.
