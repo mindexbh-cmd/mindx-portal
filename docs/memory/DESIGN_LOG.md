@@ -112,6 +112,31 @@ Shipped via commit `43b52d3`. No visual change to the portal itself; this entry 
 - A REJECT verdict cannot be argued past by any other agent or by the coordinator. Only the human owner overrides. This makes the 5 categories functionally an inviolable design contract — a UI redesign that breaks the parent shop checkout flow gets stopped here even if every other reviewer approves.
 - The two demo audits (`docs/audits/catastrophe-check-delete-books-v2-20260515-204654.md` and `catastrophe-check-add-footer-slogan-20260515-204654.md`) serve as the canonical examples of REJECT vs APPROVE shape — future designers can read them to calibrate what reads as catastrophic vs purely additive.
 
+### 2026-05-16 — Parent UX consolidated onto منصة V1; بوابة V2 entry points retired
+
+Shipped via commits `6a94497` (PID-hub student name + flash kill) and `3ad90c1` (V1 consolidation). The visible parent surface across the portal is now exactly one template — `PORTAL_PARENT_HTML` at `/portal/parent`. See ADR-017 for the A-vs-B-vs-keep-both decision.
+
+**What users see now:**
+
+| Visitor state | Entry URL hit | Resulting page |
+|---|---|---|
+| Anonymous | `/parent` or `/parent/legacy` | 302 → `/login` (no more public CPR prompt) |
+| Anonymous | `/portal/parent-hub*` (any of 7 routes) | 302 → `/` (login_required gate) |
+| Logged-in `role=parent` | `/login` → dispatch | `/portal/parent` (V1) |
+| Logged-in `role=student` (child PID as username) | `/login` → dispatch | `/portal/parent` (V1, single-child render) |
+| Logged-in any role | `/portal/parent-hub*` (saved bookmark) | 302 → `/portal/parent` |
+| Logged-in any role | `/parent` or `/parent/legacy` | 302 → `/portal/parent` |
+
+**Login page** (`LOGIN_HTML`): the Arabic hint "أولياء الأمور: استخدم الرقم الشخصي للطالب اسم مستخدم" (shipped 2026-05-15 in `3712968`) is now removed — it was V2-flow-specific and contradicts the V1 dispatch story. Login form returns to its pre-2026-05-15 shape (no parent-specific caption).
+
+**V1 template now serves two role shapes** without any visual change:
+- `role=parent` — multi-child render driven by `linked_parent_for` JSON array; existing UX preserved.
+- `role=student` — single-child render driven by `linked_student_id` foreign key. The child's display name and points/payments/evaluations sections all populate from the one linked `students` row. No new visual treatment introduced; the template renders the same card grid and points tiles as it does for a single-child parent.
+
+**Templates intentionally kept in source for one release cycle** (revert safety net per ADR-017): `PORTAL_PARENT_HUB_HTML`, `PORTAL_PARENT_PID_HUB_HTML`, `PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PARENT_HTML`. They are unreachable through the routing table (every entry returns 302 to V1) but still parseable Python string constants. Will be physically removed in a follow-up after prod soak. The 2026-05-16 `6a94497` PID-hub fixes (student-name row in `PORTAL_PARENT_PID_HUB_HTML` + `.has-deeplink-pid` flash kill in `PARENT_HTML`) are now mostly moot at the routing layer, but they remain valuable if a revert is needed.
+
+**Parent shop, books library, push notifications, evaluations** — all still reachable; the V1 template links to them via its existing tile grid. The retirement is of the V2 *hub navigation chrome*, not of the underlying features.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

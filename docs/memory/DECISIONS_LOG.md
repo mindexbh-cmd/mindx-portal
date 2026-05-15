@@ -168,6 +168,27 @@ Format:
   - All REJECT verdicts land in `docs/memory/REJECTED_CHANGES.md` (full risk breakdown) and all verdicts (REJECT + APPROVE) land in `docs/memory/CATASTROPHE_LOG.md` (append-only ledger).
 - **Reference**: commit `43b52d3`; `.claude/agents/catastrophe-prevention-agent.md`; `.claude/commands/check.md`; `.claude/hook_scripts/catastrophe_block.py`; `docs/memory/CATASTROPHE_LOG.md`; `docs/memory/REJECTED_CHANGES.md`; demo audits `docs/audits/catastrophe-check-delete-books-v2-20260515-204654.md` (REJECT) and `docs/audits/catastrophe-check-add-footer-slogan-20260515-204654.md` (APPROVE). Complements ADR-007 (Expand-Migrate-Contract), ADR-009 (auto-rollback safety tags), and ADR-015 (feature-protector).
 
+### ADR-017: Consolidate parent UX onto منصة V1 (`/portal/parent`); retire بوابة V2 entry points; keep templates one release cycle for revert safety
+- **Date**: 2026-05-16
+- **Status**: accepted (supersedes the V2-direction implicit in ADR-014)
+- **Context**: The codebase carried two parallel parent surfaces:
+  - **منصة V1** — `/portal/parent`, role=parent, `PORTAL_PARENT_HTML`, points-focused. Renders the multi-child JSON in `linked_parent_for`.
+  - **بوابة V2** — `/portal/parent-hub` + 6 sub-pages (`/attendance`, `/payments`, `/messages`, `/evaluations`, `/books`, plus the PID-hub variant) + the public `/parent` + `/parent/legacy` CPR-prompt flow used by WhatsApp deep-links.
+  ADR-014 (2026-05-15) chose Interpretation B — keep `/parent` public for anonymous WhatsApp visitors, redirect only authenticated parents/students — under the assumption that V2 was the canonical authenticated surface for parents/students. Operator clarified that "نستخدم فقط منصة ولي الأمر" — V1 is the only parent surface they actually use; V2 is unused product surface. Keeping both creates maintenance drag (two templates to keep RTL-clean, two role dispatch paths, two sets of API endpoints) and ships UI that operators don't want users to see.
+- **Decision**: Retire V2 as an entry point. `_pts_parent_children_ids` now also accepts `role=student` (returns `[linked_student_id]`) so V1 renders for the parent-with-child-PID-as-username pattern. `/login` dispatch routes `role=student` AND `role=parent` to `/portal/parent` (legacy `landing_page=parent_hub`/`student_portal` also rerouted). All 7 `/portal/parent-hub*` routes return 302 → `/portal/parent`. `/parent` and `/parent/legacy` redirect anonymous visitors to `/login` (no more public PID prompt). The login-page hint "أولياء الأمور: استخدم الرقم الشخصي" (shipped 2026-05-15 in commit `3712968`) is removed — it was V2-flow-specific and now misleading. **Templates intentionally kept in source for one release cycle as a revert safety net**: `PORTAL_PARENT_HUB_HTML`, `PORTAL_PARENT_PID_HUB_HTML`, `PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PARENT_HTML`. These will be removed in a follow-up commit after the consolidation has soaked in prod without rollback.
+- **Alternatives considered**:
+  - Keep both surfaces, mark V2 as legacy in CLAUDE.md (rejected — operator wanted V2 gone from the user-visible surface, not just labelled; maintenance drag continues otherwise).
+  - Delete the V2 templates in the same commit (rejected — no safety net if a surprise consumer surfaces; one-release-cycle soak time costs nothing).
+  - Keep `/parent` + `/parent/legacy` public for WhatsApp deep-links per ADR-014 (rejected — operator confirmed the public CPR flow is unused; redirecting anonymous visitors to `/login` is cleaner; the operator-instruction "نستخدم فقط منصة ولي الأمر" effectively supersedes ADR-014's Interpretation B for this codebase).
+  - Add a feature flag toggle between V1/V2 (rejected — adds permanent config surface for a one-time consolidation).
+- **Consequences**:
+  - V1 (`/portal/parent`) is now the single canonical parent/student surface. Multi-child parents and child-PID-as-username students both render through one template + one API endpoint pair.
+  - URL compatibility preserved for saved bookmarks — every `/portal/parent-hub*` URL still resolves (via 302 to V1). No 404 surface for users who bookmarked V2 pages.
+  - `/parent` and `/parent/legacy` lose their public PID-prompt flow. WhatsApp deep-links carrying `?pid=` will now redirect to `/login` for anonymous visitors. Operator confirmed this flow is unused; no behavioural surprise expected.
+  - One release cycle of soak time before the V2 templates are physically removed from source — if a surprise consumer surfaces, revert the dispatch logic only and the templates are still wired up.
+  - ADR-014's redirect rule for authenticated visitors on `/parent` survives in spirit (`role=parent`/`role=student` → V1) but the anonymous-visitor branch of ADR-014 is superseded.
+- **Reference**: commit `3ad90c1` (consolidation), prior commit `6a94497` (parent-portal name + PID-flash fix shipped immediately before, now mostly moot for `/parent/legacy` after this consolidation but still useful for `PORTAL_PARENT_PID_HUB_HTML` rendering during the soak). Prod SHA `3ad90c147d05`; safety tag `safety/pre-consolidate-to-v1-platform-20260516-002351`. Operator quote: "نستخدم فقط منصة ولي الأمر".
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)

@@ -127,6 +127,35 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 - Prod verified: `/api/health` green at 1778875191; smoke + full 8/8 e2e green; anon `/parent` + `/parent/legacy` still 200.
 - Decision rationale: see ADR-014 in `DECISIONS_LOG.md` (Interpretation B chosen over A).
 
+### 2026-05-16
+
+| Hash | Title |
+|---|---|
+| `6a94497` | fix(parent-portal): display student name + kill PID-prompt flash on `/parent/legacy` |
+| `3ad90c1` | refactor(parent-portal): consolidate onto منصة V1; retire بوابة V2 entry points |
+
+#### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
+
+Shipped 2026-05-16. Two regressions on the legacy PID-hub surface:
+
+- Student card in `PORTAL_PARENT_PID_HUB_HTML` was missing the student name — added a `<div id="card-name">` row with the "اسم الطالب" label.
+- `/parent/legacy?pid=<X>` flashed the anonymous CPR-prompt UI for a few hundred ms before the deep-link auto-lookup populated. Added an inline `<script>` in `<head>` of `PARENT_HTML` that adds `.has-deeplink-pid` to `<body>` when `?pid=` is present; matching CSS hides `.pp-hero` + `#pp-lookup-card` so the prompt is suppressed instantly. Documented in BUGS_LOG (see entry below for the testing-discipline lesson).
+- Templates remain in source (intentionally — see commit `3ad90c1` safety-net note).
+
+#### Refactor: consolidate parent UX onto منصة V1; retire بوابة V2 entry points (commit `3ad90c1`)
+
+Shipped 2026-05-16. Operator clarified V1 is the only parent surface in use ("نستخدم فقط منصة ولي الأمر"); V2 hub + 6 sub-pages + public `/parent` PID flow are retired as entry points. Prod SHA verified: `3ad90c147d05`; safety tag `safety/pre-consolidate-to-v1-platform-20260516-002351`.
+
+- `_pts_parent_children_ids` now accepts `role=student` (returns `[linked_student_id]`); V1 renders correctly for the parent-with-child-PID-as-username pattern.
+- `/login` post-auth dispatch routes `role=student` → `/portal/parent` (was `/portal/parent-hub`); legacy `landing_page` values `parent_hub` / `student_portal` also rerouted to V1.
+- `/portal/parent` + `/api/portal/parent/me` accept both `role=parent` (multi-child via `linked_parent_for` JSON) and `role=student` (single child via `linked_student_id`).
+- All 7 `/portal/parent-hub*` routes return 302 → `/portal/parent`. URL compatibility preserved for saved bookmarks.
+- `/parent` and `/parent/legacy` now redirect anonymous visitors to `/login` (no more public PID prompt). Logged-in users → `/portal/parent`.
+- Removed the "أولياء الأمور: استخدم الرقم الشخصي" hint from `LOGIN_HTML` (shipped 2026-05-15 in `3712968`) — was V2-flow-specific and now misleading.
+- Templates intentionally kept in source for one release cycle (revert safety net): `PORTAL_PARENT_HUB_HTML`, `PORTAL_PARENT_PID_HUB_HTML`, `PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PARENT_HTML`.
+- Prod verification: SHA `3ad90c147d05` matches; `/api/health` green; anon `/parent` + `/parent/legacy` → `/login`; anon `/portal/parent-hub` → `/` (login_required); `student_test` login → `/portal/parent`; `/api/portal/parent/me` returns `children=1` (Test Student); full 8/8 e2e green against prod.
+- Decision rationale: see ADR-017 (`DECISIONS_LOG.md`) — supersedes the V2-direction implicit in ADR-014.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:

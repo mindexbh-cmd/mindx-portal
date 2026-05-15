@@ -18,6 +18,17 @@ Format:
 
 ## 2026-05 (recent — full detail)
 
+### 2026-05-16: Testing the wrong flow — logged-in curl instead of the anonymous WhatsApp PID flow [testing discipline]
+- **Symptom**: In the prior 2026-05-15 parent-routes session (ADR-014 / commits `31499e9` + `3712968`), Claude validated the unified-login redirects with logged-in `curl` requests against `/parent`. The validation looked green. Operators using the actual parent flow — receive WhatsApp link → land on `/parent?pid=...` anonymously → expect the PID-hub student card → tap into payments/evaluations — hit two real regressions that the curl-based test never exercised: (a) the student card was missing the "اسم الطالب" name row in `PORTAL_PARENT_PID_HUB_HTML`, and (b) `/parent/legacy?pid=<X>` flashed the anonymous CPR prompt UI for ~200 ms before the deep-link auto-lookup populated, looking broken to parents.
+- **Root cause**: Test methodology mismatch. Claude assumed "if the redirect logic works for an authenticated session, it works in general" and shaped the verification around that assumption. Real parents are anonymous on first WhatsApp click, and the PID-hub deep-link path was outside the tested surface. Two issues that would have been obvious in a single manual browser walk-through (anonymous, with `?pid=` in the URL) went out the door.
+- **Fix**: Commit `6a94497` — added `<div id="card-name">` row with "اسم الطالب" label to the PID-hub student card; added an inline `<script>` in `<head>` of `PARENT_HTML` that detects `?pid=` and adds `.has-deeplink-pid` to `<body>`, with matching CSS hiding `.pp-hero` + `#pp-lookup-card` so the prompt is suppressed instantly. (Both fixes are now mostly moot at the routing layer after commit `3ad90c1` retired the public PID flow per ADR-017, but they remain valuable for the one-release-cycle revert safety net.)
+- **Prevention**: **Testing-discipline rule** — when the operator says "parents are seeing X" or describes a flow in their own words, test the EXACT flow they describe, not a logged-in approximation that's convenient to script. Specifically:
+  1. WhatsApp deep-link flows must be tested anonymously with the query string actually carried (e.g. `?pid=<X>`), not as authenticated sessions.
+  2. Curl is fine for redirect status codes but cannot detect UI flashes, missing labels, or above-the-fold content gaps — a Playwright walk-through of the same URL with the same auth state catches what curl misses.
+  3. `real-user-tester-agent` persona scripts must include at least one anonymous-WhatsApp-deep-link persona, not just authenticated personas.
+  4. The verification template for any future parent/student-facing surface change should explicitly enumerate auth states (`{anonymous, role=parent, role=student, role=admin}`) × entry URLs, and the deploy verification must hit each cell that the change touches.
+- **Commit**: `6a94497` (fix), `3ad90c1` (subsequent consolidation per ADR-017 which moots the public PID flow entirely)
+
 ### 2026-05-15: `_pg_pool` NameError silently killed orphan-loss alarm [safety]
 - **Symptom**: Boot logs never printed the books_v2 storage check. Data-loss surfaces were invisible.
 - **Root cause**: `_books_v2_orphan_probe()` referenced `_pg_pool` which doesn't exist in this codebase. Wrapped in `try/except Exception` so the NameError was swallowed.
