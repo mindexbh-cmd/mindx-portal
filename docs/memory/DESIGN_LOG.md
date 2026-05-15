@@ -1,0 +1,88 @@
+# DESIGN_LOG.md
+
+UI/UX evolution log for the mindex-portal codebase. Maintained by `memory-keeper-agent`. Sources: commits touching `*_HTML` template constants, palette / spacing / layout discussions, dashboard redesign tags.
+
+## Visual identity
+
+**Palette** (canonical):
+- `#4a148c` — primary purple (brand, headers, primary buttons)
+- `#6B3FA0` — secondary purple (hover states, mid-emphasis)
+- `#8B5CC8` — lighter accent (introduced in points board)
+- State colors: `#2e7d32` (success/paid/present), `#c62828` (destructive/absent/overdue), `#f57f17` (warning/late), `#1565c0` (info)
+- Neutral grays: `#f5f5f5`, `#e0e0e0`, `#9e9e9e`, `#424242`
+
+⚠️ Palette drift detected in `POINTS_BOARD_HTML` (May 2026): introduced `#fce4ec`, `#e1bee7`, `#bbdefb`, `#c4a8e8`, `#ede7f6`, `#faf7ff`, `#f3e5f5`, `#f8f3ff` — purple/lavender derivatives that diluted the canonical pair. Flagged by `ui-designer-agent` review. Cleanup deferred.
+
+**Typography**: System font stack `-apple-system, Segoe UI, Tahoma, Arial`. Body 14-16 px (mobile floor 14, iOS-zoom-safe inputs at 16). Section headers 18-20 px / 600. Page titles 22-24 px. No custom @font-face.
+
+**Spacing rhythm**: 4/8/12/16/20/24/32/40/48/64 px. Drift values like 6/7/22 px have appeared and been flagged.
+
+**Border-radius**: drift detected — 6, 8, 9, 10, 14, 16 all used. No canonical ladder established.
+
+## Major design events
+
+### 2026-04-29 — Full dashboard redesign
+Safety tagged: `dashboard-restyle-safepoint-20260429-160915`, `dashboard-full-redesign-20260429-165722`. Significant rework of the post-login landing page; specifics not extracted from commits at write time.
+
+### 2026-04-28 → 04-29 — Attendance UX wave
+Multiple commits in close succession:
+- Attendance anomaly warning
+- Attendance completeness check
+- Attendance summary block
+- Attendance empty-status fix
+- Attendance students-and-scroll fix
+Safety tags: `pre-attendance-anomaly-warning-20260428-1754`, `pre-attendance-completeness-check-20260428-1923`, `pre-attendance-empty-cleanup`, `pre-attendance-empty-status-fix`, `pre-attendance-students-and-scroll-fix-20260429-1913`, `pre-attendance-summary-block-20260428-1726`.
+
+### 2026-05-04 — Points board kid-facing redesign
+Adds the gamified card grid with avatar + balance + level + per-student session-points badge. Pulse animations on grant. Sticky toolbar + sticky budget bar. Hover-lift on cards. Distribute-evenly modal (⚖️). Stats modal (📊). Behaviors picker bottom-sheet.
+
+### 2026-05-04 — Egg-hatch mechanic
+"فقس البيوض" class-wide hatch button on points board. Avatar reveal animation. Per-student egg balance tracked separately.
+
+### 2026-05-08 → 05-11 — Parent shop ground-up
+Card-based redemption shop in parent hub. Prize tile dimensions iterated multiple times (110px→200px height for landscape, 90px→150px height for portrait — the bumped commits are in `BUGS_LOG.md`). Image-fit changed to `contain` so portrait prizes don't crop badly. "اطلب الآن" button auto-disables when student lacks points.
+
+### 2026-05-12 — Parent hub navigation polish
+PID-preserving back button across all hub pages (evaluations, payments, books). Without this, parents had to re-enter their child's CPR each time they bounced between sections.
+
+### 2026-05-13 — Books library tile UI
+Empty-state buttons added ("ارفع أول كتاب" / "إنشاء أول مجلد"). Folder grid card design. Custom PDF viewer page (`/parent/book/<bid>/viewer`) introduced — a page-image renderer using `pypdfium2` to strip the Chrome PDF toolbar's download button for view-only access.
+
+### 2026-05-14 — Push UI
+Admin send-panel landed on `/points/manage`. Smart-timing permission prompt (asks at the right moment, not on first load). History table on the admin dashboard. Notification action buttons (v3.2.3 SW). Heads-up urgency category for time-sensitive payloads.
+
+### 2026-05-14 — TWA / Android app
+PWABuilder Bubblewrap pipeline. Status bar matches `theme_color` (`#4a148c`). `assetlinks.json` route at `/.well-known/assetlinks.json` driven by `TWA_SHA256_FINGERPRINT` env var.
+
+## Component patterns
+
+### Cards (parent shop, points board, books)
+- White background, 14 px border-radius, soft purple shadow `rgba(107,63,160,.12)`
+- Hover-lift via `translateY(-2px)` + deeper shadow
+- Selected state outlined in `#6B3FA0` with `.faf7ff` background
+
+### Modals (across the app)
+- Full-screen on mobile (`<= 600px`), centered max-width on desktop
+- Header bar in a gradient: `linear-gradient(135deg, #6B3FA0, #8B5CC8)` for purple flavor, `linear-gradient(135deg, #43A047, #2E7D32)` for green (distribute), `linear-gradient(135deg, #FB8C00, #FF8F00)` for orange (stats)
+- Close button is the unicode glyph in white, no SVG
+
+### Buttons
+- Primary: gradient fill, white text, 9-10 px radius, 14 px font-weight 600-700
+- Secondary: white background, gray border, gray text
+- Bar-action (compact): pastel bg + matching border, 5-7 px padding (⚠ may be below 44px touch target)
+
+### Status pills (attendance, payments)
+- 999 px radius (capsule)
+- Colored fill matching status semantics
+
+## Known design debt
+
+From `ui-designer-agent` + `mobile-first-agent` reviews (recent):
+
+1. **Palette drift in `POINTS_BOARD_HTML`** (above).
+2. **Touch targets below 44 px** on `.btn` (32 px), `.pb-bar-action` (28 px), `.menu-tabs button` (40 px).
+3. **Border-radius inconsistency** — 6/8/9/10/14/16 all in one file.
+4. **Spacing drift** — 6/7/22 px appear alongside the 4/8/12/16/24 ladder.
+5. **`backdrop-filter: blur(8px)` on sticky bars** — GPU-expensive on low-end Android; potential scroll jank.
+
+Cleanup is queued behind feature work. Tracked as candidate audit follow-ups in `docs/audits/` when `/audit` runs.
