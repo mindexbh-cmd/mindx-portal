@@ -176,6 +176,111 @@ The store ("متجر") is reached one level deeper than the hub — operator-fac
 
 **Verification harness committed:** `scripts/personas/parent_hub_verify.py` walks all 4 test personas (student_test / parent_test / admin_test / teacher_test) and asserts feature-button visibility on every parent surface, with 13 reference screenshots under `scripts/screenshots/20260516-0042..0043*`. Re-run this before any future change that touches parent template dispatch.
 
+### 2026-05-16 — Formal STUDENT CARD restored as `role=student` layout; `__SESSION_PID__` injection + pre-paint CSS suppression + `DIRECT_HREF` tab pattern
+
+Shipped via commits `3b940c4` (formal student-card restoration) and `3465c6f` (follow-on attendance-500 repair). See ADR-019 for the template-selection codification, and `BUGS_LOG.md` 2026-05-16 entries "V2-hub vs PID-hub template mix-up" and "Route-200 ≠ page-works" for the process lessons.
+
+**Canonical `role=student` layout** at `/portal/parent` is now `PORTAL_PARENT_PID_HUB_HTML` — the **formal STUDENT CARD** layout:
+
+- **Header**: "STUDENT CARD · بطاقة طالب" + year
+- **ID row**: student's personal ID prominently displayed
+- **Avatar placeholder box**: currently shows the student's initial letter; designed to hold a student photo when the photo-upload feature lands
+- **Info grid** (2-column on desktop, single-column on mobile): اسم الطالب / المجموعة / المستوى / الصف / المعلمة / الحالة
+- **Hours summary bar**: aggregate hours-attended indicator
+- **5 horizontal action tabs**: الحضور / المدفوعات / المناهج / التقييمات / النقاط — each opens its `/portal/parent-hub/<area>` sub-page directly
+
+**Reusable patterns introduced (worth promoting beyond parent-portal):**
+
+#### Pattern 1: `__SESSION_PID__` server-side injection for logged-in single-identifier surfaces
+
+`PORTAL_PARENT_PID_HUB_HTML` is shared between two consumers:
+- **Anonymous** at `/parent/legacy?pid=<X>` — deep-link traffic from WhatsApp (now retired per ADR-017 but the template still exists in source).
+- **Logged-in** at `/portal/parent` for `role=student` — session carries `linked_student_id`.
+
+For the logged-in case the route resolves the PID server-side from `session.user.linked_student_id` → `students.personal_id` and substitutes it into the template via the `__SESSION_PID__` placeholder. The rendered HTML carries the PID literal so the page can auto-lookup without manual entry. **This is reusable for any logged-in template that wraps a public-prompt UI — render server-side, inject the resolved identifier, let the page auto-skip the prompt.**
+
+#### Pattern 2: Pre-paint inline-script + CSS class suppression (no flash)
+
+```html
+<head>
+  <!-- pre-paint inline script -->
+  <script>
+    (function(){
+      var sid = "__SESSION_PID__";
+      if (sid && sid !== "__SESSION_PID__") {
+        document.documentElement.classList.add("has-session-pid");
+        window._SESSION_PID = sid;
+      }
+    })();
+  </script>
+  <style>
+    html.has-session-pid #lookup-card { display: none !important; }
+  </style>
+</head>
+```
+
+The script runs BEFORE the body paints, adds `.has-session-pid` to `<html>`, and the matching CSS rule suppresses the public-prompt card before first paint. No flash, no jump, no visible "anonymous → authenticated" transition.
+
+**Reusable for any template that has a public-prompt UI but wants to skip the prompt when auth state already supplies the identifier.** The trick is: put the script in `<head>` BEFORE the stylesheet, put the suppression rule INLINE in `<head>` (not in an external stylesheet — external would arrive after first paint). Two requirements to remember when reusing:
+1. The placeholder substitution check (`if sid && sid !== "__SESSION_PID__"`) is necessary because the literal placeholder string ships in the anonymous template path.
+2. The CSS rule must be `!important` because the public-prompt element's own `display:block` rule may override otherwise.
+
+#### Pattern 3: `DIRECT_HREF` action-tab map for logged-in vs anonymous routing
+
+The 5 action tabs in the formal student card use a JS `DIRECT_HREF` map that resolves at click-time:
+
+```js
+var DIRECT_HREF = {
+  attendance:   "/portal/parent-hub/attendance",
+  payments:     "/portal/parent-hub/payments",
+  curriculum:   "/portal/parent-hub/curriculum",
+  evaluations:  "/portal/parent-hub/evaluations",
+  points:       "/portal/parent-hub/points"
+};
+function tabHref(area){
+  if (window._SESSION_PID) return DIRECT_HREF[area];
+  return "/parent/legacy?pid=" + encodeURIComponent(currentPid) + "#" + area;
+}
+```
+
+When the session PID is set, tabs link directly to the logged-in sub-page route. When anonymous, tabs fall back to the public `/parent/legacy` flow with a hash anchor. **No redirect hop for the logged-in case** — saves a round-trip and removes a brief "redirecting…" flash.
+
+#### Pattern 4: Defensive `information_schema.columns` fallback for potentially-drifted Postgres schema
+
+Introduced in `api_portal_student_attendance` alongside the `attendance_msg_cols_v1` migration (commit `3465c6f`). The pattern is worth promoting as a general technique for any user-data SELECT that touches columns added after the prod DB's first init:
+
+```python
+# Probe whether the column exists in the live table
+def _attendance_has_msg_column(db):
+    try:
+        # SQLite path
+        cols = {r[1] for r in db.execute("PRAGMA table_info(attendance)").fetchall()}
+        if cols:
+            return "message" in cols
+    except Exception:
+        pass
+    try:
+        # Postgres path
+        cur = db.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'attendance' AND column_name = 'message'"
+        )
+        return cur.fetchone() is not None
+    except Exception:
+        return False
+
+# Use the result to shape the SELECT projection
+if _attendance_has_msg_column(db):
+    sel_msg = "message"
+else:
+    sel_msg = "'' AS message"
+sql = f"SELECT id, student_name, ..., {sel_msg} FROM attendance WHERE ..."
+```
+
+**Reusable for any column added via else-branch ALTER** that might not have been included in the migration list when the column was first introduced. The defensive fallback substitutes a typed-empty value when the column is missing, so the query succeeds even on a not-yet-migrated DB. Belt-and-suspenders pattern — the `attendance_msg_cols_v1` migration is the primary fix; the column probe is the failsafe.
+
+**Verification harnesses committed (commit `e51642b`):** `scripts/personas/parent_portal_walk.py` (formal-card layout walk for 4 personas — asserts STUDENT CARD header, avatar placeholder, info grid labels, 5 action tabs visible) and `scripts/personas/verify_parent_hub_tabs.py` (5-tab navigation + API health walk — asserts every sub-page route returns 200 AND every underlying XHR returns non-5xx). Re-run both before any future change that touches parent template dispatch OR the attendance / payments / evaluations API endpoints.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

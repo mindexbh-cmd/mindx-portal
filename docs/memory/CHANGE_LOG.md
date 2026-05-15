@@ -134,6 +134,9 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 | `6a94497` | fix(parent-portal): display student name + kill PID-prompt flash on `/parent/legacy` |
 | `3ad90c1` | refactor(parent-portal): consolidate onto منصة V1; retire بوابة V2 entry points |
 | `d7cc70c` | fix(parent-portal): restore full feature hub at `/portal/parent` (6 cards) |
+| `3b940c4` | fix(parent-portal): restore the formal student-card layout at `/portal/parent` |
+| `3465c6f` | fix(parent-portal): repair 500 on `/api/portal/student/attendance` (Postgres) |
+| `e51642b` | test(personas): commit durable parent-portal verification harnesses |
 
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
@@ -172,6 +175,39 @@ Regression chain: `3ad90c1` routed `role=student` → `/portal/parent` → `PORT
 - Prod verification post-deploy: SHA matches, `/api/health` green, all 6 sub-pages return 200 for student_test session, bare `/portal/parent-hub` → 302 `/portal/parent`.
 - Decision rationale: see ADR-018 (`DECISIONS_LOG.md`) — role-dispatched template selection at `/portal/parent`.
 - Process lesson logged separately in `BUGS_LOG.md` (tested-with-curl-only blindspot).
+
+#### Fix: restore the formal student-card layout at `/portal/parent` (commit `3b940c4`)
+
+Shipped 2026-05-16. **Second regression remediation in the same chain** — `d7cc70c` had served the 6-floating-card V2 hub (`PORTAL_PARENT_HUB_HTML`) at `/portal/parent` for `role=student`, but operator's "واجهة جميلة" was specifically the formal STUDENT CARD layout in `PORTAL_PARENT_PID_HUB_HTML` (header "STUDENT CARD · بطاقة طالب", year, ID row, avatar placeholder box, info grid: اسم الطالب / المجموعة / المستوى / الصف / المعلمة / الحالة, hours-summary bar, 5 horizontal action tabs: الحضور / المدفوعات / المناهج / التقييمات / النقاط). Operator quote: "خربت منصة ولي الامر التي كانت تعرض معلومات الطلبة بشكل منسخق وكل شي ذهب للاسف عملي ضاع. كان كل طالب تظهر له واجهة جميلة مكتوب فيها معلوماته الاساسية من اسمه ورقم مجموته ومكان لصورته والازرار بشكل منظم وكل زر كان يعمل ليس مثل الان للاسف الشديد انفكت الارتباطات وكل شي". Prod SHA verified: `3465c6f3eeda` (next commit in same deploy chain); safety tag `safety/pre-restore-formal-student-card-20260516-010728`.
+
+- `/portal/parent` for `role=student` now serves `PORTAL_PARENT_PID_HUB_HTML` (formal student card) — was `PORTAL_PARENT_HUB_HTML` (6 floating cards) from the prior `d7cc70c` fix.
+- Session PID injected into the template via `__SESSION_PID__` placeholder, resolved from `session.user.linked_student_id` → `students.personal_id`. JS auto-runs `phLookup()` with the injected PID, no manual entry required.
+- Pre-paint inline `<script>` in `<head>` reads the injected PID, adds `.has-session-pid` class to `<html>`, exposes `window._SESSION_PID`. CSS rule `html.has-session-pid #lookup-card{display:none !important}` suppresses the PID lookup form before first paint — no flash.
+- `phBoot()` priority: session PID → URL `?pid=` → focus input.
+- Action tabs build hrefs via `DIRECT_HREF` map → `/portal/parent-hub/{attendance,payments,curriculum,evaluations,points}` directly when `window._SESSION_PID` is set. Anonymous fallback to `/parent/legacy?pid=<X>#anchor` preserved.
+- `role=parent` (V1 multi-child) still serves `PORTAL_PARENT_HTML` unchanged.
+- Pre-deploy verification by `real-user-tester-agent`: 4 personas walked locally, formal card visible — GREEN before deploy.
+- Decision rationale: see ADR-019 (`DECISIONS_LOG.md`) — supersedes the `role=student` template choice from ADR-018.
+
+#### Fix: repair 500 on `/api/portal/student/attendance` (commit `3465c6f`)
+
+Shipped 2026-05-16. Operator complaint after `3b940c4` landed: "الازرار فيها اذا نضغطها يخرجنا من المنصة الى صفحة تسجيل الدخول مرة اخرى. لماذا هكذا عملك سيئ لماذا للم تختبر ان كل شي يعمل على ما يرام؟؟؟". Operator's mental model: tab opens broken/empty page → "I'm logged out". Real root cause was NOT routing/logout — all 6 sub-page routes returned 200 for `role=student`. The actual bug: `/api/portal/student/attendance` threw 500 on Postgres prod with `column "message" does not exist`. The `attendance.message` + `attendance.message_status` columns existed in `init_db()` CREATE TABLE since day-1, but the long-running Postgres prod pre-dated their addition and the else-branch migration list never included them. Prod SHA verified: `3465c6f3eeda`; safety tag `safety/pre-fix-attendance-500-postgres-20260516-014052`.
+
+Two-layer fix:
+- New migration `attendance_msg_cols_v1` (else-branch): `ALTER TABLE attendance ADD COLUMN message TEXT DEFAULT ''` (same for `message_status`). Pattern mirrors `center_mode_v1` — idempotent across SQLite and Postgres.
+- Defensive SELECT in `api_portal_student_attendance`: probes `att_live` via `PRAGMA table_info` (SQLite) → falls back to `information_schema.columns` (Postgres). If `message` is missing, substitutes `'' AS message`. Belt-and-suspenders against future schema drift.
+
+- Pre-deploy verification by `real-user-tester-agent`: 5 sub-page tabs all serve content + 4 stat cells visible on attendance + 4 reward tiles + متجر visible on points sub-page — GREEN before deploy.
+- Prod verification post-deploy: SHA matches, all 6 sub-page routes return 200, `/api/portal/student/attendance` now returns `200 {ok:true, summary:{...}, rows:[]}` (was 500), `has-session-pid` CSS rule present in served HTML, injected PID literal `TEST-STUDENT-0001` present, no visible PID lookup card.
+- Process lesson: route-200 ≠ page-works. The route can serve 200 but the inline JS fetch can 5xx — broken empty page is indistinguishable from a logout to a non-technical user. Logged separately in `BUGS_LOG.md` (route-200 blindspot).
+
+#### Test: commit durable parent-portal verification harnesses (commit `e51642b`)
+
+Shipped 2026-05-16. Durable persona harnesses committed so future changes to parent template dispatch or attendance API can be re-verified with a single command.
+
+- `scripts/personas/parent_portal_walk.py` — formal student-card layout walk for 4 personas (student_test / parent_test / admin_test / teacher_test).
+- `scripts/personas/verify_parent_hub_tabs.py` — 5-tab navigation walk + API health check (verifies all 6 sub-page routes return 200 AND the underlying XHR endpoints return non-5xx).
+- `.gitignore` additions: keep scratch artifacts (`report.json`, `debug*.py`, `__pycache__`) local; only committed harnesses ship.
 
 ## How to append
 
