@@ -52,7 +52,7 @@ The seeded students row uses `personal_id='TEST-STUDENT-0001'` so it's trivially
 
 Every piece of automation lives under `.claude/` (committed) plus `scripts/` and `docs/`. Operator-personal settings stay in `.claude/settings.local.json` (gitignored).
 
-### Custom subagent team (12 + coordinator)
+### Custom subagent team (15 including coordinator)
 
 | Agent | Specialty | Invoke when |
 |---|---|---|
@@ -60,6 +60,7 @@ Every piece of automation lives under `.claude/` (committed) plus `scripts/` and
 | `code-architect-agent` | Code organization (100K-line app.py) | Before major features, refactors |
 | `database-architect-agent` | Expand-Migrate-Contract schema changes | Any schema change, DB optimization, audits |
 | `data-protector-agent` | DROP/DELETE/migration gatekeeper | **MANDATORY** before any DDL |
+| `feature-protector-agent` | Regression guard — vetoes changes that risk breaking existing features | **MANDATORY** before any change touching shared code, routes, templates, or APIs |
 | `ui-designer-agent` | Palette / spacing / RTL | After HTML/CSS changes |
 | `arabic-quality-agent` | Arabic grammar / terminology / labels | After user-facing text changes |
 | `ux-employee-agent` | Workflow efficiency | Before approving features |
@@ -68,6 +69,8 @@ Every piece of automation lives under `.claude/` (committed) plus `scripts/` and
 | `performance-watchdog` | p95 / memory / queries | Before heavy ops; on OOM |
 | `business-analyst-agent` | Adoption / ROI / deprecation | Before features; quarterly |
 | `documentation-keeper` | CHANGELOG / docs upkeep | After features; before releases |
+| `memory-keeper-agent` | Project memory — CHANGE_LOG / DECISIONS_LOG / handoff briefings | After every feat/fix commit; on session boundaries |
+| `prompt-engineer-agent` | Turns vague wishes into phased plans | Vague request? Run `/plan` first |
 
 ### Imported professional subagents (9, MIT-licensed)
 
@@ -85,7 +88,7 @@ Vendored from [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltA
 | `imported-test-automator` | Test framework architecture |
 | `imported-postgres-pro` | Postgres-specific tuning, HA |
 
-### Slash commands (10)
+### Slash commands (13)
 
 Project-specific commands under `.claude/commands/`. Each is a Markdown file with a frontmatter description and a body that becomes the prompt when `/command` is invoked.
 
@@ -101,6 +104,9 @@ Project-specific commands under `.claude/commands/`. Each is a Markdown file wit
 | `/feature <description>` | Delegate the full pipeline to `mindex-coordinator-agent` |
 | `/sql <query>` | Read-only DB query (refuses writes) |
 | `/screenshots <path>` | 360 / 768 / 1280 viewport captures via Playwright |
+| `/plan <description>` | Turn a vague request into a phased plan via `prompt-engineer-agent` |
+| `/context [compact\|full\|recent\|<topic>]` | Memory-keeper handoff generation / retrospective extraction |
+| `/protect <change>` | `feature-protector-agent` regression-risk audit of a proposed change |
 
 ### Lifecycle hooks (5)
 
@@ -169,13 +175,15 @@ Recommended starter set: **playwright** (interactive browser) + **postgres** via
 
 ## Specialist agent team
 
-Eleven subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
+Fifteen subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
 
 | Agent | Specialty | Invoke when |
 |---|---|---|
 | `mindex-coordinator-agent` | Orchestrator — plans which specialists to run, aggregates verdicts, makes go/no-go | Any non-trivial task; "review X", "ship Y" |
 | `code-architect-agent` | Code organization for the 100K-line app.py | Before major features, refactors, code reviews |
+| `database-architect-agent` | Expand-Migrate-Contract schema changes | Schema changes, DB optimization, audits |
 | `data-protector-agent` | DB safety — DROP/DELETE/TRUNCATE/migration/bulk-UPDATE gatekeeper | **MANDATORY** before any schema change or bulk data op |
+| `feature-protector-agent` | Regression guard — vetoes changes that risk breaking existing features. Maintains `docs/memory/FEATURE_INVENTORY.md` | **MANDATORY** before any change touching shared code, routes, templates, or APIs |
 | `ui-designer-agent` | Mindex palette (#4a148c / #6B3FA0), spacing rhythm, RTL | After HTML/CSS changes to the inline templates |
 | `arabic-quality-agent` | Arabic grammar, terminology, RTL with mixed content | After any user-facing text change |
 | `ux-employee-agent` | Workflow efficiency for busy teachers/admins | Before approving new features; on UX complaints |
@@ -184,6 +192,8 @@ Eleven subagents live under `.claude/agents/`. Each is committed to the repo so 
 | `performance-watchdog` | 512 MB RAM, p95 ≤ 2 s, query counts | Before heavy ops; on slow reports; after OOM |
 | `business-analyst-agent` | Usage analytics, ROI, deprecation calls | Before major features; quarterly reviews |
 | `documentation-keeper` | CHANGELOG / docs/API.md / docs/ARCHITECTURE.md upkeep | After significant features; before releases |
+| `memory-keeper-agent` | Project memory — CHANGE_LOG / DECISIONS_LOG / DESIGN_LOG / BUGS_LOG / handoff briefings | After every feat/fix commit; on session boundaries |
+| `prompt-engineer-agent` | Turns vague wishes into phased plans | Vague request? Run `/plan` first |
 
 ### Example workflows
 
