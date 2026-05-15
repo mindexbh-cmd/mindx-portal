@@ -6,6 +6,7 @@ __pycache__/
 .claude/*
 !.claude/agents/
 !.claude/commands/
+!.claude/hook_scripts/
 !.claude/mcp_servers.json
 mindx.db
 test_*.db
