@@ -2,6 +2,49 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Standard operating procedure
+
+For every non-trivial task, follow this loop:
+
+1. **Investigate first.** Read the relevant code, query the DB with `scripts/db_query.py` if needed, scan recent commits with `git log -n 20 --oneline`. Don't propose changes until you understand the current behaviour.
+2. **Create a safety tag.** Before any risky change, `git tag safety/pre-<feature>-<timestamp> HEAD`. `scripts/safe_deploy.py` does this automatically for deploys; for purely-local work, do it by hand if you're about to touch >5 files or migration code.
+3. **Implement with atomic commits.** One concern per commit. Run `python -c "import ast; ast.parse(open('app.py', encoding='utf-8').read())"` after every meaningful change to catch syntax issues before they ride a push to Render.
+4. **Test locally.** `python app.py` in one terminal, `python scripts/run_e2e.py` in another. The e2e suite covers login + the four critical pages (dashboard, attendance, database, points board) — full pass before any push.
+5. **Deploy through safe_deploy.** `python scripts/safe_deploy.py --feature <slug>` will tag, push, poll `/api/health`, run the smoke e2e against prod, and roll back automatically if anything goes red. Don't push to `main` by hand for non-trivial changes — you lose the auto-rollback.
+6. **Verify against prod.** After the deploy lands, run `python scripts/run_e2e.py --base https://mindx-portal-1.onrender.com` once more. Same suite, different target — this catches Postgres-only failures that SQLite swallowed locally.
+7. **Only report 'done' when verified.** If a safe_deploy rolls back, fix the root cause and retry — don't paper over with a "deploy is flaky" note. The protocol is the floor, not the ceiling.
+
+### Scripts you'll use constantly
+
+| Script | Purpose |
+|---|---|
+| `scripts/seed_test_users.py` | Idempotent seed of admin_test / teacher_test / student_test / parent_test. Run once locally; run once against prod via `DATABASE_URL=... python scripts/seed_test_users.py` before your first `safe_deploy`. |
+| `scripts/auto_test.py` | Library — Playwright `BrowserSession` with `login_as / navigate / click_button / screenshot / get_console_errors / check_no_500`. Import from your own probes. |
+| `scripts/run_e2e.py` | Black-box e2e runner. `--smoke` for the bare minimum, `--base <url>` to target prod. Screenshots land in `scripts/screenshots/`. |
+| `scripts/safe_deploy.py` | Tag → push → poll `/api/health` → run smoke e2e → auto-rollback. `--no-op` validates the protocol without changing code; `--no-push` is a dry run. |
+| `scripts/get_logs.py` | Pulls Render logs filtered by `--since 30m --keyword foo --level error`. Requires `RENDER_API_KEY` / `RENDER_SERVICE_ID` / `RENDER_OWNER_ID`; falls back to the dashboard URL if any are unset. |
+| `scripts/db_query.py` | Read-only DB shell. `--tables` lists, `--schema <table>` shows columns, positional arg runs a SELECT. Refuses non-read statements unless `--force-write`. Works against local SQLite by default; set `DATABASE_URL` for prod. |
+| `scripts/db_backup.py` | Snapshots local SQLite to `backups/mindx-<ts>.db` or pg_dumps prod to `backups/mindx-<ts>.sql`. |
+| `scripts/db_restore.py` | Replaces the live DB from a backup. **Destructive.** Refuses without `--yes-i-really-mean-it` and writes a `.before-restore-<ts>` safety copy on local restores. |
+
+### Health endpoints
+
+- `GET /api/health` — DB ping + scratch disk write. Used by `safe_deploy` as the deploy gate. Returns 503 if either fails.
+- `GET /api/health/deep` — also returns row counts for every critical user-data table and verifies the books storage dir is writable. Cheap but more comprehensive; call from operator tooling, not on every probe.
+
+Both endpoints are intentionally unauthenticated so a deploy script can hit them before the login form is reachable.
+
+### Test credentials
+
+Created by `scripts/seed_test_users.py` — keep these stable; the e2e suite depends on the exact strings:
+
+- `admin_test` / `TestAdmin2026!` — role=admin
+- `teacher_test` / `TestTeacher2026!` — role=teacher
+- `student_test` / `TestStudent2026!` — role=student, linked to a `students` row with `personal_id=TEST-STUDENT-0001`
+- `parent_test` / `TestParent2026!` — role=parent, linked_parent_for=`TEST-STUDENT-0001`
+
+The seeded students row uses `personal_id='TEST-STUDENT-0001'` so it's trivially identifiable in the DB and won't collide with a real Bahraini CPR.
+
 ## Running & deploying
 
 - `pip install -r requirements.txt` — install deps (Flask + gunicorn, Python 3.12.3 per `runtime.txt`).

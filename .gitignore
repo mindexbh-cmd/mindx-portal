@@ -15,3 +15,6 @@ attendance_clean.csv
 backups/
 data/curriculum/
 *.sql
+
+# Playwright e2e captures — overwritten on every run, no point in versioning.
+scripts/screenshots/
