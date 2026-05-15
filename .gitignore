@@ -1,9 +1,12 @@
 __pycache__/
 *.pyc
 # Ignore Claude Code local state but keep the committed subagent
-# team — agents/ ships with the repo so every clone gets the team.
+# team and slash commands — agents/ and commands/ ship with the repo
+# so every clone gets the team and the project-specific commands.
 .claude/*
 !.claude/agents/
+!.claude/commands/
+!.claude/mcp_servers.json
 mindx.db
 test_*.db
 
