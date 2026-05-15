@@ -75,6 +75,25 @@ Plain Arabic: "Parents: use the student's personal ID as username". Sits as a sm
 
 No new CSS, no new component. Pure backend redirect + one inline-template text addition.
 
+### 2026-05-15 — `feature-protector-agent` makes the feature surface a first-class design contract
+
+Shipped via commit `316d84d`. No visual change to the portal itself; this entry captures the fact that the UX/feature surface is now a contractually-enforced object.
+
+**Three-phase agent workflow** (`.claude/agents/feature-protector-agent.md`):
+1. **Pre-change audit** — diff vs `docs/memory/FEATURE_INVENTORY.md`. Which of the 502 routes / which shared helpers / which inline `*_HTML` templates does this change touch? Anything in the top-20 critical list?
+2. **Verdict** — `APPROVE` (no risk), `APPROVE WITH CONDITIONS` (proceed only after listed test obligations), or `REJECT` (stops the coordinator outright). Veto power.
+3. **Post-change verification** — assertions re-checked after merge. Inventory updated incrementally with any new/renamed routes.
+
+**Top-20 critical features now functioning as design invariants** ("must hold after any change", quoted from `FEATURE_INVENTORY.md`):
+The agent's top-20 list captures the load-bearing UX surfaces — login, attendance entry, the parent shop checkout, books_v2 chunked upload, the points board, parent hub navigation, the curriculum library access checks, the taqseet ↔ student_payments mirror, the dashboard tiles, the database editor, the import pipeline, and the `/portal/parent-hub/*` page chain. Each carries an explicit assertion of expected behavior. Breaking one is a REJECT, not a discussion.
+
+**What this means for designers / future UI work:**
+- Visual reskins of any top-20 surface still need to preserve the listed assertions (e.g. "اطلب الآن disables when student lacks points" for the parent shop redemption tile — already documented in `BUGS_LOG.md` as a fix worth not regressing).
+- Adding a new top-20-tier feature means appending an assertion to `FEATURE_INVENTORY.md` in the same commit so the contract is recorded the moment the surface ships.
+- Removing a feature is a deliberate act: drop its tables in the same commit (CLAUDE.md "Table creation policy"), drop its routes, drop its inventory entry, log the deprecation here and in `CHANGE_LOG.md`.
+
+The 502-route catalog also doubles as a coverage map for `/audit` runs and persona walk-throughs — `real-user-tester-agent` can cross-reference its persona scripts against the inventory to ensure no critical path is uncovered.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

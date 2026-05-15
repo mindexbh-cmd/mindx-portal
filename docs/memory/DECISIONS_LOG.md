@@ -134,6 +134,22 @@ Format:
   - Means `/parent` semantics differ by auth state. Documented inline at `app.py` ~28800 and ~28825 so future maintainers don't "simplify" the guard away.
 - **Reference**: commits `31499e9` (route guards) + `3712968` (login hint) + `5ecf19d` (plan/handoff). Plan doc: `docs/plans/unified-login-parent-direct-nav-20260515-222200.md`. Safety tag: `safety/pre-unified-login-parent-direct-nav-20260515-225736`.
 
+### ADR-015: Split DB-safety from feature-safety — two distinct guardians, each with veto
+- **Date**: 2026-05-15
+- **Status**: accepted
+- **Context**: `data-protector-agent` already gates every destructive DB op (DROP / DELETE / TRUNCATE / migration / bulk UPDATE). But "what works today" at the application surface — 502 routes, the parent shop checkout flow, the books_v2 chunked upload, the attendance loose-comparison rule, the taqseet ↔ student_payments mirror — was only implicit in `CLAUDE.md` and `PROJECT_BIBLE.md`. A well-meaning change to a shared helper could regress a feature without tripping the DB-safety agent at all. Operator wanted a second, peer-level guardian whose entire job is "does this break any existing feature?".
+- **Decision**: Introduce `feature-protector-agent` (15th custom) as a regression-guard specialist with REJECT-class veto over the coordinator. Three-phase workflow: (1) pre-change audit against `docs/memory/FEATURE_INVENTORY.md` — which routes / templates / shared helpers does the diff touch?; (2) verdict — APPROVE / APPROVE WITH CONDITIONS / REJECT, with conditions enumerated as test obligations; (3) post-change verification — assertions from the inventory re-checked after merge. Inventory is append-only / incrementally updated, never regenerated from scratch (so historical critical-feature annotations don't get washed away by route renames).
+- **Alternatives considered**:
+  - Fold feature-safety into `data-protector-agent` (rejected — different scope, different review surface, would muddy data-protector's narrow DB-safety remit).
+  - Make it advisory only, no veto (rejected — operator wanted a peer to data-protector, not a suggestion box).
+  - Lean on `real-user-tester-agent` + `code-architect-agent` for regression coverage (rejected — they look for code quality / persona fit, not feature-surface preservation).
+- **Consequences**:
+  - Every non-trivial change now passes through two veto-empowered guardians (data-protector on the DB side, feature-protector on the feature side). Together they gate every risky change.
+  - The top-20 critical-feature assertions in `FEATURE_INVENTORY.md` are now contractual invariants — breaking one is a REJECT, not a discussion.
+  - Cost: one extra agent invocation per non-trivial task. Coordinator pipeline grows by one mandatory stage when the diff touches shared code, routes, templates, or APIs.
+  - Inventory drift is the main risk — the agent must incrementally update `FEATURE_INVENTORY.md` whenever a route is added/removed/renamed. `/protect bootstrap` exists for the occasional sync but should be rare in steady state.
+- **Reference**: commit `316d84d`; `.claude/agents/feature-protector-agent.md`; `.claude/commands/protect.md`; `docs/memory/FEATURE_INVENTORY.md` (502 routes, 69 categories, top-20 assertions). Complements ADR-007 (Expand-Migrate-Contract, DB-side) and the data-protector mandate in CLAUDE.md "Specialist agent team".
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)

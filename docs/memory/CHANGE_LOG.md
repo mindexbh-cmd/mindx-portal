@@ -89,6 +89,17 @@ Recorded in tight detail because this is when the agent team / safety net / memo
 | `bf5c521` | docs: integrate memory-keeper into coordinator pipeline + SOP |
 | `b8d5079` | feat(agents): add prompt-engineer-agent + /plan command (14th custom agent + 12th slash command + demo plan) |
 | `31499e9` `3712968` `5ecf19d` | feat: unified-login parent direct-nav — guard `/parent` + `/parent/legacy` from authenticated parents; login-page Arabic hint clarifying parents use child's `personal_id` |
+| `316d84d` | feat(agents): add feature-protector-agent (15th custom) + /protect (13th slash) + `docs/memory/FEATURE_INVENTORY.md` bootstrap (502 routes, 69 categories, top-20 critical assertions) |
+
+#### Feature: feature-protector-agent + /protect + FEATURE_INVENTORY (commit `316d84d`)
+
+Shipped 2026-05-15 late evening.
+
+- `.claude/agents/feature-protector-agent.md` — regression-guard specialist with veto power. Three-phase workflow: pre-change audit → verdict (APPROVE / APPROVE WITH CONDITIONS / REJECT) → post-change verification. Mandatory invocation before any change touching shared code, routes, templates, or APIs.
+- `.claude/commands/protect.md` — `/protect <change>` for invoking the agent; `/protect bootstrap` for building/refreshing the inventory.
+- `docs/memory/FEATURE_INVENTORY.md` — 899 lines; all 502 `@app.route` entries grouped into 69 categories with line numbers, methods, handlers, auth flags. Top-20 critical features carry explicit regression-worthy assertions ("must hold after any change") — these become contractual invariants.
+- `CLAUDE.md` — agent table now lists 15 custom agents (memory-keeper + prompt-engineer surface in the table for the first time); slash-command table grows to 13 (`/plan`, `/context`, `/protect` added).
+- Decision rationale: see ADR-015 (split DB-safety vs feature-safety into two distinct guardians, each with veto).
 
 #### Feature: unified-login parent direct-nav (commits `31499e9` + `3712968` + `5ecf19d`)
 
