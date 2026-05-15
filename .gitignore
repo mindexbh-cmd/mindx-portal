@@ -25,3 +25,10 @@ data/curriculum/
 
 # Playwright e2e captures — overwritten on every run, no point in versioning.
 scripts/screenshots/
+
+# Persona-harness scratch — debug throwaways and transient run output.
+# The durable harnesses (parent_portal_walk.py, verify_parent_hub_tabs.py)
+# are committed; everything else under scripts/personas/ is local-only.
+scripts/personas/__pycache__/
+scripts/personas/report.json
+scripts/personas/debug*.py
