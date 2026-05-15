@@ -137,6 +137,8 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 | `3b940c4` | fix(parent-portal): restore the formal student-card layout at `/portal/parent` |
 | `3465c6f` | fix(parent-portal): repair 500 on `/api/portal/student/attendance` (Postgres) |
 | `e51642b` | test(personas): commit durable parent-portal verification harnesses |
+| `f6aee45` | fix(parent-portal): remove logout misclick trap from V1 + sub-pages |
+| `27ca5ba` | test(personas): commit hostile-mode logout-hunt probe |
 
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
@@ -208,6 +210,30 @@ Shipped 2026-05-16. Durable persona harnesses committed so future changes to par
 - `scripts/personas/parent_portal_walk.py` — formal student-card layout walk for 4 personas (student_test / parent_test / admin_test / teacher_test).
 - `scripts/personas/verify_parent_hub_tabs.py` — 5-tab navigation walk + API health check (verifies all 6 sub-page routes return 200 AND the underlying XHR endpoints return non-5xx).
 - `.gitignore` additions: keep scratch artifacts (`report.json`, `debug*.py`, `__pycache__`) local; only committed harnesses ship.
+
+#### Fix: remove logout misclick trap from V1 + sub-pages (commit `f6aee45`)
+
+Shipped 2026-05-16. **Third escalation in the same parent-portal session** — prior commits `3b940c4` + `3465c6f` only treated the formal student-card surface; the V1 multi-child template at `app.py:77869` still shipped a bare purple `<a href="/logout">خروج</a>` pill in the topbar, identical-styled to other navigation, with zero confirm guard. Operator quote (third escalation): "لازالت الازرار في منصة ولي الامر اذا نضغط عليها تخرجنا وترجعنا لصفحة تسجيل الدخول من جديد. اين الايجنتس الذي يختبر بشكل واقعي؟؟؟". Prod SHA verified: `27ca5bac980e`; safety tag `safety/pre-fix-logout-misclick-v1-20260516-022143`.
+
+Diagnostic gap that allowed two escalations: `real-user-tester-agent` walked `student_test` persona twice (formal student-card template at `/portal/parent` for `role=student`) and returned GREEN — that surface already had the red+confirm pattern from prior commits. The third walk, invoked in hostile mode with `parent_test` as a separate persona, finally exercised the V1 template path (`role=parent` → `PORTAL_PARENT_HTML`, same URL `/portal/parent`, **different template**) and found the bare logout link. URL `/portal/parent` is shared between two role-dispatched templates; "test all buttons on URL X" required ALL persona roles whose login lands on X, not just one.
+
+Fix layered across 4 surfaces:
+1. **Sub-pages** (`PORTAL_PARENT_ATTENDANCE/PAYMENTS/MESSAGES/EVALUATIONS_HTML` + `PORTAL_STUDENT_HTML` + `PORTAL_BOOKS_HTML`): removed every `<a class="logout" href="/logout">خروج</a>` link adjacent to "← العودة للبوابة" with identical purple styling. Sub-pages now carry ONLY the back link.
+2. **PORTAL_PARENT_HTML (V1, `role=parent`)** at `app.py:77869`: replaced bare purple logout link in topbar with red + confirm: `background:linear-gradient(135deg,#c62828,#e53935)` + `🔒 تسجيل الخروج` + `onclick="return confirm('هل تريد تسجيل الخروج من منصة ولي الأمر؟')"`.
+3. **PORTAL_PARENT_PID_HUB_HTML (`role=student`)**: already received the red+confirm pattern in earlier commits — kept unchanged.
+4. **PORTAL_PARENT_HUB_HTML (dead code)**: applied the same red+confirm pattern defensively so a future route rewire can't reintroduce the trap.
+
+PORTAL_PARENT_HTML for `role=teacher` at `/teacher/hub` keeps its bare "خروج" link — that page has no adjacent "back" link so the misclick hazard does not apply. ADR-020 codifies the red+confirm pattern across all parent surfaces.
+
+- Prod verification: SHA `27ca5bac980e` matches; parent_test on V1 has red+confirm + no bare logout link; student_test on student-card has same; all 6 sub-pages return 0 occurrences of `href="/logout"`.
+- Decision rationale: see ADR-020 (`DECISIONS_LOG.md`).
+- Process lessons logged separately in `BUGS_LOG.md`: (a) same-bug-different-template / persona-x-template coverage, (b) misclick-trap canonical pattern.
+
+#### Test: commit hostile-mode logout-hunt probe (commit `27ca5ba`)
+
+Shipped 2026-05-16. Re-runnable Playwright walk aggressively enumerating every clickable element on `/portal/parent` (both role variants) and all 6 sub-pages; flags any path that reaches `/login` or `/logout` without user confirmation. Born from the third-escalation regression.
+
+- `scripts/personas/hostile_parent_portal_logout_hunt.py` — hostile-mode probe that walks BOTH `student_test` AND `parent_test` sessions on the same URL set. Handles its own session preservation by treating `/logout` and `/api/logout` as `SESSION_KILLERS` that must not be probed via the shared cookie context (they would invalidate the session and break subsequent assertions in the same run).
 
 ## How to append
 

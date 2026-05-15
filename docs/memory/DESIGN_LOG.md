@@ -281,6 +281,58 @@ sql = f"SELECT id, student_name, ..., {sel_msg} FROM attendance WHERE ..."
 
 **Verification harnesses committed (commit `e51642b`):** `scripts/personas/parent_portal_walk.py` (formal-card layout walk for 4 personas — asserts STUDENT CARD header, avatar placeholder, info grid labels, 5 action tabs visible) and `scripts/personas/verify_parent_hub_tabs.py` (5-tab navigation + API health walk — asserts every sub-page route returns 200 AND every underlying XHR returns non-5xx). Re-run both before any future change that touches parent template dispatch OR the attendance / payments / evaluations API endpoints.
 
+### 2026-05-16 — Red+confirm logout button canonized across parent surfaces; bare-purple logout adjacent to a back link is now forbidden
+
+Shipped via commits `f6aee45` (fix across V1 + 6 sub-pages + dead-code defensive patch) and `27ca5ba` (hostile-mode persona harness). See ADR-020 for the design contract, and `BUGS_LOG.md` 2026-05-16 entries "Same bug, different template" and "Misclick trap: bare-purple logout adjacent to a back link" for the process lessons.
+
+**Canonical destructive-action button pattern** (project-wide reusable; applied first to logout, but the shape is intended for any irreversible destructive action — account deletion, payment cancellation, etc.):
+
+```html
+<a class="logout-btn"
+   href="/logout"
+   onclick="return confirm('هل تريد تسجيل الخروج من منصة ولي الأمر؟')"
+   style="background: linear-gradient(135deg, #c62828, #e53935);
+          color: #fff;
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-weight: 700;
+          text-decoration: none;">
+  🔒 تسجيل الخروج
+</a>
+```
+
+Required components (all three, no exceptions):
+1. **Destructive palette** — `#c62828` red gradient (matches DESIGN_LOG state-color spec for destructive / overdue / absent semantics; reuses an established color rather than introducing a new one).
+2. **Icon prefix** — `🔒` (or equivalent destructive glyph) visible in the label. The icon does half the work of distinguishing destructive from benign even before color is read.
+3. **JS `onclick` confirm guard** — `return confirm(...)` blocks the navigation until operator confirms. Arabic copy is mandatory for parent surfaces ("هل تريد تسجيل الخروج من منصة ولي الأمر؟"); equivalent Arabic copy required for any other destructive action.
+
+Forbidden anti-pattern (this is the exact trap that caused three operator escalations in one session):
+
+```html
+<!-- DO NOT DO THIS -->
+<a class="logout" href="/logout">خروج</a>
+```
+
+— bare logout link, purple navigation styling matching adjacent benign nav pills, no icon, no confirm guard. The trap is **adjacency-with-identical-styling**: when a logout link sits next to a "← العودة" back link with matching color/radius/padding/font, human eyes pattern-match by visual treatment first and read labels second. The labels stop being the determining factor.
+
+**Sub-pages carry NO logout link.** Only the main hub topbar of each role's template carries the destructive action. The 6 parent sub-pages (`PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PORTAL_STUDENT_HTML`, `PORTAL_BOOKS_HTML`) have ONLY the "← العودة للبوابة" back link in the topbar. Logout exists exclusively at the hub level — single source, deliberate, unmistakable. Rationale: a parent navigating away from a feature sub-page wants to return to the hub, not log out; making both actions available at the sub-page topbar creates the misclick trap. This rule applies project-wide to hub-and-spoke UX patterns.
+
+**Role-x-template duality at `/portal/parent`** — design discipline note:
+
+The URL `/portal/parent` serves **different templates for different roles** (per ADR-018/019):
+
+| Role | Template | Layout shape |
+|---|---|---|
+| `role=parent` | `PORTAL_PARENT_HTML` (V1) | Multi-child points-focused view; topbar has logout (now red+confirm). |
+| `role=student` | `PORTAL_PARENT_PID_HUB_HTML` | Formal STUDENT CARD with avatar placeholder + info grid + 5 horizontal action tabs; topbar has logout (red+confirm). |
+| Anonymous | 302 → `/login` | No template served. |
+
+**Both role-dispatched templates must follow the same UX patterns.** Fixing destructive-action discipline on one template is NOT evidence the other is sound. Three operator escalations in one session traced back to this: prior commits patched only `PORTAL_PARENT_PID_HUB_HTML` (formal student-card) and left `PORTAL_PARENT_HTML` (V1) with the bare-purple-pill trap. Any change to parent-portal UX (palette, topbar layout, destructive actions, navigation structure) must be applied to BOTH templates simultaneously and verified with a persona-per-role walk.
+
+**Hostile-mode persona harness** (`scripts/personas/hostile_parent_portal_logout_hunt.py`, committed in `27ca5ba`) — re-runnable Playwright walk that exercises BOTH `student_test` AND `parent_test` sessions on `/portal/parent` and all 6 sub-pages, aggressively enumerating every clickable element and flagging any path that reaches `/login` or `/logout` without user confirmation. The probe handles its own session preservation by treating `/logout` and `/api/logout` as `SESSION_KILLERS` that must not be probed via the shared cookie context. Re-run before any change to parent-portal templates or topbar navigation. The hostile-walk pattern is reusable for any UX-trap-prone surface (admin DDL controls, payment refunds, irreversible bulk operations).
+
+**Exception** — `PORTAL_PARENT_HTML` rendered for `role=teacher` at `/teacher/hub` keeps its bare "خروج" link unchanged. That page has no adjacent "back" link, so the misclick hazard (adjacency-with-identical-styling) does not apply. The rule is specifically about adjacency, not about logout links in general.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)
