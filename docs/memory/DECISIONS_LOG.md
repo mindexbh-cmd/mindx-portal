@@ -111,6 +111,15 @@ Format:
 - **Consequences**: Boundary: auto-memory = operator; memory-keeper = project. Don't cross-write.
 - **Reference**: `.claude/agents/memory-keeper-agent.md`
 
+### ADR-013: Separate `prompt-engineer-agent` for plan-writing
+- **Date**: 2026-05-15
+- **Status**: accepted
+- **Context**: Operator requests often arrive as a single sentence ("الموقع بطيء", "أريد ميزة كذا"). Routing those directly to `mindex-coordinator-agent` was muddying the coordinator's job (which is to orchestrate reviewers around an existing plan, not to invent the plan).
+- **Decision**: Introduce a dedicated `prompt-engineer-agent` whose only job is plan-writing — six-phase workflow ending in a markdown document under `docs/plans/`. `/plan <description>` routes to it. SOP Step 0: "Vague request? Run `/plan` first."
+- **Alternatives considered**: Have the coordinator do both planning and orchestration; rely on the parent assistant to write plans inline.
+- **Consequences**: Two new artifacts per non-trivial task — the plan doc and the coordinator's review trail. The plan doc becomes a reviewable, refinable, version-controlled object. Cost: an extra agent invocation upfront for every wishful request.
+- **Reference**: `.claude/agents/prompt-engineer-agent.md` (commit b8d5079), `docs/plans/parent-payment-reminders-20260515-194500.md` (demo)
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)

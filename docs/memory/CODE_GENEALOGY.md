@@ -123,13 +123,14 @@ For per-line blame, use `git log -L <line>,<line>:<file>`. This file is the high
 - Two health endpoints in `app.py` (`/api/health`, `/api/health/deep`).
 
 ### Agent team (May 15)
-- 13 custom subagents under `.claude/agents/`.
+- 14 custom subagents under `.claude/agents/`.
 - 9 imported professional agents under `.claude/agents/imported/` (MIT, VoltAgent).
 - Coordinator agent (`mindex-coordinator-agent`).
 - Memory keeper agent (`memory-keeper-agent`) — owns `docs/memory/`.
+- Prompt engineer agent (`prompt-engineer-agent`, added in commit b8d5079) — owns `docs/plans/`. Takes vague operator requests and produces phased plans with approval gates.
 
 ### Slash commands (May 15)
-- 10 under `.claude/commands/` + `/context` for memory-keeper handoff.
+- 10 under `.claude/commands/` + `/context` (memory-keeper handoff) + `/plan` (prompt-engineer).
 
 ### Hooks (May 15)
 - 5 Python helpers under `.claude/hook_scripts/`.

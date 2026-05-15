@@ -86,6 +86,8 @@ Recorded in tight detail because this is when the agent team / safety net / memo
 | `6caa418` | feat(memory): memory-keeper onboarding — initial corpus (9 files, 1252 lines) |
 | `caa0279` | feat(commands): /context — memory-keeper handoff generation |
 | `f59efb5` | feat(hooks): memory-tracking + HANDOFF-aware session start (6th hook) |
+| `bf5c521` | docs: integrate memory-keeper into coordinator pipeline + SOP |
+| `b8d5079` | feat(agents): add prompt-engineer-agent + /plan command (14th custom agent + 12th slash command + demo plan) |
 
 ## How to append
 
