@@ -45,6 +45,125 @@ Created by `scripts/seed_test_users.py` — keep these stable; the e2e suite dep
 
 The seeded students row uses `personal_id='TEST-STUDENT-0001'` so it's trivially identifiable in the DB and won't collide with a real Bahraini CPR.
 
+## Professional setup — complete reference
+
+Every piece of automation lives under `.claude/` (committed) plus `scripts/` and `docs/`. Operator-personal settings stay in `.claude/settings.local.json` (gitignored).
+
+### Custom subagent team (12 + coordinator)
+
+| Agent | Specialty | Invoke when |
+|---|---|---|
+| `mindex-coordinator-agent` | Orchestrator | Any non-trivial task; "review X", "ship Y" |
+| `code-architect-agent` | Code organization (100K-line app.py) | Before major features, refactors |
+| `database-architect-agent` | Expand-Migrate-Contract schema changes | Any schema change, DB optimization, audits |
+| `data-protector-agent` | DROP/DELETE/migration gatekeeper | **MANDATORY** before any DDL |
+| `ui-designer-agent` | Palette / spacing / RTL | After HTML/CSS changes |
+| `arabic-quality-agent` | Arabic grammar / terminology / labels | After user-facing text changes |
+| `ux-employee-agent` | Workflow efficiency | Before approving features |
+| `mobile-first-agent` | 360 px viewport / TWA / iOS | After UI changes; before APK |
+| `real-user-tester-agent` | Persona walk-throughs | After UI changes; before "done" |
+| `performance-watchdog` | p95 / memory / queries | Before heavy ops; on OOM |
+| `business-analyst-agent` | Adoption / ROI / deprecation | Before features; quarterly |
+| `documentation-keeper` | CHANGELOG / docs upkeep | After features; before releases |
+
+### Imported professional subagents (9, MIT-licensed)
+
+Vendored from [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) under `.claude/agents/imported/`. Each carries an HTML-comment attribution block and is renamed with the `imported-` prefix. See `.claude/agents/imported/README.md` for when to pick imported vs custom.
+
+| Imported name | Specialty |
+|---|---|
+| `imported-security-auditor` | OWASP / compliance audits |
+| `imported-code-reviewer` | PR-shaped review |
+| `imported-sql-pro` | Advanced SQL optimization |
+| `imported-debugger` | Stack-trace-driven debugging |
+| `imported-incident-responder` | Active outage / breach response |
+| `imported-python-pro` | Modern type-safe Python |
+| `imported-api-designer` | REST/GraphQL design |
+| `imported-test-automator` | Test framework architecture |
+| `imported-postgres-pro` | Postgres-specific tuning, HA |
+
+### Slash commands (10)
+
+Project-specific commands under `.claude/commands/`. Each is a Markdown file with a frontmatter description and a body that becomes the prompt when `/command` is invoked.
+
+| Command | Purpose |
+|---|---|
+| `/test` | Run `scripts/run_e2e.py` against the local dev server |
+| `/deploy <slug>` | `scripts/safe_deploy.py` with pre-flight + DB-change detection |
+| `/audit` | Fan out to 5 specialists; aggregate to `docs/audits/audit-<ts>.md` |
+| `/logs <keyword>` | Pull last hour of Render logs filtered |
+| `/backup` | Snapshot prod via `scripts/db_backup.py` |
+| `/rollback` | List safety tags, double-confirm, reset |
+| `/health` | Hit `/api/health` + `/api/health/deep`, per-subsystem report |
+| `/feature <description>` | Delegate the full pipeline to `mindex-coordinator-agent` |
+| `/sql <query>` | Read-only DB query (refuses writes) |
+| `/screenshots <path>` | 360 / 768 / 1280 viewport captures via Playwright |
+
+### Lifecycle hooks (5)
+
+Configured in `.claude/settings.local.json` (operator-personal, gitignored). Hook scripts ship in `.claude/hook_scripts/` (committed).
+
+| Hook | Event / matcher | Behavior |
+|---|---|---|
+| `precommit_check.py` | PreToolUse / `Bash(git commit *)` | Block on `app.py` syntax errors or secrets in the staged diff (rnd_/ghp_/sk- + quoted-literal password/api_key/token/secret) |
+| `prepush_check.py` | PreToolUse / `Bash(git push *)` | Warn on non-main branch, dirty tree, stale test marker. Never blocks. |
+| `post_pyedit_syntax.py` | PostToolUse / `Edit|Write` | `ast.parse` on .py; surface SyntaxError as a system message |
+| `session_start.py` | SessionStart | Inject branch + `git status --short` + `git log -5` into context |
+| `prompt_hints.py` | UserPromptSubmit | Keyword reminders (deploy/test/logs) + credential-rotation warning when token shape detected |
+
+Each clone needs to enable these manually — `.claude/settings.local.json` is gitignored by design (some operators may want different per-user behavior).
+
+### Optional MCP servers
+
+`docs/MCP_SETUP.md` documents seven candidate MCP servers with use cases. `.claude/mcp_servers.json` is the template — every server is disabled by default (keys prefixed with `_`). Copy to `.mcp.json` and remove the underscore to enable.
+
+Recommended starter set: **playwright** (interactive browser) + **postgres** via pgEdge or Zed fork with a dedicated read-only role (NOT the write-capable prod URL).
+
+### Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/seed_test_users.py` | Idempotent seed of `admin_test` / `teacher_test` / `student_test` / `parent_test` |
+| `scripts/auto_test.py` | Playwright `BrowserSession` library |
+| `scripts/run_e2e.py` | 8-test e2e suite |
+| `scripts/safe_deploy.py` | Tag → push → poll `/api/health` → smoke e2e → auto-rollback |
+| `scripts/get_logs.py` | Render API wrapper |
+| `scripts/db_query.py` | Read-only DB shell (refuses writes) |
+| `scripts/db_backup.py` | Local SQLite or `pg_dump` snapshot |
+| `scripts/db_restore.py` | Restore with safety copy |
+
+### Health endpoints
+
+- `GET /api/health` — DB ping + scratch disk write. Used by `safe_deploy` as the deploy gate.
+- `GET /api/health/deep` — row counts + books storage writability.
+
+### Workflow examples
+
+**Ship a UI change to the points page:**
+1. Edit `app.py` and `python scripts/run_e2e.py` locally.
+2. `/audit` — fan out the 5-specialist review.
+3. Fix any rejects, re-run `/audit` until clean.
+4. `/deploy points-board-fixes` — auto-rollback on red.
+
+**Ship a schema migration:**
+1. `Agent(subagent_type: "database-architect-agent", prompt: "Discovery for column X")` — produces `docs/migrations/<name>-discovery.md`, STOPS for approval.
+2. Approve plan → agent produces `<name>-plan.md`, STOPS again.
+3. Approve → Phase A (Expand) commit + `/deploy <slug>-phase-a`. Monitor 24h.
+4. Phase B (Migrate) — one call site per commit, `/deploy` each.
+5. Phase C (Contract) — drop the old column. `/deploy <slug>-contract`.
+
+**Quarterly architecture sweep:**
+1. `/feature "quarterly review — flag deprecation candidates, audit migrations"`
+2. Coordinator runs `business-analyst-agent` + `code-architect-agent` + `data-protector-agent` in parallel.
+3. `documentation-keeper` consolidates findings; commits to `docs/audits/`.
+
+**Live incident:**
+1. `/health` — quick triage.
+2. `/logs <keyword>` — recent errors.
+3. `Agent(subagent_type: "imported-incident-responder", prompt: "<symptoms>")`.
+4. If a recent deploy is the suspect: `/rollback`.
+5. Postmortem written by `documentation-keeper` to `docs/incidents/`.
+
 ## Specialist agent team
 
 Eleven subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
