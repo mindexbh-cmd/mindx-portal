@@ -88,6 +88,18 @@ Recorded in tight detail because this is when the agent team / safety net / memo
 | `f59efb5` | feat(hooks): memory-tracking + HANDOFF-aware session start (6th hook) |
 | `bf5c521` | docs: integrate memory-keeper into coordinator pipeline + SOP |
 | `b8d5079` | feat(agents): add prompt-engineer-agent + /plan command (14th custom agent + 12th slash command + demo plan) |
+| `31499e9` `3712968` `5ecf19d` | feat: unified-login parent direct-nav — guard `/parent` + `/parent/legacy` from authenticated parents; login-page Arabic hint clarifying parents use child's `personal_id` |
+
+#### Feature: unified-login parent direct-nav (commits `31499e9` + `3712968` + `5ecf19d`)
+
+Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
+
+- `refactor(parent-routes)` `31499e9` — `/parent` (`app.py` ~28800) and `/parent/legacy` (`app.py` ~28825) now check `session["user"]` first. Logged-in `role=student` → 302 `/portal/parent-hub`. Logged-in `role=parent` → 302 `/portal/parent`. Anonymous visitors unchanged — public PID prompt preserved so legacy WhatsApp deep-links keep working.
+- `feat(login)` `3712968` — `LOGIN_HTML` (`app.py` ~9700) gained Arabic hint under submit button: "أولياء الأمور: استخدم الرقم الشخصي للطالب اسم مستخدم" (entity-encoded per ADR-002).
+- `docs(memory,plans)` `5ecf19d` — refreshed `HANDOFF_COMPACT.md`; added plan `docs/plans/unified-login-parent-direct-nav-20260515-222200.md`.
+- Safety tag: `safety/pre-unified-login-parent-direct-nav-20260515-225736` (pushed to origin).
+- Prod verified: `/api/health` green at 1778875191; smoke + full 8/8 e2e green; anon `/parent` + `/parent/legacy` still 200.
+- Decision rationale: see ADR-014 in `DECISIONS_LOG.md` (Interpretation B chosen over A).
 
 ## How to append
 

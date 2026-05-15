@@ -54,6 +54,27 @@ Admin send-panel landed on `/points/manage`. Smart-timing permission prompt (ask
 ### 2026-05-14 — TWA / Android app
 PWABuilder Bubblewrap pipeline. Status bar matches `theme_color` (`#4a148c`). `assetlinks.json` route at `/.well-known/assetlinks.json` driven by `TWA_SHA256_FINGERPRINT` env var.
 
+### 2026-05-15 — Unified-login parent direct-nav (login hint + redirect rules)
+
+UX cleanup so authenticated parents/students don't see the redundant public CPR prompt on `/parent`. Shipped via commits `31499e9` (route guards) + `3712968` (login hint) + `5ecf19d` (plan/handoff). See ADR-014 for the A-vs-B decision.
+
+**New Arabic hint on the login form** (`LOGIN_HTML` at `app.py` ~9700, rendered below the submit button, entity-encoded per ADR-002):
+
+> أولياء الأمور: استخدم الرقم الشخصي للطالب اسم مستخدم
+
+Plain Arabic: "Parents: use the student's personal ID as username". Sits as a small caption — same neutral color the form already uses for secondary text; no new palette entry introduced.
+
+**Redirect rules on `/parent` and `/parent/legacy`** (`app.py` ~28800 and ~28825):
+
+| Visitor state | Behavior |
+|---|---|
+| Anonymous (no `session["user"]`) | Unchanged — public CPR prompt rendered. Preserves legacy WhatsApp deep-link compatibility. |
+| Authenticated, `role=student` | 302 → `/portal/parent-hub` |
+| Authenticated, `role=parent` | 302 → `/portal/parent` |
+| Authenticated, any other role | Unchanged — public CPR prompt rendered (admin/teacher visiting the parent surface still sees the public form). |
+
+No new CSS, no new component. Pure backend redirect + one inline-template text addition.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

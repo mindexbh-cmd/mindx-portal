@@ -120,6 +120,20 @@ Format:
 - **Consequences**: Two new artifacts per non-trivial task — the plan doc and the coordinator's review trail. The plan doc becomes a reviewable, refinable, version-controlled object. Cost: an extra agent invocation upfront for every wishful request.
 - **Reference**: `.claude/agents/prompt-engineer-agent.md` (commit b8d5079), `docs/plans/parent-payment-reminders-20260515-194500.md` (demo)
 
+### ADR-014: `/parent` stays public for anonymous WhatsApp visitors; redirect only authenticated users
+- **Date**: 2026-05-15
+- **Status**: accepted
+- **Context**: Unified-login feature needed to decide what happens when a parent who is already logged in visits `/parent` (or the legacy alias `/parent/legacy`). Two interpretations on the table:
+  - **Interpretation A**: Make `/parent` strictly authenticated. Any anonymous hit → redirect to `/login`. Cleanest URL semantics; one canonical entry per role.
+  - **Interpretation B** (recommended): Keep `/parent` public for anonymous visitors (preserves the public CPR prompt that legacy WhatsApp deep-links rely on); only redirect when `session["user"]` is already populated — `role=student` → `/portal/parent-hub`, `role=parent` → `/portal/parent`.
+- **Decision**: Operator chose Interpretation B. Authenticated parents/students now skip the redundant CPR prompt; anonymous visitors arriving from WhatsApp links keep the public PID flow unchanged.
+- **Alternatives considered**: Interpretation A (above); a feature flag toggle (rejected — adds permanent config surface for a one-time UX cleanup); detecting WhatsApp UA (rejected — fragile, easy to break by browser updates).
+- **Consequences**:
+  - Additive guards only — zero break on legacy `/parent?pid=...` deep-links circulating in WhatsApp messages.
+  - Two well-trodden public surfaces remain (`/parent`, `/parent/legacy`) but they no longer waste a click for already-authenticated visitors.
+  - Means `/parent` semantics differ by auth state. Documented inline at `app.py` ~28800 and ~28825 so future maintainers don't "simplify" the guard away.
+- **Reference**: commits `31499e9` (route guards) + `3712968` (login hint) + `5ecf19d` (plan/handoff). Plan doc: `docs/plans/unified-login-parent-direct-nav-20260515-222200.md`. Safety tag: `safety/pre-unified-login-parent-direct-nav-20260515-225736`.
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)
