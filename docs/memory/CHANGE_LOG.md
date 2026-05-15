@@ -83,7 +83,9 @@ Recorded in tight detail because this is when the agent team / safety net / memo
 | `ce970c8` | docs(mcp): MCP server documentation + opt-in template |
 | `119348e` | docs(claude): comprehensive Professional setup section in CLAUDE.md |
 | `3fd37db` | feat(agents): add memory-keeper-agent (13th custom) |
-| (this commit) | feat(memory): memory-keeper onboarding — initial corpus |
+| `6caa418` | feat(memory): memory-keeper onboarding — initial corpus (9 files, 1252 lines) |
+| `caa0279` | feat(commands): /context — memory-keeper handoff generation |
+| `f59efb5` | feat(hooks): memory-tracking + HANDOFF-aware session start (6th hook) |
 
 ## How to append
 

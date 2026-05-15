@@ -13,6 +13,8 @@ For every non-trivial task, follow this loop:
 5. **Deploy through safe_deploy.** `python scripts/safe_deploy.py --feature <slug>` will tag, push, poll `/api/health`, run the smoke e2e against prod, and roll back automatically if anything goes red. Don't push to `main` by hand for non-trivial changes — you lose the auto-rollback.
 6. **Verify against prod.** After the deploy lands, run `python scripts/run_e2e.py --base https://mindx-portal-1.onrender.com` once more. Same suite, different target — this catches Postgres-only failures that SQLite swallowed locally.
 7. **Only report 'done' when verified.** If a safe_deploy rolls back, fix the root cause and retry — don't paper over with a "deploy is flaky" note. The protocol is the floor, not the ceiling.
+8. **Log to memory-keeper.** After any feat:/fix:/refactor: commit lands (or the coordinator pipeline completes), invoke `memory-keeper-agent` in passive-tracking mode with the commit hash + task summary. The agent appends to `docs/memory/CHANGE_LOG.md` and any other relevant log (BUGS_LOG / DECISIONS_LOG / DESIGN_LOG). The post-commit hook surfaces a hint for qualifying commits — act on it.
+9. **Regenerate handoff on session boundaries.** If the work concludes a session or hands off to another operator/AI, run `/context compact` (or `/context full` for the comprehensive version) so the next session opens with current state.
 
 ### Scripts you'll use constantly
 

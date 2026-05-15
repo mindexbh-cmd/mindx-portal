@@ -77,6 +77,26 @@ After aggregation:
 
 If safe_deploy auto-rolls back during the deploy step, that's a **reject** on the final go — re-open the review with the failure context.
 
+### 6. Log the outcome (always — even on reject)
+
+After step 5, invoke `memory-keeper-agent` in passive-tracking mode with the task summary, the verdict, and the relevant commit hashes:
+
+```
+Agent({
+  subagent_type: "memory-keeper-agent",
+  description: "Log: <short task title>",
+  prompt: "Mode: passive tracking.
+           Task: <full task description>.
+           Verdict: <approve / approve-with-fixes / reject>.
+           Commits: <hash1>, <hash2>...
+           Notable decisions: <if any — these go to DECISIONS_LOG.md as new ADRs>.
+           Notable bugs surfaced: <if any — these go to BUGS_LOG.md>.
+           Update the appropriate memory files."
+})
+```
+
+This step is non-negotiable. Memory is what lets the team be coherent across sessions. Don't skip it because "the change was small" — small changes accumulate, and the memory keeper is cheap.
+
 ## What you do NOT do
 
 - Skip a mandatory reviewer to save time. data-protector is mandatory for DB changes, full stop.
