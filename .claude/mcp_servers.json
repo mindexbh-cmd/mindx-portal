@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "TEMPLATE — none of these MCP servers are active by default.",
+    "Every entry below is commented out via a leading underscore in",
+    "its key. To enable an entry, copy this file to .mcp.json at the",
+    "repo root, remove the leading underscore from the server name,",
+    "fill in any env var that begins with $, then restart Claude Code",
+    "or run /mcp to reload.",
+    "",
+    "See docs/MCP_SETUP.md for per-server setup and use cases."
+  ],
+  "mcpServers": {
+    "_playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "_note": "Interactive browser automation. Pairs with the e2e suite under scripts/. Most-installed MCP in the Claude Code ecosystem."
+    },
+    "_postgres_pgedge_readonly": {
+      "command": "npx",
+      "args": ["-y", "@pgedge/postgres-mcp"],
+      "env": {
+        "DATABASE_URL": "$MCP_POSTGRES_READONLY_URL"
+      },
+      "_note": "Read-only Postgres access. Create a dedicated mindex_readonly role per docs/MCP_SETUP.md — DO NOT point this at the write-capable production URL."
+    },
+    "_filesystem_vardata": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/var/data"],
+      "_note": "Sandboxed filesystem access rooted at /var/data (Render persistent disk). Useful when working with curriculum PDFs / SQLite snapshots / playwright browser cache without granting permission-everywhere."
+    },
+    "_git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "_note": "Structured git log/blame/diff. Useful for business-analyst-agent's last-changed-when queries and code-architect-agent's blame-driven duplication checks."
+    },
+    "_fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"],
+      "_note": "Web page fetching with LLM-friendly conversion. Equivalent to built-in WebFetch but exposes the cleaned text more granularly."
+    },
+    "_sequential_thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequentialthinking"],
+      "_note": "Structured scratchpad for multi-step reasoning. Overlaps with Plan mode and TaskList — enable only if you've found the existing tools insufficient."
+    },
+    "_memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "_note": "Knowledge-graph persistent memory. Overlaps with the auto-memory system at ~/.claude/projects/.../memory/. Pick one, not both, to avoid drift."
+    }
+  }
+}
