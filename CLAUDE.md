@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 For every non-trivial task, follow this loop:
 
 0. **Vague request? Run `/plan` first.** If the operator's ask is a sentence-level wish ("الموقع بطيء", "أريد ميزة كذا"), invoke `prompt-engineer-agent` via `/plan <description>` to convert it into a phased plan with concrete agent invocations, scripts, and approval gates. Skip this step only when the work is clearly scoped (e.g. "fix the typo on line 1234" — no plan needed).
+0a. **Risky-looking change? Run `/check` first.** Invoke `catastrophe-prevention-agent` via `/check <description>` for any change that touches data, removes/renames routes or columns, modifies auth, or could degrade UX. Only the human owner can override a REJECT verdict (via the explicit `override:catastrophe:<reason>` tag). The Bash hook auto-blocks the most dangerous patterns (DROP TABLE, DELETE FROM without WHERE, rm -rf, git push --force, etc.) until `/check` clears them.
 1. **Investigate first.** Read the relevant code, query the DB with `scripts/db_query.py` if needed, scan recent commits with `git log -n 20 --oneline`. Don't propose changes until you understand the current behaviour.
 2. **Create a safety tag.** Before any risky change, `git tag safety/pre-<feature>-<timestamp> HEAD`. `scripts/safe_deploy.py` does this automatically for deploys; for purely-local work, do it by hand if you're about to touch >5 files or migration code.
 3. **Implement with atomic commits.** One concern per commit. Run `python -c "import ast; ast.parse(open('app.py', encoding='utf-8').read())"` after every meaningful change to catch syntax issues before they ride a push to Render.
@@ -52,11 +53,12 @@ The seeded students row uses `personal_id='TEST-STUDENT-0001'` so it's trivially
 
 Every piece of automation lives under `.claude/` (committed) plus `scripts/` and `docs/`. Operator-personal settings stay in `.claude/settings.local.json` (gitignored).
 
-### Custom subagent team (15 including coordinator)
+### Custom subagent team (16 including coordinator)
 
 | Agent | Specialty | Invoke when |
 |---|---|---|
 | `mindex-coordinator-agent` | Orchestrator | Any non-trivial task; "review X", "ship Y" |
+| `catastrophe-prevention-agent` | **Supreme guardian** — 5-category disaster veto (data loss / breaking / security / performance / UX) | **MANDATORY** before any risky change. Only human owner overrides REJECT |
 | `code-architect-agent` | Code organization (100K-line app.py) | Before major features, refactors |
 | `database-architect-agent` | Expand-Migrate-Contract schema changes | Any schema change, DB optimization, audits |
 | `data-protector-agent` | DROP/DELETE/migration gatekeeper | **MANDATORY** before any DDL |
@@ -88,7 +90,7 @@ Vendored from [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltA
 | `imported-test-automator` | Test framework architecture |
 | `imported-postgres-pro` | Postgres-specific tuning, HA |
 
-### Slash commands (13)
+### Slash commands (14)
 
 Project-specific commands under `.claude/commands/`. Each is a Markdown file with a frontmatter description and a body that becomes the prompt when `/command` is invoked.
 
@@ -107,16 +109,19 @@ Project-specific commands under `.claude/commands/`. Each is a Markdown file wit
 | `/plan <description>` | Turn a vague request into a phased plan via `prompt-engineer-agent` |
 | `/context [compact\|full\|recent\|<topic>]` | Memory-keeper handoff generation / retrospective extraction |
 | `/protect <change>` | `feature-protector-agent` regression-risk audit of a proposed change |
+| `/check <change>` | `catastrophe-prevention-agent` 5-category disaster veto (data / breaking / security / performance / UX) |
 
-### Lifecycle hooks (5)
+### Lifecycle hooks (7)
 
 Configured in `.claude/settings.local.json` (operator-personal, gitignored). Hook scripts ship in `.claude/hook_scripts/` (committed).
 
 | Hook | Event / matcher | Behavior |
 |---|---|---|
+| `catastrophe_block.py` | PreToolUse / `Bash` | Pattern-blocks DROP TABLE / TRUNCATE / DELETE-without-WHERE / ALTER COLUMN / `rm -rf` on sensitive paths / `git push --force` / `git reset --hard origin/main` / `git filter-*` / `dropdb` / `pg_restore --clean`. Operator can bypass with `override:catastrophe:<reason>` inline tag. |
 | `precommit_check.py` | PreToolUse / `Bash(git commit *)` | Block on `app.py` syntax errors or secrets in the staged diff (rnd_/ghp_/sk- + quoted-literal password/api_key/token/secret) |
 | `prepush_check.py` | PreToolUse / `Bash(git push *)` | Warn on non-main branch, dirty tree, stale test marker. Never blocks. |
-| `post_pyedit_syntax.py` | PostToolUse / `Edit|Write` | `ast.parse` on .py; surface SyntaxError as a system message |
+| `post_pyedit_syntax.py` | PostToolUse / `Edit\|Write` | `ast.parse` on .py; surface SyntaxError as a system message |
+| `post_commit_memory.py` | PostToolUse / `Bash(git commit *)` | Surface memory-keeper hint when a qualifying commit lands (feat/fix/refactor) |
 | `session_start.py` | SessionStart | Inject branch + `git status --short` + `git log -5` into context |
 | `prompt_hints.py` | UserPromptSubmit | Keyword reminders (deploy/test/logs) + credential-rotation warning when token shape detected |
 
@@ -175,11 +180,12 @@ Recommended starter set: **playwright** (interactive browser) + **postgres** via
 
 ## Specialist agent team
 
-Fifteen subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
+Sixteen subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
 
 | Agent | Specialty | Invoke when |
 |---|---|---|
 | `mindex-coordinator-agent` | Orchestrator — plans which specialists to run, aggregates verdicts, makes go/no-go | Any non-trivial task; "review X", "ship Y" |
+| `catastrophe-prevention-agent` | **Supreme guardian** — 5-category disaster veto (data loss / breaking / security / performance / UX). Writes verdicts to `docs/memory/CATASTROPHE_LOG.md` + `docs/memory/REJECTED_CHANGES.md` | **MANDATORY** before any risky change. Only human owner overrides REJECT |
 | `code-architect-agent` | Code organization for the 100K-line app.py | Before major features, refactors, code reviews |
 | `database-architect-agent` | Expand-Migrate-Contract schema changes | Schema changes, DB optimization, audits |
 | `data-protector-agent` | DB safety — DROP/DELETE/TRUNCATE/migration/bulk-UPDATE gatekeeper | **MANDATORY** before any schema change or bulk data op |
