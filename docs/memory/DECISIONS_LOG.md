@@ -150,6 +150,24 @@ Format:
   - Inventory drift is the main risk — the agent must incrementally update `FEATURE_INVENTORY.md` whenever a route is added/removed/renamed. `/protect bootstrap` exists for the occasional sync but should be rare in steady state.
 - **Reference**: commit `316d84d`; `.claude/agents/feature-protector-agent.md`; `.claude/commands/protect.md`; `docs/memory/FEATURE_INVENTORY.md` (502 routes, 69 categories, top-20 assertions). Complements ADR-007 (Expand-Migrate-Contract, DB-side) and the data-protector mandate in CLAUDE.md "Specialist agent team".
 
+### ADR-016: Supreme catastrophe-prevention guardian above the role-specific guardians; veto power; only the human owner overrides REJECT
+- **Date**: 2026-05-15
+- **Status**: accepted
+- **Context**: The existing guardians are scoped — `data-protector-agent` gates DDL / bulk-data ops (ADR-007 territory); `feature-protector-agent` gates regressions against the 502-route surface (ADR-015 territory). Neither one looks at a change holistically across all disaster categories. A change can be DB-clean and feature-clean yet still be a catastrophe: a `git push --force` to `main`, a security-hole rewrite, a p95-blowing query, or a UX cliff that nukes adoption. Operator wanted a SUPREME guardian above the role-specific ones whose entire job is "would this be a catastrophe for the project across any axis?".
+- **Decision**: Introduce `catastrophe-prevention-agent` (16th custom) as a supreme guardian. Runs FIRST in the coordinator pipeline, before feature-protector and before data-protector. Reviews every change against 5 disaster categories: (1) data loss; (2) breaking changes; (3) security; (4) performance; (5) UX disasters. Default answer is NO unless the change is provably safe. Has REJECT-class veto power. **Only the human owner overrides REJECT** — no other agent, no coordinator, no operator-impersonating script. Bypass at the Bash-hook level requires the inline `override:catastrophe:<reason>` tag, which is logged.
+- **Alternatives considered**:
+  - Fold catastrophe-checks into data-protector or feature-protector (rejected — different scope, would muddy each agent's narrow remit; security + performance + UX disasters fall outside both).
+  - Make the agent advisory only, no veto (rejected — operator wanted a hard stop, not a suggestion box).
+  - Rely on the imported `security-auditor` + `performance-watchdog` + `incident-responder` already in the team (rejected — those are reactive / domain-narrow, not a unified disaster veto running on every change).
+  - Single-category catastrophe agents (one for security, one for performance, etc.) — rejected as a category explosion that wouldn't deliver the holistic "is this a catastrophe?" verdict the operator asked for.
+- **Consequences**:
+  - Every non-trivial change now passes through THREE veto-empowered guardians in series: catastrophe-prevention (first) → feature-protector (second) → data-protector (DB-touching changes only). Together they form a defense-in-depth gate.
+  - SOP gained step 0a ("Run `/check` first for risky changes") and is documented in `CLAUDE.md`.
+  - PreToolUse Bash hook `catastrophe_block.py` (7th hook) provides a fast pattern-based block at the shell layer for the most dangerous literal commands (DROP TABLE, TRUNCATE, DELETE-without-WHERE, ALTER COLUMN type/rename, `rm -rf` on sensitive paths, `git push --force` without `--force-with-lease`, `git reset --hard origin/main`, `git filter-*`, `dropdb`, `pg_restore --clean`). Bypass tag `override:catastrophe:<reason>` is required inline; the hook also blocks the dangerous string when used as DATA (e.g. inside `echo`) so documenting these patterns in commit messages or scripts requires the override.
+  - Cost: one extra agent invocation upfront per non-trivial task. Coordinator pipeline grows by one mandatory stage. Hook adds a few ms to every Bash call.
+  - All REJECT verdicts land in `docs/memory/REJECTED_CHANGES.md` (full risk breakdown) and all verdicts (REJECT + APPROVE) land in `docs/memory/CATASTROPHE_LOG.md` (append-only ledger).
+- **Reference**: commit `43b52d3`; `.claude/agents/catastrophe-prevention-agent.md`; `.claude/commands/check.md`; `.claude/hook_scripts/catastrophe_block.py`; `docs/memory/CATASTROPHE_LOG.md`; `docs/memory/REJECTED_CHANGES.md`; demo audits `docs/audits/catastrophe-check-delete-books-v2-20260515-204654.md` (REJECT) and `docs/audits/catastrophe-check-add-footer-slogan-20260515-204654.md` (APPROVE). Complements ADR-007 (Expand-Migrate-Contract), ADR-009 (auto-rollback safety tags), and ADR-015 (feature-protector).
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)

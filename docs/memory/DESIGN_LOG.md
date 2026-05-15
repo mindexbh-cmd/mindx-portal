@@ -94,6 +94,24 @@ The agent's top-20 list captures the load-bearing UX surfaces — login, attenda
 
 The 502-route catalog also doubles as a coverage map for `/audit` runs and persona walk-throughs — `real-user-tester-agent` can cross-reference its persona scripts against the inventory to ensure no critical path is uncovered.
 
+### 2026-05-15 — `catastrophe-prevention-agent` 5-category disaster model + `override:catastrophe:` bypass convention
+
+Shipped via commit `43b52d3`. No visual change to the portal itself; this entry captures the design-level invariant that every change is now reviewed against a 5-category disaster taxonomy before it can ship.
+
+**The 5 categories** (any one tripping → REJECT, agent runs FIRST in the coordinator pipeline):
+
+1. **Data loss** — any DROP / TRUNCATE / DELETE-without-WHERE / column-rename / table-rename / migration that could destroy or orphan user rows. Overlaps with `data-protector-agent` (ADR-007) but catastrophe-prevention treats it as a project-level disaster, not just a DB concern.
+2. **Breaking changes** — schema changes called out by N+ existing routes, removed endpoints, renamed signatures, deleted shared helpers, modified inline `*_HTML` template constants that other features depend on.
+3. **Security** — auth-bypass shapes, secret leaks (rnd_/ghp_/sk-), unbounded admin-impersonation, SQL constructed via f-strings, missing `@login_required` on data endpoints, `eval()` / `exec()` on user input, CORS gone wild.
+4. **Performance** — p95 budget threats: queries inside loops, missing indexes on filter columns, megabyte-class responses, missing pagination, blocking calls on the request thread, OOM-risk allocations on the 512 MB Render Starter plan.
+5. **UX disasters** — adoption-killing regressions: parent shop checkout broken, attendance entry gone, books_v2 viewer broken, login broken, RTL layout flipped, Arabic-entity decoding regressed. Top-20 invariants in `FEATURE_INVENTORY.md` are inputs here.
+
+**The `override:catastrophe:<reason>` bypass convention** — codified as the only path past the PreToolUse Bash hook `catastrophe_block.py`. Operator includes the literal tag inline in the command (e.g. `git push --force-with-lease  # override:catastrophe:rebase-after-secret-scrub`). Hook logs the bypass with reason. No silent override path exists. Documentation/test commands that need to MENTION a dangerous pattern as data (e.g. `echo "never DROP TABLE users"`) also require the tag — defense-in-depth, no false-negative carve-outs.
+
+**Why this matters for design / UX work:**
+- A REJECT verdict cannot be argued past by any other agent or by the coordinator. Only the human owner overrides. This makes the 5 categories functionally an inviolable design contract — a UI redesign that breaks the parent shop checkout flow gets stopped here even if every other reviewer approves.
+- The two demo audits (`docs/audits/catastrophe-check-delete-books-v2-20260515-204654.md` and `catastrophe-check-add-footer-slogan-20260515-204654.md`) serve as the canonical examples of REJECT vs APPROVE shape — future designers can read them to calibrate what reads as catastrophic vs purely additive.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

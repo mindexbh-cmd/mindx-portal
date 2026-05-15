@@ -17,7 +17,7 @@ Total commits as of 2026-05-15: **1308** across 43 days.
 | May 09–11 | ~50 | Books library hardening; PDF viewer custom rendering; parent portal fixes |
 | May 12 | 196 | Phase 2 push notifications foundation; parent-shop polish |
 | May 13–14 | ~140 | TWA / APK build pipeline; push UI + admin panel; books chunked upload |
-| May 15 | 44 | Infrastructure-as-code: agent team, hooks, slash commands, memory keeper, DB audit |
+| May 15 | 45+ | Infrastructure-as-code: agent team (16 custom + 9 imported), 14 slash commands, 7 hooks, memory keeper, feature-protector, catastrophe-prevention, DB audit |
 
 ## Weekly notes
 
@@ -90,6 +90,7 @@ Recorded in tight detail because this is when the agent team / safety net / memo
 | `b8d5079` | feat(agents): add prompt-engineer-agent + /plan command (14th custom agent + 12th slash command + demo plan) |
 | `31499e9` `3712968` `5ecf19d` | feat: unified-login parent direct-nav — guard `/parent` + `/parent/legacy` from authenticated parents; login-page Arabic hint clarifying parents use child's `personal_id` |
 | `316d84d` | feat(agents): add feature-protector-agent (15th custom) + /protect (13th slash) + `docs/memory/FEATURE_INVENTORY.md` bootstrap (502 routes, 69 categories, top-20 critical assertions) |
+| `43b52d3` | feat(agents): catastrophe-prevention-agent (16th custom) — supreme guardian with 5-category veto + `/check` (14th slash) + `catastrophe_block.py` PreToolUse hook (7th) + `CATASTROPHE_LOG.md` + `REJECTED_CHANGES.md` + 2 demo audits |
 
 #### Feature: feature-protector-agent + /protect + FEATURE_INVENTORY (commit `316d84d`)
 
@@ -100,6 +101,20 @@ Shipped 2026-05-15 late evening.
 - `docs/memory/FEATURE_INVENTORY.md` — 899 lines; all 502 `@app.route` entries grouped into 69 categories with line numbers, methods, handlers, auth flags. Top-20 critical features carry explicit regression-worthy assertions ("must hold after any change") — these become contractual invariants.
 - `CLAUDE.md` — agent table now lists 15 custom agents (memory-keeper + prompt-engineer surface in the table for the first time); slash-command table grows to 13 (`/plan`, `/context`, `/protect` added).
 - Decision rationale: see ADR-015 (split DB-safety vs feature-safety into two distinct guardians, each with veto).
+
+#### Feature: catastrophe-prevention-agent + /check + hook (commit `43b52d3`)
+
+Shipped 2026-05-15 late evening. 16th custom agent; sits ABOVE the role-specific guardians (data-protector, feature-protector) as a supreme guardian with REJECT-class veto.
+
+- `.claude/agents/catastrophe-prevention-agent.md` — disaster veto across 5 categories: data loss, breaking changes, security, performance, UX. Default answer is NO unless the change is provably safe. Only the human owner overrides REJECT.
+- `.claude/commands/check.md` — `/check <change>` slash command (14th).
+- `.claude/hook_scripts/catastrophe_block.py` — PreToolUse Bash hook (7th). Pattern-blocks `DROP TABLE`, `TRUNCATE`, `DELETE`-without-`WHERE`, `ALTER COLUMN` type/rename, `rm -rf` on sensitive paths, `git push --force` (not `--force-with-lease`), `git reset --hard origin/main`, `git filter-*`, `dropdb`, `pg_restore --clean`. Bypass: inline `override:catastrophe:<reason>` tag. Initial regex `--force\b` mis-matched `--force-with-lease`; corrected to `--force(?:\s|$)`.
+- `docs/memory/CATASTROPHE_LOG.md` — append-only verdict log (timestamp / slug / verdict / categories / audit file).
+- `docs/memory/REJECTED_CHANGES.md` — full risk breakdown of every REJECT verdict.
+- Two demo audits under `docs/audits/`: `catastrophe-check-delete-books-v2-20260515-204654.md` (REJECT — Cat 1 + 2, 346 callsites), `catastrophe-check-add-footer-slogan-20260515-204654.md` (APPROVE — purely additive).
+- `CLAUDE.md` — SOP gained step 0a ("`/check` first for risky changes"); custom-agent count 16; slash count 14; hook count 7 (with `post_commit_memory` also surfaced in the table).
+- `mindex-coordinator-agent.md` — catastrophe-prevention now runs FIRST in the pipeline, feature-protector SECOND. Roster table expanded to all 15 specialists.
+- Decision rationale: see ADR-016 (supreme guardian above the role-specific guardians).
 
 #### Feature: unified-login parent direct-nav (commits `31499e9` + `3712968` + `5ecf19d`)
 
