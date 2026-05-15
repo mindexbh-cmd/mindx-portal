@@ -45,6 +45,61 @@ Created by `scripts/seed_test_users.py` — keep these stable; the e2e suite dep
 
 The seeded students row uses `personal_id='TEST-STUDENT-0001'` so it's trivially identifiable in the DB and won't collide with a real Bahraini CPR.
 
+## Specialist agent team
+
+Eleven subagents live under `.claude/agents/`. Each is committed to the repo so every clone gets the same team. Invoke them through the `Agent` tool by `subagent_type` (the filename minus `.md`).
+
+| Agent | Specialty | Invoke when |
+|---|---|---|
+| `mindex-coordinator-agent` | Orchestrator — plans which specialists to run, aggregates verdicts, makes go/no-go | Any non-trivial task; "review X", "ship Y" |
+| `code-architect-agent` | Code organization for the 100K-line app.py | Before major features, refactors, code reviews |
+| `data-protector-agent` | DB safety — DROP/DELETE/TRUNCATE/migration/bulk-UPDATE gatekeeper | **MANDATORY** before any schema change or bulk data op |
+| `ui-designer-agent` | Mindex palette (#4a148c / #6B3FA0), spacing rhythm, RTL | After HTML/CSS changes to the inline templates |
+| `arabic-quality-agent` | Arabic grammar, terminology, RTL with mixed content | After any user-facing text change |
+| `ux-employee-agent` | Workflow efficiency for busy teachers/admins | Before approving new features; on UX complaints |
+| `mobile-first-agent` | 360 px viewport, touch targets, TWA/PWA, iOS Safari quirks | After UI changes; before APK releases |
+| `real-user-tester-agent` | Persona walk-throughs (Umm Ahmed / Fatima / Mohammed / Admin) | After UI changes; before declaring done |
+| `performance-watchdog` | 512 MB RAM, p95 ≤ 2 s, query counts | Before heavy ops; on slow reports; after OOM |
+| `business-analyst-agent` | Usage analytics, ROI, deprecation calls | Before major features; quarterly reviews |
+| `documentation-keeper` | CHANGELOG / docs/API.md / docs/ARCHITECTURE.md upkeep | After significant features; before releases |
+
+### Example workflows
+
+**Reviewing a UI change to the points page:**
+```
+Agent({subagent_type: "mindex-coordinator-agent",
+       prompt: "Review the new points-grant modal at app.py:37450. Coordinate the full UI pipeline."})
+```
+The coordinator runs code-architect → ui-designer + arabic-quality + mobile-first (parallel) → ux-employee → real-user-tester → aggregates.
+
+**Shipping a schema migration:**
+```
+Agent({subagent_type: "mindex-coordinator-agent",
+       prompt: "Plan to add column 'parent_phone_verified' to students. Run the full safety pipeline."})
+```
+The coordinator runs data-protector FIRST (mandatory), then code-architect, then documentation-keeper. Only after all approve does it recommend `python scripts/safe_deploy.py --feature parent-phone-verified`.
+
+**Quarterly architecture sweep:**
+```
+Agent({subagent_type: "mindex-coordinator-agent",
+       prompt: "Quarterly review — flag deprecation candidates, audit migrations, identify blueprint-split targets."})
+```
+The coordinator runs business-analyst + code-architect + data-protector in parallel; documentation-keeper consolidates the writeup.
+
+**Direct specialist invocation (skip the coordinator):**
+```
+Agent({subagent_type: "performance-watchdog",
+       prompt: "Investigate the /api/groups/<gid>/detail slow-response report — p95 has crept past 3 s."})
+```
+Use direct invocation when only one specialist is needed; use the coordinator when multiple concerns overlap.
+
+### Discipline
+
+- **Never skip a mandatory reviewer.** data-protector is mandatory for any DB-touching change; the coordinator will refuse to give a green verdict without it.
+- **Don't paraphrase a specialist.** When relaying their verdict, quote their report block verbatim or include the full text — don't summarise away the actionable details.
+- **One coordinator at a time.** Running two coordinators in parallel on overlapping scope causes contradictory verdicts.
+- **The deploy step is the coordinator's call.** Specialists recommend; the coordinator decides; `safe_deploy.py` executes.
+
 ## Running & deploying
 
 - `pip install -r requirements.txt` — install deps (Flask + gunicorn, Python 3.12.3 per `runtime.txt`).
