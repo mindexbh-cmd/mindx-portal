@@ -133,6 +133,7 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 |---|---|
 | `6a94497` | fix(parent-portal): display student name + kill PID-prompt flash on `/parent/legacy` |
 | `3ad90c1` | refactor(parent-portal): consolidate onto منصة V1; retire بوابة V2 entry points |
+| `d7cc70c` | fix(parent-portal): restore full feature hub at `/portal/parent` (6 cards) |
 
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
@@ -155,6 +156,22 @@ Shipped 2026-05-16. Operator clarified V1 is the only parent surface in use ("ن
 - Templates intentionally kept in source for one release cycle (revert safety net): `PORTAL_PARENT_HUB_HTML`, `PORTAL_PARENT_PID_HUB_HTML`, `PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PARENT_HTML`.
 - Prod verification: SHA `3ad90c147d05` matches; `/api/health` green; anon `/parent` + `/parent/legacy` → `/login`; anon `/portal/parent-hub` → `/` (login_required); `student_test` login → `/portal/parent`; `/api/portal/parent/me` returns `children=1` (Test Student); full 8/8 e2e green against prod.
 - Decision rationale: see ADR-017 (`DECISIONS_LOG.md`) — supersedes the V2-direction implicit in ADR-014.
+
+#### Fix: restore full feature hub at `/portal/parent` (commit `d7cc70c`)
+
+Shipped 2026-05-16. **Regression remediation for the V1-consolidation pass `3ad90c1`**, which over-consolidated and left the parent surface "empty" — every feature button disappeared. Operator quote: "كل البيانات التي كانت تظهر سابقا في المنصة عند دخول ولي الامر بالرقم الشخصي للطالب اصبحت الان غير ظاهرة". Prod SHA verified: `d7cc70c3f2d3`; safety tag `safety/pre-restore-parent-hub-features-20260516-004528`.
+
+Regression chain: `3ad90c1` routed `role=student` → `/portal/parent` → `PORTAL_PARENT_HTML` (V1 points-only template, not the 6-card hub) AND collapsed the 6 V2 sub-page handlers into 302 redirects to `/portal/parent`. Both changes together stripped every feature button from the parent-facing experience.
+
+- `/portal/parent` for `role=student` now serves `PORTAL_PARENT_HUB_HTML` (the 6-card hub: payments / attendance / points / messages / evaluations / curriculum). `role=parent` (V1 multi-child) still serves `PORTAL_PARENT_HTML` — that surface unchanged.
+- All 6 `/portal/parent-hub/*` sub-page handlers restored to serving their full content (`PORTAL_PARENT_PAYMENTS_HTML`, `PORTAL_PARENT_ATTENDANCE_HTML`, `PORTAL_STUDENT_HTML` for the points/store view, `PORTAL_PARENT_MESSAGES_HTML`, `PORTAL_PARENT_EVALUATIONS_HTML`, `PORTAL_BOOKS_HTML`). Bare `/portal/parent-hub` still 302 → `/portal/parent` (URL consolidation preserved).
+- `/parent` and `/parent/legacy` stay as redirects (anonymous → `/login`, logged-in → `/portal/parent`). Operator confirmed they don't want the public PID prompt back.
+- متجر (rewards store) lives inside the points sub-page (`PORTAL_STUDENT_HTML`) — verified visible by `real-user-tester-agent`.
+- Pre-deploy verification (lesson applied): `real-user-tester-agent` walked 4 personas locally — student_test (hub renders 6 cards, every sub-page 200, zero console errors, store visible — PASS), parent_test (V1 multi-child UI unchanged — PASS), admin_test / teacher_test (no regression — PASS). Verdict: GREEN.
+- Re-runnable harness: `scripts/personas/parent_hub_verify.py`; 13 screenshots under `scripts/screenshots/20260516-0042..0043*`.
+- Prod verification post-deploy: SHA matches, `/api/health` green, all 6 sub-pages return 200 for student_test session, bare `/portal/parent-hub` → 302 `/portal/parent`.
+- Decision rationale: see ADR-018 (`DECISIONS_LOG.md`) — role-dispatched template selection at `/portal/parent`.
+- Process lesson logged separately in `BUGS_LOG.md` (tested-with-curl-only blindspot).
 
 ## How to append
 

@@ -189,6 +189,35 @@ Format:
   - ADR-014's redirect rule for authenticated visitors on `/parent` survives in spirit (`role=parent`/`role=student` → V1) but the anonymous-visitor branch of ADR-014 is superseded.
 - **Reference**: commit `3ad90c1` (consolidation), prior commit `6a94497` (parent-portal name + PID-flash fix shipped immediately before, now mostly moot for `/parent/legacy` after this consolidation but still useful for `PORTAL_PARENT_PID_HUB_HTML` rendering during the soak). Prod SHA `3ad90c147d05`; safety tag `safety/pre-consolidate-to-v1-platform-20260516-002351`. Operator quote: "نستخدم فقط منصة ولي الأمر".
 
+### ADR-018: `/portal/parent` serves different templates by role — V2 hub (`PORTAL_PARENT_HUB_HTML`) for `role=student`, V1 points-only (`PORTAL_PARENT_HTML`) for `role=parent`; six sub-page handlers remain at `/portal/parent-hub/*` and serve their content directly
+- **Date**: 2026-05-16
+- **Status**: accepted (remediates / partially supersedes ADR-017)
+- **Context**: ADR-017 (2026-05-16) consolidated parent UX onto منصة V1 by routing every parent-portal entry to `/portal/parent` and serving `PORTAL_PARENT_HTML`. In the same wave (commit `3ad90c1`), the six V2 sub-page handlers (`/portal/parent-hub/{payments,attendance,points,messages,evaluations,curriculum}`) were collapsed into 302 redirects to `/portal/parent`. Operator immediately reported: "كل البيانات التي كانت تظهر سابقا في المنصة عند دخول ولي الامر بالرقم الشخصي للطالب اصبحت الان غير ظاهرة" — every feature button vanished. Root cause was a terminology / template-selection mismatch: V1's `PORTAL_PARENT_HTML` is built around `linked_parent_for` multi-child JSON for `role=parent`; it does NOT render the feature-card hub that operator and users actually call "منصة" when they think of the parent experience. The 6-card hub lives in `PORTAL_PARENT_HUB_HTML` (despite its internal title "بوابة"), and it's what the operator wanted preserved. ADR-017 retired the wrong template.
+- **Decision**:
+  - `/portal/parent` dispatches by role:
+    - `role=student` → `PORTAL_PARENT_HUB_HTML` (the 6-card hub: payments / attendance / points / messages / evaluations / curriculum).
+    - `role=parent` → `PORTAL_PARENT_HTML` (V1 multi-child render, unchanged from pre-consolidation behaviour).
+  - The 6 V2 sub-page handlers at `/portal/parent-hub/*` are restored to **serving their full content directly** (no redirects):
+    - `/portal/parent-hub/payments` → `PORTAL_PARENT_PAYMENTS_HTML`
+    - `/portal/parent-hub/attendance` → `PORTAL_PARENT_ATTENDANCE_HTML`
+    - `/portal/parent-hub/points` → `PORTAL_STUDENT_HTML` (the points/store view — يحوي متجر المكافآت)
+    - `/portal/parent-hub/messages` → `PORTAL_PARENT_MESSAGES_HTML`
+    - `/portal/parent-hub/evaluations` → `PORTAL_PARENT_EVALUATIONS_HTML`
+    - `/portal/parent-hub/curriculum` → `PORTAL_BOOKS_HTML`
+  - **Bare `/portal/parent-hub` (no sub-path) still 302 → `/portal/parent`** — URL consolidation at the entry point is preserved as a gesture to ADR-017's spirit. Saved bookmarks for `/portal/parent-hub/*` sub-paths keep working without redirects.
+  - `/parent` and `/parent/legacy` redirect rules from ADR-017 are unchanged (anonymous → `/login`; logged-in → `/portal/parent`). Operator confirmed they do NOT want the public PID prompt back.
+- **Alternatives considered**:
+  - Revert `3ad90c1` entirely (rejected — would re-introduce the V2-direction implicit in ADR-014 with its public CPR-prompt entry that operator confirmed is unused; also would forfeit the URL-consolidation gain at the entry point).
+  - Serve `PORTAL_PARENT_HUB_HTML` to BOTH roles at `/portal/parent` (rejected — would break the multi-child `role=parent` flow which has its own established UI shape in `PORTAL_PARENT_HTML`; the two role shapes have different data contracts and the V1 template is the only one wired for multi-child).
+  - Keep the sub-page handlers as redirects and embed all 6 views as tabs inside `PORTAL_PARENT_HUB_HTML` (rejected — large refactor scope for a regression fix; would mean re-wiring every sub-page's API consumer to a single-page app pattern; out of scope for an emergency restore).
+  - Add a new "hub" template purpose-built for `role=student` (rejected — `PORTAL_PARENT_HUB_HTML` already exists and renders correctly; building a third template would be duplication).
+- **Consequences**:
+  - Two visible templates serve `/portal/parent` depending on role. Documented inline in the route handler so a future maintainer doesn't "simplify" the dispatch away. The internal Arabic titles inside each template ("بوابة" inside `PORTAL_PARENT_HUB_HTML`, "منصة" inside `PORTAL_PARENT_HTML`) are no longer authoritative for what operator/users call the surface — both surfaces are referred to as "منصة" in operator vocabulary depending on context.
+  - The 6 V2 sub-pages are part of the production surface again. They were never deleted — `3ad90c1` only converted their handlers to redirects; the template constants stayed in source per ADR-017's "one release cycle revert safety net". This fix re-wires the handlers back to those preserved constants.
+  - ADR-017's claim that V2 is "retired" is partially superseded: the V2 *hub navigation chrome* AND the 6 sub-pages are alive; only the public PID-prompt flow at `/parent` + `/parent/legacy` remains retired (operator confirmed unused — that part of ADR-017 stands).
+  - Verification posture going forward: any change to which template a route serves MUST go through `real-user-tester-agent` (4 personas: student_test / parent_test / admin_test / teacher_test) BEFORE `safe_deploy`. Curl-only verification of status codes is insufficient. This is also captured as a `BUGS_LOG.md` prevention rule under the 2026-05-16 "Empty parent منصة after V1-consolidation" entry.
+- **Reference**: commit `d7cc70c` (fix); prior commit `3ad90c1` (regression); safety tag `safety/pre-restore-parent-hub-features-20260516-004528`; verification harness `scripts/personas/parent_hub_verify.py`; reference screenshots `scripts/screenshots/20260516-0042..0043*`. Operator quote (regression report): "كل البيانات التي كانت تظهر سابقا في المنصة عند دخول ولي الامر بالرقم الشخصي للطالب اصبحت الان غير ظاهرة". Supersedes the "consolidate everything onto V1" part of ADR-017 for `role=student`; leaves the `/parent` + `/parent/legacy` retirement (anonymous PID-prompt flow killed) intact.
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)

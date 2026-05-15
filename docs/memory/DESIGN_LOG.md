@@ -137,6 +137,45 @@ Shipped via commits `6a94497` (PID-hub student name + flash kill) and `3ad90c1` 
 
 **Parent shop, books library, push notifications, evaluations** — all still reachable; the V1 template links to them via its existing tile grid. The retirement is of the V2 *hub navigation chrome*, not of the underlying features.
 
+### 2026-05-16 — Operator terminology: "منصة" is the EXPERIENCE, not a template name; 6-card parent hub restored
+
+Shipped via commit `d7cc70c` (immediately remediating the empty-منصة regression from `3ad90c1`). See ADR-018 for the role-dispatched template-selection decision, and `BUGS_LOG.md` 2026-05-16 entry "Empty parent منصة after V1-consolidation" for the process lesson.
+
+**Vocabulary clarification (important for future designers):** The operator calls "منصة" the FULL hub experience users see when they tap into the parent-portal — cards, buttons, store, sub-pages, everything wired together. They use "منصة" regardless of which underlying template constant is involved. Two templates carry the burden of being called "منصة" by operator at different times:
+
+- `PORTAL_PARENT_HUB_HTML` — internal Arabic title says "بوابة", but renders the 6-card hub that operator calls "منصة" for `role=student` users (child-PID-as-username single-child case).
+- `PORTAL_PARENT_HTML` — internal Arabic title says "منصة", and renders the V1 multi-child points-focused view for `role=parent` users (multi-child via `linked_parent_for`).
+
+**The internal titles are a red herring** — they contributed to a mis-diagnosis in the 2026-05-16 regression. Never map operator vocabulary onto Python identifiers without asking; always confirm the surface the operator is talking about (which URL, which auth state, what they expect to see).
+
+**What users see now (after `d7cc70c`):**
+
+| Visitor state | Entry URL | Resulting page |
+|---|---|---|
+| Anonymous | `/parent` or `/parent/legacy` | 302 → `/login` (unchanged from ADR-017) |
+| Anonymous | `/portal/parent*` | 302 → `/` (login_required gate, unchanged) |
+| Logged-in `role=student` | `/portal/parent` | `PORTAL_PARENT_HUB_HTML` — 6-card hub (NEW vs `3ad90c1`) |
+| Logged-in `role=parent` | `/portal/parent` | `PORTAL_PARENT_HTML` — V1 multi-child (unchanged) |
+| Logged-in any role | `/portal/parent-hub/payments` | `PORTAL_PARENT_PAYMENTS_HTML` (RESTORED) |
+| Logged-in any role | `/portal/parent-hub/attendance` | `PORTAL_PARENT_ATTENDANCE_HTML` (RESTORED) |
+| Logged-in any role | `/portal/parent-hub/points` | `PORTAL_STUDENT_HTML` — points + متجر (RESTORED) |
+| Logged-in any role | `/portal/parent-hub/messages` | `PORTAL_PARENT_MESSAGES_HTML` (RESTORED) |
+| Logged-in any role | `/portal/parent-hub/evaluations` | `PORTAL_PARENT_EVALUATIONS_HTML` (RESTORED) |
+| Logged-in any role | `/portal/parent-hub/curriculum` | `PORTAL_BOOKS_HTML` (RESTORED) |
+| Logged-in any role | bare `/portal/parent-hub` | 302 → `/portal/parent` (URL consolidation, kept from ADR-017) |
+
+**The 6-card hub (`PORTAL_PARENT_HUB_HTML`)** is the canonical "feature surface" for `role=student` users. Each card opens its sub-page directly:
+1. **المدفوعات** — payments + installments view.
+2. **الحضور والغياب** — attendance ledger.
+3. **النقاط** — points balance + history + متجر المكافآت (rewards store; lives inside `PORTAL_STUDENT_HTML`).
+4. **الرسائل** — teacher broadcast inbox.
+5. **التقييمات** — monthly evaluation form view.
+6. **المناهج** — curriculum library (books / PDFs the student is assigned).
+
+The store ("متجر") is reached one level deeper than the hub — operator-facing terminology is "متجر داخل بوابة النقاط" (the store inside the points page). Designers touching the points sub-page should remember the store is the highest-value tile inside it; it must not be regressed when the points page is reworked.
+
+**Verification harness committed:** `scripts/personas/parent_hub_verify.py` walks all 4 test personas (student_test / parent_test / admin_test / teacher_test) and asserts feature-button visibility on every parent surface, with 13 reference screenshots under `scripts/screenshots/20260516-0042..0043*`. Re-run this before any future change that touches parent template dispatch.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)
