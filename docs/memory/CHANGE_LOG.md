@@ -140,6 +140,23 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 | `f6aee45` | fix(parent-portal): remove logout misclick trap from V1 + sub-pages |
 | `27ca5ba` | test(personas): commit hostile-mode logout-hunt probe |
 | `0fc833f` | fix(books): friendly Arabic page when a curriculum file is missing (UX) |
+| _data action_ | account(perms): create limited-admin manager فاطمة إبراهيم (930909151) restricted to 4 curriculum features (no code change; SQL only) |
+
+#### Data action: limited-admin account created — Fatima Ibrahim (930909151)
+
+Shipped 2026-05-16. No code change; pure SQL through `scripts/create_fatima_account.py` against both local SQLite (id 10) and prod Postgres (id 3197). Idempotent — re-running re-asserts state without duplicating rows.
+
+- **User row**: `role='manager'`, `department='شؤون المناهج والامتحانات'`, `landing_page=NULL` (login() only honours keyword landings; falls through to `/dashboard`), `is_active=1`, `must_change_pw=0`, password = sha256(`'930909151'`) = `56f7f3b4d2756b5e5fb3c948a06041bc3b8994ec4c1a8f5fa430b0b785701299`.
+- **14 explicit `user_permissions(is_visible=0)` overrides** on manager-default buttons that fall outside the four-feature whitelist: `dashboard.{payment_tracking, lessons_summary, lesson_durations, search_student, send_messages, points_board, parent_receipts}`, `attendance.{take_attendance, export_excel}`, `database.export`, `groups.add_group`, `sidebar.{attendance, groups, parent_receipts}`.
+- **`/api/me/permissions` returns 30 hidden buttons** for her (14 explicit + 16 implicit from `default_roles` not including `manager`).
+- **NOT added to any code-level allowlist** (`_STUDENT_EDIT_ALLOW`, `_EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES`, `_BOOKS_V2_FULL_ACCESS_USERNAMES`, `_EXPENSES_ACCESS_USERNAMES`). Ahmed Ibrahim + Raed are in three of those; Fatima is in none, per the explicit DENY list.
+- **Verification on prod (`https://mindx-portal-1.onrender.com`)**:
+  - Login `POST /login` with `930909151` / `930909151` → 302 `/dashboard` ✓
+  - Allowed: `/admin/teacher-deliveries`, `/admin/lessons`, `/admin/evaluations`, `/admin/parent-messages` → all 200 ✓
+  - Denied: `/admin/permissions`, `/admin/table-audit`, `/admin/receipts`, `/database`, `/settings`, `/admin/violations`, `/expenses` → all 403 ✓
+  - Denied (graceful redirect): `/admin/books`, `/points/manage` → 302 (route helpers `_books_v2_can_admin` / `_can_manage_points` redirect) ✓
+- **Decision rationale**: see ADR-025 (`DECISIONS_LOG.md`). Operator's premise that Ahmed/Raed are "technically limited" was incorrect — they are pure `role='manager'` with one additive override on Ahmed. Operator chose Path C (explicit whitelist via `user_permissions`) over Path B (literal-mirror, full manager surface).
+- **Known imperfection**: dashboard sidebar items without `data-button-key` (search-student modal button, attendance link, groups link, lessons-summary modal, payments modal, points-board link) remain visible to her exactly as they are for Ahmed/Raed. Hiding them would require adding `data-button-key` attributes to ~7 inline-HOME_HTML elements + matching `button_registry` rows. Deferred per principle "mirror Ahmed/Raed".
 
 #### Fix: friendly missing-file page for parents (commit `0fc833f`)
 

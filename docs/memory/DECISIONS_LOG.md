@@ -355,6 +355,22 @@ Format:
 - **Decision**: Recommend pgEdge or Zed-patched fork. Mandate a dedicated `mindex_readonly` role in the connection string. Never point at the write-capable `DATABASE_URL`.
 - **Reference**: `docs/MCP_SETUP.md`
 
+### ADR-025: Limited-admin accounts use role=`manager` + `user_permissions` hide overrides (no new role)
+- **Date**: 2026-05-16
+- **Status**: accepted
+- **Context**: Fatima Ibrahim (curriculum dept) needed access to four features only — `/admin/teacher-deliveries`, `/admin/lessons`, `/admin/evaluations`, `/admin/parent-messages` — and nothing else. The brief invoked Ahmed Ibrahim (id 876) and Raed (id 877) as the template ("already have the exact limited access"). Investigation showed Ahmed/Raed are pure `role='manager'` (Ahmed has one additive override `dashboard.points_manage=1`; Raed has zero rows). Their "limited" scope is **social, not technical** — they have full manager-default access to the dashboard surface but choose not to use it. Operator picked Path C: technically lock Fatima down via `user_permissions` (`is_visible=0`) for every manager-default button outside the four-feature whitelist.
+- **Decision**: Do **not** invent a new role (`curriculum_staff` / `limited_admin`) and do **not** add a new permission column. Implementation = `role='manager'` + an `is_visible=0` row in `user_permissions` per manager-defaulted button outside the whitelist. The four target routes are already gated by helpers `_td_can_view` / `_lessons_can_admin` / `_pm_can_admin` / `_ev_can_admin` which all accept `role in (admin, manager)` so no code change is needed at the route layer. Page-load JS reads `/api/me/permissions` and removes every DOM element with a matching `data-button-key`.
+- **Alternatives considered**:
+  - **New role** (`curriculum_staff`): would require route-helper updates everywhere `_*_can_admin` is referenced + a `button_registry.default_roles` JSON edit per button. Heavy, and unnecessary because the existing manager + per-user-override model already covers the case.
+  - **Per-feature boolean flags on `users`** (`can_view_evaluations`, etc.): proliferates schema. Each new feature would need a column + dual-path migration + a new server gate.
+  - **Path B (literal Ahmed/Raed mirror)**: just `role='manager'` with no overrides — would leave Fatima with the full manager dashboard surface (payment tracking, send messages, parent receipts cards), contradicting the explicit DENY list.
+- **Consequences**:
+  - **Sidebar imperfection**: items WITHOUT `data-button-key` (search-student modal button, attendance link, groups link, lessons-summary modal, payments modal, points-board link) stay visible to Fatima exactly as they are for Ahmed/Raed. Clicking attendance/groups gives her a page with route-level access if it exists; modals open empty/limited content. Hiding these would require adding `data-button-key` attributes to ~7 sidebar `<a>`/`<button>` elements in `HOME_HTML` plus matching `button_registry` rows — deferred unless operator escalates.
+  - **`landing_page` doesn't accept free-form URLs**: `login()` only matches keyword landings (`dashboard`/`teacher_hub`/`parent_hub`/...). Setting `users.landing_page='/admin/teacher-deliveries'` is silently ignored; falls through to `/dashboard`. Fatima lands on `/dashboard` and uses the sidebar to reach her features.
+  - **`/api/me/permissions` returns 30 hidden buttons** for Fatima (14 explicit overrides + 16 implicit from `default_roles` not including `manager`).
+  - **Re-applies idempotently**: the seed script `scripts/create_fatima_account.py` is safe to re-run; if the user row exists it just re-asserts the 14 overrides.
+- **Reference**: `scripts/create_fatima_account.py`; verification via `/api/me/permissions` on prod returns `role=manager username=930909151` with 30 hidden buttons; allowed pages `/admin/teacher-deliveries`, `/admin/lessons`, `/admin/evaluations`, `/admin/parent-messages` all return 200; denied pages (`/admin/permissions`, `/admin/table-audit`, `/admin/receipts`, `/database`, `/settings`, `/admin/violations`, `/expenses`) return 403; `/admin/books` and `/points/manage` 302→`/dashboard`. Prod user id = 3197.
+
 ## Pending decision candidates (not yet resolved)
 
 - Bcrypt vs argon2id migration for `users.password` (currently sha256-no-salt — ADR-003 flagged)
