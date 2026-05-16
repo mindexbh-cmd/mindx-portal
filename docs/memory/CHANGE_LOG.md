@@ -163,6 +163,15 @@ charset when one is set via `mimetype=`. Browsers parse the duplicate
 away; follow-up commit can switch to `content_type=` or drop the explicit
 charset on the `Response(...)` call.
 
+#### Data action: orphan cleanup — book 53 soft-deleted (no commit)
+
+Shipped 2026-05-16 ~10:54 UTC via live `POST /api/books/cleanup-orphans` (admin_test session). No code change — purely a data-state action against prod via the existing admin endpoint. Triggered by the post-deploy report "ALL books show the missing_file page", which `/api/books/storage-check` resolved as "exactly one active row in `books_v2`, and it's the orphan from 2026-05-15".
+
+- **Action**: `POST /api/books/cleanup-orphans` → `{count:1, deleted:[{id:53, title:"1", file_path:"/opt/render/project/src/data/books_v2/53_1.pdf"}], storage_dir:"/var/data/books_v2"}`. Audit log entry written (`books_v2.cleanup_orphans` event).
+- **Effect**: book 53 has `is_deleted=1` (reversible via `UPDATE books_v2 SET is_deleted=0 WHERE id=53` if a path is ever restored). Storage-check after: `rows: 0`. Admin list after: `count: 0`. Parent curriculum page renders empty-state copy (`لا توجد …`) instead of the friendly missing-file page; direct fetch of `/api/books/53/view` returns 404 `غير موجود` (row-not-found branch) instead of the 410 missing-file branch.
+- **Follow-up by operator**: re-upload the PDF via `/admin/books` — current upload code writes into `/var/data/books_v2/`, so the new row will be stable across deploys.
+- **Decision detail**: ADR-021 explains why cleanup-orphans was chosen over rollback of `0fc833f`.
+
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
 Shipped 2026-05-16. Two regressions on the legacy PID-hub surface:
