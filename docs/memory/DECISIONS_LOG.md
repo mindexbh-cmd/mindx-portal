@@ -355,6 +355,22 @@ Format:
 - **Decision**: Recommend pgEdge or Zed-patched fork. Mandate a dedicated `mindex_readonly` role in the connection string. Never point at the write-capable `DATABASE_URL`.
 - **Reference**: `docs/MCP_SETUP.md`
 
+### ADR-028: Sidebar-section-level lockdown + grant curriculum-staff books admin access
+- **Date**: 2026-05-16
+- **Status**: accepted (refines ADR-027 / ADR-026 / ADR-025)
+- **Context**: After ADR-027, Fatima's dashboard cards and in-page panels were locked down but the 5 sidebar SECTION HEADERS (الطلاب والمجموعات / الحضور والغياب / المالية / نظام النقاط / الإدارة والمراقبة) still showed in her sidebar — empty or near-empty, because individual links inside each were already hidden. Operator wanted the headers themselves gone. Also: as curriculum staff (شؤون المناهج والامتحانات) she needs admin access to /admin/books (curriculum/books upload). Currently `_BOOKS_V2_FULL_ACCESS_USERNAMES` allowlist is `{010307885, 980909805}` (Ahmed Ibrahim, Raed) — she's not in it.
+- **Decision**:
+  1. Tag the outer `<div class="md-sb-section">` of each of the 5 sections with `data-button-key="sidebar.section_<X>"`. Register the 5 keys via migration `permissions_v4_fatima_sidebar_sections` with `default_roles=["admin","manager"]`. Add the 5 keys to Fatima's `HIDDEN_BUTTONS`. Effect: the whole section (header + items) collapses out of the DOM for her; Ahmed/Raed and every other manager unaffected because they have no override.
+  2. Add `"930909151"` to `_BOOKS_V2_FULL_ACCESS_USERNAMES`. This grants her: (a) `data-allow-books="1"` body attribute → unhides `.mx-books-link` CSS-gated sidebar item + dashboard card; (b) full upload/edit/delete on `/admin/books`. The التعليم والتقييم sidebar section now legitimately shows 3 items for her: متابعة الدروس + رسائل المعلمات + المناهج.
+- **Alternatives considered**:
+  - **Hide via a separate "section_<X>" wrapper class + CSS rule** keyed on a body attribute: rejected — that's a parallel mechanism. The `user_permissions` + `data-button-key` pipeline already exists; reusing it is one less concept.
+  - **Read-only access to /admin/books for Fatima** (separate `_BOOKS_V2_READ_ONLY_USERNAMES`): rejected — her department literally manages curricula. Read-only would force her to ask Ahmed/Raed for every upload. Full access matches her job function.
+- **Consequences**:
+  - **For Ahmed/Raed and other managers**: zero change. The 5 new section keys default to visible (default_roles=manager). `_BOOKS_V2_FULL_ACCESS_USERNAMES` simply gained a third entry; Ahmed/Raed access unchanged.
+  - **For Fatima**: HIDDEN_BUTTONS grows 28 → 33; `/api/me/permissions` hidden_count rises from 45 to 50. Her sidebar now shows ONLY: لوحة التحكم section (1 item) + التعليم والتقييم section (3 items: lessons, parent-messages, curriculum). /admin/books returns 200.
+  - **Risk if she misuses books admin**: low — books_v2 has its own audit log + soft-delete pattern; any accidental delete is recoverable.
+- **Reference**: ADR-025 / ADR-026 / ADR-027; commit (this push); migration `permissions_v4_fatima_sidebar_sections`; `_BOOKS_V2_FULL_ACCESS_USERNAMES` literal at `app.py:_BOOKS_V2_FULL_ACCESS_USERNAMES`.
+
 ### ADR-027: In-page lockdown of /admin/teacher-deliveries + dashboard panels for limited-admin manager
 - **Date**: 2026-05-16
 - **Status**: accepted (refines ADR-026, ADR-025)

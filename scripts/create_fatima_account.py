@@ -86,6 +86,17 @@ HIDDEN_BUTTONS = [
     "dashboard.stat_pending_evals",
     "dashboard.stat_missing_lessons",
     "dashboard.reports_quick_card",
+    # ── New keys added by permissions_v4_fatima_sidebar_sections ──
+    # Hide entire collapsible sidebar sections. The "التعليم والتقييم"
+    # section stays visible because it carries her three allowed
+    # links (lessons / parent-messages) + المناهج (granted via the
+    # _BOOKS_V2_FULL_ACCESS_USERNAMES allowlist, which sets
+    # data-allow-books="1" on her body and unhides .mx-books-link).
+    "sidebar.section_students",
+    "sidebar.section_attendance_block",
+    "sidebar.section_finance",
+    "sidebar.section_points",
+    "sidebar.section_admin_monitor",
 ]
 
 
