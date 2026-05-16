@@ -355,6 +355,26 @@ Format:
 - **Decision**: Recommend pgEdge or Zed-patched fork. Mandate a dedicated `mindex_readonly` role in the connection string. Never point at the write-capable `DATABASE_URL`.
 - **Reference**: `docs/MCP_SETUP.md`
 
+### ADR-026: Lock down a limited-admin manager surface by attaching `data-button-key` to all visible dashboard items + gating role-only routes via `user_can_see_button`
+- **Date**: 2026-05-16
+- **Status**: accepted (refines ADR-025)
+- **Context**: ADR-025 created Fatima Ibrahim as `role='manager'` + 14 `user_permissions` overrides. Verification revealed two leaks: (1) every sidebar `<a>` / quick card / dashboard stat card that lacked a `data-button-key` was still visible to her, because the JS hide-pass keys off that attribute; (2) `/admin/evaluations` and `/admin/events` were role-gated only (`role in (admin, manager)`) so any manager — including locked-down Fatima — could reach them by URL even when the sidebar link was hidden by CSS. Operator escalation: "remove ALL other buttons", drop evaluations from the whitelist, keep Ahmed/Raed unchanged.
+- **Decision**: Extend the existing `user_permissions` mechanism rather than inventing a parallel gate.
+  1. Add `data-button-key` to every sidebar/quick/stat/action item Fatima could see but shouldn't (search-student, attendance, groups, lessons-summary, payment-tracking, points-board, /database, /attendance, /points/board duplicates, /teacher/lessons, /teacher/parent-messages, /teacher/evaluations, parent-link copier, evaluations sidebar). Reuse existing `dashboard.*` / `sidebar.*` keys where possible; register six new keys via migration `permissions_v2_fatima_lockdown` for elements without an obvious existing key (`evaluations.admin`, `events.admin`, `dashboard.parent_register_link`, `dashboard.teacher_lessons`, `dashboard.teacher_parent_messages`, `dashboard.teacher_evaluations`, `sidebar.admin_backups`).
+  2. Modify `_ev_can_admin` and `_events_can_admin` to AND-in `user_can_see_button(user, "<key>.admin")`. Default `default_roles=["admin","manager"]` keeps every existing manager admitted by default; only an explicit `is_visible=0` override blocks the route.
+  3. Update Fatima's hide-list to 20 keys (14 originals + 5 new keys + `events.admin`); drop `/admin/evaluations` from her whitelist (now 3 features, was 4).
+- **Alternatives considered**:
+  - **Username-based deny on the route helpers**: rejected — sprinkles `"930909151"` literals through `app.py`; same anti-pattern as `_EVENTS_VIOLATIONS_FULL_ACCESS_USERNAMES` but in the opposite direction. Bad for scale.
+  - **New role `curriculum_staff`**: rejected per ADR-025 — requires touching every `_*_can_admin` helper across the codebase.
+  - **Tighten `_events_can_admin` to require `_has_events_full_access`** (allowlist instead of role): rejected — expands change scope to all managers, contradicting "Fatima only".
+  - **Add new top-level button-registry layer**: rejected — duplicates the existing system.
+- **Consequences**:
+  - **For Ahmed/Raed and other managers**: zero change. `default_roles` includes `manager` so `user_can_see_button` returns True for them; `_ev_can_admin` / `_events_can_admin` still pass.
+  - **For Fatima**: 20 `is_visible=0` overrides; `/api/me/permissions` returns 37 hidden buttons (20 explicit + 17 implicit); browser sees only `/dashboard`, `/admin/lessons`, `/admin/parent-messages`, `/admin/teacher-deliveries` after CSS hides admin-only sections and JS hides `data-button-key` matches. `/admin/evaluations` returns 302 → /dashboard, `/admin/events` returns 403.
+  - **Future scale**: any new limited-admin account can be created by `role='manager'` + cloning Fatima's override list. The mechanism is reusable.
+  - **One small migration debt**: the script `scripts/create_fatima_account.py` now carries a hard-coded `HIDDEN_BUTTONS` list. If the registry grows, the script doesn't auto-pick up new keys — someone has to add them deliberately. That's the intentional bias: opting Fatima OUT of a new feature should be a conscious decision, not a default.
+- **Reference**: commits (this push: HOME_HTML edits + `permissions_v2_fatima_lockdown` migration + `_ev_can_admin`/`_events_can_admin` updates + `scripts/create_fatima_account.py` update). Verification on local: Fatima 200 on 3 allowed routes, 302/403 on every denied route including `/admin/evaluations` (302) and `/admin/events` (403); admin login retains 200 on all admin routes including `/admin/evaluations` and `/admin/events`. ADR-025 supersedes itself with this scope expansion but stays accepted (this ADR refines, doesn't replace, the underlying mechanism choice).
+
 ### ADR-025: Limited-admin accounts use role=`manager` + `user_permissions` hide overrides (no new role)
 - **Date**: 2026-05-16
 - **Status**: accepted

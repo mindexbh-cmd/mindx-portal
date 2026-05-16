@@ -1,15 +1,23 @@
 """Create a limited-admin manager account for Fatima Ibrahim
 (personal_id 930909151) and lock her dashboard surface down to
-the four curriculum-staff features:
+the three curriculum-staff features:
 
     1. /admin/teacher-deliveries  (متابعة تسليمات المعلمات)
     2. /admin/lessons             (متابعة التقدم في الدروس)
-    3. /admin/evaluations         (استمارة التقييم الشهري — submit + admin send)
-    4. /admin/parent-messages     (ماذا تريد أن يعرف ولي الأمر)
+    3. /admin/parent-messages     (ماذا تريد أن يعرف ولي الأمر)
+
+Evaluations (/admin/evaluations) was removed from the whitelist on
+2026-05-16 — the route is now gated by user_can_see_button(user,
+"evaluations.admin"), and Fatima carries an is_visible=0 override
+for that button_key.
 
 Mechanism: standard `role='manager'` + per-user button_registry
 overrides via `user_permissions` rows that set is_visible=0 for
-every manager-default button outside the four-feature whitelist.
+every manager-default button outside the three-feature whitelist.
+The button_registry was extended (migration
+`permissions_v2_fatima_lockdown` in app.py) with new keys to give
+DOM hooks to sidebar/quick/action items that previously had no
+data-button-key attribute.
 
 Idempotent: re-running the script after success is a no-op
 (detects existing user via username, skips INSERT, re-asserts the
@@ -38,6 +46,7 @@ PASSWORD_PLAIN = "930909151"
 
 
 HIDDEN_BUTTONS = [
+    # ── Existing manager-default buttons (already-registered) ──
     "dashboard.payment_tracking",
     "dashboard.lessons_summary",
     "dashboard.lesson_durations",
@@ -52,6 +61,17 @@ HIDDEN_BUTTONS = [
     "sidebar.attendance",
     "sidebar.groups",
     "sidebar.parent_receipts",
+    # ── New keys added by permissions_v2_fatima_lockdown ──
+    # Gate the route helpers (_ev_can_admin / _events_can_admin) in
+    # addition to hiding the sidebar links, so the overrides block the
+    # pages themselves — not just the visible nav.
+    "evaluations.admin",
+    "events.admin",
+    # 4 dashboard action cards that previously had no DOM hook.
+    "dashboard.parent_register_link",
+    "dashboard.teacher_lessons",
+    "dashboard.teacher_parent_messages",
+    "dashboard.teacher_evaluations",
 ]
 
 
