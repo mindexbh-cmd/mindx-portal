@@ -139,6 +139,29 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 | `e51642b` | test(personas): commit durable parent-portal verification harnesses |
 | `f6aee45` | fix(parent-portal): remove logout misclick trap from V1 + sub-pages |
 | `27ca5ba` | test(personas): commit hostile-mode logout-hunt probe |
+| `0fc833f` | fix(books): friendly Arabic page when a curriculum file is missing (UX) |
+
+#### Fix: friendly missing-file page for parents (commit `0fc833f`)
+
+Shipped 2026-05-16 via `safe_deploy --feature missing-file-ux`. Safety tag
+`safety/pre-missing-file-ux-20260516-105201`. Health-poll green, smoke e2e
+passed. Production verified manually: book 53 (`/api/books/53/view`,
+authenticated as `admin_test`) — `Accept: text/html` returns HTTP 410 + a
+1936-byte Mindex-styled Arabic page; `Accept: application/json` returns
+HTTP 410 + the original `{book_id, error, missing_file:true, ok:false}`
+envelope, so the APK and any other JSON consumer are unaffected.
+
+Routes `/api/books/<bid>/view+download` and `/parent/book/<bid>/view+download`
+now share `_books_v2_missing_file_response(bid, route_tag=...)`, which
+also emits one `[mindex-books] missing_file bid=<id> route=<r>` stderr
+line per hit so recurring orphan rows surface alongside the boot-probe
+diagnostics in the Render log.
+
+Known cosmetic flaw (non-blocking): `Content-Type` header reports
+`text/html; charset=utf-8; charset=utf-8` because Flask auto-appends a
+charset when one is set via `mimetype=`. Browsers parse the duplicate
+away; follow-up commit can switch to `content_type=` or drop the explicit
+charset on the `Response(...)` call.
 
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
