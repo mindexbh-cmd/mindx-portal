@@ -287,6 +287,29 @@ Format:
   - Cross-link: BUGS_LOG entry under 2026-05-16 documents the misperception ("polished error → looks like fleet failure") as a recurring class of feedback.
 - **Reference**: cleanup commit verified live at 2026-05-16 ~10:54 UTC via `POST /api/books/cleanup-orphans` (admin_test session), response `{count: 1, deleted: [{id:53, title:"1", file_path:".../53_1.pdf"}]}`. Codebase: `_books_v2_send_file` / `_books_v2_send_file_public` (`app.py:89175`, `app.py:89460`) — the 410 callers; `/api/books/cleanup-orphans` (`app.py:91440`) — the soft-delete endpoint; `_books_v2_storage_dir()` — the resolver that fixes future uploads. Related: ADR-001 (single-file architecture), ADR-020 (red+confirm patterns), and the safety tag `safety/pre-missing-file-ux-20260516-105201` kept on origin in case we ever want to compare.
 
+### ADR-022: Per-teacher evaluation coverage — universe = active group students; teacher phone deferred (no schema change)
+- **Date**: 2026-05-16
+- **Status**: accepted
+- **Context**: Admin wanted a per-teacher drill-down on `/admin/teacher-deliveries` showing which students have a monthly evaluation submitted and which are pending, with a "remind teacher" button. Two definitional choices and one constraint shaped the implementation:
+  1. **What counts as the "expected universe" of students for a teacher this month?**
+  2. **Where does the reminder go — WhatsApp, in-app, or deferred?**
+  3. The `users` table has **no `phone`/`whatsapp` column** today, so a phone-targeted `wa.me/<phone>?text=` URL isn't possible without a schema change.
+- **Decision**:
+  - **Universe = active students in groups currently assigned to that teacher** (via `student_groups.teacher_name` match + `_pm_group_recipients(db, group)` for the active-student filter). Submitted = `evaluations` rows for `(teacher_id, evaluation_month)` with `is_deleted=0`. Pending = universe − submitted. Submitted-but-no-longer-in-universe rows are ignored (they don't appear in either list) so the count answers the admin's actual question: "is this teacher up-to-date on their CURRENT students this month?".
+  - **Reminder button opens `https://wa.me/?text=<prefilled body>` in a new tab** with NO phone number. Admin picks the teacher's contact in WhatsApp's chat-picker. Honors the user's preferred reminder channel without adding a schema migration, and matches the existing one-click no-background-job pattern used by the evaluation-to-parent send flow. Long pending lists (>10 names) get a confirm modal first; body capped at 20 names with an "… و N طالبة أخرى" tail to keep URL length under WhatsApp's practical limit.
+  - **No DB schema change in this commit.** Adding `users.phone` is a separate decision that needs (a) admin form work to enter/edit phones per teacher, (b) bcrypt-style audit decisions about PII storage, (c) a migration block updating both the `init_db()` CREATE and the `else`-branch ALTER per CLAUDE.md's dual-path schema rule. None of those are blockers for v1.
+- **Alternatives considered**:
+  - **History-based universe** (every student ever evaluated by this teacher) — rejected. Misses students newly enrolled in the teacher's group this month who haven't been evaluated yet, which is exactly the case the admin needs to catch.
+  - **Show both counts** (current + historical) — rejected as v1 clutter. Can add as a tab later if needed.
+  - **In-app reminder** (open the existing `tm-req-overlay` modal, prefill with the pending list) — viable, no new deps, but doesn't reach the teacher's phone. The user's preference was WhatsApp; deferring the phone-targeting compromise is the smaller cost than building an in-app-only reminder that doesn't match the request.
+  - **Server-side WhatsApp send** (queue a `message_log` row for an external bridge to dispatch) — rejected. Existing parent-message flow uses the "click → wa.me opens, admin clicks send" pattern, not a background sender. Matching that pattern keeps mental models consistent.
+  - **Add `users.phone` column now** + targeted `wa.me/<phone>?text=` URL — rejected for this commit, kept as a follow-up (`pending decision candidates` below). Cost-benefit favored shipping the read-only feature first and adding phone targeting in a follow-up once admins have validated the list is what they wanted.
+- **Consequences**:
+  - The summary endpoint's worst-case query count is `O(unique_groups)` for `_pm_group_recipients` calls + 4 fixed queries (users, student_groups, submissions, plus the per-group calls). On current prod (~50 groups, ~10 teachers) that's well under 60 queries per page-load — fine. If group count grows to thousands the per-group call should be batched into a single SQL with grouping; not needed today.
+  - The reminder UX has one extra step (admin picks contact in WhatsApp picker) compared to a phone-targeted URL. Acceptable for v1; documented in the button's `title` attribute ("افتح واتساب مع نص جاهز — اختر جهة المعلمة من القائمة").
+  - The plan doc (`docs/plans/2026-05-16-teacher-evaluation-coverage.md`) records the deferred phone column as the natural follow-up; do it when an admin asks for one-click reminders.
+- **Reference**: commits `7c63c37` (backend), `9b00b85` (UI list), `f65f492` (reminder). Safety tag `safety/pre-teacher-eval-coverage-20260516-124334`. Plan: `docs/plans/2026-05-16-teacher-evaluation-coverage.md`. Endpoints live under `/api/monthly-evaluations/teachers/coverage` + `/api/monthly-evaluations/teachers/<int:tid>/coverage`. Cross-link: ADR-001 (single-file architecture means UI lives inline in `ADMIN_TEACHER_DELIVERIES_HTML`).
+
 ### ADR-012: Postgres-archived MCP — use pgEdge or Zed fork, with read-only role
 - **Date**: 2026-05-15
 - **Status**: accepted (in MCP docs)
@@ -301,3 +324,4 @@ Format:
 - Rename strategy for cryptic `students.col_*` and `____2026` columns (DATABASE_AUDIT §7.2)
 - Blueprint split for `books_v2` / `points` / `parent_hub` / `curriculum` (deferred — see ADR-001)
 - Backfill of 156 NULL `students.personal_id` rows (DATABASE_AUDIT §7.4 — needs staff cleanup, not engineering)
+- `users.phone` column for one-click teacher WhatsApp reminders (ADR-022 deferred this). Needs admin form for entry/edit + decision on PII storage + dual-path migration block.

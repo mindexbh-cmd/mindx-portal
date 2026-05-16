@@ -172,6 +172,23 @@ Shipped 2026-05-16 ~10:54 UTC via live `POST /api/books/cleanup-orphans` (admin_
 - **Follow-up by operator**: re-upload the PDF via `/admin/books` — current upload code writes into `/var/data/books_v2/`, so the new row will be stable across deploys.
 - **Decision detail**: ADR-021 explains why cleanup-orphans was chosen over rollback of `0fc833f`.
 
+#### Feature: per-teacher evaluation coverage drill-down (commits `7c63c37` + `9b00b85` + `f65f492`)
+
+Shipped 2026-05-16 ~12:43 UTC via `safe_deploy --feature teacher-eval-coverage`. Safety tag `safety/pre-teacher-eval-coverage-20260516-124334`. Three atomic commits, single-file changes to `app.py` plus the plan doc.
+
+- `7c63c37` — backend: two new admin-gated read-only endpoints under `/api/monthly-evaluations/`. `/teachers/coverage` (summary, one row per active teacher with submitted/total/percentage) and `/teachers/<int:tid>/coverage` (per-student lists). Universe = union of active students across every group `student_groups.teacher_name` matches this teacher; submitted = `evaluations` rows for `(teacher_id, evaluation_month)` with `is_deleted=0`. Query plan keeps N+1 out: summary resolves student sets per unique group (bounded by group count, not teacher count) + one `evaluations` query for all submissions in the month.
+- `9b00b85` — frontend: new expandable list section above the existing teacher dropdown on `/admin/teacher-deliveries` (NOT `/admin/evaluations` — different URL despite the matching title). Per-row progress bar + percentage + smart status emoji (`✨` 100, `✅` 80+, `🟡` 50+, `⚠️` >0, `🔴` 0). Clicking a row also selects the same teacher in the dropdown so both flows reinforce each other.
+- `f65f492` — frontend: `📲 تذكير المعلمة عبر واتساب` button below the pending list. Builds a prefilled Arabic body (greeting → reason → pending names capped at 20 → sign-off) and opens `wa.me/?text=` in a new tab. No phone targeting because `users` has no `phone` column today (see ADR-022 follow-up).
+
+Production verification (admin_test session):
+- Summary endpoint returns 5 teachers, including real prod data — `أ. زهراء نوح` 67/80 = 84% and `أ. كوثر شعبان` 75/86 = 87%.
+- Detail endpoint returns correct `{teacher, stats, submitted[], pending[]}` shape.
+- `/admin/teacher-deliveries` HTML contains all 8 markup markers (`tm-cov-card`, `tm-cov-list`, `tmCovLoadSummary`, `تغطية تقييمات الشهر`, `teacher_eval_coverage_v1`, `📲 تذكير المعلمة`, `wa.me/?text=`, `/api/monthly-evaluations/teachers/coverage`).
+
+Process note (one for BUGS_LOG eventually): I initially verified against `/admin/evaluations` (which serves a different template, `ADMIN_EVALUATIONS_HTML`) and was about to report markup MISSING — the Explore subagent's report mentioned the title was in `ADMIN_TEACHER_DELIVERIES_HTML` but didn't flag that the template's URL is `/admin/teacher-deliveries`. Lesson: when an agent reports a template, ALSO ask for the route that serves it. Confirmed once I grepped `@app.route` for the constant name.
+
+Decision detail: ADR-022 covers the schema-deferred phone field and pending-universe definition.
+
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
 Shipped 2026-05-16. Two regressions on the legacy PID-hub surface:
