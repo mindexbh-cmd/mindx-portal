@@ -72,6 +72,20 @@ HIDDEN_BUTTONS = [
     "dashboard.teacher_lessons",
     "dashboard.teacher_parent_messages",
     "dashboard.teacher_evaluations",
+    # ── New keys added by permissions_v3_fatima_td_lockdown ──
+    # Inside /admin/teacher-deliveries: hide the evaluations tab
+    # + the stat tile that counts month evaluations.
+    "td.tab_evaluations",
+    "td.stat_evals",
+    # On /dashboard: hide the alerts banner, آخر النشاطات + المجموعات
+    # النشطة two-column panels, the amber+blue stat cards pointing
+    # to evaluations/alerts subviews, and the "التقارير" quick card.
+    "dashboard.alerts_banner",
+    "dashboard.recent_activity",
+    "dashboard.active_groups_today",
+    "dashboard.stat_pending_evals",
+    "dashboard.stat_missing_lessons",
+    "dashboard.reports_quick_card",
 ]
 
 

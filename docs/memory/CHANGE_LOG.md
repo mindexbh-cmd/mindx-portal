@@ -142,6 +142,7 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 | `0fc833f` | fix(books): friendly Arabic page when a curriculum file is missing (UX) |
 | _data action_ | account(perms): create limited-admin manager فاطمة إبراهيم (930909151) restricted to 4 curriculum features (no code change; SQL only) |
 | pending hash  | feat(perms): full lockdown for Fatima — 3-feature whitelist + new button_registry hooks + route gates on /admin/evaluations and /admin/events |
+| pending hash  | feat(perms): in-page lockdown — hide evaluations tab on /admin/teacher-deliveries + alerts banner / آخر النشاطات / المجموعات النشطة / amber+blue stat cards / التقارير quick card on /dashboard; auto-inject /mx-helpers.js into 4 more admin pages |
 
 #### Data action: limited-admin account created — Fatima Ibrahim (930909151)
 

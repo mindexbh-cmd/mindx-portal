@@ -355,6 +355,23 @@ Format:
 - **Decision**: Recommend pgEdge or Zed-patched fork. Mandate a dedicated `mindex_readonly` role in the connection string. Never point at the write-capable `DATABASE_URL`.
 - **Reference**: `docs/MCP_SETUP.md`
 
+### ADR-027: In-page lockdown of /admin/teacher-deliveries + dashboard panels for limited-admin manager
+- **Date**: 2026-05-16
+- **Status**: accepted (refines ADR-026, ADR-025)
+- **Context**: After ADR-026 hid the dashboard nav, Fatima could still navigate *inside* /admin/teacher-deliveries and see (a) the "استمارة التقييم الشهري" tab on the per-teacher card (with all evaluation tables, "نشر الكل في بوابة ولي الأمر" button, per-student score cards), and (b) on the dashboard itself the smart-alerts banner pulling /api/teacher-deliveries/summary alerts ("327 تقييمات شهرية لم تُنشر للأهالي"), the آخر النشاطات + المجموعات النشطة اليوم two-column panels, the amber + blue stat cards linking to evaluations/alerts subviews, and the "التقارير" quick card pointing into the same. Operator confirmed dashboard nav lockdown works but in-page surfaces still leak. Also discovered `ADMIN_TEACHER_DELIVERIES_HTML` was NOT in the `/mx-helpers.js` auto-inject list — the JS hide-pass never even ran on that page.
+- **Decision**: Same mechanism as ADR-026, extended in three ways:
+  1. Add `data-button-key` to the offending DOM elements (`td.tab_evaluations` on the tab button AND the panel body so both vanish together; `td.stat_evals` on the stat tile; `dashboard.alerts_banner`, `dashboard.recent_activity`, `dashboard.active_groups_today` on the dashboard panels; `dashboard.stat_pending_evals`, `dashboard.stat_missing_lessons` on the amber+blue cards; `dashboard.reports_quick_card` on the التقارير card).
+  2. Register the 8 new keys via migration `permissions_v3_fatima_td_lockdown` with `default_roles=["admin","manager"]` so Ahmed/Raed/other managers stay unaffected.
+  3. Add `ADMIN_TEACHER_DELIVERIES_HTML` (plus `ADMIN_LESSONS_HTML`, `ADMIN_PARENT_MESSAGES_HTML`, `ADMIN_EVALUATIONS_HTML` for symmetry) to the `/mx-helpers.js` auto-inject list so the JS hide-pass runs on these pages too.
+- **Alternatives considered**:
+  - **Inline `<script>` per page**: rejected — duplicates the loader logic across templates.
+  - **Server-side rendering of the page with elements stripped for limited users**: rejected — couples permission state to the response body, breaks cache, and would need conditional Python branches around every gated element.
+- **Consequences**:
+  - **For Ahmed/Raed and other managers**: zero change. `default_roles=manager` defaults the 8 new keys to visible; without an explicit `is_visible=0` override they still see everything.
+  - **For Fatima**: HIDDEN_BUTTONS grows from 20 → 28; `/api/me/permissions` returns 45 hidden_buttons (28 explicit + 17 implicit). On /admin/teacher-deliveries she now sees only the coverage drill-down card, filters card, and the lessons/parent-messages tabs on the teacher card. On /dashboard she sees only /admin/teacher-deliveries-related cards (the action-card + sidebar items in her whitelist) — alerts banner / two-column panels / stat cards (except the green one she already had hidden) all vanish.
+  - **Future-proofing**: ADMIN_LESSONS_HTML / ADMIN_PARENT_MESSAGES_HTML / ADMIN_EVALUATIONS_HTML now get `/mx-helpers.js` auto-injected too, so any future per-user button hide on those pages will Just Work.
+- **Reference**: ADR-025, ADR-026; commit (this push); migration `permissions_v3_fatima_td_lockdown`; verification logs in CHANGE_LOG entry for 2026-05-16.
+
 ### ADR-026: Lock down a limited-admin manager surface by attaching `data-button-key` to all visible dashboard items + gating role-only routes via `user_can_see_button`
 - **Date**: 2026-05-16
 - **Status**: accepted (refines ADR-025)
