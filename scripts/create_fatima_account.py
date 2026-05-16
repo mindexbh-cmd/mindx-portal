@@ -109,6 +109,9 @@ VISIBLE_BUTTONS = [
     # Curriculum Time Plan feature — private to Fatima.
     "sidebar.curriculum_plan",
     "curriculum_plan.access",
+    # Dashboard action card shortcut (added by
+    # permissions_v6_curriculum_dashboard_card).
+    "dashboard.curriculum_plan_card",
 ]
 
 
