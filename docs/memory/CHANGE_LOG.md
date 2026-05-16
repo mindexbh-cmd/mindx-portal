@@ -189,6 +189,37 @@ Process note (one for BUGS_LOG eventually): I initially verified against `/admin
 
 Decision detail: ADR-022 covers the schema-deferred phone field and pending-universe definition.
 
+#### Data action: orphan student backfill — 30 role=student accounts created (no commit)
+
+Shipped 2026-05-16 ~13:33 UTC via direct prod SQL after extensive read-only diagnosis. Triggered by operator reporting "student 200910132 cannot log in even with PID as password". Root cause: a `students` row existed (id 4790, علي محمد أحمد) but no matching `users` row — the recent enrollment cohort (student.id 4729–5045, ~20% of active students) was never given login accounts.
+
+- **Action 1 — backup**: `backups/users_pre-orphan-backfill-20260516-103010.json` (157 rows × all columns; `scripts/db_backup.py` failed because `pg_dump` is not on PATH on this Windows box; focused-JSON snapshot used as substitute since backfill only touches `users`).
+- **Action 2 — bulk INSERT (transaction-wrapped)**: 30 new `users` rows (ids 3159–3188), each matching Tasneem's shape: `role='student'`, `username=personal_id`, `password=sha256(personal_id)`, `linked_student_id=<sid>`, `must_change_pw=1`, `is_active=1`, `notify_pref='instant'`. Ledger of new ids saved to `inserted_ids.txt`. Filter: active students (`registration_term2_2026 = تم التسجيل`) with non-empty `personal_id`. 5 active students remain unfixable (empty `personal_id` — needs staff data entry).
+- **Action 3 — disable force-change-password**: `UPDATE users SET must_change_pw=0 WHERE id IN (3159..3188)`. 29 rows changed (one — id 3168, the original problem case — had already self-onboarded via the change-password UI between the INSERT and the UPDATE, demonstrating the flow worked end-to-end). Post-state: all 30 at `mcp=0`.
+
+Trade-off accepted: PID is now a permanent (non-rotated) password for these 30 accounts. Anyone who knows a child's PID can log into that parent's account until the parent voluntarily changes it. Operator chose this over the forced-change UX because PID-as-password matches how the existing 135 parents were originally onboarded.
+
+Process discoveries from this incident (worth recording in BUGS_LOG):
+- `students.personal_id` has 5 NULL/empty values on prod; these students have no way to log in until staff fills the field.
+- No admin UI exists for creating `role=student` PID-mode accounts. The existing `POST /api/admin/parents` only does the phone-as-username V1-multi-child shape. Adding a PID-mode counterpart is a small future commit.
+- The visually-reversed-Arabic literal `'ليجستلا مت'` (vs the correct `'تم التسجيل'`) is a real footgun when copy-pasting SQL from a terminal that renders RTL — caught here because the pre-check returned 0 instead of 30.
+- A user's session changing `must_change_pw` from 1 to 0 ALSO leaves the `password` column untouched if they entered the same value (the same sha256 hash). Defensive pre-checks should not require `mcp=1` strictly — relax to `role=student` and let the UPDATE itself be idempotent.
+
+Decision detail: ADR-024 covers backfill-vs-rollback choice + the security trade-off (PID as permanent password).
+
+#### Feature: per-teacher coverage enhancements — month picker + group breakdown (commits `ca993c1` + `c9f5fd4` + `edda6dd` + `999665e`)
+
+Shipped 2026-05-16 ~14:24 UTC via `safe_deploy --feature teacher-cov-enhancements`. Safety tag `safety/pre-teacher-cov-enhancements-20260516-142400`. Four atomic commits, single-file changes to `app.py` + plan doc.
+
+- `ca993c1` — backend: new `GET /api/monthly-evaluations/months` (DISTINCT `evaluation_month` from `evaluations`, current month pinned at top). Reshape per-teacher detail endpoint: flat `submitted[]`/`pending[]` replaced by `groups[]` each with own `{name, stats, submitted, pending}` + `overall_stats` block. Empty groups skipped.
+- `c9f5fd4` — frontend: month `<select>` next to the refresh button. `tmCovCurrentMonth` state threaded through both fetch URLs. On change → clear cache, close all rows, refetch.
+- `edda6dd` — frontend: `tmCovRenderDetail` rewrite. Each teacher row's body now contains a stack of group sub-rows with their own progress bar + emoji + click-to-expand. First group expanded by default. Distinct `.tm-cov-grp-head` class so the outer-row handler doesn't double-fire.
+- `999665e` — frontend: group-aware reminder body. `tmCovBuildReminderText` walks `d.groups[]`, emits `— <group_name>:` headers with pending names beneath, 20-name TOTAL cap across all groups, fallback to legacy flat shape if a stale cached response is encountered.
+
+Production verification (admin_test session): `/months` returns مايو 2026 + أبريل 2026 (current pinned at top). `/teachers/641/coverage?month=2026-05` returns **10 groups** for أ. زهراء نوح with `overall_stats={total:80, submitted:67, pending:13, percentage:84}`, no legacy top-level keys present. `/admin/teacher-deliveries` HTML contains all 8 new markup markers. The 502 warmup flap on the first verification curl-burst is the same Render free-tier behaviour seen on the prior two deploys; resolved within ~60s.
+
+Decision detail: ADR-025 covers the schema-frozen "first-group-wins" dedup rule and the empty-group skip.
+
 #### Fix: parent-portal student name + PID-prompt flash (commit `6a94497`)
 
 Shipped 2026-05-16. Two regressions on the legacy PID-hub surface:
