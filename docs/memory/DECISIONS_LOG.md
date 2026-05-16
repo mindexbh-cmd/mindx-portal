@@ -355,6 +355,28 @@ Format:
 - **Decision**: Recommend pgEdge or Zed-patched fork. Mandate a dedicated `mindex_readonly` role in the connection string. Never point at the write-capable `DATABASE_URL`.
 - **Reference**: `docs/MCP_SETUP.md`
 
+### ADR-029: Curriculum Time Plan — private feature for Fatima (curriculum_plans + curriculum_lessons tables)
+- **Date**: 2026-05-17
+- **Status**: accepted
+- **Context**: Fatima Ibrahim (curriculum staff) needed a planning surface for curriculum schedules: each curriculum is a list of lessons, each lesson has a name + number of class sessions + start/end dates, with auto-calculation of end_date (Bahrain weekend = Fri+Sat), inline editing, copy-curriculum, soft-delete, and Excel export. Feature is private to her — invisible to other managers (Ahmed/Raed).
+- **Decision**:
+  - **Two new tables** added in a single dual-path migration `curriculum_plans_v1`. Both `CREATE TABLE IF NOT EXISTS` (no DDL on existing tables, no breakage risk). Soft-delete via `is_deleted=1` on both tables so accidental deletes are recoverable.
+  - **Access gate** `_curriculum_plan_can_use` is a three-stripe OR: admin role, OR username == "930909151" (hardcoded safety net — survives accidental `user_permissions` row deletion), OR `user_can_see_button(user, "curriculum_plan.access")`. The third path is the long-term mechanism for additional limited-admin users; the username fallback is the operational safety net.
+  - **Two new button_registry rows** seeded via migration `permissions_v5_curriculum_plan` both with `default_roles=["admin"]`. This means manager-role users (Ahmed, Raed, every other manager) see nothing of this feature by default — its existence is invisible until granted. Fatima carries `is_visible=1` overrides on both keys, applied via the new `VISIBLE_BUTTONS` set in `scripts/create_fatima_account.py`.
+  - **Sidebar link** placed inside التعليم والتقييم section with `data-button-key="sidebar.curriculum_plan"` — uses the existing JS hide-pass; admin sees by default, others only if `is_visible=1` row exists. Icon = calendar.
+  - **Inline editing UI** with click-to-edit on lesson name / sessions count / start date / end date. Auto-calc end_date when sessions_count OR start_date changes (Bahrain working week = Sun-Thu). Smart status colors (green = not started, yellow = in progress, blue = completed, red = overdue) computed in JS from today's date.
+  - **Excel export** via openpyxl with one sheet per plan, RTL right-to-left layout, mindex purple header. Returns XLSX via `Response` (avoids needing to import `send_file`).
+- **Alternatives considered**:
+  - **Add a `curriculum_categories` / `curriculum_units` nesting layer**: rejected per operator spec — "no nested units — keep flat". One level of plan → flat lessons is the entire data model.
+  - **Universal access for all managers**: rejected — operator explicitly wants private-to-Fatima.
+  - **Hard-delete on remove**: rejected — soft-delete + audit-log preserves accidental loss recovery.
+- **Consequences**:
+  - **For Ahmed/Raed and other managers**: zero change. They have no `user_permissions` row for `sidebar.curriculum_plan` / `curriculum_plan.access`, default_roles excludes them, route gate returns False. They cannot see the link, cannot reach `/curriculum-plan` (403), cannot list/create/edit plans (`/api/curriculum-plans/*` → 403).
+  - **For Fatima**: HIDDEN_BUTTONS grows 33 → 33 (unchanged); new VISIBLE_BUTTONS = 2; `apply_button_overrides` now reports "asserted 33 hide overrides + 2 visible overrides (35 total user_permissions rows)". Sidebar shows new "الخطة الزمنية للمناهج" entry under التعليم والتقييم. /curriculum-plan returns 200 with the full UI.
+  - **DB cost**: two new tables. Currently 4 rows total across both (the initial test data). Will scale to dozens-of-plans × hundreds-of-lessons at worst — well within SQLite/Postgres comfort zone.
+  - **Excel export size**: ~5KB per plan with 1-2 lessons; ~50KB at hundreds of lessons. Streams via openpyxl to a BytesIO then served as a single Response — fine for the Render Starter 512MB container.
+- **Reference**: this commit; tables: `curriculum_plans(id, name, created_by, created_at, updated_at, is_deleted)` + `curriculum_lessons(id, plan_id, lesson_name, sessions_count, start_date, end_date, sort_order, is_completed, is_deleted, created_at, updated_at)`; route helper `_curriculum_plan_can_use`; HTML constant `CURRICULUM_PLAN_HTML`; migrations `curriculum_plans_v1` + `permissions_v5_curriculum_plan`.
+
 ### ADR-028: Sidebar-section-level lockdown + grant curriculum-staff books admin access
 - **Date**: 2026-05-16
 - **Status**: accepted (refines ADR-027 / ADR-026 / ADR-025)

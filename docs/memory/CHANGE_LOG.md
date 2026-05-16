@@ -127,6 +127,43 @@ Shipped 2026-05-15 evening. MEDIUM-risk deploy, zero incidents post-deploy.
 - Prod verified: `/api/health` green at 1778875191; smoke + full 8/8 e2e green; anon `/parent` + `/parent/legacy` still 200.
 - Decision rationale: see ADR-014 in `DECISIONS_LOG.md` (Interpretation B chosen over A).
 
+### 2026-05-17
+
+| Hash | Title |
+|---|---|
+| pending hash | feat(curriculum-plan): private "الخطة الزمنية للمناهج" feature for Fatima — 2 new tables (curriculum_plans + curriculum_lessons), 10 endpoints, inline-edit UI, smart status colors, Bahrain-weekend-aware auto-calc, Excel export, sidebar link gated to admin+Fatima only |
+
+#### Feat: Curriculum Time Plan for Fatima (commit pending)
+
+Shipped 2026-05-17. New private feature surfaced at `/curriculum-plan`.
+Access gate: admin OR username==930909151 OR `user_can_see_button("curriculum_plan.access")`. Other managers (Ahmed, Raed) cannot see the sidebar link, cannot reach the page (403), cannot list or mutate plans/lessons via the API (403).
+
+- **Data model**: two new tables created by migration `curriculum_plans_v1`:
+  - `curriculum_plans(id, name, created_by, created_at, updated_at, is_deleted)`
+  - `curriculum_lessons(id, plan_id, lesson_name, sessions_count, start_date, end_date, sort_order, is_completed, is_deleted, created_at, updated_at)`
+  Pure additive — no DDL on existing tables. Soft-delete only.
+- **Endpoints** (all gated by `_curriculum_plan_can_use`):
+  - `GET  /curriculum-plan` → HTML page
+  - `GET  /api/curriculum-plans` → list plans + lessons
+  - `POST /api/curriculum-plans` → create plan
+  - `PUT  /api/curriculum-plans/<id>` → rename
+  - `DELETE /api/curriculum-plans/<id>` → soft-delete
+  - `POST /api/curriculum-plans/<id>/copy` → duplicate with new name
+  - `POST /api/curriculum-plans/<id>/lessons` → add lesson
+  - `PUT  /api/curriculum-lessons/<id>` → patch lesson
+  - `DELETE /api/curriculum-lessons/<id>` → soft-delete lesson
+  - `GET  /api/curriculum-plans/export-excel` → XLSX download (openpyxl)
+- **Sidebar link** added inside التعليم والتقييم section, tagged `data-button-key="sidebar.curriculum_plan"` (default_roles=admin). Fatima's `is_visible=1` override unlocks it via the new `VISIBLE_BUTTONS` list in `scripts/create_fatima_account.py`.
+- **UI**: mindex palette, inline cell editing (click-to-edit, blur to save), auto-calc end_date when sessions_count or start_date change (Bahrain weekend = Fri+Sat skipped), smart status colors (green/yellow/blue/red) computed from today's date, copy plan with name prompt, soft-delete with confirm. Mobile-responsive (tables overflow horizontally on small screens).
+- **Excel export**: one sheet per plan, RTL layout, mindex-purple header, status column auto-derived per row.
+
+Verification (local):
+- Fatima login → /curriculum-plan returns 200; admin → 200; teacher1 → 403.
+- POST /api/curriculum-plans creates plan; GET lists it; POST /lessons adds a lesson; PUT /lessons updates; DELETE soft-deletes; /export-excel returns valid XLSX (5KB, `Microsoft Excel 2007+`).
+- /api/me/permissions returns `is_visible=1` rows for sidebar.curriculum_plan + curriculum_plan.access for Fatima.
+
+See ADR-029 in DECISIONS_LOG.md.
+
 ### 2026-05-16
 
 | Hash | Title |

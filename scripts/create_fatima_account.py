@@ -100,6 +100,18 @@ HIDDEN_BUTTONS = [
 ]
 
 
+# Per-user is_visible=1 overrides — UNLOCK buttons that default to
+# admin-only. Registered via permissions_v5_curriculum_plan; defaults
+# to ["admin"] so a manager-role user only sees them with an explicit
+# row here. Kept separate from HIDDEN_BUTTONS so the intent is
+# unambiguous in code review and audit-log reads.
+VISIBLE_BUTTONS = [
+    # Curriculum Time Plan feature — private to Fatima.
+    "sidebar.curriculum_plan",
+    "curriculum_plan.access",
+]
+
+
 def _password_hash(plain: str) -> str:
     return hashlib.sha256(plain.encode()).hexdigest()
 
@@ -151,9 +163,14 @@ def upsert_user(kind: str, cur) -> int:
 
 
 def apply_button_overrides(kind: str, cur, user_id: int) -> int:
+    """Upsert per-user overrides. Two passes: HIDDEN_BUTTONS get
+    is_visible=0, VISIBLE_BUTTONS get is_visible=1. Each pass is
+    idempotent (UPDATE if row exists, INSERT otherwise)."""
     q = _placeholder(kind)
-    n = 0
-    for bk in HIDDEN_BUTTONS:
+    total = 0
+
+    def _upsert(bk: str, visible: int) -> None:
+        nonlocal total
         cur.execute(
             f"SELECT id FROM user_permissions WHERE user_id={q} AND button_key={q}",
             (user_id, bk),
@@ -161,19 +178,28 @@ def apply_button_overrides(kind: str, cur, user_id: int) -> int:
         row = cur.fetchone()
         if row:
             cur.execute(
-                f"UPDATE user_permissions SET is_visible=0 "
+                f"UPDATE user_permissions SET is_visible={q} "
                 f"WHERE user_id={q} AND button_key={q}",
-                (user_id, bk),
+                (visible, user_id, bk),
             )
         else:
             cur.execute(
                 f"INSERT INTO user_permissions(user_id, button_key, is_visible) "
-                f"VALUES ({q}, {q}, 0)",
-                (user_id, bk),
+                f"VALUES ({q}, {q}, {q})",
+                (user_id, bk, visible),
             )
-        n += 1
-    print(f"[fatima] asserted {n} button-key overrides (is_visible=0)")
-    return n
+        total += 1
+
+    for bk in HIDDEN_BUTTONS:
+        _upsert(bk, 0)
+    for bk in VISIBLE_BUTTONS:
+        _upsert(bk, 1)
+    print(
+        f"[fatima] asserted {len(HIDDEN_BUTTONS)} hide overrides "
+        f"+ {len(VISIBLE_BUTTONS)} visible overrides "
+        f"({total} total user_permissions rows)"
+    )
+    return total
 
 
 def write_audit(kind: str, cur, user_id: int) -> None:
