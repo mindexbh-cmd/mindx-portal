@@ -372,6 +372,26 @@ Shipped 2026-05-16. Re-runnable Playwright walk aggressively enumerating every c
 
 - `scripts/personas/hostile_parent_portal_logout_hunt.py` — hostile-mode probe that walks BOTH `student_test` AND `parent_test` sessions on the same URL set. Handles its own session preservation by treating `/logout` and `/api/logout` as `SESSION_KILLERS` that must not be probed via the shared cookie context (they would invalidate the session and break subsequent assertions in the same run).
 
+### 2026-05-17
+
+#### Feature: Dashboard + Sidebar redesign — 9 brand-color sections + new alerts card (commits `a3044fe` → `1ea86ab`)
+
+Shipped 2026-05-17. Reorganizes `HOME_HTML` (`app.py`) so the dashboard's main action grid renders as 9 brand-color section containers and the left twocol panel hosts a richer "تنبيهات تحتاج انتباهك" card instead of "آخر النشاطات". Sidebar gains 6 new items (no deletions, no route changes). Safety tag: `safety/pre-dashboard-sidebar-redesign-20260517-142157`.
+
+7 atomic commits + 1 memory log:
+
+- `a3044fe` — feat(sidebar): add `نسخ رابط بوابة أولياء الأمور` to §2 الطلاب والمجموعات. Calls existing `dhCopyParentLink()` helper.
+- `fe82a96` — feat(sidebar): add `مدة الحصص` (sdOpen modal) + `متابعة التقدم في الدروس` (/teacher/lessons, staff-only) to §3 الحضور والغياب.
+- `708785c` — feat(sidebar): add `إرسال الرسائل` (msgOpen modal) + `ماذا تريد أن يعرف ولي الأمر` (/teacher/parent-messages, staff-only) to §5 التعليم والتقييم.
+- `7e6f0e3` — feat(sidebar): add `تدقيق الجداول` (/admin/table-audit) to §9 النظام.
+- `ec4d67b` — feat(css): add `.dh-section` wrapper + soft page bg in `static/css/dashboard-redesign.css`. Foundation for the 9-section layout; uses `--dh-sec` / `--dh-sec-rgb` custom props for per-section color.
+- `c315bde` — feat(dashboard): replace `آخر النشاطات` panel with `تنبيهات تحتاج انتباهك`. Now renders all 6 alerts from `/api/teacher-deliveries/summary` (missing lessons, unreleased evals, sent-pending evals, silent teachers, silent groups, students without monthly eval) — count + deep-link per row. Old hidden `.md-alerts` banner (was display:none unless counts > 0) removed as the new card supersedes it. The right-hand `المجموعات النشطة اليوم` panel is unchanged.
+- `1ea86ab` — refactor(dashboard): wrap the 24 existing action cards inside 9 `.dh-section` containers (§1 الرئيسية #5B4FCC / §2 الطلاب والمجموعات #00897B / §3 الحضور والغياب #1565C0 / §4 المالية #2E7D32 / §5 التعليم والتقييم #7B1FA2 / §6 نظام النقاط #FB8C00 / §7 نظام المهام #00838F / §8 الإدارة والمراقبة #5E35B1 / §9 النظام #5D4037). Every card preserved byte-for-byte (same href / onclick / Arabic label / data-button-key / visibility class).
+
+Guarantees: zero backend changes, zero new endpoints, zero schema work, zero deleted buttons. Decisions captured during Phase 1 question round: keep duplicate buttons (md-quick + main-grid), use all 6 existing alerts (no new endpoints needed for "absent students" / "late payments"), keep "المجموعات النشطة اليوم" as sibling of new alerts card, remove old hidden `.md-alerts` banner.
+
+Verification per-commit: `python -c "import ast; ast.parse(...)"` + Flask `test_client` GET `/dashboard` returning 200 + content presence checks (sidebar items, alerts panel ID, no duplicate `id=` attributes, 9 `.dh-section` containers, 24 `.dh-action-card` occurrences).
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:

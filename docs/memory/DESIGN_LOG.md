@@ -354,6 +354,42 @@ The URL `/portal/parent` serves **different templates for different roles** (per
 - 999 px radius (capsule)
 - Colored fill matching status semantics
 
+## Dashboard 9-section container pattern (introduced 2026-05-17)
+
+`HOME_HTML` action grid is now organized into 9 brand-color section containers, each rendered as:
+
+```html
+<div class="dh-section" style="--dh-sec:#5B4FCC;--dh-sec-rgb:91,79,204;">
+  <div class="dh-section-head">
+    <span class="dh-section-head-icon" aria-hidden="true">📊</span>
+    <span class="dh-section-head-title">الرئيسية</span>
+  </div>
+  <div class="dh-actions-grid">…cards…</div>
+</div>
+```
+
+Color-per-section uses **inline custom properties** (`--dh-sec` and `--dh-sec-rgb`) rather than separate per-section CSS classes — keeps the `.dh-section` rule generic and allows new sections without CSS changes. The `--dh-sec-rgb` companion property feeds `rgba()` calls in the section-head gradient (`linear-gradient(90deg, rgba(var(--dh-sec-rgb), 0.08), rgba(var(--dh-sec-rgb), 0))`), so the soft brand wash blends to transparent.
+
+Section assignments + brand colors (kept inside the existing palette — no new tokens):
+
+| §  | Title                      | Color    | Existing palette use            |
+|----|----------------------------|----------|---------------------------------|
+| 1  | الرئيسية                    | `#5B4FCC`| `--md-brand-deep`                |
+| 2  | الطلاب والمجموعات           | `#00897B`| existing quick-card teal        |
+| 3  | الحضور والغياب              | `#1565C0`| existing dh-a-blue              |
+| 4  | المالية                     | `#2E7D32`| existing dh-a-green             |
+| 5  | التعليم والتقييم            | `#7B1FA2`| existing teacher-evaluations    |
+| 6  | نظام النقاط                 | `#FB8C00`| existing dh-a-orange            |
+| 7  | نظام المهام                 | `#00838F`| existing tasks-analytics cyan   |
+| 8  | الإدارة والمراقبة            | `#5E35B1`| existing teacher-deliveries     |
+| 9  | النظام                      | `#5D4037`| existing table-audit brown      |
+
+## Dashboard alerts card (introduced 2026-05-17)
+
+The left twocol panel previously rendered "آخر النشاطات" from `/api/dashboard/recent-activity`. It now renders **"تنبيهات تحتاج انتباهك"** from `/api/teacher-deliveries/summary` — the SAME endpoint the (now-removed) hidden `.md-alerts` banner used, with one behavior change: **all 6 alert rows are rendered even when count = 0**, so the panel is always informative. Counts > 0 get a warning pill (`md-pill-warning`); counts = 0 get a success pill (`md-pill-success`). Non-staff sessions get a friendly "هذه التنبيهات متاحة للإدارة فقط" line when the endpoint returns 403. No new endpoints, no new SQL.
+
+The right-hand panel ("المجموعات النشطة اليوم") is unchanged.
+
 ## Known design debt
 
 From `ui-designer-agent` + `mobile-first-agent` reviews (recent):
