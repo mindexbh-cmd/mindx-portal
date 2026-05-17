@@ -32,3 +32,47 @@ scripts/screenshots/
 scripts/personas/__pycache__/
 scripts/personas/report.json
 scripts/personas/debug*.py
+
+# Ad-hoc diagnostic dumps from local debugging sessions — never committed.
+# Root-level scratch files (.json/.html/.bin/.txt/.png) produced by quick
+# probes (curl outputs, books diagnostic dumps, prod-page comparisons).
+/*.json
+/*.html
+/*.bin
+/*.txt
+/*.png
+/*.js
+
+# Smoke-test + ad-hoc audit capture files written during local iteration.
+# Always regenerable from scripts/run_e2e.py; no point versioning the
+# transient stdout/stderr blobs.
+scripts/smoke_*.out
+scripts/smoke_*.err
+scripts/*_audit.out
+scripts/*_audit.err
+scripts/grammar_*.out
+scripts/grammar_*.err
+
+# Ad-hoc probe / one-off test scripts. The formal test suite lives in
+# scripts/run_e2e.py; anything matching scripts/test_*.py is a throwaway
+# debugger kept locally for the duration of an investigation.
+scripts/test_*.py
+scripts/test_*.pdf
+scripts/test_*.html
+scripts/import_all_students.py
+students_raw.tsv
+
+# Root-level uploads dir (production uses /var/data; local scratch only).
+uploads/
+
+# Local runtime upload directory (production stores uploads on the
+# persistent disk at /var/data; locally it's a scratch dir we don't
+# commit).
+data/uploads/
+
+# Local-only diagnostic reports + investigation drafts. The durable
+# docs live under docs/; reports/ is a scratchpad and *-investigation.md
+# / *-report.md are intentionally-uncommitted drafts.
+reports/
+docs/*-investigation.md
+docs/*-report.md
