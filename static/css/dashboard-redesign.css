@@ -747,3 +747,64 @@ body { padding-top: var(--md-header-h); font-family: var(--md-font-stack); }
   font-size: var(--md-fz-sm);
   font-weight: var(--md-fw-medium);
 }
+
+/* ==========================================================================
+   Dashboard 9-section grouping (Phase: dashboard-sidebar-redesign)
+   ==========================================================================
+   Each `.dh-section` is a soft-bg container that wraps a header strip
+   and the existing dashboard cards inside. Brand color is provided per
+   section via the `--dh-sec` custom property, set inline on the section
+   element so we don't bake a separate class per color. The colors all
+   come from the existing dashboard palette — nothing new is introduced.
+   ========================================================================== */
+body.md-sb-on .dh-main {
+  background: var(--md-bg-page);
+}
+.dh-section {
+  --dh-sec: var(--md-brand-deep);
+  background: var(--md-bg-card);
+  border: 1px solid var(--md-brand-border);
+  border-radius: var(--md-rad-lg);
+  padding: var(--md-sp-5) var(--md-sp-5) var(--md-sp-4);
+  margin-bottom: var(--md-sp-5);
+  box-shadow: var(--md-shadow-sm);
+}
+.dh-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  margin: -8px -8px 14px;
+  border-right: 4px solid var(--dh-sec);
+  border-radius: var(--md-rad-md);
+  background: linear-gradient(90deg,
+              rgba(var(--dh-sec-rgb, 91, 79, 204), 0.08),
+              rgba(var(--dh-sec-rgb, 91, 79, 204), 0.00));
+}
+.dh-section-head-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.dh-section-head-title {
+  font-size: var(--md-fz-lg);
+  font-weight: var(--md-fw-black);
+  color: var(--dh-sec);
+}
+/* The existing dh-actions-grid / dh-stats-grid / md-quick / md-stats-row
+   are used INSIDE these sections — they keep their own layout rules and
+   need no override. The wrapping section just provides the bg + header
+   strip + spacing. */
+.dh-section .dh-actions-grid,
+.dh-section .dh-stats-grid,
+.dh-section .md-quick,
+.dh-section .md-stats-row {
+  margin-bottom: 0;
+}
+@media (max-width: 768px) {
+  .dh-section {
+    padding: var(--md-sp-4) var(--md-sp-3) var(--md-sp-3);
+  }
+  .dh-section-head-title {
+    font-size: var(--md-fz-md);
+  }
+}
