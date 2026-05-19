@@ -1,26 +1,16 @@
-"""Regression suite for negative-points-no-session-deduct.
+"""Regression suite for points-net-sum (rev 2).
 
-Verifies the 8 confirmed test scenarios against a Flask test client:
+The session-budget rule is now:
+  used = max(0, SUM(points_value))   # signed net, floored at zero
 
-  1. Teacher  +5    → session used +5, student total +5
-  2. Teacher  -1    → session used unchanged, student total -1
-  3. Admin   +10    → session used +10, student total +10
-  4. Admin    -3    → session used unchanged, student total -3
-  5. Bulk-distribute +2 to N present → session used +2N, each +2
-  6. Bulk-distribute -2 to N present → session used unchanged, each -2
-  7. Undo a positive grant → session used drops by the grant
-  8. Undo a negative grant → session used unchanged (was already 0)
+Negatives CANCEL prior positives in the same session, but never
+let "used" go below zero. The pre-grant intended_cost still uses
+max(0, pv) — a negative grant's cost contribution at the cap-check
+moment is 0, but the cumulative `used` it lands in IS net-sum.
 
-Each scenario:
-  - reads /api/points/session-budget {used, remaining} BEFORE
-  - posts /api/points/grant or /api/points/bulk-grant
-  - reads {used, remaining} AFTER
-  - reads student balance via /api/points/student/<sid>
-  - asserts the expected deltas
-
-Runs against Flask test_client; no real network. Cleans up by
-DELETE'ing every grant it creates so re-running stays
-idempotent.
+This script wipes today's events for the test (group, student)
+pair at start, then runs a single sequential scenario script
+asserting the EXACT cumulative `used` after each action.
 
 Run: python scripts/verify_negative_points.py
 """
@@ -33,6 +23,9 @@ _ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 sys.path.insert(0, _ROOT)
 
 import app as appmod  # noqa: E402
+
+
+# ── infra helpers ───────────────────────────────────────────────
 
 
 def _login(client, username):
@@ -49,8 +42,6 @@ def _login(client, username):
 
 
 def _pick_group_and_student():
-    """Return (group_name, student_id, student_name) for a group that
-    has at least one student. Picks the first eligible row."""
     with appmod.app.app_context():
         db = appmod.get_db()
         row = db.execute(
@@ -78,9 +69,6 @@ def _read_balance(client, sid):
 
 
 def _behavior_id_for(amt):
-    """Pick a behavior_id so the grant is accepted. Seed has +1/+2/+3
-    /-1/-2 — pick by exact match, else fall back to any positive
-    behaviour and pass points_override."""
     with appmod.app.app_context():
         db = appmod.get_db()
         row = db.execute(
@@ -101,6 +89,22 @@ def _behavior_id_for(amt):
 _created_event_ids = []
 
 
+def _wipe_todays_events(group):
+    """Hard-delete every point_events row for (group, today) so the
+    scenario script starts from a known clean state. Local-only —
+    never run this against prod."""
+    with appmod.app.app_context():
+        db = appmod.get_db()
+        today = appmod._pts_bahrain_today()
+        cur = db.execute(
+            "DELETE FROM point_events "
+            "WHERE TRIM(group_name)=? AND session_date=?",
+            (group, today),
+        )
+        db.commit()
+        return cur.rowcount if hasattr(cur, "rowcount") else 0
+
+
 def _grant(client, sid, amt, group):
     bid, override = _behavior_id_for(amt)
     if not bid:
@@ -112,23 +116,18 @@ def _grant(client, sid, amt, group):
     j = r.get_json() or {}
     if not j.get("ok"):
         return None, j.get("error")
-    eid = None
-    if j.get("results"):
-        eid = j["results"][0].get("event_id")
+    eid = ((j.get("results") or [{}])[0] or {}).get("event_id")
     if eid:
         _created_event_ids.append(eid)
     return eid, None
 
 
 def _bulk_grant(client, group, amt):
-    bid, override = _behavior_id_for(amt)
+    bid, _override = _behavior_id_for(amt)
     if not bid:
         return None, "no behavior"
     body = {"group_name": group, "behavior_id": bid,
             "per_student_amount": amt}
-    if override is not None:
-        # bulk-grant uses per_student_amount directly — no override path
-        pass
     r = client.post("/api/points/bulk-grant", json=body)
     j = r.get_json() or {}
     if not j.get("ok"):
@@ -157,8 +156,24 @@ def _cleanup(client):
 def _assert(name, expected, actual):
     ok = (expected == actual)
     sign = "OK" if ok else "FAIL"
-    print(f"  [{sign}] {name}: expected={expected} actual={actual}")
+    print(f"    [{sign}] {name}: expected={expected} actual={actual}")
     return ok
+
+
+def _step(client, label, action, group, sid,
+          expected_used, expected_remaining, expected_bal_delta):
+    """Run one scenario step, assert the absolute `used` /
+    `remaining` and the student balance delta from the previous
+    step."""
+    bal_before = _read_balance(client, sid)
+    eid = action()
+    used, _, rem = _read_used(client, group)
+    bal_after = _read_balance(client, sid)
+    print(f"  {label}")
+    ok1 = _assert("used (absolute)",      expected_used,      used)
+    ok2 = _assert("remaining (absolute)", expected_remaining, rem)
+    ok3 = _assert("student bal Δ",        expected_bal_delta, bal_after - bal_before)
+    return ok1 and ok2 and ok3, eid
 
 
 def main():
@@ -167,210 +182,122 @@ def main():
         print("FAIL — no eligible (group, student) in local DB")
         return 1
     group, sid, sname = picked
-    print(f"Using group={group!r} student#{sid} {sname!r}\n")
+    print(f"Using group={group!r} student#{sid} {sname!r}")
 
-    all_ok = True
-    # The rule (negatives don't burn budget) is role-agnostic — admins
-    # and teachers go through the SAME api_pts_grant code path. Picking
-    # a teacher who's also assigned to the picked group requires DB
-    # setup that varies per environment, so we run every scenario as
-    # admin (always has access to every group). Role parity is asserted
-    # separately by scenario 9 below — it forces the budget to its
-    # cap and confirms a negative grant still passes the would_exceed
-    # check, which is the only behaviour where role mattered before
-    # this fix.
+    # Wipe today's events for this group so the cumulative `used`
+    # tracking below is exact. Local-only; the prod verifier uses
+    # delta-from-baseline instead and undoes everything it created.
+    wiped = _wipe_todays_events(group)
+    print(f"Wiped {wiped} existing event(s) for today/{group}\n")
+
     client = appmod.app.test_client()
     _login(client, "admin")
 
     used0, budget, rem0 = _read_used(client, group)
-    bal0 = _read_balance(client, sid)
-    print(f"Baseline: used={used0} budget={budget} remaining={rem0} bal={bal0}")
+    print(f"Baseline (clean): used={used0} budget={budget} remaining={rem0}")
+    if used0 != 0:
+        print("WARN — baseline used != 0 after wipe; results may drift")
 
-    print("\nScenario 1 — +5 (teacher policy, run as admin):")
-    _grant(client, sid, 5, group)
-    used1, _, rem1 = _read_used(client, group)
-    bal1 = _read_balance(client, sid)
-    all_ok &= _assert("session used delta", 5, used1 - used0)
-    all_ok &= _assert("student balance delta", 5, bal1 - bal0)
+    all_ok = True
 
-    print("\nScenario 2 — -1 (teacher policy, run as admin):")
-    _grant(client, sid, -1, group)
-    used2, _, rem2 = _read_used(client, group)
-    bal2 = _read_balance(client, sid)
-    all_ok &= _assert("session used delta", 0, used2 - used1)
-    all_ok &= _assert("student balance delta", -1, bal2 - bal1)
+    # ── New net-sum scenarios from the operator's spec ──────────
+    # Cumulative `used` tracked relative to the budget (e.g. 10 in
+    # the dev DB, 110 in prod for مجموعة 10). The assertions are
+    # written in terms of budget arithmetic so the script stays
+    # portable across DBs with different active-student counts.
 
-    # --- Scenario 3 + 4 — admin single grants -------------------
-    client_a = appmod.app.test_client()
-    _login(client_a, "admin")
-    used_a0, _, _ = _read_used(client_a, group)
-    bal_a0 = _read_balance(client_a, sid)
+    print("\n=== net-sum sequence ====================================")
 
-    print("\nScenario 3 — admin +10:")
-    _grant(client_a, sid, 10, group)
-    used_a1, _, _ = _read_used(client_a, group)
-    bal_a1 = _read_balance(client_a, sid)
-    all_ok &= _assert("session used delta", 10, used_a1 - used_a0)
-    all_ok &= _assert("student balance delta", 10, bal_a1 - bal_a0)
+    print("\nStep 1 — award +5  → used=5, remaining=budget-5")
+    ok, _ = _step(
+        client, "after +5", lambda: _grant(client, sid, 5, group)[0],
+        group, sid,
+        expected_used=5, expected_remaining=budget - 5,
+        expected_bal_delta=5)
+    all_ok &= ok
 
-    print("\nScenario 4 — admin -3:")
-    _grant(client_a, sid, -3, group)
-    used_a2, _, _ = _read_used(client_a, group)
-    bal_a2 = _read_balance(client_a, sid)
-    all_ok &= _assert("session used delta", 0, used_a2 - used_a1)
-    all_ok &= _assert("student balance delta", -3, bal_a2 - bal_a1)
+    print("\nStep 2 — award -5  → used=0, remaining=budget (cancel)")
+    ok, _ = _step(
+        client, "after -5", lambda: _grant(client, sid, -5, group)[0],
+        group, sid,
+        expected_used=0, expected_remaining=budget,
+        expected_bal_delta=-5)
+    all_ok &= ok
 
-    # --- Scenario 5 + 6 — bulk distribute -----------------------
-    # Resolve N = present count for this group/today via the API itself.
-    with appmod.app.app_context():
-        db = appmod.get_db()
-        n_row = db.execute(
-            "SELECT COUNT(*) FROM students "
-            "WHERE TRIM(COALESCE(group_name_student,''))=? "
-            "  AND TRIM(COALESCE(student_name,'')) <> ''", (group,)
-        ).fetchone()
-        n_present = int((n_row[0] if n_row else 0) or 0)
+    print("\nStep 3 — award -3  → used=0, remaining=budget (floor)")
+    ok, _ = _step(
+        client, "after -3", lambda: _grant(client, sid, -3, group)[0],
+        group, sid,
+        expected_used=0, expected_remaining=budget,
+        expected_bal_delta=-3)
+    all_ok &= ok
 
-    used_b0, _, _ = _read_used(client_a, group)
-    print(f"\nScenario 5 — bulk +2 to {n_present} students:")
-    eids5, err5 = _bulk_grant(client_a, group, 2)
-    if err5:
-        print(f"  FAIL — bulk grant returned: {err5}")
-        all_ok = False
+    print("\nStep 4 — award +7  → used=7, remaining=budget-7")
+    # Per-event clamp semantics (Option B): after step 3 the running
+    # used hit the floor (0), so the -3 was absorbed. The +7 here
+    # lands on top of 0, giving used=7 — NOT signed-sum +4 that an
+    # aggregate max(0, SUM) would produce. This is the core
+    # operator-facing distinction that motivated the C1 revision.
+    ok, _ = _step(
+        client, "after +7", lambda: _grant(client, sid, 7, group)[0],
+        group, sid,
+        expected_used=7, expected_remaining=budget - 7,
+        expected_bal_delta=7)
+    all_ok &= ok
+
+    print("\nStep 5 — award -10 → used=0, remaining=budget (floor)")
+    ok, _ = _step(
+        client, "after -10", lambda: _grant(client, sid, -10, group)[0],
+        group, sid,
+        expected_used=0, expected_remaining=budget,
+        expected_bal_delta=-10)
+    all_ok &= ok
+
+    # Wipe to a clean state for the admin-override scenarios.
+    _wipe_todays_events(group)
+    _created_event_ids.clear()
+    print("\n=== admin override scenarios ============================")
+    used0b, budget_b, rem0b = _read_used(client, group)
+    print(f"Reset: used={used0b} budget={budget_b} remaining={rem0b}")
+
+    print("\nStep 6 — admin big +N up to budget (no override needed)")
+    # Award an amount equal to budget so used == budget (still
+    # within cap, no override needed). Skip if budget is 0.
+    if budget_b <= 0:
+        print("    SKIP — no budget available in this env")
     else:
-        used_b1, _, _ = _read_used(client_a, group)
-        all_ok &= _assert("session used delta", 2 * n_present, used_b1 - used_b0)
-
-    used_c0, _, _ = _read_used(client_a, group)
-    print(f"\nScenario 6 — bulk -2 to {n_present} students:")
-    eids6, err6 = _bulk_grant(client_a, group, -2)
-    if err6:
-        print(f"  FAIL — bulk grant returned: {err6}")
-        all_ok = False
-    else:
-        used_c1, _, _ = _read_used(client_a, group)
-        all_ok &= _assert("session used delta", 0, used_c1 - used_c0)
-
-    # --- Scenario 7 — undo a positive grant ---------------------
-    print("\nScenario 7 — undo a +5 grant:")
-    used_d0, _, _ = _read_used(client_a, group)
-    eid_pos, _ = _grant(client_a, sid, 5, group)
-    if eid_pos:
-        used_d1, _, _ = _read_used(client_a, group)
-        ok_undo = _undo(client_a, eid_pos)
-        used_d2, _, _ = _read_used(client_a, group)
-        if eid_pos in _created_event_ids:
-            _created_event_ids.remove(eid_pos)
-        all_ok &= _assert("post-grant used delta", 5, used_d1 - used_d0)
-        all_ok &= _assert("post-undo used returns to baseline",
-                          used_d0, used_d2)
-    else:
-        print("  FAIL — positive grant for undo test failed")
-        all_ok = False
-
-    # --- Scenario 8 — undo a negative grant ---------------------
-    print("\nScenario 8 — undo a -1 grant:")
-    used_e0, _, _ = _read_used(client_a, group)
-    eid_neg, _ = _grant(client_a, sid, -1, group)
-    if eid_neg:
-        used_e1, _, _ = _read_used(client_a, group)
-        ok_undo2 = _undo(client_a, eid_neg)
-        used_e2, _, _ = _read_used(client_a, group)
-        if eid_neg in _created_event_ids:
-            _created_event_ids.remove(eid_neg)
-        all_ok &= _assert("post-grant used delta (negative)", 0,
-                          used_e1 - used_e0)
-        all_ok &= _assert("post-undo used unchanged (still 0)",
-                          used_e0, used_e2)
-    else:
-        print("  FAIL — negative grant for undo test failed")
-        all_ok = False
-
-    # --- Scenario 9 — at-cap teacher: -1 must still pass --------
-    # The most security-relevant assertion: even when used >= budget
-    # AND the caller is a non-admin role (cap enforced), a negative
-    # grant has to slip through because intended_cost = 0. Achieved by
-    # temporarily promoting the test-client's session to role=teacher
-    # AFTER admin has filled the budget. The user row in the DB is
-    # not modified — only the session payload — so this leaves no
-    # trace on disk.
-    print("\nScenario 9 — at-cap teacher: -1 must still pass:")
-    with appmod.app.app_context():
-        db = appmod.get_db()
-        # Force the budget to "full" by computing the missing amount
-        # and granting that exact positive total as admin.
-        used_pre, budget_pre, _ = _read_used(client_a, group)
-        if budget_pre <= 0:
-            # No active students or PTS_PER_STUDENT_CAP is 0 — skip
-            # but don't fail, the rule still applies.
-            print("  SKIP — budget is 0 in this env, can't force cap")
+        eid_bn, err_bn = _grant(client, sid, budget_b, group)
+        if err_bn:
+            print(f"    FAIL — grant +{budget_b} error: {err_bn}")
+            all_ok = False
         else:
-            # If previous scenarios haven't already saturated, top up.
-            need = max(0, budget_pre - used_pre)
-            if need > 0:
-                bid_pos, _ = _behavior_id_for(1)
-                if bid_pos:
-                    for _ in range(need):
-                        r = client_a.post("/api/points/grant", json={
-                            "student_ids": [sid],
-                            "behavior_id":  bid_pos,
-                            "group_name":   group,
-                        })
-                        j = r.get_json() or {}
-                        eid = (j.get("results") or [{}])[0].get("event_id")
-                        if eid:
-                            _created_event_ids.append(eid)
-            used_full, _, rem_full = _read_used(client_a, group)
-            # Assert AT-OR-OVER cap (admin's earlier overrides may have
-            # already exceeded it). The exact value is irrelevant —
-            # what matters is used >= budget so the teacher cap kicks
-            # in for any subsequent positive grant.
-            at_cap = (used_full >= budget_pre)
-            all_ok &= _assert("budget at or over cap (used >= budget)",
-                              True, at_cap)
+            used_bn, _, rem_bn = _read_used(client, group)
+            all_ok &= _assert("used == budget",   budget_b, used_bn)
+            all_ok &= _assert("remaining == 0",   0,        rem_bn)
 
-            # Now flip the client to a teacher-role session payload
-            # and confirm a -1 grant is accepted (cap normally blocks
-            # non-admin past the cap, but negatives are exempt now).
-            client_t = appmod.app.test_client()
-            teacher_payload = {
-                "id":       9_999_999,  # fake id; we only need role
-                "username": "test_at_cap_teacher",
-                "role":     "teacher",
-                "name":     "Test At-Cap Teacher",
-            }
-            with client_t.session_transaction() as s:
-                s["user"] = teacher_payload
+    print("\nStep 7 — admin -2 at cap → used drops to budget-2")
+    if budget_b <= 0:
+        print("    SKIP")
+    else:
+        eid_dec, err_dec = _grant(client, sid, -2, group)
+        if err_dec:
+            print(f"    FAIL — grant -2 at cap error: {err_dec}")
+            all_ok = False
+        else:
+            used_dec, _, rem_dec = _read_used(client, group)
+            all_ok &= _assert("used == budget-2",
+                              budget_b - 2, used_dec)
+            all_ok &= _assert("remaining == 2", 2, rem_dec)
 
-            # Bypass _pts_can_grant by patching it for this client —
-            # easier than seeding a real teacher in the group. The
-            # function-level patch is reverted in `finally`.
-            orig_can_grant = appmod._pts_can_grant
-            appmod._pts_can_grant = lambda _db, _u, _g: True
-            try:
-                eid_neg9, err9 = _grant(client_t, sid, -1, group)
-                if err9:
-                    print(f"  FAIL — teacher -1 at cap rejected: {err9}")
-                    all_ok = False
-                else:
-                    used_post, _, _ = _read_used(client_a, group)
-                    all_ok &= _assert(
-                        "teacher -1 at cap: used unchanged",
-                        used_full, used_post)
-                    bal_post = _read_balance(client_a, sid)
-                    print(f"  student balance post-grant: {bal_post} "
-                          f"(should reflect -1 from cap-time award)")
-            finally:
-                appmod._pts_can_grant = orig_can_grant
-
-    # --- Cleanup remaining events --------------------------------
+    # Cleanup — restore the local DB to its pre-test state.
     print(f"\nCleaning up {len(_created_event_ids)} stray events…")
-    _cleanup(client_a)
+    _cleanup(client)
+    _wipe_todays_events(group)
 
     print()
     if all_ok:
-        print("ALL 8 SCENARIOS PASSED — negative grants no longer affect "
-              "session budget; student totals unchanged.")
+        print("ALL SCENARIOS PASSED — net-sum with floor-at-zero "
+              "is wired correctly end-to-end.")
         return 0
     print("SOME SCENARIOS FAILED — see above.")
     return 1
