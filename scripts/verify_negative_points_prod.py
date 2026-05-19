@@ -176,8 +176,16 @@ def main():
 
     eids = []
     all_ok = True
-    print("\n  5-step sequence (per-event clamp):")
+    print("\n  5-step sequence (max(0, SUM) semantics):")
 
+    # Signed sum after each step, floored at zero:
+    #   step 1: +5  → SUM=+5  → used=5,  Δremaining=-5
+    #   step 2: -5  → SUM=0   → used=0,  Δremaining=0
+    #   step 3: -3  → SUM=-3  → used=0,  Δremaining=0  (floor)
+    #   step 4: +7  → SUM=+4  → used=4,  Δremaining=-4  ← was -7 under
+    #                                                     the previous
+    #                                                     per-event clamp
+    #   step 5: -10 → SUM=-6  → used=0,  Δremaining=0  (floor)
     ok, e = _step(sess, base, group, sid,
                   "step 1 award +5",  5,  rem0,  -5)
     all_ok &= ok
@@ -194,8 +202,8 @@ def main():
     if e: eids.append(e)
 
     ok, e = _step(sess, base, group, sid,
-                  "step 4 award +7 (HISTORY RESET)",
-                  7,  rem0,  -7)
+                  "step 4 award +7 (signed sum=+4)",
+                  7,  rem0,  -4)
     all_ok &= ok
     if e: eids.append(e)
 
@@ -213,10 +221,34 @@ def main():
     if rem_f != rem0:
         print("    WARN — final remaining != baseline; cleanup didn't fully restore")
 
+    # Also verify the previously-broken مجموعة 11 case: any group
+    # whose API used was non-zero pre-deploy should now show used=0
+    # (assuming today's signed sum is 0 — true for the diagnostic
+    # case). We don't modify any data here; just probe + report.
+    print("\n  prod-regression probe: any group still showing used>0?")
+    r = sess.get(base + "/api/points/groups", timeout=30)
+    names = ((r.json() or {}).get("names") or [])
+    nonzero = []
+    for g in names:
+        bj = sess.get(base + "/api/points/session-budget",
+                      params={"group": g}, timeout=30).json() or {}
+        u = bj.get("used") or 0
+        if u > 0:
+            nonzero.append((g, u, bj.get("budget"), bj.get("remaining")))
+    if nonzero:
+        print(f"    {len(nonzero)} group(s) still showing used>0:")
+        for n in nonzero:
+            print(f"      {n}")
+        print("    (this is informational — used>0 is fine if "
+              "today's signed sum is genuinely > 0)")
+    else:
+        print("    no groups with used>0 — clean")
+
     print()
     if all_ok and rem_f == rem0:
-        print("ALL OK — prod confirms per-event clamp: -5 cancels +5, "
-              "-3 floors at 0, +7 lands fresh (history reset), -10 floors. "
+        print("ALL OK — prod confirms max(0, SUM): -5 cancels +5, "
+              "-3 floors at 0, +7 lands at signed sum +4 (NOT 7 — "
+              "history is not reset under the new rule), -10 floors. "
               "Undo restored baseline cleanly.")
         return 0
     print("SOME CHECKS FAILED — see above.")
