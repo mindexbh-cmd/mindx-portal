@@ -126,7 +126,45 @@ def _check_user(label, username, password, paths,
     return all_ok
 
 
+# Layer B — endpoints that should 403 for Fatima but stay 200 for
+# every other manager / admin / reception. Mapping mirrors C6.
+LAYER_B_ENDPOINTS = [
+    "/api/dashboard/recent-activity",
+    "/api/dashboard/active-groups-today",
+    "/api/dashboard/active-groups-detailed",
+    "/api/teacher-deliveries/summary",
+    "/api/lessons/missing",
+]
+
+
+def _check_layer_b(label, username, password, expect_403):
+    """Hit each Layer B endpoint and assert the expected status. For
+    Fatima, expect_403=True (all 5 should be 403). For admin /
+    Ahmed Ibrahim / Raed, expect_403=False (all 5 should be 200).
+    Returns True on full pass."""
+    client = appmod.app.test_client()
+    ok, code, loc = _login(client, username, password)
+    if not ok:
+        print(f"  [{label}] LOGIN FAILED status={code} loc={loc}")
+        return False
+    all_ok = True
+    for ep in LAYER_B_ENDPOINTS:
+        r = client.get(ep, follow_redirects=False)
+        sc = r.status_code
+        if expect_403:
+            verdict = "OK (403)" if sc == 403 else f"FAIL (got {sc})"
+            ok_ep = (sc == 403)
+        else:
+            verdict = "OK (200)" if sc == 200 else f"FAIL (got {sc})"
+            ok_ep = (sc == 200)
+        if not ok_ep:
+            all_ok = False
+        print(f"  [{label}] {ep} → {verdict}")
+    return all_ok
+
+
 def main():
+    print("=== LAYER A — pre-paint <style> ==========================")
     print("Fatima Ibrahim (limited-admin manager):")
     fatima_ok = _check_user(
         "fatima", "930909151", "930909151",
@@ -135,7 +173,7 @@ def main():
     )
 
     print("\nAdmin (no overrides):")
-    admin_ok = _check_user(
+    admin_layer_a_ok = _check_user(
         "admin", "admin", "admin123",
         ["/dashboard", "/admin/teacher-deliveries"],
         expect_empty=True,
@@ -163,9 +201,30 @@ def main():
         print(f"  fatima login failed: {code} {loc}")
         backstop_ok = False
 
+    print("\n=== LAYER B — API 403 gates =============================")
+    print("Fatima (expect 403 on all 5):")
+    fatima_b_ok = _check_layer_b("fatima", "930909151", "930909151",
+                                  expect_403=True)
+
+    print("\nAdmin (expect 200 on all 5):")
+    admin_b_ok = _check_layer_b("admin", "admin", "admin123",
+                                 expect_403=False)
+
+    print("\nAhmed Ibrahim — manager, no overrides (expect 200 on all 5):")
+    ahmed_b_ok = _check_layer_b("ahmed", "010307885", "010307885",
+                                 expect_403=False)
+
+    print("\nRaed — manager, no overrides (expect 200 on all 5):")
+    raed_b_ok = _check_layer_b("raed", "980909805", "980909805",
+                                expect_403=False)
+
     print()
-    if fatima_ok and admin_ok and backstop_ok:
-        print("ALL OK — pre-paint style live for Fatima, empty for admin, JS backstop healthy.")
+    all_passed = (fatima_ok and admin_layer_a_ok and backstop_ok and
+                  fatima_b_ok and admin_b_ok and ahmed_b_ok and raed_b_ok)
+    if all_passed:
+        print("ALL OK — Layer A flash killed for Fatima; Layer B 403s "
+              "Fatima on the 5 endpoints; admin / Ahmed / Raed all "
+              "pass with 200. Backstop healthy.")
         return 0
     print("SOME CHECKS FAILED — see above.")
     return 1
