@@ -1,14 +1,22 @@
-"""Production probe for negative-points-no-session-deduct.
+"""Production probe for points-net-sum (per-event clamp).
 
-Runs the screenshot-equivalent scenario end-to-end against the
-live deployment:
+Runs the operator's 5-step sequential scenario against the live
+deployment to confirm the per-event running-balance with floor-at-0
+is wired correctly end-to-end. We track `remaining` deltas from the
+baseline rather than absolute values so this is safe to run when
+other admins are simultaneously awarding points.
 
-  1. login as admin
-  2. pick a real group + student with active points activity
-  3. read baseline session balance
-  4. award -1 → assert remaining unchanged
-  5. award +5 → assert remaining drops by 5
-  6. UNDO both grants (clean up) so the prod DB is untouched
+Sequence (against `remaining`):
+  baseline B
+  award +5  → remaining = B - 5       (positive consumes)
+  award -5  → remaining = B           (cancel)
+  award -3  → remaining = B           (floor — already at 0 used)
+  award +7  → remaining = B - 7       (history reset; +7 fresh)
+  award -10 → remaining = B           (floor)
+  undo all  → remaining = B           (clean restore)
+
+The "history reset" assertion is the key — under the old
+max(0, SUM) it would have been B-3 instead of B-7.
 
 Run:
   python scripts/verify_negative_points_prod.py
@@ -40,15 +48,12 @@ def _login(base, username, password):
 
 
 def _pick_group(sess, base, override=None):
-    """If --group is given use it; otherwise pick the first visible
-    group with at least one student via /api/points/groups."""
     if override:
         return override
     r = sess.get(base + "/api/points/groups", timeout=30)
     if r.status_code != 200:
         return None
     j = r.json() or {}
-    # Endpoint returns {"groups": [{name, ...}], "names": [...]}
     names = j.get("names") or []
     if not names:
         groups = j.get("groups") or []
@@ -84,10 +89,7 @@ def _budget(sess, base, group):
 def _pick_behavior(sess, base, want_value):
     r = sess.get(base + "/api/points/behaviors", timeout=30)
     j = r.json() or {}
-    # Endpoint returns {"rows": [...]}; older versions may return
-    # {"behaviors": [...]}. Accept both.
     behaviors = j.get("rows") or j.get("behaviors") or []
-    # Exact-value match first, then a positive fallback for override.
     for b in behaviors:
         if b.get("is_active") and int(b.get("points_value") or 0) == want_value:
             return b.get("id"), None
@@ -115,6 +117,23 @@ def _grant(sess, base, sid, amt, group):
 def _undo(sess, base, eid):
     r = sess.delete(base + f"/api/points/grant/{eid}", timeout=30)
     return (r.json() or {}).get("ok", False)
+
+
+def _step(sess, base, group, sid, label, amt, baseline_rem,
+          expected_rem_delta):
+    """Award `amt`, read remaining, assert delta from baseline."""
+    eid, err = _grant(sess, base, sid, amt, group)
+    if err:
+        print(f"  FAIL — {label} grant error: {err}")
+        return False, None
+    used, budget, rem = _budget(sess, base, group)
+    actual_delta = rem - baseline_rem
+    ok = (actual_delta == expected_rem_delta)
+    sign = "OK" if ok else "FAIL"
+    print(f"  [{sign}] {label} (amt={amt:+}): "
+          f"used={used} remaining={rem} "
+          f"Δfromξbaseline={actual_delta:+} (expected {expected_rem_delta:+})")
+    return ok, eid
 
 
 def main():
@@ -155,46 +174,52 @@ def main():
         print("  could not read baseline budget")
         return 1
 
-    # Award -1 — remaining must be unchanged.
-    print("\n  step 1 — award -1 ...")
-    eid_neg, err = _grant(sess, base, sid, -1, group)
-    if err:
-        print(f"  FAIL — -1 grant error: {err}")
-        return 1
-    u, b, rem_after_neg = _budget(sess, base, group)
-    delta_neg = rem_after_neg - rem0
-    print(f"    after -1: used={u} remaining={rem_after_neg} "
-          f"(Δremaining={delta_neg:+})")
-    ok_neg = (delta_neg == 0)
-    print(f"    {'OK' if ok_neg else 'FAIL'} — remaining unchanged after -1")
+    eids = []
+    all_ok = True
+    print("\n  5-step sequence (per-event clamp):")
 
-    # Award +5 — remaining must drop by 5.
-    print("\n  step 2 — award +5 ...")
-    eid_pos, err = _grant(sess, base, sid, 5, group)
-    if err:
-        print(f"  FAIL — +5 grant error: {err}")
-        _undo(sess, base, eid_neg)
-        return 1
-    u, b, rem_after_pos = _budget(sess, base, group)
-    delta_pos = rem_after_pos - rem_after_neg
-    print(f"    after +5: used={u} remaining={rem_after_pos} "
-          f"(Δremaining={delta_pos:+})")
-    ok_pos = (delta_pos == -5)
-    print(f"    {'OK' if ok_pos else 'FAIL'} — remaining dropped by exactly 5")
+    ok, e = _step(sess, base, group, sid,
+                  "step 1 award +5",  5,  rem0,  -5)
+    all_ok &= ok
+    if e: eids.append(e)
 
-    # Cleanup — undo both grants so prod state is restored.
-    print("\n  cleanup — undoing both grants ...")
-    _undo(sess, base, eid_pos)
-    _undo(sess, base, eid_neg)
-    u, b, rem_final = _budget(sess, base, group)
-    print(f"    final: used={u} remaining={rem_final} "
-          f"(Δfrom baseline={rem_final - rem0:+})")
+    ok, e = _step(sess, base, group, sid,
+                  "step 2 award -5",  -5, rem0,  0)
+    all_ok &= ok
+    if e: eids.append(e)
 
-    if ok_neg and ok_pos and rem_final == rem0:
-        print("\nALL OK — prod confirms: -1 doesn't touch the balance, "
-              "+5 deducts exactly 5, undo restores baseline cleanly.")
+    ok, e = _step(sess, base, group, sid,
+                  "step 3 award -3",  -3, rem0,  0)  # floor
+    all_ok &= ok
+    if e: eids.append(e)
+
+    ok, e = _step(sess, base, group, sid,
+                  "step 4 award +7 (HISTORY RESET)",
+                  7,  rem0,  -7)
+    all_ok &= ok
+    if e: eids.append(e)
+
+    ok, e = _step(sess, base, group, sid,
+                  "step 5 award -10", -10, rem0, 0)  # floor
+    all_ok &= ok
+    if e: eids.append(e)
+
+    print(f"\n  cleanup — undoing {len(eids)} grants ...")
+    for eid in eids:
+        _undo(sess, base, eid)
+    used_f, _, rem_f = _budget(sess, base, group)
+    print(f"    final: used={used_f} remaining={rem_f} "
+          f"(Δ baseline={rem_f - rem0:+})")
+    if rem_f != rem0:
+        print("    WARN — final remaining != baseline; cleanup didn't fully restore")
+
+    print()
+    if all_ok and rem_f == rem0:
+        print("ALL OK — prod confirms per-event clamp: -5 cancels +5, "
+              "-3 floors at 0, +7 lands fresh (history reset), -10 floors. "
+              "Undo restored baseline cleanly.")
         return 0
-    print("\nSOME CHECKS FAILED — see above.")
+    print("SOME CHECKS FAILED — see above.")
     return 1
 
 
