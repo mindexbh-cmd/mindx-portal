@@ -232,20 +232,21 @@ def main():
         expected_bal_delta=-3)
     all_ok &= ok
 
-    print("\nStep 4 — award +7  → used=7, remaining=budget-7")
-    # Per-event clamp semantics (Option B): after step 3 the running
-    # used hit the floor (0), so the -3 was absorbed. The +7 here
-    # lands on top of 0, giving used=7 — NOT signed-sum +4 that an
-    # aggregate max(0, SUM) would produce. This is the core
-    # operator-facing distinction that motivated the C1 revision.
+    print("\nStep 4 — award +7  → used=4, remaining=budget-4")
+    # max(0, SUM) semantics (Option 2): signed sum after this step
+    # is +5-5-3+7 = +4. The "history reset" property that the
+    # earlier per-event clamp gave (used=7) was discarded after
+    # prod evidence — see _pts_session_used docstring for the
+    # decision trail. Lower expected_used=4 is the new contract.
     ok, _ = _step(
         client, "after +7", lambda: _grant(client, sid, 7, group)[0],
         group, sid,
-        expected_used=7, expected_remaining=budget - 7,
+        expected_used=4, expected_remaining=budget - 4,
         expected_bal_delta=7)
     all_ok &= ok
 
     print("\nStep 5 — award -10 → used=0, remaining=budget (floor)")
+    # Signed sum after this step is +5-5-3+7-10 = -6 → max(0,-6) = 0.
     ok, _ = _step(
         client, "after -10", lambda: _grant(client, sid, -10, group)[0],
         group, sid,
@@ -289,6 +290,39 @@ def main():
                               budget_b - 2, used_dec)
             all_ok &= _assert("remaining == 2", 2, rem_dec)
 
+    # ── Scenario 8 — real-world fixture from prod مجموعة 11 ────
+    # The exact sequence that drove the move to max(0, SUM): two
+    # students, 16 events of ±1 each, with each student's signed
+    # sum = 0. Under the previous per-event clamp this returned
+    # used=2 (two leading -1s absorbed at the floor); under
+    # max(0, SUM) it must return used=0.
+    _wipe_todays_events(group)
+    _created_event_ids.clear()
+    print("\n=== prod fixture: 16 ±1 events, signed net = 0 =========")
+    used8_0, budget8, rem8_0 = _read_used(client, group)
+    print(f"Reset: used={used8_0} budget={budget8} remaining={rem8_0}")
+    # Pattern reproduces مجموعة 11's id-order from the diagnostic
+    # session (-1, +1, +1, -1, -1, +1, -1, -1, +1, +1, then 6 more
+    # for the second student — but we run all 16 on the same
+    # student here since the aggregate doesn't care about student
+    # affinity; the SUM is identical).
+    fixture = [-1, +1, +1, -1, -1, +1, -1, -1, +1, +1,
+               -1, +1, -1, -1, +1, +1]
+    signed_sum = sum(fixture)
+    assert signed_sum == 0, "fixture should net to 0 to exercise the bug"
+    print(f"Replaying {len(fixture)} ±1 events ({fixture})…")
+    fail_ev_n = 0
+    for amt in fixture:
+        eid, err = _grant(client, sid, amt, group)
+        if err:
+            fail_ev_n += 1
+    if fail_ev_n:
+        print(f"  WARN — {fail_ev_n} fixture grants failed (likely cap)")
+    used8_final, _, rem8_final = _read_used(client, group)
+    all_ok &= _assert("16-event fixture: used == 0", 0, used8_final)
+    all_ok &= _assert("16-event fixture: remaining == budget",
+                      budget8, rem8_final)
+
     # Cleanup — restore the local DB to its pre-test state.
     print(f"\nCleaning up {len(_created_event_ids)} stray events…")
     _cleanup(client)
@@ -296,8 +330,9 @@ def main():
 
     print()
     if all_ok:
-        print("ALL SCENARIOS PASSED — net-sum with floor-at-zero "
-              "is wired correctly end-to-end.")
+        print("ALL SCENARIOS PASSED — max(0, SUM) semantics: net-zero "
+              "always returns to 0, and the prod 16-event fixture "
+              "no longer shows phantom budget.")
         return 0
     print("SOME SCENARIOS FAILED — see above.")
     return 1
