@@ -1,5 +1,6 @@
-"""Prod-side fetch of /portal/parent-hub/payments to confirm the
-IBAN card is in the deployed markup.
+"""Prod-side fetch of /parent/legacy to confirm the IBAN card is
+in the deployed markup, in the correct position (between the
+installment picker and the receipt-upload section).
 
 Uses a real student session — defaults to the seeded student_test
 (plain password = TestStudent2026!). If your prod doesn't carry
@@ -39,10 +40,10 @@ def main():
         return 1
     print(f"  logged in as {args.username!r}")
 
-    r = s.get(base + "/portal/parent-hub/payments",
+    r = s.get(base + "/parent/legacy",
               allow_redirects=False, timeout=30)
     if r.status_code != 200:
-        print(f"  FAIL — /portal/parent-hub/payments → HTTP {r.status_code}")
+        print(f"  FAIL — /parent/legacy → HTTP {r.status_code}")
         return 1
     html = r.text
 
@@ -52,22 +53,29 @@ def main():
         if not pred: ok = False
         print(f"  [{'OK' if pred else 'FAIL'}] {label}")
 
-    check("IBAN value in markup",          IBAN in html)
-    check(".iban-card section element",    'class="section iban-card"' in html)
-    check("copy button id",                'id="iban-copy-btn"' in html)
-    check("data-iban attribute",           f'data-iban="{IBAN}"' in html)
-    check("button label '📋 نسخ'",          "📋 نسخ" in html)
-    check("'✓ تم النسخ' in JS",            "✓ تم النسخ" in html)
-    check("clipboard API path",            "navigator.clipboard.writeText" in html)
-    check("execCommand fallback",          "document.execCommand('copy')" in html)
-    check("iban-card before #root",
-          0 <= html.find('class="section iban-card"') < html.find('id="root"'))
+    check("IBAN value in markup",             IBAN in html)
+    check("#pp-iban-card element present",    'id="pp-iban-card"' in html)
+    check("copy button id #pp-iban-copy-btn", 'id="pp-iban-copy-btn"' in html)
+    check("data-iban attribute",              f'data-iban="{IBAN}"' in html)
+    check("button label '📋 نسخ'",            "📋 نسخ" in html)
+    check("'✓ تم النسخ' in JS",              "✓ تم النسخ" in html)
+    check("clipboard API path",               "navigator.clipboard.writeText" in html)
+    check("execCommand fallback",             "document.execCommand('copy')" in html)
+    check(".pp-iban-num CSS rule",            '.pp-iban-num' in html)
+
+    iban_idx   = html.find('id="pp-iban-card"')
+    pick_idx   = html.find('id="pp-pick-card"')
+    upload_idx = html.find('id="pp-upload-card"')
+    check("IBAN card AFTER #pp-pick-card",
+          0 <= pick_idx < iban_idx)
+    check("IBAN card BEFORE #pp-upload-card",
+          0 <= iban_idx < upload_idx)
 
     print()
     if ok:
-        print("ALL OK — prod serves the IBAN card markup.")
-        print(f"Operator can test live at: {base}/portal/parent-hub/payments")
-        print("(login as any parent/student account)")
+        print("ALL OK — prod serves the IBAN card on /parent/legacy "
+              "in the correct position.")
+        print(f"Operator can test live at: {base}/parent/legacy")
         return 0
     print("SOME CHECKS FAILED — see above.")
     return 1
