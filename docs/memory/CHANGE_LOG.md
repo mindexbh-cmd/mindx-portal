@@ -496,6 +496,50 @@ Two engineering notes worth carrying forward:
 - **Prod-verify probes must poll both `/api/health` AND `/`** before considering Render settled. Health alone can flicker green during rollover while authenticated routes still 502 — the initial G16.8 probe hit this and false-positive-matched against the inline script in Render's own 502 page. Future verify scripts: gate on `200` from both endpoints (or parse for an expected markup token), not just health.
 - `showInsufficientBalance` and `showCartWouldExceed` share the `#balLow` modal; both functions restore the default action row at the END of their handlers. Any new variant added to that modal must follow the same pattern or UI state will bleed between reuses.
 
+### 2026-05-22
+
+| Hash | Title |
+|---|---|
+| `d632fbf` | feat(portal): G17.1 remove direct-order button + JS from frontend |
+| `4ed38e3` | feat(portal): G17.2 remove backend endpoint /api/portal/student/order |
+| `f49be4d` | test(portal): G17.3 hermetic test for direct-order removal |
+
+#### Feature wave: G17 student rewards shop — single purchase path (commits `d632fbf` → `f49be4d`)
+
+Shipped 2026-05-22, live on prod at `f49be4d`. Safety tags: `safety/pre-g17-remove-direct-order-2026-05-21` at `37c7bbd` (the real pre-G17 baseline — rollback point if anyone ever wants the direct-order endpoint back) and `safety/pre-g17-remove-direct-order-20260522-001300` at `f49be4d` (safe_deploy's tag, same commit as the deploy per the known safe_deploy bug).
+
+What's GONE (user-visible):
+- **The "⚡ طلب مباشر" button is removed from every reward card.** Cards now show only the qty stepper + the single `🛒 أضف للسلة` button. Cart is the sole student-initiated purchase path.
+- **`POST /api/portal/student/order` is deleted at the route level.** Flask's url_map has zero routes matching that path; requests hit 404. The ~70-line `api_portal_student_order` view function is gone.
+- **Frontend wiring removed**: `askDirectOrder()` / `doDirectOrder()` JS functions deleted; `.btn-order` and `.reward-actions .btn-row` CSS rules deleted; the `canOrder` local var (which only fed the deleted button) deleted.
+- **Legacy `/api/portal/student/redeem` 410-hint updated** from `/api/portal/student/order` → `/api/portal/student/cart/add` since the previous target no longer exists.
+
+What stays (CRITICAL — verified preserved):
+- **All 5 cart endpoints intact**: `/cart`, `/cart/add`, `/cart/<cid>/quantity`, `/cart/<cid>`, `/cart/checkout`.
+- **Balance + redemptions endpoints intact**: `/api/portal/student/balance`, `/api/portal/student/redemptions`, `/api/portal/student/redemptions/<rid>/cancel`.
+- **Past `request_source='student_portal'` rows in `redemptions` untouched** — admin can still approve / reject / deliver them.
+- **All admin-side `student_portal` references preserved** (🎓 الطالب badge, history-tab dropdown option, source filter) — past direct-order rows still surface correctly in the staff UI.
+- **`_g15_validate_reward_for_request` + `_g15_student_balance` helpers preserved** — both still called by the cart endpoints.
+- All G16 surfaces (qty stepper, floating cart badge, cart modal, confirmation modal, proactive balance check, insufficient-balance modal) and all G1–G14 functionality untouched.
+
+Operator decision locked in: **Full deletion, not soft deprecation** (no 410 placeholder for `/api/portal/student/order`). Reason given in the G17 brief: "only one purchase path, no back-doors". To restore, reset to safety tag `safety/pre-g17-remove-direct-order-2026-05-21` at `37c7bbd`. See ADR-033.
+
+Prod verification:
+- `/api/portal/student/order` returns **404** (probed via `requests.Session`).
+- `/cart/add` returns 200 on add; `/balance` returns 200; legacy `/redeem` still returns 410 with `use_instead: /api/portal/student/cart/add`.
+- Deployed HTML: `'⚡ طلب مباشر'` absent, `'🛒 أضف للسلة'` present; `askDirectOrder` undefined, `askAddToCart` defined.
+- `node --check` on deployed inline JS: clean.
+- `run_e2e.py --base <prod>` 8/8 after a transient cold-start hang during Render rollover (known pattern, not a regression).
+
+Test infrastructure:
+- **New**: `scripts/smoke_g17.py` — 38 checks, inverse-asserts every G17 deletion + positive-asserts cart preservation + Flask `url_map` runtime check (0 `/order` routes, 5 `/cart` routes).
+- **Updated**: `smoke_g15.py` dropped 4 direct-order checks + softened the 410-hint assertion; `smoke_g16.py` dropped the G15.1 `/order` route check + the "direct-order button intact" regression + loosened the 410-hint check + removed `api_portal_student_order` from the function-presence list; `verify_g15_prod.py` replaced the 3-step `/order` gate-validation chain with a single 404 assertion and flipped the HTML probe.
+- All 6 smoke suites pass (G12 + G13 + G14 + G15 + G16 + G17).
+
+Files touched: `app.py` (reward-card renderer, JS, CSS, route deletion); new `scripts/smoke_g17.py`; touches on `smoke_g15.py`, `smoke_g16.py`, `verify_g15_prod.py`. No schema migrations.
+
+One engineering note worth carrying forward: **`request_source='student_portal'` is now a data-only value** — no UI surface submits a "direct-order" row anymore, but the value still tags both legacy direct-order rows AND new cart-checkout rows in `redemptions`. Future shop additions must route through cart (no parallel "quick buy" surfaces). See ADR-033.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
