@@ -141,9 +141,11 @@ section("G15.3 two-button reward card")
 
 check("renderer emits reward-actions wrapper",
       'class="reward-actions"' in PS)
-check("🛒 cart button calls addToCart",
-      "🛒 السلة" in PS and 'class="btn btn-cart"' in PS
-      and "onclick=\"addToCart(" in PS)
+check("🛒 cart button wired to a cart-add handler",
+      ('class="btn btn-cart"' in PS) and (
+          "onclick=\"addToCart(" in PS
+          or "onclick=\"askAddToCart(" in PS  # G16.2 routes via confirm
+      ))
 check("⚡ order button calls askDirectOrder",
       "⚡ طلب مباشر" in PS and 'class="btn btn-order"' in PS
       and "onclick=\"askDirectOrder(" in PS)
