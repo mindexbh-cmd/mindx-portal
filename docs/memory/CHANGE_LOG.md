@@ -414,6 +414,27 @@ Two notes worth carrying into the next session:
 
 Decision rationale: see ADR-030 (retire forced password-change for non-admin) and ADR-031 (Chart.js + analytics widgets removed from parent surfaces) in `DECISIONS_LOG.md`.
 
+#### Feature wave: G14 rewards-shop UX cleanup (commits `3225bc4` → `9a0be08`)
+
+Shipped 2026-05-21 (same day as G13). Four parent-shop polish items + two test rigs, all live on prod at `9a0be08`. Safety tags: `safety/pre-g14-rewards-2026-05-21` at `1aca22c` (pre-G14 baseline) and `safety/pre-g14-rewards-shop-20260521-202734` at `77933ec` (created by safe_deploy).
+
+What's now true that wasn't before:
+
+- **Real reward photos render on parent shop cards** (G14.1, `3225bc4`). Renderer in `PORTAL_STUDENT_HTML` now hits the existing `/api/rewards/<id>/image` BYTEA endpoint per card. No backend change — the image route already existed; the renderer was the only blocker. 48/48 active prod rewards have images and now display them.
+- **Lightbox zoom on reward images** (G14.2, `52b008c`). Clicking a card image opens overlay `#rwLightbox` at max 80vh × 80vw. Closes via backdrop click / ESC / X button. Static display + close-only (no custom pinch handlers); mobile browsers retain native pinch-zoom inside the overlay.
+- **Category filter tabs** (G14.4, `9173409`). Top-level tabs split the shop into 🎮 ألعاب (default, also catches untyped rewards so nothing disappears) and 🍔 وجبات. Backed by existing `rewards.category_type` column (`'toy'` | `'food'`) — **no schema migration**. Active tab persists across redeem re-renders via `STATE.currentCat`.
+- **History as sub-tab inside points page** (G14.6, `cae0a51`). Points page split into two sub-panes via top sub-tab bar: 🛍️ متجر المكافآت (shop, default) and 📋 مكافآتي السابقة (history). Both rendered into `innerHTML` in one pass; switching is a `display` swap, no refetch. Page-local `STATE.currentSub` persists; no URL hash (G12's outer hash owns the fragment).
+
+Test infrastructure (`77933ec` + `9a0be08`):
+- `scripts/smoke_g14.py` — hermetic Playwright test, 41 checks against the local server.
+- `scripts/verify_g14_prod.py` — prod verification probe using `requests.Session()` instead of Playwright to sidestep the headless-Chromium cookie-drop quirk logged in BUGS_LOG 2026-05-21. 17/17 prod checks pass.
+
+Files touched: `app.py` (renderer + CSS + JS in `PORTAL_STUDENT_HTML`); new test scripts under `scripts/`. No schema migrations.
+
+One surprise worth recording: the operator's CHANGE-3 spec called for adding a `category` column to `rewards`, but `category_type` (`'toy'` / `'food'`) had already existed since the menu-store work. G14.4 reused it instead — no migration, no `data-protector` round, less risk. Default for untyped rewards is the 🎮 ألعاب tab so legacy rows stay visible.
+
+Deploy note: `safe_deploy` ran with `--skip-e2e` because the e2e step has been hitting cold-start 30s navigation timeouts (same root cause as the G13 latent-bug note about safety-tag rollback being a no-op). Full `run_e2e.py --base https://mindx-portal-1.onrender.com` ran cleanly afterwards (8/8 once Render finished its hot restart — initial run hit 502s during rollover).
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
