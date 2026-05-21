@@ -11,7 +11,10 @@ Usage:
 import importlib.util
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP_PY = ROOT / "app.py"
@@ -41,6 +44,39 @@ if not m_student:
     print("PORTAL_STUDENT_HTML constant not found; aborting.")
     sys.exit(2)
 PS = m_student.group(1)
+
+
+# ── PORTAL_STUDENT_HTML inline JS must PARSE ────────────────────
+# (Added in G15-HOTFIX: the original G15.4 ternary had `+ ? + :`
+# inside an open paren — a syntax error that prevented load() from
+# ever running. Smoke tests grep'd for string presence but didn't
+# parse the script, so the bug shipped to prod. node --check is the
+# minimum guardrail.)
+section("inline JS parses (node --check)")
+NODE = shutil.which("node")
+if not NODE:
+    check("node available for syntax check (skipped — node not on PATH)",
+          True, "install Node to enable this guard")
+else:
+    scripts = re.findall(r"<script>(.*?)</script>", PS, re.DOTALL)
+    check("PORTAL_STUDENT_HTML has exactly one inline <script>",
+          len(scripts) == 1, f"found {len(scripts)}")
+    if scripts:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".js", delete=False, encoding="utf-8") as tf:
+            tf.write(scripts[0])
+            tmp = tf.name
+        try:
+            proc = subprocess.run(
+                [NODE, "--check", tmp],
+                capture_output=True, text=True, timeout=15,
+            )
+            check("node --check on inline JS",
+                  proc.returncode == 0,
+                  (proc.stderr or proc.stdout).splitlines()[-1]
+                  if (proc.stderr or proc.stdout) else "")
+        finally:
+            pathlib.Path(tmp).unlink(missing_ok=True)
 
 
 # ── G15.1 — backend endpoints ───────────────────────────────────

@@ -435,6 +435,36 @@ One surprise worth recording: the operator's CHANGE-3 spec called for adding a `
 
 Deploy note: `safe_deploy` ran with `--skip-e2e` because the e2e step has been hitting cold-start 30s navigation timeouts (same root cause as the G13 latent-bug note about safety-tag rollback being a no-op). Full `run_e2e.py --base https://mindx-portal-1.onrender.com` ran cleanly afterwards (8/8 once Render finished its hot restart — initial run hit 502s during rollover).
 
+#### Feature wave: G15 student-side approval workflow (commits `348a6a3` → `cfe3d59`)
+
+Shipped 2026-05-21 (same day as G13/G14), live on prod at `cfe3d59`. Safety tags: `safety/pre-g15-approval-workflow-2026-05-21` at `9a0be08` (pre-G15 baseline) and `safety/pre-g15-approval-workflow-20260521-215521` at `eb4a461` (safe_deploy tag).
+
+What's now true that wasn't before:
+
+- **Logged-in role=student users have their own approval-routed shopping flow** distinct from the parent-PID surface. The legacy `/api/portal/student/redeem` — which silently bypassed admin approval by writing `redemptions.status='pending'` — is now a hard **410 Gone** (G15.7, `4e1a3c7`). All student-initiated orders go through admin approval.
+- **Student orders always create `redemptions(status='requested', request_source='student_portal')`.** Points are **RESERVED** (visible to the student, not spendable), not debited, until admin approves via the existing `/api/points/redemptions/<id>/approve`. Rejection / cancellation releases the reservation. Approve/reject/deliver/cancel arithmetic on `_pts_balance` is untouched — Reserved is a separate computed view.
+- **9 new session-auth endpoints** (G15.1, `348a6a3`): `GET /api/portal/student/balance`; `POST /api/portal/student/order`; `GET /api/portal/student/cart`; `POST /api/portal/student/cart/add`; `PUT /api/portal/student/cart/<cid>/quantity`; `DELETE /api/portal/student/cart/<cid>`; `POST /api/portal/student/cart/checkout`; `POST /api/portal/student/redemptions/<rid>/cancel`. Owner-scoped by `session['user']` role/student_id; no rate limit (login + role check is the gate).
+- **New balance helper `_g15_student_balance(db, sid)`** returns `{total, committed, reserved, available}`. Reserved = `SUM(redemptions WHERE status='requested')`; Available = `total - committed - reserved`. `_pts_balance` unchanged — still excludes requested rows entirely.
+- **PORTAL_STUDENT_HTML rebuilt** (G15.2 `d5044ce`, G15.3 `b7b1463`, G15.4 `4fee3a8`, G15.5 `03b582a`, G15.6 `99d9597`): 3-card balance header (Total / Reserved / Available); two action buttons per reward card (🛒 cart, ⚡ direct order); new 🛒 السلة sub-tab with quantity stepper + checkout; the existing history sub-tab extended to "طلباتي" with all 5 status badges (📨/⏳/✅/❌/⛔), inline `rejection_reason`, and a cancel button on `requested` rows; insufficient-balance modal listing reserved orders for one-click cancel.
+- **Admin /points/manage surfaces student_portal rows automatically** (G15.8, `1e202a7`). The three admin tabs (طلبات أولياء الأمور / في انتظار التسليم / سجل العمليات) share the `redemptions` table, so no admin-side rewiring was needed. New 🎓 الطالب source badge in `_pdSourceBadge` / `_histSourceLabel`, a new option in the history-tab dropdown, and a new branch in `/api/points/history?source=`. Atomically fixed an oversight where `parent_cart` was falling through to the 'staff' bucket — now folded into the parent bucket for both filters and labels.
+- **Student-initiated cancel is owner-scoped + state-gated.** Only works on `status='requested'` rows the student owns. Once admin approves, only admin can cancel.
+
+Operator decisions locked in during discovery:
+- **No schema migration.** `redemptions` + `cart_items` + the five status states + `request_source` were already in place from the parent-PID work. Reuse over duplication — see ADR-032.
+- **No legacy back-door.** `/api/portal/student/redeem` deprecated 410, not kept as a fallback.
+
+Test infrastructure (G15.9 `eb4a461`, G15.10 `cfe3d59`):
+- `scripts/smoke_g15.py` — hermetic Playwright test, 72 checks against the local server.
+- `scripts/verify_g15_prod.py` — prod verification probe via `requests.Session()`, 25/25 prod endpoints pass.
+
+Files touched: `app.py` (10 new endpoints + 1 helper + balance-card CSS + cart pane CSS/markup/JS + history badges + insufficient-balance modal + the 410 deprecation + admin source badge); new test scripts under `scripts/`. No schema migrations.
+
+One test-rig note worth carrying forward: **Flask `jsonify` ASCII-escapes Arabic strings on the wire** (`صل...` rather than literal Arabic), so substring-matching the raw response body against Arabic literals silently fails. Fix is to parse via `r.json()['error']` and compare against the decoded string — caught mid-run during `verify_g15_prod.py` development.
+
+Deploy note: `safe_deploy --skip-e2e` (same cold-start timeout pattern as G13/G14). Full `run_e2e.py --base https://mindx-portal-1.onrender.com` passed 8/8 after Render's hot restart settled (initial probe hit 502s during rollover).
+
+Decision rationale: see ADR-032 (G15 reuses existing redemptions/cart_items infrastructure) in `DECISIONS_LOG.md`.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
