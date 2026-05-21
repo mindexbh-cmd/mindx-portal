@@ -84,7 +84,7 @@ section("G15.1 backend endpoints registered")
 
 for sig in [
     "@app.route('/api/portal/student/balance', methods=['GET'])",
-    "@app.route('/api/portal/student/order', methods=['POST'])",
+    # G17: /api/portal/student/order removed — cart is the sole purchase path
     "@app.route('/api/portal/student/cart', methods=['GET'])",
     "@app.route('/api/portal/student/cart/add', methods=['POST'])",
     "@app.route('/api/portal/student/cart/<int:cid>/quantity', methods=['PUT'])",
@@ -146,18 +146,15 @@ check("🛒 cart button wired to a cart-add handler",
           "onclick=\"addToCart(" in PS
           or "onclick=\"askAddToCart(" in PS  # G16.2 routes via confirm
       ))
-check("⚡ order button calls askDirectOrder",
-      "⚡ طلب مباشر" in PS and 'class="btn btn-order"' in PS
-      and "onclick=\"askDirectOrder(" in PS)
+# G17: direct-order surface fully removed (button, JS, endpoint).
+# smoke_g17.py now asserts the inverse. The legacy G15.3 checks for
+# the ⚡ button + askDirectOrder/doDirectOrder defs are retired.
 check("addToCart() function defined",
       "function addToCart(rid, name, cost)" in PS)
-check("askDirectOrder() function defined",
-      "function askDirectOrder(rid,name,cost)" in PS)
-check("doDirectOrder() POSTs to /api/portal/student/order",
-      "fetch('/api/portal/student/order'" in PS)
-check("can-afford uses Available (not legacy bal)",
-      "var avail = b.available" in PS
-      and "canAfford = avail >= cost" in PS)
+check("Available balance var used by renderer",
+      "var avail = b.available" in PS)
+# G17: canAfford local var was tied to the deleted direct-order
+# button. Cart flow gates per-item at the endpoint level instead.
 
 
 # ── G15.4 — cart UI ─────────────────────────────────────────────
@@ -215,8 +212,9 @@ check("#balLow modal in DOM",
       'id="balLow"' in PS and 'id="balLowBody"' in PS)
 check("showInsufficientBalance() defined",
       "function showInsufficientBalance(available, needed)" in PS)
-check("direct-order error path wires modal",
-      "d.error === 'insufficient available balance'" in PS)
+# G17: direct-order error path retired with the function. The
+# insufficient-balance modal now fires from doCartCheckout (below)
+# and from the G16.4 proactive check before add-to-cart confirms.
 check("cart-checkout error path wires modal",
       "showInsufficientBalance(d.available|0, d.cart_total|0)" in PS)
 check("modal lists requested rows from STATE.redemptions",
@@ -229,7 +227,10 @@ section("G15.7 legacy /api/portal/student/redeem → 410")
 
 check("endpoint returns 410",
       'def api_portal_student_redeem()' in SRC
-      and '"use_instead": "/api/portal/student/order"' in SRC
+      # G17: was /api/portal/student/order; that endpoint was also
+      # removed. The hint now points at /cart/add.
+      and ('"use_instead": "/api/portal/student/cart/add"' in SRC
+           or '"use_instead": "/api/portal/student/order"' in SRC)
       and '), 410' in SRC)
 check("no askRedeem/doRedeem in PORTAL_STUDENT_HTML anymore",
       "function askRedeem(" not in PS
@@ -294,7 +295,8 @@ except Exception as ex:
 
 for fname in (
     "_g15_student_balance", "_g15_validate_reward_for_request",
-    "api_portal_student_balance", "api_portal_student_order",
+    # G17: api_portal_student_order removed.
+    "api_portal_student_balance",
     "api_portal_student_cart_get", "api_portal_student_cart_add",
     "api_portal_student_cart_set_qty", "api_portal_student_cart_remove",
     "api_portal_student_cart_checkout",

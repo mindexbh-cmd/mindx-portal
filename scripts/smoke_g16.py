@@ -206,12 +206,13 @@ check("G14.4 category tabs intact",
       'data-cat="toy"' in PS and 'data-cat="food"' in PS)
 check("G15.1 backend endpoints intact",
       "@app.route('/api/portal/student/balance', methods=['GET'])" in SRC
-      and "@app.route('/api/portal/student/order', methods=['POST'])" in SRC)
+      # G17: /api/portal/student/order removed
+      and "@app.route('/api/portal/student/cart/add', methods=['POST'])" in SRC)
 check("G15.2 3-card balance header intact",
       ".bal-cards{display:grid" in PS
       and 'class="bal-card available"' in PS)
-check("G15.3 direct-order button intact",
-      "⚡ طلب مباشر" in PS and "function askDirectOrder(" in PS)
+# G17: direct-order button replaced by cart-only flow. smoke_g17.py
+# asserts the inverse (button + JS gone).
 check("G15.4 cart sub-pane intact",
       "function renderCartContents()" in PS
       and "function doCartCheckout()" in PS)
@@ -221,7 +222,10 @@ check("G15.6 insufficient-balance modal intact",
       'id="balLow"' in PS
       and "function showInsufficientBalance(" in PS)
 check("G15.7 legacy /redeem still 410",
-      '"use_instead": "/api/portal/student/order"' in SRC
+      # G17: hint updated from /order to /cart/add when the
+      # direct-order endpoint was removed.
+      ('"use_instead": "/api/portal/student/cart/add"' in SRC
+       or '"use_instead": "/api/portal/student/order"' in SRC)
       and "), 410" in SRC)
 check("admin approve endpoint preserved",
       "/api/points/redemptions/<int:redeem_id>/approve" in SRC)
@@ -239,7 +243,8 @@ except Exception as ex:
 
 # G15 endpoint helpers still in place (no shape break).
 for fname in ("_g15_student_balance", "_g15_validate_reward_for_request",
-              "api_portal_student_balance", "api_portal_student_order",
+              # G17: api_portal_student_order removed
+              "api_portal_student_balance",
               "api_portal_student_cart_get", "api_portal_student_cart_add"):
     check(f"function present: {fname}", hasattr(mod, fname))
 

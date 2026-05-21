@@ -3,7 +3,7 @@
 Uses requests.Session() (sidesteps the headless-Chromium cookie-drop
 quirk first seen in G13). Logs in as student_test, exercises:
   - GET  /api/portal/student/balance
-  - POST /api/portal/student/order (insufficient + gate validation)
+  - POST /api/portal/student/order — G17: confirms 404 (endpoint removed)
   - POST /api/portal/student/cart/add
   - GET  /api/portal/student/cart
   - PUT  /api/portal/student/cart/<cid>/quantity
@@ -66,29 +66,14 @@ def main() -> int:
           (bal.get("ok") and
            bal["available"] == bal["total"] - bal["committed"] - bal["reserved"]))
 
-    # 3. Order endpoint — gate validation paths. Note: Flask's
-    # jsonify ASCII-escapes Arabic strings on the wire, so we
-    # compare against the parsed JSON .error field, not the raw text.
-    print("\n[G15.3 + G15.1] /order gate validation")
+    # 3. G17: /api/portal/student/order REMOVED. Confirm Flask
+    # returns 404 (no route registered).
+    print("\n[G17] /order endpoint removed")
     r = s.post(BASE + "/api/portal/student/order", json={}, timeout=30)
-    j = r.json() if r.status_code == 400 else {}
-    check(f"/order no body → 400 'معرّف المكافأة مطلوب' ({r.status_code})",
-          r.status_code == 400 and "المكافأة مطلوب" in (j.get("error") or ""))
-    r = s.post(BASE + "/api/portal/student/order",
-               json={"reward_id": 999999}, timeout=30)
-    j = r.json() if r.status_code == 404 else {}
-    check(f"/order missing reward → 404 ({r.status_code})",
-          r.status_code == 404
-          and "غير موجودة" in (j.get("error") or ""))
+    check(f"/order returns 404 (was 400/404 before G17) ({r.status_code})",
+          r.status_code == 404)
     rwj = s.get(BASE + "/api/points/rewards", timeout=30).json()
     real_rid = (rwj.get("rows") or [{}])[0].get("id", 0)
-    if real_rid:
-        r = s.post(BASE + "/api/portal/student/order",
-                   json={"reward_id": real_rid}, timeout=30)
-        j = r.json() if r.status_code == 400 else {}
-        check(f"/order real reward + no balance → 400 ({r.status_code})",
-              r.status_code == 400
-              and "insufficient available balance" == (j.get("error") or ""))
 
     # 4. Cart endpoints.
     print("\n[G15.4] cart endpoints round-trip")
@@ -149,8 +134,11 @@ def main() -> int:
     check("3-card balance markup deployed",
           ".bal-cards{display:grid" in html
           and 'class="bal-card available"' in html)
-    check("Two-button reward card deployed",
-          "🛒 السلة" in html and "⚡ طلب مباشر" in html
+    # G17: direct-order button removed. Cart is the sole purchase
+    # path now. G16's "أضف للسلة" label is what the renderer ships.
+    check("Cart-only reward card deployed",
+          "🛒 أضف للسلة" in html
+          and "⚡ طلب مباشر" not in html
           and 'class="reward-actions"' in html)
     check("Cart sub-pane deployed",
           'id="pane-cart"' in html and 'data-sub="cart"' in html)
