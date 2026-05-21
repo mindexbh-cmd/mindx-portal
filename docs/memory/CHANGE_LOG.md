@@ -581,6 +581,52 @@ Two notes worth carrying forward:
 - **Pending-redemption-already-debited UX trap will keep biting.** Any student with a pending order sees `total > available` internally. The single-number display hides this from students, but staff need to know: "approve" (requested → pending) IS the commitment point, NOT "deliver". Undoing a debit requires cancelling the redemption (refunds), not refraining from delivery.
 - **Operator-compensating manual adjustment is a UX failure mode.** Sara's +80 on 2026-05-21 19:00 is the canonical example: when staff feel something is wrong, they add an offsetting `points_manual_adjust` entry rather than cancelling the real `redemptions` row, which leaves the audit trail confusing. Future improvement candidate: a one-click "cancel + refund" shortcut on the admin redemption row, so the proper fix is easier than the manual-adjustment workaround.
 
+| Hash | Title |
+|---|---|
+| `f80e1f8` | fix(parent-portal): G20a.1 restore read-only book viewer link (المناهج) |
+| `1df9f89` | fix(parent-portal): G20a.2 restore front-of-shop pending/rejected callouts (النقاط) |
+| `f08138d` | fix(parent-portal): G20a.3 wrap evaluations tab in iframe to OLD rich page (التقييمات) |
+| `355b9d4` | test(parent-portal): G20a.4 hermetic test for 3-tab restoration |
+
+#### Feature wave: G20a parent-portal — restore 3 tab regressions from V2-retirement consolidation (commits `f80e1f8` → `355b9d4`)
+
+Shipped 2026-05-22, live on prod at `355b9d4`. Safety tags: `safety/pre-restore-pre-redesign-features-2026-05-22` at `759a8d0` (pre-G20a baseline, real rollback point) and `safety/pre-g20a-parent-tab-restoration-20260522-022345` at `355b9d4` (safe_deploy tag, same commit as the deploy per the known safe_deploy bug).
+
+**Root-cause framing.** Three parent-portal tabs (المناهج / النقاط / التقييمات) had lost user-visible features in the 2026-05-16 consolidation commit `3ad90c1` — when ~100K of rich flat-scroll `PARENT_HTML` was retired and replaced by ~30K of split sub-page templates. The OLD backend endpoints (`/parent/book/<bid>/viewer`, `/parent/book/<bid>/page/<n>.webp`, `/parent/evaluations/view`, `/parent/evaluations` JSON) were ALIVE the entire time — only the frontend linkage to them was dropped. G20a re-links, doesn't rebuild. Backend is untouched.
+
+What's restored (user-visible):
+- **المناهج (books) tab.** Books with `can_download=false` now route to `/parent/book/<id>/viewer?pid=<pid>` — the operator-built per-page WebP renderer with watermark, NO PDF download possible. Restores the IP-protection feature that was unlinked when `PARENT_HTML` was retired. Books with `can_download=true` still use `/api/books/<id>/view` (browser's PDF viewer with built-in download, by design).
+- **النقاط (points) tab.** Pending and rejected redemption callouts are now PROMINENTLY displayed at the top of the shop pane, above the category tabs. Pending shows a blue ⏳ card "طلبك قيد المراجعة من الإدارة" + reward + points + timestamp. Rejected shows an orange ⚠ card "تم رفض طلبك" + reward + points + timestamp + the admin's `rejection_reason` inline ("سبب الرفض: …" with fallback "(لم يُذكر سبب)" when blank). Rejected cap at 5 most-recent. Same pattern as the OLD `_ppRenderStore` (deleted in `3ad90c1`). Data sourced from existing `STATE.redemptions` — no new API calls.
+- **التقييمات (evaluations) tab.** `/portal/parent-hub/evaluations` route now returns an iframe wrapping `/parent/evaluations/view?pid=<pid>` when called with `?inner=1` (G12 in-page tab mode). Standalone visit (no `?inner=1`) 302-redirects to the rich page directly. The richer pre-`3ad90c1` `PARENT_EVALUATIONS_HTML` (16K chars vs the 13K slimmed `PORTAL_PARENT_EVALUATIONS_HTML`) is now what parents actually see inside the tab. `PORTAL_PARENT_EVALUATIONS_HTML` is left in code (no callers now) — flagged for a future cleanup pass.
+
+What stays (CRITICAL — verified preserved):
+- **Backend untouched.** No route added, removed, or changed. The 4 OLD endpoints listed above were already alive; G20a only re-wires the frontend to point at them.
+- **The 3-card balance display from G19.2 stays unchanged** — that was a separate operator-confirmed UX decision (see ADR-034), not part of the same regression class.
+- **All G12–G19 surfaces** (parent-portal in-page tabs, scaffolding, hub, fees, attendance, behaviour, single-number balance) intact.
+
+Operator decisions locked in during G20a discovery:
+- **All 3 tabs sequentially in one deploy cycle**, not 3 separate deploys. The fixes are independent but the diagnostic frame is shared — easier to verify together.
+- **Evaluations: Path B (iframe wrapper), NOT port content into the new template.** Faster, and keeps the OLD richer page authoritative for the data model. Re-porting was rejected as ~600 lines of UI work for zero functional gain.
+- **Re-link, don't rebuild.** Every "lost" feature here turned out to be a still-live backend endpoint that the new template just never wired up to. Confirmed by checking `app.py` for the route handler before assuming a rewrite was needed.
+
+Diagnostic breadcrumb for future "we lost X in the redesign" reports:
+- **ALWAYS check whether the OLD endpoints are still alive in the backend before assuming they need to be rebuilt.** Frontend templates get rewritten frequently in a parent-portal redesign cycle; the routes survive longer than the templates that called them.
+- **The conversion commit `3ad90c1` (2026-05-16) is THE point** where 100K of rich flat-scroll `PARENT_HTML` was replaced by ~30K of split sub-page templates. Anything reported as "lost" in the 3 content tabs (books / evals / points) is highly likely to be a renderer that lived in OLD `PARENT_HTML`'s IIFE and was not ported.
+- **Extraction pattern**: `git show 3ad90c1^1:app.py | grep -A 50 'function _ppRenderStore'` (or `_ppRender`, `ppRenderBookCard`, etc.) pulls the OLD render functions. Diff against the current sub-page renderer to identify the gap.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g20a.py` — 45 checks asserting all 3 restorations + `node --check` on `PORTAL_STUDENT_HTML` AND `PORTAL_BOOKS_HTML` inline JS + Flask `url_map` regression for 8 critical routes (books-viewer, books-page-webp, evaluations-view, evaluations-json, parent-hub tabs).
+- All 8 smoke suites pass (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a).
+
+Prod verification:
+- المناهج tab: deployed HTML carries the conditional `viewHref` linking — books-with-no-download point at `/parent/book/<id>/viewer?pid=<pid>`, downloadable books still go to `/api/books/<id>/view`.
+- النقاط tab: deployed CSS carries `.pp-pending-card` + `.pp-rejected-card`, Arabic title strings ("طلبك قيد المراجعة من الإدارة", "تم رفض طلبك", "سبب الرفض") present.
+- التقييمات tab: `/portal/parent-hub/evaluations?inner=1` returns the 492-char iframe wrapper pointing at `/parent/evaluations/view?pid=TEST-STUDENT-0001`; no-`?inner` mode 302-redirects to the rich page.
+
+Files touched: `app.py` (3 surgical edits: `PORTAL_BOOKS_HTML` renderer, `PORTAL_STUDENT_HTML` shop section + CSS, `portal_parent_hub_evaluations_page` route); new `scripts/smoke_g20a.py`. No schema migrations. No backend route changes.
+
+One engineering principle worth carrying forward: **when migrating a flat-scroll template to sub-page templates, prefer re-linking the OLD richer surface (via iframe / redirect / direct URL) over re-porting features.** Faster, preserves the operator's original work, and avoids the silent-feature-loss class of regression entirely. See ADR-035.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
