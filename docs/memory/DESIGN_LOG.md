@@ -351,6 +351,24 @@ Chart.js is still loaded by `/dashboard`, the parent evaluations page, and the r
 
 **Design principle codified**: analytics widgets belong on admin surfaces (dashboard, reports), not on parent surfaces. Parent-facing pages are "card + action tabs" — single hero, clear actions, no decorative metrics. Any future analytics-feature ask on the parent side has to explicitly re-litigate ADR-031.
 
+### 2026-05-22 — G19 student rewards balance reverts from 3-card breakdown to single number
+
+Operator-driven UX cleanup (commits `e51569e` / `d314049` / `759a8d0`). The G15.2 3-card balance display (المجموع / قيد الحجز / المتاح) on `/portal/parent-hub/points` is reverted to the pre-G15.2 single big headline number. The displayed value is `STATE.balance.available` (spendable now), NOT `STATE.balance.total` (gross earnings). See ADR-034.
+
+Trigger: operator reported student سارة السيد هادي (id=4822) was "missing 80 points". Investigation (`scripts/investigate_g19_sara.py`) reconciled the math — 181 earned − 80 committed to pending COLOR MUD redemption = 101 available, NO bug. The 3-card breakdown was technically accurate but exposed internal accounting (pending redemptions are committed at admin-approve time, not at delivery) that students misread as missing balance. The operator's own +80 manual adjustment on 2026-05-21 19:00 was a compensating attempt to "refund" the COLOR MUD without cancelling the redemption row — a recognised UX failure mode.
+
+What changed (visible):
+- 3 stacked cards → 1 big `.pts` headline + `.ptslbl` subtitle (the original pre-G15.2 markup).
+- The number shown is the spendable figure, full stop. No gross/committed/available distinction in the student-facing UI.
+
+What stays (invisible):
+- `/api/portal/student/balance` still returns `{total, committed, reserved, available}`. The backend distinction is preserved for staff tooling, cart gates, and the G15.6 / G16.4 insufficient-balance modals.
+- All cart flows still gate on `STATE.balance.available` server-side and client-side.
+
+**Design principle codified**: student-facing balance displays show ONLY the spendable figure. Internal accounting (committed / reserved / available delta) is operator-facing context — surfaces in `/dashboard` and `/api/points/reports/student/<sid>`, never in the student portal. Future enhancements that want to expose the breakdown to students must be explicitly opt-in (staff toggle, long-press detail view, dedicated pending-orders panel — see ADR-034 alternatives) and re-litigate the decision.
+
+This supersedes the G15.2 "3 cards for transparency" design choice within ADR-032 based on real operator feedback (sara incident, 2026-05-22).
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

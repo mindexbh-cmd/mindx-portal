@@ -540,6 +540,47 @@ Files touched: `app.py` (reward-card renderer, JS, CSS, route deletion); new `sc
 
 One engineering note worth carrying forward: **`request_source='student_portal'` is now a data-only value** — no UI surface submits a "direct-order" row anymore, but the value still tags both legacy direct-order rows AND new cart-checkout rows in `redemptions`. Future shop additions must route through cart (no parallel "quick buy" surfaces). See ADR-033.
 
+| Hash | Title |
+|---|---|
+| `e51569e` | chore(scripts): G19.1 investigation probe for student 4822 balance gap |
+| `d314049` | feat(portal): G19.2 revert balance display to single number |
+| `759a8d0` | test(portal): G19.3 hermetic test for single-number balance revert |
+
+#### Feature wave: G19 student rewards shop — revert 3-card balance to single number (commits `e51569e` → `759a8d0`)
+
+Shipped 2026-05-22, live on prod at `759a8d0`. Safety tags: `safety/pre-g19-balance-investigation-2026-05-22` at `f49be4d` (pre-G19 baseline, real rollback point) and `safety/pre-g19-balance-revert-20260522-005803` at `759a8d0` (safe_deploy tag, same commit as deploy per the known safe_deploy bug).
+
+**Investigation outcome (G19.1): no bug.** Operator reported student سارة السيد هادي (id=4822, مجموعة 3) was "missing 80 points". Read-only admin-endpoint probe (`scripts/investigate_g19_sara.py`) reconciled the math: 8 `point_events` sum to 181 earned; 1 `redemptions` row (id=58, COLOR MUD, cost=80, status=`pending` — approved/awaiting-delivery, already debited per G15's documented state machine); 181 − 80 = 101 available. Two manual adjustments visible in the log: +88 on 2026-05-12 by Ahmed Ibrahim (legitimate initial top-up pattern) and +80 on 2026-05-21 19:00 by admin (almost certainly an operator-compensating adjustment for the COLOR MUD the operator forgot was already approved). Operator accepted the finding — no data correction.
+
+**The real issue was UX, not data.** G15.2's 3-card breakdown (Total / قيد الحجز / المتاح) was technically accurate but invited the "where did my points go?" misread — pending redemptions are committed at admin-approve time (NOT at delivery), so any student with an outstanding pending order sees `total > available` and reads it as a missing balance. The 3-card design exposed internal accounting that confused students more than it helped them.
+
+What changed (user-visible):
+- **The 3-card balance display is REVERTED.** Students now see the pre-G15.2 single big headline number (the original `.pts` + `.ptslbl` markup restored verbatim).
+- **The displayed number is `STATE.balance.available`** — what they can actually spend, NOT the gross `total`. Pending/delivered redemptions are silently subtracted at the API layer; students see only the spendable figure.
+
+What stays (CRITICAL — verified preserved):
+- **`/api/portal/student/balance` endpoint unchanged.** Still returns `{total, committed, reserved, available}`. `STATE.balance` still populated client-side.
+- **`_pts_balance` + `_g15_student_balance` helpers unchanged.** No data fix, no migration. Past `student_portal`-sourced redemptions stay in place.
+- **All cart gates still use `.available`**: G15.6 insufficient-balance modal, G16.4 proactive cart-aware check, `/cart/add` server-side validation — none of them touched the visible markup; they read from `STATE.balance.available` which has been the actual spend gate all along.
+- All G14–G17 surfaces (qty stepper, floating cart badge, cart modal, confirmation modal, proactive balance check, insufficient-balance modal, single-purchase-path cart) intact.
+
+Operator decisions locked in during G19.1:
+- **No data correction for student 4822.** Math is correct; the COLOR MUD redemption is legitimate even if forgotten by the operator.
+- **Single number, not 3 cards.** The breakdown was technically right but UX-confusing.
+- **Show `available` (spendable now), not `total` (gross earnings).** Avoids the entire class of "missing points" perception bugs.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g19.py` — 40 checks asserting 3-card markup removed, single-number restored, dependent surfaces (G15.6 / G16.4) still gate on `.available`, every G14–G17 surface preserved, plus `node --check` on inline JS.
+- **New**: `scripts/investigate_g19_sara.py` — read-only admin-endpoint probe, re-runnable for any future balance investigation (takes `--base <url>`, hits `/api/students` + `/api/points/student/<sid>` + `/api/points/reports/student/<sid>` + `/api/points/redemptions` + `/api/points/history`).
+- **Updated**: `smoke_g15.py` G15.2 section flipped from positive 3-card assertions to positive single-number assertions + inverse "3-card GONE" check; `smoke_g16.py` dropped the 3-card regression check (kept balance-fetch wiring); `verify_g15_prod.py` HTML probe flipped to assert single-number markup.
+- All 7 smoke suites pass (G12 + G13 + G14 + G15 + G16 + G17 + G19); full 8-test e2e against prod green; `node --check` on deployed inline JS clean.
+
+Files touched: `app.py` (PORTAL_STUDENT_HTML balance markup revert); new `scripts/smoke_g19.py`, new `scripts/investigate_g19_sara.py`; touches on `smoke_g15.py`, `smoke_g16.py`, `verify_g15_prod.py`. No schema migrations. No backend route changes.
+
+Two notes worth carrying forward:
+- **Pending-redemption-already-debited UX trap will keep biting.** Any student with a pending order sees `total > available` internally. The single-number display hides this from students, but staff need to know: "approve" (requested → pending) IS the commitment point, NOT "deliver". Undoing a debit requires cancelling the redemption (refunds), not refraining from delivery.
+- **Operator-compensating manual adjustment is a UX failure mode.** Sara's +80 on 2026-05-21 19:00 is the canonical example: when staff feel something is wrong, they add an offsetting `points_manual_adjust` entry rather than cancelling the real `redemptions` row, which leaves the audit trail confusing. Future improvement candidate: a one-click "cancel + refund" shortcut on the admin redemption row, so the proper fix is easier than the manual-adjustment workaround.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
