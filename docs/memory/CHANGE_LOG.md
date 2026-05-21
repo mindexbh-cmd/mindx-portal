@@ -465,6 +465,37 @@ Deploy note: `safe_deploy --skip-e2e` (same cold-start timeout pattern as G13/G1
 
 Decision rationale: see ADR-032 (G15 reuses existing redemptions/cart_items infrastructure) in `DECISIONS_LOG.md`.
 
+#### Feature wave: G16 cart UX polish (commits `aa9f084` → `37c7bbd`)
+
+Shipped 2026-05-21 (same day as G13/G14/G15), live on prod at `37c7bbd`. Safety tags: `safety/pre-g16-cart-ux-2026-05-21` at `7a67eb5` (pre-G16 baseline) and `safety/pre-g16-cart-ux-20260521-230739` at `37c7bbd` (safe_deploy tag).
+
+What's now true that wasn't before:
+
+- **Per-card qty stepper on every reward card** (G16.1, `aa9f084`). `− [N] +` control with cap = `min(99, floor(available/cost))`; the `+` button enforces a cart-aware ceiling so `qty + cart-total-of-this-item` can't exceed available. Stepper resets to 1 after each add. Cart button label changed from "🛒 السلة" → "🛒 أضف للسلة" (the old label was operator-flagged as ambiguous).
+- **Confirmation modal on add-to-cart** (G16.2, `05d1d38`). Click no longer silently adds — user sees "هل تريد إضافة [name] (×N) إلى سلتك؟" in the existing `#confirm` modal.
+- **Floating cart badge** (G16.3, `b0e21c9`). Fixed bottom-right (RTL end, operator choice), 56×56 brand-purple circle with item-count chip. Hidden when cart is empty; 200ms opacity fade-in; `z-index 90` (below modals). Click opens the cart modal.
+- **Cart modal overlay** (G16.5, `564b373`). New `#cartModal` is an overlay version of the cart sub-pane, reusing `renderCartContents()` so qty changes / removes / checkout behave identically. Closes on backdrop / ESC / ✕. Body refreshes on every load() so edits in either surface stay in sync. The G15.4 cart sub-tab is preserved as a secondary access path (additive change only).
+- **Proactive balance-exhausted block** (G16.4, `f4fb60f`). When `cart.total + (cost × qty) > available` the user sees "طلبياتك استوعبت النقاط — لا توجد نقاط تكفي لهذه اللعبة" with a 4-row breakdown (Available / Current cart / This item / Shortfall) and a "عرض السلة" CTA that jumps to the cart modal. Reuses the `#balLow` markup with a swapped action row.
+- **Floating-badge ↔ sub-tab coordination** (G16.6, `142f524`). Both surfaces share state so the badge count, the sub-tab cart pane, and the overlay modal never drift.
+
+Operator decisions locked in during discovery:
+- Confirm text: "هل تريد إضافة [name] (×N) إلى سلتك؟"
+- Balance-exhausted text: "طلبياتك استوعبت النقاط — لا توجد نقاط تكفي لهذه اللعبة"
+- Floating badge position: bottom-right (RTL end)
+- Stepper resets to 1 after each add
+- Cart sub-tab kept alongside the modal (safety brief, additive only)
+
+Test infrastructure (G16.7, `37c7bbd`):
+- `scripts/smoke_g16.py` — new hermetic Playwright test, 56 checks.
+- `scripts/smoke_g15.py` — one-line update so the cart-button assertion now accepts `addToCart` OR `askAddToCart`.
+
+Files touched: `app.py` (CSS + reward card renderer + 6 new JS functions + 2 new modal DOMs + render() integration); new `scripts/smoke_g16.py`; one-line touch on `scripts/smoke_g15.py`. No schema migrations.
+
+Two engineering notes worth carrying forward:
+- **`node --check` guard from G15-HOTFIX still pays off.** It continues to catch inline-JS parse errors in the giant `PORTAL_STUDENT_HTML` blob; G16.7's hermetic test runs it on every CI cycle. Keep it in the pipeline for any future portal work.
+- **Prod-verify probes must poll both `/api/health` AND `/`** before considering Render settled. Health alone can flicker green during rollover while authenticated routes still 502 — the initial G16.8 probe hit this and false-positive-matched against the inline script in Render's own 502 page. Future verify scripts: gate on `200` from both endpoints (or parse for an expected markup token), not just health.
+- `showInsufficientBalance` and `showCartWouldExceed` share the `#balLow` modal; both functions restore the default action row at the END of their handlers. Any new variant added to that modal must follow the same pattern or UI state will bleed between reuses.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
