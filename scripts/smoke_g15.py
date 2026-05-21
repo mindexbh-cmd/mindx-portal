@@ -114,26 +114,24 @@ check(
 )
 
 
-# ── G15.2 — 3-card balance header ───────────────────────────────
-section("G15.2 3-card balance header")
+# ── G15.2 — balance header (REVERTED in G19.2) ──────────────────
+section("G15.2 balance header (3-card → single-number after G19.2)")
 
-check("bal-cards CSS class shipped",
-      ".bal-cards{display:grid" in PS
-      and ".bal-card.total" in PS
-      and ".bal-card.reserved" in PS
-      and ".bal-card.available" in PS)
-check("renderer fetches /api/portal/student/balance",
+# G19.2 reverted the 3-card UI to the pre-G15.2 single-number layout.
+# The /api/portal/student/balance endpoint + STATE.balance object
+# still drive the cart, but the visible UI is now the original .pts
+# big number. Smoke_g19.py asserts the new layout positively.
+check("renderer fetches /api/portal/student/balance (still does)",
       "/api/portal/student/balance" in PS)
-check("renderer emits 3-card grid",
-      'class="bal-card total"' in PS
-      and 'class="bal-card reserved"' in PS
-      and 'class="bal-card available"' in PS)
-check("animates Available (balAvail)",
-      "countUp('balAvail'" in PS)
-check("Arabic labels (الإجمالي / قيد الحجز / المتاح)",
-      "إجمالي النقاط" in PS
-      and "قيد الحجز" in PS
-      and "المتاح" in PS)
+check("STATE.balance is still consumed by the renderer",
+      "STATE.balance" in PS)
+# Original .pts headline restored — animated via countUp('balCount').
+check("single-number .pts hero restored (G19.2)",
+      'class="pts" id="balCount"' in PS
+      and "countUp('balCount'" in PS)
+check("3-card markup is GONE (G19.2)",
+      'class="bal-card total"' not in PS
+      and 'class="bal-card reserved"' not in PS)
 
 
 # ── G15.3 — two-button reward card ──────────────────────────────

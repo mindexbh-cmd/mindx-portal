@@ -131,9 +131,10 @@ def main() -> int:
     print(f"    (status={r.status_code}, html_len={len(html)})")
     check("/portal/parent-hub/points → 200",
           r.status_code == 200 and len(html) > 5000)
-    check("3-card balance markup deployed",
-          ".bal-cards{display:grid" in html
-          and 'class="bal-card available"' in html)
+    # G19.2: 3-card balance reverted to single-number .pts hero.
+    check("single-number balance markup deployed (G19.2)",
+          'class="pts" id="balCount"' in html
+          and 'class="bal-card' not in html)
     # G17: direct-order button removed. Cart is the sole purchase
     # path now. G16's "أضف للسلة" label is what the renderer ships.
     check("Cart-only reward card deployed",

@@ -208,9 +208,11 @@ check("G15.1 backend endpoints intact",
       "@app.route('/api/portal/student/balance', methods=['GET'])" in SRC
       # G17: /api/portal/student/order removed
       and "@app.route('/api/portal/student/cart/add', methods=['POST'])" in SRC)
-check("G15.2 3-card balance header intact",
-      ".bal-cards{display:grid" in PS
-      and 'class="bal-card available"' in PS)
+# G19.2: 3-card balance header reverted to single-number .pts hero.
+# STATE.balance still populated by /balance endpoint; only visible UI
+# changed. smoke_g19.py asserts the new layout positively.
+check("G15.2 balance fetch + STATE.balance still wired",
+      "/api/portal/student/balance" in PS and "STATE.balance" in PS)
 # G17: direct-order button replaced by cart-only flow. smoke_g17.py
 # asserts the inverse (button + JS gone).
 check("G15.4 cart sub-pane intact",
