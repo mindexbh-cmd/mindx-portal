@@ -333,6 +333,24 @@ The URL `/portal/parent` serves **different templates for different roles** (per
 
 **Exception** — `PORTAL_PARENT_HTML` rendered for `role=teacher` at `/teacher/hub` keeps its bare "خروج" link unchanged. That page has no adjacent "back" link, so the misclick hazard (adjacency-with-identical-styling) does not apply. The rule is specifically about adjacency, not about logout links in general.
 
+### 2026-05-21 — G13 parent/student portal simplification: analytics removed
+
+Operator-driven UX cleanup (commits `3a12493` / `4c36ab4` / `a8c1071` / `dd3584f`). Four widgets stripped from the parent-facing surfaces; Chart.js CDN tag dropped from `<head>` of both templates. See ADR-031.
+
+Removed from `PORTAL_PARENT_PID_HUB_HTML` (formal student-card, `role=student`):
+- **المستوى row** in the student info grid — hidden via inline `display:none` on `#card-level`. Element + JS binding preserved so `phRenderHub` doesn't null-deref; data still flows from `/api/parent/hub-stats`.
+
+Removed from `PORTAL_STUDENT_HTML` (points-tab view at `/portal/parent-hub/points`):
+- **"ملخص هذا الأسبوع"** 3-card weekly summary block — section deleted entirely.
+
+Removed from BOTH `PORTAL_STUDENT_HTML` AND `PORTAL_PARENT_HTML`:
+- **"آخر النشاطات"** activity-feed cards — section deleted entirely. The admin-side `/dashboard` "آخر النشاطات" widget (`/api/dashboard/recent-activity`) is preserved unchanged.
+- **"تطوري خلال 8 أسابيع" / "التقدم خلال آخر 8 أسابيع"** 8-week chart sections — HTML deleted, `drawChart` / `drawCharts` functions deleted, Chart.js `<script src=...>` line dropped from `<head>`. Page weight on parent surfaces drops by ~80KB.
+
+Chart.js is still loaded by `/dashboard`, the parent evaluations page, and the reports tab — the CDN is not gone from the app, just removed from the parent templates where unused.
+
+**Design principle codified**: analytics widgets belong on admin surfaces (dashboard, reports), not on parent surfaces. Parent-facing pages are "card + action tabs" — single hero, clear actions, no decorative metrics. Any future analytics-feature ask on the parent side has to explicitly re-litigate ADR-031.
+
 ## Component patterns
 
 ### Cards (parent shop, points board, books)

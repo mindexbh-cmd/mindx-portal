@@ -446,6 +446,48 @@ Format:
   - **Re-applies idempotently**: the seed script `scripts/create_fatima_account.py` is safe to re-run; if the user row exists it just re-asserts the 14 overrides.
 - **Reference**: `scripts/create_fatima_account.py`; verification via `/api/me/permissions` on prod returns `role=manager username=930909151` with 30 hidden buttons; allowed pages `/admin/teacher-deliveries`, `/admin/lessons`, `/admin/evaluations`, `/admin/parent-messages` all return 200; denied pages (`/admin/permissions`, `/admin/table-audit`, `/admin/receipts`, `/database`, `/settings`, `/admin/violations`, `/expenses`) return 403; `/admin/books` and `/points/manage` 302→`/dashboard`. Prod user id = 3197.
 
+### ADR-030: Retire forced password-change for non-admin users; gate `/portal/change-password` to admin-only
+- **Date**: 2026-05-21
+- **Status**: accepted (supersedes the implicit "everyone must rotate on first login" stance that produced the 9 redirect guards)
+- **Context**: The `must_change_pw=1` flag forced parents and students through `/portal/change-password` on first login. In practice this was friction: most parents log in once via WhatsApp deep-link with the child's PID, the forced-change screen confused them, and the operator's intent had drifted — admin-issued temp passwords were now meant to be the working credential, not a placeholder to rotate. New users were being created with `must_change_pw=1` at 4 sites (student auto-provision, two admin parent-create UPSERT branches, admin parent password-reset), and 9 redirect guards across the portal pushed those users away from their actual destination. The G13 wave from the operator was an explicit ask to simplify the parent/student portals.
+- **Decision**: Forced password-change is admin-only.
+  1. Remove all 9 redirect guards that bounced `must_change_pw=1` users to `/portal/change-password`.
+  2. Gate `/portal/change-password` and `POST /api/portal/change-password` to `role=admin` only. Non-admin requests are no longer served.
+  3. New users created at the 4 INSERT/UPDATE sites get `must_change_pw=0` from day 1. The admin parent password-reset endpoint still issues temp passwords; those temp passwords are now the operational credential — operators communicate them to parents directly.
+  4. Keep the `users.must_change_pw` column in schema (additive philosophy — never drop user-data columns even when retired). It stays as dead data and can be repurposed later.
+- **Alternatives considered**:
+  - **Drop the column**: rejected per the never-DROP-user-data discipline (CLAUDE.md "Data safety").
+  - **Keep the flag but remove the redirect guards, leaving `/portal/change-password` open to all**: rejected — admins still need a UI to force a credential rotation on a specific account, so the page must exist; serving it to non-admin was the actual problem, not the page itself.
+  - **Keep the flag but invert default to `0`, retain redirects**: rejected — the redirects themselves were the friction; flipping defaults without removing redirects would leave the 30 backfilled student accounts from 2026-05-16 still bouncing.
+- **Consequences**:
+  - **For new users**: zero forced rotation. PID-as-password (students) and admin-issued temp passwords (parents) are now permanent until the user voluntarily changes them via account settings.
+  - **For the 30 student accounts backfilled 2026-05-16**: already had `must_change_pw=0` from action 3 of that backfill — no change in behavior.
+  - **Security trade-off**: extends the security trade-off already documented in ADR-023 (PID as permanent password for students) to all new accounts. Anyone who knows a PID can log into that account until the parent voluntarily rotates. Mitigated by: the operator's preference for operational simplicity over forced rotation; the staff-issued-temp-password flow for parents (admin controls the credential); and the rate limit (5 fails / 15 min) inherited from staff auth.
+  - **`/portal/change-password` still works** for admin-initiated flows (e.g. an admin walking a parent through a change). Non-admin requests now return 403/302.
+  - **Operator decisions captured**: `must_change_pw` default for new users = `0`; `/portal/change-password` gating = admin-only. Recorded explicitly so the next iteration of "forced rotation" doesn't have to re-litigate.
+- **Reference**: commit `bb69bfe`; CHANGE_LOG 2026-05-21 entry; related ADR-023 (PID-as-permanent-password security trade-off).
+
+### ADR-031: Remove Chart.js + analytics widgets (weekly summary, activity feed, 8-week chart) from parent/student portal surfaces
+- **Date**: 2026-05-21
+- **Status**: accepted
+- **Context**: G13 wave was an operator-driven simplification of the parent/student portal. The two parent-facing templates (`PORTAL_PARENT_HTML` V1 multi-child, `PORTAL_STUDENT_HTML` student/points view) carried three analytics surfaces that the operator deemed noise: the المستوى row in the student info card (`PORTAL_PARENT_PID_HUB_HTML`), the 3-card "ملخص هذا الأسبوع" weekly summary (`PORTAL_STUDENT_HTML` only), the "آخر النشاطات" activity-feed cards (both templates), and the "تطوري خلال 8 أسابيع" / "التقدم خلال آخر 8 أسابيع" 8-week chart sections (both templates). The chart sections were the only consumer of the Chart.js CDN tag in the parent templates — keeping the CDN tag in `<head>` after removing the chart cost ~80KB on every page load for no benefit.
+- **Decision**: Strip the four widgets from the parent/student surfaces. Drop the Chart.js CDN `<script>` tag from both parent template `<head>` blocks. Keep Chart.js loaded on `/dashboard`, the parent evaluations page, and the reports tab — those surfaces still use it.
+  1. **المستوى row**: hide via inline `display:none` on the `#card-level` element. Keep the element + its JS binding (`phRenderHub`) intact so existing JS doesn't null-deref; the data still flows through `/api/parent/hub-stats`. Reversible by removing the inline style.
+  2. **Weekly summary, activity feed, 8-week chart**: delete the HTML blocks. Delete `drawChart` + `drawCharts` functions. Delete the Chart.js `<script src=...>` line from `<head>`.
+  3. **Admin "آخر النشاطات" widget on `/dashboard`** (driven by `/api/dashboard/recent-activity`): preserved unchanged. The activity-feed removal is parent-surface-only; the staff dashboard widget is a different consumer of a different endpoint.
+  4. **Both parent templates targeted simultaneously** for items 3/4/5. The operator was conflating which template held which section; the resolution was to strip from both rather than try to surgically figure out which surface needed it.
+- **Alternatives considered**:
+  - **Hide via CSS only**: rejected for the three larger sections — keeping dead HTML + dead JS + the 80KB CDN tag in production for code that no longer renders is the wrong default. Inline-hide preserved only for المستوى because the JS binding still touches the element.
+  - **Move the analytics to the admin side**: rejected — the operator was eliminating, not relocating.
+  - **Replace Chart.js with a lighter renderer (sparklines, inline SVG)**: rejected — operator wanted the chart gone, not redesigned.
+- **Consequences**:
+  - **Page weight on parent surfaces drops by ~80KB** (Chart.js gone from `<head>`). Mobile data + first-paint both benefit.
+  - **No template-fragmentation risk**: both parent templates carry the same shape (same sections removed from each).
+  - **Chart.js still used elsewhere** — dashboard, parent evaluations, reports tab. The CDN is not gone from the app, just removed where unused.
+  - **Visual simplification**: the parent surface is now closer to "card + 5 action tabs", with no analytics distractions between hero and actions. Codified for parent-portal UX going forward — analytics belong on admin surfaces, not parent surfaces.
+  - **Operator decisions captured**: "remove Chart.js CDN where unused"; "strip from both `PORTAL_STUDENT_HTML` AND `PORTAL_PARENT_HTML`, not just one". Recorded so the next analytics-feature ask on the parent side has to explicitly re-litigate ADR-031.
+- **Reference**: commits `3a12493` / `4c36ab4` / `a8c1071` / `dd3584f`; CHANGE_LOG 2026-05-21 entry; templates touched: `PORTAL_PARENT_PID_HUB_HTML`, `PORTAL_PARENT_HTML`, `PORTAL_STUDENT_HTML`.
+
 ## Pending decision candidates (not yet resolved)
 
 - Bcrypt vs argon2id migration for `users.password` (currently sha256-no-salt — ADR-003 flagged)

@@ -372,6 +372,48 @@ Shipped 2026-05-16. Re-runnable Playwright walk aggressively enumerating every c
 
 - `scripts/personas/hostile_parent_portal_logout_hunt.py` — hostile-mode probe that walks BOTH `student_test` AND `parent_test` sessions on the same URL set. Handles its own session preservation by treating `/logout` and `/api/logout` as `SESSION_KILLERS` that must not be probed via the shared cookie context (they would invalidate the session and break subsequent assertions in the same run).
 
+### 2026-05-21
+
+| Hash | Title |
+|---|---|
+| `bb69bfe` | feat(portal): G13.1 bypass forced password-change for non-admin users |
+| `3a12493` | feat(portal): G13.2 hide level row in student info card |
+| `4c36ab4` | feat(portal): G13.3 remove weekly summary section from student portal |
+| `a8c1071` | feat(portal): G13.4 remove activity feed from both parent surfaces |
+| `dd3584f` | feat(portal): G13.5 remove 8-week chart + Chart.js from parent surfaces |
+| `714c2fd` | test(portal): G13.7 hermetic test for all five UX cleanups |
+| `1aca22c` | test(portal): G13.8 prod verification probe |
+
+#### Feature wave: G13 parent/student portal UX cleanup (commits `bb69bfe` → `1aca22c`)
+
+Shipped 2026-05-21. Five operator-driven simplifications + two test rigs. All deployed; full 8/8 e2e against prod green after deploy. Safety tags: `safety/pre-g13-cleanups-2026-05-21` at `e52f3df` (pre-G13 baseline) and `safety/pre-g13-ux-cleanups-20260521-194210` at `714c2fd` (created by safe_deploy).
+
+What's now true that wasn't before:
+
+- **Forced password-change retired for non-admin** (G13.1, `bb69bfe`). All 9 redirect guards that pushed `must_change_pw=1` users to `/portal/change-password` were removed. Both `/portal/change-password` and `POST /api/portal/change-password` are now admin-only gated. The 4 user INSERT/UPDATE sites that previously set `must_change_pw=1` (student auto-provision, admin parent create UPSERT branches, admin parent password reset) now write `must_change_pw=0`. The `must_change_pw` column remains in the schema as dead data (not dropped — additive philosophy). The admin parent password-reset endpoint still issues temp passwords; those temp passwords are now the working credential (no forced rotation on first login).
+- **Student info card simplified** (G13.2, `3a12493`). المستوى row hidden in `PORTAL_PARENT_PID_HUB_HTML` via inline `display:none`. The `id="card-level"` element is preserved so the existing `phRenderHub` JS binding doesn't null-deref; `/api/parent/hub-stats` still returns the field.
+- **Weekly summary section removed** (G13.3, `4c36ab4`). "ملخص هذا الأسبوع" 3-card block stripped from `PORTAL_STUDENT_HTML` (the points-tab view at `/portal/parent-hub/points`). The 3-card section never existed in `PORTAL_PARENT_HTML`.
+- **Activity feed removed from both parent surfaces** (G13.4, `a8c1071`). "آخر النشاطات" cards stripped from BOTH `PORTAL_STUDENT_HTML` and `PORTAL_PARENT_HTML`. The admin-side `/dashboard` "آخر النشاطات" widget (`/api/dashboard/recent-activity`) is preserved — that's the staff-facing feed and stays untouched.
+- **8-week chart + Chart.js dependency removed** (G13.5, `dd3584f`). "تطوري خلال 8 أسابيع" / "التقدم خلال آخر 8 أسابيع" chart sections removed from both `PORTAL_STUDENT_HTML` and `PORTAL_PARENT_HTML`. `drawChart` and `drawCharts` functions deleted. Chart.js CDN `<script>` tag dropped from both templates' `<head>` (saves ~80KB per page load on parent surfaces). Chart.js is still loaded by dashboard, the parent evaluations page, and the reports tab — so the CDN is not gone from the app, just removed where unused.
+
+Test infrastructure (`714c2fd` + `1aca22c`):
+- `scripts/smoke_g13.py` — hermetic Playwright test asserting all five cleanups against the local server.
+- `scripts/verify_g13_prod.py` — prod verification probe with `wait_for_load_state("networkidle", timeout=15000)` after login (workaround for `auto_test.py` quirk noted below).
+
+Files touched across the wave: `app.py`; new test scripts under `scripts/`. No schema migrations.
+
+Operator decisions locked in during discovery (so they don't recur):
+- G13.3 / G13.4 / G13.5 target BOTH `PORTAL_STUDENT_HTML` AND `PORTAL_PARENT_HTML`, not just one. The operator was conflating which template held which section; resolved by stripping from both.
+- Chart.js CDN: remove from templates where unused; keep elsewhere. No project-wide dependency removal.
+- `must_change_pw` default for new users: `0`.
+- `/portal/change-password` gating: admin-only.
+
+Two notes worth carrying into the next session:
+1. **safe_deploy auto-rollback is a no-op for HEAD-tagged safety points.** The deploy ran the safety-tag step at HEAD (the new code), so when the e2e step later failed, `git reset --hard <safety-tag>` reverted to the new code — i.e. didn't actually revert. In this case the e2e failure was a cold-start network timeout (`Page.goto /dashboard 30s`), prod was actually healthy, and the full 8-test e2e against prod (`run_e2e.py --base https://mindx-portal-1.onrender.com`) passed cleanly afterwards. Latent bug in `scripts/safe_deploy.py` — the safety tag must be taken at the PRE-CHANGE commit, not HEAD, for the rollback to mean anything. Logged in BUGS_LOG.
+2. **`scripts/auto_test.py` `BrowserSession.navigate` uses `wait_until="domcontentloaded"`,** which returns before post-login redirects + G12 in-page tab activation finish. Workaround applied in `verify_g13_prod.py`: explicit `wait_for_load_state("networkidle", timeout=15000)` after login. Separately, doing a second cross-route navigate (e.g. `/portal/parent-hub/points` after `/portal/parent`) sometimes loses the session cookie in headless Chromium and redirects to `/login` — Playwright/test-rig artifact, not a real regression. Logged in BUGS_LOG.
+
+Decision rationale: see ADR-030 (retire forced password-change for non-admin) and ADR-031 (Chart.js + analytics widgets removed from parent surfaces) in `DECISIONS_LOG.md`.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
