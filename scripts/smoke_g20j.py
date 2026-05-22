@@ -8,7 +8,10 @@ Asserts:
     or overrun-banner change.
   - Fix B: Mobile-only CSS (inside @media max-width:600px) makes
     #hub-content a flex column with .mb-nav-card ordered FIRST
-    (order:1) above .mb-card (order:2) and .mb-tab-pane (order:3).
+    (order) above .mb-card and .mb-tab-pane. (Mobile order was
+    swapped in G20l 2026-05-22 — student-card now order:1, nav
+    order:2, tab-pane order:3 — see smoke_g20l.py for the current
+    contract.)
   - Fix B: Mobile-only visual prominence boost — .mb-nav-card gets
     a purple gradient/border/shadow, .mb-nav-hint becomes large
     purple bold, .mb-nav-btn bumps padding + icon size + label.
@@ -98,10 +101,15 @@ check("@media (max-width:600px) brand block found", bool(mobile_block))
 
 check("mobile makes #hub-content a flex column",
       "#hub-content{display:flex;flex-direction:column;}" in mobile_block)
-check("mobile gives .mb-nav-card order:1 (first)",
-      "#hub-content > .mb-nav-card{order:1;}" in mobile_block)
-check("mobile gives .mb-card order:2 (second)",
-      "#hub-content > .mb-card{order:2;}" in mobile_block)
+# Mobile flex order — values updated by G20l (operator swap so the
+# student-card appears FIRST and the nav directly below it). The
+# G20j.2 reorder mechanism (making #hub-content a flex column on
+# mobile so order works) is still in place — only the two order
+# integers flipped. .mb-tab-pane stays at order:3.
+check("mobile gives .mb-card order:1 (first — G20l swap)",
+      "#hub-content > .mb-card{order:1;}" in mobile_block)
+check("mobile gives .mb-nav-card order:2 (second — G20l swap)",
+      "#hub-content > .mb-nav-card{order:2;}" in mobile_block)
 check("mobile gives .mb-tab-pane order:3 (last)",
       "#hub-content > .mb-tab-pane{order:3;}" in mobile_block)
 
