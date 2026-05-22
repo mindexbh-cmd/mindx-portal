@@ -627,6 +627,49 @@ Files touched: `app.py` (3 surgical edits: `PORTAL_BOOKS_HTML` renderer, `PORTAL
 
 One engineering principle worth carrying forward: **when migrating a flat-scroll template to sub-page templates, prefer re-linking the OLD richer surface (via iframe / redirect / direct URL) over re-porting features.** Faster, preserves the operator's original work, and avoids the silent-feature-loss class of regression entirely. See ADR-035.
 
+| Hash | Title |
+|---|---|
+| `2da5483` | fix(parent-portal): G20b.1 shade unaffordable rewards |
+| `7c6331f` | test(parent-portal): G20b.2 end-to-end workflow probe (proves no bug) |
+| `2407cdf` | fix(points-manage): G20b.3 make rejection reason MANDATORY |
+| `b531c9b` | test(parent-portal): G20b.4 hermetic test for shading + mandatory reject |
+
+#### Feature wave: G20b parent-portal — unaffordable-reward shading + mandatory rejection reason + workflow proof (commits `2da5483` → `b531c9b`)
+
+Shipped 2026-05-22, live on prod at `b531c9b`. Safety tags: `safety/pre-g20b-shading-approval-2026-05-22` at `355b9d4` (pre-G20b baseline, real rollback point) and `safety/pre-g20b-shading-mandatory-reject-20260522-025614` at `b531c9b` (safe_deploy tag).
+
+**Two user-visible restorations + one diagnostic breakthrough.** Operator filed back-to-back complaints that the cart-checkout → admin-approval workflow was broken. G20b proved it is NOT broken end-to-end (controlled prod probe, 2 cycles, 24 checks each), then shipped the two UX restorations that were independently needed and that — incidentally — make the silent-failure mode that caused the false-positive bug report impossible to reproduce.
+
+What's restored (user-visible):
+- **النقاط shop — unaffordable cards now visually muted.** Restored from the OLD `_ppFormatStoreCard` pattern (pre-`3ad90c1`) that G17 relaxed when it allowed "planning ahead" by keeping the cart button live regardless of balance. New behaviour: card opacity 0.55, product image grayscale 60%, cart button disabled, quantity stepper `+` disabled, and a small red hint "⚠ نقاطك غير كافية" below the cost. Operator-driven flip back to upfront-visible-signal UX.
+- **/points/manage طلبات tab — admin rejection reason is now MANDATORY.** Old prompt `"سبب الرفض (اختياري):"` allowed admins to bypass on empty. New prompt loops on empty input with alert `"يجب كتابة سبب الرفض. اضغط إلغاء للتراجع عن الرفض."` Cancel still aborts the whole reject (no row mutation). The reason text then surfaces on the front-of-shop rejected callout (G20a.2) under `"سبب الرفض: <text>"` — the chain `admin reason → student visibility` is now end-to-end enforced.
+
+**The workflow-is-actually-working verification breakthrough.** Two runs of `scripts/verify_g20b_workflow.py` against prod — once before G20b.1 (redemptions row #59) and once after deploy (row #60). Each cycle: grant +50 via `behavior_id=15` ("تعديل يدوي") → `cart/add` (200) → `cart/checkout` creates `redemptions` row with `status='requested'` + `source='student_portal'` → admin `approve` flips to `pending` (debits 30 pts, balance 50→20) → admin `deliver` flips to `delivered` → cleanup refund -50. Both cycles green. Operator's complaint history: G20-round-1 "not a bug"; G20-round-2 "I tested again it IS a bug" — actually still wasn't, MAX(id) was 58 with 0 new rows; G20b "the workflow is broken" — **confirmed working end-to-end via controlled probe**.
+
+**Diagnostic breadcrumb for the next operator who reports "approval workflow is broken":**
+- The `cart/checkout` endpoint at `app.py:88663-88668` correctly inserts `status='requested'` + `request_source='student_portal'`.
+- The admin filter `loadRequests` at `app.py:89177` correctly filters on `r.status === 'requested'` source-agnostically.
+- Both are provably correct.
+- **If a real student submits and nothing appears in the approval queue, the submission failed BEFORE the INSERT** — almost certainly on the balance/affordability gate at `app.py:88644`: `if summary["total"] > bal["available"]: return 400`. The student saw a generic error and the admin saw an empty queue.
+- G20b.1's shading + disabled cart button make this state visible upfront, so the operator can't repro the silent failure mode that caused the false-positive report (i.e. testing with a 0-balance account like `student_test`).
+
+Operator decisions locked in (these implement existing decisions — no new ADR):
+- **Shade unaffordable rewards upfront**, even though G17 had relaxed this to support "planning ahead". The planning-ahead UX is silently subverted by the balance-gate INSERT failure, so re-asserting the upfront signal is net-positive.
+- **Mandatory rejection reason** — the rejected callout already surfaces the reason to students (G20a.2), so allowing admins to skip leaves students with a callout that says "سبب الرفض: (لم يُذكر سبب)" — defeating the point of the restoration. The student-facing "(لم يُذكر سبب)" fallback is kept for historical rows.
+
+What stays (verified preserved):
+- **Backend untouched.** No route added, removed, or changed. Three surgical frontend edits to `app.py`: `PORTAL_STUDENT_HTML` CSS + renderer (G20b.1), `POINTS_MANAGE_HTML` `rejectRequest` function (G20b.3).
+- The 3-card balance display from G19.2 + the G20a tab restorations (المناهج / النقاط / التقييمات) all intact.
+
+Test infrastructure:
+- **New (re-runnable)**: `scripts/verify_g20b_workflow.py` — 24 checks, end-to-end prod probe. Grants +N points, runs the full cart → approve → deliver cycle, refunds -N. The go-to diagnostic when a future operator reports "workflow is broken" — before assuming a code regression, run this against prod with `student_test` boosted to a positive balance. If it stays green, the user-reported failure is upstream (balance gate, not the workflow).
+- **New (hermetic)**: `scripts/smoke_g20b.py` — 30 checks. Asserts shading CSS + renderer + mandatory-reject prompt + 9 critical routes still in `url_map`.
+- All 9 smoke suites pass (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a + G20b).
+
+Files touched: `app.py` (3 surgical edits to `PORTAL_STUDENT_HTML` + `POINTS_MANAGE_HTML`, no backend changes); new `scripts/verify_g20b_workflow.py`; new `scripts/smoke_g20b.py`. No schema migrations.
+
+One operational principle worth carrying forward: **when an operator reports a workflow regression, run a controlled end-to-end prod probe BEFORE assuming the code changed.** Two of three "the workflow is broken" reports in the G20 cycle turned out to be false positives caused by silent failure modes upstream of the workflow itself (zero-balance accounts hitting the affordability gate). The `verify_g20b_workflow.py` probe is now the diagnostic of record for this complaint class.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
