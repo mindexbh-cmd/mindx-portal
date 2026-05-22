@@ -110,8 +110,13 @@ check("renderer emits <div class=\"ptslbl\">نقطة",
       'class="ptslbl">نقطة' in PS)
 check("countUp animates balCount",
       "countUp('balCount'" in PS)
-check("countUp animates available (not legacy bal/total)",
-      "countUp('balCount', bavail," in PS)
+# G20d.1: countUp now animates (total-committed), not .available.
+# The named-var changed from `bavail` to `_headlineNum`. Both legacy
+# names accepted here so the smoke suite stays stable across this
+# semantics change.
+check("countUp animates a balance number on #balCount",
+      "countUp('balCount', _headlineNum," in PS
+      or "countUp('balCount', bavail," in PS)
 
 
 # ── STATE.balance + endpoint preserved ──────────────────────────
@@ -126,8 +131,14 @@ check("renderer still fetches /balance in load() Promise.all",
       and "STATE.balance" in PS)
 check("STATE.balance fallback shape preserved",
       "{total:bal, committed:0, reserved:0, available:bal}" in PS)
-check("renderer reads b.available for headline",
-      "b.available !== undefined" in PS)
+# G20d.1 retired this assertion: the headline now reads (b.total -
+# b.committed) instead of b.available, per operator's clarified model
+# (only approved/delivered should reduce the displayed number; pending
+# requests shouldn't). The internal gates (cart-checkout backend,
+# G16.4 proactive check, G20b.1 shading) still use b.available; only
+# the headline consumer changed. smoke_g20d.py owns that assertion.
+check("renderer reads a balance field for headline",
+      "b.total" in PS and "b.committed" in PS)
 
 
 # ── G15.6 / G16.4 still gate on STATE.balance.available ─────────
