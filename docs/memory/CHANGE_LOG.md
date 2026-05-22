@@ -825,6 +825,41 @@ Files touched: `app.py` (4 surgical edits: `/parent/legacy` route inject + `/par
 
 **Pattern carry-forward — the "hide-when-embedded" recipe for iframe-duplicate-chrome.** When an iframe page has duplicate chrome (back button, header, etc.) that's only redundant inside the parent shell: (1) use a query flag (e.g. `?embed=1`) on the iframe src URL; (2) in the embedded page's route handler, read `request.args.get('embed')` and conditionally inject a targeted `<style>` rule (NOT a JS class toggle — no timing issues, no race conditions, and CSS applies even to dynamically-inserted DOM nodes like the `addBackButton()` pattern); (3) HIDE via CSS, never delete the element from the template — standalone visits must still work; (4) keep the selector laser-focused (single ID, not a broad class) to avoid hiding unintended elements; (5) test via Flask `test_client()`: GET with and without the flag, assert the hide-CSS toggles. Simpler than spinning up a prod probe for behavior changes.
 
+#### Data action: parent-portal linkage repair — 139 silently-rescued + 1 broken account fixed; 3 zombie duplicates deactivated (no commit)
+
+Shipped 2026-05-22 ~14:44 UTC via single transaction-wrapped `UPDATE` against prod Postgres. No code change — purely a data-state repair. Triggered by an operator report that ريم (130914878) + خولة (190405392) saw "account not linked to a student" / "تعذر تحديد الطالبة" / "غير مصرح" errors when tapping section buttons. Investigation widened scope from 3 to 143+ affected user rows.
+
+What changed in prod data:
+
+- **139 silently-rescued accounts** moved from the username-fallback path (`_resolve_session_student_id` Strategy 2) to the canonical `linked_student_id` path (Strategy 1). These accounts had a non-zero `linked_student_id` pointing at a renumbered/deleted students row from a past re-import (audit found the dead pointers spanned uid 707–849, all pointing at students.id in the 2460–2779 range when the live rows were at id 4720–5040 — a uniform ~+2250 shift). The username fallback was returning the right student all along, but every login paid for two SELECTs instead of one and the system was one cleanup-mistake away from breaking ~80% of parent accounts.
+- **3 zombie accounts deactivated** (`is_active = 0`): uid=846 `حسن محمد حسن` (username `160412312` — typo, real pid `160412323`), uid=795 `حسين حسين علي مكي` (`160807379` — middle digits transposed, real pid `160803739`), uid=748 `زينب خليل ابراهيم عبد المحسن` (`1940405392` — 10 digits, real pid `160713595`). Each had a correctly-set-up twin account (uid=3181/3180/3188 respectively) with `must_change_pw=0` (proving the parent had logged in successfully at least once) and matching student name. Zombies had `must_change_pw=1` (never logged in) and 0 `point_events` — confirmed never used. Deactivation chosen over deletion for reversibility (flip `is_active=1` to undo).
+- **1 broken account repaired** (uid=714 `زينب فاضل المكحل`): bidi marks (U+200F at start, U+202A inside) stripped from BOTH `students.id=5044` `personal_id` AND `users.id=714` `username`. The stored values were `'‏170‪206963'` and `'170‪206963'` respectively — neither could be typed from a keyboard. Username and student pid are now both clean `'170206963'`. Password reset to `hp('170206963')` (same SHA-256 helper `app.py:261`); `must_change_pw=1` (informational per G13.1's removal of the forced-change flow).
+
+Operator-confirmed corrections came from cross-referencing the official roster. Bulk audit query joined `users` × `students` on `TRIM(personal_id) = TRIM(username)` to find the dead-pointer-but-fallback-works set; ambiguity gate confirmed zero usernames matched multiple students before any write.
+
+Pre-write safety: backup `backups/users_students_pre-linkage-fix-20260522-172934.json` (95 KB, 174 user rows + 4 affected students + 4 affected users with all columns including password hashes for full rollback). Safety tag `safety/pre-linkage-fix-2026-05-22` at the pre-fix HEAD. Original plan was Path 1 (rename 4 broken to corrected pids) — the first transaction attempt rolled back atomically on `psycopg2.errors.UniqueViolation` because the corrected pids were already held by the twin accounts (3 of 4). The transaction's atomicity is what saved this: Phase A's 139-row UPDATE was rolled back together with Phase B's failed write — zero partial state visible to anyone. Operator approved Path 2 (deactivate zombies + repair unique-broken uid=714); second transaction COMMITTED cleanly.
+
+Post-fix audit:
+- `dead-linked-with-fallback (active)` = **0** (was 139)
+- `broken-with-no-fallback (active)` = **0** (was 4; 3 are now `is_active=0`, 1 is repaired)
+- Spot-check 5 random accounts from the 139 (`180311824` `130707562` `211010979` `140110372` `130309291`) — all login + `/api/portal/student/me` return correct student
+- Playwright real-browser repro on prod: REPAIRED uid=714 + all 3 TWINS log in + 5/5 section buttons load 200 OK with the right student data
+- Confirmed 3 TWIN rows (3181, 3180, 3188) UNCHANGED before and after the transaction (column-by-column diff: username / linked_student_id / is_active / must_change_pw / password all identical)
+
+Summary written to `backups/linkage-fix-path2-summary-20260522-174444.json` alongside the pre-write backup.
+
+**Prevention rule (apply to every future students-table re-import):** any operation that renumbers or replaces `students.id` MUST be immediately followed by:
+```sql
+UPDATE users u SET linked_student_id = s.id
+FROM students s
+WHERE TRIM(s.personal_id) = TRIM(u.username)
+  AND u.role = 'student' AND COALESCE(u.is_active,1) = 1
+  AND u.linked_student_id IS DISTINCT FROM s.id;
+```
+Without this sync, every renumber leaves dependent FK columns stale. The existing `_resolve_session_student_id` username fallback (app.py:86396, commits `f41d0ff`/`8b7ed35`/`e1c8c3d`/`9aa1bfe`) silently rescues the resulting accounts, masking the data drift until a coincident edit (username typo, pid bidi cleanup) finally breaks the fallback path too. Bake this UPDATE into the operator's import runbook + the data-protector-agent's pre-import checklist.
+
+(Optional, deferred: a "self-heal" hook inside `_resolve_session_student_id` that updates `linked_student_id` on every successful fallback resolution. Low-risk additive change; would have prevented this entire incident by self-healing each account on first login. Flagged for a separate decision — would write to `users` on every login so needs data-protector-agent sign-off.)
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
