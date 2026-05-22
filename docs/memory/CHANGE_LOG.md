@@ -709,6 +709,49 @@ Files touched: `app.py` (2 surgical edits: `PORTAL_STUDENT_HTML` headline + `cou
 
 One UX principle worth carrying forward: **when a single backend balance payload feeds both a display and a gate, pick a field per purpose — never mix.** The student-facing headline answers "what do I still own?" (`total − committed`); the cart gate answers "what can I still queue?" (`.available` = `total − committed − reserved`). Showing the smaller-of-the-two as the headline (as G19 did) caused operator confusion when reservations rolled in. The two-tier display is now the locked-in pattern. See ADR-036.
 
+| Hash | Title |
+|---|---|
+| `3f2b1b0` | feat(admin): G20f.2 DELETE /redemptions/<id> auto-restores stock |
+| `ed33fc0` | feat(parent-portal): G20f.3 distinct out-of-stock visual + 'نفد المخزون' hint |
+| `9cebcf1` | test(parent-portal): G20f.4 hermetic test for stock-restore + out-of-stock hint |
+
+#### Feature wave: G20f admin + parent-portal — stock-restore trap closed + out-of-stock UX cue (commits `3f2b1b0` → `9cebcf1`)
+
+Shipped 2026-05-22, live on prod at `9cebcf1`. Safety tag: `safety/pre-g20f-stock-restore-20260522-042758` at `9cebcf1` (safe_deploy bookmark; no separate pre-G20f baseline tag — work followed directly from G20e at `7fa7a2b`).
+
+**Closed a stock-decrement trap discovered after G20e cleanup and added a missing out-of-stock UX cue.** Two code commits + 1 hermetic test + 1 immediate prod data fix.
+
+Sequence of events:
+1. G20e (`7fa7a2b`) added `DELETE /api/admin/redemptions/<id>` as a test-data cleanup tool — but it did NOT mirror the `/cancel` endpoint's stock-restore logic. Hard-deleting a `pending` row left the `+1` stock that approval had decremented gone for good.
+2. Operator ran G20e on حميدة حسن's 4 test rows. One (#64, Twirling Top, `pending`) had decremented Twirling Top stock from `1 → 0` during her test approval. Deletion didn't restore it.
+3. Post-cleanup, operator reported Twirling Top showed as "unaffordable" on حميدة's parent portal. Investigation: stock=0 (NOT affordability — balance was the clean 217).
+4. Immediate data fix: PATCHed Twirling Top stock `0 → 1` via the existing `/api/points/rewards/<id>` admin endpoint (no deploy needed).
+5. Code fix shipped in one `safe_deploy` cycle (commits `3f2b1b0` + `ed33fc0` + `9cebcf1`).
+
+What is now true about the system:
+
+1. **`DELETE /api/admin/redemptions/<id>` now restores stock** when the deleted row was in `pending` or `delivered` status. Mirrors `/cancel` exactly. Response includes a new `stock_restored` bool. Audit log snapshot carries `_stock_restored=True/False` for after-the-fact tracing. `requested` / `rejected` / `cancelled` rows skip the restore (they never decremented stock to begin with).
+
+2. **`PORTAL_STUDENT_HTML` renderer now applies a distinct `.out-of-stock` CSS class** (opacity `0.55` + `75%` grayscale image) + a `نفد المخزون` hint when `reward.stock = 0`. Separate from `.unaffordable` (opacity `0.55` + `60%` grayscale + `نقاطك غير كافية` hint). Precedence: **out-of-stock > unaffordable** — the student can earn more points but can't conjure stock. Restored from the OLD `_ppFormatStoreCard` pattern (pre-`3ad90c1`) which had exactly this two-hint setup. Students now see WHY a reward is disabled instead of guessing.
+
+Operator decisions locked in (no new ADR — G20f implements existing decisions, doesn't take new ones):
+- Restore Twirling Top stock to `1` (matches what test approval consumed).
+- Enhance the `DELETE` endpoint to auto-restore — prevents the same off-by-one on future cleanups.
+- Out-of-stock UX hint stays a **separate visual treatment**, not folded into `.unaffordable`.
+
+Prod verification:
+- `/portal/parent-hub/points` HTML probe: `.reward.out-of-stock` CSS deployed, `.stock-hint` base CSS deployed, renderer's `(!inStock) ? ' out-of-stock'` precedence rule deployed, `نفد المخزون` string present, all regression checks (G20a.2 / G20b.1 / G20d.1) still pass.
+- Twirling Top `stock=1` on prod (restored via PATCH at investigation time, confirmed in final verify).
+- حميدة balance=`217`, 0 redemption rows.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g20f.py` — 22 checks. Asserts the stock-restore code path, CSS class + hint, precedence rule, regression guards for G20a/b/d/e, and node-check.
+- All 11 smoke suites green (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a + G20b + G20d + G20f).
+
+Files touched: `app.py` (3 surgical edits: `DELETE` endpoint stock-restore logic; `PORTAL_STUDENT_HTML` CSS for `.out-of-stock` + `.stock-hint`; renderer precedence rule); new `scripts/smoke_g20f.py`. No schema migrations.
+
+Diagnostic pattern worth carrying forward: **stock=0 after a recent G20e cleanup → check whether the operator approved a test purchase before deleting.** The OLD G20e endpoint shape (pre-G20f.2) left stock off-by-one if the deleted row was `pending` or `delivered`. The fix has been in place since `9cebcf1`; any earlier cleanups may need manual stock restoration via the rewards PATCH endpoint. Out-of-stock and unaffordable are NOT the same state visually anymore — orange `نفد المخزون` = inventory issue (fix in admin); red `نقاطك غير كافية` = student needs more points.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
