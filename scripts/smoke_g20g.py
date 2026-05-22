@@ -76,11 +76,15 @@ check("iframe loading=lazy + referrerpolicy=same-origin",
 check("iframe carries Arabic title 'الأقساط الشهرية'",
       'title="الأقساط الشهرية"' in SRC)
 check("standalone visit redirects to /parent/legacy",
-      # Look inside the payments handler specifically for the redirect
-      # (G20a.3 evaluations also has a redirect — we want both to exist
-      # but make sure ours uses iframe_url).
-      "return redirect(iframe_url)" in SRC
-      and SRC.count("return redirect(iframe_url)") >= 2)
+      # G20g originally redirected to iframe_url (which carried
+      # embed=1). G20m.2 split the URLs: the iframe still uses
+      # iframe_url (embed=1, hides duplicate back-button per G20i),
+      # but the standalone redirect uses standalone_url (no
+      # embed=1) so the back-button is visible on full-page mobile
+      # nav. Both payments + evaluations follow the same pattern,
+      # so we expect two `return redirect(standalone_url)` lines.
+      "return redirect(standalone_url)" in SRC
+      and SRC.count("return redirect(standalone_url)") >= 2)
 
 
 # ── Legacy page preserved (iframe target) ──────────────────────
