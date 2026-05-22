@@ -21,6 +21,13 @@ What the operator (mindex.bh@gmail.com) has been focused on over time. Maintaine
 
 ## Recurring patterns
 
+### "Feature stopped showing things to parents" → check the visibility gate FIRST
+Three back-to-back NOT-A-BUG investigations on 2026-05-22 night converged on the same shape: operator's mental model is "the OLD design showed X to parents/users", investigation reveals the OLD design also had the same gate, and the actual problem is a workflow step (admin publish click, approval rhythm, etc.) that wasn't happening. Documented cases:
+- **G20 round 1+2** (cart submissions): pending-redemption rows looked suspicious; turned out to be `admin_on_behalf` + pre-G15 legacy rows. Live-watch probe (poll `MAX(redemptions.id)` for 3-5 minutes during a controlled test) instantly disambiguated frontend-silent-failure vs backend-issue.
+- **G20h** (evaluations not visible to parents): 156 of 157 evals on prod were sitting with `released_to_parent=0` (draft state, documented as an intentional admin-review gate). Bulk-released via existing endpoint; no code change.
+
+**Diagnostic recipe** when the next operator reports "feature stopped showing X to parents/users": (a) does a row exist at all in the source table? (b) is its release/visibility/status flag set as the read endpoint expects? (c) is the filter on the read endpoint behaving as documented? Code regression is the LAST hypothesis, not the first. The visibility gates are usually well-documented in CLAUDE.md — search there before assuming a regression.
+
 ### "Auto-accept all, bypass mode active"
 The operator frequently prefixes large requests with autonomy declarations: "Auto-accept all", "Bypass mode active", "Don't ask permission between steps". They want the assistant to ship end-to-end without prompting for clarification on intermediate steps.
 

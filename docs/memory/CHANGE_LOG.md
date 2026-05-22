@@ -752,6 +752,47 @@ Files touched: `app.py` (3 surgical edits: `DELETE` endpoint stock-restore logic
 
 Diagnostic pattern worth carrying forward: **stock=0 after a recent G20e cleanup → check whether the operator approved a test purchase before deleting.** The OLD G20e endpoint shape (pre-G20f.2) left stock off-by-one if the deleted row was `pending` or `delivered`. The fix has been in place since `9cebcf1`; any earlier cleanups may need manual stock restoration via the rewards PATCH endpoint. Out-of-stock and unaffordable are NOT the same state visually anymore — orange `نفد المخزون` = inventory issue (fix in admin); red `نقاطك غير كافية` = student needs more points.
 
+| Hash | Title |
+|---|---|
+| `a491ea8` | fix(parent-portal): G20g wrap payments tab in iframe to /parent/legacy |
+
+#### Feature wave: G20g parent-portal — installment-payment flow restored via iframe-wrap of `/parent/legacy` (commit `a491ea8`)
+
+Shipped 2026-05-22, live on prod at `a491ea8`. Safety tags: `safety/pre-g20g-payments-iframe-2026-05-22` at `9cebcf1` (real pre-G20g rollback point) and `safety/pre-g20g-payments-iframe-20260522-045642` at `a491ea8` (safe_deploy bookmark).
+
+**Restored the parent installment-payment flow that was lost when `3ad90c1` retired V2.** Same Path B (iframe wrap) pattern as G20a.3 evaluations. One atomic commit + one hermetic test + one `safe_deploy` cycle.
+
+What is now true about the system:
+
+1. **`/portal/parent-hub/payments?inner=1`** returns a 493-byte iframe wrapper pointing at `/parent/legacy?pid=<student.personal_id>#section-payment`. The iframe uses the same `.pay-frame` CSS pattern as G20a.3's `.eval-frame`: `calc(100vh - 220px)` desktop, `calc(100vh - 180px)` mobile, min-height `560/480`, lazy loading, same-origin referrer policy, `title="الأقساط الشهرية"`.
+2. **`/portal/parent-hub/payments`** (no `?inner`) 302-redirects to `/parent/legacy?pid=...#section-payment` so nobody lands on the slim tab template by typing the URL.
+3. **The OLD rich payment flow at `/parent/legacy`** is now reachable inside the new parent-portal tab UX. Parents see the IBAN card (hardcoded `BH30BIBB00100002994768`), the installment picker, the receipt-upload form, and the "all paid" success state — same UI that's been in production use (the `parent_receipts` table has confirmed historical rows from real parents).
+4. **Backend untouched.** The complete chain — `POST /api/parent/upload-receipt` → `parent_receipts` table → admin `/api/admin/receipts` list + confirm/reject + file fetch — all still wired exactly as it was. The `is_remainder` dup-guard logic (which handles partial-payment follow-up uploads) is preserved.
+
+What's STILL missing (intentionally deferred to a future commit):
+- BenefitPay number (not in code yet; operator said they'll provide it later).
+- Labeled "Beneficiary: مايندكس" card (currently implicit via IBAN string only).
+- Admin-configurable IBAN/BenefitPay via `settings` table (Path A+ from G20g discovery; deferred).
+
+Operator-confirmed decisions (locked in during G20g discovery + implementation):
+- Path B chosen over Path A or A+ for speed and zero-risk. Same proven pattern as G20a.3.
+- BenefitPay restoration deferred to future work when the operator provides the number.
+- Hardcoded IBAN (`BH30BIBB00100002994768`) preserved exactly. No admin UI to edit it yet.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g20g.py` — 40 checks. Asserts the iframe wrapper, route redirect behavior, `.pay-frame` CSS, `/parent/legacy` still has the rich UI + the unchanged IBAN value, all 5 backend endpoints (upload + receipt-file + admin list/confirm/reject) still in `url_map`, `parent_receipts` schema columns intact, regression guards for every G20a/b/d/e/f surface.
+- All 12 smoke suites green (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a + G20b + G20d + G20f + G20g).
+
+Prod verification:
+- `/portal/parent-hub/payments?inner=1` → 200 OK, 493 chars, iframe markup deployed with correct deep-link.
+- `/portal/parent-hub/payments` (no `?inner`) → 302 redirect to `/parent/legacy?pid=TEST-STUDENT-0001#section-payment`.
+- `/parent/legacy?pid=TEST-STUDENT-0001` → 200 OK, 120K chars, IBAN value + IBAN card + upload card + installment picker + `ppUpload` JS + `/api/parent/upload-receipt` all present.
+- `/api/admin/receipts/count` → 200 `{ok:true, pending:0}`.
+
+Files touched: `app.py` (1 surgical edit: `portal_parent_hub_payments_page` route now returns iframe markup + redirects standalone visits); new `scripts/smoke_g20g.py`. No schema migrations. No backend route changes.
+
+**Pattern carry-forward — the Path B template for "V2-retirement regressions" is now fully proven.** G20a.3 (evaluations) + G20g (payments) establish the recipe: iframe-wrap the OLD rich surface from `/parent/legacy` or its sibling routes inside the new G12 tab pane via `?inner=1`. Standalone visit (no `?inner`) 302-redirects to the OLD URL. The `.pay-frame` / `.eval-frame` CSS is reusable verbatim (`calc(100vh - 220px)`, `560` desktop / `480` mobile min-height). Use when the OLD endpoints are alive on the backend and the OLD frontend markup still survives somewhere. Diagnostic recipe: grep `3ad90c1^1:app.py` for the OLD render functions; verify the backend endpoints are still in the `url_map`; check whether the legacy template (`PARENT_HTML` at `/parent/legacy`) still has the markup. If yes, iframe-wrap. If no, port the markup forward (Path A) or rebuild (only if backend is also gone).
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:

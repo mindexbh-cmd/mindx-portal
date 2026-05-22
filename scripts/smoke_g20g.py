@@ -60,7 +60,10 @@ check("route reads students.personal_id for the pid",
       SRC.count("SELECT personal_id FROM students WHERE id=?") >= 2)
 check("iframe_url = /parent/legacy?pid=...#section-payment",
       '"/parent/legacy?pid="' in SRC
-      and '"#section-payment"' in SRC)
+      # G20i: &embed=1 was appended before the hash; accept either
+      # the post-G20i combined string or the pre-G20i bare hash.
+      and ('"#section-payment"' in SRC
+           or '"&embed=1#section-payment"' in SRC))
 check("?inner=1 returns iframe markup with .pay-frame class",
       "<iframe class=\"pay-frame\"" in SRC)
 check(".pay-frame CSS sizes to viewport",
