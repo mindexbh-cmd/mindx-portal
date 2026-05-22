@@ -793,6 +793,38 @@ Files touched: `app.py` (1 surgical edit: `portal_parent_hub_payments_page` rout
 
 **Pattern carry-forward — the Path B template for "V2-retirement regressions" is now fully proven.** G20a.3 (evaluations) + G20g (payments) establish the recipe: iframe-wrap the OLD rich surface from `/parent/legacy` or its sibling routes inside the new G12 tab pane via `?inner=1`. Standalone visit (no `?inner`) 302-redirects to the OLD URL. The `.pay-frame` / `.eval-frame` CSS is reusable verbatim (`calc(100vh - 220px)`, `560` desktop / `480` mobile min-height). Use when the OLD endpoints are alive on the backend and the OLD frontend markup still survives somewhere. Diagnostic recipe: grep `3ad90c1^1:app.py` for the OLD render functions; verify the backend endpoints are still in the `url_map`; check whether the legacy template (`PARENT_HTML` at `/parent/legacy`) still has the markup. If yes, iframe-wrap. If no, port the markup forward (Path A) or rebuild (only if backend is also gone).
 
+| Hash | Title |
+|---|---|
+| `5a9f2d6` | fix(parent-portal): G20i hide duplicate back-buttons when embedded |
+
+#### Feature wave: G20i parent-portal — hide duplicate back-buttons inside G20a.3 + G20g iframes (commit `5a9f2d6`)
+
+Shipped 2026-05-22, live on prod at `5a9f2d6`. Safety tags: `safety/pre-g20i-hide-dup-buttons-2026-05-22` at `a491ea8` (real pre-G20i rollback point) and `safety/pre-g20i-hide-dup-back-buttons-20260522-053445` at `5a9f2d6` (safe_deploy bookmark).
+
+**Hid two duplicate back-buttons that were showing inside the G20a.3 (evaluations) and G20g (payments) iframes.** Hide-when-embedded pattern via a new `&embed=1` query flag. Single atomic commit + smoke + `safe_deploy` + prod verify.
+
+What is now true about the system:
+
+1. **G20g payments iframe** at `/portal/parent-hub/payments?inner=1` now sets its src to `/parent/legacy?pid=<pid>&embed=1#section-payment`. **G20a.3 evaluations iframe** at `/portal/parent-hub/evaluations?inner=1` now sets its src to `/parent/evaluations/view?pid=<pid>&embed=1`.
+2. **`/parent/legacy`** reads `request.args.get('embed')` and, when `==='1'`, injects a single `<style>#pp-back-btn{display:none !important;}</style>` rule just before `</head>`. The button itself (`#pp-back-btn`, "← العودة إلى القائمة الرئيسية") is still created by `addBackButton()` in the inline JS — we hide via CSS, never delete. Standalone visits (no flag) keep the button visible.
+3. **`/parent/evaluations/view`** follows the same pattern for `#pe-back-link` ("← رجوع") in the static topbar of `PARENT_EVALUATIONS_HTML`.
+4. **Verified on prod end-to-end:** standalone visits show the button; `&embed=1` visits hide it via the injected `<style>`. Both iframe wrappers now carry the flag.
+5. **Buttons remain alive in both templates** — only the rendering changes when `embed=1` is present. Removing the embed flag from either iframe URL would instantly restore the buttons. The hide rule is also defensive (only matches the exact button ID, doesn't affect any other nav).
+
+Operator-confirmed decisions (locked in during G20i implementation):
+- Hide-when-embedded, do **NOT** delete the buttons (standalone visits keep them).
+- Server-side `<style>` injection chosen over client-side JS toggle (no timing issues, simpler to reason about).
+- A single new commit covers both buttons + both iframe URLs + the smoke test.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g20i.py` — 24 checks. Source-level + Flask test-client probes. The test-client probe is novel for this codebase — uses `mod.app.test_client()` to GET `/parent/evaluations/view?pid=<real-pid>` with and without `?embed=1` and asserts the hide-CSS toggles correctly. **Pattern to remember: any future "behavior toggle based on a query flag" can reuse this test-client recipe instead of needing a full prod probe.**
+- **Updated**: `scripts/smoke_g20g.py` — one assertion was checking the OLD iframe URL pattern (`'"#section-payment"'` as a quoted standalone). Now accepts the post-G20i combined string (`'"&embed=1#section-payment"'`) OR the pre-G20i bare pattern, so the suite stays stable across this change.
+- All 13 smoke suites green (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a + G20b + G20d + G20f + G20g + G20i).
+
+Files touched: `app.py` (4 surgical edits: `/parent/legacy` route inject + `/parent/evaluations/view` route inject + G20g iframe URL + G20a.3 iframe URL); new `scripts/smoke_g20i.py`; `scripts/smoke_g20g.py` assertion update. No schema migrations. No backend route changes.
+
+**Pattern carry-forward — the "hide-when-embedded" recipe for iframe-duplicate-chrome.** When an iframe page has duplicate chrome (back button, header, etc.) that's only redundant inside the parent shell: (1) use a query flag (e.g. `?embed=1`) on the iframe src URL; (2) in the embedded page's route handler, read `request.args.get('embed')` and conditionally inject a targeted `<style>` rule (NOT a JS class toggle — no timing issues, no race conditions, and CSS applies even to dynamically-inserted DOM nodes like the `addBackButton()` pattern); (3) HIDE via CSS, never delete the element from the template — standalone visits must still work; (4) keep the selector laser-focused (single ID, not a broad class) to avoid hiding unintended elements; (5) test via Flask `test_client()`: GET with and without the flag, assert the hide-CSS toggles. Simpler than spinning up a prod probe for behavior changes.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
