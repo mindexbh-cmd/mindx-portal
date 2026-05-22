@@ -120,7 +120,12 @@ check("?inner=1 returns iframe HTML markup",
       "iframe class=\"eval-frame\"" in SRC
       or "<iframe class=\"eval-frame\"" in SRC)
 check("standalone visit redirects to old rich page",
-      "return redirect(iframe_url)" in SRC)
+      # G20a originally redirected to iframe_url. G20m.2 split the
+      # URLs so the iframe still uses iframe_url (carrying embed=1)
+      # but the standalone redirect uses standalone_url (no embed=1)
+      # so the legacy back-button stays visible on mobile full-page
+      # navigation.
+      "return redirect(standalone_url)" in SRC)
 check(".eval-frame CSS sizes to viewport",
       ".eval-frame{width:100%" in SRC
       and "height:calc(100vh - 220px)" in SRC)
