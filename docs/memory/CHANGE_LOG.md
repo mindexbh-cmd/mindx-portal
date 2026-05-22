@@ -670,6 +670,45 @@ Files touched: `app.py` (3 surgical edits to `PORTAL_STUDENT_HTML` + `POINTS_MAN
 
 One operational principle worth carrying forward: **when an operator reports a workflow regression, run a controlled end-to-end prod probe BEFORE assuming the code changed.** Two of three "the workflow is broken" reports in the G20 cycle turned out to be false positives caused by silent failure modes upstream of the workflow itself (zero-balance accounts hitting the affordability gate). The `verify_g20b_workflow.py` probe is now the diagnostic of record for this complaint class.
 
+| Hash | Title |
+|---|---|
+| `1153b09` | fix(parent-portal): G20d.1 headline = total − committed (not − reserved) |
+| `1b51793` | fix(points-manage): G20d.4 delivery checkbox + row stays visible |
+| `b0d56c2` | test(parent-portal): G20d.5 hermetic test for balance headline + delivery checkbox |
+| `f9163628` | test(smoke): update G19 assertion to accept G20d.1 headline change |
+
+#### Feature wave: G20d parent-portal — headline = "still-owned" + delivery checkbox stays visible (commits `1153b09` → `f9163628`)
+
+Shipped 2026-05-22, live on prod at `f9163628`. Safety tags: `safety/pre-g20d-balance-display-delivery-2026-05-22` at `b531c9b` (real pre-G20d rollback point) and `safety/pre-g20d-headline-delivery-20260522-033710` at `f9163628` (safe_deploy bookmark).
+
+**Two user-visible UX fixes per operator's clarified mental model. Backend untouched.**
+
+1. **Student rewards headline = `total − committed` (NOT `total − committed − reserved`).** A student with 217 earned and 160 in a pending cart-request now sees `217` as their headline, not `57`. The `requested` state (cart submission awaiting admin approval) no longer reduces the displayed number — it's a reservation, not a debit. Only when the admin approves (`requested → pending`, which grows `committed`) does the headline drop. The cart over-request gate, the G16.4 proactive cart-aware check, and the G20b.1 unaffordable-shading STILL consume `STATE.balance.available` (= total − committed − reserved) internally — so a student still can't queue requests beyond their truly-spendable pool. The smaller `.available` figure is hidden from the student; the larger `.total − .committed` figure is what they see.
+
+2. **`/points/manage` delivery row stays visible after click, with checkbox + button side-by-side.** Each row in the "في انتظار التسليم" tab now renders a `.pd-cb` checkbox alongside the `.pd-btn` button — both wired to `pdDeliver`. After a successful delivery the row stays in the list with the checkbox checked, the button in a gray disabled "✅ مُسلَّم" success state at `#9e9e9e` background, and `.pd-row` at `opacity: 0.75`. Only the badge count refreshes; no full list reload, no fade-out animation. Admins get visible confirmation their action took effect; the row drops naturally on the next page load (server filter excludes `status='delivered'`).
+
+What stays unchanged:
+- **Backend untouched.** `_g15_student_balance` still returns the 4-key `{total, committed, reserved, available}` dict — the renderer just consumes different fields. No schema migration. The `approve` / `reject` / `deliver` endpoints are unchanged — only the admin UI's delivery-row markup + post-click DOM behaviour changed.
+- All G14–G20b functionality preserved (G15.6 insufficient-balance modal, G16 cart surfaces, G19.2 single-number layout, G20a tab restorations, G20b unaffordable-shading + mandatory-reject).
+
+Operator decisions locked in (clarified during G20d discovery):
+- **Headline formula: `total − committed`.** Excludes `reserved`. Cart gates stay internal on `.available`.
+- **Delivery checkbox: row STAYS visible** with checked + gray success state. No fade-out. Only badge refresh, not full list reload.
+
+Prod verification:
+- `/portal/parent-hub/points` HTML probe: headline reads `(b.total - b.committed)`, `countUp` animates `_headlineNum` (renamed from `bavail`). NOT `b.available` or `bavail` anymore.
+- `/points/manage` HTML probe: `.pd-cb` checkbox + `.pd-btn` class + `.pd-row` marker + `سُلِّم` label + `✅ مُسلَّم` success-state string + `#9e9e9e` gray background all deployed.
+- End-to-end workflow probe re-ran on the new code (row #63 cycled `requested → pending → delivered` cleanly). Test row cleaned up via undeliver + cancel.
+
+Test infrastructure:
+- **New**: `scripts/smoke_g20d.py` — 40 checks. Asserts headline formula switched to `(b.total - b.committed)`, `countUp` animates `_headlineNum`, internal gates still use `.available`, balance helper arithmetic identity preserved (`available = total − committed − reserved`), checkbox + button + post-click gray-out, and regression guards for G14–G20b.
+- **Updated**: `scripts/smoke_g19.py` — two assertions adapted to accept the new headline consumer (`b.total`/`b.committed` instead of `b.available`; `_headlineNum` name instead of `bavail`).
+- All 10 smoke suites green (G12 + G13 + G14 + G15 + G16 + G17 + G19 + G20a + G20b + G20d).
+
+Files touched: `app.py` (2 surgical edits: `PORTAL_STUDENT_HTML` headline + `countUp`; `POINTS_MANAGE_HTML` `loadPendingDelivery` row markup + `pdDeliver` handler); new `scripts/smoke_g20d.py`; updated `scripts/smoke_g19.py`. No schema migrations. No backend route changes.
+
+One UX principle worth carrying forward: **when a single backend balance payload feeds both a display and a gate, pick a field per purpose — never mix.** The student-facing headline answers "what do I still own?" (`total − committed`); the cart gate answers "what can I still queue?" (`.available` = `total − committed − reserved`). Showing the smaller-of-the-two as the headline (as G19 did) caused operator confusion when reservations rolled in. The two-tier display is now the locked-in pattern. See ADR-036.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
