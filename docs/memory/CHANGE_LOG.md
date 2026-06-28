@@ -904,6 +904,42 @@ Files touched: `app.py` (new table, migration, helper, 5 write gates, 2 read end
 
 **Pattern carry-forward — kill-switch shape for future toggles.** Reuse this template for any future feature that needs an admin-controlled freeze: (1) one generic `feature_flags` table — DON'T add a hardcoded boolean column for each toggle; (2) server-side gate is the source of truth (return 503 with Arabic message on writes; `frozen:true` shape on reads); (3) UI styling communicates state but never enforces it — direct POSTs to the gated endpoint must still 503; (4) keep the surface visible (greyed/disabled) instead of hiding it, so users understand the feature exists and is temporarily closed; (5) admin toggle endpoint refuses unknown flag_keys to prevent typos polluting the table; (6) audit-log every flip via `updated_by_id` + `updated_at`. See ADR-039 for the rationale.
 
+- `30ee923` — fix(parent-portal): freeze ONLY the products grid, not the whole store (parent-portal · student-portal · kill-switch refit) — see BUGS_LOG entry below.
+
+#### Fix: surgical store-freeze scope + second-surface coverage (commit `30ee923`)
+
+Shipped 2026-06-28 to prod (https://mindx-portal-1.onrender.com). Refit of the b64dfba kill-switch after the operator caught two issues with the first iteration: (a) on `/parent/legacy` the whole `#ppStoreCard` greyed out, hiding the balance row, "قيد المراجعة" callouts, and rejection notices that are still useful while the store is closed; (b) the student-portal points page (`/portal/parent-hub/points`, `PORTAL_STUDENT_HTML`) wasn't gated at all — it consumes a different API set (`/api/points/rewards` + `/api/portal/student/cart/*`), so the b64dfba server gates silently missed it.
+
+**Server changes:**
+- `GET /api/parent/store/menu` — field renamed `frozen` → `store_frozen`; balance + pending_requests + recent_rejected populated even when frozen. Only `items.{food,toy}` blanked.
+- `GET /api/points/rewards` — new gate. Returns `{rows:[], store_frozen:true}` for role=student/parent sessions when flag is off. Admin/manager/teacher continue to see the full catalogue (this endpoint backs `/points/manage` which must keep working).
+- `GET /api/portal/student/cart` — surfaces `store_frozen:true`; cart contents preserved.
+- `POST /api/portal/student/cart/add` + `PUT .../cart/<cid>/quantity` + `DELETE .../cart/<cid>` + `POST .../cart/checkout` — all return 503 with Arabic "المتجر مغلق مؤقتاً" when frozen.
+
+**PARENT_HTML JS (`/parent/legacy`):**
+- `_ppRenderStoreFrozen` helper removed; folded into `_ppRenderStore`.
+- No more whole-card `.is-frozen` class. Balance row + pending + rejected + food/toy tabs render normally; only `.pp-store-grid` is swapped for the `.store-frozen-banner`.
+- Cart FAB still hidden in frozen state.
+
+**PORTAL_STUDENT_HTML JS (`/portal/parent-hub/points`):**
+- `STATE.storeFrozen` flag detected from rewards OR cart response.
+- Shop sub-pane: cat-tabs (وجبات / ألعاب) + banner shown in place of `.shop` grid. Balance / level / progress / sub-tabs (متجر / السلة / طلباتي) stay visible.
+- Cart sub-pane: banner shown above existing items; write APIs return 503 so the toast surfaces the closed-store message on any +/- or checkout attempt.
+- History sub-pane (طلباتي): untouched — existing requests + cancel buttons remain usable.
+- New `.store-frozen-banner` CSS rule shared by both surfaces.
+
+**Manual prod probes (2026-06-28):**
+- `GET /api/parent/store/menu` → `store_frozen:true` + balance + pending + rejected populated (confirmed)
+- `GET /api/points/rewards` (student session) → `store_frozen:true` + `rows=[]` (confirmed)
+- `GET /api/points/rewards` (admin session) → `store_frozen:false` + 49 rows (unaffected, confirmed)
+- `GET /api/portal/student/cart` (student) → `store_frozen:true` (confirmed)
+- `POST /api/portal/student/cart/add` (student) → 503 with "المتجر مغلق مؤقتاً" (confirmed)
+- e2e 8/8 pass locally
+
+Files touched: `app.py` only (+150/-84 LOC across the menu endpoint, two new gates on `/api/points/rewards` + cart endpoints, PARENT_HTML render branch, PORTAL_STUDENT_HTML load/render/CSS).
+
+No new ADR — ADR-039 from b64dfba already covers the architecture; this is a scope-correction within the same pattern.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:

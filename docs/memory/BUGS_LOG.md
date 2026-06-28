@@ -247,6 +247,28 @@ Format:
 - **Pattern recognised**: "pending redemption is already debited" UX trap. `approve` (requested → pending) IS the commitment point in G15's state machine, NOT `deliver`. Anyone investigating a balance complaint must verify pending-redemption rows before treating it as a bug. Future enhancement candidate: one-click "cancel + refund" shortcut on admin redemption row to make the proper fix easier than the manual-adjustment workaround.
 - **Commit**: `e51569e` (investigation probe) → `d314049` (UI revert) → `759a8d0` (hermetic test). Safety tag `safety/pre-g19-balance-investigation-2026-05-22` at `f49be4d`.
 
+### 2026-06-28: store kill-switch had too-broad UI scope AND missed the second consumer surface [parent-portal / student-portal / kill-switch]
+- **Symptom**: After the b64dfba store-freeze landed on prod, operator observed two regressions: (1) on `/parent/legacy` the entire `#ppStoreCard` was greyed out — balance row, "قيد المراجعة" pending callouts, and rejection notices all disappeared behind the `.is-frozen` opacity/grayscale veil even though those are still useful info while the store is closed; (2) the student-portal points page at `/portal/parent-hub/points` (`PORTAL_STUDENT_HTML`) was completely unaffected — students could still browse rewards, add to cart, and checkout. The b64dfba kill-switch was silently not protecting that page at all.
+- **Root cause**: Two distinct failures with one common root.
+  1. **UI scope was the whole card, not the action surface.** `loadStoreMenu` added `.is-frozen` to `#ppStoreCard` and `_ppRenderStoreFrozen` replaced the entire card body with a banner. Balance/pending/rejected callouts vanished. The freeze should communicate "no new orders" while preserving "here's what you have / what's in flight".
+  2. **Endpoint enumeration was incomplete.** The store has TWO consumer pages each with its own API set:
+     - `/parent/legacy` (PARENT_HTML) → `/api/parent/store/menu` + `/api/parent/store/request` + `/api/parent/cart/*` (gated by b64dfba)
+     - `/portal/parent-hub/points` (PORTAL_STUDENT_HTML) → `/api/points/rewards` + `/api/portal/student/cart/*` (NOT gated by b64dfba)
+     The original implementation gated only the parent-portal API set. The student-portal set was a wholly separate code path that nobody enumerated when designing the kill-switch.
+- **Fix** (commit `30ee923`, prod-verified 2026-06-28):
+  - Renamed `frozen` → `store_frozen` on `/api/parent/store/menu` response; populate balance + pending + rejected even when frozen. Only `items.{food,toy}` blanked.
+  - Added role-aware gate to `GET /api/points/rewards` — returns `{rows:[], store_frozen:true}` for role=student/parent when flag is off. Admin/manager/teacher still see the full catalogue (this endpoint also backs `/points/manage` which must keep working — DON'T blanket-gate it).
+  - Added `store_frozen:true` field to `GET /api/portal/student/cart`; cart contents preserved.
+  - All four `/api/portal/student/cart/*` write endpoints (add, quantity, delete, checkout) return 503 with Arabic "المتجر مغلق مؤقتاً" when frozen.
+  - PARENT_HTML JS: dropped whole-card `.is-frozen`. `_ppRenderStore` now swaps ONLY `.pp-store-grid` for the banner. Balance + pending + rejected + food/toy tabs render normally.
+  - PORTAL_STUDENT_HTML JS: `STATE.storeFrozen` detected from rewards OR cart response. Shop sub-pane keeps cat-tabs + sub-tabs visible, swaps `.shop` grid for banner. Cart sub-pane shows banner above existing items. History sub-pane (طلباتي) untouched.
+  - New `.store-frozen-banner` CSS class shared by both surfaces.
+- **Prevention**: 
+  - **Kill-switch design rule:** before merging any feature-flag gate, enumerate EVERY route that touches the gated resource grouped by consumer surface. If two pages consume the same logical feature via different endpoints, ALL endpoints need server-side gates. UI hiding alone is never sufficient — defense-in-depth at the route level is mandatory because direct API calls (curl, replay, JS console) bypass the UI.
+  - **Freeze scope rule:** the frozen UI surface should be the action surface only (the "add to cart" / "checkout" buttons), not the entire surrounding card. Keep informational widgets (balance, pending requests, rejection notices) visible. Users need to understand WHY they can't act, not have the whole feature vanish.
+  - **Pattern carry-forward for ADR-039 implementations:** when extending `feature_flags` to a new feature, audit `git grep` for every endpoint referencing the relevant table(s) and every JS render path that consumes those endpoints. Document the enumeration in the commit message.
+- **Commit**: `30ee923` (UI scope fix + second-surface coverage). Prod probes 2026-06-28: `/api/parent/store/menu` → `store_frozen:true` + balance/pending/rejected populated; `/api/points/rewards` (student) → `store_frozen:true` + rows=[]; `/api/points/rewards` (admin) → `store_frozen:false` + 49 rows (unaffected); `/api/portal/student/cart` (student) → `store_frozen:true`; `/api/portal/student/cart/add` (student) → 503 with "المتجر مغلق مؤقتاً". e2e 8/8 green. No new ADR — same architecture as ADR-039, scope-correction only.
+
 ## 2026-05 (earlier highlights — abbreviated)
 
 - Push admin-send endpoint visibility and history (May 14)
