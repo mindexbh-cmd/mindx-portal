@@ -677,6 +677,25 @@ Format:
   - 4 zombie usernames (`160412312`, `160807379`, `1940405392`, `170‪206963` with bidi) are now FREE on the `users.username` UNIQUE index — could be re-used in the future without collision.
 - **Reference**: data action only (no commit). Backup `backups/users_students_pre-linkage-fix-20260522-172934.json` (95 KB, 174 users + 4 affected students + 4 affected users with all columns including password hashes). Commit summary `backups/linkage-fix-path2-summary-20260522-174444.json`. Working script `scripts/_apply_linkage_fix.py`, verification script `scripts/_verify_linkage_fix.py`. Safety tag `safety/pre-linkage-fix-2026-05-22` at the pre-fix HEAD. CHANGE_LOG 2026-05-22 "Data action: parent-portal linkage repair" entry has the operational detail. Builds on ADR-023 (2026-05-16 orphan-backfill that created the original 30 accounts) by addressing the dependent-FK-decay that the backfill's `linked_student_id` choice left vulnerable to. Related: `_resolve_session_student_id` username-fallback chain (`f41d0ff` → `8b7ed35` → `e1c8c3d` → `9aa1bfe`) — the defense-in-depth that silently kept things working since the re-import broke direct linkage.
 
+### ADR-039: Generic `feature_flags` kill-switch table — server-side gate is the source of truth, UI styling is communication only
+- **Date**: 2026-06-28
+- **Status**: accepted
+- **Context**: Owner requested the parent-portal store be frozen at deploy time, with the ability to re-open it later without a code change. Two shapes were on the table: (a) a hardcoded boolean column on an existing table + a single ad-hoc admin endpoint per toggle, or (b) a generic `feature_flags(flag_key UNIQUE, is_enabled, …)` table reused by every future kill-switch. The freeze also needed to survive direct POSTs from a tampered DOM — pure UI greying-out was insufficient.
+- **Decision**: Ship the generic `feature_flags` table now. Seed `parent_portal.store_enabled=0` via migration tag `feature_flags_v1`. Gate writes server-side (503 on `POST /api/parent/store/request`, `POST/PUT/DELETE /api/parent/cart/*`, checkout) and let reads return `{ok:true, frozen:true, …}` so the UI keeps rendering the surface in a visibly-closed state. Admin endpoints (`GET /api/admin/feature-flags`, `PUT /api/admin/feature-flags/<flag_key>`) reuse the same table; new keys are added as INSERTs, no schema work per future toggle.
+- **Alternatives considered**:
+  - Hardcoded boolean column on a parent_portal settings row — every future toggle needs another column + another endpoint.
+  - Hide the store surface entirely while frozen — rejected because parents lose visibility that the feature still exists.
+  - Pure UI lockdown (disable buttons in JS only) — rejected because direct `curl` / tampered-DOM POSTs would still complete.
+  - Use the existing `settings` table — rejected because `settings` is keyed by `(page, component)` for typed admin-config values, not boolean kill-switches; mixing the two muddies the audit semantics.
+- **Consequences**:
+  - One generic table + one admin endpoint pair handles every future kill-switch with zero schema work.
+  - Server is the authoritative refusal point — UI styling is informative, not enforcing.
+  - Read endpoints adopting `{frozen:true}` shape (instead of 503 on read) means clients can render the closed state without an error-path branch.
+  - Every flag flip is audit-logged (`updated_at`, `updated_by_id`).
+  - Convention: flag_key is `<surface>.<feature>` (e.g. `parent_portal.store_enabled`); the admin endpoint refuses unknown keys (404) to prevent typo-driven phantom rows.
+  - Dual-path migration is mandatory — `init_db()` CREATE plus else-branch `CREATE TABLE IF NOT EXISTS` plus `feature_flags_v1` tag persisted in `schema_migrations` (per ADR-004).
+- **Reference**: commit `b64dfba` (rebased from pre-rebase `385ab00`); deployed 2026-06-28 to https://mindx-portal-1.onrender.com; admin endpoint `/api/admin/feature-flags`; helper `_feature_flag(db, flag_key, default=1)` near `get_setting()`; PARENT_HTML render branch `_ppRenderStoreFrozen` + `.is-frozen` CSS class. Related: ADR-004 (dual-path schema), ADR-017 (parent UX consolidation).
+
 ## Pending decision candidates (not yet resolved)
 
 - Bcrypt vs argon2id migration for `users.password` (currently sha256-no-salt — ADR-003 flagged)

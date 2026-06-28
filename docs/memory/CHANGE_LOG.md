@@ -860,6 +860,50 @@ Without this sync, every renumber leaves dependent FK columns stale. The existin
 
 (Optional, deferred: a "self-heal" hook inside `_resolve_session_student_id` that updates `linked_student_id` on every successful fallback resolution. Low-risk additive change; would have prevented this entire incident by self-healing each account on first login. Flagged for a separate decision — would write to `users` on every login so needs data-protector-agent sign-off.)
 
+### 2026-06-28
+
+- `b64dfba` — feat(parent-portal): add feature_flags + freeze store via kill-switch (parent-portal · schema · admin) — see ADR-039.
+
+#### Feature: generic feature_flags kill-switch + parent-portal store freeze (commit `b64dfba`)
+
+Shipped 2026-06-28 to prod (https://mindx-portal-1.onrender.com). Note: re-logged from pre-rebase hash `385ab00`; rebase onto `origin/main` reassigned the hash to `b64dfba`, same code/content. Migration `feature_flags_v1` applied on prod boot; admin endpoint `/api/admin/feature-flags` lists `parent_portal.store_enabled` with `is_enabled=0` (final state per owner request).
+
+**Schema:**
+- New table `feature_flags(id, flag_key UNIQUE, is_enabled, updated_at, updated_by_id)` + index on `flag_key`. Dual-path (init_db CREATE + else-branch `CREATE TABLE IF NOT EXISTS`).
+- Migration tag `feature_flags_v1` seeds `parent_portal.store_enabled=0` (disabled by default — owner explicitly wants the store frozen at deploy time).
+- Helper `_feature_flag(db, flag_key, default=1)` added near `get_setting()`; never raises, falls back to `default`.
+
+**Backend gates (Arabic 503 on writes when flag is off):**
+- `POST /api/parent/store/request`
+- `POST /api/parent/cart/add`
+- `PUT /api/parent/cart/<cid>/quantity`
+- `DELETE /api/parent/cart/<cid>`
+- `POST /api/parent/cart/checkout`
+
+**Read endpoints stay readable with `frozen:true` shape:**
+- `GET /api/parent/store/menu` — empty items array, balance preserved
+- `GET /api/parent/cart` — cart contents preserved, treated as read-only by UI
+
+**UI (PARENT_HTML):**
+- `loadStoreMenu` detects `frozen:true` → calls new `_ppRenderStoreFrozen` which paints a lock-icon banner ("المتجر مغلق مؤقتاً") and adds `.is-frozen` class (opacity .45, pointer-events:none, grayscale). Cart FAB hidden in frozen state. `requestStoreItem` early-exits with toast if DOM tampering re-enables a button (defence-in-depth — server gate is the authoritative refusal).
+
+**Admin endpoints:**
+- `GET /api/admin/feature-flags` — list flags + registry
+- `PUT /api/admin/feature-flags/<flag_key>` — flip 0|1, admin-only, refuses unknown keys (404), audit-logged
+
+**Manual prod probes (2026-06-28):**
+- `GET /api/parent/store/menu` → `frozen:true` payload (confirmed)
+- `POST /api/parent/store/request` → 503 (confirmed)
+- `POST /api/parent/cart/add` / `PUT .../quantity` / `DELETE` / `POST .../checkout` → 503 (confirmed)
+- Admin `PUT /api/admin/feature-flags/parent_portal.store_enabled` round-trips 0↔1 (confirmed)
+- Unknown flag_key → 404; no auth → 302 to login
+- e2e 8/8 pass
+- Final state left at `0` (frozen) per owner request
+
+Files touched: `app.py` (new table, migration, helper, 5 write gates, 2 read endpoints, 2 admin endpoints, PARENT_HTML render branch + CSS class).
+
+**Pattern carry-forward — kill-switch shape for future toggles.** Reuse this template for any future feature that needs an admin-controlled freeze: (1) one generic `feature_flags` table — DON'T add a hardcoded boolean column for each toggle; (2) server-side gate is the source of truth (return 503 with Arabic message on writes; `frozen:true` shape on reads); (3) UI styling communicates state but never enforces it — direct POSTs to the gated endpoint must still 503; (4) keep the surface visible (greyed/disabled) instead of hiding it, so users understand the feature exists and is temporarily closed; (5) admin toggle endpoint refuses unknown flag_keys to prevent typos polluting the table; (6) audit-log every flip via `updated_by_id` + `updated_at`. See ADR-039 for the rationale.
+
 ## How to append
 
 memory-keeper appends new entries here in passive-tracking mode (PostToolUse on `feat:`/`fix:`/`refactor:` commits). Format for a single-day entry:
